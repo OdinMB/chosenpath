@@ -1,38 +1,6 @@
 import { z } from "zod";
-import {
-  beatSchema,
-  beatArchiveSchema,
-  narrativeConsequenceSchema,
-} from "./beat";
-import { outcomeStatusEnum } from "./enums";
-
-// Individual schemas for better organization
-export const outcomeSchema = z
-  .object({
-    id: z
-      .string()
-      .describe(
-        "Use a short phrase with underscores, like 'murderer_found' or 'relationship_with_x'."
-      ),
-    question: z.string().describe("Question that defines the outcome"),
-    possibleOutcomes: z
-      .array(z.string())
-      .describe("List of potential outcomes or resolutions"),
-    status: outcomeStatusEnum.describe(
-      "Current state of the outcome in the narrative. Always starts with not_introduced."
-    ),
-  })
-  .describe(
-    "Outcome that (co-)defines the ending of the story. No intermediate outcomes, only elements of the ending.\n" +
-      "For exmaple: Is the murderer found ? Does the player stay loyal to X or follow Y instead?\n" +
-      "Only include outcomes that depend on the player's choices. Bad: 'What is the truth about X ?' (doesn't depend on player choicer). Good: 'Does the player find out the truth about X?'\n" +
-      "Questions and options must be specific. Bad: 'Personal and group relationships'. Good: 'What type of relationship to NPC X does the player character end up with?'"
-  );
-export const outcomesSchema = z
-  .array(outcomeSchema)
-  .describe(
-    "Outcomes that will make up the ending of the story. No intermediate outcomes, only elements of the ending."
-  );
+import { beatHistorySchema } from "./beat";
+import { outcomesSchema } from "./outcome";
 
 export const statSchema = z
   .object({
@@ -44,7 +12,6 @@ export const statSchema = z
     name: z
       .string()
       .describe("Name of the variable that will be displayed to the player."),
-
     type: z
       .enum(["number", "boolean", "string", "string[]"])
       .describe("Data type of the variable"),
@@ -56,7 +23,10 @@ export const statSchema = z
       .describe("Whether this stat should be visible to the player")
       .optional(),
   })
-  .describe("A variable that is tracked in the game state");
+  .describe(
+    "A variable that is tracked in the game state.\n" +
+      "Don't use stats to track progress toward outcomes. That will be done with narrative milestones."
+  );
 
 export const statsSchema = z
   .array(statSchema)
@@ -141,10 +111,8 @@ export const storyStateSchema = z.object({
   npcs: NPCsSchema,
   player: PCSchema,
   outcomes: outcomesSchema,
-  narrativeConsequences: z.array(narrativeConsequenceSchema),
-  beatArchive: beatArchiveSchema,
-  previousBeat: beatSchema.optional(),
-  currentBeat: beatSchema.optional(),
+  establishedFacts: z.array(z.string()),
+  beatHistory: beatHistorySchema,
   currentTurn: z.number(),
   maxTurns: z.number(),
 });

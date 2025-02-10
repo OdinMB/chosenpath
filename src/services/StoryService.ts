@@ -1,6 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { StoryState, storySetupSchema } from "../types/story";
-
 import { beatGenerationSchema, Beat } from "../types/beat";
 
 export class StoryService {
@@ -19,9 +18,19 @@ export class StoryService {
     try {
       const response = await structuredModel.invoke(
         `Create a setup for an interactive story based on this prompt: "${prompt}".
+        
         The entire story is supposed to play out over a course of 30 beats, with each beat consisting of about three paragraphs of text and a decision by the player.
-        Make sure that conflicts and outcomes can be explored in a satisfactory way within these 30 beats.
-        Generate enough locations and NPCs to make the story interesting, but not so many that they cannot be introduced and developed within the 30 beats.
+        Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make the story interesting, but not so many that they cannot be fully developed within the 30 beats.
+        Here are guidelines for a story with 30 beats:
+        - 3 conflicts
+        - 3 types of decisions
+        - 3 outcomes with 4 intended milestones each for resolution
+        - 5-6 NPCs / factions / organizations
+        - 4-6 stats for traits/skills/powers/dispositions of the player character. 
+        - 3-5 stats for relationships between the player character and the NPCs / factions / organizations (if relevant) (often strings work better for this than numbers)
+        - 1-3 stats for resources (if relevant)
+        - 2-3 stats for world elements that can be influenced by the player (e.g. tension between factions) (if relevant)
+        - 1-2 stats for pacing vehicles (if relevant) (e.g. number of remaining leads that can be investigated, invisible proximity of a bounty hunter, etc.)
         `
       );
       console.log(response);
@@ -41,7 +50,7 @@ export class StoryService {
       const response = await structuredModel.invoke(
         this.createBeatPrompt(state)
       );
-      console.log("Generated beat:", JSON.stringify(response, null, 2));
+      console.log("Plan:\n", response.plan);
       return response.beat;
     } catch (error) {
       console.error("Failed to generate next beat:", error);
@@ -50,6 +59,30 @@ export class StoryService {
   }
 
   private createBeatPrompt(state: StoryState): string {
+    const beatHistorySection = state.beatHistory
+      .map((beat, index) => {
+        const isLastBeat = index === state.beatHistory.length - 1;
+        const chosenOption =
+          beat.choice >= 0 ? beat.options[beat.choice] : null;
+
+        const formattedChanges = beat.changes
+          .map((change) => `- ${JSON.stringify(change)}`)
+          .join("\n");
+
+        return `Beat ${index + 1}:
+Applied changes:\n${formattedChanges}
+Summary: ${beat.summary}${
+          isLastBeat
+            ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
+            : ""
+        }${chosenOption ? `\nChosen option: ${chosenOption.text}` : ""}`;
+      })
+      .join("\n\n");
+
+    const hasUnintroducedOutcomes = state.outcomes.some(
+      (outcome) => outcome.milestones.length === 0
+    );
+
     const prompt = `Game state:
 
 STORY GUIDELINES
@@ -72,63 +105,68 @@ OUTCOMES that will define the story's ending:
 ${state.outcomes
   .map(
     (outcome) =>
-      `- id: ${outcome.id} (${outcome.status})
+      `id: ${outcome.id}
 ${outcome.question}
-Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}`
+Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}
+Milestones (${outcome.milestones.length} / ${
+        outcome.intendedNumberOfMilestones
+      } to resolution):
+${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
   )
-  .join("\n")}
+  .join("\n\n")}${
+      hasUnintroducedOutcomes
+        ? "\n\nNote: If an outcome has 0 milestones, it means that it hasn't yet been introduced to the player. When you introduce it, create a milestone to mark its introduction."
+        : ""
+    }
+
 
 STORY PROGRESS
 - Turn: ${state.currentTurn}/${state.maxTurns}
     
 CURRENT STATS:
 ${state.stats
-  .map((stat) => `- ${stat.name} (id: ${stat.id}): ${stat.value}`)
+  .map(
+    (stat) =>
+      `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${stat.value}${
+        stat.isVisible === false ? " (not visible to the player)" : ""
+      }`
+  )
   .join("\n")}
 
-STORY HISTORY:
-${state.beatArchive
-  .map(
-    (beat, index) =>
-      `Beat ${index + 1}: Summary: ${beat.summary}
-Choice: ${JSON.stringify(beat.choice)}`
-  )
-  .join("\n\n")}
-
-PREVIOUS BEAT (for continuity):
-${state.previousBeat?.text}
+BEAT HISTORY:
+${beatHistorySection}
 
 INSTRUCTIONS FOR NEXT BEAT:
-Each beat should do three things:
+Each beat must do five things:
 
-1. Give narrative feedback on the decisions made in the previous beat (except for the first beat).
-- Stat changes are already incorporated in the story state at this point but still have to be mentioned in the narrative.
-- If the player decided to meet someone, go to a location, etc., and the outcome of this decision is not yet clear, this next beat should be about that.
+1. Define changes to the story state based on the player's choice in the previous beat.
 
-2. Make Progress Towards Story Outcomes:
+2. Give narrative feedback so the player understands these changes (except when the affected stats are not visible to the player).
+
+3. Decide to continue the scene or thread of the previous beat or to start a new one.
+- If you added the final milestone to an outcome (number of milestones equals intended number of milestones), the outcome is resolved. Use this beat to give the resolution some gravity.
+
+4. Make Progress Towards Story Outcomes:
 - For 'not_introduced' outcomes: Consider introducing them through NPCs, events, or discoveries
-- For 'introduced' or 'in_progress' outcomes: Move them closer to resolution
+- For 'introduced' or 'in_progress' outcomes: Move them closer to resolution by creating scenes that lead to new milestones toward that outcome's resolution
 - Ensure progression feels natural within the story's context and pacing
 
-3. Develop World and Characters:
+5. Develop World and Characters:
 - Reveal new information about the world or NPCs
-- Deepen relationships between characters
+- Deepen relationships between the player character and other characters
 - Provide opportunities for meaningful stat changes
 - Reference and build upon previous story elements and choices
 
-Consider
+Consider the following:
+- the story's key conflicts and types of decisions
+- the status of outcomes, especially how many milestones are still missing for their resolution and the number of remaining beats
+- the player's stats and relationships
 - the previous beat to continue the story naturally
-- the story's key conflicts and types of decisions to shape the beat accordingly
-- the player's stats and relationships to influence the beat, the choices and their consequences
 
 Create an engaging beat with:
 - A descriptive title
-- 2-3 paragraphs of narrative text
-- 2-3 meaningful choices that affect:
-  * Story progression
-  * Character relationships
-  * Stats
-  * Outcome progression`;
+- 3-4 paragraphs of narrative text
+- 3 meaningful choices`;
 
     console.log("Beat generation prompt:\n", prompt);
     return prompt;

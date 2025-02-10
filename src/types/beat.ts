@@ -1,58 +1,8 @@
 import { z } from "zod";
-import { outcomeStatusEnum } from "./enums";
-
-export const statConsequenceSchema = z.object({
-  type: z.literal("stat"),
-  stat: z.string().describe("ID of the stat to modify"),
-  change: z
-    .enum([
-      "addNumber",
-      "subtractNumber",
-      "setNumber",
-      "setString",
-      "addElement",
-      "removeElement",
-    ])
-    .describe("Type of modification to apply"),
-  value: z
-    .union([z.number(), z.string(), z.boolean()])
-    .describe("Value to apply in the modification"),
-});
-
-export const narrativeConsequenceSchema = z.object({
-  type: z.literal("narrative"),
-  fact: z
-    .string()
-    .describe(
-      "An important change in the game world or story that will be tracked to influence the story from this point on.\n" +
-        "Don't use this if the information would be redundant with the option that was presented to the player or a stat change that is already mentioned in a different consequence.\n" +
-        "Bad: 'The player decided to confront X at their house' if the option is 'Confront X at their house'\n" +
-        "Good: 'The player gets lost on their way to X's house' (e.g. because of a bad orientation trait; not redundant with the option 'Confront X at their house')"
-    ),
-});
-
-export const outcomeStatusChangeSchema = z.object({
-  outcome: z.string().describe("The outcome that is being updated"),
-  newStatus: outcomeStatusEnum.describe("The new status of the outcome"),
-});
-export const outcomeStatusChangeConsequenceSchema =
-  outcomeStatusChangeSchema.extend({
-    type: z.literal("outcomeStatus"),
-  });
-
-export const beatConsequenceSchema = z.discriminatedUnion("type", [
-  statConsequenceSchema,
-  narrativeConsequenceSchema,
-  outcomeStatusChangeConsequenceSchema,
-]);
-
-export type BeatConsequence = z.infer<typeof beatConsequenceSchema>;
+import { changeSchema } from "./change";
 
 export const beatOptionSchema = z.object({
   text: z.string().describe("Text shown to player for this choice"),
-  consequences: z
-    .array(beatConsequenceSchema)
-    .describe("Effects that occur when this option is chosen"),
 });
 
 export const beatSchema = z.object({
@@ -74,22 +24,21 @@ export const beatSchema = z.object({
   options: z
     .array(beatOptionSchema)
     .describe("Available choices for the player"),
+  choice: z
+    .number()
+    .describe(
+      "Index of option chosen by the player. Always set to -1 initially."
+    ),
+  changes: z.array(changeSchema).describe(
+    `List of changes that will be applied to the story state.
+      Include all changes that happen because of the player's decision in the previous beat.
+      If you introduce an outcome without a milestone for the first time, create a milestone to mark its introduction.
+      Use newFact only as a backup. Try to track changes via stats and milestones first. The player's decisions are tracked anyway and don't have to be tracked via newFacts.
+      Remmeber that the player's decision for this beat will be processed in the next beat.`
+  ),
 });
-export type Beat = z.infer<typeof beatSchema>;
 
-export const pastBeatSchema = z.object({
-  summary: z.string(),
-  choice: beatOptionSchema,
-});
-export type PastBeat = z.infer<typeof pastBeatSchema>;
-export const beatArchiveSchema = z.array(pastBeatSchema).default([]);
-export type BeatArchive = z.infer<typeof beatArchiveSchema>;
-
-export const outcomeStatusChangesSchema = z
-  .array(outcomeStatusChangeSchema)
-  .describe(
-    "List of status changes of outcomes based on this story beat (regardless of the player's decision), e.g. because an outcome was introduced. Can be empty."
-  );
+export const beatHistorySchema = z.array(beatSchema).default([]);
 
 export const beatGenerationSchema = z.object({
   plan: z
@@ -98,6 +47,8 @@ export const beatGenerationSchema = z.object({
       "A detailed plan for the next beat, considering the previous beat, the story's key conflicts and types of decisions, and the player's stats and relationships."
     ),
   beat: beatSchema,
-  outcomeStatusChanges: outcomeStatusChangesSchema,
 });
+
+export type Beat = z.infer<typeof beatSchema>;
+export type BeatHistory = z.infer<typeof beatHistorySchema>;
 export type BeatGeneration = z.infer<typeof beatGenerationSchema>;

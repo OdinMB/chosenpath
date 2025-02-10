@@ -3,6 +3,8 @@ import { StoryInitializer } from "./components/StoryInitializer.tsx";
 import { GameLayout } from "./components/GameLayout.tsx";
 import { StorySetup, StoryState } from "./types/story";
 import { StoryService } from "./services/StoryService.ts";
+import { ChangeService } from "./services/ChangeService.ts";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 function createInitialState(setup: StorySetup): StoryState {
   return {
@@ -13,33 +15,61 @@ function createInitialState(setup: StorySetup): StoryState {
     player: setup.pc,
     currentTurn: 1,
     maxTurns: 30,
-    beatArchive: [],
-    currentBeat: undefined,
-    previousBeat: undefined,
-    narrativeConsequences: [],
+    beatHistory: [],
+    establishedFacts: [],
   };
 }
 
 function App() {
   const { setStoryState, setIsLoading, storyState } = useStory();
-  const storyService = new StoryService();
+  const storyService = useMemo(() => new StoryService(), []);
+  const changeService = useMemo(() => new ChangeService(), []);
+  const [shouldGenerateNextBeat, setShouldGenerateNextBeat] = useState(false);
 
-  const handleStorySetup = async (setup: StorySetup) => {
-    const initialState = createInitialState(setup);
-    setStoryState(initialState); // to move from the story initializer to the game layout
+  useEffect(() => {
+    const lastBeat =
+      storyState?.beatHistory?.[storyState.beatHistory.length - 1];
+    if (lastBeat && lastBeat.choice >= 0) {
+      // Only proceed if lastBeat exists and has a choice
+      setShouldGenerateNextBeat(true);
+    }
+  }, [storyState?.beatHistory]);
 
-    setIsLoading(true);
+  const getNextBeat = useCallback(async () => {
+    if (!storyState) return;
+
     try {
-      const firstBeat = await storyService.generateNextBeat(initialState);
-      setStoryState({
-        ...initialState,
-        currentBeat: firstBeat,
-      });
+      setIsLoading(true);
+      const beat = await storyService.generateNextBeat(storyState);
+
+      // Apply any changes from the beat generation itself
+      let updatedState = changeService.applyChanges(storyState, beat.changes);
+
+      // Add the new beat to history
+      updatedState = {
+        ...updatedState,
+        beatHistory: [...updatedState.beatHistory, beat],
+      };
+
+      setStoryState(updatedState);
     } catch (error) {
-      console.error("Error during story setup:", error);
+      console.error("Error during beat generation:", error);
     } finally {
       setIsLoading(false);
     }
+  }, [storyState, setIsLoading, setStoryState, storyService, changeService]);
+
+  useEffect(() => {
+    if (shouldGenerateNextBeat && storyState) {
+      setShouldGenerateNextBeat(false);
+      getNextBeat();
+    }
+  }, [shouldGenerateNextBeat, storyState, getNextBeat]);
+
+  const handleStorySetup = async (setup: StorySetup) => {
+    const initialState = createInitialState(setup);
+    setStoryState(initialState);
+    setShouldGenerateNextBeat(true);
   };
 
   const handleExitGame = () => {
@@ -47,8 +77,26 @@ function App() {
   };
 
   const handlePlayerChoice = async (optionIndex: number) => {
-    console.log("Player choice:", optionIndex);
-    return;
+    if (!storyState || !storyState.beatHistory.length) return;
+
+    try {
+      const currentBeat =
+        storyState.beatHistory[storyState.beatHistory.length - 1];
+
+      // Update the choice in the current beat
+      const updatedBeat = { ...currentBeat, choice: optionIndex };
+
+      // Apply consequences of the choice
+      const updatedState = storyState;
+
+      setStoryState({
+        ...updatedState,
+        currentTurn: updatedState.currentTurn + 1,
+        beatHistory: [...updatedState.beatHistory.slice(0, -1), updatedBeat],
+      });
+    } catch (error) {
+      console.error("Error during handlePlayerChoice:", error);
+    }
   };
 
   return (

@@ -8,23 +8,41 @@ interface Props {
 export function StoryDisplay({ onChoiceSelected }: Props) {
   const { storyState, isLoading } = useStory();
 
+  if (!storyState) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-600">Story state not initialized</div>
+      </div>
+    );
+  }
+
+  if (isLoading && storyState.beatHistory.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-600">
+          Generating your story's beginning...
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600">Generating story beat...</div>
+        <div className="text-gray-600">Generating next story beat...</div>
       </div>
     );
   }
 
-  if (!storyState?.currentBeat) {
+  const currentBeat = storyState.beatHistory[storyState.beatHistory.length - 1];
+
+  if (!currentBeat) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-600">No story beat to display</div>
+        <div className="text-gray-600">Your story is about to begin...</div>
       </div>
     );
   }
-
-  const { currentBeat } = storyState;
 
   return (
     <div className="space-y-8">
