@@ -23,21 +23,12 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
         <aside className="w-80 bg-white rounded-lg shadow-sm p-4 flex flex-col">
           {/* Character Section */}
           <section className="mb-6 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Character
+            <h2 className="text-xl font-semibold text-gray-900 mb-1 text-center">
+              {player.name}
             </h2>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-gray-900 font-medium">Name</span>
-                <span className="text-gray-700">{player.name}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="text-gray-900 font-medium">Pronouns</span>
-                <span className="text-gray-700">
-                  {player.pronouns.subject}/{player.pronouns.object}
-                </span>
-              </div>
-            </div>
+            <p className="text-gray-600 text-center">
+              {player.pronouns.subject}/{player.pronouns.object}
+            </p>
           </section>
 
           {/* Stats Section */}
