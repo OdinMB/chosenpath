@@ -1,26 +1,36 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { StoryState, storySetupSchema } from "../types/story";
-import { beatGenerationSchema, Beat } from "../types/beat";
-import { Image } from "../types/image";
 import OpenAI from "openai";
+import type { StoryState, StorySetup } from "../../../shared/types/story.js";
+import { storySetupSchema } from "../../../shared/types/story.js";
+import type { Beat } from "../../../shared/types/beat.js";
+import { beatGenerationSchema } from "../../../shared/types/beat.js";
+import type { Image } from "../../../shared/types/image.js";
+import { ChangeService } from "./ChangeService.js";
 
 export class StoryService {
   private model: ChatOpenAI;
   private openai: OpenAI;
+  private changeService: ChangeService;
 
   constructor() {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY environment variable is not set");
+    }
+
     this.model = new ChatOpenAI({
       modelName: "gpt-4o",
-      temperature: 0.5,
+      temperature: 0.4,
+      openAIApiKey: process.env.OPENAI_API_KEY,
     });
 
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      dangerouslyAllowBrowser: true, // Only for development!
     });
+
+    this.changeService = new ChangeService();
   }
 
-  async initializeStory(prompt: string) {
+  async initializeStory(prompt: string): Promise<StorySetup> {
     const structuredModel = this.model.withStructuredOutput(storySetupSchema);
 
     try {
@@ -41,8 +51,14 @@ export class StoryService {
         - 1-2 stats for pacing vehicles (if relevant) (e.g. number of remaining leads that can be investigated, invisible proximity of a bounty hunter, etc.)
         `
       );
-      console.log(response);
-      return response;
+
+      // Create initial story state
+      const initialState: StorySetup = {
+        ...response,
+      };
+
+      console.log("Story setup generated:", initialState);
+      return initialState;
     } catch (error) {
       console.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
@@ -59,8 +75,8 @@ export class StoryService {
         this.createBeatPrompt(state)
       );
 
-      console.log("Plan:\n", response.plan);
-      console.log("Image generation:\n", response.imageGeneration);
+      console.log("Plan:", response.plan);
+      console.log("Image generation:", response.imageGeneration);
 
       let image: Image | undefined;
       if (state.generateImages && response.imageGeneration) {
@@ -78,7 +94,7 @@ export class StoryService {
               url: imageResponse.data[0].url,
             };
           }
-          console.log("Image URL:\n", image?.url);
+          console.log("Image URL:", image?.url);
         } catch (error) {
           console.error("Failed to generate image:", error);
         }
@@ -88,6 +104,37 @@ export class StoryService {
     } catch (error) {
       console.error("Failed to generate next beat:", error);
       throw new Error("Failed to generate next beat. Please try again.");
+    }
+  }
+
+  async processPlayerChoice(
+    state: StoryState,
+    optionIndex: number
+  ): Promise<StoryState> {
+    try {
+      if (!state.beatHistory.length) return state;
+
+      const currentBeat = state.beatHistory[state.beatHistory.length - 1];
+      const updatedBeat = { ...currentBeat, choice: optionIndex };
+
+      let updatedState = {
+        ...state,
+        currentTurn: state.currentTurn + 1,
+        beatHistory: [...state.beatHistory.slice(0, -1), updatedBeat],
+      };
+
+      // Apply changes if the beat has them
+      if (updatedBeat.changes.length > 0) {
+        updatedState = this.changeService.applyChanges(
+          updatedState,
+          updatedBeat.changes
+        );
+      }
+
+      return updatedState;
+    } catch (error) {
+      console.error("Error in processPlayerChoice:", error);
+      throw error;
     }
   }
 
@@ -154,7 +201,6 @@ ${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
         : ""
     }
 
-
 STORY PROGRESS: Turn: ${state.currentTurn}/${state.maxTurns}
 
 IMAGES: ${
@@ -218,9 +264,7 @@ CREATE AN ENGAGING BEAT with:
 - 3-4 paragraphs of narrative text
 - 3 meaningful options for the player to choose from`;
 
-    console.log("Beat generation prompt:\n", prompt);
+    console.log("Beat generation prompt:", prompt);
     return prompt;
   }
 }
-
-export const storyService = new StoryService();

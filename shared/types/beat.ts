@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { changeSchema } from "./change";
-import { imageGenerationSchema } from "./image";
+import { changeSchema } from "./change.js";
+import { imageGenerationSchema } from "./image.js";
 
 export const beatOptionSchema = z.object({
   text: z.string().describe("Text shown to player for this choice"),
@@ -38,14 +38,13 @@ export const beatSchema = z.object({
   choice: z
     .number()
     .describe(
-      "Index of option chosen by the player. Always set to -1 initially."
+      "Index of the option chosen by the player. When generating a new beat, always set this -1 initially to indicate that no choice has been made yet."
     ),
   changes: z.array(changeSchema).describe(
     `List of changes that will be applied to the story state.
-      Include all changes that happen because of the player's decision in the previous beat.
-      If you introduce an outcome without a milestone for the first time, create a milestone to mark its introduction.
-      Use newFact only as a backup. Try to track changes via stats and milestones first. The player's decisions are tracked anyway and don't have to be tracked via newFacts.
-      Remmeber that the player's decision for this beat will be processed in the next beat.`
+    ONLY the following types are allowed: statChange, newMilestone, newFact!
+    Use newFact only as a backup. Try to track changes via statChange and newMilestone first.
+    The player's decisions are tracked anyway and don't have to be tracked via newFact.`
   ),
 });
 

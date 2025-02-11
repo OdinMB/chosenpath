@@ -1,12 +1,9 @@
 import { z } from "zod";
-import { beatHistorySchema } from "./beat";
-import { outcomesSchema } from "./outcome";
-import { statsSchema } from "./stat";
-import { imageLibrarySchema } from "./image";
-
-export const pronounSchema = z
-  .enum(["he/him", "she/her", "they/them"])
-  .describe("Character's preferred pronouns");
+import { imageLibrarySchema } from "./image.js";
+import { beatHistorySchema } from "./beat.js";
+import { statsSchema } from "./stat.js";
+import { NPCsSchema, PCSchema } from "./character.js";
+import { outcomesSchema } from "./outcome.js";
 
 export const guidelinesSchema = z
   .object({
@@ -32,35 +29,6 @@ export const guidelinesSchema = z
   })
   .describe("Story guidelines and parameters");
 
-export const NPCSchema = z
-  .object({
-    name: z.string().describe("NPC's name"),
-    role: z.string().describe("NPC's role in the story"),
-    pronouns: pronounSchema,
-    traits: z.array(z.string()).describe("NPC's defining traits"),
-  })
-  .describe("Important NPCs in the story.");
-
-export const NPCsSchema = z
-  .array(NPCSchema)
-  .describe(
-    "List of important NPCs in the story. Don't include the player character (main protagonist) in this list."
-  );
-
-export const PCSchema = z
-  .object({
-    name: z.string().describe("Player character's name"),
-    pronouns: pronounSchema,
-    fluff: z
-      .string()
-      .describe(
-        "Fluff text about the player character that will be referenced in the story. Make sure that this works for any gender and pronouns."
-      ),
-  })
-  .describe(
-    "Player character. Note that the player will be able to change the name and pronouns before the story begins."
-  );
-
 export const storyStateSchema = z.object({
   guidelines: guidelinesSchema,
   stats: statsSchema,
@@ -75,8 +43,6 @@ export const storyStateSchema = z.object({
   images: imageLibrarySchema,
 });
 
-export type StoryState = z.infer<typeof storyStateSchema>;
-
 export const storySetupSchema = z
   .object({
     guidelines: guidelinesSchema,
@@ -87,4 +53,5 @@ export const storySetupSchema = z
   })
   .describe("Initial setup for the story");
 
+export type StoryState = z.infer<typeof storyStateSchema>;
 export type StorySetup = z.infer<typeof storySetupSchema>;

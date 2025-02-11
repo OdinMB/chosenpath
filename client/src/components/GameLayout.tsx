@@ -1,6 +1,6 @@
-import { useStory } from "../context/storyContext";
-import { StoryDisplay } from "./StoryDisplay";
+import { useStory } from "../contexts/StoryContext";
 import { StatDisplay } from "./StatDisplay";
+import { StoryDisplay } from "./StoryDisplay";
 
 interface Props {
   onExitGame: () => void;

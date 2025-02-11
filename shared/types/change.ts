@@ -43,10 +43,14 @@ export const newMilestoneSchema = z.object({
   ),
 });
 
-export const changeSchema = z.discriminatedUnion("type", [
-  statChangeSchema,
-  newFactSchema,
-  newMilestoneSchema,
-]);
+export const changeSchema = z
+  .discriminatedUnion("type", [
+    statChangeSchema,
+    newFactSchema,
+    newMilestoneSchema,
+  ])
+  .describe(
+    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact!"
+  );
 
 export type Change = z.infer<typeof changeSchema>;

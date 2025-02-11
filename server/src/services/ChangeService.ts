@@ -1,13 +1,11 @@
-import type { Change } from "../types/change";
-import type { StoryState } from "../types/story";
+import type { Change } from "../../../shared/types/change.js";
+import type { StoryState } from "../../../shared/types/story.js";
 
 export class ChangeService {
   applyChanges(state: StoryState, changes: Change[]): StoryState {
     let updatedState = { ...state };
 
     for (const change of changes) {
-      // console.log("Applying change:", change);
-
       switch (change.type) {
         case "stat":
           updatedState = this.applyStatChange(updatedState, change);
@@ -62,7 +60,6 @@ export class ChangeService {
     }
 
     const stat = updatedStats[statIndex];
-    // console.log(`Modifying stat ${stat.id} with change type ${change.change}`);
 
     switch (change.change) {
       case "setBoolean":
@@ -79,7 +76,7 @@ export class ChangeService {
         break;
       case "addNumber":
       case "subtractNumber":
-        if (stat.type === "number") {
+        if (stat.type === "number" || stat.type === "percentage") {
           const delta = change.change === "addNumber" ? 1 : -1;
           const newValue =
             (stat.value as number) + delta * (change.value as number);
@@ -92,7 +89,7 @@ export class ChangeService {
         }
         break;
       case "setNumber":
-        if (stat.type === "number") {
+        if (stat.type === "number" || stat.type === "percentage") {
           console.log(`Setting number stat ${stat.id} to ${change.value}`);
           stat.value = change.value as number;
         }
