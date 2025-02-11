@@ -6,6 +6,8 @@ import type { Beat } from "../../../shared/types/beat.js";
 import { beatGenerationSchema } from "../../../shared/types/beat.js";
 import type { Image } from "../../../shared/types/image.js";
 import { ChangeService } from "./ChangeService.js";
+import dotenv from 'dotenv';
+dotenv.config();
 
 export class StoryService {
   private model: ChatOpenAI;
@@ -19,13 +21,10 @@ export class StoryService {
 
     this.model = new ChatOpenAI({
       modelName: "gpt-4o",
-      temperature: 0.4,
-      openAIApiKey: process.env.OPENAI_API_KEY,
+      temperature: 0.4
     });
 
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    this.openai = new OpenAI();
 
     this.changeService = new ChangeService();
   }
