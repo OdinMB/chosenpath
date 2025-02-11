@@ -1,50 +1,16 @@
-# React + TypeScript + Vite
+# ToDo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Fill with setup instructions with AI
 
-Currently, two official plugins are available:
+# Last Cursor message to pick up from laptop
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
-
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
-
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
-
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+Yes, exactly! WebSocket is a protocol that enables two-way communication between the client and server. Unlike HTTP requests which are one-off request/response cycles, WebSocket maintains an open connection that allows:
+Client to server messages (like regular requests)
+Server to client messages (push notifications) without the client having to ask for them
+Here's a typical flow:
+So your flow could be:
+Client makes HTTP request (choice or next beat) 2. Server sends immediate HTTP response (success/error)
+Server processes request asynchronously
+When ready, server pushes new state via WebSocket
+Client receives push notification and updates its state
+Would you like to see how to implement this pattern in your codebase?
