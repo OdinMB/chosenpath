@@ -48,6 +48,41 @@ export function StoryDisplay({ onChoiceSelected }: Props) {
     <div className="space-y-8">
       <div className="story-content">
         <h2 className="text-2xl font-bold mb-4">{currentBeat.title}</h2>
+
+        {storyState.generateImages && (
+          <div className="mb-6">
+            {currentBeat.imageId ? (
+              <figure className="relative">
+                <img
+                  src={
+                    storyState.images.find(
+                      (img) => img.id === currentBeat.imageId
+                    )?.url
+                  }
+                  alt={
+                    storyState.images.find(
+                      (img) => img.id === currentBeat.imageId
+                    )?.description
+                  }
+                  className="w-full rounded-lg"
+                />
+
+                <figcaption className="text-sm text-gray-500 mt-2">
+                  {
+                    storyState.images.find(
+                      (img) => img.id === currentBeat.imageId
+                    )?.description
+                  }
+                </figcaption>
+              </figure>
+            ) : (
+              <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+                <div className="text-gray-400">Generating image...</div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="prose prose-slate max-w-none">
           <ReactMarkdown>{currentBeat.text}</ReactMarkdown>
         </div>

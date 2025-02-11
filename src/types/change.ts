@@ -36,11 +36,11 @@ export const newMilestoneSchema = z.object({
   outcome: z
     .string()
     .describe("ID of the outcome that this new milestone will be added to."),
-  newMilestone: z
-    .string()
-    .describe(
-      "One sentence summarizing the event/decision/realization that moves the outcome closer to its resolution."
-    ),
+  newMilestone: z.string().describe(
+    `One sentence summarizing the event/decision/realization that marks significant progress toward the outcome's resolution.
+      Simple beat summarizes and player choices are already tracked elsewhere. Only add a milestone if it describes a big step toward the outcome's resolution, or a clear signal which resolution the story is moving toward.
+      Consider how many milestones are left to bring the outcome to a resolution. The remaining 2 milestones must be significant enough to move from the current status to a resolution.`
+  ),
 });
 
 export const changeSchema = z.discriminatedUnion("type", [

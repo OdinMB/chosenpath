@@ -1,55 +1,11 @@
 import { z } from "zod";
 import { beatHistorySchema } from "./beat";
 import { outcomesSchema } from "./outcome";
-
-export const statSchema = z
-  .object({
-    id: z
-      .string()
-      .describe(
-        "Unique identifier for the stat. Use a short phrase with underscores, like 'relationship_x'."
-      ),
-    name: z
-      .string()
-      .describe("Name of the variable that will be displayed to the player."),
-    type: z
-      .enum(["number", "boolean", "string", "string[]"])
-      .describe("Data type of the variable"),
-    value: z
-      .union([z.number(), z.boolean(), z.string(), z.array(z.string())])
-      .describe("Current value of the variable"),
-    isVisible: z
-      .boolean()
-      .describe("Whether this stat should be visible to the player")
-      .optional(),
-  })
-  .describe(
-    "A variable that is tracked in the game state.\n" +
-      "Don't use stats to track progress toward outcomes. That will be done with narrative milestones."
-  );
-
-export const statsSchema = z
-  .array(statSchema)
-  .describe(
-    "Stats to be tracked in the game state. Stats define how the story progresses, which choices the player has, and how outcomes can be tracked. Can include\n" +
-      "- Skills, areas of expertise, dispositions, health, special powers, etc. of the player character\n" +
-      "- Resources that the character can acquire and allocate, e.g. money, time, mental energy, fuel, bullets, etc.\n" +
-      "- Aspects of the world that can be influenced by the player, e.g. level of tension between factions, status of a spaceship, etc.\n" +
-      "- Relationships to NPCs, factions, organizations, or general reputation. (Important NPCs often deserve their own stat.)\n" +
-      "- Inventory, e.g. for special items, clues, or pieces of knowledge\n" +
-      "Only include stats that are relevant to the story. E.g. don't include 'age' or 'height' of the player character if they don't play a role in the story.\n" +
-      "Use numbers(0 - 100) for traits that can change granually over the course of the story, strings for qualitative summaries of statuses, or bools and lists of strings for traits that can be either true or false or that can be chosen from a list.\n" +
-      "Hide stats that the player shouldn't be able to see."
-  );
+import { statsSchema } from "./stat";
+import { imageLibrarySchema } from "./image";
 
 export const pronounSchema = z
-  .object({
-    subject: z.string().describe("Subject pronoun (e.g., 'he', 'she', 'they')"),
-    object: z.string().describe("Object pronoun (e.g., 'him', 'her', 'them')"),
-    possessive: z
-      .string()
-      .describe("Possessive pronoun (e.g., 'his', 'her', 'their')"),
-  })
+  .enum(["he/him", "she/her", "they/them"])
   .describe("Character's preferred pronouns");
 
 export const guidelinesSchema = z
@@ -115,6 +71,8 @@ export const storyStateSchema = z.object({
   beatHistory: beatHistorySchema,
   currentTurn: z.number(),
   maxTurns: z.number(),
+  generateImages: z.boolean(),
+  images: imageLibrarySchema,
 });
 
 export type StoryState = z.infer<typeof storyStateSchema>;

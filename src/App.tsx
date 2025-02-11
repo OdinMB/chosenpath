@@ -1,24 +1,10 @@
 import { useStory } from "./context/storyContext.ts";
 import { StoryInitializer } from "./components/StoryInitializer.tsx";
 import { GameLayout } from "./components/GameLayout.tsx";
-import { StorySetup, StoryState } from "./types/story";
+import { StoryState } from "./types/story";
 import { StoryService } from "./services/StoryService.ts";
 import { ChangeService } from "./services/ChangeService.ts";
 import { useState, useEffect, useCallback, useMemo } from "react";
-
-function createInitialState(setup: StorySetup): StoryState {
-  return {
-    guidelines: setup.guidelines,
-    outcomes: setup.outcomes,
-    stats: setup.stats,
-    npcs: setup.npcs,
-    player: setup.pc,
-    currentTurn: 1,
-    maxTurns: 30,
-    beatHistory: [],
-    establishedFacts: [],
-  };
-}
 
 function App() {
   const { setStoryState, setIsLoading, storyState } = useStory();
@@ -40,15 +26,17 @@ function App() {
 
     try {
       setIsLoading(true);
-      const beat = await storyService.generateNextBeat(storyState);
+      const response = await storyService.generateNextBeat(storyState);
+      const { image, ...beat } = response;
 
-      // Apply any changes from the beat generation itself
+      // Apply changes to the story state as specified by the beat
       let updatedState = changeService.applyChanges(storyState, beat.changes);
 
-      // Add the new beat to history
+      // Add the new beat to history and image if present
       updatedState = {
         ...updatedState,
         beatHistory: [...updatedState.beatHistory, beat],
+        images: image ? [...updatedState.images, image] : updatedState.images,
       };
 
       setStoryState(updatedState);
@@ -66,8 +54,21 @@ function App() {
     }
   }, [shouldGenerateNextBeat, storyState, getNextBeat]);
 
-  const handleStorySetup = async (setup: StorySetup) => {
-    const initialState = createInitialState(setup);
+  const handleStorySetup = async (prompt: string, generateImages: boolean) => {
+    const setup = await storyService.initializeStory(prompt);
+    const initialState: StoryState = {
+      guidelines: setup.guidelines,
+      outcomes: setup.outcomes,
+      stats: setup.stats,
+      npcs: setup.npcs,
+      player: setup.pc,
+      currentTurn: 1,
+      maxTurns: 30,
+      beatHistory: [],
+      establishedFacts: [],
+      generateImages,
+      images: [],
+    };
     setStoryState(initialState);
     setShouldGenerateNextBeat(true);
   };

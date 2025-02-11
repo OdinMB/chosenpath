@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useStory } from "../context/storyContext";
-import { storyService } from "../services/StoryService";
-import { StorySetup } from "../types/story";
 
 interface Props {
-  onSetup: (setup: StorySetup) => void;
+  onSetup: (prompt: string, generateImages: boolean) => void;
 }
 
 export function StoryInitializer({ onSetup }: Props) {
   const [prompt, setPrompt] = useState("");
+  const [generateImages, setGenerateImages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { setIsLoading, isLoading } = useStory();
 
@@ -20,8 +19,7 @@ export function StoryInitializer({ onSetup }: Props) {
     setIsLoading(true);
 
     try {
-      const setup = await storyService.initializeStory(prompt);
-      onSetup(setup);
+      onSetup(prompt, generateImages);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to initialize story"
@@ -42,6 +40,19 @@ export function StoryInitializer({ onSetup }: Props) {
           rows={4}
           placeholder="Enter your story prompt..."
         />
+
+        <div className="mb-4 flex items-center">
+          <input
+            type="checkbox"
+            id="generateImages"
+            checked={generateImages}
+            onChange={(e) => setGenerateImages(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="generateImages" className="ml-2 text-gray-700">
+            Generate images?
+          </label>
+        </div>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

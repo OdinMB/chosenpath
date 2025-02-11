@@ -1,5 +1,6 @@
 import { useStory } from "../context/storyContext";
 import { StoryDisplay } from "./StoryDisplay";
+import { StatDisplay } from "./StatDisplay";
 
 interface Props {
   onExitGame: () => void;
@@ -26,41 +27,29 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
             <h2 className="text-xl font-semibold text-gray-900 mb-1 text-center">
               {player.name}
             </h2>
-            <p className="text-gray-600 text-center">
-              {player.pronouns.subject}/{player.pronouns.object}
-            </p>
-          </section>
-
-          {/* Stats Section */}
-          <section className="mb-6 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Stats</h2>
-            <div className="space-y-2">
-              {visibleStats.map((stat) => (
-                <div
-                  key={stat.name}
-                  className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                >
-                  <span className="text-gray-900 font-medium">{stat.name}</span>
-                  <span className="text-gray-700">{String(stat.value)}</span>
-                </div>
-              ))}
-              {visibleStats.length === 0 && (
-                <div className="text-gray-500 italic">No stats available</div>
-              )}
-            </div>
+            <p className="text-gray-600 text-center">{player.pronouns}</p>
           </section>
 
           {/* Turn Counter Section */}
-          <section className="mb-6 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Turn Counter
+          <section className="mb-4 pb-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3 text-center">
+              Turn {currentTurn} / {maxTurns}
             </h2>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-              <span className="text-gray-900 font-medium">Current Turn</span>
-              <span className="text-gray-700">
-                {currentTurn} / {maxTurns}
-              </span>
-            </div>
+          </section>
+
+          {/* Stats Section */}
+          <section className="space-y-3">
+            {visibleStats.map((stat) => (
+              <StatDisplay
+                key={stat.id}
+                name={stat.name}
+                value={stat.value}
+                type={stat.type}
+              />
+            ))}
+            {visibleStats.length === 0 && (
+              <div className="text-gray-500 italic">No stats available</div>
+            )}
           </section>
 
           <button

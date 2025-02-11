@@ -62,7 +62,7 @@ export class ChangeService {
     }
 
     const stat = updatedStats[statIndex];
-    console.log(`Modifying stat ${stat.id} with change type ${change.change}`);
+    // console.log(`Modifying stat ${stat.id} with change type ${change.change}`);
 
     switch (change.change) {
       case "setBoolean":
