@@ -1,0 +1,14 @@
+{
+    "files.exclude": {
+        "**/node_modules": true
+    },
+    "explorer.excludeGitIgnore": false,
+    "files.watcherExclude": {
+        "**/node_modules": true
+    },
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.expand": false,
+    "explorer.fileNesting.patterns": {
+        ".config": "${capture}.*, package.json, package-lock.json, yarn.lock, pnpm-lock.yaml, .npmrc, .yarnrc, .nvmrc, tsconfig.json, tsconfig.*.json, .tsconfig.*, vite.config.*, *.config.js, *.config.ts, *.config.cjs, *.config.mjs, .postcssrc, postcss.config.*, .eslintrc.*, .prettierrc.*, .env, .env.*, .editorconfig, .gitignore"
+    }
+} 

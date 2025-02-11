@@ -14,3 +14,8 @@ Server processes request asynchronously
 When ready, server pushes new state via WebSocket
 Client receives push notification and updates its state
 Would you like to see how to implement this pattern in your codebase?
+
+# Feature backlog
+
+- Move to websocket only, with full states being pushed to the client
+- Select language (different ones for different players)
