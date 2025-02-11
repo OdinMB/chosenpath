@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const statChangeSchema = z.object({
-  type: z.literal("stat"),
+  type: z.literal("statChange"),
   stat: z.string().describe("ID of the stat to modify"),
   change: z
     .enum([

@@ -1,4 +1,6 @@
+// import React from "react";
 import { useStory } from "../contexts/StoryContext";
+import type { Beat } from "../../../shared/types/beat";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -9,7 +11,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   if (!storyState) return null;
 
-  const currentBeat = storyState.beatHistory[storyState.beatHistory.length - 1];
+  const currentBeat = storyState.beatHistory[
+    storyState.beatHistory.length - 1
+  ] as Beat;
   console.log("Current beat:", currentBeat);
   console.log("Story state:", storyState);
   const hasChoice = currentBeat?.choice === -1;

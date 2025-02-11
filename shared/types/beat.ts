@@ -34,12 +34,6 @@ export const beatSchema = z.object({
   options: z
     .array(beatOptionSchema)
     .describe("Available choices for the player"),
-
-  choice: z
-    .number()
-    .describe(
-      "Index of the option chosen by the player. When generating a new beat, always set this -1 initially to indicate that no choice has been made yet."
-    ),
   changes: z.array(changeSchema).describe(
     `List of changes that will be applied to the story state.
     ONLY the following types are allowed: statChange, newMilestone, newFact!
@@ -78,6 +72,9 @@ That said, if the player's early choices make an option unlikely or even impossi
     ),
 });
 
-export type Beat = z.infer<typeof beatSchema>;
+export type Beat = z.infer<typeof beatSchema> & {
+  choice: number;
+};
+
 export type BeatHistory = z.infer<typeof beatHistorySchema>;
 export type BeatGeneration = z.infer<typeof beatGenerationSchema>;

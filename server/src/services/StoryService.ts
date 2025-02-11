@@ -100,7 +100,18 @@ export class StoryService {
         }
       }
 
-      return { ...response.beat, image };
+      // Construct a proper Beat object with the choice field
+      const beatWithChoice: Beat = {
+        title: response.beat.title,
+        text: response.beat.text,
+        summary: response.beat.summary,
+        imageId: response.beat.imageId,
+        options: response.beat.options,
+        changes: response.beat.changes,
+        choice: -1,
+      };
+
+      return { ...beatWithChoice, image };
     } catch (error) {
       console.error("Failed to generate next beat:", error);
       throw new Error("Failed to generate next beat. Please try again.");
@@ -141,9 +152,12 @@ export class StoryService {
   private createBeatPrompt(state: StoryState): string {
     const beatHistorySection = state.beatHistory
       .map((beat, index) => {
+        const beatWithChoice = beat as Beat; // Cast to Beat type to access choice
         const isLastBeat = index === state.beatHistory.length - 1;
         const chosenOption =
-          beat.choice >= 0 ? beat.options[beat.choice] : null;
+          beatWithChoice.choice >= 0
+            ? beatWithChoice.options[beatWithChoice.choice]
+            : null;
 
         const formattedChanges = beat.changes
           .map((change) => `- ${JSON.stringify(change)}`)

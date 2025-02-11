@@ -3,6 +3,7 @@ import { StoryInitializer } from "./components/StoryInitializer";
 import { GameLayout } from "./components/GameLayout";
 import { useState, useEffect } from "react";
 import { apiService } from "./services/ApiService.js";
+import type { Beat } from "../../shared/types/beat";
 
 function App() {
   const { setStoryState, setIsLoading, storyState, sessionId, setSessionId } =
@@ -10,8 +11,9 @@ function App() {
   const [shouldGenerateNextBeat, setShouldGenerateNextBeat] = useState(false);
 
   useEffect(() => {
-    const lastBeat =
-      storyState?.beatHistory?.[storyState.beatHistory.length - 1];
+    const lastBeat = storyState?.beatHistory?.[
+      storyState.beatHistory.length - 1
+    ] as Beat;
     if (lastBeat && lastBeat.choice >= 0) {
       setShouldGenerateNextBeat(true);
     }
@@ -73,11 +75,19 @@ function App() {
 
       // Update the current beat with the player's choice
       const updatedBeatHistory = [...storyState.beatHistory];
-      const currentBeat = updatedBeatHistory[updatedBeatHistory.length - 1];
-      updatedBeatHistory[updatedBeatHistory.length - 1] = {
-        ...currentBeat,
+      const currentBeat = updatedBeatHistory[
+        updatedBeatHistory.length - 1
+      ] as Beat;
+      const updatedBeat: Beat = {
+        title: currentBeat.title,
+        text: currentBeat.text,
+        summary: currentBeat.summary,
+        imageId: currentBeat.imageId,
+        options: currentBeat.options,
+        changes: currentBeat.changes,
         choice: optionIndex,
       };
+      updatedBeatHistory[updatedBeatHistory.length - 1] = updatedBeat;
 
       setStoryState({
         ...storyState,

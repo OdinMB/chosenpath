@@ -7,7 +7,7 @@ export class ChangeService {
 
     for (const change of changes) {
       switch (change.type) {
-        case "stat":
+        case "statChange":
           updatedState = this.applyStatChange(updatedState, change);
           break;
         case "newFact":
@@ -49,7 +49,7 @@ export class ChangeService {
 
   private applyStatChange(
     state: StoryState,
-    change: Extract<Change, { type: "stat" }>
+    change: Extract<Change, { type: "statChange" }>
   ): StoryState {
     const updatedStats = [...state.stats];
     const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
