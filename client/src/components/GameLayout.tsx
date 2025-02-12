@@ -14,7 +14,7 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
     return null; // or some loading state if needed
   }
 
-  const { player, stats, currentTurn, maxTurns } = storyState;
+  const { player, stats } = storyState;
   const visibleStats = stats.filter((stat) => stat.isVisible !== false);
 
   return (
@@ -28,13 +28,6 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
               {player.name}
             </h2>
             <p className="text-gray-600 text-center">{player.pronouns}</p>
-          </section>
-
-          {/* Turn Counter Section */}
-          <section className="mb-4 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3 text-center">
-              Turn {currentTurn} / {maxTurns}
-            </h2>
           </section>
 
           {/* Stats Section */}
