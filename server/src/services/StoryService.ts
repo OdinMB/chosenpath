@@ -7,6 +7,7 @@ import { beatGenerationSchema } from "../../../shared/types/beat.js";
 import type { Image } from "../../../shared/types/image.js";
 import { ChangeService } from "./ChangeService.js";
 import dotenv from 'dotenv';
+import type { ImageGeneration } from "../../../shared/types/image.js";
 dotenv.config();
 
 export class StoryService {
@@ -64,9 +65,8 @@ export class StoryService {
     }
   }
 
-  async generateNextBeat(state: StoryState): Promise<Beat & { image?: Image }> {
-    const structuredModel =
-      this.model.withStructuredOutput(beatGenerationSchema);
+  async generateNextBeat(state: StoryState): Promise<Beat & { imageGeneration?: ImageGeneration }> {
+    const structuredModel = this.model.withStructuredOutput(beatGenerationSchema);
 
     try {
       console.log("Generating beat for turn:", state.currentTurn);
@@ -77,30 +77,8 @@ export class StoryService {
       console.log("Plan:", response.plan);
       console.log("Image generation:", response.imageGeneration);
 
-      let image: Image | undefined;
-      if (state.generateImages && response.imageGeneration) {
-        try {
-          const imageResponse = await this.openai.images.generate({
-            model: "dall-e-3",
-            prompt: response.imageGeneration.prompt,
-            n: 1,
-            size: "1792x1024",
-          });
-
-          if (imageResponse.data[0].url) {
-            image = {
-              ...response.imageGeneration,
-              url: imageResponse.data[0].url,
-            };
-          }
-          console.log("Image URL:", image?.url);
-        } catch (error) {
-          console.error("Failed to generate image:", error);
-        }
-      }
-
       // Construct a proper Beat object with the choice field
-      const beatWithChoice: Beat = {
+      const beatWithImageGen: Beat & { imageGeneration?: ImageGeneration } = {
         title: response.beat.title,
         text: response.beat.text,
         summary: response.beat.summary,
@@ -108,9 +86,10 @@ export class StoryService {
         options: response.beat.options,
         changes: response.beat.changes,
         choice: -1,
+        imageGeneration: response.imageGeneration
       };
 
-      return { ...beatWithChoice, image };
+      return beatWithImageGen;
     } catch (error) {
       console.error("Failed to generate next beat:", error);
       throw new Error("Failed to generate next beat. Please try again.");
@@ -158,12 +137,14 @@ export class StoryService {
             ? beatWithChoice.options[beatWithChoice.choice]
             : null;
 
-        const formattedChanges = beat.changes
+/*
+            const formattedChanges = beat.changes
           .map((change) => `- ${JSON.stringify(change)}`)
           .join("\n");
+          Applied changes:\n${formattedChanges}
+*/
 
         return `Beat ${index + 1}:
-Applied changes:\n${formattedChanges}
 Summary: ${beat.summary}${
           isLastBeat
             ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`

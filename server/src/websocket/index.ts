@@ -1,8 +1,10 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import type { StoryState } from "../../../shared/types/story.js";
+import type { ImageGeneration } from "../../../shared/types/image.js";
 import { StoryService } from "../services/StoryService.js";
 import { sessionService } from "../services/SessionService.js";
+import { imageService } from "../services/ImageService.js";
 
 interface GameClient {
   ws: WebSocket;
@@ -115,9 +117,12 @@ export class GameWebSocketServer {
                   beatHistory: [firstBeat]
                 };
                 
-                // Save and broadcast updated state
+                // Save and broadcast updated state with beat immediately
                 sessionService.updateSession(data.sessionId, stateWithBeat);
                 this.broadcastStateUpdate(data.sessionId, stateWithBeat);
+
+                // Handle image generation if needed
+                await this.handleImageGeneration(data.sessionId, stateWithBeat, firstBeat.imageGeneration);
                 
                 console.log('Story initialized with first beat for session:', data.sessionId);
               } catch (error) {
@@ -136,44 +141,14 @@ export class GameWebSocketServer {
                 break;
               }
 
-              try {
-                // Get current state
-                const currentState = sessionService.getSession(data.sessionId);
-                if (!currentState) {
-                  console.warn('No state found for session:', data.sessionId);
-                  break;
-                }
-
-                // Process the choice
-                const stateAfterChoice = await this.storyService.processPlayerChoice(
-                  currentState,
-                  data.payload.optionIndex
-                );
-                
-                // Generate next beat
-                const nextBeat = await this.storyService.generateNextBeat(stateAfterChoice);
-                
-                // Create final state with new beat
-                const finalState = {
-                  ...stateAfterChoice,
-                  beatHistory: [...stateAfterChoice.beatHistory, nextBeat]
-                };
-
-                // Save and broadcast the updated state
-                sessionService.updateSession(data.sessionId, finalState);
-                this.broadcastStateUpdate(data.sessionId, finalState);
-                
-                console.log('Choice processed and next beat generated for session:', data.sessionId);
-              } catch (error) {
-                console.error('Failed to process choice:', error);
-                ws.send(JSON.stringify({ 
-                  type: "error", 
-                  error: "Failed to process choice" 
-                }));
-              }
+              await this.handleMakeChoice(ws, data.sessionId, data.payload.optionIndex);
               break;
 
             case "exit_story":
+              if (!data.sessionId) {
+                console.warn('[WebSocket] Missing sessionId for exit_story');
+                break;
+              }
               console.log('[WebSocket] Exiting story for session:', data.sessionId);
               sessionService.updateSession(data.sessionId, null);
               this.broadcastStateUpdate(data.sessionId, null);
@@ -190,7 +165,67 @@ export class GameWebSocketServer {
     });
   }
 
-  broadcastStateUpdate(sessionId: string, state: StoryState) {
+  private async handleImageGeneration(
+    sessionId: string, 
+    state: StoryState, 
+    imageGeneration?: ImageGeneration
+  ): Promise<void> {
+    const lastBeat = state.beatHistory[state.beatHistory.length - 1];
+    if (state.generateImages && !lastBeat.imageId && imageGeneration) {
+      const image = await imageService.generateImage(imageGeneration);
+      if (image) {
+        // Update state with the new image
+        const stateWithImage = imageService.updateStateWithImage(state, image);
+        
+        // Save and broadcast the state update with the new image
+        sessionService.updateSession(sessionId, stateWithImage);
+        this.broadcastStateUpdate(sessionId, stateWithImage);
+      }
+    }
+  }
+
+  async handleMakeChoice(ws: WebSocket, sessionId: string, optionIndex: number) {
+    try {
+      // Get current state
+      const currentState = sessionService.getSession(sessionId);
+      if (!currentState) {
+        console.warn('No state found for session:', sessionId);
+        return;
+      }
+
+      // Process the choice
+      const stateAfterChoice = await this.storyService.processPlayerChoice(
+        currentState,
+        optionIndex
+      );
+      
+      // Generate next beat
+      const nextBeat = await this.storyService.generateNextBeat(stateAfterChoice);
+      
+      // Create initial state with new beat
+      let updatedState = {
+        ...stateAfterChoice,
+        beatHistory: [...stateAfterChoice.beatHistory, nextBeat]
+      };
+
+      // Save and broadcast the initial state update immediately
+      sessionService.updateSession(sessionId, updatedState);
+      this.broadcastStateUpdate(sessionId, updatedState);
+      
+      // Handle image generation if needed
+      await this.handleImageGeneration(sessionId, updatedState, nextBeat.imageGeneration);
+      
+      console.log('Choice processed and next beat generated for session:', sessionId);
+    } catch (error) {
+      console.error('Failed to process choice:', error);
+      ws.send(JSON.stringify({ 
+        type: "error", 
+        error: "Failed to process choice" 
+      }));
+    }
+  }
+
+  broadcastStateUpdate(sessionId: string, state: StoryState | null) {
     const client = this.clients.get(sessionId);
     if (!client?.ws) {
       console.warn('[WebSocket] Cannot broadcast: no client found for session:', sessionId);

@@ -7,21 +7,18 @@ interface GameSession {
 }
 
 export class SessionService {
-  private sessions: Map<string, GameSession>;
+  private sessions: Map<string, StoryState | null> = new Map();
+  private sessionTimes: Map<string, Date> = new Map();
   private readonly SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours instead of 1 hour
 
   constructor() {
-    this.sessions = new Map();
     this.setupCleanup();
   }
 
   createSession(): string {
     const sessionId = crypto.randomUUID();
-    this.sessions.set(sessionId, {
-      id: sessionId,
-      state: null,
-      lastUpdated: new Date()
-    });
+    this.sessions.set(sessionId, null);
+    this.sessionTimes.set(sessionId, new Date());
     console.log('[SessionService] Created session:', sessionId);
     return sessionId;
   }
@@ -33,17 +30,12 @@ export class SessionService {
       return null;
     }
     console.log('[SessionService] Retrieved session:', sessionId);
-    return session.state;
+    return session;
   }
 
-  updateSession(sessionId: string, state: StoryState): void {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      console.log('[SessionService] Cannot update: session not found:', sessionId);
-      return;
-    }
-    session.state = state;
-    session.lastUpdated = new Date();
+  updateSession(sessionId: string, state: StoryState | null): void {
+    this.sessions.set(sessionId, state);
+    this.sessionTimes.set(sessionId, new Date());
     console.log('[SessionService] Updated session:', sessionId);
   }
 
@@ -51,10 +43,11 @@ export class SessionService {
     setInterval(() => {
       const now = new Date().getTime();
       console.log('[SessionService] Running session cleanup');
-      for (const [id, session] of this.sessions) {
-        if (now - session.lastUpdated.getTime() > this.SESSION_TIMEOUT) {
+      for (const [id, lastUpdated] of this.sessionTimes) {
+        if (now - lastUpdated.getTime() > this.SESSION_TIMEOUT) {
           console.log('[SessionService] Cleaning up expired session:', id);
           this.sessions.delete(id);
+          this.sessionTimes.delete(id);
         }
       }
     }, 60 * 60 * 1000); // Still check every hour
