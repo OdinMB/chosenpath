@@ -151,7 +151,12 @@ export class GameWebSocketServer {
               }
               console.log('[WebSocket] Exiting story for session:', data.sessionId);
               sessionService.updateSession(data.sessionId, null);
-              this.broadcastStateUpdate(data.sessionId, null);
+              
+              // Send confirmation back to client
+              ws.send(JSON.stringify({ 
+                type: "exit_story_response",
+                sessionId: data.sessionId 
+              }));
               break;
           }
         } catch (error) {

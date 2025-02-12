@@ -13,7 +13,7 @@ export interface WSClientMessage {
 
 // Server -> Client messages
 export interface WSServerMessage {
-  type: "session_created" | "state_update" | "error";
+  type: "session_created" | "state_update" | "error" | "exit_story_response";
   sessionId?: string;
   state?: StoryState;
   error?: string;

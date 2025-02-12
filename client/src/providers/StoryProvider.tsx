@@ -10,21 +10,11 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Clear any existing handlers
     wsService.clearMessageHandlers();
 
-    // Set up message handlers
     wsService.onMessage("session_created", (data: WSServerMessage) => {
       if (data.type === "session_created" && data.sessionId) {
         console.log('[StoryProvider] Session created:', data.sessionId);
-        
-        // Clear previous state if this was due to session expiry
-        if (data.error === "Previous session expired") {
-          console.log('[StoryProvider] Previous session expired, clearing state');
-          setStoryState(null);
-          localStorage.removeItem('sessionId');
-        }
-        
         setSessionId(data.sessionId);
         localStorage.setItem('sessionId', data.sessionId);
         wsService.setSessionId(data.sessionId);
@@ -34,13 +24,19 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     wsService.onMessage("state_update", (data: WSServerMessage) => {
       if (data.type === "state_update" && data.state) {
         console.log('[StoryProvider] Received state update:', {
-          currentTurn: data.state.currentTurn,
-          beatHistoryLength: data.state.beatHistory.length,
-          lastBeat: data.state.beatHistory[data.state.beatHistory.length - 1],
-          sessionId: savedSessionId
+          state: data.state
         });
         setStoryState(data.state);
         setIsLoading(false);
+      }
+    });
+
+    wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
+      if (data.type === "exit_story_response") {
+        console.log('[StoryProvider] Story exit confirmed');
+        setStoryState(null);
+        setSessionId(null);
+        localStorage.removeItem('sessionId');
       }
     });
 
@@ -51,34 +47,15 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Set up connection handler
-    wsService.onOpen(() => {
-      console.log('[StoryProvider] WebSocket connected, checking for saved session');
-      const savedSessionId = localStorage.getItem('sessionId');
-      if (savedSessionId) {
-        console.log('[StoryProvider] Found saved session:', savedSessionId);
-        setSessionId(savedSessionId);
-        wsService.sendMessage({ type: "join", sessionId: savedSessionId });
-      } else {
-        console.log('[StoryProvider] No saved session, creating new one');
-        wsService.sendMessage({ type: "create_session" });
-      }
-    });
-
-    // Connect
+    // Connect to WebSocket
     const savedSessionId = localStorage.getItem('sessionId');
-    if (savedSessionId) {
-      console.log('[StoryProvider] Initializing with saved session:', savedSessionId);
-      setSessionId(savedSessionId); // Set sessionId during initial load
-    }
     wsService.connect(savedSessionId || undefined);
 
-    // Cleanup on unmount
     return () => {
       wsService.disconnect();
       wsService.clearMessageHandlers();
     };
-  }, []); // Empty dependency array
+  }, []); // Only run once on mount
 
   const value = {
     storyState,

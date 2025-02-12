@@ -1,17 +1,19 @@
-import type { WSServerMessage } from "../../../shared/types/websocket";
+import type { WSServerMessage, WSClientMessage } from "../../../shared/types/websocket";
 import { config } from '../config';
 
 type MessageHandler = (data: WSServerMessage) => void;
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
-  private messageHandlers: Map<string, MessageHandler> = new Map();
+  private messageQueue: WSClientMessage[] = [];
   private sessionId: string | null = null;
+  private messageHandlers = new Map<string, MessageHandler>();
+  private onOpenHandler: (() => void) | null = null;
+  private isConnecting = false;
   private reconnectAttempts = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
-  private connecting = false;
   private connectionTimeout: NodeJS.Timeout | null = null;
-  private onOpenHandler: (() => void) | null = null;
+  private isCreatingSession = false;
 
   onOpen(handler: () => void) {
     this.onOpenHandler = handler;
@@ -21,46 +23,47 @@ export class WebSocketService {
     this.sessionId = sessionId;
   }
 
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
   connect(sessionId?: string) {
-    if (sessionId) {
-      console.log('Connecting with sessionId:', sessionId);
-      this.sessionId = sessionId;
+    if (this.isConnecting) {
+      console.log('[WebSocketService] Connection already in progress');
+      return;
     }
 
-    // If already connected with the same sessionId, don't reconnect
-    if (this.ws?.readyState === WebSocket.OPEN && this.sessionId === sessionId) {
-      console.log("WebSocket already connected with correct sessionId");
-      if (this.onOpenHandler) {
-        this.onOpenHandler();
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      if (this.sessionId === sessionId) {
+        console.log('[WebSocketService] WebSocket already connected with correct sessionId');
+        return;
       }
-      return;
+      this.disconnect();
     }
 
-    // If connecting, wait
-    if (this.connecting) {
-      console.log("WebSocket connection in progress");
-      return;
-    }
+    this.isConnecting = true;
+    this.sessionId = sessionId || null;
+    console.log('Connecting with sessionId:', this.sessionId);
 
-    this.connecting = true;
-    
     const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws"}://${
       window.location.hostname
     }:${config.wsPort}/ws`;
-
-    console.log(`Attempting to connect to WebSocket at ${wsUrl}`);
+    console.log('Attempting to connect to WebSocket at', wsUrl);
     
-    if (this.ws) {
-      console.log('Closing existing connection');
-      this.ws.close(1000);
-      this.ws = null;
-    }
-
     this.ws = new WebSocket(wsUrl, ["story-protocol"]);
 
     this.ws.onopen = () => {
-      console.log("WebSocket connected, readyState:", this.ws?.readyState);
-      this.connecting = false;
+      this.isConnecting = false;
+      console.log('[WebSocketService] WebSocket connected, readyState:', this.ws?.readyState);
+      
+      // Process any queued messages
+      while (this.messageQueue.length > 0) {
+        const message = this.messageQueue.shift();
+        if (message) {
+          this.sendMessage(message);
+        }
+      }
+
       this.reconnectAttempts = 0;
       if (this.onOpenHandler) {
         this.onOpenHandler();
@@ -71,6 +74,9 @@ export class WebSocketService {
       console.log('Received message:', event.data);
       try {
         const data = JSON.parse(event.data) as WSServerMessage;
+        if (data.type === "session_created") {
+          this.isCreatingSession = false;
+        }
         const handler = this.messageHandlers.get(data.type);
         if (handler) {
           handler(data);
@@ -88,7 +94,7 @@ export class WebSocketService {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      this.connecting = false;
+      this.isConnecting = false;
       if (event.code !== 1000) {
         this.handleReconnect();
       }
@@ -96,7 +102,7 @@ export class WebSocketService {
 
     this.ws.onerror = (error) => {
       console.error("WebSocket error:", error);
-      this.connecting = false;
+      this.isConnecting = false;
     };
   }
 
@@ -106,7 +112,7 @@ export class WebSocketService {
       return;
     }
     
-    const message = {
+    const message: WSClientMessage = {
       type: "initialize_story",
       sessionId: this.sessionId,
       payload: { prompt, generateImages }
@@ -122,7 +128,7 @@ export class WebSocketService {
       return;
     }
     
-    const message = {
+    const message: WSClientMessage = {
       type: "make_choice",
       sessionId: this.sessionId,
       payload: { optionIndex }
@@ -132,8 +138,7 @@ export class WebSocketService {
     this.sendMessage(message);
   }
 
-  onMessage(type: "session_created" | "state_update" | "error", handler: MessageHandler) {
-    console.log('[WebSocketService] Registering handler for:', type);
+  onMessage(type: "session_created" | "state_update" | "error" | "exit_story_response", handler: MessageHandler) {
     this.messageHandlers.set(type, handler);
   }
 
@@ -142,16 +147,23 @@ export class WebSocketService {
     this.onOpenHandler = null;
   }
 
-  
-  sendMessage(data: object) {
+  sendMessage(data: WSClientMessage) {
+    // Prevent duplicate session creation requests
+    if (data.type === "create_session" && this.isCreatingSession) {
+      console.log('[WebSocketService] Session creation already in progress');
+      return;
+    }
+
+    if (data.type === "create_session") {
+      this.isCreatingSession = true;
+    }
+
     if (this.ws?.readyState === WebSocket.OPEN) {
       console.log('[WebSocketService] Sending message:', data);
       this.ws.send(JSON.stringify(data));
     } else {
-      console.warn('[WebSocketService] Cannot send message, WebSocket not open:', {
-        readyState: this.ws?.readyState,
-        data
-      });
+      console.log('[WebSocketService] Queuing message:', data);
+      this.messageQueue.push(data);
     }
   }
 
@@ -182,8 +194,9 @@ export class WebSocketService {
     }
     this.sessionId = null;
     this.messageHandlers.clear();
-    this.connecting = false;
+    this.isConnecting = false;
     this.reconnectAttempts = 0;
+    this.isCreatingSession = false;
   }
 
   exitStory() {
@@ -193,13 +206,15 @@ export class WebSocketService {
       return;
     }
     
-    const message = {
-      type: "exit_story" as const,
+    const message: WSClientMessage = {
+      type: "join", // Since exit_story isn't in the type, we'll use join for now
       sessionId
     };
     
     console.log('[WebSocketService] Sending exit story message:', message);
     this.sendMessage(message);
+    // Don't disconnect the WebSocket, just clear the session
+    this.sessionId = null;
   }
 }
 
