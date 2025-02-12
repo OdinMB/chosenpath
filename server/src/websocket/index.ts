@@ -172,6 +172,12 @@ export class GameWebSocketServer {
                 }));
               }
               break;
+
+            case "exit_story":
+              console.log('[WebSocket] Exiting story for session:', data.sessionId);
+              sessionService.updateSession(data.sessionId, null);
+              this.broadcastStateUpdate(data.sessionId, null);
+              break;
           }
         } catch (error) {
           console.error('[WebSocket] Error processing message:', error);

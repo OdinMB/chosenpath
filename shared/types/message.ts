@@ -30,7 +30,12 @@ export interface MakeChoiceMessage extends BaseMessage {
   };
 }
 
-export type ClientMessage = JoinMessage | InitializeStoryMessage | MakeChoiceMessage;
+export interface ExitStoryMessage extends BaseMessage {
+  type: "exit_story";
+  sessionId: string;
+}
+
+export type ClientMessage = JoinMessage | InitializeStoryMessage | MakeChoiceMessage | ExitStoryMessage;
 
 // Server -> Client messages
 export interface StateUpdateMessage extends BaseMessage {

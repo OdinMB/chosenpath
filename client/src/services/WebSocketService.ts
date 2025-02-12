@@ -185,6 +185,22 @@ export class WebSocketService {
     this.connecting = false;
     this.reconnectAttempts = 0;
   }
+
+  exitStory() {
+    const sessionId = this.sessionId;
+    if (!sessionId) {
+      console.warn('[WebSocketService] Cannot exit story: no sessionId');
+      return;
+    }
+    
+    const message = {
+      type: "exit_story" as const,
+      sessionId
+    };
+    
+    console.log('[WebSocketService] Sending exit story message:', message);
+    this.sendMessage(message);
+  }
 }
 
 export const wsService = new WebSocketService();

@@ -53,10 +53,10 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           </section>
 
           <button
-            className="mt-auto w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded transition-colors"
+            className="mt-auto text-gray-600 hover:text-red-600 transition-colors py-2 px-4 text-sm"
             onClick={onExitGame}
           >
-            Exit Game
+            Exit story
           </button>
         </aside>
 

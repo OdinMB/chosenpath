@@ -13,6 +13,7 @@ function App() {
   };
 
   const handleExitGame = () => {
+    wsService.exitStory();
     setStoryState(null);
     setSessionId(null);
   };
