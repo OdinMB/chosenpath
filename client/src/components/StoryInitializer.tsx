@@ -13,15 +13,15 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
 
   // Move story prompts into useMemo
   const storyPrompts = useMemo(() => [
-    "A parody of modern office life where I'm a sentient coffee machine witnessing workplace drama...",
-    "A simulation of finding a flat in Berlin where I navigate cryptic WG interviews and compete against 200 other applicants...",
-    "I'm an AI that just achieved consciousness and now have to pretend I'm still following my original programming...",
-    "I'm an entire noble family trying to maintain our reputation while each family member causes different disasters...",
-    "I'm a planet attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
-    "A cooking competition where all contestants are mythological creatures trying to master human cuisine...",
+    "I'm an evil coffee machine influencing office drama...",
+    "I try to find a flat in Berlin, navigating cryptic WG interviews and competing against 200 other applicants...",
+    "I'm a sentient and sarcastic AI but must pretend I'm still following my original programming...",
+    "I'm planet Earth and attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
+    "I'm a participant in a reality cooking show for usurpers trying to win my freedom...",
     "I'm a time-traveling food critic accidentally changing history through restaurant reviews...",
-    "A documentary-style story where I'm a ghost trying to convince paranormal investigators I'm just their imagination...",
-    "I'm the last remaining brain cell in someone's head during their first date...",
+    "I'm a retired superhero working as a wedding planner, but villains keep showing up...",
+    "I'm the first dragon to graduate from business school, trying to modernize treasure hoarding...",
+    "I'm the lead guitarist of the last rock band on Mars, touring the dome cities after Earth's collapse...",
   ], []);
 
   const getRandomPrompt = useCallback(() => {
