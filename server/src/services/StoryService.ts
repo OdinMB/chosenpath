@@ -280,4 +280,22 @@ CREATE AN ENGAGING BEAT with:
     console.log("Beat generation prompt:", prompt);
     return prompt;
   }
+
+  public async createInitialState(prompt: string, generateImages: boolean): Promise<StoryState> {
+    const setup = await this.initializeStory(prompt);
+    
+    return {
+      guidelines: setup.guidelines,
+      outcomes: setup.outcomes,
+      stats: setup.stats,
+      npcs: setup.npcs,
+      player: setup.pc,
+      currentTurn: 1,
+      maxTurns: 30,
+      beatHistory: [],
+      establishedFacts: [],
+      generateImages,
+      images: [],
+    };
+  }
 }

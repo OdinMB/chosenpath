@@ -1,4 +1,4 @@
-import { useStory } from "../contexts/StoryContext";
+import { useStory } from "../hooks/useStory";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 

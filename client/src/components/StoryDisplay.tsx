@@ -1,5 +1,5 @@
 // import React from "react";
-import { useStory } from "../contexts/StoryContext";
+import { useStory } from "../hooks/useStory";
 import type { Beat } from "../../../shared/types/beat";
 
 interface StoryDisplayProps {
@@ -55,7 +55,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               {currentBeat.options.map((option, index) => (
                 <button
                   key={index}
-                  onClick={() => onChoiceSelected(index)}
+                  onClick={() => {
+                    console.log("[StoryDisplay] Option selected:", {
+                      index,
+                      optionText: option.text
+                    });
+                    onChoiceSelected(index);
+                  }}
                   disabled={isLoading}
                   className="choice-button w-full p-3 text-left border rounded hover:bg-gray-100 disabled:opacity-50"
                 >
