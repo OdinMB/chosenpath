@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useStory } from "../hooks/useStory";
 
 interface StoryInitializerProps {
@@ -8,7 +8,42 @@ interface StoryInitializerProps {
 export function StoryInitializer({ onSetup }: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
+  const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(new Set());
   const { isLoading } = useStory();
+
+  // Move story prompts into useMemo
+  const storyPrompts = useMemo(() => [
+    "A parody of modern office life where I'm a sentient coffee machine witnessing workplace drama...",
+    "A simulation of finding a flat in Berlin where I navigate cryptic WG interviews and compete against 200 other applicants...",
+    "I'm an AI that just achieved consciousness and now have to pretend I'm still following my original programming...",
+    "I'm an entire noble family trying to maintain our reputation while each family member causes different disasters...",
+    "I'm a planet attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
+    "A cooking competition where all contestants are mythological creatures trying to master human cuisine...",
+    "I'm a time-traveling food critic accidentally changing history through restaurant reviews...",
+    "A documentary-style story where I'm a ghost trying to convince paranormal investigators I'm just their imagination...",
+    "I'm the last remaining brain cell in someone's head during their first date...",
+  ], []);
+
+  const getRandomPrompt = useCallback(() => {
+    const availableIndices = storyPrompts
+      .map((_, index) => index)
+      .filter(index => !usedPromptIndices.has(index));
+
+    // If all prompts have been used, reset the used indices
+    if (availableIndices.length === 0) {
+      setUsedPromptIndices(new Set());
+      return storyPrompts[Math.floor(Math.random() * storyPrompts.length)];
+    }
+
+    const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+    setUsedPromptIndices(prev => new Set(prev).add(randomIndex));
+    return storyPrompts[randomIndex];
+  }, [usedPromptIndices, storyPrompts]);
+
+  const handleSuggestion = () => {
+    const newPrompt = getRandomPrompt();
+    setPrompt(newPrompt);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,22 +53,32 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Create Your Story</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">Interactive Fiction Generator</h1>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label
-            htmlFor="prompt"
-            className="block text-lg font-semibold text-gray-900 mb-2"
-          >
-            What kind of story would you like to experience?
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label
+              htmlFor="prompt"
+              className="block text-base font-medium text-gray-700"
+            >
+              What kind of story would you like to experience?
+            </label>
+            <button
+              type="button"
+              onClick={handleSuggestion}
+              className="px-3 py-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors duration-200"
+              disabled={isLoading}
+            >
+              Get suggestion
+            </button>
+          </div>
           <textarea
             id="prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="w-full min-h-[120px] rounded-lg border border-gray-300 shadow-sm px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
-            placeholder="For example: A cyberpunk detective story where I'm investigating a mysterious disappearance..."
+            className="w-full min-h-[100px] rounded-lg border border-gray-300 shadow-sm px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            placeholder="For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief..."
             disabled={isLoading}
           />
         </div>
