@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useSession } from "../hooks/useSession.js";
+import { MAX_PLAYERS } from "../../../shared/config.js";
 
 interface StoryInitializerProps {
   onSetup: (prompt: string, generateImages: boolean, playerCount: number) => void;
@@ -115,7 +116,7 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
               id="player-count"
               type="range"
               min="1"
-              max="3"
+              max={MAX_PLAYERS}
               value={playerCount}
               onChange={(e) => setPlayerCount(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
@@ -123,7 +124,7 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
             />
             <div className="flex justify-between text-sm text-gray-500">
               <span>Single Player</span>
-              <span>3 Players</span>
+              <span>{MAX_PLAYERS} Players</span>
             </div>
           </div>
 

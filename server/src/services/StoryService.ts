@@ -7,8 +7,8 @@ import { ChangeService } from "./ChangeService.js";
 import dotenv from 'dotenv';
 import type { ImageGeneration } from "../../../shared/types/image.js";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
-import { PlayerCount } from "../../../shared/types/players.js";
-import { getPlayerNumbers } from "../../../shared/utils/playerUtils.js";
+import type { PlayerCount } from "../../../shared/types/players.js";
+import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 dotenv.config();
 
 export class StoryService {
@@ -38,12 +38,23 @@ export class StoryService {
   ): Promise<StoryState> {
     const setup = await this.initializeStory(prompt, playerCount);
     
+    // Create a record of all players from the setup
+    const players = Object.fromEntries(
+      getPlayerSlots(playerCount).map(slot => [
+        slot,
+        {
+          character: setup[slot].character,
+          outcomes: setup[slot].outcomes,
+          characterStats: setup[slot].characterStats,
+        }
+      ])
+    );
+
     return {
       guidelines: setup.guidelines,
-      outcomes: setup.player1.outcomes,
-      stats: setup.worldStats,
+      worldStats: setup.worldStats,
       npcs: setup.npcs,
-      player: setup.player1.character,
+      players,
       maxTurns: 30,
       beatHistory: [],
       establishedFacts: [],
@@ -81,11 +92,19 @@ export class StoryService {
       );
 
       console.log("Raw response:", response);
-      console.log("Player keys:", Object.keys(response).filter(key => key.startsWith('player')));
+      
+      const playerSlots = getPlayerSlots(playerCount);
+      const responsePlayerSlots = Object.keys(response).filter(key => key.startsWith('player'));
+      
+      if (responsePlayerSlots.length !== playerCount) {
+        throw new Error(`Expected ${playerCount} players but got ${responsePlayerSlots.length}`);
+      }
 
-      const playerKeys = Object.keys(response).filter(key => key.startsWith('player'));
-      if (playerKeys.length !== playerCount) {
-        throw new Error(`Expected ${playerCount} players but got ${playerKeys.length}`);
+      // Verify all expected player slots are present
+      for (const slot of playerSlots) {
+        if (!response[slot]) {
+          throw new Error(`Missing player data for ${slot}`);
+        }
       }
 
       const validated = schema.parse(response);

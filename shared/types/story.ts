@@ -4,7 +4,7 @@ import { beatHistorySchema } from "./beat.js";
 import { statsSchema, statSchema } from "./stat.js";
 import { NPCsSchema, PCSchema } from "./character.js";
 import { outcomesSchema } from "./outcome.js";
-import { PlayerCount, ExactPlayerMap } from "./players.js";
+import { PLAYER_SLOTS, ExactPlayerMap, PlayerCount } from "./players.js";
 
 export const guidelinesSchema = z
   .object({
@@ -53,12 +53,14 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   }).strict().describe("Initial setup for the story");
 };
 
+// Convert PLAYER_SLOTS array to tuple type for Zod
+const playerSlotsTuple = PLAYER_SLOTS as unknown as [string, ...string[]];
+
 export const storyStateSchema = z.object({
   guidelines: guidelinesSchema,
-  stats: statsSchema,
+  worldStats: statsSchema,
   npcs: NPCsSchema,
-  player: PCSchema,
-  outcomes: outcomesSchema,
+  players: z.record(z.enum(playerSlotsTuple), playerStateGenerationSchema),
   establishedFacts: z.array(z.string()),
   beatHistory: beatHistorySchema,
   maxTurns: z.number(),

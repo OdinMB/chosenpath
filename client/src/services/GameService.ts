@@ -1,12 +1,5 @@
 import { wsService } from "./WebSocketService";
-import type { PlayerCount } from "../../../shared/types/players.js";
-
-// Helper function to get valid player counts from the PlayerCount type
-const isValidPlayerCount = (count: number): count is PlayerCount => {
-  // Get array of valid player counts from PlayerCount type
-  const validCounts = [1, 2, 3] as const;
-  return validCounts.includes(count as PlayerCount);
-};
+import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
 
 class GameService {
   initializeStory(prompt: string, generateImages: boolean, playerCount: number) {
@@ -16,7 +9,7 @@ class GameService {
       return;
     }
     
-    // Validate playerCount using type guard
+    // Validate playerCount using utility function
     if (!isValidPlayerCount(playerCount)) {
       console.error('[GameService] Invalid player count:', playerCount);
       return;
