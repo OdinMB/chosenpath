@@ -24,13 +24,13 @@ function App() {
     }
   }, [sessionId]);
 
-  const handleStorySetup = (prompt: string, generateImages: boolean) => {
+  const handleStorySetup = (prompt: string, generateImages: boolean, playerCount: number) => {
     if (!sessionId) {
       console.warn('[App] Cannot initialize story: waiting for session');
       return;
     }
     setIsLoading(true);
-    gameService.initializeStory(prompt, generateImages);
+    gameService.initializeStory(prompt, generateImages, playerCount);
   };
 
   const handleExitGame = () => {

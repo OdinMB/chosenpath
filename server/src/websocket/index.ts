@@ -2,6 +2,7 @@ import { Server, Socket } from "socket.io";
 import http from "http";
 import { SessionService } from "../services/SessionService.js";
 import { GameHandler } from "../handlers/GameHandler.js";
+import { PlayerCount } from "../../../shared/types/players.js";
 import { config } from "../config/env.js";
 
 export class GameWebSocketServer {
@@ -48,8 +49,19 @@ export class GameWebSocketServer {
         }
       });
 
-      socket.on("initialize_story", async (data: { sessionId: string; prompt: string; generateImages: boolean }) => {
-        await gameHandler.initializeStory(data.sessionId, data.prompt, data.generateImages);
+      socket.on("initialize_story", async (data: { 
+        sessionId: string; 
+        prompt: string; 
+        generateImages: boolean;
+        playerCount: number;
+      }) => {
+        console.log('[WebSocket] Initializing story with data:', data);
+        await gameHandler.initializeStory(
+          data.sessionId, 
+          data.prompt, 
+          data.generateImages,
+          data.playerCount as PlayerCount
+        );
       });
 
       socket.on("make_choice", async (data: { sessionId: string; optionIndex: number }) => {

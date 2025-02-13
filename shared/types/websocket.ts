@@ -1,10 +1,11 @@
 import type { StoryState } from "./story.js";
+import type { PlayerCount } from "./players.js";
 
 // Client -> Server messages
 export type WSClientMessage =
   | { type: "create_session" }
   | { type: "join_session"; sessionId: string }
-  | { type: "initialize_story"; prompt: string; generateImages: boolean }
+  | { type: "initialize_story"; prompt: string; generateImages: boolean; playerCount: PlayerCount }
   | { type: "make_choice"; optionIndex: number }
   | { type: "exit_story" };
 

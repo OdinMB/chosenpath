@@ -32,14 +32,12 @@ export const statSchema = z
       ),
     isVisible: z
       .boolean()
-      .describe("Whether this stat should be visible to the player")
-      .optional(),
+      .describe("Whether this stat should be visible to the player"),
     hint: z
       .string()
       .describe(
         "Short hint on how you want this stat to be used. For example, 'If this falls below 30%, bad things should happen', or 'Reduce this by one for each gig that the band plays. Once it reaches 0, no more gigs are possible.'. Only visible to the AI, not the player. If the role is clear from the other attributes, leave this empty."
-      )
-      .optional(),
+      ),
   })
   .describe(
     "A variable that is tracked in the game state.\n" +

@@ -1,14 +1,10 @@
 import { z } from "zod";
 
-export const pronounSchema = z
-  .enum(["he/him", "she/her", "they/them", "it/its"])
-  .describe("Character's preferred pronouns");
-
 export const NPCSchema = z
   .object({
     name: z.string().describe("NPC's name"),
     role: z.string().describe("NPC's role in the story"),
-    pronouns: pronounSchema,
+    pronouns: z.string().describe("NPC's preferred pronouns"),
     traits: z.array(z.string()).describe("NPC's defining traits"),
   })
   .describe("Important NPC in the story.");
@@ -16,13 +12,13 @@ export const NPCSchema = z
 export const NPCsSchema = z
   .array(NPCSchema)
   .describe(
-    "List of important NPCs in the story. Don't include the player character (main protagonist) in this list."
+    "List of important NPCs in the story. Don't include the player characters (main protagonists) in this list."
   );
 
 export const PCSchema = z
   .object({
     name: z.string().describe("Player character's name"),
-    pronouns: pronounSchema,
+    pronouns: z.string().describe("Player character's preferred pronouns"),
     fluff: z
       .string()
       .describe(
@@ -30,5 +26,5 @@ export const PCSchema = z
       ),
   })
   .describe(
-    "Player character. Note that the player will be able to change the name and pronouns before the story begins."
+    "Basic player character info."
   );

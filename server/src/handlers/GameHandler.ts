@@ -3,6 +3,8 @@ import type { StoryState } from "../../../shared/types/story.js";
 import { StoryService } from "../services/StoryService.js";
 import { SessionService } from "../services/SessionService.js";
 import { ImageService } from "../services/ImageService.js";
+import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
+import type { PlayerCount } from "../../../shared/types/players.js";
 
 export class GameHandler {
   private sessionService: SessionService;
@@ -16,18 +18,24 @@ export class GameHandler {
     console.log('[GameHandler] Created new handler for socket:', socket.id);
   }
 
-  async initializeStory(sessionId: string, prompt: string, generateImages: boolean) {
+  async initializeStory(sessionId: string, prompt: string, generateImages: boolean, playerCount: number) {
     console.log('[GameHandler] Initializing story:', {
       sessionId,
       prompt,
       generateImages,
+      playerCount,
       socketId: this.socket.id
     });
 
     try {
+      if (!isValidPlayerCount(playerCount)) {
+        throw new Error(`Invalid player count: ${playerCount}`);
+      }
+
       const initialState = await this.storyService.createInitialState(
         prompt,
-        generateImages
+        generateImages,
+        playerCount as PlayerCount
       );
       console.log('[GameHandler] Created initial state');
       

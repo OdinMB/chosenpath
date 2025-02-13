@@ -2,12 +2,13 @@ import { useState, useCallback, useMemo } from "react";
 import { useSession } from "../hooks/useSession.js";
 
 interface StoryInitializerProps {
-  onSetup: (prompt: string, generateImages: boolean) => void;
+  onSetup: (prompt: string, generateImages: boolean, playerCount: number) => void;
 }
 
 export function StoryInitializer({ onSetup }: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
+  const [playerCount, setPlayerCount] = useState(1);
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(new Set());
   const { isLoading, isConnecting } = useSession();
 
@@ -48,7 +49,7 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    onSetup(prompt.trim(), generateImages);
+    onSetup(prompt.trim(), generateImages, playerCount);
   };
 
   return (
@@ -104,6 +105,26 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
             >
               Generate images for the story
             </label>
+          </div>
+
+          <div className="flex flex-col space-y-2 bg-gray-50 rounded-lg p-4">
+            <label htmlFor="player-count" className="text-base text-gray-700">
+              Number of Players: {playerCount}
+            </label>
+            <input
+              id="player-count"
+              type="range"
+              min="1"
+              max="3"
+              value={playerCount}
+              onChange={(e) => setPlayerCount(Number(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              disabled={isLoading}
+            />
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Single Player</span>
+              <span>3 Players</span>
+            </div>
           </div>
 
           <button

@@ -19,8 +19,8 @@ export const outcomeSchema = z
     milestones: z.array(z.string()).describe("Initially empty."),
   })
   .describe(
-    "Outcome that (co-)defines the ending of the story. No intermediate outcomes, only elements of the ending.\n" +
-      "For exmaple: Is the murderer found ? Does the player stay loyal to X or follow Y instead?\n" +
+    "Outcome that (co-)defines the ending of the story for this player. No intermediate outcomes, only elements of the ending.\n" +
+      "For exmaple: Is the murderer found? Does the player stay loyal to X or follow Y instead?\n" +
       "Only include outcomes that depend on the player's choices. Bad: 'What is the truth about X ?' (doesn't depend on player choicer). Good: 'Does the player find out the truth about X?'\n" +
       "Questions and options must be specific. Bad: 'Personal and group relationships'. Good: 'What type of relationship to NPC X does the player character end up with?'"
   );
@@ -28,5 +28,5 @@ export const outcomeSchema = z
 export const outcomesSchema = z
   .array(outcomeSchema)
   .describe(
-    "Outcomes that will make up the ending of the story. No intermediate outcomes, only elements of the ending."
+    "Outcomes that will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
   );
