@@ -4,9 +4,10 @@ import { MAX_PLAYERS } from "../../../shared/config.js";
 
 interface StoryInitializerProps {
   onSetup: (prompt: string, generateImages: boolean, playerCount: number) => void;
+  onBack: () => void;
 }
 
-export function StoryInitializer({ onSetup }: StoryInitializerProps) {
+export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
   const [playerCount, setPlayerCount] = useState(1);
@@ -128,13 +129,23 @@ export function StoryInitializer({ onSetup }: StoryInitializerProps) {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading || !prompt.trim() || isConnecting}
-            className="w-full py-3 px-4 rounded-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors duration-200"
-          >
-            {isLoading ? "Creating Story..." : "Create Story"}
-          </button>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-1/3 py-3 px-4 rounded-lg text-base font-medium text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+            >
+              Back
+            </button>
+            
+            <button
+              type="submit"
+              disabled={isLoading || !prompt.trim() || isConnecting}
+              className="w-2/3 py-3 px-4 rounded-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors duration-200"
+            >
+              {isLoading ? "Creating Story..." : "Create Story"}
+            </button>
+          </div>
         </form>
       )}
     </div>

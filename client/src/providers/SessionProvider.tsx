@@ -6,6 +6,7 @@ import { SessionContext } from "../contexts/SessionContext.js";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyState, setStoryState] = useState<StoryState | null>(null);
+  const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
@@ -49,6 +50,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    wsService.onMessage("story_codes", (data: WSServerMessage) => {
+      if (data.type === "story_codes") {
+        console.log('[SessionProvider] Received story codes:', data.codes);
+        // localStorage.setItem('storyCodes', JSON.stringify(data.codes));
+        setStoryCodes(data.codes);
+        setIsLoading(false);
+      }
+    });
+
     // Connect to WebSocket
     const savedSessionId = localStorage.getItem('sessionId');
     wsService.connect(savedSessionId || undefined);
@@ -67,6 +77,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     setIsLoading,
     isConnecting,
+    storyCodes,
   };
 
   return (

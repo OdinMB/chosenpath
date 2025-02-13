@@ -12,6 +12,7 @@ export type WSClientMessage =
 // Server -> Client messages
 export type WSServerMessage = 
   | { type: "session_created"; sessionId: string }
+  | { type: "story_codes"; codes: Record<string, string> }
   | { type: "state_update"; state: StoryState }
   | { type: "exit_story_response" }
   | { type: "error"; error: string }; 

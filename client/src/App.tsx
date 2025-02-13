@@ -5,11 +5,33 @@ import { wsService } from "./services/WebSocketService.js";
 import { gameService } from "./services/GameService.js";
 import { useEffect, useState } from "react";
 import { getCurrentTurn } from "../../shared/utils/storyUtils.js";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { PlayerCodes } from "./components/PlayerCodes";
+
+// Add this type at the top with the imports
+type ViewState = 'CONNECTING' | 'WELCOME' | 'SETUP' | 'PLAYER_CODES' | 'GAME';
 
 function App() {
-  const { setStoryState, setIsLoading, storyState, sessionId, setSessionId } =
-    useSession();
+  const { 
+    setStoryState, 
+    setIsLoading, 
+    storyState, 
+    sessionId, 
+    setSessionId,
+    storyCodes 
+  } = useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [viewState, setViewState] = useState<ViewState>('CONNECTING');
+  const [playerCode, setPlayerCode] = useState<string | null>(
+    localStorage.getItem('playerCode')
+  );
+
+  // Update initial view state based on connection
+  useEffect(() => {
+    if (sessionId && !storyState) {
+      setViewState(playerCode ? 'SETUP' : 'WELCOME');
+    }
+  }, [sessionId, storyState, playerCode]);
 
   useEffect(() => {
     if (!sessionId && !isCreatingSession && wsService.isConnected()) {
@@ -25,13 +47,22 @@ function App() {
     }
   }, [sessionId]);
 
-  const handleStorySetup = (prompt: string, generateImages: boolean, playerCount: number) => {
-    if (!sessionId) {
-      console.warn('[App] Cannot initialize story: waiting for session');
-      return;
+  // Update view state when codes are received
+  useEffect(() => {
+    if (storyCodes && viewState === 'SETUP') {
+      setViewState('PLAYER_CODES');
     }
+  }, [storyCodes, viewState]);
+
+  const handleStorySetup = (prompt: string, generateImages: boolean, playerCount: number) => {
     setIsLoading(true);
     gameService.initializeStory(prompt, generateImages, playerCount);
+  };
+
+  const handleCodeSubmit = (code: string) => {
+    setPlayerCode(code);
+    localStorage.setItem('playerCode', code);
+    setViewState('SETUP');
   };
 
   const handleExitGame = () => {
@@ -39,7 +70,14 @@ function App() {
     setStoryState(null);
     wsService.clearSession();
     setSessionId(null);
-    setIsCreatingSession(false);
+    setViewState('WELCOME');
+  };
+
+  const handleNewStory = () => {
+    setPlayerCode(null);
+    localStorage.removeItem('playerCode');
+    setStoryState(null);
+    setViewState('SETUP');
   };
 
   const handlePlayerChoice = (optionIndex: number) => {
@@ -56,30 +94,54 @@ function App() {
     gameService.makeChoice(optionIndex);
   };
 
-  // Only show loading state when creating initial session
-  if (!sessionId && isCreatingSession) {
-    return (
-      <div className="app flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Connecting...</p>
+  // Simplified view rendering
+  switch (viewState) {
+    case 'CONNECTING':
+      return (
+        <div className="app flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Connecting...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
 
-  return (
-    <div className="app">
-      {storyState ? (
-        <GameLayout
-          onExitGame={handleExitGame}
-          onChoiceSelected={handlePlayerChoice}
-        />
-      ) : (
-        <StoryInitializer onSetup={handleStorySetup} />
-      )}
-    </div>
-  );
+    case 'WELCOME':
+      return <WelcomeScreen onCodeSubmit={handleCodeSubmit} onNewStory={handleNewStory} />;
+
+    case 'SETUP':
+      return <StoryInitializer 
+        onSetup={handleStorySetup} 
+        onBack={() => setViewState('WELCOME')} 
+      />;
+
+      case 'PLAYER_CODES':
+        return storyCodes ? (
+          <PlayerCodes 
+            codes={storyCodes} 
+            onBack={() => setViewState('WELCOME')}
+            onCodeSubmit={handleCodeSubmit}
+          />
+        ) : (
+          <StoryInitializer 
+            onSetup={handleStorySetup}
+            onBack={() => setViewState('WELCOME')} 
+          />
+        );
+
+    case 'GAME':
+      return (
+        <div className="app">
+          <GameLayout
+            onExitGame={handleExitGame}
+            onChoiceSelected={handlePlayerChoice}
+          />
+        </div>
+      );
+
+    default:
+      return null;
+  }
 }
 
 export default App;

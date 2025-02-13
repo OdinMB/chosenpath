@@ -9,6 +9,7 @@ interface SessionContextType {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   isConnecting: boolean;
+  storyCodes: Record<string, string> | null;
 }
 
 export const SessionContext = createContext<SessionContextType>({
@@ -19,4 +20,7 @@ export const SessionContext = createContext<SessionContextType>({
   isLoading: false,
   setIsLoading: () => {},
   isConnecting: true,
-}); 
+  storyCodes: null,
+});
+
+export type { SessionContextType }; 

@@ -72,6 +72,15 @@ export class GameWebSocketServer {
         await gameHandler.exitStory(data.sessionId);
       });
 
+      socket.on("verify_code", async (code: string) => {
+        const state = gameHandler.verifyCode(code);
+        if (state) {
+          socket.emit("state_update", { state });
+        } else {
+          socket.emit("error", { error: "Invalid player code" });
+        }
+      });
+
       socket.on("disconnect", () => {
         console.log('[WebSocket] Client disconnected');
         for (const [sessionId, clientSocket] of this.clients.entries()) {

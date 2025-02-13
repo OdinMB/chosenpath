@@ -96,6 +96,15 @@ export class WebSocketService {
       }
     });
 
+    // Add handler for story_codes events
+    this.socket.on("story_codes", (data: { codes: Record<string, string> }) => {
+      console.log('[WebSocketService] Story codes received:', data);
+      const handler = this.messageHandlers.get("story_codes");
+      if (handler) {
+        handler({ type: "story_codes", codes: data.codes });
+      }
+    });
+
     // Handle exit_story_response events
     this.socket.on("exit_story_response", () => {
       const handler = this.messageHandlers.get("exit_story_response");
