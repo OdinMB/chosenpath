@@ -6,6 +6,8 @@ import { NPCsSchema, PCSchema } from "./character.js";
 import { outcomesSchema } from "./outcome.js";
 import { PLAYER_SLOTS, ExactPlayerMap, PlayerCount } from "./players.js";
 
+// GENERATION WITH LLM
+
 export const guidelinesSchema = z
   .object({
     settingElements: z
@@ -35,6 +37,7 @@ export const playerStateGenerationSchema = z.object({
   outcomes: outcomesSchema,
   characterStats: z.array(statSchema).describe("Stats belonging to this player character"),
 });
+export type PlayerStateGeneration = z.infer<typeof playerStateGenerationSchema>;
 
 export const createStorySetupSchema = (playerCount: PlayerCount) => {
   // Create a record of required player schemas based on player count
@@ -53,26 +56,33 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   }).strict().describe("Initial setup for the story");
 };
 
-// Convert PLAYER_SLOTS array to tuple type for Zod
-const playerSlotsTuple = PLAYER_SLOTS as unknown as [string, ...string[]];
-
-export const storyStateSchema = z.object({
-  guidelines: guidelinesSchema,
-  worldStats: statsSchema,
-  npcs: NPCsSchema,
-  players: z.record(z.enum(playerSlotsTuple), playerStateGenerationSchema),
-  establishedFacts: z.array(z.string()),
-  beatHistory: beatHistorySchema,
-  maxTurns: z.number(),
-  generateImages: z.boolean(),
-  images: imageLibrarySchema,
-});
-
 // Helper type for the response - simplified by using ExactPlayerMap
 export type StorySetup<N extends PlayerCount> = {
   guidelines: z.infer<typeof guidelinesSchema>;
   npcs: z.infer<typeof NPCsSchema>;
   worldStats: z.infer<typeof statSchema>[];
 } & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
+
+// STORY STATE USED BY SERVER
+
+// Convert PLAYER_SLOTS array to tuple type for Zod
+const playerSlotsTuple = PLAYER_SLOTS as unknown as [string, ...string[]];
+
+// New schema for player state that includes beat history
+export const playerStateSchema = playerStateGenerationSchema.extend({
+  beatHistory: beatHistorySchema,
+});
+
+export const storyStateSchema = z.object({
+  guidelines: guidelinesSchema,
+  worldStats: statsSchema,
+  npcs: NPCsSchema,
+  players: z.record(z.enum(playerSlotsTuple), playerStateSchema),
+  establishedFacts: z.array(z.string()),
+  maxTurns: z.number(),
+  generateImages: z.boolean(),
+  images: imageLibrarySchema,
+  playerCodes: z.record(z.enum(playerSlotsTuple), z.string()),
+});
 
 export type StoryState = z.infer<typeof storyStateSchema>;

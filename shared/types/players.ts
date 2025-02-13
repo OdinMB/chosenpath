@@ -25,5 +25,5 @@ export type PlayerMap<T> = {
 
 // Helper type to ensure exactly N players
 export type ExactPlayerMap<T, N extends PlayerCount> = {
-  [K in PlayerSlot]: K extends `player${NumberRange<typeof MIN_PLAYERS, N>}` ? T : never;
+  [K in `player${NumberRange<1, N>}`]: T;
 };

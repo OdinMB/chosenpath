@@ -4,6 +4,7 @@ import { GameLayout } from "./components/GameLayout.js";
 import { wsService } from "./services/WebSocketService.js";
 import { gameService } from "./services/GameService.js";
 import { useEffect, useState } from "react";
+import { getCurrentTurn } from "../../shared/utils/storyUtils.js";
 
 function App() {
   const { setStoryState, setIsLoading, storyState, sessionId, setSessionId } =
@@ -49,7 +50,7 @@ function App() {
     console.log("[App] Processing player choice:", {
       optionIndex,
       sessionId,
-      currentTurn: storyState.beatHistory.length
+      currentTurn: getCurrentTurn(storyState)
     });
     setIsLoading(true);
     gameService.makeChoice(optionIndex);

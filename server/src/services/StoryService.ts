@@ -1,6 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import OpenAI from "openai";
-import type { StoryState, StorySetup } from "../../../shared/types/story.js";
+import type { StoryState, StorySetup, PlayerStateGeneration } from "../../../shared/types/story.js";
 import type { Beat } from "../../../shared/types/beat.js";
 import { beatGenerationSchema } from "../../../shared/types/beat.js";
 import { ChangeService } from "./ChangeService.js";
@@ -36,18 +36,23 @@ export class StoryService {
     generateImages: boolean, 
     playerCount: PlayerCount
   ): Promise<StoryState> {
-    const setup = await this.initializeStory(prompt, playerCount);
+    const setup = await this.generateStorySetup(prompt, playerCount);
     
     // Create a record of all players from the setup
     const players = Object.fromEntries(
-      getPlayerSlots(playerCount).map(slot => [
-        slot,
-        {
-          character: setup[slot].character,
-          outcomes: setup[slot].outcomes,
-          characterStats: setup[slot].characterStats,
-        }
-      ])
+      getPlayerSlots(playerCount).map(slot => {
+        const playerKey = slot as keyof StorySetup<typeof playerCount>;
+        const playerData = setup[playerKey] as PlayerStateGeneration;
+        return [
+          slot,
+          {
+            character: playerData.character,
+            outcomes: playerData.outcomes,
+            characterStats: playerData.characterStats,
+            beatHistory: [],
+          }
+        ];
+      })
     );
 
     return {
@@ -56,19 +61,18 @@ export class StoryService {
       npcs: setup.npcs,
       players,
       maxTurns: 30,
-      beatHistory: [],
       establishedFacts: [],
       generateImages,
       images: [],
     };
   }
 
-  async initializeStory(prompt: string, playerCount: PlayerCount): Promise<StorySetup<typeof playerCount>> {
+  async generateStorySetup(prompt: string, playerCount: PlayerCount): Promise<StorySetup<typeof playerCount>> {
     const schema = createStorySetupSchema(playerCount);
     const structuredModel = this.model.withStructuredOutput(schema);
 
     try {
-      console.log("Initializing story with playerCount:", playerCount);
+      console.log("Generating story setup with playerCount:", playerCount);
 
       const response = await structuredModel.invoke(
         `Create a setup for a multiplayer, interactive fiction game for ${playerCount} player${playerCount > 1 ? 's' : ''} based on this prompt: "${prompt}".
@@ -93,24 +97,7 @@ export class StoryService {
 
       console.log("Raw response:", response);
       
-      const playerSlots = getPlayerSlots(playerCount);
-      const responsePlayerSlots = Object.keys(response).filter(key => key.startsWith('player'));
-      
-      if (responsePlayerSlots.length !== playerCount) {
-        throw new Error(`Expected ${playerCount} players but got ${responsePlayerSlots.length}`);
-      }
-
-      // Verify all expected player slots are present
-      for (const slot of playerSlots) {
-        if (!response[slot]) {
-          throw new Error(`Missing player data for ${slot}`);
-        }
-      }
-
-      const validated = schema.parse(response);
-      console.log("Validated response:", validated);
-      
-      return validated as StorySetup<typeof playerCount>;
+      return response as StorySetup<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
