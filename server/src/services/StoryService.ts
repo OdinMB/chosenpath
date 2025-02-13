@@ -69,7 +69,7 @@ export class StoryService {
     const structuredModel = this.model.withStructuredOutput(beatGenerationSchema);
 
     try {
-      console.log("Generating beat for turn:", state.currentTurn);
+      console.log("Generating beat for turn:", state.beatHistory.length + 1);
       const response = await structuredModel.invoke(
         this.createBeatPrompt(state)
       );
@@ -108,7 +108,6 @@ export class StoryService {
 
       let updatedState = {
         ...state,
-        currentTurn: state.currentTurn + 1,
         beatHistory: [...state.beatHistory.slice(0, -1), updatedBeat],
       };
 
@@ -195,7 +194,7 @@ ${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
         : ""
     }
 
-STORY PROGRESS: Turn: ${state.currentTurn}/${state.maxTurns}
+STORY PROGRESS: Turn: ${state.beatHistory.length + 1}/${state.maxTurns}
 
 IMAGES: ${
       state.generateImages
@@ -271,7 +270,6 @@ CREATE AN ENGAGING BEAT with:
       stats: setup.stats,
       npcs: setup.npcs,
       player: setup.pc,
-      currentTurn: 1,
       maxTurns: 30,
       beatHistory: [],
       establishedFacts: [],

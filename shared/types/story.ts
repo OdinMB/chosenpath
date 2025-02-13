@@ -37,7 +37,6 @@ export const storyStateSchema = z.object({
   outcomes: outcomesSchema,
   establishedFacts: z.array(z.string()),
   beatHistory: beatHistorySchema,
-  currentTurn: z.number(),
   maxTurns: z.number(),
   generateImages: z.boolean(),
   images: imageLibrarySchema,

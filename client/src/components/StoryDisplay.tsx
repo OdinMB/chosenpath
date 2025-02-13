@@ -50,7 +50,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     <div className="story-display space-y-6">
       {storyState.beatHistory.length > 0 && (
         <div className="story-progress text-center text-sm text-gray-600 pb-0 -mb-5">
-          Turn {storyState.currentTurn} of {storyState.maxTurns}
+          Turn {storyState.beatHistory.length} of {storyState.maxTurns}
         </div>
       )}
 

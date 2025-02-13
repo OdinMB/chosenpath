@@ -49,7 +49,7 @@ function App() {
     console.log("[App] Processing player choice:", {
       optionIndex,
       sessionId,
-      currentTurn: storyState.currentTurn
+      currentTurn: storyState.beatHistory.length
     });
     setIsLoading(true);
     gameService.makeChoice(optionIndex);
