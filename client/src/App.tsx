@@ -28,10 +28,12 @@ function App() {
 
   // Update initial view state based on connection
   useEffect(() => {
-    if (sessionId && !storyState) {
-      setViewState(playerCode ? 'SETUP' : 'WELCOME');
+    if (!sessionId) {
+      setViewState('CONNECTING');
+    } else if (!storyState) {
+      setViewState('WELCOME'); // Always show welcome screen initially
     }
-  }, [sessionId, storyState, playerCode]);
+  }, [sessionId, storyState]);
 
   useEffect(() => {
     if (!sessionId && !isCreatingSession && wsService.isConnected()) {
@@ -107,7 +109,11 @@ function App() {
       );
 
     case 'WELCOME':
-      return <WelcomeScreen onCodeSubmit={handleCodeSubmit} onNewStory={handleNewStory} />;
+      return <WelcomeScreen 
+        onCodeSubmit={handleCodeSubmit} 
+        onNewStory={handleNewStory}
+        existingPlayerCode={playerCode} 
+      />;
 
     case 'SETUP':
       return <StoryInitializer 
@@ -115,19 +121,19 @@ function App() {
         onBack={() => setViewState('WELCOME')} 
       />;
 
-      case 'PLAYER_CODES':
-        return storyCodes ? (
-          <PlayerCodes 
-            codes={storyCodes} 
-            onBack={() => setViewState('WELCOME')}
-            onCodeSubmit={handleCodeSubmit}
-          />
-        ) : (
-          <StoryInitializer 
-            onSetup={handleStorySetup}
-            onBack={() => setViewState('WELCOME')} 
-          />
-        );
+    case 'PLAYER_CODES':
+      return storyCodes ? (
+        <PlayerCodes 
+          codes={storyCodes} 
+          onBack={() => setViewState('WELCOME')}
+          onCodeSubmit={handleCodeSubmit}
+        />
+      ) : (
+        <StoryInitializer 
+          onSetup={handleStorySetup}
+          onBack={() => setViewState('WELCOME')} 
+        />
+      );
 
     case 'GAME':
       return (

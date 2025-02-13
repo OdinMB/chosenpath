@@ -3,15 +3,22 @@ import { useState } from "react";
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
+  existingPlayerCode: string | null;
 }
 
-export function WelcomeScreen({ onCodeSubmit, onNewStory }: WelcomeScreenProps) {
+export function WelcomeScreen({ onCodeSubmit, onNewStory, existingPlayerCode }: WelcomeScreenProps) {
   const [code, setCode] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
     onCodeSubmit(code.trim());
+  };
+
+  const handleResume = () => {
+    if (existingPlayerCode) {
+      onCodeSubmit(existingPlayerCode);
+    }
   };
 
   return (
@@ -21,13 +28,33 @@ export function WelcomeScreen({ onCodeSubmit, onNewStory }: WelcomeScreenProps) 
       </h1>
       
       <div className="space-y-6">
+        {existingPlayerCode && (
+          <>
+            <button
+              onClick={handleResume}
+              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Resume Previous Story
+            </button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">or</span>
+              </div>
+            </div>
+          </>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="code"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Have a player code?
+              {existingPlayerCode ? "Have a different player code?" : "Have a player code?"}
             </label>
             <input
               id="code"
@@ -41,7 +68,8 @@ export function WelcomeScreen({ onCodeSubmit, onNewStory }: WelcomeScreenProps) 
 
           <button
             type="submit"
-            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={!code.trim()}
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Join Game
           </button>

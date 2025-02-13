@@ -35,8 +35,8 @@ export class GameHandler {
     return codes;
   }
 
-  public verifyCode(code: string): StoryState | null {
-    return this.storyStateManager.getStateByCode(code);
+  public async verifyCode(code: string): StoryState | null {
+    return await this.storyStateManager.getStateByCode(code);
   }
 
   async initializeStory(sessionId: string, prompt: string, generateImages: boolean, playerCount: number) {
@@ -67,7 +67,7 @@ export class GameHandler {
       };
       
       const storyId = crypto.randomUUID();
-      this.storyStateManager.storeState(storyId, stateWithCodes);
+      await this.storyStateManager.storeState(storyId, stateWithCodes);
       console.log('[GameHandler] Stored initial state');
       
       // Only emit the codes initially
@@ -76,6 +76,7 @@ export class GameHandler {
       });
       console.log('[GameHandler] Emitted player codes: ', stateWithCodes.playerCodes);
 
+      // Leave this in; we'll use it later
       // // Generate first beat
       // const firstBeat = await this.storyService.generateNextBeat(stateWithCodes);
       // console.log('[GameHandler] Generated first beat:', firstBeat.title);
@@ -86,7 +87,7 @@ export class GameHandler {
       // };
       
       // // Update the stored state with the first beat
-      // this.storyStateManager.updateState(storyId, stateWithBeat);
+      // await this.storyStateManager.updateState(storyId, stateWithBeat);
       // console.log('[GameHandler] Updated state with first beat');
 
       // // Generate and update image if needed
@@ -189,7 +190,7 @@ export class GameHandler {
         beatTitle: currentBeat.title
       });
       const updatedState = this.imageService.updateStateWithImage(state, image);
-      this.storyStateManager.updateState(storyId, updatedState);
+      await this.storyStateManager.updateState(storyId, updatedState);
       this.socket.emit("state_update", { state: updatedState });
       console.log('[GameHandler] State updated with new image');
     } else {
