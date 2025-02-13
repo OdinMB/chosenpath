@@ -1,7 +1,7 @@
 import { createContext } from "react";
 import type { StoryState } from "../../../shared/types/story";
 
-interface SessionContextType {
+export type SessionContextType = {
   storyState: StoryState | null;
   setStoryState: (state: StoryState | null) => void;
   sessionId: string | null;
@@ -10,7 +10,9 @@ interface SessionContextType {
   setIsLoading: (loading: boolean) => void;
   isConnecting: boolean;
   storyCodes: Record<string, string> | null;
-}
+  error: string | null;
+  setError: (error: string | null) => void;
+};
 
 export const SessionContext = createContext<SessionContextType>({
   storyState: null,
@@ -21,6 +23,6 @@ export const SessionContext = createContext<SessionContextType>({
   setIsLoading: () => {},
   isConnecting: true,
   storyCodes: null,
-});
-
-export type { SessionContextType }; 
+  error: null,
+  setError: () => {},
+}); 

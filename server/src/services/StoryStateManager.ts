@@ -49,21 +49,56 @@ export class StoryStateManager {
   }
 
   async getStateByCode(playerCode: string): Promise<StoryState | null> {
+    // First try memory cache via the code-to-story map
     const storyId = this.codeToStoryMap.get(playerCode);
-    if (!storyId) return null;
+    if (storyId) {
+      // Try memory cache first
+      const cachedState = this.storyStates.get(storyId);
+      if (cachedState) return cachedState;
 
-    // Try memory cache first
-    const cachedState = this.storyStates.get(storyId);
-    if (cachedState) return cachedState;
+      // Try loading specific file if we know the ID
+      try {
+        const fileContent = await fs.readFile(this.getFilePath(storyId), 'utf-8');
+        const state = JSON.parse(fileContent) as StoryState;
+        this.storyStates.set(storyId, state); // Update cache
+        this.codeToStoryMap.set(playerCode, storyId); // Ensure code mapping
+        return state;
+      } catch (error) {
+        console.error(`Failed to load story state for ID ${storyId}:`, error);
+      }
+    }
 
-    // Try loading from file
+    // If not found in memory, search through all files
     try {
-      const fileContent = await fs.readFile(this.getFilePath(storyId), 'utf-8');
-      const state = JSON.parse(fileContent) as StoryState;
-      this.storyStates.set(storyId, state); // Update cache
-      return state;
+      const files = await fs.readdir(this.stateDirectory);
+      
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        
+        try {
+          const filePath = path.join(this.stateDirectory, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const state = JSON.parse(content) as StoryState;
+          
+          // Check if this state contains the player code
+          const hasCode = Object.values(state.playerCodes).includes(playerCode);
+          if (hasCode) {
+            // Update our caches
+            const storyId = path.basename(file, '.json');
+            this.storyStates.set(storyId, state);
+            this.codeToStoryMap.set(playerCode, storyId);
+            return state;
+          }
+        } catch (error) {
+          console.error(`Error reading file ${file}:`, error);
+          continue; // Skip problematic files
+        }
+      }
+      
+      // Code not found in any file
+      return null;
     } catch (error) {
-      console.error(`Failed to load story state for ID ${storyId}:`, error);
+      console.error('Failed to read story states directory:', error);
       return null;
     }
   }

@@ -127,6 +127,15 @@ export class WebSocketService {
         this.socket?.emit("create_session");
       }
     });
+
+    // Handle verify_code_response events
+    this.socket.on("verify_code_response", (data: { state: StoryState | null, error?: string }) => {
+      console.log('[WebSocketService] Code verification response:', data);
+      const handler = this.messageHandlers.get("verify_code_response");
+      if (handler) {
+        handler({ type: "verify_code_response", ...data });
+      }
+    });
   }
 
   onMessage(type: string, handler: MessageHandler) {

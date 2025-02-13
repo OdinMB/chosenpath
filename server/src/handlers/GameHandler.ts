@@ -35,8 +35,20 @@ export class GameHandler {
     return codes;
   }
 
-  public async verifyCode(code: string): StoryState | null {
-    return await this.storyStateManager.getStateByCode(code);
+  public async verifyCode(code: string): Promise<{ state: StoryState | null; error?: string }> {
+    console.log('[GameHandler] Attempting to verify code:', code);
+    try {
+      const state = await this.storyStateManager.getStateByCode(code);
+      if (!state) {
+        console.log('[GameHandler] No state found for code:', code);
+        return { state: null, error: "Invalid player code" };
+      }
+      console.log('[GameHandler] Successfully found state for code:', code);
+      return { state };
+    } catch (error) {
+      console.error('[GameHandler] Error verifying code:', error);
+      return { state: null, error: "Failed to verify code" };
+    }
   }
 
   async initializeStory(sessionId: string, prompt: string, generateImages: boolean, playerCount: number) {

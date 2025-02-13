@@ -10,6 +10,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     wsService.clearMessageHandlers();
@@ -45,7 +46,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("error", (data: WSServerMessage) => {
       if (data.type === "error") {
+        if (data.error === "Session not found") {
+          console.warn("[SessionProvider] Session not found - reconnecting");
+          return;
+        }
         console.error("[SessionProvider] WebSocket error:", data.error);
+        setError(data.error);
         setIsLoading(false);
       }
     });
@@ -55,6 +61,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         console.log('[SessionProvider] Received story codes:', data.codes);
         // localStorage.setItem('storyCodes', JSON.stringify(data.codes));
         setStoryCodes(data.codes);
+        setIsLoading(false);
+      }
+    });
+
+    wsService.onMessage("verify_code_response", (data: WSServerMessage) => {
+      if (data.type === "verify_code_response") {
+        if (data.error) {
+          console.error('[SessionProvider] Code verification failed:', data.error);
+          setError(data.error);
+        } else if (data.state) {
+          console.log('[SessionProvider] Code verified, received state:', data.state);
+          setStoryState(data.state);
+          setError(null);
+        }
         setIsLoading(false);
       }
     });
@@ -78,6 +98,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setIsLoading,
     isConnecting,
     storyCodes,
+    error,
+    setError,
   };
 
   return (

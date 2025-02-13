@@ -72,12 +72,23 @@ export class GameWebSocketServer {
         await gameHandler.exitStory(data.sessionId);
       });
 
-      socket.on("verify_code", async (code: string) => {
-        const state = gameHandler.verifyCode(code);
-        if (state) {
-          socket.emit("state_update", { state });
+      socket.on("verify_code", async (data: { code: string }) => {
+        console.log('[WebSocket] Verifying code:', data.code);
+        const result = await gameHandler.verifyCode(data.code);
+        if (result.error) {
+          console.log('[WebSocket] Code verification failed:', {
+            socketId: socket.id,
+            code: data.code,
+            error: result.error
+          });
+          socket.emit("verify_code_response", { state: null, error: result.error });
         } else {
-          socket.emit("error", { error: "Invalid player code" });
+          console.log('[WebSocket] Code verification successful:', {
+            socketId: socket.id,
+            code: data.code,
+            stateExists: !!result.state
+          });
+          socket.emit("verify_code_response", { state: result.state });
         }
       });
 

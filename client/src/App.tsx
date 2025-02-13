@@ -18,7 +18,9 @@ function App() {
     storyState, 
     sessionId, 
     setSessionId,
-    storyCodes 
+    storyCodes,
+    error,
+    setError 
   } = useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [viewState, setViewState] = useState<ViewState>('CONNECTING');
@@ -62,9 +64,10 @@ function App() {
   };
 
   const handleCodeSubmit = (code: string) => {
+    setIsLoading(true);
+    gameService.verifyCode(code);
     setPlayerCode(code);
     localStorage.setItem('playerCode', code);
-    setViewState('SETUP');
   };
 
   const handleExitGame = () => {
@@ -96,58 +99,81 @@ function App() {
     gameService.makeChoice(optionIndex);
   };
 
-  // Simplified view rendering
-  switch (viewState) {
-    case 'CONNECTING':
-      return (
-        <div className="app flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Connecting...</p>
+  // Add error display component
+  const ErrorMessage = () => error ? (
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 flex items-center shadow-lg">
+      <span className="mr-2">{error}</span>
+      <button 
+        onClick={() => setError(null)}
+        className="text-red-700 hover:text-red-900"
+      >
+        ×
+      </button>
+    </div>
+  ) : null;
+
+  // Get the current view content
+  const getCurrentView = () => {
+    switch (viewState) {
+      case 'CONNECTING':
+        return (
+          <div className="app flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Connecting...</p>
+            </div>
           </div>
-        </div>
-      );
+        );
 
-    case 'WELCOME':
-      return <WelcomeScreen 
-        onCodeSubmit={handleCodeSubmit} 
-        onNewStory={handleNewStory}
-        existingPlayerCode={playerCode} 
-      />;
+      case 'WELCOME':
+        return <WelcomeScreen 
+          onCodeSubmit={handleCodeSubmit} 
+          onNewStory={handleNewStory}
+          existingPlayerCode={playerCode} 
+        />;
 
-    case 'SETUP':
-      return <StoryInitializer 
-        onSetup={handleStorySetup} 
-        onBack={() => setViewState('WELCOME')} 
-      />;
-
-    case 'PLAYER_CODES':
-      return storyCodes ? (
-        <PlayerCodes 
-          codes={storyCodes} 
-          onBack={() => setViewState('WELCOME')}
-          onCodeSubmit={handleCodeSubmit}
-        />
-      ) : (
-        <StoryInitializer 
-          onSetup={handleStorySetup}
+      case 'SETUP':
+        return <StoryInitializer 
+          onSetup={handleStorySetup} 
           onBack={() => setViewState('WELCOME')} 
-        />
-      );
+        />;
 
-    case 'GAME':
-      return (
-        <div className="app">
-          <GameLayout
-            onExitGame={handleExitGame}
-            onChoiceSelected={handlePlayerChoice}
+      case 'PLAYER_CODES':
+        return storyCodes ? (
+          <PlayerCodes 
+            codes={storyCodes} 
+            onBack={() => setViewState('WELCOME')}
+            onCodeSubmit={handleCodeSubmit}
           />
-        </div>
-      );
+        ) : (
+          <StoryInitializer 
+            onSetup={handleStorySetup}
+            onBack={() => setViewState('WELCOME')} 
+          />
+        );
 
-    default:
-      return null;
-  }
+      case 'GAME':
+        return (
+          <div className="app">
+            <GameLayout
+              onExitGame={handleExitGame}
+              onChoiceSelected={handlePlayerChoice}
+            />
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Render
+  return (
+    <>
+      <ErrorMessage />
+      {getCurrentView()}
+    </>
+  );
 }
 
 export default App;

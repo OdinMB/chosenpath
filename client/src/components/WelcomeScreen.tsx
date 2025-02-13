@@ -30,12 +30,20 @@ export function WelcomeScreen({ onCodeSubmit, onNewStory, existingPlayerCode }: 
       <div className="space-y-6">
         {existingPlayerCode && (
           <>
-            <button
-              onClick={handleResume}
-              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Resume Previous Story
-            </button>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600">Your story code:</span>
+                <code className="bg-gray-100 px-3 py-1 rounded-lg font-mono text-sm text-gray-800">
+                  {existingPlayerCode}
+                </code>
+              </div>
+              <button
+                onClick={handleResume}
+                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Resume your story
+              </button>
+            </div>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

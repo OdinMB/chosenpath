@@ -61,6 +61,14 @@ class GameService {
       type: "exit_story"
     });
   }
+
+  verifyCode(code: string) {
+    console.log('[GameService] Verifying code:', code);
+    wsService.sendMessage({
+      type: "verify_code",
+      code
+    });
+  }
 }
 
 export const gameService = new GameService(); 
