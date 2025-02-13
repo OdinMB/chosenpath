@@ -11,7 +11,7 @@ export const NPCSchema = z
     pronouns: pronounSchema,
     traits: z.array(z.string()).describe("NPC's defining traits"),
   })
-  .describe("Important NPCs in the story.");
+  .describe("Important NPC in the story.");
 
 export const NPCsSchema = z
   .array(NPCSchema)

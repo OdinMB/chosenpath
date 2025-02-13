@@ -1,15 +1,14 @@
 // import React from "react";
-import { useStory } from "../hooks/useStory";
-import type { Beat } from "../../../shared/types/beat";
 import React from "react";
+import { useSession } from "../hooks/useSession";
+import type { Beat } from "../../../shared/types/beat";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
-  selectedChoice?: number;
 }
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
-  const { storyState, isLoading } = useStory();
+  const { storyState, isLoading } = useSession();
   const [localSelectedChoice, setLocalSelectedChoice] = React.useState<number | undefined>(undefined);
   const [previousBeatCount, setPreviousBeatCount] = React.useState(0);
 
@@ -46,8 +45,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const currentBeat = storyState.beatHistory[
     storyState.beatHistory.length - 1
   ] as Beat;
-  console.log("Current beat:", currentBeat);
-  console.log("Story state:", storyState);
 
   return (
     <div className="story-display space-y-6">

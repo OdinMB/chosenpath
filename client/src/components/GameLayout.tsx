@@ -1,4 +1,4 @@
-import { useStory } from "../hooks/useStory";
+import { useSession } from "../hooks/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 
@@ -8,10 +8,10 @@ interface Props {
 }
 
 export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
-  const { storyState } = useStory();
+  const { storyState } = useSession();
 
   if (!storyState) {
-    return null; // or some loading state if needed
+    return null;
   }
 
   const { player, stats } = storyState;

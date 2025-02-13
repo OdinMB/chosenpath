@@ -1,29 +1,31 @@
 import { useState, useEffect } from "react";
 import type { StoryState } from "../../../shared/types/story";
 import type { WSServerMessage } from "../../../shared/types/websocket";
-import { wsService } from "../services/WebSocketService";
-import { StoryContext } from "../contexts/StoryContext";
+import { wsService } from "../services/WebSocketService.js";
+import { SessionContext } from "../contexts/SessionContext.js";
 
-export function StoryProvider({ children }: { children: React.ReactNode }) {
+export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyState, setStoryState] = useState<StoryState | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(true);
 
   useEffect(() => {
     wsService.clearMessageHandlers();
 
     wsService.onMessage("session_created", (data: WSServerMessage) => {
       if (data.type === "session_created" && data.sessionId) {
-        console.log('[StoryProvider] Session created:', data.sessionId);
+        console.log('[SessionProvider] Session created:', data.sessionId);
         setSessionId(data.sessionId);
         localStorage.setItem('sessionId', data.sessionId);
         wsService.setSessionId(data.sessionId);
+        setIsConnecting(false);
       }
     });
 
     wsService.onMessage("state_update", (data: WSServerMessage) => {
       if (data.type === "state_update" && data.state) {
-        console.log('[StoryProvider] Received state update:', {
+        console.log('[SessionProvider] Received state update:', {
           state: data.state
         });
         setStoryState(data.state);
@@ -33,7 +35,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
       if (data.type === "exit_story_response") {
-        console.log('[StoryProvider] Story exit confirmed');
+        console.log('[SessionProvider] Story exit confirmed');
         setStoryState(null);
         setSessionId(null);
         localStorage.removeItem('sessionId');
@@ -42,7 +44,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("error", (data: WSServerMessage) => {
       if (data.type === "error") {
-        console.error("[StoryProvider] WebSocket error:", data.error);
+        console.error("[SessionProvider] WebSocket error:", data.error);
         setIsLoading(false);
       }
     });
@@ -64,9 +66,10 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     setSessionId,
     isLoading,
     setIsLoading,
+    isConnecting,
   };
 
   return (
-    <StoryContext.Provider value={value}>{children}</StoryContext.Provider>
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
 } 

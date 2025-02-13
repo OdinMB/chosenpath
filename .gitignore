@@ -30,3 +30,6 @@ boiler
 # Vite cache
 .vite
 .vite/**
+
+story_states/*
+working files

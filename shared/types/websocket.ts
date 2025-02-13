@@ -1,20 +1,16 @@
 import type { StoryState } from "./story.js";
 
 // Client -> Server messages
-export interface WSClientMessage {
-  type: "create_session" | "join" | "initialize_story" | "make_choice";
-  sessionId?: string;
-  payload?: {
-    prompt?: string;
-    generateImages?: boolean;
-    optionIndex?: number;
-  };
-}
+export type WSClientMessage =
+  | { type: "create_session" }
+  | { type: "join_session"; sessionId: string }
+  | { type: "initialize_story"; prompt: string; generateImages: boolean }
+  | { type: "make_choice"; optionIndex: number }
+  | { type: "exit_story" };
 
 // Server -> Client messages
-export interface WSServerMessage {
-  type: "session_created" | "state_update" | "error" | "exit_story_response";
-  sessionId?: string;
-  state?: StoryState;
-  error?: string;
-} 
+export type WSServerMessage = 
+  | { type: "session_created"; sessionId: string }
+  | { type: "state_update"; state: StoryState }
+  | { type: "exit_story_response" }
+  | { type: "error"; error: string }; 

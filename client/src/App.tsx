@@ -1,12 +1,13 @@
-import { useStory } from "./hooks/useStory";
-import { StoryInitializer } from "./components/StoryInitializer";
-import { GameLayout } from "./components/GameLayout";
-import { wsService } from "./services/WebSocketService.ts";
+import { useSession } from "./hooks/useSession.js";
+import { StoryInitializer } from "./components/StoryInitializer.js";
+import { GameLayout } from "./components/GameLayout.js";
+import { wsService } from "./services/WebSocketService.js";
+import { gameService } from "./services/GameService.js";
 import { useEffect, useState } from "react";
 
 function App() {
   const { setStoryState, setIsLoading, storyState, sessionId, setSessionId } =
-    useStory();
+    useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   useEffect(() => {
@@ -29,12 +30,13 @@ function App() {
       return;
     }
     setIsLoading(true);
-    wsService.initializeStory(prompt, generateImages);
+    gameService.initializeStory(prompt, generateImages);
   };
 
   const handleExitGame = () => {
-    wsService.exitStory();
+    gameService.exitStory();
     setStoryState(null);
+    wsService.clearSession();
     setSessionId(null);
     setIsCreatingSession(false);
   };
@@ -50,7 +52,7 @@ function App() {
       currentTurn: storyState.currentTurn
     });
     setIsLoading(true);
-    wsService.makeChoice(optionIndex);
+    gameService.makeChoice(optionIndex);
   };
 
   // Only show loading state when creating initial session
