@@ -14,7 +14,10 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
     return null;
   }
 
-  const { player, stats } = storyState;
+  // Get the player data from the first (and only) player in the players object
+  const playerSlot = Object.keys(storyState.players)[0];
+  const player = storyState.players[playerSlot];
+  const stats = [...player.characterStats, ...storyState.worldStats];
   const visibleStats = stats.filter((stat) => stat.isVisible !== false);
 
   return (
@@ -25,9 +28,9 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           {/* Character Section */}
           <section className="mb-6 pb-4">
             <h2 className="text-xl font-semibold text-gray-900 mb-1 text-center">
-              {player.name}
+              {player.character.name}
             </h2>
-            <p className="text-gray-600 text-center">{player.pronouns}</p>
+            <p className="text-gray-600 text-center">{player.character.pronouns}</p>
           </section>
 
           {/* Stats Section */}

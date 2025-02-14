@@ -24,7 +24,7 @@ export function WelcomeScreen({ onCodeSubmit, onNewStory, existingPlayerCode }: 
   return (
     <div className="max-w-md mx-auto p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Welcome to the Story
+        Multiplayer Interactive Fiction Generator
       </h1>
       
       <div className="space-y-6">

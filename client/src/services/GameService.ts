@@ -63,9 +63,16 @@ class GameService {
   }
 
   verifyCode(code: string) {
+    const sessionId = wsService.getSessionId();
+    if (!sessionId) {
+      console.warn('[GameService] Cannot verify code: no session');
+      return;
+    }
+    
     console.log('[GameService] Verifying code:', code);
     wsService.sendMessage({
       type: "verify_code",
+      sessionId,
       code
     });
   }

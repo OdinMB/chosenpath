@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import type { StoryState } from "../../../shared/types/story";
+import type { ClientStoryState } from "../../../shared/types/story";
 import type { WSServerMessage } from "../../../shared/types/websocket";
 import { wsService } from "../services/WebSocketService.js";
 import { SessionContext } from "../contexts/SessionContext.js";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [storyState, setStoryState] = useState<StoryState | null>(null);
+  const [storyState, setStoryState] = useState<ClientStoryState | null>(null);
   const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +59,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     wsService.onMessage("story_codes", (data: WSServerMessage) => {
       if (data.type === "story_codes") {
         console.log('[SessionProvider] Received story codes:', data.codes);
-        // localStorage.setItem('storyCodes', JSON.stringify(data.codes));
         setStoryCodes(data.codes);
         setIsLoading(false);
       }

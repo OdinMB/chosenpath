@@ -86,3 +86,14 @@ export const storyStateSchema = z.object({
 });
 
 export type StoryState = z.infer<typeof storyStateSchema>;
+
+// Add this after the existing StoryState type
+export const clientStoryStateSchema = z.object({
+  players: z.record(z.enum(playerSlotsTuple), playerStateSchema),
+  worldStats: statsSchema,
+  maxTurns: z.number(),
+  generateImages: z.boolean(),
+  images: imageLibrarySchema,
+});
+
+export type ClientStoryState = z.infer<typeof clientStoryStateSchema>;

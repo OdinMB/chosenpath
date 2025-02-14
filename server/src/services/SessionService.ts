@@ -1,15 +1,16 @@
 import type { StoryState } from "../../../shared/types/story.js";
+import type { PlayerSlot } from "../../../shared/types/players.js";
 
-interface GameSession {
-  id: string;
-  state: StoryState | null;
-  lastUpdated: Date;
+interface PlayerContext {
+  gameId: string;
+  playerSlot: PlayerSlot;
 }
 
 export class SessionService {
   private sessions: Map<string, StoryState | null> = new Map();
   private sessionTimes: Map<string, Date> = new Map();
-  private readonly SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours instead of 1 hour
+  private playerContexts: Map<string, PlayerContext> = new Map(); // sessionId -> PlayerContext
+  private readonly SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor() {
     this.setupCleanup();
@@ -21,6 +22,15 @@ export class SessionService {
     this.sessionTimes.set(sessionId, new Date());
     console.log('[SessionService] Created session:', sessionId);
     return sessionId;
+  }
+
+  setPlayerContext(sessionId: string, gameId: string, playerSlot: PlayerSlot): void {
+    this.playerContexts.set(sessionId, { gameId, playerSlot });
+    console.log('[SessionService] Set player context:', { sessionId, gameId, playerSlot });
+  }
+
+  getPlayerContext(sessionId: string): PlayerContext | null {
+    return this.playerContexts.get(sessionId) || null;
   }
 
   getSession(sessionId: string): StoryState | null {
@@ -48,6 +58,7 @@ export class SessionService {
           console.log('[SessionService] Cleaning up expired session:', id);
           this.sessions.delete(id);
           this.sessionTimes.delete(id);
+          this.playerContexts.delete(id);
         }
       }
     }, 60 * 60 * 1000); // Still check every hour

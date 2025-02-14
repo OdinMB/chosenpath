@@ -12,14 +12,22 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const [localSelectedChoice, setLocalSelectedChoice] = React.useState<number | undefined>(undefined);
   const [previousBeatCount, setPreviousBeatCount] = React.useState(0);
 
+  // Get the player data from the first (and only) player in the players object
+  const playerSlotId = storyState?.players ? Object.keys(storyState.players)[0] : undefined;
+  const playerState = playerSlotId ? storyState?.players[playerSlotId] : undefined;
+
   // Reset the selected choice when a new beat arrives
   React.useEffect(() => {
-    const currentBeatCount = storyState?.beatHistory?.length ?? 0;
+    const currentBeatCount = playerState?.beatHistory?.length ?? 0;
     if (currentBeatCount !== previousBeatCount) {
       setLocalSelectedChoice(undefined);
       setPreviousBeatCount(currentBeatCount);
     }
-  }, [storyState?.beatHistory, previousBeatCount]);
+  }, [playerState?.beatHistory, previousBeatCount]);
+
+  if (!storyState || !playerState) {
+    return null;
+  }
 
   const handleChoiceSelect = (index: number) => {
     setLocalSelectedChoice(index);
@@ -28,7 +36,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   const choiceMade = localSelectedChoice !== undefined;
 
-  if (!storyState || storyState.beatHistory.length === 0) {
+  if (!storyState || playerState.beatHistory.length === 0) {
     return (
       <div className="story-display">
         <div className="loading-indicator text-center py-4">
@@ -42,15 +50,15 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     );
   }
 
-  const currentBeat = storyState.beatHistory[
-    storyState.beatHistory.length - 1
+  const currentBeat = playerState.beatHistory[
+    playerState.beatHistory.length - 1
   ] as Beat;
 
   return (
     <div className="story-display space-y-6">
-      {storyState.beatHistory.length > 0 && (
+      {playerState.beatHistory.length > 0 && (
         <div className="story-progress text-center text-sm text-gray-600 pb-0 -mb-5">
-          Turn {storyState.beatHistory.length} of {storyState.maxTurns}
+          Turn {playerState.beatHistory.length} of {storyState.maxTurns}
         </div>
       )}
 

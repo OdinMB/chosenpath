@@ -7,6 +7,8 @@ import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { StoryStateManager } from "../services/StoryStateManager.js";
+import { getPlayerSlotByCode, filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
+import type { ClientStoryState } from "../../../shared/types/story.js";
 
 export class GameHandler {
   private sessionService: SessionService;
@@ -35,16 +37,26 @@ export class GameHandler {
     return codes;
   }
 
-  public async verifyCode(code: string): Promise<{ state: StoryState | null; error?: string }> {
+  public async verifyCode(sessionId: string, code: string): Promise<{ state: ClientStoryState | null; error?: string }> {
     console.log('[GameHandler] Attempting to verify code:', code);
     try {
-      const state = await this.storyStateManager.getStateByCode(code);
-      if (!state) {
+      const { state, storyId } = await this.storyStateManager.getStateByCode(code);
+      if (!state || !storyId) {
         console.log('[GameHandler] No state found for code:', code);
         return { state: null, error: "Invalid player code" };
       }
-      console.log('[GameHandler] Successfully found state for code:', code);
-      return { state };
+
+      const playerSlot = getPlayerSlotByCode(state, code);
+      if (!playerSlot) {
+        console.log('[GameHandler] Player slot not found for code:', code);
+        return { state: null, error: "Invalid player code" };
+      }
+
+      this.sessionService.setPlayerContext(sessionId, storyId, playerSlot);
+
+      const filteredState = filterStateForPlayer(state, playerSlot);
+      console.log('[GameHandler] Successfully found and filtered state for code:', code);
+      return { state: filteredState as ClientStoryState };
     } catch (error) {
       console.error('[GameHandler] Error verifying code:', error);
       return { state: null, error: "Failed to verify code" };

@@ -48,13 +48,13 @@ export class StoryStateManager {
     }
   }
 
-  async getStateByCode(playerCode: string): Promise<StoryState | null> {
+  async getStateByCode(playerCode: string): Promise<{ state: StoryState | null; storyId: string | null }> {
     // First try memory cache via the code-to-story map
     const storyId = this.codeToStoryMap.get(playerCode);
     if (storyId) {
       // Try memory cache first
       const cachedState = this.storyStates.get(storyId);
-      if (cachedState) return cachedState;
+      if (cachedState) return { state: cachedState, storyId };
 
       // Try loading specific file if we know the ID
       try {
@@ -62,7 +62,7 @@ export class StoryStateManager {
         const state = JSON.parse(fileContent) as StoryState;
         this.storyStates.set(storyId, state); // Update cache
         this.codeToStoryMap.set(playerCode, storyId); // Ensure code mapping
-        return state;
+        return { state, storyId };
       } catch (error) {
         console.error(`Failed to load story state for ID ${storyId}:`, error);
       }
@@ -84,10 +84,10 @@ export class StoryStateManager {
           const hasCode = Object.values(state.playerCodes).includes(playerCode);
           if (hasCode) {
             // Update our caches
-            const storyId = path.basename(file, '.json');
-            this.storyStates.set(storyId, state);
-            this.codeToStoryMap.set(playerCode, storyId);
-            return state;
+            const foundStoryId = path.basename(file, '.json');
+            this.storyStates.set(foundStoryId, state);
+            this.codeToStoryMap.set(playerCode, foundStoryId);
+            return { state, storyId: foundStoryId };
           }
         } catch (error) {
           console.error(`Error reading file ${file}:`, error);
@@ -96,10 +96,10 @@ export class StoryStateManager {
       }
       
       // Code not found in any file
-      return null;
+      return { state: null, storyId: null };
     } catch (error) {
       console.error('Failed to read story states directory:', error);
-      return null;
+      return { state: null, storyId: null };
     }
   }
 

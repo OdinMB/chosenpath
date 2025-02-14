@@ -1,9 +1,9 @@
 import { createContext } from "react";
-import type { StoryState } from "../../../shared/types/story";
+import type { ClientStoryState } from "../../../shared/types/story";
 
 export type SessionContextType = {
-  storyState: StoryState | null;
-  setStoryState: (state: StoryState | null) => void;
+  storyState: ClientStoryState | null;
+  setStoryState: (state: ClientStoryState | null) => void;
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
   isLoading: boolean;

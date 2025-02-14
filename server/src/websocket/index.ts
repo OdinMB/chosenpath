@@ -72,9 +72,9 @@ export class GameWebSocketServer {
         await gameHandler.exitStory(data.sessionId);
       });
 
-      socket.on("verify_code", async (data: { code: string }) => {
+      socket.on("verify_code", async (data: { sessionId: string, code: string }) => {
         console.log('[WebSocket] Verifying code:', data.code);
-        const result = await gameHandler.verifyCode(data.code);
+        const result = await gameHandler.verifyCode(data.sessionId, data.code);
         if (result.error) {
           console.log('[WebSocket] Code verification failed:', {
             socketId: socket.id,

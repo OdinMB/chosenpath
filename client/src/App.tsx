@@ -33,7 +33,9 @@ function App() {
     if (!sessionId) {
       setViewState('CONNECTING');
     } else if (!storyState) {
-      setViewState('WELCOME'); // Always show welcome screen initially
+      setViewState('WELCOME');
+    } else {
+      setViewState('GAME'); // Automatically show game when state is available
     }
   }, [sessionId, storyState]);
 
@@ -76,6 +78,8 @@ function App() {
     wsService.clearSession();
     setSessionId(null);
     setViewState('WELCOME');
+    // setPlayerCode(null);
+    // localStorage.removeItem('playerCode');
   };
 
   const handleNewStory = () => {
