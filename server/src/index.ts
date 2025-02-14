@@ -1,41 +1,52 @@
+import http from "http";
 import express from "express";
-import { createServer } from "http";
 import cors from "cors";
 import { GameWebSocketServer } from "./websocket/index.js";
-import { config } from "./config.js";
+import { config } from "./config/env.js";
 
-const app = express();
-app.use(cors());
+async function startServer() {
+  const app = express();
 
-const server = createServer(app);
-const wss = new GameWebSocketServer(server);
+  // Configure middleware
+  app.use(
+    cors({
+      origin: config.corsOrigin,
+      methods: ["GET", "POST"],
+      credentials: true,
+    })
+  );
+  app.use(express.json());
 
-// Graceful shutdown handler
-function shutdown() {
-  console.log('\nShutting down gracefully...');
-  
-  // Close WebSocket server first
-  wss.close(() => {
-    console.log('WebSocket server closed');
-    
-    // Then close HTTP server
-    server.close(() => {
-      console.log('HTTP server closed');
-      process.exit(0);
-    });
+  // Health check endpoint
+  app.get("/health", (_, res) => {
+    res.json({ status: "ok" });
   });
 
-  // Force exit after 5 seconds if graceful shutdown fails
-  setTimeout(() => {
-    console.error('Could not close connections in time, forcefully shutting down');
-    process.exit(1);
-  }, 5000);
+  const server = http.createServer(app);
+
+  // Initialize WebSocket server
+  const wsServer = new GameWebSocketServer(server);
+
+  // Start HTTP server
+  server.listen(config.port, () => {
+    console.log(
+      `[Server] HTTP/WebSocket server running on port ${config.port}`
+    );
+  });
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log("[Server] SIGTERM received. Shutting down gracefully...");
+    wsServer.close(() => {
+      server.close(() => {
+        console.log("[Server] Server shut down complete");
+        process.exit(0);
+      });
+    });
+  });
 }
 
-// Handle different termination signals
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-server.listen(config.port, () => {
-  console.log(`WebSocket server ready on ws://localhost:${config.port}`);
+startServer().catch((error) => {
+  console.error("[Server] Failed to start:", error);
+  process.exit(1);
 });

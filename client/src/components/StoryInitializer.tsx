@@ -3,7 +3,11 @@ import { useSession } from "../hooks/useSession.js";
 import { MAX_PLAYERS } from "../../../shared/config.js";
 
 interface StoryInitializerProps {
-  onSetup: (prompt: string, generateImages: boolean, playerCount: number) => void;
+  onSetup: (
+    prompt: string,
+    generateImages: boolean,
+    playerCount: number
+  ) => void;
   onBack: () => void;
 }
 
@@ -11,26 +15,31 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
   const [playerCount, setPlayerCount] = useState(1);
-  const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(new Set());
+  const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
+    new Set()
+  );
   const { isLoading, isConnecting } = useSession();
 
   // Move story prompts into useMemo
-  const storyPrompts = useMemo(() => [
-    "I'm an evil coffee machine influencing office drama...",
-    "I try to find a flat in Berlin, navigating cryptic WG interviews and competing against 200 other applicants...",
-    "I'm a sentient (and sarcastic) AI but must pretend I'm still following my original programming...",
-    "I'm planet Earth and attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
-    "I'm a participant in a reality cooking show for vonvicted criminals trying to win my freedom...",
-    "I'm a time-traveling food critic accidentally changing history through restaurant reviews...",
-    "I'm a retired superhero working as a wedding planner, but villains keep showing up...",
-    "I'm the first dragon to graduate from business school, trying to modernize treasure hoarding...",
-    "I'm the lead guitarist of the last rock band on Mars, touring the dome cities after Earth's collapse...",
-  ], []);
+  const storyPrompts = useMemo(
+    () => [
+      "I'm an evil coffee machine influencing office drama...",
+      "I try to find a flat in Berlin, navigating cryptic WG interviews and competing against 200 other applicants...",
+      "I'm a sentient (and sarcastic) AI but must pretend I'm still following my original programming...",
+      "I'm planet Earth and attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
+      "I'm a participant in a reality cooking show for convicted criminals trying to win my freedom...",
+      "I'm a time-traveling food critic accidentally changing history through restaurant reviews...",
+      "I'm a retired superhero working as a wedding planner, but villains keep showing up...",
+      "I'm the first dragon to graduate from business school, trying to modernize treasure hoarding...",
+      "I'm the lead guitarist of the last rock band on Mars, touring the dome cities after Earth's collapse...",
+    ],
+    []
+  );
 
   const getRandomPrompt = useCallback(() => {
     const availableIndices = storyPrompts
       .map((_, index) => index)
-      .filter(index => !usedPromptIndices.has(index));
+      .filter((index) => !usedPromptIndices.has(index));
 
     // If all prompts have been used, reset the used indices
     if (availableIndices.length === 0) {
@@ -38,8 +47,9 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
       return storyPrompts[Math.floor(Math.random() * storyPrompts.length)];
     }
 
-    const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-    setUsedPromptIndices(prev => new Set(prev).add(randomIndex));
+    const randomIndex =
+      availableIndices[Math.floor(Math.random() * availableIndices.length)];
+    setUsedPromptIndices((prev) => new Set(prev).add(randomIndex));
     return storyPrompts[randomIndex];
   }, [usedPromptIndices, storyPrompts]);
 
@@ -56,8 +66,10 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">Interactive Fiction Generator</h1>
-      
+      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+        Interactive Fiction Generator
+      </h1>
+
       {isConnecting ? (
         <div className="text-center py-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
@@ -137,7 +149,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
             >
               Back
             </button>
-            
+
             <button
               type="submit"
               disabled={isLoading || !prompt.trim() || isConnecting}

@@ -1,109 +1,262 @@
+import { promises as fs } from "fs";
+import path from "path";
+import { connectionManager } from "./ConnectionManager.js";
 import type { StoryState } from "../../../shared/types/story.js";
-import type { PlayerCount, PlayerSlot } from "../../../shared/types/players.js";
-import fs from 'fs/promises';
-import path from 'path';
+import type { PlayerSlot } from "../../../shared/types/players.js";
 
 export class StoryStateManager {
-  private storyStates: Map<string, StoryState> = new Map();
-  private codeToStoryMap: Map<string, string> = new Map(); // Maps player codes to story IDs
-  private readonly stateDirectory: string;
+  private storyStates: Map<string, StoryState>;
+  private storageDir: string;
 
   constructor() {
-    // Remove 'server/' from the path since process.cwd() already points to the server directory
-    this.stateDirectory = path.resolve(process.cwd(), 'story_states');
-    console.log('[StoryStateManager] Using directory:', this.stateDirectory);
-    
-    // Create directory synchronously to ensure it exists before any operations
-    fs.mkdir(this.stateDirectory, { recursive: true })
-      .then(() => console.log('[StoryStateManager] Directory created/verified successfully'))
-      .catch(error => console.error('[StoryStateManager] Failed to create directory:', error));
+    this.storyStates = new Map();
+    this.storageDir = path.join(process.cwd(), "data", "stories");
+    this.ensureStorageDir();
+  }
+
+  private async ensureStorageDir() {
+    try {
+      await fs.mkdir(this.storageDir, { recursive: true });
+    } catch (error) {
+      console.error(
+        "[StoryStateManager] Failed to create storage directory:",
+        error
+      );
+    }
   }
 
   private getFilePath(storyId: string): string {
-    const filePath = path.join(this.stateDirectory, `${storyId}.json`);
-    console.log('[StoryStateManager] File path for story:', filePath);
-    return filePath;
+    return path.join(this.storageDir, `${storyId}.json`);
   }
 
-  async storeState(storyId: string, state: StoryState) {
+  async getState(storyId: string): Promise<StoryState | null> {
+    console.log("[StoryStateManager] Getting state for story:", storyId);
+
+    // Try memory cache first
+    const cachedState = this.storyStates.get(storyId);
+    if (cachedState) {
+      console.log("[StoryStateManager] Found state in memory cache");
+      return cachedState;
+    }
+
+    console.log("[StoryStateManager] State not in cache, loading from file...");
+
+    // If not in memory, try loading from file
+    try {
+      const filePath = this.getFilePath(storyId);
+      console.log("[StoryStateManager] Reading from:", filePath);
+
+      const data = await fs.readFile(filePath, "utf-8");
+      const state = JSON.parse(data) as StoryState;
+
+      console.log("[StoryStateManager] Successfully loaded state from file");
+
+      // Cache in memory
+      this.storyStates.set(storyId, state);
+      console.log("[StoryStateManager] Cached state in memory");
+
+      // Register codes with ConnectionManager if they're not already registered
+      if (state.playerCodes) {
+        console.log("[StoryStateManager] Registering player codes...");
+        Object.entries(state.playerCodes).forEach(([slot, code]) => {
+          if (!connectionManager.hasCode(code)) {
+            console.log("[StoryStateManager] Registering new code:", {
+              slot,
+              code,
+            });
+            connectionManager.registerCode(storyId, slot as PlayerSlot, code);
+          } else {
+            console.log("[StoryStateManager] Code already registered:", {
+              slot,
+              code,
+            });
+          }
+        });
+      }
+
+      return state;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        console.log("[StoryStateManager] Story file not found:", storyId);
+      } else {
+        console.error("[StoryStateManager] Failed to load state:", error);
+      }
+      return null;
+    }
+  }
+
+  async storeState(storyId: string, state: StoryState): Promise<void> {
     try {
       // Update memory cache
       this.storyStates.set(storyId, state);
-      
-      // Map each player code to this story ID
-      Object.entries(state.playerCodes).forEach(([_, code]) => {
-        this.codeToStoryMap.set(code, storyId);
-      });
 
+      // Save to file
       const filePath = this.getFilePath(storyId);
-      await fs.writeFile(
-        filePath,
-        JSON.stringify(state, null, 2),
-        'utf-8'
+      await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
+
+      console.log(
+        "[StoryStateManager] Successfully stored state to:",
+        filePath
       );
-      console.log('[StoryStateManager] Successfully stored state to:', filePath);
     } catch (error) {
-      console.error('[StoryStateManager] Failed to store state:', error);
-      throw error; // Re-throw to handle in GameHandler
+      console.error("[StoryStateManager] Failed to store state:", error);
+      throw error;
     }
   }
 
-  async getStateByCode(playerCode: string): Promise<{ state: StoryState | null; storyId: string | null }> {
-    // First try memory cache via the code-to-story map
-    const storyId = this.codeToStoryMap.get(playerCode);
-    if (storyId) {
-      // Try memory cache first
-      const cachedState = this.storyStates.get(storyId);
-      if (cachedState) return { state: cachedState, storyId };
-
-      // Try loading specific file if we know the ID
-      try {
-        const fileContent = await fs.readFile(this.getFilePath(storyId), 'utf-8');
-        const state = JSON.parse(fileContent) as StoryState;
-        this.storyStates.set(storyId, state); // Update cache
-        this.codeToStoryMap.set(playerCode, storyId); // Ensure code mapping
-        return { state, storyId };
-      } catch (error) {
-        console.error(`Failed to load story state for ID ${storyId}:`, error);
-      }
-    }
-
-    // If not found in memory, search through all files
-    try {
-      const files = await fs.readdir(this.stateDirectory);
-      
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue;
-        
-        try {
-          const filePath = path.join(this.stateDirectory, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          const state = JSON.parse(content) as StoryState;
-          
-          // Check if this state contains the player code
-          const hasCode = Object.values(state.playerCodes).includes(playerCode);
-          if (hasCode) {
-            // Update our caches
-            const foundStoryId = path.basename(file, '.json');
-            this.storyStates.set(foundStoryId, state);
-            this.codeToStoryMap.set(playerCode, foundStoryId);
-            return { state, storyId: foundStoryId };
-          }
-        } catch (error) {
-          console.error(`Error reading file ${file}:`, error);
-          continue; // Skip problematic files
-        }
-      }
-      
-      // Code not found in any file
-      return { state: null, storyId: null };
-    } catch (error) {
-      console.error('Failed to read story states directory:', error);
-      return { state: null, storyId: null };
-    }
-  }
-
-  async updateState(storyId: string, state: StoryState) {
+  async updateState(storyId: string, state: StoryState): Promise<void> {
     await this.storeState(storyId, state);
   }
-} 
+
+  async deleteState(storyId: string): Promise<void> {
+    try {
+      // Remove from memory cache
+      this.storyStates.delete(storyId);
+
+      // Remove file
+      const filePath = this.getFilePath(storyId);
+      await fs.unlink(filePath);
+
+      console.log("[StoryStateManager] Successfully deleted state:", storyId);
+    } catch (error) {
+      console.error("[StoryStateManager] Failed to delete state:", error);
+      throw error;
+    }
+  }
+
+  // Helper method to clean up completed or abandoned stories
+  async cleanupStates(): Promise<void> {
+    try {
+      const files = await fs.readdir(this.storageDir);
+
+      for (const file of files) {
+        const storyId = path.parse(file).name;
+        const activePlayers = connectionManager.getActivePlayersInGame(storyId);
+
+        // If no active players and story is old, delete it
+        if (activePlayers.length === 0) {
+          const filePath = this.getFilePath(storyId);
+          const stats = await fs.stat(filePath);
+          const ageInHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
+
+          if (ageInHours > 24) {
+            // Delete stories older than 24 hours
+            await this.deleteState(storyId);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[StoryStateManager] Failed to cleanup states:", error);
+    }
+  }
+
+  // Get all active stories (useful for monitoring/debugging)
+  async getActiveStories(): Promise<
+    Array<{ storyId: string; playerCount: number }>
+  > {
+    const result = [];
+
+    for (const [storyId, state] of this.storyStates) {
+      const activePlayers = connectionManager.getActivePlayersInGame(storyId);
+      if (activePlayers.length > 0) {
+        result.push({
+          storyId,
+          playerCount: Object.keys(state.players).length,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  // Add this method to load all existing stories on startup
+  async loadExistingStories(): Promise<void> {
+    try {
+      const files = await fs.readdir(this.storageDir);
+      console.log("[StoryStateManager] Loading existing stories...");
+
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+
+        const storyId = path.parse(file).name;
+        try {
+          const data = await fs.readFile(
+            path.join(this.storageDir, file),
+            "utf-8"
+          );
+          const state = JSON.parse(data) as StoryState;
+          this.storyStates.set(storyId, state);
+          console.log("[StoryStateManager] Loaded story:", storyId);
+        } catch (error) {
+          console.error(
+            `[StoryStateManager] Failed to load story ${storyId}:`,
+            error
+          );
+        }
+      }
+
+      console.log("[StoryStateManager] Finished loading stories");
+      return;
+    } catch (error) {
+      console.error(
+        "[StoryStateManager] Failed to load existing stories:",
+        error
+      );
+    }
+  }
+
+  // Add method to get all loaded stories
+  getAllStories(): Array<{ storyId: string; state: StoryState }> {
+    return Array.from(this.storyStates.entries()).map(([storyId, state]) => ({
+      storyId,
+      state,
+    }));
+  }
+
+  async findStateByCode(
+    code: string
+  ): Promise<{ storyId: string; state: StoryState } | null> {
+    console.log("[StoryStateManager] Searching for state with code:", code);
+
+    try {
+      const files = await fs.readdir(this.storageDir);
+      console.log(
+        "[StoryStateManager] Searching through ",
+        files.length,
+        " story files"
+      );
+
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+
+        const storyId = path.parse(file).name;
+        const filePath = path.join(this.storageDir, file);
+        const data = await fs.readFile(filePath, "utf-8");
+        const state = JSON.parse(data) as StoryState;
+
+        // Check if this state contains the code
+        if (
+          state.playerCodes &&
+          Object.values(state.playerCodes).includes(code)
+        ) {
+          console.log("[StoryStateManager] Found code in story:", storyId);
+
+          // Cache the found state
+          this.storyStates.set(storyId, state);
+          console.log("[StoryStateManager] Cached found state in memory");
+
+          return { storyId, state };
+        }
+      }
+
+      console.log("[StoryStateManager] Code not found in any story files");
+      return null;
+    } catch (error) {
+      console.error("[StoryStateManager] Error searching for code:", error);
+      return null;
+    }
+  }
+}
+
+// Export singleton instance
+export const storyStateManager = new StoryStateManager();

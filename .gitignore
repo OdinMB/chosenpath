@@ -32,5 +32,5 @@ boiler
 .vite/**
 
 # Keep story_states folder but ignore contents
-story_states
+data
 working files
