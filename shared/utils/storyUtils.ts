@@ -87,6 +87,9 @@ export const filterStateForPlayer = (
     (stat) => stat.isVisible !== false
   );
 
+  // Get pending players
+  const pendingPlayers = getPendingPlayers(state);
+
   // Remove other players' codes
   filteredState.playerCodes = { [playerSlot]: state.playerCodes[playerSlot] };
 
@@ -100,5 +103,6 @@ export const filterStateForPlayer = (
     maxTurns,
     generateImages,
     images,
+    pendingPlayers,
   };
 };

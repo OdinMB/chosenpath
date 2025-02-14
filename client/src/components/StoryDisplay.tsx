@@ -2,10 +2,37 @@
 import React from "react";
 import { useSession } from "../hooks/useSession";
 import { BeatHistory } from "./BeatHistory";
+import { PlayerSlot } from "../../../shared/types/players";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
 }
+
+const PendingPlayers = ({
+  pendingPlayers,
+}: {
+  pendingPlayers: PlayerSlot[];
+}) => {
+  if (pendingPlayers.length === 0) return null;
+
+  return (
+    <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+      <h3 className="text-sm font-medium text-yellow-800">
+        Waiting for players:
+      </h3>
+      <div className="mt-1 text-sm text-yellow-600">
+        {pendingPlayers.map((slot) => (
+          <span
+            key={slot}
+            className="inline-block px-2 py-1 m-1 bg-yellow-100 rounded"
+          >
+            Player {slot.replace("player", "")}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const { storyState, isLoading } = useSession();
@@ -63,11 +90,16 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         ? localSelectedChoice!
         : currentBeat.choice;
       return (
-        <div className="mt-6 text-lg bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-          <span className="font-bold">Choice: </span>
-          <span className="text-indigo-800">
-            {currentBeat.options[choiceIndex]}
-          </span>
+        <div className="space-y-4">
+          <div className="mt-6 text-lg bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+            <span className="font-bold">Choice: </span>
+            <span className="text-indigo-800">
+              {currentBeat.options[choiceIndex]}
+            </span>
+          </div>
+          {storyState?.pendingPlayers && (
+            <PendingPlayers pendingPlayers={storyState.pendingPlayers} />
+          )}
         </div>
       );
     }

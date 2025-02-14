@@ -4,7 +4,12 @@ import { BeatHistory } from "./beat.js";
 import { statsSchema, statSchema } from "./stat.js";
 import { NPCsSchema, PCSchema } from "./character.js";
 import { outcomesSchema } from "./outcome.js";
-import { PLAYER_SLOTS, ExactPlayerMap, PlayerCount } from "./players.js";
+import {
+  PLAYER_SLOTS,
+  ExactPlayerMap,
+  PlayerCount,
+  PlayerSlot,
+} from "./players.js";
 
 // GENERATION WITH LLM
 
@@ -95,4 +100,5 @@ export type ClientStoryState = {
   maxTurns: number;
   generateImages: boolean;
   images: ImageLibrary;
+  pendingPlayers: PlayerSlot[];
 };
