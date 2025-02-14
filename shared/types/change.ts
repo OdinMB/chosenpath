@@ -1,7 +1,12 @@
 import { z } from "zod";
+import { PLAYER_SLOTS, PlayerSlot } from "./players.js";
 
 export const statChangeSchema = z.object({
   type: z.literal("statChange"),
+  group: z.union([
+    z.literal("world"), 
+    z.enum(PLAYER_SLOTS as [string, ...string[]])
+  ]).describe("Target group for the change - either 'world' or a player slot"),
   stat: z.string().describe("ID of the stat to modify"),
   change: z
     .enum([
@@ -33,6 +38,7 @@ export const newFactSchema = z.object({
 
 export const newMilestoneSchema = z.object({
   type: z.literal("newMilestone"),
+  player: z.enum(PLAYER_SLOTS as [string, ...string[]]).describe("Player slot this milestone belongs to"),
   outcome: z
     .string()
     .describe("ID of the outcome that this new milestone will be added to."),

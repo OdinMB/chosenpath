@@ -100,24 +100,18 @@ export class GameHandler {
       });
       console.log('[GameHandler] Emitted player codes: ', stateWithCodes.playerCodes);
 
-      // Leave this in; we'll use it later
-      // // Generate first beat
-      // const firstBeat = await this.storyService.generateNextBeat(stateWithCodes);
-      // console.log('[GameHandler] Generated first beat:', firstBeat.title);
+      // Generate first set of beats
+      const stateWithInitialBeats = await this.storyService.generateNextSetOfBeats(stateWithCodes);
+      console.log('[GameHandler] Generated first set of beats:');
       
-      // const stateWithBeat = {
-      //   ...stateWithCodes,
-      //   beatHistory: [firstBeat]
-      // };
-      
-      // // Update the stored state with the first beat
-      // await this.storyStateManager.updateState(storyId, stateWithBeat);
-      // console.log('[GameHandler] Updated state with first beat');
+      // Update the stored state with the first beat
+      await this.storyStateManager.updateState(storyId, stateWithInitialBeats);
+      console.log('[GameHandler] Updated state with initial beats');
 
-      // // Generate and update image if needed
-      // if (generateImages) {
-      //   await this.generateAndUpdateImage(storyId, stateWithBeat);
-      // }
+      // Generate and update image if needed
+      if (generateImages) {
+        await this.generateAndUpdateImage(storyId, stateWithInitialBeats);
+      }
     } catch (error) {
       console.error('[GameHandler] Failed to initialize story:', error);
       this.socket.emit("error", { error: "Failed to initialize story" });

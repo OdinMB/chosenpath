@@ -2,13 +2,14 @@ import { ChatOpenAI } from "@langchain/openai";
 import OpenAI from "openai";
 import type { StoryState, StorySetup, PlayerStateGeneration } from "../../../shared/types/story.js";
 import type { Beat } from "../../../shared/types/beat.js";
-import { beatGenerationSchema } from "../../../shared/types/beat.js";
 import { ChangeService } from "./ChangeService.js";
 import dotenv from 'dotenv';
 import type { ImageGeneration } from "../../../shared/types/image.js";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
+import { createSetOfBeatPlanGenerationSchema } from "../../../shared/types/beat.js";
+import type { PlayerSlot } from "../../../shared/types/players.js";
 dotenv.config();
 
 export class StoryService {
@@ -64,6 +65,7 @@ export class StoryService {
       establishedFacts: [],
       generateImages,
       images: [],
+      playerCodes: {},
     };
   }
 
@@ -104,33 +106,26 @@ export class StoryService {
     }
   }
 
-  async generateNextBeat(state: StoryState): Promise<Beat & { imageGeneration?: ImageGeneration }> {
-    const structuredModel = this.model.withStructuredOutput(beatGenerationSchema);
+  async generateNextSetOfBeats(state: StoryState): Promise<Record<PlayerSlot, Beat & { imageGeneration?: ImageGeneration }>> {
+    const schema = createSetOfBeatPlanGenerationSchema(Object.keys(state.players).length as PlayerCount);
+    const structuredModel = this.model.withStructuredOutput(schema);
 
     try {
-      console.log("Generating beat for turn:", state.beatHistory.length + 1);
+      console.log("Generating beats for turn:", Object.values(state.players)[0].beatHistory.length + 1);
       const response = await structuredModel.invoke(
         this.createBeatPrompt(state)
       );
 
-      console.log("Plan:", response.plan);
-      console.log("Image generation:", response.imageGeneration);
+      console.log("Response:\n", response);
+      // console.log("Plan:", response.plan);
+      // console.log("Changes:", response.changes);
 
-      const beatWithImageGen: Beat & { imageGeneration?: ImageGeneration } = {
-        title: response.beat.title,
-        text: response.beat.text,
-        summary: response.beat.summary,
-        imageId: response.beat.imageId,
-        options: response.beat.options,
-        changes: response.beat.changes,
-        choice: -1,
-        imageGeneration: response.imageGeneration
-      };
+      // ToDo: return updated story state?
 
-      return beatWithImageGen;
+      return response;
     } catch (error) {
-      console.error("Failed to generate next beat:", error);
-      throw new Error("Failed to generate next beat. Please try again.");
+      console.error("Failed to generate next beats:", error);
+      throw new Error("Failed to generate next beats. Please try again.");
     }
   }
 
@@ -164,84 +159,31 @@ export class StoryService {
   }
 
   private createBeatPrompt(state: StoryState): string {
-    const beatHistorySection = state.beatHistory
-      .map((beat, index) => {
-        const beatWithChoice = beat as Beat;
-        const isLastBeat = index === state.beatHistory.length - 1;
-        const chosenOption =
-          beatWithChoice.choice >= 0
-            ? beatWithChoice.options[beatWithChoice.choice]
-            : null;
+    const playersSection = Object.entries(state.players).map(([slot, playerState]) => {
+      const beatHistorySection = playerState.beatHistory
+        .map((beat, index) => {
+          const isLastBeat = index === playerState.beatHistory.length - 1;
+          const chosenOption = beat.choice >= 0 ? beat.options[beat.choice] : null;
 
-        return `Beat ${index + 1}:
+          return `Beat ${index + 1}:
 Summary: ${beat.summary}${
-          isLastBeat
-            ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
-            : ""
-        }${chosenOption ? `\nChosen option: ${chosenOption.text}` : ""}`;
-      })
-      .join("\n\n");
+            isLastBeat
+              ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
+              : ""
+          }${chosenOption ? `\nPlayer choice: ${chosenOption}` : ""}`;
+        })
+        .join("\n\n");
 
-    const hasUnintroducedOutcomes = state.outcomes.some(
-      (outcome) => outcome.milestones.length === 0
-    );
+      const hasUnintroducedOutcomes = playerState.outcomes.some(
+        (outcome) => outcome.milestones.length === 0
+      );
 
-    const prompt = `Game state:
+      return `#####################################\n######## PLAYER ID: ${slot} ########\n#####################################\n
+      ${playerState.character.name} (${playerState.character.pronouns})
+${playerState.character.fluff}
 
-STORY GUIDELINES
-- Setting elements: ${state.guidelines.settingElements.join(", ")}
-- Rules: ${state.guidelines.rules.join(", ")}
-- Tone: ${state.guidelines.tone.join(", ")}
-- Core conflicts: ${state.guidelines.conflicts.join(", ")}
-- Decision types: ${state.guidelines.decisions.join(", ")}
-
-PLAYER CHARACTER: ${state.player.name} (${state.player.pronouns})
-${state.player.fluff}
-
-NPCs:
-${state.npcs
-  .map(
-    (npc) =>
-      `- ${npc.name} (${npc.pronouns}, ${npc.role}): ${npc.traits.join(", ")}`
-  )
-  .join("\n")}
-
-OUTCOMES that will define the story's ending:
-${state.outcomes
-  .map(
-    (outcome) =>
-      `id: ${outcome.id}
-${outcome.question}
-Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}
-Milestones (${outcome.milestones.length} / ${
-        outcome.intendedNumberOfMilestones
-      } to resolution):
-${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
-  )
-  .join("\n\n")}${
-      hasUnintroducedOutcomes
-        ? "\nNote: If an outcome has 0 milestones, it means that it hasn't yet been introduced to the player. When you introduce it, create a milestone to mark its introduction."
-        : ""
-    }
-
-STORY PROGRESS: Turn: ${state.beatHistory.length + 1}/${state.maxTurns}
-
-IMAGES: ${
-      state.generateImages
-        ? "Are to be generated (or chosen from the library)"
-        : "Are NOT to be generated"
-    }
-
-${
-  state.generateImages
-    ? `IMAGE LIBRARY:
-${state.images.map((image) => `- ${image.id}: ${image.description}`).join("\n")}
-
-`
-    : ""
-}CURRENT STATS:
-
-${state.stats
+CHARACTER STATS:
+${playerState.characterStats
   .map((stat) => {
     const formattedValue = (() => {
       switch (stat.type) {
@@ -256,38 +198,101 @@ ${state.stats
       }
     })();
 
-    return `- ${stat.name} (id: ${stat.id}, type: ${
-      stat.type
-    }): ${formattedValue}${
+    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${
       stat.isVisible === false ? " (not visible to the player)" : ""
     }${stat.hint ? `\nHint: ${stat.hint}` : ""}`;
   })
   .join("\n")}
 
+OUTCOMES that will define this character's story ending:
+${playerState.outcomes
+  .map(
+    (outcome) =>
+      `id: ${outcome.id}
+${outcome.question}
+Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}
+Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):
+${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
+  )
+  .join("\n\n")}
+
 BEAT HISTORY:
 ${beatHistorySection}
+`;
+    }).join("\n\n" + "=".repeat(80) + "\n\n");
 
-PLAN THE NEXT BEAT:
+    const prompt = `======= CURRENT GAME STATE =======
+
+STORY GUIDELINES
+- Setting elements: ${state.guidelines.settingElements.join(", ")}
+- Rules: ${state.guidelines.rules.join(", ")}
+- Tone: ${state.guidelines.tone.join(", ")}
+- Core conflicts: ${state.guidelines.conflicts.join(", ")}
+- Decision types: ${state.guidelines.decisions.join(", ")}
+
+NPCs:
+${state.npcs
+  .map(
+    (npc) =>
+      `- ${npc.name} (${npc.pronouns}, ${npc.role}): ${npc.traits.join(", ")}`
+  )
+  .join("\n")}
+
+STORY PROGRESS: Turn: ${Object.values(state.players)[0].beatHistory.length + 1}/${state.maxTurns}
+
+WORLD STATS:
+${state.worldStats
+  .map((stat) => {
+    const formattedValue = (() => {
+      switch (stat.type) {
+        case "percentage":
+          return `${stat.value}%`;
+        case "string[]":
+          return Array.isArray(stat.value) ? stat.value.join(", ") : stat.value;
+        case "boolean":
+          return stat.value.toString();
+        default:
+          return stat.value;
+      }
+    })();
+
+    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${
+      stat.isVisible === false ? " (not visible to the player)" : ""
+    }${stat.hint ? `\nHint: ${stat.hint}` : ""}`;
+  })
+  .join("\n")}
+
+IMAGES: ${state.generateImages ? "Are to be generated (or chosen from the library)" : "Are NOT to be generated"}
+
+${state.generateImages ? `IMAGE LIBRARY:
+${state.images.map((image) => `- ${image.id}: ${image.description}`).join("\n")}
+
+` : ""}${playersSection}
+
+======= YOUR JOB: GENERATE THE NEXT SET OF STORY BEATS =======
+
 Each beat must do five things:
 
-1. Define changes to the story state based on the player's choice in the previous beat.
-2. Give narrative feedback so the player understands these changes (except when the affected stats are not visible to the player).
-3. Decide to continue the scene or thread of the previous beat or to start a new one.
-4. Make Progress Towards Story Outcomes:
-5. Develop World and Characters:
+1. Define changes to the story state based on the players' choices in the previous beats.
+2. Give narrative feedback so the players understand these changes (except when the affected stats are not visible to the player).
+Skip steps 1+2 if this is the first set of beats in the game.
+3. Decide to continue the scene or thread of the previous beats or to start new ones.
+4. Make Progress Towards Story Outcomes
+Note: If an outcome has 0 milestones, it means that it hasn't yet been introduced to the player. When you introduce it, create a milestone to mark its introduction.
+5. Develop World and Characters
 
 Consider the following:
 - the story's key conflicts and types of decisions
-- the status of outcomes, especially how many milestones are still missing for their resolution and the number of remaining beats
-- the player's stats and relationships
-- the previous beat to continue the story naturally
+- the status of outcomes for each player, especially how many milestones are still missing for their resolution and the number of remaining beats
+- each player's stats and relationships
+- the previous beats to continue the story naturally
 
-CREATE AN ENGAGING BEAT with:
+CREATE ENGAGING BEATS for each player with:
 - a descriptive title
 - 3-4 paragraphs of narrative text
 - 3 meaningful options for the player to choose from`;
 
-    console.log("Beat generation prompt:", prompt);
+    console.log("\n\n########\nBeat generation prompt\n########\n", prompt, "\n\n");
     return prompt;
   }
 
