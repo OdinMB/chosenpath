@@ -1,9 +1,5 @@
 # Feature backlog
 
-Full functionality
-
-- mobile-friendly frontend
-
 Easy nice-to-haves
 
 - display which players have made their choice

@@ -48,11 +48,11 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
   const hasWorldStats = Object.keys(storyState.worldStats).length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen">
       {/* Mobile Stats Toggle */}
       <button
         onClick={() => setShowStats(!showStats)}
-        className="fixed top-4 right-4 md:hidden z-20 bg-white p-2 rounded-lg shadow-sm"
+        className="fixed top-4 right-4 md:hidden z-30 bg-white p-2 rounded-lg shadow-sm"
         aria-label="Toggle Stats Panel"
       >
         {showStats ? (
@@ -86,19 +86,21 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
         )}
       </button>
 
-      <div className="mx-auto max-w-7xl flex flex-col md:flex-row gap-4 min-h-screen">
+      <div className="md:flex">
         {/* Sidebar */}
         <aside
           className={`
-          w-full md:w-80 bg-white shadow-sm
-          fixed md:relative
-          inset-0 z-10 md:z-0
-          transform transition-transform duration-200 ease-in-out
-          ${showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-          overflow-y-auto
-          p-4
-          flex flex-col
-        `}
+            w-80 bg-white shadow-sm
+            fixed md:sticky top-0 h-screen
+            z-20 md:z-0
+            transform transition-transform duration-200 ease-in-out
+            ${
+              showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+            }
+            overflow-y-auto md:overflow-visible
+            p-4
+            flex flex-col
+          `}
         >
           <section className="mb-6 pb-4">
             <h2 className="text-xl font-semibold text-gray-900 mb-1 text-center">
@@ -126,8 +128,8 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           </button>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 bg-white shadow-sm p-4 md:p-6 overflow-y-auto">
+        {/* Main Content Area */}
+        <main className="flex-1">
           <StoryDisplay onChoiceSelected={onChoiceSelected} />
         </main>
       </div>
