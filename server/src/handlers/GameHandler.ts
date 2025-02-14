@@ -53,7 +53,6 @@ export class GameHandler {
       }
 
       this.sessionService.setPlayerContext(sessionId, storyId, playerSlot);
-
       const filteredState = filterStateForPlayer(state, playerSlot);
       console.log('[GameHandler] Successfully found and filtered state for code:', code);
       return { state: filteredState as ClientStoryState };
@@ -101,13 +100,15 @@ export class GameHandler {
       console.log('[GameHandler] Emitted player codes: ', stateWithCodes.playerCodes);
 
       // Generate first set of beats
-      const stateWithInitialBeats = await this.storyService.generateNextSetOfBeats(stateWithCodes);
+      const stateWithInitialBeats = await this.storyService.addNextSetOfBeats(stateWithCodes);
       console.log('[GameHandler] Generated first set of beats:');
       
       // Update the stored state with the first beat
       await this.storyStateManager.updateState(storyId, stateWithInitialBeats);
       console.log('[GameHandler] Updated state with initial beats');
 
+      // ToDo: Emit the updated state to all players
+      
       // Generate and update image if needed
       if (generateImages) {
         await this.generateAndUpdateImage(storyId, stateWithInitialBeats);

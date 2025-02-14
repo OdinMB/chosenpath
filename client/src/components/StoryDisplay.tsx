@@ -115,7 +115,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               {choiceMade ? (
                 <div>
                   <div className="choice-button w-full p-3 text-left border rounded">
-                  Decision: {currentBeat.options[localSelectedChoice].text}
+                  Decision: {currentBeat.options[localSelectedChoice]}
                   </div>
                 </div>
               ) : (
@@ -127,7 +127,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                       disabled={isLoading}
                       className="choice-button w-full p-3 text-left border rounded hover:bg-gray-100 disabled:opacity-50"
                     >
-                      {option.text}
+                      {option}
                     </button>
                   ))}
                 </div>

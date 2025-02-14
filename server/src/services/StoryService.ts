@@ -106,23 +106,58 @@ export class StoryService {
     }
   }
 
-  async generateNextSetOfBeats(state: StoryState): Promise<Record<PlayerSlot, Beat & { imageGeneration?: ImageGeneration }>> {
+  async addNextSetOfBeats(state: StoryState): Promise<StoryState> {
     const schema = createSetOfBeatPlanGenerationSchema(Object.keys(state.players).length as PlayerCount);
     const structuredModel = this.model.withStructuredOutput(schema);
 
     try {
       console.log("Generating beats for turn:", Object.values(state.players)[0].beatHistory.length + 1);
+      
+      // type SetOfBeatPlanGenerationSchema
       const response = await structuredModel.invoke(
         this.createBeatPrompt(state)
       );
 
       console.log("Response:\n", response);
-      // console.log("Plan:", response.plan);
-      // console.log("Changes:", response.changes);
 
-      // ToDo: return updated story state?
+      // Create updated state with new beats and changes
+      let updatedState = { ...state };
 
-      return response;
+      // Apply any changes from the previous beat's choices
+      if (response.changes.length > 0) {
+        updatedState = this.changeService.applyChanges(updatedState, response.changes);
+      }
+
+      // Add the new beats to each player's history
+      // ToDo: This should be done more elegantly with a beat schema
+      Object.entries(response).forEach(([key, value]) => {
+        if (
+          key.startsWith('player') && 
+          typeof value === 'object' && 
+          value !== null && 
+          'title' in value &&
+          'options' in value &&
+          'text' in value &&
+          'summary' in value &&
+          'imageId' in value
+        ) {
+          const playerSlot = key.toLowerCase() as PlayerSlot;
+          if (updatedState.players[playerSlot]) {
+            const beat: Beat = {
+              title: value.title as string,
+              options: value.options as string[],
+              text: value.text as string,
+              summary: value.summary as string,
+              imageId: value.imageId as string,
+              choice: -1,
+            };
+            updatedState.players[playerSlot].beatHistory.push(beat);
+          }
+        }
+      });
+
+      console.log("Updated state:\n", updatedState);
+      return updatedState;
     } catch (error) {
       console.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
@@ -134,24 +169,9 @@ export class StoryService {
     optionIndex: number
   ): Promise<StoryState> {
     try {
-      if (!state.beatHistory.length) return state;
+      // ToDo: Implement this
 
-      const currentBeat = state.beatHistory[state.beatHistory.length - 1];
-      const updatedBeat = { ...currentBeat, choice: optionIndex };
-
-      let updatedState = {
-        ...state,
-        beatHistory: [...state.beatHistory.slice(0, -1), updatedBeat],
-      };
-
-      if (updatedBeat.changes.length > 0) {
-        updatedState = this.changeService.applyChanges(
-          updatedState,
-          updatedBeat.changes
-        );
-      }
-
-      return updatedState;
+      return state;
     } catch (error) {
       console.error("Error in processPlayerChoice:", error);
       throw error;

@@ -91,6 +91,7 @@ export const createSetOfBeatPlanGenerationSchema = (playerCount: PlayerCount) =>
     ...beatSchemas,
   }).strict().describe("Set of beat generations for all players");
 };
+export type SetOfBeatPlanGenerationSchema = z.infer<ReturnType<typeof createSetOfBeatPlanGenerationSchema>>;
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;

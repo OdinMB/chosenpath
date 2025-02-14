@@ -1,10 +1,39 @@
 import { useSession } from "../hooks/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
+import { z } from "zod";
+import { statSchema } from "../../../shared/types/stat";
+
+type Stat = z.infer<typeof statSchema>;
 
 interface Props {
   onExitGame: () => void;
   onChoiceSelected: (optionIndex: number) => void;
+}
+
+function StatSection({ title, stats }: { title?: string; stats: Stat[] }) {
+  const visibleStats = stats.filter(stat => stat.isVisible !== false);
+  
+  return (
+    <div>
+      {title && (
+        <h3 className="text-gray-700 mb-2 text-center">{title}</h3>
+      )}
+      <div className="space-y-3">
+        {visibleStats.map((stat) => (
+          <StatDisplay
+            key={stat.id}
+            name={stat.name}
+            value={stat.value}
+            type={stat.type}
+          />
+        ))}
+        {visibleStats.length === 0 && (
+          <div className="text-gray-500 italic">No {title?.toLowerCase() ?? 'character'} stats available</div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
@@ -17,8 +46,6 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
   // Get the player data from the first (and only) player in the players object
   const playerSlot = Object.keys(storyState.players)[0];
   const player = storyState.players[playerSlot];
-  const stats = [...player.characterStats, ...storyState.worldStats];
-  const visibleStats = stats.filter((stat) => stat.isVisible !== false);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -34,18 +61,9 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           </section>
 
           {/* Stats Section */}
-          <section className="space-y-3">
-            {visibleStats.map((stat) => (
-              <StatDisplay
-                key={stat.id}
-                name={stat.name}
-                value={stat.value}
-                type={stat.type}
-              />
-            ))}
-            {visibleStats.length === 0 && (
-              <div className="text-gray-500 italic">No stats available</div>
-            )}
+          <section className="space-y-8">
+            <StatSection stats={player.characterStats} />
+            <StatSection title="World" stats={storyState.worldStats} />
           </section>
 
           <button
