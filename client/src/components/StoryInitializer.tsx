@@ -65,101 +65,106 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Interactive Fiction Generator
-      </h1>
+    <div className="min-h-screen p-4 md:p-6">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 text-center">
+          Interactive Fiction Generator
+        </h1>
 
-      {isConnecting ? (
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Connecting to server...</p>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <div className="flex justify-between items-center mb-2">
+        {isConnecting ? (
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Connecting to server...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
+                <label
+                  htmlFor="prompt"
+                  className="text-sm md:text-base font-medium text-gray-700"
+                >
+                  What kind of story would you like to experience?
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSuggestion}
+                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors duration-200"
+                  disabled={isLoading}
+                >
+                  Get suggestion
+                </button>
+              </div>
+              <textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-gray-300 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief..."
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="flex items-center bg-gray-50 rounded-lg p-3 md:p-4">
+              <input
+                id="generate-images"
+                type="checkbox"
+                checked={generateImages}
+                onChange={(e) => setGenerateImages(e.target.checked)}
+                className="h-4 w-4 md:h-5 md:w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                disabled={isLoading}
+              />
               <label
-                htmlFor="prompt"
-                className="block text-base font-medium text-gray-700"
+                htmlFor="generate-images"
+                className="ml-2 md:ml-3 text-sm md:text-base text-gray-700"
               >
-                What kind of story would you like to experience?
+                Generate images for the story
               </label>
+            </div>
+
+            <div className="flex flex-col space-y-2 bg-gray-50 rounded-lg p-3 md:p-4">
+              <label
+                htmlFor="player-count"
+                className="text-sm md:text-base text-gray-700"
+              >
+                Number of Players: {playerCount}
+              </label>
+              <input
+                id="player-count"
+                type="range"
+                min="1"
+                max={MAX_PLAYERS}
+                value={playerCount}
+                onChange={(e) => setPlayerCount(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                disabled={isLoading}
+              />
+              <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                <span>Single Player</span>
+                <span>{MAX_PLAYERS} Players</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
               <button
                 type="button"
-                onClick={handleSuggestion}
-                className="px-3 py-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors duration-200"
-                disabled={isLoading}
+                onClick={onBack}
+                className="w-full sm:w-1/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
               >
-                Get suggestion
+                Back
+              </button>
+
+              <button
+                type="submit"
+                disabled={isLoading || !prompt.trim() || isConnecting}
+                className="w-full sm:w-2/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors duration-200"
+              >
+                {isLoading ? "Creating Story..." : "Create Story"}
               </button>
             </div>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="w-full min-h-[100px] rounded-lg border border-gray-300 shadow-sm px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
-              placeholder="For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief..."
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="flex items-center bg-gray-50 rounded-lg p-4">
-            <input
-              id="generate-images"
-              type="checkbox"
-              checked={generateImages}
-              onChange={(e) => setGenerateImages(e.target.checked)}
-              className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              disabled={isLoading}
-            />
-            <label
-              htmlFor="generate-images"
-              className="ml-3 text-base text-gray-700"
-            >
-              Generate images for the story
-            </label>
-          </div>
-
-          <div className="flex flex-col space-y-2 bg-gray-50 rounded-lg p-4">
-            <label htmlFor="player-count" className="text-base text-gray-700">
-              Number of Players: {playerCount}
-            </label>
-            <input
-              id="player-count"
-              type="range"
-              min="1"
-              max={MAX_PLAYERS}
-              value={playerCount}
-              onChange={(e) => setPlayerCount(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              disabled={isLoading}
-            />
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>Single Player</span>
-              <span>{MAX_PLAYERS} Players</span>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={onBack}
-              className="w-1/3 py-3 px-4 rounded-lg text-base font-medium text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-            >
-              Back
-            </button>
-
-            <button
-              type="submit"
-              disabled={isLoading || !prompt.trim() || isConnecting}
-              className="w-2/3 py-3 px-4 rounded-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors duration-200"
-            >
-              {isLoading ? "Creating Story..." : "Create Story"}
-            </button>
-          </div>
-        </form>
-      )}
+          </form>
+        )}
+      </div>
     </div>
   );
 }

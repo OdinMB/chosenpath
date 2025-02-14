@@ -77,31 +77,27 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     playerState.beatHistory[playerState.beatHistory.length - 1];
 
   return (
-    <div className="story-display space-y-6">
+    <div className="story-display space-y-4 md:space-y-6">
       {playerState.beatHistory.length > 0 && (
-        <div className="story-progress text-center text-sm text-gray-600 pb-0 -mb-5">
+        <div className="story-progress text-center text-sm text-gray-600">
           Turn {playerState.beatHistory.length} of {storyState.maxTurns}
         </div>
       )}
 
       {currentBeat && (
         <>
-          <h2 className="text-2xl font-bold text-center mt-0 pt-0">
+          <h2 className="text-xl md:text-2xl font-bold text-center">
             {currentBeat.title}
           </h2>
 
           <div className="narrative-container relative">
             {storyState.generateImages && (
               <div
-                className={`float-right ml-6 mb-4 w-64 h-64 ${
-                  !currentBeat.imageId ||
-                  !storyState.images.find(
-                    (img) =>
-                      img.id === currentBeat.imageId && img.status === "ready"
-                  )
-                    ? "bg-gray-50"
-                    : ""
-                }`}
+                className={`
+                w-full md:w-64 md:float-right md:ml-6 mb-4 
+                aspect-square md:h-64
+                ${!currentBeat.imageId ? "bg-gray-50" : ""}
+              `}
               >
                 {currentBeat.imageId &&
                 storyState.images.find(
@@ -151,7 +147,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               </div>
             )}
 
-            <div className="narrative-text whitespace-pre-wrap">
+            <div className="narrative-text whitespace-pre-wrap text-base md:text-lg">
               {currentBeat.text}
             </div>
           </div>
@@ -185,37 +181,26 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           )}
 
           {currentBeat.options && (
-            <>
-              {choiceMade ? (
-                <div>
-                  <div className="choice-button w-full p-3 text-left border rounded">
-                    <strong>Choice:</strong>{" "}
-                    {currentBeat.options[localSelectedChoice]}
-                  </div>
-                </div>
-              ) : (
-                <div className="choices-container space-y-4">
-                  {currentBeat.options.map((option, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleChoiceClick(index)}
-                      disabled={isLoading}
-                      className="choice-button w-full p-3 text-left 
-                        border-2 rounded-lg
-                        bg-white hover:bg-blue-50 active:bg-blue-100
-                        border-blue-400 hover:border-blue-500
-                        shadow-sm hover:shadow-md
-                        transition-all duration-150
-                        disabled:opacity-50 disabled:hover:bg-white 
-                        disabled:border-gray-300 disabled:hover:border-gray-300
-                        disabled:shadow-none disabled:hover:shadow-none"
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+            <div className="choices-container space-y-3 md:space-y-4 mt-4 md:mt-6">
+              {currentBeat.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleChoiceClick(index)}
+                  disabled={isLoading}
+                  className="choice-button w-full p-3 text-left text-sm md:text-base
+                    border-2 rounded-lg
+                    bg-white hover:bg-blue-50 active:bg-blue-100
+                    border-blue-400 hover:border-blue-500
+                    shadow-sm hover:shadow-md
+                    transition-all duration-150
+                    disabled:opacity-50 disabled:hover:bg-white 
+                    disabled:border-gray-300 disabled:hover:border-gray-300
+                    disabled:shadow-none disabled:hover:shadow-none"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           )}
         </>
       )}
