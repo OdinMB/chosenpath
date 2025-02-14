@@ -42,6 +42,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         console.log("[SessionProvider] Story exit confirmed");
         setStoryState(null);
         setSessionId(null);
+        setStoryCodes(null);
         localStorage.removeItem("sessionId");
       }
     });
@@ -99,6 +100,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setIsLoading,
     isConnecting,
     storyCodes,
+    setStoryCodes,
     error,
     setError,
   };

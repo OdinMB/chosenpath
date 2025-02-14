@@ -18,6 +18,7 @@ function App() {
     sessionId,
     setSessionId,
     storyCodes,
+    setStoryCodes,
     error,
     setError,
   } = useSession();
@@ -93,11 +94,10 @@ function App() {
   const handleExitGame = () => {
     gameService.exitStory();
     setStoryState(null);
+    setStoryCodes(null);
     wsService.clearSession();
     setSessionId(null);
     setViewState("WELCOME");
-    setPlayerCode(null);
-    localStorage.removeItem(playerCodeKey);
   };
 
   const handleNewStory = () => {

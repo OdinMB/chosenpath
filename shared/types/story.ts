@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { imageLibrarySchema } from "./image.js";
+import { ImageLibrary } from "./image.js";
 import { BeatHistory } from "./beat.js";
 import { statsSchema, statSchema } from "./stat.js";
 import { NPCsSchema, PCSchema } from "./character.js";
@@ -35,7 +35,9 @@ export const guidelinesSchema = z
 export const playerStateGenerationSchema = z.object({
   character: PCSchema,
   outcomes: outcomesSchema,
-  characterStats: z.array(statSchema).describe("Stats belonging to this player character"),
+  characterStats: z
+    .array(statSchema)
+    .describe("Stats belonging to this player character"),
 });
 export type PlayerStateGeneration = z.infer<typeof playerStateGenerationSchema>;
 
@@ -44,16 +46,19 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   const playerSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
       `player${i + 1}`,
-      playerStateGenerationSchema
+      playerStateGenerationSchema,
     ])
   ) as Record<`player${number}`, typeof playerStateGenerationSchema>;
 
-  return z.object({
-    guidelines: guidelinesSchema,
-    ...playerSchemas,
-    npcs: NPCsSchema,
-    worldStats: z.array(statSchema).describe("Stats of the world")
-  }).strict().describe("Initial setup for the story");
+  return z
+    .object({
+      guidelines: guidelinesSchema,
+      ...playerSchemas,
+      npcs: NPCsSchema,
+      worldStats: z.array(statSchema).describe("Stats of the world"),
+    })
+    .strict()
+    .describe("Initial setup for the story");
 };
 
 // Helper type for the response - simplified by using ExactPlayerMap
@@ -79,7 +84,7 @@ export type StoryState = {
   establishedFacts: string[];
   maxTurns: number;
   generateImages: boolean;
-  images: z.infer<typeof imageLibrarySchema>;
+  images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };
 
@@ -89,5 +94,5 @@ export type ClientStoryState = {
   worldStats: z.infer<typeof statsSchema>;
   maxTurns: number;
   generateImages: boolean;
-  images: z.infer<typeof imageLibrarySchema>;
+  images: ImageLibrary;
 };

@@ -99,6 +99,7 @@ export class WebSocketService {
         );
         this.sendMessage({
           type: "verify_code",
+          sessionId: this.sessionId || "",
           code: this.playerCode,
         });
       } else if (this.sessionId) {
@@ -158,16 +159,11 @@ export class WebSocketService {
     });
 
     // Handle error events
-    this.socket.on("error", (error) => {
-      console.log("[WebSocketService] Socket error:", {
-        error,
-        playerCode: this.playerCode,
-        sessionId: this.sessionId,
-      });
-
-      if (error === "Session not found" && this.sessionId) {
-        console.log("[WebSocketService] Clearing invalid session");
-        this.clearSession();
+    this.socket.on("error", (error: string) => {
+      console.log("[WebSocketService] Socket error:", error);
+      if (error === "Session not found" || error === "Invalid session") {
+        this.sessionId = null;
+        localStorage.removeItem("sessionId");
         this.socket?.emit("create_session");
       }
     });

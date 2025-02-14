@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-export const imageUrlSchema = z
-  .string()
-  .url()
-  .describe("URL where the generated image is stored");
-
+// Only used for LLM generation
 export const imageGenerationSchema = z.object({
   prompt: z
     .string()
@@ -21,12 +17,17 @@ export const imageGenerationSchema = z.object({
     ),
 });
 
-export const imageSchema = imageGenerationSchema.extend({
-  url: imageUrlSchema,
-});
+// Types used by the application
+export type ImageStatus = "ready" | "generating" | "failed";
 
-export const imageLibrarySchema = z.array(imageSchema);
+export type Image = {
+  id: string;
+  prompt: string;
+  description: string;
+  url?: string;
+  status: ImageStatus;
+};
 
-export type ImageLibrary = z.infer<typeof imageLibrarySchema>;
+export type ImageLibrary = Image[];
+
 export type ImageGeneration = z.infer<typeof imageGenerationSchema>;
-export type Image = z.infer<typeof imageSchema>;

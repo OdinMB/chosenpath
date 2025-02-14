@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io";
 import type { StoryState } from "../../../shared/types/story.js";
 import { SessionService } from "../services/SessionService.js";
-import { ImageService } from "../services/ImageService.js";
+import { AIImageGenerator } from "../services/AIImageGenerator.js";
 import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
@@ -10,16 +10,13 @@ import { connectionManager } from "../services/ConnectionManager.js";
 import type { PlayerSlot } from "../../../shared/types/players.js";
 import type { Server } from "socket.io";
 import { filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
-import {
-  getCurrentTurn,
-  areAllChoicesSubmitted,
-} from "../../../shared/utils/storyUtils.js";
+import { areAllChoicesSubmitted } from "../../../shared/utils/storyUtils.js";
 import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
 
 export class GameHandler {
   private sessionService: SessionService;
-  private imageService: ImageService;
+  private imageService: AIImageGenerator;
   protected storyStateManager: StoryStateManager;
   private socket: Socket;
   private io: Server;
@@ -30,7 +27,7 @@ export class GameHandler {
     this.socket = socket;
     this.aiStoryGenerator = new AIStoryGenerator();
     this.sessionService = new SessionService();
-    this.imageService = new ImageService();
+    this.imageService = new AIImageGenerator();
     this.storyStateManager = new StoryStateManager();
     this.changeService = new ChangeService();
     this.io = socket.nsp.server;
@@ -92,6 +89,37 @@ export class GameHandler {
     }
   }
 
+  private async generateAndBroadcastNextBeats(
+    storyId: string,
+    state: StoryState
+  ) {
+    // Get next beats, changes, and image generations
+    const [nextState, changes, imageGenerations] =
+      await this.aiStoryGenerator.addNextSetOfBeats(state);
+
+    // Apply changes to state and update/broadcast
+    const stateWithChanges = this.changeService.applyChanges(
+      nextState,
+      changes
+    );
+    await this.storyStateManager.updateState(storyId, stateWithChanges);
+    this.broadcastStateUpdate(storyId, stateWithChanges);
+
+    console.log("[GameHandler] Image generations:", imageGenerations);
+    // Generate images if needed
+    let stateWithImages: StoryState | undefined;
+    if (state.generateImages && imageGenerations.length > 0) {
+      stateWithImages = await this.imageService.generateImagesForState(
+        stateWithChanges,
+        imageGenerations
+      );
+      await this.storyStateManager.updateState(storyId, stateWithImages);
+      this.broadcastStateUpdate(storyId, stateWithImages);
+    }
+
+    return stateWithImages || stateWithChanges;
+  }
+
   async initializeStory(
     sessionId: string,
     prompt: string,
@@ -145,27 +173,12 @@ export class GameHandler {
       );
 
       // Generate first set of beats
-      const [stateWithInitialBeats, changes] =
-        await this.aiStoryGenerator.addNextSetOfBeats(stateWithCodes);
-      console.log("[GameHandler] Generated first set of beats:");
-
-      // Apply any changes from the initial beats
-      const finalState = this.changeService.applyChanges(
-        stateWithInitialBeats,
-        changes
+      const finalState = await this.generateAndBroadcastNextBeats(
+        storyId,
+        stateWithCodes
       );
 
-      // Update the stored state with the first beat
-      await this.storyStateManager.updateState(storyId, finalState);
-      console.log("[GameHandler] Updated state with initial beats");
-
-      // Broadcast the state update to all connected players
-      this.broadcastStateUpdate(storyId, finalState);
-
-      // Generate and update image if needed
-      if (generateImages) {
-        await this.generateAndUpdateImage(storyId, finalState);
-      }
+      // ToDo: call image generation once it has its own function
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
       this.socket.emit("error", { error: "Failed to initialize story" });
@@ -216,18 +229,7 @@ export class GameHandler {
 
       // Check if all players have submitted their choices
       if (areAllChoicesSubmitted(state)) {
-        const [nextState, changes] =
-          await this.aiStoryGenerator.addNextSetOfBeats(state);
-        const updatedState = this.changeService.applyChanges(
-          nextState,
-          changes
-        );
-        await this.storyStateManager.updateState(
-          playerInfo.storyId,
-          updatedState
-        );
-        this.broadcastStateUpdate(playerInfo.storyId, updatedState);
-        await this.generateAndUpdateImage(playerInfo.storyId, updatedState);
+        await this.generateAndBroadcastNextBeats(playerInfo.storyId, state);
       }
     } catch (error) {
       console.error("[GameHandler] Error processing choice:", error);
@@ -268,52 +270,6 @@ export class GameHandler {
     } catch (error) {
       console.error("[GameHandler] Failed to exit story:", error);
       this.socket.emit("error", { error: "Failed to exit story" });
-    }
-  }
-
-  private async generateAndUpdateImage(storyId: string, state: StoryState) {
-    if (!state.generateImages) {
-      console.log("[GameHandler] Image generation disabled");
-      return;
-    }
-
-    const currentBeat = state.beatHistory[state.beatHistory.length - 1];
-    if (!currentBeat) {
-      console.warn("[GameHandler] No current beat found");
-      return;
-    }
-
-    if (currentBeat.imageId) {
-      console.log("[GameHandler] Beat already has image:", currentBeat.imageId);
-      return;
-    }
-
-    console.log("[GameHandler] Generating image for beat:", {
-      title: currentBeat.title,
-      beatIndex: state.beatHistory.length - 1,
-    });
-
-    const imageGeneration = {
-      id: crypto.randomUUID(),
-      prompt: `${currentBeat.title}. ${currentBeat.text}`,
-      description: currentBeat.title,
-    };
-
-    const image = await this.imageService.generateImage(imageGeneration);
-    if (image) {
-      console.log("[GameHandler] Image generated successfully:", {
-        imageId: image.id,
-        beatTitle: currentBeat.title,
-      });
-      const updatedState = this.imageService.updateStateWithImage(state, image);
-      await this.storyStateManager.updateState(storyId, updatedState);
-      this.socket.emit("state_update", { state: updatedState });
-      console.log("[GameHandler] State updated with new image");
-    } else {
-      console.warn(
-        "[GameHandler] Failed to generate image for beat:",
-        currentBeat.title
-      );
     }
   }
 }

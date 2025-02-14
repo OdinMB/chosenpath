@@ -5,12 +5,18 @@ import type {
   PlayerStateGeneration,
 } from "../../../shared/types/story.js";
 import type { Change } from "../../../shared/types/change.js";
-import type { Beat } from "../../../shared/types/beat.js";
+import type {
+  Beat,
+  BeatGeneration,
+  PlayerBeatResponse,
+  SetOfBeatPlanGenerationSchema,
+} from "../../../shared/types/beat.js";
 import dotenv from "dotenv";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { createSetOfBeatPlanGenerationSchema } from "../../../shared/types/beat.js";
+import type { ImageGeneration } from "../../../shared/types/image.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -108,7 +114,9 @@ export class AIStoryGenerator {
     }
   }
 
-  async addNextSetOfBeats(state: StoryState): Promise<[StoryState, Change[]]> {
+  async addNextSetOfBeats(
+    state: StoryState
+  ): Promise<[StoryState, Change[], ImageGeneration[]]> {
     const schema = createSetOfBeatPlanGenerationSchema(
       Object.keys(state.players).length as PlayerCount
     );
@@ -120,35 +128,71 @@ export class AIStoryGenerator {
         Object.values(state.players)[0].beatHistory.length + 1
       );
 
-      const response = await structuredModel.invoke(
+      const response = (await structuredModel.invoke(
         this.createBeatPrompt(state)
-      );
+      )) as SetOfBeatPlanGenerationSchema;
 
       console.log("Response:\n", response);
 
       // Create a copy of the state to add new beats
       let updatedState = { ...state };
 
+      // Filter out ImageGeneration objects for beats that already have an imageId
+      const validImageGenerations = Object.entries(response)
+        .filter(([key, value]) => {
+          return (
+            key.startsWith("player") &&
+            !["plan", "changes"].includes(key) &&
+            typeof value === "object" &&
+            value !== null &&
+            "beat" in value &&
+            typeof value.beat === "object" &&
+            value.beat !== null &&
+            "imageId" in value.beat &&
+            (!value.beat.imageId || value.beat.imageId === "") &&
+            "imageGeneration" in value &&
+            typeof value.imageGeneration === "object" &&
+            value.imageGeneration !== null
+          );
+        })
+        .map(([_, value]) => (value as PlayerBeatResponse).imageGeneration!)
+        .filter((gen): gen is ImageGeneration => gen !== undefined);
+
       // Add the new beats to each player's history
       Object.entries(response).forEach(([key, value]) => {
         if (
           key.startsWith("player") &&
+          !["plan", "changes"].includes(key) &&
           typeof value === "object" &&
           value !== null &&
-          "title" in value &&
-          "options" in value &&
-          "text" in value &&
-          "summary" in value &&
-          "imageId" in value
+          "beat" in value &&
+          typeof value.beat === "object" &&
+          value.beat !== null &&
+          "title" in value.beat &&
+          "options" in value.beat &&
+          "text" in value.beat &&
+          "summary" in value.beat &&
+          "imageId" in value.beat
         ) {
           const playerSlot = key.toLowerCase();
+          const playerResponse = value as PlayerBeatResponse;
           if (updatedState.players[playerSlot]) {
+            const beatData = playerResponse.beat;
+
+            // If there's no imageId but we have an imageGeneration, use its id
+            if (
+              (!beatData.imageId || beatData.imageId === "") &&
+              playerResponse.imageGeneration
+            ) {
+              beatData.imageId = playerResponse.imageGeneration.id;
+            }
+
             const beat: Beat = {
-              title: value.title as string,
-              options: value.options as string[],
-              text: value.text as string,
-              summary: value.summary as string,
-              imageId: value.imageId as string,
+              title: beatData.title,
+              options: beatData.options,
+              text: beatData.text,
+              summary: beatData.summary,
+              imageId: beatData.imageId,
               choice: -1,
             };
             updatedState.players[playerSlot].beatHistory.push(beat);
@@ -156,7 +200,7 @@ export class AIStoryGenerator {
         }
       });
 
-      return [updatedState, response.changes || []];
+      return [updatedState, response.changes, validImageGenerations];
     } catch (error) {
       console.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");

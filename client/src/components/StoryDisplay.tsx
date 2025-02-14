@@ -94,10 +94,20 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             {storyState.generateImages && (
               <div
                 className={`float-right ml-6 mb-4 w-64 h-64 ${
-                  !currentBeat.imageId ? "bg-gray-50" : ""
+                  !currentBeat.imageId ||
+                  !storyState.images.find(
+                    (img) =>
+                      img.id === currentBeat.imageId && img.status === "ready"
+                  )
+                    ? "bg-gray-50"
+                    : ""
                 }`}
               >
-                {currentBeat.imageId ? (
+                {currentBeat.imageId &&
+                storyState.images.find(
+                  (img) =>
+                    img.id === currentBeat.imageId && img.status === "ready"
+                ) ? (
                   <img
                     src={
                       storyState.images.find(

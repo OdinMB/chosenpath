@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { changeSchema } from "./change.js";
-import { imageGenerationSchema } from "./image.js";
+import { imageGenerationSchema, type ImageGeneration } from "./image.js";
 import { PlayerCount } from "./players.js";
+import type { Change } from "./change.js";
 
 export const beatGenerationSchema = z.object({
   title: z
@@ -60,40 +61,56 @@ That said, if the player's early choices make an option unlikely or even impossi
     ),
 });
 
-export const createSetOfBeatPlanGenerationSchema = (playerCount: PlayerCount) => {
+export const createSetOfBeatPlanGenerationSchema = (
+  playerCount: PlayerCount
+) => {
   // Create a record of required beat generation schemas based on player count
   const beatSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
       `player${i + 1}`,
-      beatGenerationSchema
+      beatPlanGenerationSchema,
     ])
-  ) as Record<`player${number}`, typeof beatGenerationSchema>;
+  ) as Record<`player${number}`, typeof beatPlanGenerationSchema>;
 
-  return z.object({
-    plan: z.string().describe(
-      `A preparatory thinking step. Identify changes that should be applied to the story state based on the decisions of all players during the last beat.
+  return z
+    .object({
+      plan: z.string().describe(
+        `A preparatory thinking step. Identify changes that should be applied to the story state based on the decisions of all players during the last beat.
   1. Which changes should be applied to the world stats?
   2. Which changes should be applied to the stats of each player?
   Go through all players and describe the changes for each of them.
   An player's decision can affect their own stats, the world stats, or the stats of another player.
   If this is the first set of beats, just say "No changes (first set of beats)".
   `
-    ),
-    changes: z.array(changeSchema).describe(
-      `List of all changes that will be applied to the story state.
+      ),
+      changes: z.array(changeSchema).describe(
+        `List of all changes that will be applied to the story state.
       ONLY the following types are allowed: statChange, newMilestone, newFact!
       Use newFact only as a backup. Try to track changes via statChange and newMilestone first.
       Include changes to both the world stats and the character stats of each player.
       The players' decisions are tracked separately and don't have to be tracked via newFact.
       If this is the first set of beats, just return an empty list.".
       `
-    ),
-    ...beatSchemas,
-  }).strict().describe("Set of beat generations for all players");
+      ),
+      ...beatSchemas,
+    })
+    .strict()
+    .describe("Set of beat generations for all players");
 };
-export type SetOfBeatPlanGenerationSchema = z.infer<ReturnType<typeof createSetOfBeatPlanGenerationSchema>>;
+export type SetOfBeatPlanGenerationSchema = {
+  plan: string;
+  changes: Change[];
+} & Record<`player${number}`, PlayerBeatResponse>;
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
 };
 export type BeatHistory = Array<Beat>;
+
+export type BeatGeneration = z.infer<typeof beatGenerationSchema>;
+export type BeatPlanGeneration = z.infer<typeof beatPlanGenerationSchema>;
+export type PlayerBeatResponse = {
+  plan: string;
+  beat: BeatGeneration;
+  imageGeneration?: ImageGeneration;
+};

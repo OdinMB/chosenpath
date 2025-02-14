@@ -10,6 +10,7 @@ export type SessionContextType = {
   setIsLoading: (loading: boolean) => void;
   isConnecting: boolean;
   storyCodes: Record<string, string> | null;
+  setStoryCodes: (codes: Record<string, string> | null) => void;
   error: string | null;
   setError: (error: string | null) => void;
 };
@@ -23,6 +24,7 @@ export const SessionContext = createContext<SessionContextType>({
   setIsLoading: () => {},
   isConnecting: true,
   storyCodes: null,
+  setStoryCodes: () => {},
   error: null,
   setError: () => {},
-}); 
+});

@@ -47,7 +47,8 @@ export class GameWebSocketServer {
           socket.emit("state_update", { state: existingState });
           console.log("[WebSocket] Client joined session:", sessionId);
         } else {
-          socket.emit("error", { error: "Session not found" });
+          console.log("[WebSocket] Session not found:", sessionId);
+          socket.emit("error", "Session not found");
         }
       });
 

@@ -1,34 +1,37 @@
 # Feature backlog
 
 Full functionality
-- add player choice handling
-- emit story state updates to all players who are connected to the game
+
 - mobile-friendly frontend
 
 Easy nice-to-haves
-- display which players have made their choice 
+
+- display which players have made their choice
 - display which players are online (last 5 minutes)
-- Titles for stories
+- Titles for stories (show in resume story section in Welcome screen)
 - Config option for game setup: cooperative (only shared outcomes), competitive (only individual and in part conflictiog outcomes), both shared and individual outcomes
 - Suggested prompts based on number of players and type of setup (cooperative etc.)
 - Scroll through beat history
 
 Big features
+
 - Queue processor to avoid conflicts between player actions
 - Multiplaer mode: shared perspective
--- majority vote
--- lottery
--- setting for % players who must have voted to continue)
+  -- majority vote
+  -- lottery
+  -- setting for % players who must have voted to continue)
 - Select language
--- different ones for different players
+  -- different ones for different players
 - Let player choose/adjust starting position (name, pronouns, stats)
 
 User accounts
+
 - Manage games
 - Invite specific account to a player slot
 - Game history
 
 Open Source?
+
 - Add setup and deployment instructions
 
 # Queue processor
