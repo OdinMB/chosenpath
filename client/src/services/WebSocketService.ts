@@ -13,9 +13,28 @@ type WSMessage = {
 export class WebSocketService {
   private socket: Socket | null = null;
   private sessionId: string | null = null;
+  private playerCode: string | null = null;
+  private tabId: string;
   private messageHandlers = new Map<string, MessageHandler>();
   private isConnecting = false;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
+
+  constructor() {
+    this.tabId =
+      sessionStorage.getItem("tabId") ||
+      Math.random().toString(36).substring(2, 15);
+    sessionStorage.setItem("tabId", this.tabId);
+
+    const playerCodeKey = `playerCode_${this.tabId}`;
+    this.playerCode = localStorage.getItem(playerCodeKey);
+    this.sessionId = localStorage.getItem("sessionId");
+
+    console.log("[WebSocketService] Initialized with:", {
+      tabId: this.tabId,
+      playerCode: this.playerCode,
+      sessionId: this.sessionId,
+    });
+  }
 
   getSessionId(): string | null {
     return this.sessionId;
@@ -56,6 +75,7 @@ export class WebSocketService {
       reconnection: true,
       reconnectionAttempts: this.MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     this.setupSocketHandlers();
@@ -66,19 +86,41 @@ export class WebSocketService {
 
     this.socket.on("connect", () => {
       this.isConnecting = false;
-      console.log("[WebSocketService] Connected");
+      console.log("[WebSocketService] Connected to server with state:", {
+        playerCode: this.playerCode,
+        sessionId: this.sessionId,
+        socketId: this.socket?.id,
+      });
 
-      if (this.sessionId) {
-        console.log("[WebSocketService] Joining session:", this.sessionId);
+      if (this.playerCode) {
+        console.log(
+          "[WebSocketService] Attempting to reconnect with player code:",
+          this.playerCode
+        );
+        this.sendMessage({
+          type: "verify_code",
+          code: this.playerCode,
+        });
+      } else if (this.sessionId) {
+        console.log(
+          "[WebSocketService] Joining existing session:",
+          this.sessionId
+        );
         this.socket?.emit("join_session", this.sessionId);
       } else {
-        console.log("[WebSocketService] Creating new session");
+        console.log(
+          "[WebSocketService] No existing session or code, creating new session"
+        );
         this.socket?.emit("create_session");
       }
     });
 
-    this.socket.on("disconnect", () => {
-      console.log("[WebSocketService] Disconnected");
+    this.socket.on("disconnect", (reason) => {
+      console.log("[WebSocketService] Disconnected:", {
+        reason,
+        playerCode: this.playerCode,
+        sessionId: this.sessionId,
+      });
     });
 
     // Handle session_created events
@@ -116,14 +158,14 @@ export class WebSocketService {
     });
 
     // Handle error events
-    this.socket.on("error", (data: { error: string }) => {
-      console.log("[WebSocketService] Error received:", data.error);
-      const handler = this.messageHandlers.get("error");
-      if (handler) {
-        handler({ type: "error", error: data.error });
-      }
+    this.socket.on("error", (error) => {
+      console.log("[WebSocketService] Socket error:", {
+        error,
+        playerCode: this.playerCode,
+        sessionId: this.sessionId,
+      });
 
-      if (data.error === "Session not found" && this.sessionId) {
+      if (error === "Session not found" && this.sessionId) {
         console.log("[WebSocketService] Clearing invalid session");
         this.clearSession();
         this.socket?.emit("create_session");
@@ -152,6 +194,11 @@ export class WebSocketService {
   }
 
   sendMessage(message: WSMessage) {
+    console.log("[WebSocketService] Sending message:", {
+      type: message.type,
+      socketId: this.socket?.id,
+      connected: this.socket?.connected,
+    });
     if (!this.socket?.connected) {
       console.warn("[WebSocketService] Cannot send message: not connected");
       return;
@@ -166,7 +213,15 @@ export class WebSocketService {
   }
 
   clearSession() {
+    console.log("[WebSocketService] Clearing session:", {
+      oldPlayerCode: this.playerCode,
+      oldSessionId: this.sessionId,
+    });
+
     this.sessionId = null;
+    this.playerCode = null;
+    const playerCodeKey = `playerCode_${this.tabId}`;
+    localStorage.removeItem(playerCodeKey);
     localStorage.removeItem("sessionId");
   }
 
@@ -177,6 +232,13 @@ export class WebSocketService {
     }
     this.sessionId = null;
     this.isConnecting = false;
+  }
+
+  setPlayerCode(code: string) {
+    console.log("[WebSocketService] Setting player code:", code);
+    this.playerCode = code;
+    const playerCodeKey = `playerCode_${this.tabId}`;
+    localStorage.setItem(playerCodeKey, code);
   }
 }
 

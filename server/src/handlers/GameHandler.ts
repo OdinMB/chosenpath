@@ -1,32 +1,38 @@
 import type { Socket } from "socket.io";
 import type { StoryState } from "../../../shared/types/story.js";
-import { StoryService } from "../services/StoryService.js";
 import { SessionService } from "../services/SessionService.js";
 import { ImageService } from "../services/ImageService.js";
 import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { StoryStateManager } from "../services/StoryStateManager.js";
-import type { ClientStoryState } from "../../../shared/types/story.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import type { PlayerSlot } from "../../../shared/types/players.js";
 import type { Server } from "socket.io";
 import { filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
+import {
+  getCurrentTurn,
+  areAllChoicesSubmitted,
+} from "../../../shared/utils/storyUtils.js";
+import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
+import { ChangeService } from "../services/ChangeService.js";
 
 export class GameHandler {
   private sessionService: SessionService;
-  private storyService: StoryService;
   private imageService: ImageService;
   protected storyStateManager: StoryStateManager;
   private socket: Socket;
   private io: Server;
+  private aiStoryGenerator: AIStoryGenerator;
+  private changeService: ChangeService;
 
   constructor(socket: Socket) {
     this.socket = socket;
+    this.aiStoryGenerator = new AIStoryGenerator();
     this.sessionService = new SessionService();
-    this.storyService = new StoryService();
     this.imageService = new ImageService();
     this.storyStateManager = new StoryStateManager();
+    this.changeService = new ChangeService();
     this.io = socket.nsp.server;
     console.log("[GameHandler] Created new handler for socket:", socket.id);
   }
@@ -97,7 +103,7 @@ export class GameHandler {
         throw new Error(`Invalid player count: ${playerCount}`);
       }
 
-      const initialState = await this.storyService.createInitialState(
+      const initialState = await this.aiStoryGenerator.createInitialState(
         prompt,
         generateImages,
         playerCount
@@ -139,20 +145,26 @@ export class GameHandler {
       );
 
       // Generate first set of beats
-      const stateWithInitialBeats = await this.storyService.addNextSetOfBeats(
-        stateWithCodes
-      );
+      const [stateWithInitialBeats, changes] =
+        await this.aiStoryGenerator.addNextSetOfBeats(stateWithCodes);
       console.log("[GameHandler] Generated first set of beats:");
 
+      // Apply any changes from the initial beats
+      const finalState = this.changeService.applyChanges(
+        stateWithInitialBeats,
+        changes
+      );
+
       // Update the stored state with the first beat
-      await this.storyStateManager.updateState(storyId, stateWithInitialBeats);
+      await this.storyStateManager.updateState(storyId, finalState);
       console.log("[GameHandler] Updated state with initial beats");
 
-      // ToDo: Emit the updated state to all players
+      // Broadcast the state update to all connected players
+      this.broadcastStateUpdate(storyId, finalState);
 
       // Generate and update image if needed
       if (generateImages) {
-        await this.generateAndUpdateImage(storyId, stateWithInitialBeats);
+        await this.generateAndUpdateImage(storyId, finalState);
       }
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
@@ -160,84 +172,80 @@ export class GameHandler {
     }
   }
 
-  async makeChoice(sessionId: string, optionIndex: number) {
-    console.log("[GameHandler] Processing choice:", {
-      sessionId,
-      optionIndex,
-      socketId: this.socket.id,
-    });
+  async makeChoice(optionIndex: number) {
+    console.log("[GameHandler] Processing choice:", { optionIndex });
 
     try {
-      // Get player info from socket
-      const socketInfo = connectionManager.getPlayerBySocket(this.socket.id);
-      if (!socketInfo) {
-        throw new Error("Player not found for socket");
+      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+      if (!playerInfo) {
+        throw new Error("Player not found");
       }
 
-      const { storyId, playerSlot } = socketInfo;
-      const state = await this.storyStateManager.getState(storyId);
+      const state = await this.storyStateManager.getState(playerInfo.storyId);
       if (!state) {
-        throw new Error("Story state not found");
+        throw new Error("Story not found");
       }
+
+      const player = state.players[playerInfo.playerSlot];
+      const currentBeat = player.beatHistory[player.beatHistory.length - 1];
 
       // Validate the choice
-      const currentBeat =
-        state.players[playerSlot].beatHistory[
-          state.players[playerSlot].beatHistory.length - 1
-        ];
-      if (!currentBeat || optionIndex >= currentBeat.options.length) {
-        throw new Error("Invalid choice");
+      if (currentBeat.choice !== -1) {
+        throw new Error("Choice already made for this turn");
       }
 
-      // Record the choice
-      const updatedState = {
-        ...state,
-        players: {
-          ...state.players,
-          [playerSlot]: {
-            ...state.players[playerSlot],
-            beatHistory: state.players[playerSlot].beatHistory.map(
-              (beat, index) => {
-                if (
-                  index ===
-                  state.players[playerSlot].beatHistory.length - 1
-                ) {
-                  return { ...beat, choice: optionIndex };
-                }
-                return beat;
-              }
-            ),
-          },
-        },
-      };
+      // Record the player's choice
+      currentBeat.choice = optionIndex;
 
-      // Store updated state
-      await this.storyStateManager.updateState(storyId, updatedState);
+      // Save the updated state
+      await this.storyStateManager.updateState(playerInfo.storyId, state);
 
-      // Broadcast state update to all players
-      this.broadcastStateUpdate(storyId, updatedState);
+      console.log(
+        "[GameHandler] Set choice for ",
+        playerInfo.playerSlot,
+        " for beat #",
+        player.beatHistory.length,
+        " (",
+        currentBeat.title,
+        ") to option #",
+        optionIndex
+      );
 
-      // Check if all players have made their choices
-      if (this.areAllChoicesSubmitted(updatedState)) {
-        await this.generateNextBeats(storyId, updatedState);
+      // Broadcast the updated state to all players
+      this.broadcastStateUpdate(playerInfo.storyId, state);
+
+      // Check if all players have submitted their choices
+      if (areAllChoicesSubmitted(state)) {
+        const [nextState, changes] =
+          await this.aiStoryGenerator.addNextSetOfBeats(state);
+        const updatedState = this.changeService.applyChanges(
+          nextState,
+          changes
+        );
+        await this.storyStateManager.updateState(
+          playerInfo.storyId,
+          updatedState
+        );
+        this.broadcastStateUpdate(playerInfo.storyId, updatedState);
+        await this.generateAndUpdateImage(playerInfo.storyId, updatedState);
       }
     } catch (error) {
-      console.error("[GameHandler] Failed to process choice:", error);
-      this.socket.emit("error", { error: "Failed to process choice" });
+      console.error("[GameHandler] Error processing choice:", error);
+      this.socket.emit("error", {
+        error:
+          error instanceof Error ? error.message : "Failed to process choice",
+      });
     }
   }
 
   private broadcastStateUpdate(storyId: string, state: StoryState) {
-    // Get all connected sockets for this game
     const playerSlots = Object.keys(state.players) as PlayerSlot[];
 
     playerSlots.forEach((slot) => {
       const sockets = connectionManager.getActiveSockets(storyId, slot);
       sockets.forEach((socketId) => {
         const filteredState = filterStateForPlayer(state, slot);
-        this.io.to(socketId).emit("state_update", {
-          state: filteredState,
-        });
+        this.io.to(socketId).emit("state_update", { state: filteredState });
       });
     });
   }
@@ -307,16 +315,5 @@ export class GameHandler {
         currentBeat.title
       );
     }
-  }
-
-  private areAllChoicesSubmitted(state: StoryState): boolean {
-    // Implement the logic to check if all players have made their choices
-    return false; // Placeholder return, actual implementation needed
-  }
-
-  private async generateNextBeats(storyId: string, state: StoryState) {
-    // Implement the logic to generate the next set of beats
-    // This method should return the updated state with the new beats
-    return state; // Placeholder return, actual implementation needed
   }
 }

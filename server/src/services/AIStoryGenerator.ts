@@ -1,21 +1,20 @@
 import { ChatOpenAI } from "@langchain/openai";
-import OpenAI from "openai";
-import type { StoryState, StorySetup, PlayerStateGeneration } from "../../../shared/types/story.js";
+import type {
+  StoryState,
+  StorySetup,
+  PlayerStateGeneration,
+} from "../../../shared/types/story.js";
+import type { Change } from "../../../shared/types/change.js";
 import type { Beat } from "../../../shared/types/beat.js";
-import { ChangeService } from "./ChangeService.js";
-import dotenv from 'dotenv';
-import type { ImageGeneration } from "../../../shared/types/image.js";
+import dotenv from "dotenv";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { createSetOfBeatPlanGenerationSchema } from "../../../shared/types/beat.js";
-import type { PlayerSlot } from "../../../shared/types/players.js";
 dotenv.config();
 
-export class StoryService {
+export class AIStoryGenerator {
   private model: ChatOpenAI;
-  private openai: OpenAI;
-  private changeService: ChangeService;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
@@ -24,24 +23,20 @@ export class StoryService {
 
     this.model = new ChatOpenAI({
       modelName: "gpt-4o",
-      temperature: 0.4
+      temperature: 0.4,
     });
-
-    this.openai = new OpenAI();
-
-    this.changeService = new ChangeService();
   }
 
   public async createInitialState(
-    prompt: string, 
-    generateImages: boolean, 
+    prompt: string,
+    generateImages: boolean,
     playerCount: PlayerCount
   ): Promise<StoryState> {
     const setup = await this.generateStorySetup(prompt, playerCount);
-    
-    // Create a record of all players from the setup
+
+    // Create a record of all players from the setup.
     const players = Object.fromEntries(
-      getPlayerSlots(playerCount).map(slot => {
+      getPlayerSlots(playerCount).map((slot) => {
         const playerKey = slot as keyof StorySetup<typeof playerCount>;
         const playerData = setup[playerKey] as PlayerStateGeneration;
         return [
@@ -51,7 +46,7 @@ export class StoryService {
             outcomes: playerData.outcomes,
             characterStats: playerData.characterStats,
             beatHistory: [],
-          }
+          },
         ];
       })
     );
@@ -69,7 +64,10 @@ export class StoryService {
     };
   }
 
-  async generateStorySetup(prompt: string, playerCount: PlayerCount): Promise<StorySetup<typeof playerCount>> {
+  async generateStorySetup(
+    prompt: string,
+    playerCount: PlayerCount
+  ): Promise<StorySetup<typeof playerCount>> {
     const schema = createStorySetupSchema(playerCount);
     const structuredModel = this.model.withStructuredOutput(schema);
 
@@ -77,7 +75,9 @@ export class StoryService {
       console.log("Generating story setup with playerCount:", playerCount);
 
       const response = await structuredModel.invoke(
-        `Create a setup for a multiplayer, interactive fiction game for ${playerCount} player${playerCount > 1 ? 's' : ''} based on this prompt: "${prompt}".
+        `Create a setup for a multiplayer, interactive fiction game for ${playerCount} player${
+          playerCount > 1 ? "s" : ""
+        } based on this prompt: "${prompt}".
         
         The entire story is supposed to play out over a course of 30 beats, with each beat consisting of about three paragraphs of text for each player and a decision by the player.
         Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make the story interesting, but not so many that they cannot be fully developed within the 30 beats.
@@ -93,12 +93,14 @@ export class StoryService {
         - 3-5 stats for relationships with NPCs/factions (if relevant)
         - 1-3 stats for resources (if relevant)
 
-        Important: You must generate exactly ${playerCount} player character${playerCount > 1 ? 's' : ''} with their respective outcomes and stats.
+        Important: You must generate exactly ${playerCount} player character${
+          playerCount > 1 ? "s" : ""
+        } with their respective outcomes and stats.
         `
       );
 
       console.log("Raw response:", response);
-      
+
       return response as StorySetup<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
@@ -106,42 +108,40 @@ export class StoryService {
     }
   }
 
-  async addNextSetOfBeats(state: StoryState): Promise<StoryState> {
-    const schema = createSetOfBeatPlanGenerationSchema(Object.keys(state.players).length as PlayerCount);
+  async addNextSetOfBeats(state: StoryState): Promise<[StoryState, Change[]]> {
+    const schema = createSetOfBeatPlanGenerationSchema(
+      Object.keys(state.players).length as PlayerCount
+    );
     const structuredModel = this.model.withStructuredOutput(schema);
 
     try {
-      console.log("Generating beats for turn:", Object.values(state.players)[0].beatHistory.length + 1);
-      
-      // type SetOfBeatPlanGenerationSchema
+      console.log(
+        "Generating beats for turn:",
+        Object.values(state.players)[0].beatHistory.length + 1
+      );
+
       const response = await structuredModel.invoke(
         this.createBeatPrompt(state)
       );
 
       console.log("Response:\n", response);
 
-      // Create updated state with new beats and changes
+      // Create a copy of the state to add new beats
       let updatedState = { ...state };
 
-      // Apply any changes from the previous beat's choices
-      if (response.changes.length > 0) {
-        updatedState = this.changeService.applyChanges(updatedState, response.changes);
-      }
-
       // Add the new beats to each player's history
-      // ToDo: This should be done more elegantly with a beat schema
       Object.entries(response).forEach(([key, value]) => {
         if (
-          key.startsWith('player') && 
-          typeof value === 'object' && 
-          value !== null && 
-          'title' in value &&
-          'options' in value &&
-          'text' in value &&
-          'summary' in value &&
-          'imageId' in value
+          key.startsWith("player") &&
+          typeof value === "object" &&
+          value !== null &&
+          "title" in value &&
+          "options" in value &&
+          "text" in value &&
+          "summary" in value &&
+          "imageId" in value
         ) {
-          const playerSlot = key.toLowerCase() as PlayerSlot;
+          const playerSlot = key.toLowerCase();
           if (updatedState.players[playerSlot]) {
             const beat: Beat = {
               title: value.title as string,
@@ -156,49 +156,36 @@ export class StoryService {
         }
       });
 
-      console.log("Updated state:\n", updatedState);
-      return updatedState;
+      return [updatedState, response.changes || []];
     } catch (error) {
       console.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
     }
   }
 
-  async processPlayerChoice(
-    state: StoryState,
-    optionIndex: number
-  ): Promise<StoryState> {
-    try {
-      // ToDo: Implement this
-
-      return state;
-    } catch (error) {
-      console.error("Error in processPlayerChoice:", error);
-      throw error;
-    }
-  }
-
   private createBeatPrompt(state: StoryState): string {
-    const playersSection = Object.entries(state.players).map(([slot, playerState]) => {
-      const beatHistorySection = playerState.beatHistory
-        .map((beat, index) => {
-          const isLastBeat = index === playerState.beatHistory.length - 1;
-          const chosenOption = beat.choice >= 0 ? beat.options[beat.choice] : null;
+    const playersSection = Object.entries(state.players)
+      .map(([slot, playerState]) => {
+        const beatHistorySection = playerState.beatHistory
+          .map((beat, index) => {
+            const isLastBeat = index === playerState.beatHistory.length - 1;
+            const chosenOption =
+              beat.choice >= 0 ? beat.options[beat.choice] : null;
 
-          return `Beat ${index + 1}:
+            return `Beat ${index + 1}:
 Summary: ${beat.summary}${
-            isLastBeat
-              ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
-              : ""
-          }${chosenOption ? `\nPlayer choice: ${chosenOption}` : ""}`;
-        })
-        .join("\n\n");
+              isLastBeat
+                ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
+                : ""
+            }${chosenOption ? `\nPlayer choice: ${chosenOption}` : ""}`;
+          })
+          .join("\n\n");
 
-      const hasUnintroducedOutcomes = playerState.outcomes.some(
-        (outcome) => outcome.milestones.length === 0
-      );
+        const hasUnintroducedOutcomes = playerState.outcomes.some(
+          (outcome) => outcome.milestones.length === 0
+        );
 
-      return `#####################################\n######## PLAYER ID: ${slot} ########\n#####################################\n
+        return `#####################################\n######## PLAYER ID: ${slot} ########\n#####################################\n
       ${playerState.character.name} (${playerState.character.pronouns})
 ${playerState.character.fluff}
 
@@ -218,7 +205,9 @@ ${playerState.characterStats
       }
     })();
 
-    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${
+    return `- ${stat.name} (id: ${stat.id}, type: ${
+      stat.type
+    }): ${formattedValue}${
       stat.isVisible === false ? " (not visible to the player)" : ""
     }${stat.hint ? `\nHint: ${stat.hint}` : ""}`;
   })
@@ -231,7 +220,9 @@ ${playerState.outcomes
       `id: ${outcome.id}
 ${outcome.question}
 Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}
-Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):
+Milestones (${outcome.milestones.length} / ${
+        outcome.intendedNumberOfMilestones
+      } to resolution):
 ${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
   )
   .join("\n\n")}
@@ -239,7 +230,8 @@ ${outcome.milestones.map((milestone) => `- ${milestone}`).join("\n")}`
 BEAT HISTORY:
 ${beatHistorySection}
 `;
-    }).join("\n\n" + "=".repeat(80) + "\n\n");
+      })
+      .join("\n\n" + "=".repeat(80) + "\n\n");
 
     const prompt = `======= CURRENT GAME STATE =======
 
@@ -258,7 +250,9 @@ ${state.npcs
   )
   .join("\n")}
 
-STORY PROGRESS: Turn: ${Object.values(state.players)[0].beatHistory.length + 1}/${state.maxTurns}
+STORY PROGRESS: Turn: ${
+      Object.values(state.players)[0].beatHistory.length + 1
+    }/${state.maxTurns}
 
 WORLD STATS:
 ${state.worldStats
@@ -276,18 +270,28 @@ ${state.worldStats
       }
     })();
 
-    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${
+    return `- ${stat.name} (id: ${stat.id}, type: ${
+      stat.type
+    }): ${formattedValue}${
       stat.isVisible === false ? " (not visible to the player)" : ""
     }${stat.hint ? `\nHint: ${stat.hint}` : ""}`;
   })
   .join("\n")}
 
-IMAGES: ${state.generateImages ? "Are to be generated (or chosen from the library)" : "Are NOT to be generated"}
+IMAGES: ${
+      state.generateImages
+        ? "Are to be generated (or chosen from the library)"
+        : "Are NOT to be generated"
+    }
 
-${state.generateImages ? `IMAGE LIBRARY:
+${
+  state.generateImages
+    ? `IMAGE LIBRARY:
 ${state.images.map((image) => `- ${image.id}: ${image.description}`).join("\n")}
 
-` : ""}${playersSection}
+`
+    : ""
+}${playersSection}
 
 ======= YOUR JOB: GENERATE THE NEXT SET OF STORY BEATS =======
 
@@ -312,8 +316,11 @@ CREATE ENGAGING BEATS for each player with:
 - 3-4 paragraphs of narrative text
 - 3 meaningful options for the player to choose from`;
 
-    console.log("\n\n########\nBeat generation prompt\n########\n", prompt, "\n\n");
+    console.log(
+      "\n\n########\nBeat generation prompt\n########\n",
+      prompt,
+      "\n\n"
+    );
     return prompt;
   }
-
 }

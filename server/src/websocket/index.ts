@@ -69,12 +69,18 @@ export class GameWebSocketServer {
         }
       );
 
-      socket.on(
-        "make_choice",
-        async (data: { sessionId: string; optionIndex: number }) => {
-          await gameHandler.makeChoice(data.sessionId, data.optionIndex);
+      socket.on("make_choice", async (data: { optionIndex: number }) => {
+        try {
+          await gameHandler.makeChoice(data.optionIndex);
+        } catch (error) {
+          socket.emit("error", {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to process choice",
+          });
         }
-      );
+      });
 
       socket.on("exit_story", async (data: { sessionId: string }) => {
         await gameHandler.exitStory(data.sessionId);

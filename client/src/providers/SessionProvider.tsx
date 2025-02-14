@@ -6,7 +6,9 @@ import { SessionContext } from "../contexts/SessionContext.js";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyState, setStoryState] = useState<ClientStoryState | null>(null);
-  const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(null);
+  const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(
+    null
+  );
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
@@ -17,9 +19,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("session_created", (data: WSServerMessage) => {
       if (data.type === "session_created" && data.sessionId) {
-        console.log('[SessionProvider] Session created:', data.sessionId);
+        console.log("[SessionProvider] Session created:", data.sessionId);
         setSessionId(data.sessionId);
-        localStorage.setItem('sessionId', data.sessionId);
+        localStorage.setItem("sessionId", data.sessionId);
         wsService.setSessionId(data.sessionId);
         setIsConnecting(false);
       }
@@ -27,8 +29,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("state_update", (data: WSServerMessage) => {
       if (data.type === "state_update" && data.state) {
-        console.log('[SessionProvider] Received state update:', {
-          state: data.state
+        console.log("[SessionProvider] Received state update:", {
+          state: data.state,
         });
         setStoryState(data.state);
         setIsLoading(false);
@@ -37,10 +39,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
       if (data.type === "exit_story_response") {
-        console.log('[SessionProvider] Story exit confirmed');
+        console.log("[SessionProvider] Story exit confirmed");
         setStoryState(null);
         setSessionId(null);
-        localStorage.removeItem('sessionId');
+        localStorage.removeItem("sessionId");
       }
     });
 
@@ -58,7 +60,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("story_codes", (data: WSServerMessage) => {
       if (data.type === "story_codes") {
-        console.log('[SessionProvider] Received story codes:', data.codes);
+        console.log("[SessionProvider] Received story codes:", data.codes);
         setStoryCodes(data.codes);
         setIsLoading(false);
       }
@@ -66,20 +68,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("verify_code_response", (data: WSServerMessage) => {
       if (data.type === "verify_code_response") {
-        if (data.error) {
-          console.error('[SessionProvider] Code verification failed:', data.error);
-          setError(data.error);
-        } else if (data.state) {
-          console.log('[SessionProvider] Code verified, received state:', data.state);
+        console.log("[SessionProvider] Code verification response:", data);
+        if (data.state) {
           setStoryState(data.state);
-          setError(null);
+          setIsLoading(false);
+          setIsConnecting(false);
+        } else if (data.error) {
+          setError(data.error);
+          setIsLoading(false);
         }
-        setIsLoading(false);
       }
     });
 
     // Connect to WebSocket
-    const savedSessionId = localStorage.getItem('sessionId');
+    const savedSessionId = localStorage.getItem("sessionId");
     wsService.connect(savedSessionId || undefined);
 
     return () => {
@@ -104,4 +106,4 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
-} 
+}

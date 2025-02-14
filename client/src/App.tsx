@@ -4,44 +4,58 @@ import { GameLayout } from "./components/GameLayout.js";
 import { wsService } from "./services/WebSocketService.js";
 import { gameService } from "./services/GameService.js";
 import { useEffect, useState } from "react";
-import { getCurrentTurn } from "../../shared/utils/storyUtils.js";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { PlayerCodes } from "./components/PlayerCodes";
 
 // Add this type at the top with the imports
-type ViewState = 'CONNECTING' | 'WELCOME' | 'SETUP' | 'PLAYER_CODES' | 'GAME';
+type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";
 
 function App() {
-  const { 
-    setStoryState, 
-    setIsLoading, 
-    storyState, 
-    sessionId, 
+  const {
+    setStoryState,
+    setIsLoading,
+    storyState,
+    sessionId,
     setSessionId,
     storyCodes,
     error,
-    setError 
+    setError,
   } = useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const [viewState, setViewState] = useState<ViewState>('CONNECTING');
-  const [playerCode, setPlayerCode] = useState<string | null>(
-    localStorage.getItem('playerCode')
+  const [viewState, setViewState] = useState<ViewState>("CONNECTING");
+
+  // Generate a unique ID for this tab if it doesn't exist
+  const [tabId] = useState(
+    () =>
+      sessionStorage.getItem("tabId") ||
+      Math.random().toString(36).substring(2, 15)
   );
 
-  // Update initial view state based on connection
+  // Use tab-specific storage key for player code
+  const playerCodeKey = `playerCode_${tabId}`;
+  const [playerCode, setPlayerCode] = useState<string | null>(
+    localStorage.getItem(playerCodeKey)
+  );
+
+  // Store tabId in sessionStorage when tab opens
   useEffect(() => {
-    if (!sessionId) {
-      setViewState('CONNECTING');
+    sessionStorage.setItem("tabId", tabId);
+  }, [tabId]);
+
+  // Update initial view state based on connection and player code
+  useEffect(() => {
+    if (!sessionId && !playerCode) {
+      setViewState("CONNECTING");
     } else if (!storyState) {
-      setViewState('WELCOME');
+      setViewState("WELCOME");
     } else {
-      setViewState('GAME'); // Automatically show game when state is available
+      setViewState("GAME"); // Automatically show game when state is available
     }
-  }, [sessionId, storyState]);
+  }, [sessionId, storyState, playerCode]);
 
   useEffect(() => {
     if (!sessionId && !isCreatingSession && wsService.isConnected()) {
-      console.log('[App] No session found, requesting new session');
+      console.log("[App] No session found, requesting new session");
       setIsCreatingSession(true);
       wsService.sendMessage({ type: "create_session" });
     }
@@ -55,12 +69,16 @@ function App() {
 
   // Update view state when codes are received
   useEffect(() => {
-    if (storyCodes && viewState === 'SETUP') {
-      setViewState('PLAYER_CODES');
+    if (storyCodes && viewState === "SETUP") {
+      setViewState("PLAYER_CODES");
     }
   }, [storyCodes, viewState]);
 
-  const handleStorySetup = (prompt: string, generateImages: boolean, playerCount: number) => {
+  const handleStorySetup = (
+    prompt: string,
+    generateImages: boolean,
+    playerCount: number
+  ) => {
     setIsLoading(true);
     gameService.initializeStory(prompt, generateImages, playerCount);
   };
@@ -69,7 +87,7 @@ function App() {
     setIsLoading(true);
     gameService.verifyCode(code);
     setPlayerCode(code);
-    localStorage.setItem('playerCode', code);
+    localStorage.setItem(playerCodeKey, code);
   };
 
   const handleExitGame = () => {
@@ -77,49 +95,48 @@ function App() {
     setStoryState(null);
     wsService.clearSession();
     setSessionId(null);
-    setViewState('WELCOME');
-    // setPlayerCode(null);
-    // localStorage.removeItem('playerCode');
+    setViewState("WELCOME");
+    setPlayerCode(null);
+    localStorage.removeItem(playerCodeKey);
   };
 
   const handleNewStory = () => {
     setPlayerCode(null);
-    localStorage.removeItem('playerCode');
+    localStorage.removeItem(playerCodeKey);
     setStoryState(null);
-    setViewState('SETUP');
+    setViewState("SETUP");
   };
 
   const handlePlayerChoice = (optionIndex: number) => {
-    if (!storyState || !sessionId) {
-      console.warn("[App] Cannot make choice: missing storyState or sessionId");
+    if (!storyState) {
+      console.warn("[App] Cannot make choice: missing storyState");
       return;
     }
-    console.log("[App] Processing player choice:", {
-      optionIndex,
-      sessionId,
-      currentTurn: getCurrentTurn(storyState)
-    });
+
+    console.log("[App] Processing player choice:", { optionIndex });
+
     setIsLoading(true);
     gameService.makeChoice(optionIndex);
   };
 
   // Add error display component
-  const ErrorMessage = () => error ? (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 flex items-center shadow-lg">
-      <span className="mr-2">{error}</span>
-      <button 
-        onClick={() => setError(null)}
-        className="text-red-700 hover:text-red-900"
-      >
-        ×
-      </button>
-    </div>
-  ) : null;
+  const ErrorMessage = () =>
+    error ? (
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 flex items-center shadow-lg">
+        <span className="mr-2">{error}</span>
+        <button
+          onClick={() => setError(null)}
+          className="text-red-700 hover:text-red-900"
+        >
+          ×
+        </button>
+      </div>
+    ) : null;
 
   // Get the current view content
   const getCurrentView = () => {
     switch (viewState) {
-      case 'CONNECTING':
+      case "CONNECTING":
         return (
           <div className="app flex items-center justify-center min-h-screen">
             <div className="text-center">
@@ -129,34 +146,38 @@ function App() {
           </div>
         );
 
-      case 'WELCOME':
-        return <WelcomeScreen 
-          onCodeSubmit={handleCodeSubmit} 
-          onNewStory={handleNewStory}
-          existingPlayerCode={playerCode} 
-        />;
-
-      case 'SETUP':
-        return <StoryInitializer 
-          onSetup={handleStorySetup} 
-          onBack={() => setViewState('WELCOME')} 
-        />;
-
-      case 'PLAYER_CODES':
-        return storyCodes ? (
-          <PlayerCodes 
-            codes={storyCodes} 
-            onBack={() => setViewState('WELCOME')}
+      case "WELCOME":
+        return (
+          <WelcomeScreen
             onCodeSubmit={handleCodeSubmit}
-          />
-        ) : (
-          <StoryInitializer 
-            onSetup={handleStorySetup}
-            onBack={() => setViewState('WELCOME')} 
+            onNewStory={handleNewStory}
+            existingPlayerCode={playerCode}
           />
         );
 
-      case 'GAME':
+      case "SETUP":
+        return (
+          <StoryInitializer
+            onSetup={handleStorySetup}
+            onBack={() => setViewState("WELCOME")}
+          />
+        );
+
+      case "PLAYER_CODES":
+        return storyCodes ? (
+          <PlayerCodes
+            codes={storyCodes}
+            onBack={() => setViewState("WELCOME")}
+            onCodeSubmit={handleCodeSubmit}
+          />
+        ) : (
+          <StoryInitializer
+            onSetup={handleStorySetup}
+            onBack={() => setViewState("WELCOME")}
+          />
+        );
+
+      case "GAME":
         return (
           <div className="app">
             <GameLayout
