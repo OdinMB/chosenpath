@@ -2,12 +2,16 @@
 
 Easy nice-to-haves
 
-- Config option for game setup: cooperative (only shared outcomes), competitive (only individual and in part conflictiog outcomes), both shared and individual outcomes
-- Suggested prompts based on number of players and type of setup (cooperative etc.)
+- Improve instructions for stat setups
+  -- static traits if developing skills is not a theme of the story
+  -- world stats as a scoring mechanism for competitive stories (especially opposites)
+  -- enums for common progressions? (ally-enemy, unknown-lover, ...)
+  -- only use "Ambition|Cunning" syntax for stats of type opposite
 - Titles for stories (show in resume story section in Welcome screen)
 
 Big features
 
+- Let player choose/adjust starting position (name, pronouns, stats)
 - Queue processor to avoid conflicts between player actions
 - Multiplaer mode: shared perspective
   -- majority vote
@@ -15,7 +19,6 @@ Big features
   -- setting for % players who must have voted to continue)
 - Select language
   -- different ones for different players
-- Let player choose/adjust starting position (name, pronouns, stats)
 
 User accounts
 

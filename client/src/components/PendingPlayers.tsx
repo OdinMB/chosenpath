@@ -56,8 +56,9 @@ export function PendingPlayers({
                 : "bg-gray-100 text-gray-600"
             }`}
           >
-            Player {slot.replace("player", "")}
-            {slot === currentPlayer && " (You)"}
+            {slot === currentPlayer
+              ? "You"
+              : `Player ${slot.replace("player", "")}`}
           </span>
         ))}
       </div>
