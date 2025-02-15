@@ -16,7 +16,7 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
   switch (type) {
     case "percentage":
       return (
-        <div className="relative h-8 bg-gray-200 rounded mb-3">
+        <div className="relative h-8 bg-gray-200 rounded mb-2">
           <div
             className="h-full bg-blue-500 rounded"
             style={{ width: `${value}%` }}
@@ -31,7 +31,7 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
 
     case "opposites":
       return (
-        <div className="relative h-8 bg-gray-200 rounded flex mb-3">
+        <div className="relative h-8 bg-gray-200 rounded flex mb-2">
           <div
             className="h-full bg-blue-500 rounded-l"
             style={{ width: `${value}%` }}
@@ -53,7 +53,7 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
 
     case "boolean":
       return (
-        <div className="flex items-center justify-between mb-3 bg-gray-200 rounded px-2 h-8">
+        <div className="flex items-center justify-between mb-2 bg-gray-200 rounded px-2 h-8">
           <span>{name}</span>
           <span className={value ? "text-green-600" : "text-red-600"}>
             {value ? "Yes" : "No"}
@@ -63,22 +63,28 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
 
     case "string[]":
       return (
-        <div className="flex flex-wrap gap-1 mb-3 bg-gray-200 rounded px-2 py-1">
-          {(value as string[]).map((item) => (
-            <span
-              key={item}
-              className="px-2 py-0.5 bg-gray-100 rounded-full text-sm"
-            >
-              {item}
-            </span>
-          ))}
+        <div className="mb-2">
+          <div className="mb-1">
+            {name}
+            {(value as string[]).length === 0 ? " (empty)" : ""}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(value as string[]).map((item) => (
+              <span
+                key={item}
+                className="px-3 py-1 bg-gray-200 rounded-full text-base"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
       );
 
     default:
       return (
-        <div className="flex items-center justify-between mb-3 bg-gray-200 rounded px-2 h-8">
-          <span>{name}</span>
+        <div className="flex items-center justify-between mb-2 bg-gray-200 rounded px-2 h-8">
+          <span className={name.length > 20 ? "text-sm" : ""}>{name}</span>
           <span>{String(value)}</span>
         </div>
       );

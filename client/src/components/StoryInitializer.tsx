@@ -37,7 +37,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "I'm an evil coffee machine stirring up office drama...",
         "I'm a fortune cookie writer whose predictions started coming true...",
         "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
-        "I'm a teenage wizard trying to balance, school, friends, and romance...",
+        "I'm a teenage wizard trying to balance school, friends, and romance...",
       ],
       cooperative: [
         "We're retired superheroes running a wedding planning business together...",
@@ -68,15 +68,15 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
   const getPlaceholderText = useCallback(() => {
     if (playerCount === 1) {
-      return "For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief...";
+      return "A reverse heist where I'm a museum artifact trying to get stolen by the right thief...";
     }
     const modeTexts = {
       cooperative:
-        "For example: We're ghost roommates helping each other complete unfinished business...",
+        "We're ghost roommates helping each other complete unfinished business...",
       competitive:
-        "For example: We're rival garden gnomes competing for the best spot in the garden...",
+        "We're rival garden gnomes competing for the best spot in the garden...",
       "cooperative-competitive":
-        "For example: We're demigods sharing Mount Olympus while competing for worshippers...",
+        "We're demigods sharing Mount Olympus while competing for worshippers...",
     };
     return modeTexts[gameMode];
   }, [playerCount, gameMode]);
@@ -231,7 +231,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-2">
               <label className="text-sm md:text-base font-medium text-gray-700">
-                Story Length: {maxTurns} turns
+                Story Length: {maxTurns} decisions
               </label>
               <input
                 type="range"
@@ -244,8 +244,8 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 disabled={isLoading}
               />
               <div className="flex justify-between text-xs md:text-sm text-gray-500">
-                <span>{MIN_TURNS} turns</span>
-                <span>{MAX_TURNS} turns</span>
+                <span>{MIN_TURNS} decisions</span>
+                <span>{MAX_TURNS} decisions</span>
               </div>
             </div>
 

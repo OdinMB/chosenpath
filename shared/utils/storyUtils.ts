@@ -82,8 +82,8 @@ export const filterStateForPlayer = (
   );
   filteredState.players = { [playerSlot]: playerData };
 
-  // Filter out hidden world stats
-  filteredState.worldStats = state.worldStats.filter(
+  // Filter out hidden shared stats
+  filteredState.sharedStats = state.sharedStats.filter(
     (stat) => stat.isVisible !== false
   );
 
@@ -94,14 +94,14 @@ export const filterStateForPlayer = (
   filteredState.playerCodes = { [playerSlot]: state.playerCodes[playerSlot] };
 
   // Remove server-only properties by picking only the properties we want to send
-  const { players, worldStats, maxTurns, generateImages, images, gameMode } =
+  const { players, sharedStats, maxTurns, generateImages, images, gameMode } =
     filteredState;
 
   return {
     numberOfPlayers: Object.keys(state.players).length,
     players,
     gameMode,
-    worldStats,
+    sharedStats,
     maxTurns,
     generateImages,
     images,

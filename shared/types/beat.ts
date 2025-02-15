@@ -30,7 +30,9 @@ export const beatGenerationSchema = z.object({
     ),
   options: z
     .array(z.string().describe("Text shown to player for this choice"))
-    .describe("Available choices for the player"),
+    .describe(
+      "Available choices for the player. Offer 3 choices. (2 can be fine occassionally if you want to force a clear or quick 'left vs. right' kind of choice.)"
+    ),
 });
 
 export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {

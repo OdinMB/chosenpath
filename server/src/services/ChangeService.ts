@@ -34,7 +34,7 @@ export class ChangeService {
 
     const updatedPlayers = { ...state.players };
     const player = updatedPlayers[change.player];
-    
+
     if (!player) {
       console.log(`Player ${change.player} not found`);
       return state;
@@ -65,24 +65,24 @@ export class ChangeService {
     state: StoryState,
     change: Extract<Change, { type: "statChange" }>
   ): StoryState {
-    // Handle world stats
-    if (change.group === "world") {
-      return this.applyWorldStatChange(state, change);
+    // Handle shared stats
+    if (change.group === "shared") {
+      return this.applySharedStatChange(state, change);
     }
 
     // Handle player stats
     return this.applyPlayerStatChange(state, change);
   }
 
-  private applyWorldStatChange(
+  private applySharedStatChange(
     state: StoryState,
     change: Extract<Change, { type: "statChange" }>
   ): StoryState {
-    const updatedStats = [...state.worldStats];
+    const updatedStats = [...state.sharedStats];
     const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
 
     if (statIndex === -1) {
-      console.log(`World stat ${change.stat} not found`);
+      console.log(`Shared stat ${change.stat} not found`);
       return state;
     }
 
@@ -91,7 +91,7 @@ export class ChangeService {
     if (!updatedStat) return state;
 
     updatedStats[statIndex] = updatedStat;
-    return { ...state, worldStats: updatedStats };
+    return { ...state, sharedStats: updatedStats };
   }
 
   private applyPlayerStatChange(
@@ -117,6 +117,9 @@ export class ChangeService {
     const stat = updatedStats[statIndex];
     const updatedStat = this.updateStatValue(stat, change);
     if (!updatedStat) return state;
+    console.log(
+      `Updated stat for player ${playerSlot}: ${stat.id} to ${updatedStat.value}`
+    );
 
     updatedStats[statIndex] = updatedStat;
     const updatedPlayer = {
@@ -154,9 +157,12 @@ export class ChangeService {
       case "subtractNumber":
         if (stat.type === "number" || stat.type === "percentage") {
           const delta = change.change === "addNumber" ? 1 : -1;
-          const newValue = (stat.value as number) + delta * (change.value as number);
+          const newValue =
+            (stat.value as number) + delta * (change.value as number);
           console.log(
-            `${change.change === "addNumber" ? "Adding to" : "Subtracting from"} number stat ${stat.id}: ${stat.value} -> ${newValue}`
+            `${
+              change.change === "addNumber" ? "Adding to" : "Subtracting from"
+            } number stat ${stat.id}: ${stat.value} -> ${newValue}`
           );
           return { ...stat, value: newValue };
         }
@@ -169,19 +175,23 @@ export class ChangeService {
         break;
       case "addElement":
         if (stat.type === "string[]") {
-          console.log(`Adding element "${change.value}" to array stat ${stat.id}`);
-          return { 
-            ...stat, 
-            value: [...(stat.value as string[]), change.value as string]
+          console.log(
+            `Adding element "${change.value}" to array stat ${stat.id}`
+          );
+          return {
+            ...stat,
+            value: [...(stat.value as string[]), change.value as string],
           };
         }
         break;
       case "removeElement":
         if (stat.type === "string[]") {
-          console.log(`Removing element "${change.value}" from array stat ${stat.id}`);
+          console.log(
+            `Removing element "${change.value}" from array stat ${stat.id}`
+          );
           return {
             ...stat,
-            value: (stat.value as string[]).filter((v) => v !== change.value)
+            value: (stat.value as string[]).filter((v) => v !== change.value),
           };
         }
         break;

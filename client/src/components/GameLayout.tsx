@@ -13,27 +13,77 @@ interface Props {
   onChoiceSelected: (optionIndex: number) => void;
 }
 
-function StatSection({ title, stats }: { title?: string; stats: Stat[] }) {
-  const visibleStats = stats.filter((stat) => stat.isVisible !== false);
+function StatGroup({ title, stats }: { title: string; stats: Stat[] }) {
+  const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <div>
-      {title && <h3 className="text-gray-700 mb-2 text-center">{title}</h3>}
-      <div className="space-y-3">
-        {visibleStats.map((stat) => (
-          <StatDisplay
-            key={stat.id}
-            name={stat.name}
-            value={stat.value}
-            type={stat.type}
+    <div className="bg-gray-50 rounded-lg pt-2 pb-1 pl-3 pr-3 border border-gray-100">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-center gap-2 hover:text-gray-900"
+      >
+        <h4 className="text-gray-700 text-center font-bold">{title}</h4>
+        <svg
+          className={`w-4 h-4 transition-transform ${
+            isExpanded ? "rotate-180" : ""
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
           />
-        ))}
-        {visibleStats.length === 0 && (
-          <div className="text-gray-500 italic">
-            No {title?.toLowerCase() ?? "character"} stats available
-          </div>
-        )}
+        </svg>
+      </button>
+      {isExpanded && (
+        <div className="mt-2 grid gap-0">
+          {stats.map((stat) => (
+            <StatDisplay
+              key={stat.id}
+              name={stat.name}
+              value={stat.value}
+              type={stat.type}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatSection({ title, stats }: { title?: string; stats: Stat[] }) {
+  const visibleStats = stats.filter((stat) => stat.isVisible !== false);
+  const groupedStats = visibleStats.reduce<Record<string, Stat[]>>(
+    (acc, stat) => {
+      const group = stat.group || "Other";
+      acc[group] = [...(acc[group] || []), stat];
+      return acc;
+    },
+    {}
+  );
+
+  if (visibleStats.length === 0) {
+    return (
+      <div className="text-gray-500 italic">
+        No {title?.toLowerCase() ?? "character"} stats available
       </div>
+    );
+  }
+
+  const groups = Object.keys(groupedStats);
+
+  return (
+    <div className="space-y-3">
+      {title && (
+        <h3 className="text-gray-700 mb-2 text-center font-bold">{title}</h3>
+      )}
+      {groups.map((group) => (
+        <StatGroup key={group} title={group} stats={groupedStats[group]} />
+      ))}
     </div>
   );
 }
@@ -41,12 +91,14 @@ function StatSection({ title, stats }: { title?: string; stats: Stat[] }) {
 export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
   const { storyState } = useSession();
   const [showStats, setShowStats] = useState(false);
+  const [showFluff, setShowFluff] = useState(false);
 
   if (!storyState) return null;
 
   const playerSlot = Object.keys(storyState.players)[0];
   const player = storyState.players[playerSlot];
-  const hasWorldStats = Object.keys(storyState.worldStats).length > 0;
+
+  const allStats = [...player.characterStats, ...storyState.sharedStats];
 
   return (
     <div className="min-h-screen">
@@ -104,19 +156,50 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           `}
         >
           <section className="mb-6 pb-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-1 text-center">
-              {player.character.name}
-            </h2>
+            <div className="flex items-center justify-center gap-2">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">
+                {player.character.name}
+              </h2>
+              <button
+                onClick={() => setShowFluff(!showFluff)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label={
+                  showFluff
+                    ? "Hide character description"
+                    : "Show character description"
+                }
+              >
+                <svg
+                  className={`w-5 h-5 transform transition-transform ${
+                    showFluff ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
             <p className="text-gray-600 text-center">
               {player.character.pronouns}
             </p>
+            {showFluff && (
+              <div className="bg-gray-50 rounded-lg p-3 mt-4 border border-gray-100">
+                <p className="text-gray-600 text-sm">
+                  {player.character.fluff}
+                </p>
+              </div>
+            )}
           </section>
 
-          <section className="space-y-8 flex-grow">
-            <StatSection stats={player.characterStats} />
-            {hasWorldStats && (
-              <StatSection title="World" stats={storyState.worldStats} />
-            )}
+          <section className="space-y-4 flex-grow">
+            <StatSection stats={allStats} />
           </section>
 
           {storyState.numberOfPlayers > 1 && (

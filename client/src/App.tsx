@@ -108,6 +108,8 @@ function App() {
     gameMode: GameMode;
   }) => {
     setIsLoading(true);
+    setPlayerCode(null);
+    localStorage.removeItem(playerCodeKey);
     gameService.initializeStory(
       options.prompt,
       options.generateImages,

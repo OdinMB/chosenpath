@@ -60,6 +60,12 @@ export const playerStateGenerationSchema = z.object({
 });
 export type PlayerStateGeneration = z.infer<typeof playerStateGenerationSchema>;
 
+export const statGroupsSchema = z
+  .array(z.string())
+  .describe(
+    "Names of groups for character stats. This is just a way to organize stats in the UI."
+  );
+
 export const createStorySetupSchema = (playerCount: PlayerCount) => {
   // Create a record of required player schemas based on player count
   const playerSchemas = Object.fromEntries(
@@ -72,9 +78,12 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   return z
     .object({
       guidelines: guidelinesSchema,
+      statGroups: statGroupsSchema,
       ...playerSchemas,
       npcs: NPCsSchema,
-      worldStats: z.array(statSchema).describe("Stats of the world"),
+      sharedStats: z
+        .array(statSchema)
+        .describe("Stats that are shared among players"),
     })
     .strict()
     .describe("Initial setup for the story");
@@ -83,8 +92,9 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
 // Helper type for the response - simplified by using ExactPlayerMap
 export type StorySetup<N extends PlayerCount> = {
   guidelines: z.infer<typeof guidelinesSchema>;
+  statGroups: z.infer<typeof statGroupsSchema>;
   npcs: z.infer<typeof NPCsSchema>;
-  worldStats: z.infer<typeof statSchema>[];
+  sharedStats: z.infer<typeof statSchema>[];
 } & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
 
 // TYPES USED BY APP (not LLM)
@@ -97,7 +107,7 @@ export type PlayerState = PlayerStateGeneration & {
 // Direct type definition for StoryState
 export type StoryState = {
   guidelines: z.infer<typeof guidelinesSchema>;
-  worldStats: z.infer<typeof statsSchema>;
+  sharedStats: z.infer<typeof statsSchema>;
   npcs: z.infer<typeof NPCsSchema>;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   establishedFacts: string[];
@@ -113,7 +123,7 @@ export type ClientStoryState = {
   numberOfPlayers: number;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   gameMode: GameMode;
-  worldStats: z.infer<typeof statsSchema>;
+  sharedStats: z.infer<typeof statsSchema>;
   maxTurns: number;
   generateImages: boolean;
   images: ImageLibrary;

@@ -18,9 +18,10 @@ export class AIImageGenerator {
     }
     this.openai = new OpenAI();
     this.model = new ChatOpenAI({
-      modelName: "o3-mini", // o3-mini, gpt-4o
+      modelName: "o3-mini",
       reasoningEffort: "low",
-      // temperature: 0.3,
+      // modelName: "gpt-4o",
+      // temperature: 0.4,
     });
   }
 
