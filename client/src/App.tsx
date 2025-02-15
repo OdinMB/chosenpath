@@ -3,9 +3,10 @@ import { StoryInitializer } from "./components/StoryInitializer.js";
 import { GameLayout } from "./components/GameLayout.js";
 import { wsService } from "./services/WebSocketService.js";
 import { gameService } from "./services/GameService.js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { PlayerCodes } from "./components/PlayerCodes";
+import { GameMode } from "../../shared/types/story.js";
 
 // Add this type at the top with the imports
 type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";
@@ -43,31 +44,47 @@ function App() {
     sessionStorage.setItem("tabId", tabId);
   }, [tabId]);
 
-  // Update initial view state based on connection and player code
+  // Wrap loggedSetViewState in useCallback
+  const loggedSetViewState = useCallback(
+    (newState: ViewState) => {
+      console.log(`[App] View state changing from ${viewState} to ${newState}`);
+      setViewState(newState);
+    },
+    [viewState]
+  );
+
+  // Replace all setViewState calls with loggedSetViewState
   useEffect(() => {
     if (!sessionId && !playerCode) {
-      setViewState("CONNECTING");
+      loggedSetViewState("CONNECTING");
     } else if (viewState === "SETUP") {
       // nothing
     } else if (viewState === "PLAYER_CODES") {
       if (storyState) {
-        setViewState("GAME");
+        loggedSetViewState("GAME");
       }
     } else if (storyState) {
-      setViewState("GAME");
+      loggedSetViewState("GAME");
     } else {
-      setViewState("WELCOME");
+      loggedSetViewState("WELCOME");
     }
     if (viewState === "WELCOME") {
       if (storyState) {
-        setViewState("GAME");
+        loggedSetViewState("GAME");
       }
     }
 
     if (storyCodes && viewState === "SETUP") {
-      setViewState("PLAYER_CODES");
+      loggedSetViewState("PLAYER_CODES");
     }
-  }, [sessionId, storyState, playerCode, storyCodes, viewState]);
+  }, [
+    sessionId,
+    storyState,
+    playerCode,
+    storyCodes,
+    viewState,
+    loggedSetViewState,
+  ]);
 
   useEffect(() => {
     if (!sessionId && !isCreatingSession && wsService.isConnected()) {
@@ -83,13 +100,21 @@ function App() {
     }
   }, [sessionId]);
 
-  const handleStorySetup = (
-    prompt: string,
-    generateImages: boolean,
-    playerCount: number
-  ) => {
+  const handleStorySetup = (options: {
+    prompt: string;
+    generateImages: boolean;
+    playerCount: number;
+    maxTurns: number;
+    gameMode: GameMode;
+  }) => {
     setIsLoading(true);
-    gameService.initializeStory(prompt, generateImages, playerCount);
+    gameService.initializeStory(
+      options.prompt,
+      options.generateImages,
+      options.playerCount,
+      options.maxTurns,
+      options.gameMode
+    );
   };
 
   const handleCodeSubmit = (code: string) => {
@@ -104,20 +129,14 @@ function App() {
     setStoryState(null);
     setStoryCodes(null);
     setSessionId(null);
-    setViewState("WELCOME");
+    loggedSetViewState("WELCOME");
   };
 
   const handleNewStory = () => {
     setStoryState(null);
     setStoryCodes(null);
 
-    // Important: Clear the session before transitioning
-    if (sessionId) {
-      gameService.exitStory();
-      setSessionId(null);
-    }
-
-    setViewState("SETUP");
+    loggedSetViewState("SETUP");
   };
 
   const handlePlayerChoice = (optionIndex: number) => {

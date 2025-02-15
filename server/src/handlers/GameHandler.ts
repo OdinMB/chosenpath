@@ -13,6 +13,7 @@ import { filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
 import { areAllChoicesSubmitted } from "../../../shared/utils/storyUtils.js";
 import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
+import type { GameMode } from "../../../shared/types/story.js";
 
 export class GameHandler {
   private sessionService: SessionService;
@@ -123,24 +124,28 @@ export class GameHandler {
     sessionId: string,
     prompt: string,
     generateImages: boolean,
-    playerCount: PlayerCount
-  ) {
+    playerCount: PlayerCount,
+    maxTurns: number,
+    gameMode: GameMode
+  ): Promise<void> {
     try {
       if (!isValidPlayerCount(playerCount)) {
         throw new Error(`Invalid player count: ${playerCount}`);
       }
 
-      const initialState = await this.aiStoryGenerator.createInitialState(
+      const state = await this.aiStoryGenerator.createInitialState(
         prompt,
         generateImages,
-        playerCount
+        playerCount,
+        maxTurns,
+        gameMode
       );
       console.log("[GameHandler] Created initial state");
 
       // Generate player codes
       const playerCodes = this.generatePlayerCodes(playerCount);
       const stateWithCodes = {
-        ...initialState,
+        ...state,
         playerCodes,
       };
 
@@ -172,10 +177,7 @@ export class GameHandler {
       );
 
       // Generate first set of beats
-      const finalState = await this.generateAndBroadcastNextBeats(
-        storyId,
-        stateWithCodes
-      );
+      await this.generateAndBroadcastNextBeats(storyId, stateWithCodes);
 
       // ToDo: call image generation once it has its own function
     } catch (error) {
@@ -199,25 +201,35 @@ export class GameHandler {
         throw new Error("Story not found");
       }
 
-      // Create a deep copy of the state to avoid mutation
-      const updatedState = JSON.parse(JSON.stringify(state));
-
-      const player = updatedState.players[playerInfo.playerSlot];
+      // Validate the choice
+      const player = state.players[playerInfo.playerSlot];
       const currentBeat = player.beatHistory[player.beatHistory.length - 1];
 
-      // Validate the choice
       if (currentBeat.choice !== -1) {
         throw new Error(
-          `Choice already made for this turn (player: ${
-            playerInfo.playerSlot
-          }, beat #${player.beatHistory.length} (${
-            currentBeat.title
-          }), choice: ${currentBeat.options[currentBeat.choice]})`
+          `Choice already made for this turn (player: ${playerInfo.playerSlot}, beat #${player.beatHistory.length})`
         );
       }
 
-      // Record the player's choice
-      currentBeat.choice = optionIndex;
+      // Create a focused update instead of copying entire state
+      const updatedPlayer = {
+        ...player,
+        beatHistory: player.beatHistory.map((beat, index) => {
+          if (index === player.beatHistory.length - 1) {
+            return { ...beat, choice: optionIndex };
+          }
+          return beat;
+        }),
+      };
+
+      // Create minimal state update
+      const updatedState = {
+        ...state,
+        players: {
+          ...state.players,
+          [playerInfo.playerSlot]: updatedPlayer,
+        },
+      };
 
       // Save the updated state
       await this.storyStateManager.updateState(
@@ -226,7 +238,7 @@ export class GameHandler {
       );
 
       console.log(
-        `[GameHandler] Set choice for player ${playerInfo.playerSlot} for beat #${player.beatHistory.length} (${currentBeat.title}) to option #${optionIndex} (${currentBeat.options[optionIndex]})`
+        `[GameHandler] Set choice for player ${playerInfo.playerSlot} for beat #${player.beatHistory.length} (${currentBeat.title}) to option #${optionIndex}`
       );
 
       // Broadcast the updated state to all players

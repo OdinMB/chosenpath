@@ -1,11 +1,14 @@
 import { wsService } from "./WebSocketService";
 import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
+import { GameMode } from "../../../shared/types/story.js";
 
 class GameService {
   initializeStory(
     prompt: string,
     generateImages: boolean,
-    playerCount: number
+    playerCount: number,
+    maxTurns: number,
+    gameMode: GameMode
   ) {
     const sessionId = wsService.getSessionId();
     if (!sessionId) {
@@ -24,6 +27,8 @@ class GameService {
       prompt,
       generateImages,
       playerCount,
+      maxTurns,
+      gameMode,
     });
 
     wsService.sendMessage({
@@ -32,6 +37,8 @@ class GameService {
       prompt,
       generateImages,
       playerCount,
+      maxTurns,
+      gameMode,
     });
   }
 

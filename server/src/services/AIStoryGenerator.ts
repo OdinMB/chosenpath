@@ -16,6 +16,7 @@ import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "../../../shared/types/beat.js";
 import type { BeatsNeedingImages } from "../../../shared/types/image.js";
+import { type GameMode, GameModes } from "../../../shared/types/story.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -36,9 +37,16 @@ export class AIStoryGenerator {
   public async createInitialState(
     prompt: string,
     generateImages: boolean,
-    playerCount: PlayerCount
+    playerCount: PlayerCount,
+    maxTurns: number,
+    gameMode: GameMode
   ): Promise<StoryState> {
-    const setup = await this.generateStorySetup(prompt, playerCount);
+    const setup = await this.generateStorySetup(
+      prompt,
+      playerCount,
+      gameMode,
+      maxTurns
+    );
 
     // Create a record of all players from the setup.
     const players = Object.fromEntries(
@@ -62,17 +70,20 @@ export class AIStoryGenerator {
       worldStats: setup.worldStats,
       npcs: setup.npcs,
       players,
-      maxTurns: 30,
+      maxTurns,
       establishedFacts: [],
       generateImages,
       images: [],
       playerCodes: {},
+      gameMode,
     };
   }
 
   async generateStorySetup(
     prompt: string,
-    playerCount: PlayerCount
+    playerCount: PlayerCount,
+    gameMode: GameMode,
+    maxTurns: number
   ): Promise<StorySetup<typeof playerCount>> {
     const schema = createStorySetupSchema(playerCount);
     const structuredModel = this.model.withStructuredOutput(schema);
@@ -80,14 +91,21 @@ export class AIStoryGenerator {
     try {
       console.log("Generating story setup with playerCount:", playerCount);
 
+      const gameModeInstructions = {
+        [GameModes.Competitive]: `\n\nThe players in this game are competing against each other. The players' outcomes should represent at least one competing goal or interest and no shared goals.\n\n`,
+        [GameModes.Cooperative]: `\n\nThe players in this game are cooperating with each other. The players' outcomes should include at least one shared goal or interest that requires collaboration to achieve. Individual players may still have personal goals, but these should not conflict with the shared objective.\n\n`,
+        [GameModes.CooperativeCompetitive]: `\n\nThe players in this game have a mix of cooperative and competitive elements. Include both shared goals that require collaboration AND individual goals that may put players in competition. Players should need to carefully balance helping others versus pursuing their own interests.\n\n`,
+      };
+
       const response = await structuredModel.invoke(
         `Create a setup for a multiplayer, interactive fiction game for ${playerCount} player${
           playerCount > 1 ? "s" : ""
-        } based on this prompt: "${prompt}".
+        } based on this prompt: "${prompt}".${gameModeInstructions[gameMode]}
         
-        The entire story is supposed to play out over a course of 30 beats, with each beat consisting of about three paragraphs of text for each player and a decision by the player.
-        Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make the story interesting, but not so many that they cannot be fully developed within the 30 beats.
-        Here are guidelines for a story with 30 beats:
+        The entire story is supposed to play out over a course of ${maxTurns} beats, with each beat consisting of about three paragraphs of text for each player and a decision by the player.
+        Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make the story interesting, but not so many that they cannot be fully developed within the ${maxTurns} beats.
+
+        Here are guidelines for a story with 20 beats:
         - 3 overarching conflicts
         - 3 types of decisions that the players will be able to make
         - 5-6 NPCs / factions / organizations
@@ -190,7 +208,7 @@ Summary: ${beat.summary}${
           .join("\n\n");
 
         return `#####################################\n######## PLAYER ID: ${slot} ########\n#####################################\n
-      ${playerState.character.name} (${playerState.character.pronouns})
+${playerState.character.name} (${playerState.character.pronouns})
 ${playerState.character.fluff}
 
 CHARACTER STATS:
@@ -239,7 +257,20 @@ ${beatHistorySection}
 
     const prompt = `======= CURRENT GAME STATE =======
 
-STORY GUIDELINES
+${
+  Object.keys(state.players).length > 1
+    ? `MULTIPLAYER GAME MODE: ${state.gameMode}
+${
+  state.gameMode === GameModes.Competitive
+    ? "Players are competing against each other with conflicting goals and interests."
+    : state.gameMode === GameModes.Cooperative
+    ? "Players are cooperating with shared goals that require collaboration."
+    : "Players have both shared goals requiring collaboration AND individual competitive goals."
+}
+
+`
+    : ""
+}STORY GUIDELINES
 - Setting elements: ${state.guidelines.settingElements.join(", ")}
 - Rules: ${state.guidelines.rules.join(", ")}
 - Tone: ${state.guidelines.tone.join(", ")}
@@ -302,10 +333,11 @@ ${
 1. Changes to the story state
 
 - Include changes to both the world stats and the character stats of each player.
+- Take stats into account. For example, if a player character tries to be stealthy, but the character traits indicate more of a brute force approach, the character will not be stealthy.
 - If an outcome has 0 milestones and was introduced to the player, create a milestone to mark its introduction.
 - Use newFact only as a backup. Try to track changes via statChange and newMilestone first.
 - The players' decisions are tracked separately and don't have to be tracked via newFact.
-- If this is the first set of beats, just return an empty list.
+- If this is the first set of beats, there should be no changes. Just return an empty list.
 
 2. Beat generation
 
@@ -330,13 +362,12 @@ d) How should we develop the world, its characters, and the relationships that t
 
 e) How can we best stay true to the game's overall setup?
 - Stay with the story's key conflicts and types of decisions
-- Make the world and player stats relevant
-
-Format
-Each beat should have
-- a descriptive title
-- 3-4 paragraphs of narrative text
-- 3 meaningful options for the player to choose from`;
+- Make the world and player stats relevant${
+      Object.keys(state.players).length > 1
+        ? `
+- Honor the ${state.gameMode.toLowerCase()} multiplayer game mode for the general feel and in how characters interact`
+        : ""
+    }`;
 
     console.log(
       "\n\n########\nBeat generation prompt\n########\n",

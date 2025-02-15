@@ -7,6 +7,7 @@ import { config } from "../config/env.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import type { PlayerSlot } from "../../../shared/types/players.js";
 import type { WSClientMessage } from "../../../shared/types/websocket.js";
+import { GameMode } from "../../../shared/types/story.js";
 
 export class GameWebSocketServer {
   private io: Server;
@@ -59,13 +60,17 @@ export class GameWebSocketServer {
           prompt: string;
           generateImages: boolean;
           playerCount: number;
+          maxTurns: number;
+          gameMode: GameMode;
         }) => {
           console.log("[WebSocket] Initializing story with data:", data);
           await gameHandler.initializeStory(
             data.sessionId,
             data.prompt,
             data.generateImages,
-            data.playerCount as PlayerCount
+            data.playerCount as PlayerCount,
+            data.maxTurns,
+            data.gameMode
           );
         }
       );

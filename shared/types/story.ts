@@ -13,6 +13,18 @@ import {
 
 // GENERATION WITH LLM
 
+export const GameModes = {
+  Cooperative: "cooperative",
+  Competitive: "competitive",
+  CooperativeCompetitive: "cooperative-competitive",
+} as const;
+export const gameModeSchema = z.enum([
+  GameModes.Cooperative,
+  GameModes.Competitive,
+  GameModes.CooperativeCompetitive,
+]);
+export type GameMode = typeof gameModeSchema._type;
+
 export const guidelinesSchema = z
   .object({
     settingElements: z
@@ -93,12 +105,14 @@ export type StoryState = {
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
+  gameMode: GameMode;
 };
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
   numberOfPlayers: number;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
+  gameMode: GameMode;
   worldStats: z.infer<typeof statsSchema>;
   maxTurns: number;
   generateImages: boolean;

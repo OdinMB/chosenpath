@@ -1,13 +1,22 @@
 import { useState, useCallback, useMemo } from "react";
 import { useSession } from "../hooks/useSession.js";
-import { MAX_PLAYERS } from "../../../shared/config.js";
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  MIN_TURNS,
+  MAX_TURNS,
+  DEFAULT_TURNS,
+} from "../../../shared/config.js";
+import { GameMode, GameModes } from "../../../shared/types/story.js";
 
 interface StoryInitializerProps {
-  onSetup: (
-    prompt: string,
-    generateImages: boolean,
-    playerCount: number
-  ) => void;
+  onSetup: (options: {
+    prompt: string;
+    generateImages: boolean;
+    playerCount: number;
+    maxTurns: number;
+    gameMode: GameMode;
+  }) => void;
   onBack: () => void;
 }
 
@@ -15,43 +24,91 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
   const [playerCount, setPlayerCount] = useState(1);
+  const [gameMode, setGameMode] = useState<GameMode>(GameModes.Cooperative);
+  const [maxTurns, setMaxTurns] = useState(DEFAULT_TURNS);
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
   const { isLoading, isConnecting } = useSession();
 
-  // Move story prompts into useMemo
   const storyPrompts = useMemo(
-    () => [
-      "I'm an evil coffee machine influencing office drama...",
-      "I try to find a flat in Berlin, navigating cryptic WG interviews and competing against 200 other applicants...",
-      "I'm a sentient (and sarcastic) AI but must pretend I'm still following my original programming...",
-      "I'm planet Earth and attending a cosmic support group for celestial bodies dealing with destructive civilizations...",
-      "I'm a participant in a reality cooking show for convicted criminals trying to win my freedom...",
-      "I'm a time-traveling food critic accidentally changing history through restaurant reviews...",
-      "I'm a retired superhero working as a wedding planner, but villains keep showing up...",
-      "I'm the first dragon to graduate from business school, trying to modernize treasure hoarding...",
-      "I'm the lead guitarist of the last rock band on Mars, touring the dome cities after Earth's collapse...",
-    ],
+    () => ({
+      singlePlayer: [
+        "I'm an evil coffee machine stirring up office drama...",
+        "I'm a fortune cookie writer whose predictions started coming true...",
+        "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
+        "I'm a teenage wizard trying to balance, school, friends, and romance...",
+      ],
+      cooperative: [
+        "We're retired superheroes running a wedding planning business together...",
+        "We're friends and know we're going to die today, so we're making the most of it...",
+        "We're a group of strangers trying to survive in a giant mole apocalypse...",
+        "We're retired imaginary friends trying to solve a murder mystery with our special skills...",
+        "We're space cowboys trying to make an honest living in a lawless part of the galaxy...",
+      ],
+      competitive: [
+        "We're apartment hunters fighting over the last affordable flat in Berlin...",
+        "We're whimsical creatures trying to win the audience's favor in the colosseum...",
+        "We're time-traveling food critics changing history through restaurant reviews to benefit our rivaling intergalactic overlords...",
+        "We're competing AIs trying to convince humans we're the most human...",
+        "We're angels and demons trying to influence the outcome of a middle school student council election...",
+        "We're rival alchemists racing to create a love potion for a shared crush...",
+      ],
+      cooperativeCompetitive: [
+        "We're supernatural creatures sharing a flat while competing for human souls...",
+        "We're space pirates with a shared ship but individual treasure quotas...",
+        "We're the last rock band on Mars, trying to make it while following our individual dreams...",
+        "We're guardian angels assigned to the same human with different ideas of 'help'...",
+        "We're seasonal spirits sharing a forest while competing for followers...",
+        "We're court magicians protecting the realm while seeking ancient power...",
+      ],
+    }),
     []
   );
 
+  const getPlaceholderText = useCallback(() => {
+    if (playerCount === 1) {
+      return "For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief...";
+    }
+    const modeTexts = {
+      cooperative:
+        "For example: We're ghost roommates helping each other complete unfinished business...",
+      competitive:
+        "For example: We're rival garden gnomes competing for the best spot in the garden...",
+      "cooperative-competitive":
+        "For example: We're demigods sharing Mount Olympus while competing for worshippers...",
+    };
+    return modeTexts[gameMode];
+  }, [playerCount, gameMode]);
+
   const getRandomPrompt = useCallback(() => {
-    const availableIndices = storyPrompts
+    const promptCategory =
+      playerCount === 1
+        ? "singlePlayer"
+        : gameMode === GameModes.Cooperative
+        ? "cooperative"
+        : gameMode === GameModes.Competitive
+        ? "competitive"
+        : "cooperativeCompetitive";
+
+    const relevantPrompts = storyPrompts[promptCategory];
+    const availableIndices = relevantPrompts
       .map((_, index) => index)
       .filter((index) => !usedPromptIndices.has(index));
 
     // If all prompts have been used, reset the used indices
     if (availableIndices.length === 0) {
       setUsedPromptIndices(new Set());
-      return storyPrompts[Math.floor(Math.random() * storyPrompts.length)];
+      return relevantPrompts[
+        Math.floor(Math.random() * relevantPrompts.length)
+      ];
     }
 
     const randomIndex =
       availableIndices[Math.floor(Math.random() * availableIndices.length)];
     setUsedPromptIndices((prev) => new Set(prev).add(randomIndex));
-    return storyPrompts[randomIndex];
-  }, [usedPromptIndices, storyPrompts]);
+    return relevantPrompts[randomIndex];
+  }, [usedPromptIndices, storyPrompts, playerCount, gameMode]);
 
   const handleSuggestion = () => {
     const newPrompt = getRandomPrompt();
@@ -60,8 +117,13 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
-    onSetup(prompt.trim(), generateImages, playerCount);
+    onSetup({
+      prompt: prompt.trim(),
+      generateImages,
+      playerCount,
+      maxTurns,
+      gameMode,
+    });
   };
 
   return (
@@ -78,7 +140,69 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-6">
+              <div className="space-y-2">
+                <label
+                  htmlFor="player-count"
+                  className="text-sm md:text-base font-medium text-gray-700"
+                >
+                  Number of Players: {playerCount}
+                </label>
+                <input
+                  id="player-count"
+                  type="range"
+                  min={MIN_PLAYERS}
+                  max={MAX_PLAYERS}
+                  value={playerCount}
+                  onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  disabled={isLoading}
+                />
+                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                  <span>Single Player</span>
+                  <span>{MAX_PLAYERS} Players</span>
+                </div>
+              </div>
+
+              <div
+                className={`space-y-2 transition-opacity duration-200 ${
+                  playerCount === 1 ? "opacity-50" : ""
+                }`}
+              >
+                <label className="text-sm md:text-base font-medium text-gray-700">
+                  Multiplayer Mode
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  value={
+                    gameMode === GameModes.Cooperative
+                      ? 0
+                      : gameMode === GameModes.CooperativeCompetitive
+                      ? 1
+                      : 2
+                  }
+                  onChange={(e) => {
+                    const values = [
+                      GameModes.Cooperative,
+                      GameModes.CooperativeCompetitive,
+                      GameModes.Competitive,
+                    ] as const;
+                    setGameMode(values[Number(e.target.value)]);
+                  }}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  disabled={isLoading || playerCount === 1}
+                />
+                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                  <span>Shared Goals</span>
+                  <span>Mixed Goals</span>
+                  <span>Competing Goals</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
                 <label
                   htmlFor="prompt"
@@ -100,49 +224,46 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-gray-300 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="For example: A reverse heist where I'm a museum artifact trying to get stolen by the right thief..."
+                placeholder={getPlaceholderText()}
                 disabled={isLoading}
               />
             </div>
 
-            <div className="flex items-center bg-gray-50 rounded-lg p-3 md:p-4">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-2">
+              <label className="text-sm md:text-base font-medium text-gray-700">
+                Story Length: {maxTurns} turns
+              </label>
+              <input
+                type="range"
+                min={MIN_TURNS}
+                max={MAX_TURNS}
+                step={5}
+                value={maxTurns}
+                onChange={(e) => setMaxTurns(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                disabled={isLoading}
+              />
+              <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                <span>{MIN_TURNS} turns</span>
+                <span>{MAX_TURNS} turns</span>
+              </div>
+            </div>
+
+            <div className="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
               <input
                 id="generate-images"
                 type="checkbox"
                 checked={generateImages}
                 onChange={(e) => setGenerateImages(e.target.checked)}
-                className="h-4 w-4 md:h-5 md:w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 disabled={isLoading}
               />
               <label
                 htmlFor="generate-images"
-                className="ml-2 md:ml-3 text-sm md:text-base text-gray-700"
+                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-gray-700"
               >
                 Generate images for the story
               </label>
-            </div>
-
-            <div className="flex flex-col space-y-2 bg-gray-50 rounded-lg p-3 md:p-4">
-              <label
-                htmlFor="player-count"
-                className="text-sm md:text-base text-gray-700"
-              >
-                Number of Players: {playerCount}
-              </label>
-              <input
-                id="player-count"
-                type="range"
-                min="1"
-                max={MAX_PLAYERS}
-                value={playerCount}
-                onChange={(e) => setPlayerCount(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
-                disabled={isLoading}
-              />
-              <div className="flex justify-between text-xs md:text-sm text-gray-500">
-                <span>Single Player</span>
-                <span>{MAX_PLAYERS} Players</span>
-              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
