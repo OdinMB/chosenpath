@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { Beat } from "./beat.js";
 
 // Only used for LLM generation
 export const imageGenerationSchema = z.object({
   prompt: z
     .string()
     .describe(
-      `Prompt for AI image generation. Include the term 'digital art'. Don't include characters (the AI can't keep them consistent). Focus on the scene. Keep it under 200 characters.`
+      `Prompt for AI image generation. Include the term 'digital art'. Don't include characters (the AI can't keep them consistent). Focus on the scene, important items, the environment, etc. Keep it under 200 characters.`
     ),
   description: z
     .string()
@@ -31,3 +32,5 @@ export type Image = {
 export type ImageLibrary = Image[];
 
 export type ImageGeneration = z.infer<typeof imageGenerationSchema>;
+
+export type BeatsNeedingImages = Record<string, Beat>;

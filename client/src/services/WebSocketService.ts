@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import type { WSServerMessage } from "../../../shared/types/websocket";
-import type { StoryState } from "../../../shared/types/story";
+import type { ClientStoryState } from "../../../shared/types/story";
 import { config } from "../config";
 
 type MessageHandler = (data: WSServerMessage) => void;
@@ -134,7 +134,7 @@ export class WebSocketService {
     });
 
     // Handle state_update events
-    this.socket.on("state_update", (data: { state: StoryState }) => {
+    this.socket.on("state_update", (data: { state: ClientStoryState }) => {
       const handler = this.messageHandlers.get("state_update");
       if (handler) {
         handler({ type: "state_update", state: data.state });
@@ -171,7 +171,7 @@ export class WebSocketService {
     // Handle verify_code_response events
     this.socket.on(
       "verify_code_response",
-      (data: { state: StoryState | null; error?: string }) => {
+      (data: { state: ClientStoryState | null; error?: string }) => {
         console.log("[WebSocketService] Code verification response:", data);
         const handler = this.messageHandlers.get("verify_code_response");
         if (handler) {

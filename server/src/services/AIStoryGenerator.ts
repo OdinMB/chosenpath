@@ -8,15 +8,14 @@ import type { Change } from "../../../shared/types/change.js";
 import type {
   Beat,
   BeatGeneration,
-  PlayerBeatResponse,
-  SetOfBeatPlanGenerationSchema,
+  SetOfBeatGenerationSchema,
 } from "../../../shared/types/beat.js";
 import dotenv from "dotenv";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
-import { createSetOfBeatPlanGenerationSchema } from "../../../shared/types/beat.js";
-import type { ImageGeneration } from "../../../shared/types/image.js";
+import { createSetOfBeatGenerationSchema } from "../../../shared/types/beat.js";
+import type { BeatsNeedingImages } from "../../../shared/types/image.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -28,8 +27,9 @@ export class AIStoryGenerator {
     }
 
     this.model = new ChatOpenAI({
-      modelName: "gpt-4o",
-      temperature: 0.4,
+      modelName: "o3-mini", // o3-mini, gpt-4o
+      // temperature: 0.4,
+      reasoningEffort: "medium",
     });
   }
 
@@ -116,8 +116,8 @@ export class AIStoryGenerator {
 
   async addNextSetOfBeats(
     state: StoryState
-  ): Promise<[StoryState, Change[], ImageGeneration[]]> {
-    const schema = createSetOfBeatPlanGenerationSchema(
+  ): Promise<[StoryState, Change[], BeatsNeedingImages]> {
+    const schema = createSetOfBeatGenerationSchema(
       Object.keys(state.players).length as PlayerCount
     );
     const structuredModel = this.model.withStructuredOutput(schema);
@@ -130,69 +130,33 @@ export class AIStoryGenerator {
 
       const response = (await structuredModel.invoke(
         this.createBeatPrompt(state)
-      )) as SetOfBeatPlanGenerationSchema;
+      )) as SetOfBeatGenerationSchema;
 
       console.log("Response:\n", response);
 
       // Create a copy of the state to add new beats
       let updatedState = { ...state };
 
-      // Filter out ImageGeneration objects for beats that already have an imageId
-      const validImageGenerations = Object.entries(response)
-        .filter(([key, value]) => {
-          return (
-            key.startsWith("player") &&
-            !["plan", "changes"].includes(key) &&
-            typeof value === "object" &&
-            value !== null &&
-            "beat" in value &&
-            typeof value.beat === "object" &&
-            value.beat !== null &&
-            "imageId" in value.beat &&
-            (!value.beat.imageId || value.beat.imageId === "") &&
-            "imageGeneration" in value &&
-            typeof value.imageGeneration === "object" &&
-            value.imageGeneration !== null
-          );
-        })
-        .map(([_, value]) => (value as PlayerBeatResponse).imageGeneration!)
-        .filter((gen): gen is ImageGeneration => gen !== undefined);
+      // Track beats needing images instead of generating requests
+      const beatsNeedingImages: BeatsNeedingImages = {};
 
       // Add the new beats to each player's history
       Object.entries(response).forEach(([key, value]) => {
-        if (
-          key.startsWith("player") &&
-          !["plan", "changes"].includes(key) &&
-          typeof value === "object" &&
-          value !== null &&
-          "beat" in value &&
-          typeof value.beat === "object" &&
-          value.beat !== null &&
-          "title" in value.beat &&
-          "options" in value.beat &&
-          "text" in value.beat &&
-          "summary" in value.beat &&
-          "imageId" in value.beat
-        ) {
+        if (key.startsWith("player") && !["changes"].includes(key)) {
           const playerSlot = key.toLowerCase();
-          const playerResponse = value as PlayerBeatResponse;
-          if (updatedState.players[playerSlot]) {
-            const beatData = playerResponse.beat;
+          const beatData = value as BeatGeneration;
 
-            // If there's no imageId but we have an imageGeneration, use its id
-            if (
-              (!beatData.imageId || beatData.imageId === "") &&
-              playerResponse.imageGeneration
-            ) {
-              beatData.imageId = playerResponse.imageGeneration.id;
+          if (updatedState.players[playerSlot]) {
+            // If no existing imageId is specified, mark for image generation
+            if (!beatData.imageId || beatData.imageId === "") {
+              beatsNeedingImages[playerSlot] = {
+                ...beatData,
+                choice: -1,
+              };
             }
 
             const beat: Beat = {
-              title: beatData.title,
-              options: beatData.options,
-              text: beatData.text,
-              summary: beatData.summary,
-              imageId: beatData.imageId,
+              ...beatData,
               choice: -1,
             };
             updatedState.players[playerSlot].beatHistory.push(beat);
@@ -200,7 +164,7 @@ export class AIStoryGenerator {
         }
       });
 
-      return [updatedState, response.changes, validImageGenerations];
+      return [updatedState, response.changes, beatsNeedingImages];
     } catch (error) {
       console.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
@@ -219,15 +183,11 @@ export class AIStoryGenerator {
             return `Beat ${index + 1}:
 Summary: ${beat.summary}${
               isLastBeat
-                ? `\n\nFull text (only for the last beat to improve continuity):\n${beat.text}`
+                ? `\n\nFull text (only for the last beat to help with continuity):\n${beat.text}`
                 : ""
             }${chosenOption ? `\nPlayer choice: ${chosenOption}` : ""}`;
           })
           .join("\n\n");
-
-        const hasUnintroducedOutcomes = playerState.outcomes.some(
-          (outcome) => outcome.milestones.length === 0
-        );
 
         return `#####################################\n######## PLAYER ID: ${slot} ########\n#####################################\n
       ${playerState.character.name} (${playerState.character.pronouns})
@@ -322,40 +282,58 @@ ${state.worldStats
   })
   .join("\n")}
 
-IMAGES: ${
-      state.generateImages
-        ? "Are to be generated (or chosen from the library)"
-        : "Are NOT to be generated"
-    }
-
 ${
   state.generateImages
     ? `IMAGE LIBRARY:
-${state.images.map((image) => `- ${image.id}: ${image.description}`).join("\n")}
+${
+  state.images.length === 0
+    ? "No images yet."
+    : state.images
+        .map((image) => `- ${image.id}: ${image.description}`)
+        .join("\n")
+}
 
 `
     : ""
 }${playersSection}
 
-======= YOUR JOB: GENERATE THE NEXT SET OF STORY BEATS =======
+======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS =======
 
-Each beat must do five things:
+1. Changes to the story state
 
-1. Define changes to the story state based on the players' choices in the previous beats.
-2. Give narrative feedback so the players understand these changes (except when the affected stats are not visible to the player).
-Skip steps 1+2 if this is the first set of beats in the game.
-3. Decide to continue the scene or thread of the previous beats or to start new ones.
-4. Make Progress Towards Story Outcomes
-Note: If an outcome has 0 milestones, it means that it hasn't yet been introduced to the player. When you introduce it, create a milestone to mark its introduction.
-5. Develop World and Characters
+- Include changes to both the world stats and the character stats of each player.
+- If an outcome has 0 milestones and was introduced to the player, create a milestone to mark its introduction.
+- Use newFact only as a backup. Try to track changes via statChange and newMilestone first.
+- The players' decisions are tracked separately and don't have to be tracked via newFact.
+- If this is the first set of beats, just return an empty list.
 
-Consider the following:
-- the story's key conflicts and types of decisions
-- the status of outcomes for each player, especially how many milestones are still missing for their resolution and the number of remaining beats
-- each player's stats and relationships
-- the previous beats to continue the story naturally
+2. Beat generation
 
-CREATE ENGAGING BEATS for each player with:
+For each beat, consider the following points:
+
+a) How should we narrate the changes to the story state to this player?
+Exclude changes to stats that are not visible to the player.
+This step is irrelevant if this is the first beat of the story.
+
+b) Should we continue the scene or thread of the previous beat or start a new one?
+- In most cases, it should take several beats to establish a milestone toward an outcome's resolution.
+- If you added the final milestone to an outcome (number of milestones equals intended number of milestones), the outcome is resolved. Use this beat to give the resolution some gravity.
+
+c) How should we make progress towards unresolved story outcomes?
+- For outcomes without milestones: Consider introducing the outcome through NPCs, events, or initial discoveries.
+- For outcomes with milestones: What are options for the next milestone to move the outcome closer to resolution?
+Consider how many milestones are left to bring the outcome from its current status to a resolution.
+Don't favor one option over others. Which option ends up as the outcome's resolution should be dictated by players' choices.
+That said, if the players' early choices make an option unlikely or even impossible, it's OK to no longer consider milestones toward it.
+
+d) How should we develop the world, its characters, and the relationships that the player character has with them?
+
+e) How can we best stay true to the game's overall setup?
+- Stay with the story's key conflicts and types of decisions
+- Make the world and player stats relevant
+
+Format
+Each beat should have
 - a descriptive title
 - 3-4 paragraphs of narrative text
 - 3 meaningful options for the player to choose from`;

@@ -20,7 +20,9 @@ export const guidelinesSchema = z
       .describe("Required characters, locations, and story elements"),
     rules: z
       .array(z.string())
-      .describe("Fundamental rules governing the story world"),
+      .describe(
+        "Fundamental rules governing the story world (not your rules for creating the story)"
+      ),
     tone: z
       .array(z.string())
       .describe("Emotional and narrative tone guidelines"),

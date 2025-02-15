@@ -3,99 +3,119 @@ import type { Image, ImageGeneration } from "../../../shared/types/image.js";
 import type { StoryState } from "../../../shared/types/story.js";
 import type { Beat } from "../../../shared/types/beat.js";
 import dotenv from "dotenv";
+import { ChatOpenAI } from "@langchain/openai";
+import { imageGenerationSchema } from "../../../shared/types/image.js";
+import type { BeatsNeedingImages } from "../../../shared/types/image.js";
 dotenv.config();
 
 export class AIImageGenerator {
   private openai: OpenAI;
+  private model: ChatOpenAI;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
     this.openai = new OpenAI();
+    this.model = new ChatOpenAI({
+      modelName: "o3-mini", // o3-mini, gpt-4o
+      reasoningEffort: "low",
+      // temperature: 0.3,
+    });
   }
 
-  async generateImagesForState(
-    state: StoryState,
-    imageGenerations: ImageGeneration[]
-  ): Promise<StoryState> {
-    if (!state.generateImages || imageGenerations.length === 0) {
-      console.log("[AIImageGenerator] No images to generate");
-      return state;
-    }
-
-    console.log(
-      `[AIImageGenerator] Starting generation for ${imageGenerations.length} images`
+  private async generateImageRequest(beat: Beat): Promise<ImageGeneration> {
+    const structuredModel = this.model.withStructuredOutput(
+      imageGenerationSchema
     );
-
-    const updatedState = { ...state };
-    const newImages: Image[] = imageGenerations.map((gen) => ({
-      ...gen,
-      status: "generating" as const,
-    }));
-
-    // Add to image library
-    updatedState.images.push(...newImages);
-    console.log(
-      `[AIImageGenerator] Added ${newImages.length} placeholder images to state`
+    const response = await structuredModel.invoke(
+      `We need an image for the following story beat: ${beat.text}\n\nSummary: ${beat.summary}`
     );
+    console.log("Image generation response: ", response);
+    return response;
+  }
 
-    // Generate all images in parallel
-    console.log("[AIImageGenerator] Starting parallel image generation");
-    const imagePromises = newImages.map(async (image) => {
-      console.log(
-        `[AIImageGenerator] Generating image for prompt: ${image.prompt.slice(
-          0,
-          50
-        )}...`
-      );
-      try {
-        const imageResponse = await this.openai.images.generate({
-          model: "dall-e-3",
-          prompt: image.prompt,
-          n: 1,
-          size: "1024x1024",
-        });
-
-        if (imageResponse.data[0].url) {
-          return {
-            ...image,
-            url: imageResponse.data[0].url,
-            status: "ready" as const,
-          };
-        }
-        throw new Error("No URL in image response");
-      } catch (error) {
-        console.error(
-          `[AIImageGenerator] Failed to generate image ${image.id}:`,
-          error
-        );
-        return {
-          ...image,
-          status: "failed" as const,
-        };
-      }
+  private async generateImage(prompt: string): Promise<string> {
+    const imageResponse = await this.openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
     });
 
-    // Wait for all images to complete
-    const generatedImages = await Promise.all(imagePromises);
-    const successCount = generatedImages.filter(
-      (img) => img.status === "ready"
-    ).length;
-    const failedCount = generatedImages.filter(
-      (img) => img.status === "failed"
-    ).length;
-    console.log(
-      `[AIImageGenerator] Generation complete. Success: ${successCount}, Failed: ${failedCount}`
+    if (!imageResponse.data[0].url) {
+      throw new Error("No URL in image response");
+    }
+
+    return imageResponse.data[0].url;
+  }
+
+  async generateImagesForBeats(
+    state: StoryState,
+    beatsNeedingImages: BeatsNeedingImages
+  ): Promise<StoryState> {
+    const updatedState = { ...state };
+
+    // Generate image requests and images in parallel
+    const imagePromises = Object.entries(beatsNeedingImages).map(
+      async ([playerSlot, beat]) => {
+        let imageGen: ImageGeneration;
+
+        try {
+          // Generate image request from beat
+          imageGen = await this.generateImageRequest(beat);
+
+          // Add placeholder to image library
+          const placeholderImage: Image = {
+            ...imageGen,
+            status: "generating",
+          };
+          updatedState.images.push(placeholderImage);
+
+          // Generate actual image
+          const imageUrl = await this.generateImage(imageGen.prompt);
+
+          // Return final image and player info
+          return {
+            playerSlot,
+            image: {
+              ...imageGen,
+              url: imageUrl,
+              status: "ready" as const,
+            },
+          };
+        } catch (error) {
+          console.error(`Failed to generate image for ${playerSlot}:`, error);
+          return {
+            playerSlot,
+            image: {
+              id: crypto.randomUUID(),
+              prompt: "",
+              description: "Failed to generate image",
+              status: "failed" as const,
+            },
+          };
+        }
+      }
     );
 
-    // Update images in state
-    generatedImages.forEach((genImage) => {
+    const results = await Promise.all(imagePromises);
+
+    // Update state with generated images
+    results.forEach(({ playerSlot, image }) => {
+      // Update image in library
       const imageIndex = updatedState.images.findIndex(
-        (img) => img.id === genImage.id
+        (img) => img.id === image.id
       );
       if (imageIndex !== -1) {
-        updatedState.images[imageIndex] = genImage;
+        updatedState.images[imageIndex] = image;
+      }
+
+      // Update beat with image id
+      const player = updatedState.players[playerSlot];
+      if (player && player.beatHistory.length > 0) {
+        const lastBeat = player.beatHistory[player.beatHistory.length - 1];
+        lastBeat.imageId = image.id;
       }
     });
 

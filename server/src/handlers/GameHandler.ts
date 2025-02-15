@@ -78,7 +78,7 @@ export class GameHandler {
         playerInfo.playerSlot
       );
 
-      // Filter state for specific player
+      // Filter state for specific player and convert to ClientStoryState
       const filteredState = filterStateForPlayer(state, playerInfo.playerSlot);
 
       console.log("[GameHandler] Verification successful");
@@ -93,8 +93,8 @@ export class GameHandler {
     storyId: string,
     state: StoryState
   ) {
-    // Get next beats, changes, and image generations
-    const [nextState, changes, imageGenerations] =
+    // Get next beats, changes, and beats needing images
+    const [nextState, changes, beatsNeedingImages] =
       await this.aiStoryGenerator.addNextSetOfBeats(state);
 
     // Apply changes to state and update/broadcast
@@ -105,13 +105,12 @@ export class GameHandler {
     await this.storyStateManager.updateState(storyId, stateWithChanges);
     this.broadcastStateUpdate(storyId, stateWithChanges);
 
-    console.log("[GameHandler] Image generations:", imageGenerations);
     // Generate images if needed
     let stateWithImages: StoryState | undefined;
-    if (state.generateImages && imageGenerations.length > 0) {
-      stateWithImages = await this.imageService.generateImagesForState(
+    if (state.generateImages && Object.keys(beatsNeedingImages).length > 0) {
+      stateWithImages = await this.imageService.generateImagesForBeats(
         stateWithChanges,
-        imageGenerations
+        beatsNeedingImages
       );
       await this.storyStateManager.updateState(storyId, stateWithImages);
       this.broadcastStateUpdate(storyId, stateWithImages);
