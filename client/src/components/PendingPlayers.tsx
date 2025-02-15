@@ -3,11 +3,13 @@ import type { PlayerSlot } from "../../../shared/types/players.js";
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];
   currentPlayer: PlayerSlot;
+  numberOfPlayers: number;
 }
 
 export function PendingPlayers({
   pendingPlayers,
   currentPlayer,
+  numberOfPlayers,
 }: PendingPlayersProps) {
   if (pendingPlayers.length === 0) {
     return (
@@ -42,7 +44,9 @@ export function PendingPlayers({
   return (
     <div className="rounded-md bg-gray-50 p-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-sm font-medium text-gray-700">Waiting for</span>
+        <span className="text-sm font-medium text-gray-700">
+          Waiting for {pendingPlayers.length}/{numberOfPlayers}:
+        </span>
         {pendingPlayers.map((slot) => (
           <span
             key={slot}

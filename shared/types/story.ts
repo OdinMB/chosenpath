@@ -97,6 +97,7 @@ export type StoryState = {
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
+  numberOfPlayers: number;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   worldStats: z.infer<typeof statsSchema>;
   maxTurns: number;

@@ -47,12 +47,27 @@ function App() {
   useEffect(() => {
     if (!sessionId && !playerCode) {
       setViewState("CONNECTING");
-    } else if (!storyState) {
-      setViewState("WELCOME");
+    } else if (viewState === "SETUP") {
+      // nothing
+    } else if (viewState === "PLAYER_CODES") {
+      if (storyState) {
+        setViewState("GAME");
+      }
+    } else if (storyState) {
+      setViewState("GAME");
     } else {
-      setViewState("GAME"); // Automatically show game when state is available
+      setViewState("WELCOME");
     }
-  }, [sessionId, storyState, playerCode]);
+    if (viewState === "WELCOME") {
+      if (storyState) {
+        setViewState("GAME");
+      }
+    }
+
+    if (storyCodes && viewState === "SETUP") {
+      setViewState("PLAYER_CODES");
+    }
+  }, [sessionId, storyState, playerCode, storyCodes, viewState]);
 
   useEffect(() => {
     if (!sessionId && !isCreatingSession && wsService.isConnected()) {
@@ -67,13 +82,6 @@ function App() {
       setIsCreatingSession(false);
     }
   }, [sessionId]);
-
-  // Update view state when codes are received
-  useEffect(() => {
-    if (storyCodes && viewState === "SETUP") {
-      setViewState("PLAYER_CODES");
-    }
-  }, [storyCodes, viewState]);
 
   const handleStorySetup = (
     prompt: string,
@@ -95,15 +103,20 @@ function App() {
     gameService.exitStory();
     setStoryState(null);
     setStoryCodes(null);
-    wsService.clearSession();
     setSessionId(null);
     setViewState("WELCOME");
   };
 
   const handleNewStory = () => {
-    setPlayerCode(null);
-    localStorage.removeItem(playerCodeKey);
     setStoryState(null);
+    setStoryCodes(null);
+
+    // Important: Clear the session before transitioning
+    if (sessionId) {
+      gameService.exitStory();
+      setSessionId(null);
+    }
+
     setViewState("SETUP");
   };
 

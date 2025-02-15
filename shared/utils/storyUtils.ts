@@ -98,6 +98,7 @@ export const filterStateForPlayer = (
     filteredState;
 
   return {
+    numberOfPlayers: Object.keys(state.players).length,
     players,
     worldStats,
     maxTurns,

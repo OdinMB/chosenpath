@@ -119,12 +119,15 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
             )}
           </section>
 
-          <div className="mt-8">
-            <PendingPlayers
-              pendingPlayers={storyState.pendingPlayers}
-              currentPlayer={playerSlot}
-            />
-          </div>
+          {storyState.numberOfPlayers > 1 && (
+            <div className="mt-8">
+              <PendingPlayers
+                pendingPlayers={storyState.pendingPlayers}
+                numberOfPlayers={storyState.numberOfPlayers}
+                currentPlayer={playerSlot}
+              />
+            </div>
+          )}
 
           <button
             onClick={onExitGame}

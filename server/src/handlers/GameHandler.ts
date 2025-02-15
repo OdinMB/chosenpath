@@ -267,14 +267,18 @@ export class GameHandler {
     });
 
     try {
-      const state = this.sessionService.getSession(sessionId);
-      if (state) {
-        this.sessionService.updateSession(sessionId, null);
+      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+      if (!playerInfo) {
+        console.log("[GameHandler] No player info found for socket");
         this.socket.emit("exit_story_response");
-        console.log("[GameHandler] Story exited successfully");
-      } else {
-        console.warn("[GameHandler] No state found for session:", sessionId);
+        return;
       }
+
+      // Remove socket from connection manager
+      connectionManager.removeSocket(this.socket.id);
+
+      this.socket.emit("exit_story_response");
+      console.log("[GameHandler] Story exited successfully");
     } catch (error) {
       console.error("[GameHandler] Failed to exit story:", error);
       this.socket.emit("error", { error: "Failed to exit story" });

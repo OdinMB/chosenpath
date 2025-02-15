@@ -44,7 +44,17 @@ class GameService {
   }
 
   exitStory() {
-    wsService.sendMessage({ type: "exit_story" });
+    const sessionId = wsService.getSessionId();
+    if (!sessionId) {
+      console.warn("[GameService] Cannot exit story: no session");
+      return;
+    }
+
+    console.log("[GameService] Exiting story");
+    wsService.sendMessage({
+      type: "exit_story",
+      sessionId,
+    });
   }
 
   verifyCode(code: string) {

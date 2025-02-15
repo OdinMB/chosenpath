@@ -214,11 +214,14 @@ export class WebSocketService {
       oldSessionId: this.sessionId,
     });
 
+    // Don't clear the player code as it might be needed for resuming
     this.sessionId = null;
-    this.playerCode = null;
-    const playerCodeKey = `playerCode_${this.tabId}`;
-    localStorage.removeItem(playerCodeKey);
     localStorage.removeItem("sessionId");
+  }
+
+  handleExitStoryResponse() {
+    this.socket?.emit("leave_session", this.sessionId);
+    this.clearSession();
   }
 
   disconnect() {
