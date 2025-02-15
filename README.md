@@ -2,11 +2,9 @@
 
 Easy nice-to-haves
 
-- display which players have made their choice
-- display which players are online (last 5 minutes)
-- Titles for stories (show in resume story section in Welcome screen)
 - Config option for game setup: cooperative (only shared outcomes), competitive (only individual and in part conflictiog outcomes), both shared and individual outcomes
 - Suggested prompts based on number of players and type of setup (cooperative etc.)
+- Titles for stories (show in resume story section in Welcome screen)
 
 Big features
 

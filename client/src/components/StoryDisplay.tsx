@@ -17,14 +17,32 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     number | null
   >(null);
 
-  // Get the player data from the first (and only) player in the players object
-  const playerSlotId = storyState?.players
-    ? Object.keys(storyState.players)[0]
-    : undefined;
-  const playerState = playerSlotId
-    ? storyState?.players[playerSlotId]
-    : undefined;
-  const beatHistory = playerState?.beatHistory || [];
+  // Memoize player data calculations
+  const playerSlotId = React.useMemo(
+    () =>
+      storyState?.players ? Object.keys(storyState.players)[0] : undefined,
+    [storyState?.players]
+  );
+
+  const playerState = React.useMemo(
+    () => (playerSlotId ? storyState?.players[playerSlotId] : undefined),
+    [playerSlotId, storyState?.players]
+  );
+
+  const beatHistory = React.useMemo(
+    () => playerState?.beatHistory || [],
+    [playerState?.beatHistory]
+  );
+
+  // Initialize localSelectedChoice from server state when component mounts or state updates
+  React.useEffect(() => {
+    if (beatHistory.length > 0) {
+      const currentBeat = beatHistory[beatHistory.length - 1];
+      if (currentBeat.choice !== -1) {
+        setLocalSelectedChoice(currentBeat.choice);
+      }
+    }
+  }, [beatHistory]);
 
   // Reset the selected choice and displayed beat index when a new beat arrives
   React.useEffect(() => {
@@ -44,14 +62,28 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   }, [beatHistory.length, displayedBeatIndex]);
 
   const handleChoiceClick = (index: number) => {
-    if (choiceMade || displayedBeatIndex !== beatHistory.length - 1) return;
+    const currentBeat = beatHistory[beatHistory.length - 1];
+    // Don't allow choice if already made (either locally or in server state)
+    if (
+      localSelectedChoice !== undefined ||
+      currentBeat?.choice !== -1 ||
+      displayedBeatIndex !== beatHistory.length - 1
+    )
+      return;
+
     setLocalSelectedChoice(index);
     onChoiceSelected(index);
   };
 
-  const choiceMade = localSelectedChoice !== undefined;
+  // Check both local and server state for choice status
   const currentBeat =
     displayedBeatIndex !== null ? beatHistory[displayedBeatIndex] : null;
+  // Use server state choice if available, otherwise use local state
+  const selectedChoice =
+    currentBeat && currentBeat.choice !== -1
+      ? currentBeat.choice
+      : localSelectedChoice;
+  const choiceMade = selectedChoice !== undefined;
   const isViewingLatestBeat = displayedBeatIndex === beatHistory.length - 1;
 
   const renderOptions = () => {
@@ -59,16 +91,43 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     // For previous beats or when a choice is made, only show the selected choice
     if ((!isViewingLatestBeat && currentBeat.choice !== -1) || choiceMade) {
-      const choiceIndex = choiceMade
-        ? localSelectedChoice!
-        : currentBeat.choice;
+      const choiceIndex = choiceMade ? selectedChoice! : currentBeat.choice;
       return (
         <div className="space-y-4">
-          <div className="mt-6 text-lg bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-            <span className="font-bold">Choice: </span>
-            <span className="text-indigo-800">
-              {currentBeat.options[choiceIndex]}
-            </span>
+          <div className="mt-6">
+            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">Choice: </span>
+                <span className="text-indigo-800">
+                  {currentBeat.options[choiceIndex]}
+                </span>
+              </div>
+              {choiceMade && isLoading && (
+                <div className="flex items-center gap-2 mt-3 text-gray-600">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span className="text-sm">Generating next story beat...</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       );

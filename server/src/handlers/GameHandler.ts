@@ -193,42 +193,51 @@ export class GameHandler {
         throw new Error("Player not found");
       }
 
+      // Get current state
       const state = await this.storyStateManager.getState(playerInfo.storyId);
       if (!state) {
         throw new Error("Story not found");
       }
 
-      const player = state.players[playerInfo.playerSlot];
+      // Create a deep copy of the state to avoid mutation
+      const updatedState = JSON.parse(JSON.stringify(state));
+
+      const player = updatedState.players[playerInfo.playerSlot];
       const currentBeat = player.beatHistory[player.beatHistory.length - 1];
 
       // Validate the choice
       if (currentBeat.choice !== -1) {
-        throw new Error("Choice already made for this turn");
+        throw new Error(
+          `Choice already made for this turn (player: ${
+            playerInfo.playerSlot
+          }, beat #${player.beatHistory.length} (${
+            currentBeat.title
+          }), choice: ${currentBeat.options[currentBeat.choice]})`
+        );
       }
 
       // Record the player's choice
       currentBeat.choice = optionIndex;
 
       // Save the updated state
-      await this.storyStateManager.updateState(playerInfo.storyId, state);
+      await this.storyStateManager.updateState(
+        playerInfo.storyId,
+        updatedState
+      );
 
       console.log(
-        "[GameHandler] Set choice for ",
-        playerInfo.playerSlot,
-        " for beat #",
-        player.beatHistory.length,
-        " (",
-        currentBeat.title,
-        ") to option #",
-        optionIndex
+        `[GameHandler] Set choice for player ${playerInfo.playerSlot} for beat #${player.beatHistory.length} (${currentBeat.title}) to option #${optionIndex} (${currentBeat.options[optionIndex]})`
       );
 
       // Broadcast the updated state to all players
-      this.broadcastStateUpdate(playerInfo.storyId, state);
+      this.broadcastStateUpdate(playerInfo.storyId, updatedState);
 
       // Check if all players have submitted their choices
-      if (areAllChoicesSubmitted(state)) {
-        await this.generateAndBroadcastNextBeats(playerInfo.storyId, state);
+      if (areAllChoicesSubmitted(updatedState)) {
+        await this.generateAndBroadcastNextBeats(
+          playerInfo.storyId,
+          updatedState
+        );
       }
     } catch (error) {
       console.error("[GameHandler] Error processing choice:", error);
