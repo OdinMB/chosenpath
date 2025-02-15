@@ -4,6 +4,7 @@ import { StoryDisplay } from "./StoryDisplay";
 import { z } from "zod";
 import { statSchema } from "../../../shared/types/stat";
 import { useState } from "react";
+import { PendingPlayers } from "./PendingPlayers";
 
 type Stat = z.infer<typeof statSchema>;
 
@@ -118,9 +119,16 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
             )}
           </section>
 
+          <div className="mt-8">
+            <PendingPlayers
+              pendingPlayers={storyState.pendingPlayers}
+              currentPlayer={playerSlot}
+            />
+          </div>
+
           <button
             onClick={onExitGame}
-            className="mt-8 text-sm font-medium transition-colors duration-200
+            className="mt-4 text-sm font-medium transition-colors duration-200
               md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
               w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
           >
