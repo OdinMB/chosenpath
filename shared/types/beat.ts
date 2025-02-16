@@ -3,17 +3,41 @@ import { changeSchema } from "./change.js";
 import { PlayerCount } from "./players.js";
 import type { Change } from "./change.js";
 
-export const beatGenerationSchema = z.object({
-  plan: z
+export const beatPlanSchema = z.object({
+  stateChanges: z
     .string()
     .describe(
-      "Detailed plan for this beat, including the following points:\n" +
-        "a) How should we narrate the changes to the story state and the decisions of other players to this player? In multiplayer games, go through each other player's decision.\n" +
-        "b) Should we continue the scene or thread of the previous beat or start a new one? Start by listing the number of beats that the player has spent in the current scene. If it's 2 or more, offer the player an option to go to another scene. If it's 3 or more, offer only options that go to another scene. (Unless it's a showdown of some kind.)\n" +
-        "c) How should we make progress towards unresolved story outcomes? Create an overview of outcomes, how many milestones are left, and how many beats we have left.\n" +
-        "d) How should we develop the world, its characters, and the relationships that the players have with them? Create a few bullet points of what should be developed.\n" +
-        "e) How can we reinforce the story's key conflicts and focused types of decisions? Spell out at least 4 ideas for options and how they align with the types of decisions that this story is supposed to focus on."
+      "Bullet list with changes to the story state and the decisions of other players and how we should narrate them to this player. In multiplayer games, go through each other player's decision."
     ),
+  otherBeats: z
+    .string()
+    .describe(
+      "Bullet list with information from other beats in this turn that we must consider for this beat. If the player is in the same scene as other player(s) whose beat you created before, copy those beats here in their entirety (to make sure that the details are consistent). If this is the beat for player1, leave this empty."
+    ),
+  sceneProgress: z
+    .string()
+    .describe(
+      "List the number of beats that the player has spent in the current scene. Then decide if we should continue the scene or thread of the previous beat or start a new one. If the player has spent 2 or more beats in this scene/on this thread, offer the player an option to go to another scene/thread. If it's 3 or more, offer only options that go to another scene. (Unless it's a showdown of some kind.)"
+    ),
+  storyProgress: z
+    .string()
+    .describe(
+      "Say how many beats we have left in this story. Then create a list of outcomes, summarizing how close we are to resolving them. Then decide how we should make progress towards unresolved story outcomes."
+    ),
+  worldElements: z
+    .string()
+    .describe(
+      "Create a few bullet points with elements in the game world that this beat is going to develop further (NPCs, locations, relationships, etc.)."
+    ),
+  optionIdeas: z
+    .string()
+    .describe(
+      "Spell out at least 4 ideas for options and how they align with the types of decisions that this story is supposed to focus on."
+    ),
+});
+
+export const beatGenerationSchema = z.object({
+  plan: beatPlanSchema,
   title: z
     .string()
     .describe(
@@ -79,3 +103,5 @@ export type Beat = z.infer<typeof beatGenerationSchema> & {
 export type BeatHistory = Array<Beat>;
 
 export type BeatGeneration = z.infer<typeof beatGenerationSchema>;
+
+export type BeatPlan = z.infer<typeof beatPlanSchema>;

@@ -3,9 +3,9 @@
 Improve generations
 
 - Special prompt for the first set of beats?
-- General writing advice? (Direct speech, action-oriented, specific, ...)
 - shared outcomes?
 - Separate, multi-step flow for generating a stat schema?
+- General writing advice? (already much better with gpt-4o compared to o3-mini)
 
 Easy nice-to-haves
 
@@ -60,7 +60,7 @@ Be ready to migrate to proper databases later
 
 Please help me implement this step by step, starting with the basic queue manager structure and then adding operations one by one.
 
-Current relevant code is in:
+Current relevant code includes:
 server/src/services/StoryService.ts (story state management)
 server/src/websocket/index.ts (WebSocket handling)
 server/src/services/SessionService.ts (current in-memory session storage)

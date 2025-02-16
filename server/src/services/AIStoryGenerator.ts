@@ -243,7 +243,7 @@ Premise: The last rock band on Mars tries to make it while following individual 
 - character stats:
 --- (Musician) Stage Presence (percentage). Value: 20-40. Hint: Describes how well the musician is able to perform in front of an audience. Can be developed over time.
 --- (Musician) Instrument proficiency (percentage). Value: 20-40. Hint: Describes how well the musician is able to play their instrument. Can be developed over time.
---- (Ambition) Band Loyalty|Solo Ambition (opposites). Value: 30-70. Hint: Describes how much the musician is dedicated to the band or to their solo career. <30 means that the musician is more likely to get options for pursuing a solo career. >70 means that the musician is less likely to be tempted to leave the band.
+--- (Ambition) Band Loyalty|Solo Ambition (opposites). Value: 30-70. Hint: Describes how much the musician is dedicated to the band or to their solo career. <30 means that the musician gets options for activiely promoting their solo career. >60 means that the musician does not actively explore a solo career for now.
 --- (Ambition) [Some personal goal, e.g. "Creating a family", different for each player] (percentage). Value: 0-100. Hint: Describes a personal goal of the musician that makes it hard to focus on the band.
 - shared stats:
 --- (Band) Gear quality (string). Value: "Worn". Hint: Options: Pristine / Worn / Broken. Gear quality influences the success of gigs.
@@ -474,11 +474,13 @@ ${
 
 You can use markdown in the text of the beats.
 
-Players have separate beat histories!
-- No player can see the beats of other players.
-- Each beat must flow naturally from the previous beat of that player.
-- If a group encounters something new, you must introduce the new information to all palyers separately.
+How beats work:
+- Players have separate beat histories. No player can see the beats of other players.
+- Each beat must flow naturally from the previous beat OF THAT PLAYER.
+- If several players encounter something new, you must introduce the new information to all players separately.
 - No player can see the decisions of other players. If a player made a decision in the previous beat that affects other players, you must introduce the information to the other players separately.
+- Beats for one turn are presented to players at the same time.
+- Make sure that the options you give a player in one beat does not contradict any of the options that you gave to other players in the same turn.
 
 For each beat, consider the following points:
 
@@ -486,21 +488,26 @@ a) How should we narrate the changes to the story state and the decisions of oth
 Exclude changes and decisions that this player shouldn't know about.
 This step is irrelevant if this is the first beat of the story.
 
-b) Should we continue the scene or thread of the previous beat or start a new one?
-- In your plan, mark down the number of beats that the player has spent in the current scene.
-- In most cases, it should take 2-3 beats to establish a new milestone toward an outcome's resolution.
-- In most cases, players should not spend more than 3 beats in a scene (4 if it's a showdown of some kind).
-- If you added the final milestone to an outcome (number of milestones equals intended number of milestones), the outcome is resolved. Use this beat to give the resolution some gravity.
+b) Which information from other beats in this turn do we need to consider for this beat?
+- Create a bullet list of things that happened other beats in this turn that we should consider for this beat (or even repeat if the player is in the same scene).
+--- If the player is in the same scene as other player(s) whose beat you created before, copy those beats here in their entirety (to make sure that the details are consistent).
+- Create a bullet list of options that you included in the other beats of this turn so far that we mustn't contradict with the options for this beat?
 
-c) How should we make progress towards unresolved story outcomes?
+c) Should we continue the scene or thread of the previous beat or start a new one?
+- In your plan, mark down the number of beats that the player has spent in the current scene.
+- In most cases, it should take 2-3 beats to establish a milestone toward an outcome's resolution.
+- In most cases, players should not spend more than 3 beats in a scene (4 if it's a showdown of some kind).
+- If you added the final milestone to an outcome (number of milestones equals intended number of milestones), the outcome is resolved. Use this beat to describe the outcome, its aftermath, and give the resolution some gravity.
+
+d) How should we make progress towards unresolved story outcomes?
 - For outcomes without milestones: Consider introducing the outcome through NPCs, events, or initial discoveries.
 - For outcomes with milestones: What are options for the next milestone to move the outcome closer to resolution?
 Consider how many beats are still to play and how many milestones are still left to bring the outcome from its current status to a resolution.
 In the first beat, introduce the core premise, what the player represents in the story, and what this whole story is all about.
 
-d) How should we develop the world, its characters, and the relationships that the player character has with them?
+e) How should we develop the world, its characters, and the relationships that the player character has with them?
 
-e) How can we reinforce the story's key conflicts and focused types of decisions?
+f) How can we reinforce the story's key conflicts and focused types of decisions?
 ${
   Object.keys(state.players).length > 1
     ? `
