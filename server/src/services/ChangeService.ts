@@ -65,39 +65,24 @@ export class ChangeService {
     state: StoryState,
     change: Extract<Change, { type: "statChange" }>
   ): StoryState {
-    // Handle shared stats
     if (change.group === "shared") {
-      return this.applySharedStatChange(state, change);
+      const updatedStats = [...state.sharedStats];
+      const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
+
+      if (statIndex === -1) {
+        console.log(`Shared stat ${change.stat} not found`);
+        return state;
+      }
+
+      const stat = updatedStats[statIndex];
+      const updatedStat = this.updateStatValue(stat, change);
+      if (!updatedStat) return state;
+
+      updatedStats[statIndex] = updatedStat;
+      return { ...state, sharedStats: updatedStats };
     }
 
     // Handle player stats
-    return this.applyPlayerStatChange(state, change);
-  }
-
-  private applySharedStatChange(
-    state: StoryState,
-    change: Extract<Change, { type: "statChange" }>
-  ): StoryState {
-    const updatedStats = [...state.sharedStats];
-    const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
-
-    if (statIndex === -1) {
-      console.log(`Shared stat ${change.stat} not found`);
-      return state;
-    }
-
-    const stat = updatedStats[statIndex];
-    const updatedStat = this.updateStatValue(stat, change);
-    if (!updatedStat) return state;
-
-    updatedStats[statIndex] = updatedStat;
-    return { ...state, sharedStats: updatedStats };
-  }
-
-  private applyPlayerStatChange(
-    state: StoryState,
-    change: Extract<Change, { type: "statChange" }>
-  ): StoryState {
     const playerSlot = change.group as PlayerSlot;
     const player = state.players[playerSlot];
 

@@ -2,6 +2,8 @@
 import React from "react";
 import { useSession } from "../hooks/useSession";
 import { BeatHistory } from "./BeatHistory";
+import ReactMarkdown from "react-markdown";
+import type { ComponentType } from "react";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -102,31 +104,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                   {currentBeat.options[choiceIndex]}
                 </span>
               </div>
-              {choiceMade && isLoading && (
-                <div className="flex items-center gap-2 mt-3 text-gray-600">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  <span className="text-sm">Generating next story beat...</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -158,10 +135,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   if (playerState.beatHistory.length === 0) {
     return (
-      <div className="story-display">
-        <div className="loading-indicator text-center py-4">
+      <div className="story-display h-full flex items-center justify-center">
+        <div className="text-center">
           <svg
-            className="animate-spin h-5 w-5 text-gray-600 mx-auto mb-2"
+            className="animate-spin h-8 w-8 text-gray-600 mx-auto mb-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -180,7 +157,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          First story beat is being generated...
+          <p className="text-xl font-medium text-gray-700">
+            First story beat is being generated...
+          </p>
         </div>
       </div>
     );
@@ -205,7 +184,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               <h2 className="text-xl md:text-2xl font-bold text-center">
                 {currentBeat.title}
               </h2>
-
               <div className="narrative-container relative">
                 {storyState.generateImages && (
                   <div
@@ -264,66 +242,76 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                   </div>
                 )}
 
-                <div className="narrative-text whitespace-pre-wrap text-base md:text-lg">
-                  {currentBeat.text}
+                <div className="narrative-text text-base md:text-lg [&>p]:mb-4">
+                  {React.createElement(
+                    ReactMarkdown as ComponentType<{
+                      children: string;
+                      breaks?: boolean;
+                    }>,
+                    { breaks: true, children: currentBeat.text }
+                  )}
                 </div>
               </div>
-
-              {isLoading && (
-                <div className="loading-indicator text-center py-4">
-                  <svg
-                    className="animate-spin h-5 w-5 text-gray-600 mx-auto mb-2"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  {choiceMade
-                    ? "Next story beat is being generated..."
-                    : "Generating story..."}
-                </div>
-              )}
-
               {renderOptions()}
+              {choiceMade &&
+                currentBeat &&
+                storyState?.pendingPlayers.length == 0 && (
+                  <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-gray-50 rounded-lg">
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span className="text-base">
+                      Generating next story beat...
+                    </span>
+                  </div>
+                )}
             </>
           )}
 
           {!currentBeat && isLoading && (
-            <div className="loading-indicator text-center py-4">
-              <svg
-                className="animate-spin h-5 w-5 text-gray-600 mx-auto mb-2"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              First story beat is being generated...
+            <div className="h-full flex items-center justify-center py-8">
+              <div className="text-center">
+                <svg
+                  className="animate-spin h-8 w-8 text-gray-600 mx-auto mb-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <p className="text-xl font-medium text-gray-700">
+                  First story beat is being generated...
+                </p>
+              </div>
             </div>
           )}
         </div>

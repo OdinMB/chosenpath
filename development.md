@@ -1,12 +1,14 @@
 # Feature backlog
 
+Improve generations
+
+- Special prompt for the first set of beats?
+- General writing advice? (Direct speech, action-oriented, specific, ...)
+- shared outcomes?
+- Separate, multi-step flow for generating a stat schema?
+
 Easy nice-to-haves
 
-- Improve instructions for stat setups
-  -- static traits if developing skills is not a theme of the story
-  -- world stats as a scoring mechanism for competitive stories (especially opposites)
-  -- enums for common progressions? (ally-enemy, unknown-lover, pristine-broken, ...)
-  -- only use "Ambition|Cunning" syntax for stats of type opposite
 - Titles for stories (show in resume story section in Welcome screen)
 
 Big features

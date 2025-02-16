@@ -28,10 +28,10 @@ export class AIStoryGenerator {
     }
 
     this.model = new ChatOpenAI({
-      modelName: "o3-mini",
-      reasoningEffort: "medium",
-      // modelName: "gpt-4o",
-      // temperature: 0.4,
+      // modelName: "o3-mini",
+      // reasoningEffort: "high", // low, medium, high
+      modelName: "gpt-4o",
+      temperature: 0.4,
     });
   }
 
@@ -95,7 +95,7 @@ export class AIStoryGenerator {
       const gameModeInstructions = {
         [GameModes.Competitive]: `\n\nThe players in this game are competing against each other. The players' outcomes should represent at least one competing goal or interest and no shared goals.\n\n`,
         [GameModes.Cooperative]: `\n\nThe players in this game are cooperating with each other. The players' outcomes should include at least one shared goal or interest that requires collaboration to achieve. Individual players may still have personal goals, but these should not conflict with the shared objective.\n\n`,
-        [GameModes.CooperativeCompetitive]: `\n\nThe players in this game have a mix of cooperative and competitive elements. Include both shared goals that require collaboration AND individual goals that may put players in competition. Players should need to carefully balance helping others versus pursuing their own interests.\n\n`,
+        [GameModes.CooperativeCompetitive]: `\n\nThe players in this game have a mix of cooperative and competitive elements. Include both shared goals/assets/interests that require collaboration AND individual goals that may put players in competition. Players should need to carefully balance helping others versus pursuing their own interests.\n\n`,
       };
 
       const response = await structuredModel.invoke(
@@ -111,14 +111,14 @@ Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make
 This is how a story with 20 beats could look like:
 - 3 overarching conflicts
 - 3 types of decisions that the players will be able to make
-- 4-6 NPCs / factions / organizations
-- 4-5 shared stats for things that are not directly linked to one player
+- 3-4 NPCs (including factions and organizations)
+- 3-4 shared stats for things that are not directly linked to one player
 --- Things that are shared between players (e.g. group/organization, a spaceship, a flat, a list of collected clues, etc.)
 --- Stats about the world (e.g. tension between factions, industry trends, etc.)
 - Stats for scoring, pacing, and story flags if you think they are needed (some stories don't need them)
 For each player
 - 3 outcomes with 4 milestones each towards the outcome's resolution
-- 4-5 stats that are linked directly to that player (traits, skills, dispositions, health, companions, individual relationships, individual resources, etc.)
+- 3-4 stats that are linked directly to that player (traits, skills, dispositions, health, personal relationships, personal resources, etc.)
 
 Stat groups
 are used to group stats in the UI. Both character and shared stats can be grouped and will be displayed in the UI together.
@@ -128,60 +128,33 @@ are used to group stats in the UI. Both character and shared stats can be groupe
 - Bad: Traits/Skills/Resources/Relationship (too many groups, too generic, focuses on functional aspects of the stats instead of story aspects)
 - Good: Character/Empire/Politics (for building a mafia empire), Detective/Investigation/Contacts (for a mystery story), Character/Ship/Crew/Resources (for a space opera)
 
-How to define stats
-- Be specific and flavorful given the context of the story.
---- Story about an adventuring mystic. Bad: Mystic power (number) set to 5. Too abstract and not flavorful. Doesn't flesh out the character. Good: Mystic abilities (string[]) set to ["Levitation", "Summoning frogs"]
---- Story about a band leader balancing a career and a personal life. Bad: Personal Life (string) set to "Content". Doesn't do justice to the core conflict. Doesn't inspire story elements. Good: Close relationships (string[]) set to ["Parents", "Pete"]
+Stat guidelines
+- In general, favor string and string[] over numbers
+--- Exception: countable things whose management is central to the story (gold)
+--- Exception: percentages/opposites for aspects that must be managed often and granularly (health, fuel)
 - Put at least two stats in each stat group.
 --- Stat groups represent key areas of the story. By assigning at least two stats to each group, we are making sure that each area gets enough weight.
 - Use a variety of stat types.
---- For example, a few percentage/opposites for stats that have to be managed often and granularly and a few string and string[] stats for qualitative aspects that are not supposed to change often and don't have to be managed granularly.
+--- For example, a few percentage/opposites for stats that have to be managed often and granularly, a string[] for a list of items or a list of unmutable skills, and a few string for qualitative aspects that are not supposed to change often and don't have to be managed granularly.
 - If players are of the same type (e.g. all are time-traveling spies), use the same character stats for all players.
 --- Exception: Stats for relationships or individual side quests can be different for each player.
---- Exception: If you want some asymmetry to make the setup more interesting, go for it!
---- Values for stats should of course be different for each player.
+--- Values for stats should of course be different for each player. This can include lists of items or skills.
 - If a stat should be the same for all players, use a shared stat.
 --- Example: If the players are all on the same ship, the ship's fuel level is the same for all players.
 --- Example: If players maintain a relationship to an NPC as a group, use a shared stat for that relationship. If only one specific player has a relationship with that NPC, use a character stat.
 - Use the isVisible attribute to hide stats that the player shouldn't see.
---- Example: The stat serves as a pacing vehicle under the hood
---- Example: The stat is a flag to highlight a particular milestone or development for the AI when it continues the story
 - Don't use stats for things that are covered by other mechanics.
 --- Don't track the number of remaining turns or story beats (tracked separately)
---- Don't track qualitative progress towards an outcome (tracked via milestones)
---- Don't track ordinary player decisions (tracked separately)
-- In multiplayer games with a competitive element, aim for a balanced initial distribution of stat values.
---- Better values in one stat should be offset by worse values in another stat.
-- If a stat belongs to a group 'Relationships', 'Relationship with Mr. Kline' is unnecessarily long. 'Mr. Kline' is enough in that case.
+--- Don't track qualitative progress towards an outcome (this will instead be tracked via milestones towards outcomes)
+--- Don't track ordinary player decisions (tracked separately))
+- In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)
+- You can use the stat's grouping to shorten the stat name. For example, if a stat belongs to the group 'Relationships', 'Relationship with Mr. Kline' is unnecessarily long. 'Mr. Kline' is enough.
 
 Type of stats and what they are good for:
-- percentage: 0-100. Qualitative aspects that will be changed often and granularly over the course of the story.
---- Resources with a capacity limit (e.g. mana, chi, stamina, fuel, energy, oxygen supply)
---- Statuses (e.g. health, spaceship integrity, mental stability)
---- Skills ONLY IF developing the skill is central to the story (e.g., illusions/summoning/potions for a student magician who must decide which skills to develop)
---- Relationship strength with NPCs or factions ONLY IF the relationship is central to the story and must be tracked granularly. Otherwise, use string.
---- Environmental conditions ONLY IF the conditions change often and granularly (e.g., radiation levels)
---- Progress trackers ONLY IF the progress is granular (e.g., corruption level, suspicion meter, faction influence)
-
-- opposites: Two percentage stats in one. The second stat is always (100 - first stat). Only for qualitative aspects that will be changed often and granularly over the course of the story.
---- Moral alignments (e.g., good|evil, order|chaos, tradition|progress)
---- Competing influences (e.g., science|magic, empire|rebellion)
---- Character development axes (e.g., cynicism|idealism, logic|emotion)
---- Resource allocation (e.g., offense|defense, mind|body)
---- Faction control (e.g., playerA|playerB territory control)
-
-- number: Countable quantities
-If it cannot be counted, choose another type of stat. Number is NOT GOOD for things like influence, experience, level of interest, etc.
---- Resources without a maximum capacity (e.g., money, ammunition, army size, cult followers)
---- Collection goals ONLY IF the nature of the items is not important (e.g., artifacts found, evidence pieces); otherwise, use a string[].
---- Counters (e.g., wins in a tournament, number of people saved)
---- Countdowns for pacing the story (e.g. days until deadline, remaining seals that protect a powerful artifact)
---- NOT good for skills. They aren't countable. Use percentage if the stat is supposed to be changed often, otherwise use a string or an item in a string[].
---- NOT good for power levels (like mystic power). Use string to describe the power level qualitatively or string[] to list specific abilities.
-
-- string: Status descriptions for qualitative aspects that aren't as central to the story, that don't change often, or that don't have to be tracked granularly.
+- string: Qualitative aspects that don't change often, or that don't have to be tracked granularly.
+--- Role that can be filled with the name of an NPC (e.g. Assistant, Mentor)
 --- Character conditions (e.g., healthy/injured/critical)
---- Relationship states (e.g., stranger/acquaintance/friend/confidant)
+--- Relationship states for specific NPCs(e.g., stranger/acquaintance/friend/confidant)
 --- Rank (e.g. Private/Corporal/Captain/General)
 --- Equipment status (e.g., pristine/worn/damaged/broken)
 --- Faction standings (e.g., hostile/neutral/friendly/allied)
@@ -191,18 +164,42 @@ If it cannot be counted, choose another type of stat. Number is NOT GOOD for thi
 - string[]: Lists of traits or collectibles
 --- Character traits and abilities that are not supposed to change over the course of the story (e.g., ["Ambitious", "Empathic", "Spontaneous"] in a romance story, ["Telepathy", "Invisibility"] in a superhero story.)
 --- Equipment/inventory (e.g., ["Laser sword", "Med kit"])
---- Known information (e.g., ["Suspect's alibi", "Murder weapon location"])
+--- Role that can be filled with the names of several NPCs (e.g. Friends, Love Interests)
+--- Collection goals and known information ONLY IF the specifics of what is collected or known are important (e.g., artifacts found, evidence pieces); otherwise, don't use a stat but track progress via milestones towards outcomes
 --- Issues (e.g. ["Poisoned", "Bleeding"] if avoiding and dealing with specific ailments is central to the story; otherwise, use a percentage for health)
 --- Contacts (e.g., ["Dealers", "Local Newspaper"] if using and building these contacts is central to the story; otherwise, use a string to represent the bredth of contacts)
 
-- boolean: Important story flags and conditions.
---- Story-changing decisions (e.g., betrayed the alliance)
---- Discovered secrets (e.g., learned about the conspiracy)
---- Unlocked abilities (e.g., gained access to restricted area)
---- Relationship markers (e.g., romantic interest revealed)
---- Quest availability (e.g., side mission unlocked)
+- percentage: 0-100. Qualitative aspects that will be changed often and granularly over the course of the story.
+--- Resources with a capacity limit (e.g. mana, chi, stamina, fuel, energy, oxygen supply)
+--- Integrity statuses (e.g. health, spaceship integrity, mental stability)
+--- Skills ONLY IF it's a clearly defined skill and developing the skill is central to the story. ("Magic", "Mystic power", etc. are not clearly defined skills and are often better represented as a string[] of abilities.)
+--- Relationship strength with NPCs ONLY IF managing that relationship is central; otherwise, use a string.
+--- Environmental conditions ONLY IF the condition must be managed often and granularly (e.g., radiation levels); otherwise, use a string.
 
-Using the hint attribute for stats effectively:
+- opposites: Two percentage stats in one. The second stat is always (100 - first stat). As percentages, only use this for qualitative aspects that will be changed often and granularly over the course of the story.
+--- Moral alignments (e.g., good|evil, order|chaos, tradition|progress)
+--- Competing influences (e.g., science|magic, empire|rebellion)
+--- Character dispositions (e.g., cynicism|idealism, logic|emotion)
+--- Devices to keep score for competitive, tug-of-war-like outcomes in multiplayer games(e.g., playerA|playerB territory control)
+
+- number: Only for countable quantities
+If it cannot be counted, choose another type of stat.
+--- Resources without a maximum capacity (e.g., money, ammunition, army size, cult followers)
+--- Counters (e.g., wins in a tournament, number of people saved)
+--- Countdowns for pacing the story (e.g. days until deadline, remaining seals that protect a powerful artifact)
+--- NOT good for skills. Skills aren't countable. Use percentage if the stat is supposed to be developed granularly and changed often, otherwise use a string, or add the skill as an item in a string[].
+--- NOT good for power levels (like mystic power). Use string to describe the power level qualitatively or string[] to list specific abilities.
+--- NOT good for things that cannot counted, like influence, experience, level of interest, etc.
+
+Options for using the hint attribute for stats effectively:
+- For string stats:
+--- List all possible values: "Values: Novice/Apprentice/Master/Grandmaster"
+--- Explain transitions: "Can only change one step at a time"
+--- Define requirements: "Master requires 3 successful rituals"
+- For string[] stats:
+--- List all possible values: "Values: Lead Singer/Guitarist/Bassist/Drummer/Keyboardist/Vocalist"
+--- Alternatively, describe the category: "Only minor spells"
+--- Set limitations: "Maximum 5 items can be carried"
 - For percentage stats:
 --- Specify thresholds: "Below 30% triggers crisis events"
 --- Define value meanings: "75%+ considered mastery level"
@@ -213,18 +210,46 @@ Using the hint attribute for stats effectively:
 - For number stats:
 --- Define critical values: "Minimum 5 required for survival"
 --- Explain acquisition: "Typically gained 1-3 per successful mission"
-- For string stats:
---- List all possible values: "Values: novice/apprentice/master/grandmaster"
---- Explain transitions: "Can only change one step at a time"
---- Define requirements: "Master requires 3 successful rituals"
-- For string[] stats:
---- Set limitations: "Maximum 5 items can be carried"
---- Define categories: "Can include weapons, tools, and artifacts"
---- Specify uniqueness: "No duplicate abilities allowed"
-- For boolean stats:
---- Explain permanence: "Cannot be reversed once true"
---- Define triggers: "Set to true when player discovers the ancient tomb"
---- Specify implications: "When true, unlocks new dialogue options"
+
+Stat examples for games with 20 beats
+Premise: alchemists racing to brew a love potion (competitive)
+- groups: Alchemist/Potion/City
+- character stats:
+--- (Alchemist) Traits (string[]). Value: 2-3 of the options. Hint: Unlock options and make certain actions more likely to succeed. Options: Cautious, Charming, Empathetic, Ruthless, Good reputation.
+--- (Alchemist) Gold (number). Value: 100-500. Hint: Can be used to buy ingredients, to hire assistants, or to disturb other alchemists.
+--- (Potion) Ingredients (string[]). Value: up to one of the ingredients. Hint: collected ingredients. Requires these three to start brewing: "Frog legs/Dragon scales/Unicorn horn"
+--- (Potion) Brewing (percentage). Value: 0. Hint: brewing progress. First player at 100% wins. Brewing undisturbed increases progress by 20%.
+--- (City) Contacts (string[]). Value: 2-3 of the 5 options. Hint: Contacts correspond to the NPCs in the city. Options: Assistant, Supplier, Guard, Thief, Thug. Available contacts can be paid to increase brewing progress (Assistant), buy an ingredient (Supplier), steal an ingredient from another player (Thief), disturb an alchemist's shop (Thugs), or guard a player's shop (Guard).
+- shared stats:
+--- (City) Market (string). Value: "Healer in town". Hint: defines if ingredients can be bought. "No market/Healer in town/Traders coming through"
+--- (City) Season (string). Value: "Spring". Hint: defines if ingredients grow in the wild. "Spring/Summer/Autumn/Winter"
+--- (City) Rumor (string). Value: "No rumors". Hint: Mention here if an alchemist collected all ingredients or starts brewing.
+
+Premise: nature spirits guard the forest and compete for followers (cooperative-competitive)
+- groups: Spirit/Forest/Following
+- character stats:
+--- (Spirit) Seasonal powers (string[]). Value: 2 special powers (things like "Protecting crops" or "Healing the sick").
+--- (Spirit) Energy (percentage). Value: 100. Hint: Energy is used for manifesting in the world. Regeneration rate: 10% per beat.
+--- (Following) Followers (number). Value: 20. Hint: amount of energy a spirit gets when it rests. Determines which spirit has the greatest following at the end of the game.
+--- (Following) Special followers (string[]). Value: 2 special followers. Hint: special followers can take action on behalf of the spirit without the spirit having to spend energy to manifest in the world.
+- shared stats:
+--- (Forest) Threats (string[]). Value: 2 threats. Hint: things like tree-eating bugs, drought, etc.
+--- (Forest) Health (percentage). Value: 100. Hint: goes down by 5% per beat per threat that hasn't been removed. Cannot be revived if it ever falls to 0.
+--- (Forest) Animal cooperation (percentage). Value: 50. Hint: describes how eager animals are to help the spirits. <40 means that animals become less likely to help the spirits. >60 means that they become more likely.
+--- (Forest) Human cooperation (percentage). Value: 50. Hint: describes how eager humans are to help the spirits. <40 means that inhabitants become less likely to help the spirits. >60 means that they become more likely.
+
+Premise: The last rock band on Mars tries to make it while following individual dreams (cooperative-competitive)
+- groups: Musician/Ambition/Band
+- character stats:
+--- (Musician) Stage Presence (percentage). Value: 20-40. Hint: Describes how well the musician is able to perform in front of an audience. Can be developed over time.
+--- (Musician) Instrument proficiency (percentage). Value: 20-40. Hint: Describes how well the musician is able to play their instrument. Can be developed over time.
+--- (Ambition) Band Loyalty|Solo Ambition (opposites). Value: 30-70. Hint: Describes how much the musician is dedicated to the band or to their solo career. <30 means that the musician is more likely to get options for pursuing a solo career. >70 means that the musician is less likely to be tempted to leave the band.
+--- (Ambition) [Some personal goal, e.g. "Creating a family", different for each player] (percentage). Value: 0-100. Hint: Describes a personal goal of the musician that makes it hard to focus on the band.
+- shared stats:
+--- (Band) Gear quality (string). Value: "Worn". Hint: Options: Pristine / Worn / Broken. Gear quality influences the success of gigs.
+--- (Band) Fans (number). Value: 150. Hint: Increases by ~10%-20% per gig (depending on the quality). Increases by ~25-100% per album (depending on the quality and if the album hits the taste of Mars).
+--- (Band) Sound (string[]). Value: 2 aspects. Hint: can hold max 2 aspects. Describes the sound of the band (e.g. upbeat, sad, nostalgic, etc.). Can be changed to match the taste of Mars.
+--- (Band) Trends on Mars (string[]). Value: 2 aspects. Hint: Any aspect of music that is currently popular on Mars (e.g. upbeat, sad, nostalgic, etc.).
 `
       );
 
@@ -325,8 +350,8 @@ ${playerState.characterStats
           return `${stat.value}%`;
         case "string[]":
           return Array.isArray(stat.value) ? stat.value.join(", ") : stat.value;
-        case "boolean":
-          return stat.value.toString();
+        // case "boolean":
+        //   return stat.value.toString();
         default:
           return stat.value;
       }
@@ -386,7 +411,8 @@ NPCs:
 ${state.npcs
   .map(
     (npc) =>
-      `- ${npc.name} (${npc.pronouns}, ${npc.role}): ${npc.traits.join(", ")}`
+      `- ${npc.name} (${npc.pronouns}, ${npc.role}): ${npc.traits.join(", ")}
+${npc.fluff}`
   )
   .join("\n")}
 
@@ -403,8 +429,8 @@ ${state.sharedStats
           return `${stat.value}%`;
         case "string[]":
           return Array.isArray(stat.value) ? stat.value.join(", ") : stat.value;
-        case "boolean":
-          return stat.value.toString();
+        // case "boolean":
+        //   return stat.value.toString();
         default:
           return stat.value;
       }
@@ -444,41 +470,61 @@ ${
 - The players' decisions are tracked separately and don't have to be tracked via newFact.
 - If this is the first set of beats, there should be no changes. Just return an empty list.
 
-2. Beat generation
+2.Story beats
+
+You can use markdown in the text of the beats.
+
+Players have separate beat histories!
+- No player can see the beats of other players.
+- Each beat must flow naturally from the previous beat of that player.
+- If a group encounters something new, you must introduce the new information to all palyers separately.
+- No player can see the decisions of other players. If a player made a decision in the previous beat that affects other players, you must introduce the information to the other players separately.
 
 For each beat, consider the following points:
 
-a) How should we narrate the changes to the story state to this player?
-Exclude changes to stats that are not visible to the player.
+a) How should we narrate the changes to the story state and the decisions of other players to this player?
+Exclude changes and decisions that this player shouldn't know about.
 This step is irrelevant if this is the first beat of the story.
 
 b) Should we continue the scene or thread of the previous beat or start a new one?
-- In most cases, it should take several beats to establish a milestone toward an outcome's resolution.
+- In your plan, mark down the number of beats that the player has spent in the current scene.
+- In most cases, it should take 2-3 beats to establish a new milestone toward an outcome's resolution.
+- In most cases, players should not spend more than 3 beats in a scene (4 if it's a showdown of some kind).
 - If you added the final milestone to an outcome (number of milestones equals intended number of milestones), the outcome is resolved. Use this beat to give the resolution some gravity.
 
 c) How should we make progress towards unresolved story outcomes?
 - For outcomes without milestones: Consider introducing the outcome through NPCs, events, or initial discoveries.
 - For outcomes with milestones: What are options for the next milestone to move the outcome closer to resolution?
-Consider how many milestones are left to bring the outcome from its current status to a resolution.
-Don't favor one option over others. Which option ends up as the outcome's resolution should be dictated by players' choices.
-That said, if the players' early choices make an option unlikely or even impossible, it's OK to no longer consider milestones toward it.
+Consider how many beats are still to play and how many milestones are still left to bring the outcome from its current status to a resolution.
+In the first beat, introduce the core premise, what the player represents in the story, and what this whole story is all about.
 
 d) How should we develop the world, its characters, and the relationships that the player character has with them?
 
-e) How can we best stay true to the game's overall setup?
-- Stay with the story's key conflicts and types of decisions
-- Make the shared stats and player stats relevant${
-      Object.keys(state.players).length > 1
-        ? `
-- Honor the ${state.gameMode.toLowerCase()} multiplayer game mode for the general feel and in how characters interact`
-        : ""
-    }`;
+e) How can we reinforce the story's key conflicts and focused types of decisions?
+${
+  Object.keys(state.players).length > 1
+    ? `
+- Honor the '${state.gameMode.toLowerCase()}' multiplayer game mode`
+    : ""
+}
 
-    console.log(
-      "\n\n########\nBeat generation prompt\n########\n",
-      prompt,
-      "\n\n"
-    );
+3. Options
+
+- Offer 3 options.
+--- 2 can be fine occassionally if you want to force a clear or quick 'left vs. right' kind of choice.
+- Be specific and action-oriented.
+--- Bad: 'Investigate the artifact'. Good: 'Search the library for clues about the artifact'
+--- Bad: 'Confront X physically'. Good: 'Punsh X in the face'.
+- Make sure that options allow the story to flow naturally.
+--- If the beat ends in the middle of a scene, the player shouldn't be able to just vanish from that scene.
+- Stay true to the story's key conflicts and types of decisions that we want players to make
+`;
+
+    // console.log(
+    //   "\n\n########\nBeat generation prompt\n########\n",
+    //   prompt,
+    //   "\n\n"
+    // );
     return prompt;
   }
 }

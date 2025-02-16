@@ -133,7 +133,7 @@ export class GameWebSocketServer {
             data.code
           );
 
-          console.log("[WebSocket] Verification result:", result);
+          // console.log("[WebSocket] Verification result:", result);
 
           // Send response to client
           socket.emit("verify_code_response", {

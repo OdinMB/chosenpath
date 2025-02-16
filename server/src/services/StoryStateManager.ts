@@ -95,8 +95,9 @@ export class StoryStateManager {
       await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
 
       console.log(
-        "[StoryStateManager] Successfully stored state to:",
-        filePath
+        "[StoryStateManager] Successfully stored state (",
+        storyId,
+        ")"
       );
     } catch (error) {
       console.error("[StoryStateManager] Failed to store state:", error);

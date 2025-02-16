@@ -53,9 +53,9 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
 
     case "boolean":
       return (
-        <div className="flex items-center justify-between mb-2 bg-gray-200 rounded px-2 h-8">
-          <span>{name}</span>
-          <span className={value ? "text-green-600" : "text-red-600"}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="">{name}</span>
+          <span className="bg-blue-500 text-white px-3 py-1 rounded">
             {value ? "Yes" : "No"}
           </span>
         </div>
@@ -64,28 +64,31 @@ export function StatDisplay({ name, value, type }: StatDisplayProps) {
     case "string[]":
       return (
         <div className="mb-2">
-          <div className="mb-1">
-            {name}
-            {(value as string[]).length === 0 ? " (empty)" : ""}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(value as string[]).map((item) => (
-              <span
-                key={item}
-                className="px-3 py-1 bg-gray-200 rounded-full text-base"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
+          <div className="mb-1">{name}:</div>
+          {(value as string[]).length === 0 ? (
+            "None"
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(value as string[]).map((item, index) => (
+                <span
+                  key={index}
+                  className="bg-blue-500 text-white px-3 py-1 rounded"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       );
 
     default:
       return (
-        <div className="flex items-center justify-between mb-2 bg-gray-200 rounded px-2 h-8">
-          <span className={name.length > 20 ? "text-sm" : ""}>{name}</span>
-          <span>{String(value)}</span>
+        <div className="flex items-center justify-between mb-2">
+          <span className="">{name}</span>
+          <span className="bg-blue-500 text-white px-3 py-1 rounded">
+            {String(value)}
+          </span>
         </div>
       );
   }

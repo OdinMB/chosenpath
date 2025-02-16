@@ -9,26 +9,20 @@ export const statSchema = z
       ),
     type: z
       .enum([
+        "string",
+        "string[]",
         "percentage",
         "opposites",
         "number",
-        "boolean",
-        "string",
-        "string[]",
+        // "boolean",
       ])
       .describe(
-        "Data type of the variable. A stat of type 'opposites' represents two traits whose sum always equals 100%."
+        "Data type of the variable. As a general tendency, favor string and string[] over percentage/opposites/number -- unless for countable things whose management is central to the story (number), and percentages/opposites for aspects that must be managed by the player often and granularly."
       ),
     name: z
       .string()
       .describe(
         "Name of the variable that will be displayed to the player. If you chose a stat of type opposites, use the '|' character to separate the two traits ('Brutality|Finesse')."
-      ),
-    value: z
-      .union([z.number(), z.boolean(), z.string(), z.array(z.string())])
-      .describe(
-        "Current value of the variable. For the initial setup, choose a value that makes sense for the beginning of the story.\n" +
-          "For stats of type 'opposites', value describes the value of the first stat. The second stat will be automatically calculcated with (100% - value)."
       ),
     isVisible: z
       .boolean()
@@ -42,6 +36,12 @@ export const statSchema = z
       .string()
       .describe(
         "Name of the group of stats that this stat will be displayed in. Only affects the UI."
+      ),
+    value: z
+      .union([z.number(), z.boolean(), z.string(), z.array(z.string())])
+      .describe(
+        "Current value of the variable. For the initial setup, choose a value that makes sense for the beginning of the story.\n" +
+          "For stats of type 'opposites', value describes the value of the first stat. The second stat will be automatically calculcated with (100% - value)."
       ),
   })
   .describe(

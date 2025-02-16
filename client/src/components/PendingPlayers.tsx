@@ -11,9 +11,16 @@ export function PendingPlayers({
   currentPlayer,
   numberOfPlayers,
 }: PendingPlayersProps) {
-  if (pendingPlayers.length === 0) {
-    return (
-      <div className="rounded-md bg-gray-50 p-3">
+  const showLoadingSpinner = pendingPlayers.length === 0;
+  const showPendingPlayers = numberOfPlayers >= 2 && pendingPlayers.length > 0;
+
+  if (!showLoadingSpinner && !showPendingPlayers) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md bg-gray-50 p-3">
+      {showLoadingSpinner && (
         <div className="flex items-center gap-2">
           <svg
             className="animate-spin h-4 w-4 text-gray-600"
@@ -37,31 +44,29 @@ export function PendingPlayers({
           </svg>
           <p className="text-sm text-gray-600">Generating next story beat...</p>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="rounded-md bg-gray-50 p-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-sm font-medium text-gray-700">
-          Waiting for {pendingPlayers.length}/{numberOfPlayers}:
-        </span>
-        {pendingPlayers.map((slot) => (
-          <span
-            key={slot}
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              slot === currentPlayer
-                ? "bg-blue-100 text-blue-700"
-                : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {slot === currentPlayer
-              ? "You"
-              : `Player ${slot.replace("player", "")}`}
+      {showPendingPlayers && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-medium text-gray-700">
+            Waiting for {pendingPlayers.length}/{numberOfPlayers}:
           </span>
-        ))}
-      </div>
+          {pendingPlayers.map((slot) => (
+            <span
+              key={slot}
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                slot === currentPlayer
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {slot === currentPlayer
+                ? "You"
+                : `Player ${slot.replace("player", "")}`}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
