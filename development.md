@@ -3,27 +3,22 @@
 Improve generations
 
 - world elements (npcs, locations, etc.)
---- more details
---- for each player: save which ones have been introduced
---- give instructions for how to introduce elements
---- facts can be added to elements
---- if a stat refers to something, that something must exist as an element
-
+  --- for each player: save which ones have been introduced
 - chapters
---- set of beats
---- attributes: title, description, outcome/potential milestones, player slots linked to the chapter
---- assign milestones only after chapters
---- players in a chapter get the same beat (but different options)
---- separate chapter generation prompt
---- planning on both chapter and beat level
+  --- set of beats
+  --- attributes: title, description, outcome/potential milestones, player slots linked to the chapter
+  --- assign milestones only after chapters
+  --- players in a chapter get the same beat (but different options)
+  --- separate chapter generation prompt
+  --- planning on both chapter and beat level
 
 - outcomes
---- add attribute for why it's impportant for the player (or group of players if shared)
---- add shared outcomes
+  --- add attribute for why it's impportant for the player (or group of players if shared)
+  --- add shared outcomes
 
 - writig
---- Special prompt for the first beat
---- changes: consider how the player feels/reacts
+  --- Special prompt for the first beat
+  --- changes: consider how the player feels/reacts
 
 - Multi-step flow for generating a stat schema?
 - General writing instructions? (already much better with gpt-4o compared to o3-mini)

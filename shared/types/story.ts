@@ -2,23 +2,27 @@ import { z } from "zod";
 import { ImageLibrary } from "./image.js";
 import { BeatHistory } from "./beat.js";
 import { statsSchema, statSchema } from "./stat.js";
-import { NPCsSchema, PCSchema } from "./character.js";
 import { outcomesSchema } from "./outcome.js";
 import {
   PLAYER_SLOTS,
   ExactPlayerMap,
   PlayerCount,
   PlayerSlot,
+  PCSchema,
 } from "./players.js";
+import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 
 // GENERATION WITH LLM
 
-export const GameModes = {
-  Cooperative: "cooperative",
-  Competitive: "competitive",
-  CooperativeCompetitive: "cooperative-competitive",
-} as const;
+export enum GameModes {
+  Cooperative = "cooperative",
+  Competitive = "competitive",
+  CooperativeCompetitive = "cooperative-competitive",
+  SinglePlayer = "single-player",
+}
+
 export const gameModeSchema = z.enum([
+  GameModes.SinglePlayer,
   GameModes.Cooperative,
   GameModes.Competitive,
   GameModes.CooperativeCompetitive,
@@ -27,9 +31,11 @@ export type GameMode = typeof gameModeSchema._type;
 
 export const guidelinesSchema = z
   .object({
-    settingElements: z
-      .array(z.string())
-      .describe("Required characters, locations, and story elements"),
+    world: z
+      .string()
+      .describe(
+        "Three sentences about the essence of the world that the story takes place in."
+      ),
     rules: z
       .array(z.string())
       .describe(
@@ -41,12 +47,12 @@ export const guidelinesSchema = z
     conflicts: z
       .array(z.string())
       .describe(
-        "Major conflicts driving the narrative. E.g. needs of superhero vs personal identity, confrontation with the nemesis"
+        "Major conflicts driving the narrative and gameplay. For example, needs of superhero vs personal identity, confrontation with the nemesis"
       ),
     decisions: z
       .array(z.string())
       .describe(
-        "Types of decisions that should occur in the game. E.g. prioritizing investigation leads given limited amount of time, following common sense morals vs. speeding up the investigation"
+        "Types of decisions that players will make. Should be tied to the conflicts. For example, prioritizing investigation leads given limited amount of time, following common sense morals vs. speeding up the investigation, how to manage resources, etc."
       ),
   })
   .describe("Story guidelines and parameters");
@@ -80,7 +86,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
       guidelines: guidelinesSchema,
       statGroups: statGroupsSchema,
       ...playerSchemas,
-      npcs: NPCsSchema,
+      storyElements: StoryElementsSchema,
       sharedStats: z
         .array(statSchema)
         .describe("Stats that are shared among players"),
@@ -93,7 +99,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
 export type StorySetup<N extends PlayerCount> = {
   guidelines: z.infer<typeof guidelinesSchema>;
   statGroups: z.infer<typeof statGroupsSchema>;
-  npcs: z.infer<typeof NPCsSchema>;
+  storyElements: z.infer<typeof StoryElementsSchema>;
   sharedStats: z.infer<typeof statSchema>[];
 } & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
 
@@ -108,9 +114,9 @@ export type PlayerState = PlayerStateGeneration & {
 export type StoryState = {
   guidelines: z.infer<typeof guidelinesSchema>;
   sharedStats: z.infer<typeof statsSchema>;
-  npcs: z.infer<typeof NPCsSchema>;
+  storyElements: StoryElement[];
+  worldFacts: string[];
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
-  establishedFacts: string[];
   maxTurns: number;
   generateImages: boolean;
   images: ImageLibrary;

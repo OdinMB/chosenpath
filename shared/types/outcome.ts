@@ -10,7 +10,9 @@ export const outcomeSchema = z
     question: z.string().describe("Question that defines the outcome"),
     possibleOutcomes: z
       .array(z.string())
-      .describe("List of potential outcomes or resolutions"),
+      .describe(
+        "List 3 potential outcomes or resolutions. (2 can be OK if you a clear-cut outcome.)"
+      ),
     intendedNumberOfMilestones: z
       .number()
       .describe(

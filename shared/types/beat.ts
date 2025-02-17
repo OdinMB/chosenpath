@@ -1,13 +1,17 @@
 import { z } from "zod";
-import { changeSchema } from "./change.js";
 import { PlayerCount } from "./players.js";
-import type { Change } from "./change.js";
+import {
+  type Change,
+  newFactSchema,
+  statChangeSchema,
+  newStoryElementSchema,
+} from "./change.js";
 
 export const beatPlanSchema = z.object({
-  stateChanges: z
+  developmentsToNarrate: z
     .string()
     .describe(
-      "Bullet list with changes to the story state and the decisions of other players and how we should narrate them to this player. In multiplayer games, go through each other player's decision."
+      "Bullet list with changes to the story state and the decisions of other players (if relevant) and how we should narrate them to this player. Ignore this if this is the first beat (no changes yet)."
     ),
   otherBeats: z
     .string()
@@ -24,15 +28,25 @@ export const beatPlanSchema = z.object({
     .describe(
       "Say how many beats we have left in this story. Then create a list of outcomes, summarizing how close we are to resolving them. Then decide how we should make progress towards unresolved story outcomes."
     ),
-  worldElements: z
+  worldBuilding: z
     .string()
     .describe(
-      "Create a few bullet points with elements in the game world that this beat is going to develop further (NPCs, locations, relationships, etc.)."
+      "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Make absolutelyl sure that you don't create duplicate story elements or facts."
+    ),
+  newGameElements: z
+    .array(newStoryElementSchema)
+    .describe(
+      "List of new story elements to add to the story state. Leave this empty if no new story elements are to be created in this beat. Only use this if a new story element is to be created in this beat that is likely to be used in later beats."
+    ),
+  establishedFacts: z
+    .array(newFactSchema)
+    .describe(
+      "List of facts about existing story elements that this beat is going to establish. Include every new detail about NPCs, locations, important item, rumor, mystery, etc. If you want to add a fact to a story element that isn't registered yet, chances are that you should create it. Use 'world' as the story element if you want to add a fact that doesn't belong to any specific story element."
     ),
   optionIdeas: z
     .string()
     .describe(
-      "Spell out at least 4 ideas for options and how they align with the types of decisions that this story is supposed to focus on."
+      "Bullet list with 4 ideas for options and how they align with the types of decisions that this story is supposed to focus on."
     ),
 });
 
@@ -47,9 +61,9 @@ export const beatGenerationSchema = z.object({
     .string()
     .describe(
       "Main narrative text for this player.\n" +
-        "- Write 2-4 paragraphs.\n" +
+        "- Write 4-5 paragraphs.\n" +
         "- Use present tense.\n" +
-        "- Address the player character directly ('You' instead of the name of the character).\n" +
+        "- Address the player character directly ('You' instead of the name of the character). Exception: several players are in the same scene.\n" +
         "- Use markdown for formatting. Write two empty spaces followed by two newlines to mark the end of a paragraph."
     ),
   summary: z
@@ -65,7 +79,7 @@ export const beatGenerationSchema = z.object({
   options: z
     .array(z.string().describe("Text shown to player for this choice"))
     .describe(
-      "Available choices for the player. Be specific and action-oriented."
+      "3 choices for the player from the list of options generated in the plan. (If you want a sharp focus for this beat, you can choose only 2 options.)"
     ),
 });
 
@@ -80,11 +94,11 @@ export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
 
   return z
     .object({
-      changes: z
-        .array(changeSchema)
+      decisionConsequences: z
+        .array(statChangeSchema)
         .describe(
-          "List of all changes that will be applied to the story state.\n" +
-            "Only the following types are allowed: statChange, newMilestone, newFact!\n" +
+          "List of stat changes based on players' decisions in the last beat that will be applied to the story state.\n" +
+            "Use only changes of type statChange.\n" +
             "If this is the first set of beats, just return an empty list."
         ),
       ...beatSchemas,
@@ -94,7 +108,8 @@ export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
 };
 
 export type SetOfBeatGenerationSchema = {
-  changes: Change[];
+  decisionConsequences: Change[];
+  establishedFacts: Change[];
 } & Record<`player${number}`, BeatGeneration>;
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {

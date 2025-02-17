@@ -93,7 +93,7 @@ export const filterStateForPlayer = (
   // Remove other players' codes
   filteredState.playerCodes = { [playerSlot]: state.playerCodes[playerSlot] };
 
-  // Remove server-only properties by picking only the properties we want to send
+  // Pick only the properties we want to send
   const { players, sharedStats, maxTurns, generateImages, images, gameMode } =
     filteredState;
 

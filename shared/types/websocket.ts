@@ -1,5 +1,5 @@
-import type { StoryState, ClientStoryState } from "./story.js";
-import type { PlayerCount, PlayerSlot } from "./players.js";
+import type { ClientStoryState } from "./story.js";
+import type { PlayerSlot } from "./players.js";
 import type { GameMode } from "./story.js";
 
 // Client -> Server messages

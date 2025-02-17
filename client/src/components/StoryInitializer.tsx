@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSession } from "../hooks/useSession.js";
 import {
   MAX_PLAYERS,
@@ -38,6 +38,8 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "I'm a fortune cookie writer whose predictions started coming true...",
         "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
         "I'm a teenage wizard trying to balance school, friends, and romance...",
+        "I'm a psychic detective investigating crimes in dreams...",
+        "I'm a corporate concierge for supernatural entities with impossible requests...",
       ],
       cooperative: [
         "We're retired superheroes running a wedding planning business together...",
@@ -66,19 +68,33 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     []
   );
 
+  // Update gameMode when playerCount changes
+  useEffect(() => {
+    if (playerCount === 1) {
+      setGameMode(GameModes.SinglePlayer);
+    } else if (gameMode === GameModes.SinglePlayer) {
+      setGameMode(GameModes.Cooperative);
+    }
+  }, [playerCount, gameMode]);
+
   const getPlaceholderText = useCallback(() => {
     if (playerCount === 1) {
       return "A reverse heist where I'm a museum artifact trying to get stolen by the right thief...";
     }
-    const modeTexts = {
-      cooperative:
+    const modeTexts: Record<
+      Exclude<GameMode, typeof GameModes.SinglePlayer>,
+      string
+    > = {
+      [GameModes.Cooperative]:
         "We're ghost roommates helping each other complete unfinished business...",
-      competitive:
+      [GameModes.Competitive]:
         "We're rival garden gnomes competing for the best spot in the garden...",
-      "cooperative-competitive":
+      [GameModes.CooperativeCompetitive]:
         "We're demigods sharing Mount Olympus while competing for worshippers...",
     };
-    return modeTexts[gameMode];
+    return modeTexts[
+      gameMode as Exclude<GameMode, typeof GameModes.SinglePlayer>
+    ];
   }, [playerCount, gameMode]);
 
   const getRandomPrompt = useCallback(() => {

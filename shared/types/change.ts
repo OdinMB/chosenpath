@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { PLAYER_SLOTS, PlayerSlot } from "./players.js";
+import { PLAYER_SLOTS } from "./players.js";
+import { storyElementSchema } from "./storyElement.js";
 
 export const statChangeSchema = z.object({
   type: z.literal("statChange"),
@@ -23,17 +24,19 @@ export const statChangeSchema = z.object({
     .describe("Value to apply in the modification"),
 });
 
-export const newFactSchema = z.object({
-  type: z.literal("newFact"),
-  fact: z
-    .string()
-    .describe(
-      "An important change in the game world or story that will be tracked to influence the story from this point on.\n" +
-        "Don't use this if the information would be redundant with the option that was presented to the player or a stat change that is already mentioned in a different consequence.\n" +
-        "Bad: 'The player decided to confront X at their house' if the option is 'Confront X at their house'\n" +
-        "Good: 'The player gets lost on their way to X's house' (e.g. because of a bad orientation trait; not redundant with the option 'Confront X at their house')"
-    ),
-});
+export const newFactSchema = z
+  .object({
+    type: z.literal("newFact"),
+    storyElementId: z
+      .string()
+      .describe(
+        "ID of the story element that this fact should be added to (or 'world' for adding a big fact about the game world overall)."
+      ),
+    fact: z.string(),
+  })
+  .describe(
+    "A fact about a story element (NPC, location, item, etc.) that should be tracked to ensure consistency of the story."
+  );
 
 export const newMilestoneSchema = z.object({
   type: z.literal("newMilestone"),
@@ -52,14 +55,22 @@ export const newMilestoneSchema = z.object({
   ),
 });
 
+export const newStoryElementSchema = z.object({
+  type: z.literal("newStoryElement"),
+  element: storyElementSchema.extend({
+    facts: z.array(z.string()),
+  }),
+});
+
 export const changeSchema = z
   .discriminatedUnion("type", [
     statChangeSchema,
     newFactSchema,
     newMilestoneSchema,
+    newStoryElementSchema,
   ])
   .describe(
-    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact!"
+    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact, newStoryElement!"
   );
 
 export type Change = z.infer<typeof changeSchema>;

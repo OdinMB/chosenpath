@@ -12,11 +12,13 @@ export class ChangeService {
           updatedState = this.applyStatChange(updatedState, change);
           break;
         case "newFact":
-          console.log(`Adding new fact: ${change.fact}`);
-          updatedState.establishedFacts.push(change.fact);
+          updatedState = this.applyNewFact(updatedState, change);
           break;
         case "newMilestone":
           updatedState = this.applyNewMilestone(updatedState, change);
+          break;
+        case "newStoryElement":
+          updatedState = this.applyNewStoryElement(updatedState, change);
           break;
       }
     }
@@ -66,23 +68,14 @@ export class ChangeService {
     change: Extract<Change, { type: "statChange" }>
   ): StoryState {
     if (change.group === "shared") {
-      const updatedStats = [...state.sharedStats];
-      const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
-
-      if (statIndex === -1) {
-        console.log(`Shared stat ${change.stat} not found`);
-        return state;
-      }
-
-      const stat = updatedStats[statIndex];
-      const updatedStat = this.updateStatValue(stat, change);
-      if (!updatedStat) return state;
-
-      updatedStats[statIndex] = updatedStat;
-      return { ...state, sharedStats: updatedStats };
+      return this.updateStatsArray(
+        state,
+        state.sharedStats,
+        change,
+        (updatedStats) => ({ ...state, sharedStats: updatedStats })
+      );
     }
 
-    // Handle player stats
     const playerSlot = change.group as PlayerSlot;
     const player = state.players[playerSlot];
 
@@ -91,34 +84,54 @@ export class ChangeService {
       return state;
     }
 
-    const updatedStats = [...player.characterStats];
-    const statIndex = updatedStats.findIndex((s) => s.id === change.stat);
+    return this.updateStatsArray(
+      state,
+      player.characterStats,
+      change,
+      (updatedStats) => ({
+        ...state,
+        players: {
+          ...state.players,
+          [playerSlot]: {
+            ...player,
+            characterStats: updatedStats,
+          },
+        },
+      })
+    );
+  }
+
+  private updateStatsArray(
+    state: StoryState,
+    stats: any[],
+    change: Extract<Change, { type: "statChange" }>,
+    updateState: (updatedStats: any[]) => StoryState
+  ): StoryState {
+    const statIndex = stats.findIndex((s) => s.id === change.stat);
 
     if (statIndex === -1) {
-      console.log(`Stat ${change.stat} not found for player ${playerSlot}`);
+      console.log(`Stat ${change.stat} not found`);
       return state;
     }
 
-    const stat = updatedStats[statIndex];
+    const stat = stats[statIndex];
     const updatedStat = this.updateStatValue(stat, change);
-    if (!updatedStat) return state;
+
+    if (!updatedStat) {
+      console.log(`Stat ${stat.id} not updated`);
+      return state;
+    }
+
     console.log(
-      `Updated stat for player ${playerSlot}: ${stat.id} to ${updatedStat.value}`
+      `Updated stat ${stat.id} ${
+        change.group === "shared" ? "(shared)" : `for player ${change.group}`
+      } from ${stat.value} to ${updatedStat.value}`
     );
 
+    const updatedStats = [...stats];
     updatedStats[statIndex] = updatedStat;
-    const updatedPlayer = {
-      ...player,
-      characterStats: updatedStats,
-    };
 
-    return {
-      ...state,
-      players: {
-        ...state.players,
-        [playerSlot]: updatedPlayer,
-      },
-    };
+    return updateState(updatedStats);
   }
 
   private updateStatValue(
@@ -128,13 +141,11 @@ export class ChangeService {
     switch (change.change) {
       case "setBoolean":
         if (stat.type === "boolean") {
-          console.log(`Setting boolean stat ${stat.id} to ${change.value}`);
           return { ...stat, value: change.value as boolean };
         }
         break;
       case "setString":
         if (stat.type === "string") {
-          console.log(`Setting string stat ${stat.id} to "${change.value}"`);
           return { ...stat, value: change.value as string };
         }
         break;
@@ -144,11 +155,6 @@ export class ChangeService {
           const delta = change.change === "addNumber" ? 1 : -1;
           const newValue =
             (stat.value as number) + delta * (change.value as number);
-          console.log(
-            `${
-              change.change === "addNumber" ? "Adding to" : "Subtracting from"
-            } number stat ${stat.id}: ${stat.value} -> ${newValue}`
-          );
           return { ...stat, value: newValue };
         }
         break;
@@ -160,9 +166,6 @@ export class ChangeService {
         break;
       case "addElement":
         if (stat.type === "string[]") {
-          console.log(
-            `Adding element "${change.value}" to array stat ${stat.id}`
-          );
           return {
             ...stat,
             value: [...(stat.value as string[]), change.value as string],
@@ -171,9 +174,6 @@ export class ChangeService {
         break;
       case "removeElement":
         if (stat.type === "string[]") {
-          console.log(
-            `Removing element "${change.value}" from array stat ${stat.id}`
-          );
           return {
             ...stat,
             value: (stat.value as string[]).filter((v) => v !== change.value),
@@ -182,5 +182,54 @@ export class ChangeService {
         break;
     }
     return null;
+  }
+
+  private applyNewFact(
+    state: StoryState,
+    change: Extract<Change, { type: "newFact" }>
+  ): StoryState {
+    console.log(`Adding new fact to ${change.storyElementId}: ${change.fact}`);
+
+    if (change.storyElementId === "world") {
+      return {
+        ...state,
+        worldFacts: [...state.worldFacts, change.fact],
+      };
+    }
+
+    const updatedElements = state.storyElements.map((element) => {
+      if (element.id === change.storyElementId) {
+        return {
+          ...element,
+          facts: [...element.facts, change.fact],
+        };
+      }
+      return element;
+    });
+
+    return {
+      ...state,
+      storyElements: updatedElements,
+    };
+  }
+
+  private applyNewStoryElement(
+    state: StoryState,
+    change: Extract<Change, { type: "newStoryElement" }>
+  ): StoryState {
+    console.log(`Adding new story element: ${JSON.stringify(change.element)}`);
+
+    // Check if element with this ID already exists
+    if (
+      state.storyElements.some((element) => element.id === change.element.id)
+    ) {
+      console.log(`Story element with ID ${change.element.id} already exists`);
+      return state;
+    }
+
+    return {
+      ...state,
+      storyElements: [...state.storyElements, change.element],
+    };
   }
 }
