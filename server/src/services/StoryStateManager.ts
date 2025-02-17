@@ -5,13 +5,20 @@ import type { StoryState } from "../../../shared/types/story.js";
 import type { PlayerSlot } from "../../../shared/types/players.js";
 
 export class StoryStateManager {
-  private storyStates: Map<string, StoryState>;
+  private static instance: StoryStateManager;
+  private storyStates: Map<string, StoryState> = new Map();
   private storageDir: string;
 
-  constructor() {
-    this.storyStates = new Map();
+  private constructor() {
     this.storageDir = path.join(process.cwd(), "data", "stories");
     this.ensureStorageDir();
+  }
+
+  public static getInstance(): StoryStateManager {
+    if (!StoryStateManager.instance) {
+      StoryStateManager.instance = new StoryStateManager();
+    }
+    return StoryStateManager.instance;
   }
 
   private async ensureStorageDir() {
@@ -32,11 +39,11 @@ export class StoryStateManager {
   async getState(storyId: string): Promise<StoryState | null> {
     console.log("[StoryStateManager] Getting state for story:", storyId);
 
-    // Try memory cache first
+    // Check memory cache first
     const cachedState = this.storyStates.get(storyId);
     if (cachedState) {
       console.log("[StoryStateManager] Found state in memory cache");
-      return cachedState;
+      return JSON.parse(JSON.stringify(cachedState));
     }
 
     console.log("[StoryStateManager] State not in cache, loading from file...");
@@ -74,7 +81,8 @@ export class StoryStateManager {
         });
       }
 
-      return state;
+      // Return a fresh copy
+      return JSON.parse(JSON.stringify(state));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         console.log("[StoryStateManager] Story file not found:", storyId);
@@ -85,28 +93,18 @@ export class StoryStateManager {
     }
   }
 
-  async storeState(storyId: string, state: StoryState): Promise<void> {
-    try {
-      // Update memory cache
-      this.storyStates.set(storyId, state);
+  async storeState(storyId: string, newState: StoryState): Promise<void> {
+    console.log("[StoryStateManager] Storing state for story:", storyId);
 
-      // Save to file
-      const filePath = this.getFilePath(storyId);
-      await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
+    // Create a fresh copy for both cache and file
+    const stateCopy = JSON.parse(JSON.stringify(newState));
 
-      console.log(
-        "[StoryStateManager] Successfully stored state (",
-        storyId,
-        ")"
-      );
-    } catch (error) {
-      console.error("[StoryStateManager] Failed to store state:", error);
-      throw error;
-    }
-  }
+    // Update memory cache
+    this.storyStates.set(storyId, stateCopy);
 
-  async updateState(storyId: string, state: StoryState): Promise<void> {
-    await this.storeState(storyId, state);
+    // Write to file
+    const filePath = this.getFilePath(storyId);
+    await fs.writeFile(filePath, JSON.stringify(newState, null, 2));
   }
 
   async deleteState(storyId: string): Promise<void> {
@@ -260,4 +258,4 @@ export class StoryStateManager {
 }
 
 // Export singleton instance
-export const storyStateManager = new StoryStateManager();
+export const storyStateManager = StoryStateManager.getInstance();

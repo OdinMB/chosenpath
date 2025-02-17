@@ -29,7 +29,7 @@ export class GameHandler {
     this.aiStoryGenerator = new AIStoryGenerator();
     this.sessionService = new SessionService();
     this.imageService = new AIImageGenerator();
-    this.storyStateManager = new StoryStateManager();
+    this.storyStateManager = StoryStateManager.getInstance();
     this.changeService = new ChangeService();
     this.io = socket.nsp.server;
     console.log("[GameHandler] Created new handler for socket:", socket.id);
@@ -103,7 +103,7 @@ export class GameHandler {
       nextState,
       changes
     );
-    await this.storyStateManager.updateState(storyId, stateWithChanges);
+    await this.storyStateManager.storeState(storyId, stateWithChanges);
     this.broadcastStateUpdate(storyId, stateWithChanges);
 
     // Generate images if needed
@@ -113,7 +113,7 @@ export class GameHandler {
         stateWithChanges,
         beatsNeedingImages
       );
-      await this.storyStateManager.updateState(storyId, stateWithImages);
+      await this.storyStateManager.storeState(storyId, stateWithImages);
       this.broadcastStateUpdate(storyId, stateWithImages);
     }
 
@@ -198,13 +198,40 @@ export class GameHandler {
       // Get current state
       const state = await this.storyStateManager.getState(playerInfo.storyId);
       if (!state) {
-        throw new Error("Story not found");
+        throw new Error("Game state not found");
+      }
+
+      // Debug: Check current choices
+      Object.entries(state.players).forEach(([slot, playerState]) => {
+        const currentBeat =
+          playerState.beatHistory[playerState.beatHistory.length - 1];
+      });
+
+      // Ensure player's socket is still valid
+      const activeSockets = connectionManager.getActiveSockets(
+        playerInfo.storyId,
+        playerInfo.playerSlot
+      );
+
+      if (!activeSockets.has(this.socket.id)) {
+        throw new Error("Socket connection needs refresh");
+      }
+
+      const player = state.players[playerInfo.playerSlot];
+      if (!player) {
+        throw new Error(`Player ${playerInfo.playerSlot} not found in state`);
+      }
+
+      if (!player.beatHistory || player.beatHistory.length === 0) {
+        throw new Error(`No beat history for player ${playerInfo.playerSlot}`);
+      }
+
+      const currentBeat = player.beatHistory[player.beatHistory.length - 1];
+      if (!currentBeat) {
+        throw new Error(`No current beat for player ${playerInfo.playerSlot}`);
       }
 
       // Validate the choice
-      const player = state.players[playerInfo.playerSlot];
-      const currentBeat = player.beatHistory[player.beatHistory.length - 1];
-
       if (currentBeat.choice !== -1) {
         throw new Error(
           `Choice already made for this turn (player: ${playerInfo.playerSlot}, beat #${player.beatHistory.length})`
@@ -232,10 +259,7 @@ export class GameHandler {
       };
 
       // Save the updated state
-      await this.storyStateManager.updateState(
-        playerInfo.storyId,
-        updatedState
-      );
+      await this.storyStateManager.storeState(playerInfo.storyId, updatedState);
 
       console.log(
         `[GameHandler] Set choice for player ${playerInfo.playerSlot} for beat #${player.beatHistory.length} (${currentBeat.title}) to option #${optionIndex}`

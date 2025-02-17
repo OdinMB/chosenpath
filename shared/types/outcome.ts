@@ -14,7 +14,7 @@ export const outcomeSchema = z
         "List 3 potential resolutions. (2 can be OK if you a clear-cut outcome.)"
       ),
     resonance: z
-      .number()
+      .string()
       .describe(
         "1-2 sentences about the character's needs, hopes, fears, or traumas related to this outcome. Why does this outcome matter to the player?"
       ),
