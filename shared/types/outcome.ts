@@ -8,10 +8,15 @@ export const outcomeSchema = z
         "Use a short phrase with underscores, like 'murderer_found' or 'relationship_with_x'."
       ),
     question: z.string().describe("Question that defines the outcome"),
-    possibleOutcomes: z
+    possibleResolutions: z
       .array(z.string())
       .describe(
-        "List 3 potential outcomes or resolutions. (2 can be OK if you a clear-cut outcome.)"
+        "List 3 potential resolutions. (2 can be OK if you a clear-cut outcome.)"
+      ),
+    resonance: z
+      .number()
+      .describe(
+        "1-2 sentences about the character's needs, hopes, fears, or traumas related to this outcome. Why does this outcome matter to the player?"
       ),
     intendedNumberOfMilestones: z
       .number()
@@ -23,7 +28,7 @@ export const outcomeSchema = z
   .describe(
     "Outcome that (co-)defines the ending of the story for this player. No intermediate outcomes, only elements of the ending.\n" +
       "For exmaple: Is the murderer found? Does the player stay loyal to X or follow Y instead?\n" +
-      "Only include outcomes that depend on the player's choices. Bad: 'What is the truth about X ?' (doesn't depend on player choicer). Good: 'Does the player find out the truth about X?'\n" +
+      "Only include outcomes that depend on the players' choices. Bad: 'What is the truth about X ?' (doesn't depend on players' choices). Good: 'Does the player find out the truth about X?'\n" +
       "Questions and options must be specific. Bad: 'Personal and group relationships'. Good: 'What type of relationship to NPC X does the player character end up with?'"
   );
 

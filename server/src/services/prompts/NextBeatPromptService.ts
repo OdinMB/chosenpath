@@ -72,6 +72,8 @@ Consider how many beats are still to play and how many milestones are still left
 In the first beat, introduce the core premise, what the player represents in the story, and what this whole story is all about.
 
 e) How should we flesh out the game world to make it more immersive?
+- Check if the player is going to encounter a story element that has not yet been introduced to the player.
+--- If so, introduce the element properly in the beat text and add the element id to the player's list of known story elements.
 - Check if you should add a new story element to the story state.
 --- Do this whenever a new element is introduced that is likely to be used in later beats.
 --- In most beats, you don't have to add a new story element.
@@ -87,14 +89,25 @@ e) How should we flesh out the game world to make it more immersive?
 f) How can we reinforce the story's key conflicts and focused types of decisions?
 
 Beat text
-- The first paragraph should continue exactly where the previous beat for this player ended and describe the immediate consequences of the player's decision.
---- The goal is create a natural flow from one beat to the next.
---- Don't reintroduce the scene or situation if that has already happened. Just continue the story.
---- Sometimes, this can be as simple as "You leave X and go to Y."
-- Never just mention the player's options. They will be listed in the options sections later.
+- The first paragraph
+--- Should continue exactly where the previous beat for this player ended
+--- Describe the immediate consequences of the player's decision.
+--- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.
+--- The goal is to create a natural flow from one beat to the next.
+--- It often makes sense to include some reaction from the player's perspective, like a bodily sensation, a thought, or an emotion.
+- Use direct speech
+--- Both for the player characters and the NPCs.
+--- Give characters a voice. Don't just say "you absorb the cryptic wisdom imparted by X" or "you talk to X".
+--- Exception: you want to skip over a routine conversation that doesn't add to the story.
+- Story elements
+--- If a player encounters a story element that has not been introduced yet, you must introduce it properly.
+--- If a player encounters a story element that has been introduced before, don't introduce it again. Just refer to it assuming that the player knows what it is.
+- Never mention, refer, or even hint at the player's options.
+--- The options will be added in a special options sections later.
 --- Bad: "The path before you is fraught with choices ..."
 --- Bad: "Will you seek X, or will you seek Y?"
 --- Bad: "You must decide: ..."
+--- Bad: "You weigh your options carefully"
 --- Good: Just write a strong beat that pushes the story forward and then mention the options in the options section.
 
 3. Options
@@ -238,6 +251,9 @@ ${modeDescriptions[state.gameMode]}
           "OUTCOMES that will define this character's story ending:",
           this.createOutcomesSection(playerState.outcomes),
           "",
+          "STORY ELEMENTS INTRODUCED: ",
+          playerState.knownStoryElements.map((id) => `${id}`).join(", "),
+          "",
           "BEAT HISTORY:",
           beatHistorySection,
         ].join("\n");
@@ -286,7 +302,8 @@ ${modeDescriptions[state.gameMode]}
         return [
           `id: ${outcome.id}`,
           outcome.question,
-          `Possible outcomes: ${outcome.possibleOutcomes.join(" | ")}`,
+          `Possible resolutions: ${outcome.possibleResolutions.join(" | ")}`,
+          `Resonance: ${outcome.resonance}`,
           `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
           outcome.milestones
             .map((milestone: string) => `- ${milestone}`)

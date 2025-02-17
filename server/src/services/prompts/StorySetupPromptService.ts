@@ -42,7 +42,7 @@ export class StorySetupPromptService {
       "The entire story is supposed to play out over a course of " +
       maxTurns +
       " beats, " +
-      "with each beat consisting of about three paragraphs of text for each player and a decision by the player.\n" +
+      "with each beat consisting of about four paragraphs of text for each player and a decision by the player.\n" +
       "Generate enough conflicts, types of decisions, outcomes, NPCs, and stats to make the story interesting, " +
       "but not so many that they cannot be fully developed within the " +
       maxTurns +
@@ -59,6 +59,7 @@ export class StorySetupPromptService {
 --- 2-4 NPCs.
 --- 2-4 locations
 --- 2-4 miscellaneous elements (like items, factions, organizations, dangers, mysteries, conflicts, or whatever the story might need)
+--- Add three facts about each story element.
 --- Don't include the player characters (main protagonists) in this list.
 --- If a stat refers to something (a character, organization, faction, location, etc.), chances are that it should be a story element.
 - 3-4 visible shared stats for things that are not directly linked to one player

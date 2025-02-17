@@ -5,6 +5,7 @@ import {
   newFactSchema,
   statChangeSchema,
   newStoryElementSchema,
+  addKnownStoryElementSchema,
 } from "./change.js";
 
 export const beatPlanSchema = z.object({
@@ -32,6 +33,11 @@ export const beatPlanSchema = z.object({
     .string()
     .describe(
       "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Make absolutelyl sure that you don't create duplicate story elements or facts."
+    ),
+  newKnownStoryElements: z
+    .array(addKnownStoryElementSchema)
+    .describe(
+      "List of story elements that are going to be introduced to the player in this beat for the first time. Leave this empty if the player doesn't encounter any new story elements."
     ),
   newGameElements: z
     .array(newStoryElementSchema)
@@ -109,7 +115,6 @@ export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
 
 export type SetOfBeatGenerationSchema = {
   decisionConsequences: Change[];
-  establishedFacts: Change[];
 } & Record<`player${number}`, BeatGeneration>;
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {

@@ -2,23 +2,24 @@
 
 Improve generations
 
-- world elements (npcs, locations, etc.)
-  --- for each player: save which ones have been introduced
 - chapters
-  --- set of beats
-  --- attributes: title, description, outcome/potential milestones, player slots linked to the chapter
-  --- assign milestones only after chapters
-  --- players in a chapter get the same beat (but different options)
-  --- separate chapter generation prompt
-  --- planning on both chapter and beat level
 
-- outcomes
-  --- add attribute for why it's impportant for the player (or group of players if shared)
-  --- add shared outcomes
+  - set of beats
+  - attributes: title, description, outcome/potential milestones, player slots linked to the chapter
+  - assign milestones only after chapters
+  - players in a chapter get the same beat (but different options)
+  - separate chapter generation prompt
+  - planning on both chapter and beat level
 
-- writig
-  --- Special prompt for the first beat
-  --- changes: consider how the player feels/reacts
+- world elements (npcs, locations, etc.)
+
+  - for each player: save which ones have been introduced
+
+- shared outcomes
+
+- writing
+
+  - Special prompt for the first beat
 
 - Multi-step flow for generating a stat schema?
 - General writing instructions? (already much better with gpt-4o compared to o3-mini)
@@ -32,11 +33,11 @@ Big features
 - Let player choose/adjust starting position (name, pronouns, stats)
 - Queue processor to avoid conflicts between player actions
 - Multiplaer mode: shared perspective
-  -- majority vote
-  -- lottery
-  -- setting for % players who must have voted to continue)
+  - majority vote
+  - lottery
+  - setting for % players who must have voted to continue)
 - Select language
-  -- different ones for different players
+  - different ones for different players
 
 User accounts
 

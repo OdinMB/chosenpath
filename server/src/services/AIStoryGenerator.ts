@@ -89,6 +89,7 @@ export class AIStoryGenerator {
             character: playerData.character,
             outcomes: playerData.outcomes,
             characterStats: playerData.characterStats,
+            knownStoryElements: [],
             beatHistory: [],
           },
         ];

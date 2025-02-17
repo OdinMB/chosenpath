@@ -20,7 +20,7 @@ export const storyElementSchema = z.object({
   facts: z
     .array(z.string())
     .describe(
-      "Add three facts about the element. For NPCs, include their preferred pronouns and motivations."
+      "Three facts about the element that can be used to introduce the element to the player. For NPCs, include their preferred pronouns and motivations."
     ),
 });
 

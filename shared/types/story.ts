@@ -107,6 +107,7 @@ export type StorySetup<N extends PlayerCount> = {
 
 // Direct type definition for PlayerState
 export type PlayerState = PlayerStateGeneration & {
+  knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
 };
 

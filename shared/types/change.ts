@@ -62,15 +62,26 @@ export const newStoryElementSchema = z.object({
   }),
 });
 
+export const addKnownStoryElementSchema = z.object({
+  type: z.literal("addKnownStoryElement"),
+  player: z
+    .enum(PLAYER_SLOTS as [string, ...string[]])
+    .describe("Player slot to add the known story element to"),
+  storyElementId: z
+    .string()
+    .describe("ID of the story element that the player now knows about"),
+});
+
 export const changeSchema = z
   .discriminatedUnion("type", [
     statChangeSchema,
     newFactSchema,
     newMilestoneSchema,
     newStoryElementSchema,
+    addKnownStoryElementSchema,
   ])
   .describe(
-    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact, newStoryElement!"
+    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact, newStoryElement, addKnownStoryElement!"
   );
 
 export type Change = z.infer<typeof changeSchema>;

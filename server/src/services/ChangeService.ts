@@ -4,9 +4,16 @@ import type { PlayerSlot } from "../../../shared/types/players.js";
 
 export class ChangeService {
   applyChanges(state: StoryState, changes: Change[]): StoryState {
+    // Sort changes to process newStoryElement before newFact
+    const sortedChanges = [...changes].sort((a, b) => {
+      if (a.type === "newStoryElement" && b.type === "newFact") return -1;
+      if (a.type === "newFact" && b.type === "newStoryElement") return 1;
+      return 0;
+    });
+
     let updatedState = { ...state };
 
-    for (const change of changes) {
+    for (const change of sortedChanges) {
       switch (change.type) {
         case "statChange":
           updatedState = this.applyStatChange(updatedState, change);
@@ -20,10 +27,50 @@ export class ChangeService {
         case "newStoryElement":
           updatedState = this.applyNewStoryElement(updatedState, change);
           break;
+        case "addKnownStoryElement":
+          updatedState = this.applyAddKnownStoryElement(updatedState, change);
+          break;
       }
     }
 
     return updatedState;
+  }
+
+  private applyAddKnownStoryElement(
+    state: StoryState,
+    change: Extract<Change, { type: "addKnownStoryElement" }>
+  ): StoryState {
+    console.log(
+      `Adding known story element ${change.storyElementId} for player ${change.player}`
+    );
+
+    const player = state.players[change.player];
+
+    if (!player) {
+      console.log(`Player ${change.player} not found`);
+      return state;
+    }
+
+    if (player.knownStoryElements.includes(change.storyElementId)) {
+      console.log(
+        `Story element ${change.storyElementId} is already known to player ${change.player}`
+      );
+      return state;
+    }
+
+    return {
+      ...state,
+      players: {
+        ...state.players,
+        [change.player]: {
+          ...player,
+          knownStoryElements: [
+            ...player.knownStoryElements,
+            change.storyElementId,
+          ],
+        },
+      },
+    };
   }
 
   private applyNewMilestone(
@@ -166,10 +213,14 @@ export class ChangeService {
         break;
       case "addElement":
         if (stat.type === "string[]") {
-          return {
-            ...stat,
-            value: [...(stat.value as string[]), change.value as string],
-          };
+          const currentValue = stat.value as string[];
+          if (!currentValue.includes(change.value as string)) {
+            return {
+              ...stat,
+              value: [...currentValue, change.value as string],
+            };
+          }
+          return stat;
         }
         break;
       case "removeElement":

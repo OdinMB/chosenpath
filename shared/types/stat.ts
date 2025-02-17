@@ -50,3 +50,4 @@ export const statSchema = z
   );
 
 export const statsSchema = z.array(statSchema);
+export type Stat = z.infer<typeof statSchema>;
