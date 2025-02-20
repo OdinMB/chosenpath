@@ -62,13 +62,16 @@ export class StorySetupPromptService {
 --- Add three facts about each story element.
 --- Don't include the player characters (main protagonists) in this list.
 --- If a stat refers to something (a character, organization, faction, location, etc.), chances are that it should be a story element.
+- In multiplayer games, 0-3 shared outcomes with 4 milestones each towards the outcome's resolution
+--- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
+--- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
 --- Things that are shared between players (e.g. group/organization, a spaceship, a flat, a list of collected clues, etc.)
 --- Stats about the world (e.g. tension between factions, industry trends, etc.)
 - Any invisible shared stats that you think are important
-- Stats for scoring, pacing, and story flags if you think they are needed (some stories don't need them)
+- Stats for scoring, pacing, and story flags if you think they are needed (if any)
 For each player
-- 3 outcomes with 4 milestones each towards the outcome's resolution
+- (3 - number of shared outcomes) individual outcomes with 4 milestones each towards the outcome's resolution
 - 3-4 visible stats that are linked directly to that player (traits, skills, dispositions, health, personal relationships, personal resources, etc.)
 - Any invisible stats that are linked to that player that you think are important
 

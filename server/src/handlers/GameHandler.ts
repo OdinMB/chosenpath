@@ -94,6 +94,11 @@ export class GameHandler {
     storyId: string,
     state: StoryState
   ) {
+    const currentThreads = state.currentThreads;
+    const nextThreads = await this.aiStoryGenerator.generateNextSetOfSwitches(
+      state
+    );
+
     // Get next beats, changes, and beats needing images
     const [nextState, changes, beatsNeedingImages] =
       await this.aiStoryGenerator.addNextSetOfBeats(state);

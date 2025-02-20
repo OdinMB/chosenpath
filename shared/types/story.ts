@@ -11,6 +11,7 @@ import {
   PCSchema,
 } from "./players.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
+import { Thread } from "./thread.js";
 
 // GENERATION WITH LLM
 
@@ -59,7 +60,9 @@ export const guidelinesSchema = z
 
 export const playerStateGenerationSchema = z.object({
   character: PCSchema,
-  outcomes: outcomesSchema,
+  outcomes: outcomesSchema.describe(
+    "Individual outcomes that (together with shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
+  ),
   characterStats: z
     .array(statSchema)
     .describe("Stats belonging to this player character"),
@@ -84,9 +87,12 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   return z
     .object({
       guidelines: guidelinesSchema,
+      storyElements: StoryElementsSchema,
+      sharedOutcomes: outcomesSchema.describe(
+        "Shared outcomes that (together with individual outcomes) will make up the endings of the story for all players. Can include both shared goals and questions that players compete over. No intermediate outcomes, only elements of the ending."
+      ),
       statGroups: statGroupsSchema,
       ...playerSchemas,
-      storyElements: StoryElementsSchema,
       sharedStats: z
         .array(statSchema)
         .describe("Stats that are shared among players"),
@@ -98,8 +104,9 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
 // Helper type for the response - simplified by using ExactPlayerMap
 export type StorySetup<N extends PlayerCount> = {
   guidelines: z.infer<typeof guidelinesSchema>;
-  statGroups: z.infer<typeof statGroupsSchema>;
   storyElements: z.infer<typeof StoryElementsSchema>;
+  sharedOutcomes: z.infer<typeof outcomesSchema>;
+  statGroups: z.infer<typeof statGroupsSchema>;
   sharedStats: z.infer<typeof statSchema>[];
 } & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
 
@@ -113,16 +120,18 @@ export type PlayerState = PlayerStateGeneration & {
 
 // Direct type definition for StoryState
 export type StoryState = {
+  gameMode: GameMode;
   guidelines: z.infer<typeof guidelinesSchema>;
-  sharedStats: z.infer<typeof statsSchema>;
   storyElements: StoryElement[];
   worldFacts: string[];
+  sharedOutcomes: z.infer<typeof outcomesSchema>;
+  sharedStats: z.infer<typeof statsSchema>;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   maxTurns: number;
+  currentThreads: Thread[];
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
-  gameMode: GameMode;
 };
 
 // Direct type definition for ClientStoryState

@@ -62,11 +62,11 @@ export const newStoryElementSchema = z.object({
   }),
 });
 
-export const addKnownStoryElementSchema = z.object({
-  type: z.literal("addKnownStoryElement"),
+export const addIntroductionOfStoryElementSchema = z.object({
+  type: z.literal("addIntroductionOfStoryElement"),
   player: z
     .enum(PLAYER_SLOTS as [string, ...string[]])
-    .describe("Player slot to add the known story element to"),
+    .describe("Player slot to add the just introduced story element to"),
   storyElementId: z
     .string()
     .describe("ID of the story element that the player now knows about"),
@@ -78,10 +78,10 @@ export const changeSchema = z
     newFactSchema,
     newMilestoneSchema,
     newStoryElementSchema,
-    addKnownStoryElementSchema,
+    addIntroductionOfStoryElementSchema,
   ])
   .describe(
-    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact, newStoryElement, addKnownStoryElement!"
+    "A change that will be applied to the story state. ONLY the following types are allowed: statChange, newMilestone, newFact, newStoryElement, addIntroductionOfStoryElement!"
   );
 
 export type Change = z.infer<typeof changeSchema>;

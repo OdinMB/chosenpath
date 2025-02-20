@@ -5,35 +5,34 @@ export const outcomeSchema = z
     id: z
       .string()
       .describe(
-        "Use a short phrase with underscores, like 'murderer_found' or 'relationship_with_x'."
+        "Use a short phrase with underscores, like 'shared_murderer_found' or 'player2_relationship_with_catya'."
       ),
     question: z.string().describe("Question that defines the outcome"),
     possibleResolutions: z
       .array(z.string())
       .describe(
-        "List 3 potential resolutions. (2 can be OK if you a clear-cut outcome.)"
+        "List 2-3 potential resolutions that could result from player choices."
       ),
     resonance: z
       .string()
       .describe(
-        "1-2 sentences about the character's needs, hopes, fears, or traumas related to this outcome. Why does this outcome matter to the player?"
+        "For individual outcomes: Why does this matter to the character? What needs, hopes, fears, or traumas are involved?\n" +
+          "For shared outcomes: What makes this meaningful to the group? If competitive, what drives each player's stake in this outcome?"
       ),
     intendedNumberOfMilestones: z
       .number()
       .describe(
-        "The number of milestones that should bring this outcome to its resolution. Define a number that makes sense given the number of beats of the story and how much space this outcome should get."
+        "The number of milestones needed to reach resolution. Consider the story length and this outcome's importance (whether individual or shared)."
       ),
     milestones: z.array(z.string()).describe("Initially empty."),
   })
   .describe(
-    "Outcome that (co-)defines the ending of the story for this player. No intermediate outcomes, only elements of the ending.\n" +
-      "For exmaple: Is the murderer found? Does the player stay loyal to X or follow Y instead?\n" +
-      "Only include outcomes that depend on the players' choices. Bad: 'What is the truth about X ?' (doesn't depend on players' choices). Good: 'Does the player find out the truth about X?'\n" +
-      "Questions and options must be specific. Bad: 'Personal and group relationships'. Good: 'What type of relationship to NPC X does the player character end up with?'"
+    "Defines a story ending element.\n" +
+      "Examples:\n" +
+      "Individual: 'Does Alex choose loyalty to the family or their own ambitions?'\n" +
+      "Shared cooperative: 'Do the players successfully prevent the ritual?'\n" +
+      "Shared competitive: 'Which player gains control of the artifact?'\n" +
+      "Questions and options must be specific and depend on player choices."
   );
 
-export const outcomesSchema = z
-  .array(outcomeSchema)
-  .describe(
-    "Outcomes that will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
-  );
+export const outcomesSchema = z.array(outcomeSchema);

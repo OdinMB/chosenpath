@@ -2,27 +2,10 @@
 
 Improve generations
 
-- chapters
-
-  - set of beats
-  - attributes: title, description, outcome/potential milestones, player slots linked to the chapter
-  - assign milestones only after chapters
-  - players in a chapter get the same beat (but different options)
-  - separate chapter generation prompt
-  - planning on both chapter and beat level
-
-- world elements (npcs, locations, etc.)
-
-  - for each player: save which ones have been introduced
-
-- shared outcomes
-
-- writing
-
-  - Special prompt for the first beat
-
+- Switches and Threads as narrative structures
+  - AI doesn't understand switches and coordination patterns yet
+- Special prompt for the first beat
 - Multi-step flow for generating a stat schema?
-- General writing instructions? (already much better with gpt-4o compared to o3-mini)
 
 Easy nice-to-haves
 

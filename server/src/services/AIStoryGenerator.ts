@@ -12,14 +12,19 @@ import type {
 } from "../../../shared/types/beat.js";
 import dotenv from "dotenv";
 import { createStorySetupSchema } from "../../../shared/types/story.js";
+import {
+  createSwitchAnalysisSchema,
+  type SwitchAnalysis,
+} from "../../../shared/types/switch.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "../../../shared/types/beat.js";
 import type { BeatsNeedingImages } from "../../../shared/types/image.js";
 import { type GameMode } from "../../../shared/types/story.js";
 import type { StoryElement } from "../../../shared/types/storyElement.js";
-import { StoryPromptService } from "./prompts/NextBeatPromptService.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
+import { NextSwitchPromptService } from "./prompts/NextSwitchPromptService.js";
+import { NextBeatPromptService } from "./prompts/NextBeatPromptService.js";
 import { PLAYER_SLOTS } from "../../../shared/types/players.js";
 dotenv.config();
 
@@ -62,16 +67,18 @@ export class AIStoryGenerator {
     );
 
     return {
+      gameMode,
       guidelines: setup.guidelines,
-      sharedStats: setup.sharedStats,
       storyElements,
+      worldFacts: [],
+      sharedOutcomes: setup.sharedOutcomes,
+      sharedStats: setup.sharedStats,
       players,
       maxTurns,
-      worldFacts: [],
+      currentThreads: [],
       generateImages,
       images: [],
       playerCodes: {},
-      gameMode,
     };
   }
 
@@ -126,6 +133,21 @@ export class AIStoryGenerator {
     }
   }
 
+  async generateNextSetOfSwitches(state: StoryState): Promise<Beat[]> {
+    const schema = createSwitchAnalysisSchema(
+      Object.keys(state.players).length as PlayerCount
+    );
+    const structuredModel = this.model.withStructuredOutput(schema);
+    const prompt = NextSwitchPromptService.createSwitchAnalysisPrompt(state);
+
+    const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
+
+    console.log("Response:\n", JSON.stringify(response, null, 2));
+
+    return [];
+    // return response.threads as Beat[];
+  }
+
   async addNextSetOfBeats(
     state: StoryState
   ): Promise<[StoryState, Change[], BeatsNeedingImages]> {
@@ -158,10 +180,10 @@ export class AIStoryGenerator {
     );
 
     const response = (await structuredModel.invoke(
-      this.createBeatPrompt(state)
+      NextBeatPromptService.createBeatPrompt(state)
     )) as SetOfBeatGenerationSchema;
 
-    console.log("Response:\n", response);
+    console.log("Response:\n", JSON.stringify(response, null, 2));
     return response;
   }
 
@@ -226,15 +248,15 @@ export class AIStoryGenerator {
     const allNewGameElements = playerBeats.flatMap(
       (beat) => beat.plan.newGameElements || []
     );
+    const allNewIntroductions = playerBeats.flatMap(
+      (beat) => beat.plan.newIntroductionsOfStoryElements || []
+    );
 
     return [
       ...(response.decisionConsequences || []),
       ...allEstablishedFacts,
       ...allNewGameElements,
+      ...allNewIntroductions,
     ];
-  }
-
-  private createBeatPrompt(state: StoryState): string {
-    return StoryPromptService.createBeatPrompt(state);
   }
 }

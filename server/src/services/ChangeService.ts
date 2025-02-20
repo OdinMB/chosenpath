@@ -27,8 +27,11 @@ export class ChangeService {
         case "newStoryElement":
           updatedState = this.applyNewStoryElement(updatedState, change);
           break;
-        case "addKnownStoryElement":
-          updatedState = this.applyAddKnownStoryElement(updatedState, change);
+        case "addIntroductionOfStoryElement":
+          updatedState = this.applyAddIntroductionOfStoryElement(
+            updatedState,
+            change
+          );
           break;
       }
     }
@@ -36,12 +39,12 @@ export class ChangeService {
     return updatedState;
   }
 
-  private applyAddKnownStoryElement(
+  private applyAddIntroductionOfStoryElement(
     state: StoryState,
-    change: Extract<Change, { type: "addKnownStoryElement" }>
+    change: Extract<Change, { type: "addIntroductionOfStoryElement" }>
   ): StoryState {
     console.log(
-      `Adding known story element ${change.storyElementId} for player ${change.player}`
+      `Adding introduction of story element ${change.storyElementId} for player ${change.player}`
     );
 
     const player = state.players[change.player];
