@@ -3,17 +3,17 @@ import type { StoryState } from "../../../shared/types/story.js";
 import { SessionService } from "../services/SessionService.js";
 import { AIImageGenerator } from "../services/AIImageGenerator.js";
 import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
-import type { PlayerCount } from "../../../shared/types/players.js";
+import type { PlayerCount, PlayerSlot } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { StoryStateManager } from "../services/StoryStateManager.js";
 import { connectionManager } from "../services/ConnectionManager.js";
-import type { PlayerSlot } from "../../../shared/types/players.js";
 import type { Server } from "socket.io";
 import { filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
 import { areAllChoicesSubmitted } from "../../../shared/utils/storyUtils.js";
 import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
 import type { GameMode } from "../../../shared/types/story.js";
+import type { BeatType } from "../../../shared/types/beat.js";
 
 export class GameHandler {
   private sessionService: SessionService;
@@ -90,41 +90,6 @@ export class GameHandler {
     }
   }
 
-  private async generateAndBroadcastNextBeats(
-    storyId: string,
-    state: StoryState
-  ) {
-    const currentThreads = state.currentThreads;
-    const nextThreads = await this.aiStoryGenerator.generateNextSetOfSwitches(
-      state
-    );
-
-    // Get next beats, changes, and beats needing images
-    const [nextState, changes, beatsNeedingImages] =
-      await this.aiStoryGenerator.addNextSetOfBeats(state);
-
-    // Apply changes to state and update/broadcast
-    const stateWithChanges = this.changeService.applyChanges(
-      nextState,
-      changes
-    );
-    await this.storyStateManager.storeState(storyId, stateWithChanges);
-    this.broadcastStateUpdate(storyId, stateWithChanges);
-
-    // Generate images if needed
-    let stateWithImages: StoryState | undefined;
-    if (state.generateImages && Object.keys(beatsNeedingImages).length > 0) {
-      stateWithImages = await this.imageService.generateImagesForBeats(
-        stateWithChanges,
-        beatsNeedingImages
-      );
-      await this.storyStateManager.storeState(storyId, stateWithImages);
-      this.broadcastStateUpdate(storyId, stateWithImages);
-    }
-
-    return stateWithImages || stateWithChanges;
-  }
-
   async initializeStory(
     sessionId: string,
     prompt: string,
@@ -181,14 +146,131 @@ export class GameHandler {
         stateWithCodes.playerCodes
       );
 
-      // Generate first set of beats
-      await this.generateAndBroadcastNextBeats(storyId, stateWithCodes);
+      // And go
+      await this.moveStoryForward(storyId, stateWithCodes);
 
       // ToDo: call image generation once it has its own function
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
       this.socket.emit("error", { error: "Failed to initialize story" });
     }
+  }
+
+  private async moveStoryForward(storyId: string, state: StoryState) {
+    // - First beat? => create and set current beat type to switch
+    // - Last beat was the last beat of a thread? => create and set current beat type to switch
+    // - Last beat was a switch? => create and set current beat type to thread
+    // - Create next set of beats based on the current beat type
+
+    console.log("[GameHandler] Moving the story forward.");
+
+    let currentBeatType: BeatType = this.determineNextBeatType(state);
+    let updatedState = state;
+
+    console.log("[GameHandler] Current beat type:", currentBeatType);
+
+    if (currentBeatType === "intro" || currentBeatType === "switch") {
+      // Switch = kill previous switch/thread configurations
+      console.log("[GameHandler] Resetting beat context");
+      updatedState = this.resetBeatContext(updatedState);
+      console.log("[GameHandler] Generating switches");
+      updatedState = await this.aiStoryGenerator.generateSwitches(updatedState);
+    } else {
+      // Thread = keep previous switch/thread configurations
+      // Create thread configuration if needed
+      if (
+        state.currentThreadAnalysis === null ||
+        state.currentThreadBeatsCompleted === 0
+      ) {
+        console.log("[GameHandler] Generating threads");
+        updatedState = await this.aiStoryGenerator.generateThreads(state);
+      } else {
+        console.log("[GameHandler] Continuing thread");
+      }
+    }
+    updatedState.currentBeatType = currentBeatType;
+
+    // Better to not store and wait for the beats to be generated?
+    this.storyStateManager.storeState(storyId, updatedState);
+
+    await this.addBeats(storyId, updatedState);
+  }
+
+  private determineNextBeatType(state: StoryState): BeatType {
+    const lastBeatType = state.currentBeatType;
+    console.log(
+      "[GameHandler] Determining next beat type. Last beat type:",
+      lastBeatType
+    );
+
+    let currentBeatType: BeatType = "intro";
+
+    if (lastBeatType === "intro") {
+      currentBeatType = "switch";
+      console.log("[GameHandler] Intro beat = switch");
+    } else if (lastBeatType === "switch") {
+      currentBeatType = "thread";
+      console.log(
+        "[GameHandler] Last beat was switch, next beat will be thread"
+      );
+    } else if (
+      lastBeatType === "thread" &&
+      state.currentThreadMaxBeats === state.currentThreadBeatsCompleted
+    ) {
+      currentBeatType = "switch";
+      console.log("[GameHandler] Thread completed, next beat will be switch");
+    } else if (lastBeatType === "thread") {
+      currentBeatType = "thread";
+      console.log("[GameHandler] Continuing thread");
+    }
+
+    console.log("[GameHandler] Determined next beat type:", currentBeatType);
+    return currentBeatType;
+  }
+
+  private resetBeatContext(state: StoryState): StoryState {
+    return {
+      ...state,
+      currentBeatType: null,
+      currentSwitchAnalysis: null,
+      currentThreadAnalysis: null,
+      currentThreadMaxBeats: 0,
+      currentThreadBeatsCompleted: 0,
+    };
+  }
+
+  private async addBeats(storyId: string, state: StoryState) {
+    // Get next beats, changes, and beats needing images
+    const [nextState, changes, beatsNeedingImages] =
+      await this.aiStoryGenerator.generateBeats(state);
+
+    // Apply changes to state
+    const stateWithChanges = this.changeService.applyChanges(
+      nextState,
+      changes
+    );
+
+    // Add 1 to the beats counter
+    if (state.currentBeatType === "thread") {
+      stateWithChanges.currentThreadBeatsCompleted += 1;
+    }
+
+    // update/broadcast
+    await this.storyStateManager.storeState(storyId, stateWithChanges);
+    this.broadcastStateUpdate(storyId, stateWithChanges);
+
+    // Generate images if needed
+    let stateWithImages: StoryState | undefined;
+    if (state.generateImages && Object.keys(beatsNeedingImages).length > 0) {
+      stateWithImages = await this.imageService.generateImagesForBeats(
+        stateWithChanges,
+        beatsNeedingImages
+      );
+      await this.storyStateManager.storeState(storyId, stateWithImages);
+      this.broadcastStateUpdate(storyId, stateWithImages);
+    }
+
+    return stateWithImages || stateWithChanges;
   }
 
   async makeChoice(optionIndex: number) {
@@ -275,10 +357,7 @@ export class GameHandler {
 
       // Check if all players have submitted their choices
       if (areAllChoicesSubmitted(updatedState)) {
-        await this.generateAndBroadcastNextBeats(
-          playerInfo.storyId,
-          updatedState
-        );
+        await this.moveStoryForward(playerInfo.storyId, updatedState);
       }
     } catch (error) {
       console.error("[GameHandler] Error processing choice:", error);

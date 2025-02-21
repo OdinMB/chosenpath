@@ -11,7 +11,9 @@ import {
   PCSchema,
 } from "./players.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
-import { Thread } from "./thread.js";
+import { BeatType } from "./beat.js";
+import { SwitchAnalysis } from "./switch.js";
+import { ThreadAnalysis } from "./thread.js";
 
 // GENERATION WITH LLM
 
@@ -128,7 +130,11 @@ export type StoryState = {
   sharedStats: z.infer<typeof statsSchema>;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   maxTurns: number;
-  currentThreads: Thread[];
+  currentBeatType: BeatType | null;
+  currentSwitchAnalysis: SwitchAnalysis | null;
+  currentThreadAnalysis: ThreadAnalysis | null;
+  currentThreadMaxBeats: number;
+  currentThreadBeatsCompleted: number;
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
@@ -136,12 +142,12 @@ export type StoryState = {
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
-  numberOfPlayers: number;
-  players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   gameMode: GameMode;
+  players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   sharedStats: z.infer<typeof statsSchema>;
   maxTurns: number;
   generateImages: boolean;
   images: ImageLibrary;
+  numberOfPlayers: number;
   pendingPlayers: PlayerSlot[];
 };

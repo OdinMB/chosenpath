@@ -10,6 +10,8 @@ export interface SectionConfig {
   imageLibrary?: boolean;
   players?: boolean;
   storyProgress?: boolean;
+  switchConfiguration?: boolean;
+  threadConfiguration?: boolean;
 }
 
 export const DEFAULT_SECTION_CONFIG: SectionConfig = {
@@ -22,6 +24,8 @@ export const DEFAULT_SECTION_CONFIG: SectionConfig = {
   imageLibrary: true,
   players: true,
   storyProgress: true,
+  switchConfiguration: true,
+  threadConfiguration: true,
 } as const;
 
 export class StoryStatePromptService {
@@ -40,11 +44,11 @@ export class StoryStatePromptService {
       sections.imageLibrary ? this.createImageLibrarySection(state) : "",
       sections.players ? this.createPlayersSection(state) : "",
       sections.storyProgress ? this.createStoryProgressSection(state) : "",
+      sections.switchConfiguration ? this.getSwitchConfiguration(state) : "",
+      sections.threadConfiguration ? this.getThreadConfiguration(state) : "",
     ]
       .filter(Boolean)
       .join("\n");
-
-    console.log(prompt);
 
     return prompt;
   }
@@ -197,7 +201,7 @@ ${modeDescriptions[state.gameMode]}
 
         if (isLastBeat) {
           return [
-            `Beat ${index + 1} (previous beat) - full text for continuity:`,
+            `- Beat ${index + 1} (previous beat) - full text for continuity:`,
             beat.text,
             chosenOption ? `Player choice: ${chosenOption}` : "",
           ]
@@ -205,9 +209,9 @@ ${modeDescriptions[state.gameMode]}
             .join("\n\n");
         }
 
-        return `Beat ${index + 1}: ${beat.summary}`;
+        return `- ${beat.summary}`;
       })
-      .join("\n\n");
+      .join("\n");
   }
 
   private static createCharacterStatsSection(stats: any[]): string {
@@ -242,7 +246,7 @@ ${modeDescriptions[state.gameMode]}
 
   private static createStoryProgressSection(state: StoryState): string {
     const turn = Object.values(state.players)[0].beatHistory.length + 1;
-    return `STORY PROGRESS: Turn: ${turn}/${state.maxTurns}`;
+    return `\nSTORY PROGRESS: Turn: ${turn}/${state.maxTurns}\n`;
   }
 
   private static createSharedOutcomesSection(state: StoryState): string {
@@ -251,5 +255,73 @@ ${modeDescriptions[state.gameMode]}
       this.createOutcomesSection(state.sharedOutcomes),
       "",
     ].join("\n");
+  }
+
+  public static getSwitchConfiguration(state: StoryState): string {
+    if (!state.currentSwitchAnalysis) {
+      return "";
+    }
+
+    const { switches, coordinationPatternSummary } =
+      state.currentSwitchAnalysis;
+
+    const switchConfigs = switches
+      .map((singleSwitch) => {
+        const baseLine = `${singleSwitch.title} (${singleSwitch.id})\n- Type: ${
+          singleSwitch.type
+        }\n- Players: ${singleSwitch.players.join(", ")}`;
+        const flavorLine =
+          singleSwitch.type === "flavor"
+            ? `\n- Outcome: ${singleSwitch.outcome}\n- Question: ${singleSwitch.question}`
+            : "";
+        const relationshipLine = `\n- Relationship to other switches: ${singleSwitch.relationshipToOtherSwitches}`;
+        return baseLine + flavorLine + relationshipLine;
+      })
+      .join("\n\n");
+
+    return (
+      "CURRENT SWITCH CONFIGURATION:\n" +
+      coordinationPatternSummary +
+      "\n\n" +
+      "Configuration:\n" +
+      switchConfigs
+    );
+  }
+
+  public static getThreadConfiguration(state: StoryState): string {
+    if (!state.currentThreadAnalysis) {
+      return "";
+    }
+
+    const { threads } = state.currentThreadAnalysis;
+
+    const threadConfigs = threads
+      .map((thread) => {
+        const outcomesSection = thread.outcomes
+          .map((outcome) => {
+            return [
+              `  Outcome ID: ${outcome.outcomeId}`,
+              `  Question: ${outcome.question}`,
+              `  Possible Milestones:`,
+              outcome.possibleMilestones.map((m) => `    - ${m}`).join("\n"),
+            ].join("\n");
+          })
+          .join("\n\n");
+
+        return [
+          `Thread: ${thread.title} (${thread.id})`,
+          `Players: ${thread.players.join(", ")}`,
+          `Progress: this is beat ${
+            state.currentThreadBeatsCompleted + 1
+          } out of ${state.currentThreadMaxBeats}`,
+          `Plan: ${thread.plan}`,
+          `Relationship to other threads: ${thread.relationshipToOtherThreads}`,
+          "\nOutcomes that will get a milestone after this thread:",
+          outcomesSection,
+        ].join("\n");
+      })
+      .join("\n\n" + "-".repeat(40) + "\n\n");
+
+    return "\nCURRENT THREAD CONFIGURATION:\n\n" + threadConfigs;
   }
 }

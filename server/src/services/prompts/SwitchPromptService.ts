@@ -4,7 +4,7 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 
-export class NextSwitchPromptService {
+export class SwitchPromptService {
   private static readonly SECTIONS: SectionConfig = {
     gameMode: true,
     guidelines: true,
@@ -15,6 +15,8 @@ export class NextSwitchPromptService {
     imageLibrary: false,
     players: true,
     storyProgress: true,
+    switchConfiguration: false,
+    threadConfiguration: true,
   } as const;
 
   static createSwitchAnalysisPrompt(state: StoryState): string {
@@ -25,8 +27,7 @@ export class NextSwitchPromptService {
   }
 
   private static createInstructionsSection(): string {
-    return `
-======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
+    return `\n\n======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
 
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
@@ -57,23 +58,22 @@ Follow these steps:
 
 1. Determine the story situation for each player
 
-a) Continuity. Based on the last thread (or story setup, if this is the first switch), is there an outcome/question pair that is forced or at least strongly suggested as the focus of the next thread?
-Consider the following:
-- Immediate consequences. Example: If the player just betrayed an NPC, the next thread should address the fallout of that betrayal.
-- Time-sensitive events. Example: If a bomb is about to explode, the next thread must deal with defusing it or escaping.
-- Consistent actions and narrative momentum. Example: If the player just discovered a crucial piece of evidence, the next thread should follow up on that discovery.
-- Dramatic timing. Example: A revelation about a character's true identity should be addressed while the emotional impact is still fresh.
-Only mark an outcome/question pair as important for continuity if it is forced or very strongly suggested as a next thread by the previous thread. Player agency in the form of a topic switch is valuable and should not be squandered.
+a) Continuity. Based on the last thread (or story setup, if this is the first beat), is there an outcome/question pair that is forced as the focus of the next thread?
+Consider these cases:
+- The immediate consequences of the last thread must be addressed in the next thread for narrative reasons. Example: If the player just betrayed an NPC, and the NPC launches a revenge operation, the next thread should address the revenge operation.
+- Events are interfering with the story that cannot be ignored for narrative reasons. Example: If a bomb is about to explode, the next thread must deal with defusing it or escaping.
+- Switching focus would be illogical from a narrative perspective. Example: If the player just avoided dangerous traps to venture further into the mines, the next thread should be about exploring the mines.
+The following cases are NOT important enough to force an outcome/question pair because of Continuity:
+- Something is time-sensitive, but the story can continue without addressing it. (It's enough to present dealing with the issue as one of the options of a topic switch.)
+- It seems like the player would be stupid if they ignored an opportunity. (It's enough to present the opportunity is one of several options of a topic switch.)
 
 b) Priority. Is there any outcome/question pair that must be addressed now to allow all outcomes to be resolved before the story ends?
-Consider the following:
-- Story duration. Example: There are only 10 beats left in the story, and the outcome "Does [player] become a famous musician?" only has 1/4 milestones. It must be pushed now to get a resolution before the story ends.
-- Story dependencies. Example: Other outcomes depend on resolving this one first, like needing to determine if the player becomes a werewolf before exploring their role in the pack.
-Only enforce an outcome/question pair as priority if it is forced or very strongly suggested. Player agency in the form of a topic switch is valuable and should not be squandered.
+- Example: There are only 10 beats left in the story, and the outcome "Does [player] become a famous musician?" only has 1/4 milestones. It must be pushed now to get a resolution before the story ends.
+
+Only mark an outcome/question pair as important for Continuity or Priority if it is forced as a next thread for narrative reasons.
+Player agency in the form of a topic switch is valuable and should not be squandered.
 
 c) Decision. Justify your choice of using a flavor switch or a topic switch.
-- If an outcome/question pair must be prioritized because of Continuity or Priority, justify this assessment. We will create a flavor switch.
-- Otherwise, we can afford to give the player more agency. We will create a topic switch.
 
 Consider both player outcomes and shared outcomes throughout this process.
 
@@ -96,19 +96,17 @@ b) Analyze potential for player coordination based on:
 c) Choose a coordination pattern:
 - Grouped thread: All players get flavor switches for the same outcome/question when the story demands their cooperation
   Example: All players must deal with an incoming invasion, but each can choose their approach
-- Opt-in grouping: Players get topic switches that include both individual and group options
-  Example: Each player chooses between some variation of "Help the band prepare for the concert" or "Handle personal business"
-- Parallel threads with intersection points: Players get separate switches but their choices might affect each other
-  Example: Player A's choice to warn the authorities could impact Player B's heist planning
-- Fully independent threads: Players get unrelated switches when their stories have naturally diverged
+- Opt-in grouping: Players can choose to join a grouped thread with a topic switch.
+  Example: Each player chooses between some variation of "Help the band prepare for the concert" or "Handle personal business". The ones who choose "help the band" end up in the same thread.
+- Independent threads: Players get unrelated switches when their stories have naturally diverged
   Example: Player A explores the mountains while Player B investigates city politics
 
 You can also combine these patterns.
 
 Examples:
-- player1 and player2 are in independent threads (with a flavor switch) to deal with urgent matters. player3 can decide which player's thread they want to join with a topic switch (opt-in grouping).
-- player1 and player2 are in a grouped thread trying to woo the same NPC. They get flavor switches to decide their approach.
-- player1 and player2 can both choose how to proceed with a topic switch. Their switches should have one option in common ("Join the expedition"). If they both choose this option, they will be in the same thread.
+- Independent threads + opt-in grouping: player1 and player2 are in independent threads (with a flavor switch) to deal with urgent matters. player3 can decide which player's thread they want to join with a topic switch.
+- Grouped thread to compete over a shared outcome: player1 and player2 are in a grouped thread trying to woo the same NPC. They get flavor switches to decide their approach.
+- In-grouping via an overlap of options: player1 and player2 can both choose how to proceed with a topic switch. Their switches should have one option in common ("Join the expedition"). If they both choose this option, they will be in the same thread.
 
 Follow steps 1a-c for each player, then apply step 2 to determine how their switches should relate to each other.
 
@@ -138,10 +136,11 @@ Switch 2:
 - Players: player3
 
 IMPORTANT:
-This whole exercise is ONLY about designing a sensible flow of the story.
-Given what has happened so far and the questions that the story wants to answer (for its ending), what should be the next thread (or set of threads)?
-How much agency can we give the player over which outcome/question will be explored next?
-Don't make ANY assessment as to what the player should do to achieve their goals. That's for the player to decide.
+This whole exercise is ONLY about designing a sensible flow of the story. The output is NOT about what the player should do.
+The relevant questions are:
+- Given what has happened so far and the questions that the story wants to answer (for its ending), what should be the next thread (or set of threads)?
+- How much agency can we give the player over which outcome/question will be explored next?
+Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
 `;
   }
 }

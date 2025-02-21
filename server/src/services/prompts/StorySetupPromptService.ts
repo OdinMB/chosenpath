@@ -62,7 +62,7 @@ export class StorySetupPromptService {
 --- Add three facts about each story element.
 --- Don't include the player characters (main protagonists) in this list.
 --- If a stat refers to something (a character, organization, faction, location, etc.), chances are that it should be a story element.
-- In multiplayer games, 0-3 shared outcomes with 4 milestones each towards the outcome's resolution
+- In multiplayer games, 0-3 shared outcomes with slots for 3 milestones each towards the outcome's resolution
 --- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
 --- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
@@ -71,9 +71,15 @@ export class StorySetupPromptService {
 - Any invisible shared stats that you think are important
 - Stats for scoring, pacing, and story flags if you think they are needed (if any)
 For each player
-- (3 - number of shared outcomes) individual outcomes with 4 milestones each towards the outcome's resolution
+- (3 - number of shared outcomes) individual outcomes with slots for 3 milestones each towards the outcome's resolution
 - 3-4 visible stats that are linked directly to that player (traits, skills, dispositions, health, personal relationships, personal resources, etc.)
 - Any invisible stats that are linked to that player that you think are important
+
+Outcomes
+- In a story with 20 beats, every player should have 3 outcomes as the sum of individual and shared outcomes.
+- If an outcome is shared, it should not be repeated as an individual outcome.
+--- Example: If the shared (competitive) outcome is "Who will reign over the forst?", there should not be any individual outcome like "Will [player] become the new spirit leader?"
+--- Example: If the shared (cooperative) outcome is "Who the group reach the lost city?", there should not be any individual outcome like "Will [player] find the lost city?"
 
 Story elements
 - For NPCs, include their preferred pronouns and motivations.
@@ -95,8 +101,6 @@ Stat guidelines
 --- Exception: percentages/opposites for aspects that must be managed often and granularly (health, fuel)
 - Use the distribution of stats to shape the focus of the story.
 --- Example: In a space opera, having three percentage stats for relationships with crew members means that the story will focus heavily on these relationships. If you add a stat 'Crew Morale' (string[]), the focus of the story will be elsewhere.
-- Use a variety of stat types.
---- For example, a few percentage/opposites for stats that have to be managed often and granularly, a string[] for a list of items or a list of unmutable skills, and a few string for qualitative aspects that are not supposed to change often and don't have to be managed granularly.
 - If players are of the same type (e.g. all are time-traveling spies), use the same character stats for all players.
 --- Exception: Stats for relationships or individual side quests can be different for each player.
 --- Values for stats should of course be different for each player. This can include lists of items or skills.
@@ -109,8 +113,8 @@ Stat guidelines
 - Stat names must be specific and mustn't include any placeholders.
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
+--- Don't directly track progress towards individual or shared outcomes. Outcomes are tracked separately. If an outcome is "Does [player] find the murderer of [NPC]?", don't add a stat like "Investigation progress".
 --- Don't track the number of remaining turns or story beats (tracked separately)
---- Don't track progress towards outcomes (this will instead be tracked in the form of milestones using a different mechanic)
 --- Don't track ordinary player decisions (tracked separately))
 - In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)
 - You can use the stat's grouping to shorten the stat name. For example, if a stat belongs to the group 'Relationships', 'Relationship with Mr. Kline' is unnecessarily long. 'Mr. Kline' is enough.

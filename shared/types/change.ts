@@ -18,10 +18,12 @@ export const statChangeSchema = z.object({
       "addElement",
       "removeElement",
     ])
-    .describe("Type of modification to apply"),
+    .describe("Type of change to apply to a stat"),
   value: z
     .union([z.number(), z.string(), z.boolean()])
-    .describe("Value to apply in the modification"),
+    .describe(
+      "Value to apply in the change. For setString and addElement, remember that the text is displayed to the players."
+    ),
 });
 
 export const newFactSchema = z

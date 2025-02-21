@@ -16,6 +16,10 @@ export function getCurrentTurn(state: StoryState): number {
   return firstPlayer.beatHistory.length;
 }
 
+export function isFirstBeat(state: StoryState): boolean {
+  return getCurrentTurn(state) === 0;
+}
+
 /**
  * Check if the story has reached its maximum turns
  */

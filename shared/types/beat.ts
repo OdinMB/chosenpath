@@ -8,12 +8,17 @@ import {
   addIntroductionOfStoryElementSchema,
 } from "./change.js";
 
+export const beatTypeSchema = z.enum(["intro", "switch", "thread", "ending"]);
+
 export const beatPlanSchema = z.object({
   developmentsToNarrate: z
     .string()
     .describe(
       "Bullet list with changes to the story state and the decisions of other players (if relevant) and how we should narrate them to this player. Ignore this if this is the first beat (no changes yet)."
     ),
+  beatTypeConsiderations: z
+    .string()
+    .describe("Considerations based on the type of beat that we should create"),
   otherBeats: z
     .string()
     .describe(
@@ -42,14 +47,8 @@ export const beatPlanSchema = z.object({
   optionIdeas: z
     .string()
     .describe(
-      "Bullet list with 4 ideas for options and how they align with the types of decisions that this story is supposed to focus on."
+      "Things to keep in mind as you create the options for this beat."
     ),
-});
-
-export const beatPlanIntroductionSchema = beatPlanSchema.omit({
-  developmentsToNarrate: true,
-  worldBuilding: true,
-  newGameElements: true,
 });
 
 export const beatGenerationSchema = z.object({
@@ -57,7 +56,7 @@ export const beatGenerationSchema = z.object({
   title: z
     .string()
     .describe(
-      "Title for the story beat that will be shown to the player as the headline. Format: '[thread title] ([current beat number within the thread])'."
+      "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'."
     ),
   text: z
     .string()
@@ -65,8 +64,10 @@ export const beatGenerationSchema = z.object({
       "Main narrative text for this player.\n" +
         "- Write 4-5 paragraphs.\n" +
         "- Use present tense.\n" +
-        "- Address the player character directly ('You' instead of the name of the character). Exception: several players are in the same scene.\n" +
-        "- Use markdown for formatting. Write two empty spaces followed by two newlines to mark the end of a paragraph."
+        "- Address the player character directly ('You' instead of the name of the character).\n" +
+        "- NEVER introduce, talk about, or even hint at the player's options in the beat text.\n" +
+        "- AVOID all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
+        "- You can use markdown for formatting."
     ),
   summary: z
     .string()
@@ -108,6 +109,8 @@ export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
     .strict()
     .describe("Set of beat generations for all players");
 };
+
+export type BeatType = z.infer<typeof beatTypeSchema>;
 
 export type SetOfBeatGenerationSchema = {
   decisionConsequences: Change[];

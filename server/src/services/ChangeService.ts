@@ -203,15 +203,28 @@ export class ChangeService {
       case "subtractNumber":
         if (stat.type === "number" || stat.type === "percentage") {
           const delta = change.change === "addNumber" ? 1 : -1;
-          const newValue =
+          let newValue =
             (stat.value as number) + delta * (change.value as number);
+
+          // Clamp percentage values between 0 and 100
+          if (stat.type === "percentage") {
+            newValue = Math.max(0, Math.min(100, newValue));
+          }
+
           return { ...stat, value: newValue };
         }
         break;
       case "setNumber":
         if (stat.type === "number" || stat.type === "percentage") {
           console.log(`Setting number stat ${stat.id} to ${change.value}`);
-          return { ...stat, value: change.value as number };
+          let newValue = change.value as number;
+
+          // Clamp percentage values between 0 and 100
+          if (stat.type === "percentage") {
+            newValue = Math.max(0, Math.min(100, newValue));
+          }
+
+          return { ...stat, value: newValue };
         }
         break;
       case "addElement":

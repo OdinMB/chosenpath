@@ -1,10 +1,16 @@
 import { z } from "zod";
+import { PLAYER_SLOTS } from "./players.js";
 
-export const potentialMilestoneSchema = z.object({
+export const threadOutcomeSchema = z.object({
   outcomeId: z
     .string()
     .describe(
-      "Id of the outcome that this potential milestone would be added to. Can be an outcome associated with a player or a shared outcome."
+      "ID of the outcome that this potential milestone would be added to. Can be an outcome associated with a player or a shared outcome."
+    ),
+  question: z
+    .string()
+    .describe(
+      "Question that the thread poses to the player. This question is the focus of the thread."
     ),
   possibleMilestones: z
     .array(z.string())
@@ -14,40 +20,41 @@ export const potentialMilestoneSchema = z.object({
 });
 
 export const threadSchema = z.object({
-  notes: z
-    .string()
-    .describe("Notes on pacing and narrative guidelines for the thread."),
   outcomes: z
-    .array(potentialMilestoneSchema)
+    .array(threadOutcomeSchema)
     .describe(
-      "List of outcomes that will get a new milestones at the end of this thread. Can be left empty if this is an 'agency' thread."
+      "List of outcomes that will get a new milestones at the end of this thread."
     ),
-  playerIds: z
-    .array(z.string())
-    .describe("Ids of the players that are part of this thread."),
-  duration: z
-    .number()
+  players: z
+    .array(z.enum(PLAYER_SLOTS as [string, ...string[]]))
+    .describe("IDs of players who are involved in this thread"),
+  title: z
+    .string()
     .describe(
-      "Expected number of beats in this thread. Use 1 if you want to give the player(s) agency over the next thread (e.g. quick prioritization), or 2-4 if you want to create a set of threads to push outcomes closer to resolution."
+      "Thread title. Will be used as the title for the beats in this thread. Think book chapter or TV series episode."
     ),
   id: z
     .string()
     .describe(
       "Unique identifier for the thread. Use a short phrase with underscores, like 'search_for_timmy'."
     ),
-  title: z.string().describe("Thread title"),
-});
-
-export const createSetOfThreadsSchema = z.object({
   plan: z
     .string()
     .describe(
-      "Detailed plan for creating the next thread (or set of threads). Must include:\n" +
-        "a) How could we make progress towards unresolved story outcomes? (with a detailed overview of the unresolved outcomes and the questions that could be answered in this thread)\n" +
-        "b) What are the most important questions we should focus on?\n" +
-        "c) Decision on which type of threads to create (e.g. 'agency' or 'push outcomes closer to resolution') with justification\n" +
-        "d) The right duration for this thread (or set of threads)\n" +
-        "e) A high-level structure for this thread (or set of threads) with players, outcomes, and questions"
+      "A flexible plan that outlines a logical flow of beats that creates tension over the course of the thread and how to coordinate several players in the same thread (if relevant)."
+    ),
+  relationshipToOtherThreads: z
+    .string()
+    .describe(
+      "How this thread relates to other threads (especially if what happens in this thread can be influenced by what happens in other threads or vice versa)"
+    ),
+});
+
+export const threadAnalysisSchema = z.object({
+  duration: z
+    .number()
+    .describe(
+      "Number of beats for this thread (or set of threads). Must be between 2-4. Will be the same for all threads."
     ),
   threads: z
     .array(threadSchema)
@@ -56,9 +63,5 @@ export const createSetOfThreadsSchema = z.object({
     ),
 });
 
-export type SetOfThreadsGenerationSchema = {
-  plan: string;
-  threads: Thread[];
-};
-
 export type Thread = z.infer<typeof threadSchema>;
+export type ThreadAnalysis = z.infer<typeof threadAnalysisSchema>;

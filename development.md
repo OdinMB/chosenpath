@@ -1,10 +1,15 @@
 # Feature backlog
 
+Finish switch/thread system
+
+- Update the thread's plan with each beat
+- When generating switches, the beat must resolve the previous thread and assign milestones
+- Add mechanism to generate an ending (and stop the game from continuing)
+
 Improve generations
 
-- Switches and Threads as narrative structures
-  - AI doesn't understand switches and coordination patterns yet
-- Special prompt for the first beat
+- Attach facts to players?
+- adjust scope of story setup based on the number of beats
 - Multi-step flow for generating a stat schema?
 
 Easy nice-to-haves

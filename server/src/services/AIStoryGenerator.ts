@@ -16,6 +16,10 @@ import {
   createSwitchAnalysisSchema,
   type SwitchAnalysis,
 } from "../../../shared/types/switch.js";
+import {
+  type ThreadAnalysis,
+  threadAnalysisSchema,
+} from "../../../shared/types/thread.js";
 import type { PlayerCount } from "../../../shared/types/players.js";
 import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "../../../shared/types/beat.js";
@@ -23,8 +27,9 @@ import type { BeatsNeedingImages } from "../../../shared/types/image.js";
 import { type GameMode } from "../../../shared/types/story.js";
 import type { StoryElement } from "../../../shared/types/storyElement.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
-import { NextSwitchPromptService } from "./prompts/NextSwitchPromptService.js";
-import { NextBeatPromptService } from "./prompts/NextBeatPromptService.js";
+import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
+import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
+import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { PLAYER_SLOTS } from "../../../shared/types/players.js";
 dotenv.config();
 
@@ -75,7 +80,11 @@ export class AIStoryGenerator {
       sharedStats: setup.sharedStats,
       players,
       maxTurns,
-      currentThreads: [],
+      currentBeatType: "intro",
+      currentSwitchAnalysis: null,
+      currentThreadAnalysis: null,
+      currentThreadMaxBeats: 0,
+      currentThreadBeatsCompleted: 0,
       generateImages,
       images: [],
       playerCodes: {},
@@ -133,22 +142,35 @@ export class AIStoryGenerator {
     }
   }
 
-  async generateNextSetOfSwitches(state: StoryState): Promise<Beat[]> {
+  async generateSwitches(state: StoryState): Promise<StoryState> {
     const schema = createSwitchAnalysisSchema(
       Object.keys(state.players).length as PlayerCount
     );
     const structuredModel = this.model.withStructuredOutput(schema);
-    const prompt = NextSwitchPromptService.createSwitchAnalysisPrompt(state);
+    const prompt = SwitchPromptService.createSwitchAnalysisPrompt(state);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
-
     console.log("Response:\n", JSON.stringify(response, null, 2));
 
-    return [];
-    // return response.threads as Beat[];
+    return { ...state, currentSwitchAnalysis: response };
   }
 
-  async addNextSetOfBeats(
+  async generateThreads(state: StoryState): Promise<StoryState> {
+    const schema = threadAnalysisSchema;
+    const structuredModel = this.model.withStructuredOutput(schema);
+    const prompt = ThreadPromptService.createThreadPrompt(state);
+
+    const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
+    console.log("Response:\n", JSON.stringify(response, null, 2));
+
+    return {
+      ...state,
+      currentThreadAnalysis: response,
+      currentThreadMaxBeats: response.duration,
+    };
+  }
+
+  async generateBeats(
     state: StoryState
   ): Promise<[StoryState, Change[], BeatsNeedingImages]> {
     try {
@@ -180,7 +202,7 @@ export class AIStoryGenerator {
     );
 
     const response = (await structuredModel.invoke(
-      NextBeatPromptService.createBeatPrompt(state)
+      BeatPromptService.createBeatPrompt(state)
     )) as SetOfBeatGenerationSchema;
 
     console.log("Response:\n", JSON.stringify(response, null, 2));

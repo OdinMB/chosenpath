@@ -5,7 +5,7 @@ export const outcomeSchema = z
     id: z
       .string()
       .describe(
-        "Use a short phrase with underscores, like 'shared_murderer_found' or 'player2_relationship_with_catya'."
+        "Use a short phrase with underscores, starting with either a player id or 'shared'. For example: 'shared_murderer_found' or 'player2_relationship_with_catya'."
       ),
     question: z.string().describe("Question that defines the outcome"),
     possibleResolutions: z
