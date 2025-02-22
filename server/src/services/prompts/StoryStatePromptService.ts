@@ -1,4 +1,5 @@
 import { type StoryState, GameModes } from "../../../../shared/types/story.js";
+import { ThreadAnalysis } from "../../../../shared/types/thread.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -12,6 +13,7 @@ export interface SectionConfig {
   storyProgress?: boolean;
   switchConfiguration?: boolean;
   threadConfiguration?: boolean;
+  previousThreadConfiguration?: boolean;
 }
 
 export const DEFAULT_SECTION_CONFIG: SectionConfig = {
@@ -26,6 +28,7 @@ export const DEFAULT_SECTION_CONFIG: SectionConfig = {
   storyProgress: true,
   switchConfiguration: true,
   threadConfiguration: true,
+  previousThreadConfiguration: false,
 } as const;
 
 export class StoryStatePromptService {
@@ -45,7 +48,21 @@ export class StoryStatePromptService {
       sections.players ? this.createPlayersSection(state) : "",
       sections.storyProgress ? this.createStoryProgressSection(state) : "",
       sections.switchConfiguration ? this.getSwitchConfiguration(state) : "",
-      sections.threadConfiguration ? this.getThreadConfiguration(state) : "",
+      sections.threadConfiguration
+        ? this.createThreadConfigurationSection(
+            state.currentThreadAnalysis,
+            "current"
+          ) +
+          `\n\nCURRENT THREAD PROGRESSION: Turn ${
+            state.currentThreadBeatsCompleted + 1
+          }/${state.currentThreadMaxBeats}\n`
+        : "",
+      sections.previousThreadConfiguration
+        ? this.createThreadConfigurationSection(
+            state.previousThreadAnalysis,
+            "previous"
+          )
+        : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -288,12 +305,15 @@ ${modeDescriptions[state.gameMode]}
     );
   }
 
-  public static getThreadConfiguration(state: StoryState): string {
-    if (!state.currentThreadAnalysis) {
+  private static createThreadConfigurationSection(
+    threadAnalysis: ThreadAnalysis | null,
+    type: "current" | "previous"
+  ): string {
+    if (!threadAnalysis) {
       return "";
     }
 
-    const { threads } = state.currentThreadAnalysis;
+    const { threads } = threadAnalysis;
 
     const threadConfigs = threads
       .map((thread) => {
@@ -311,10 +331,8 @@ ${modeDescriptions[state.gameMode]}
         return [
           `Thread: ${thread.title} (${thread.id})`,
           `Players: ${thread.players.join(", ")}`,
-          `Progress: this is beat ${
-            state.currentThreadBeatsCompleted + 1
-          } out of ${state.currentThreadMaxBeats}`,
-          `Plan: ${thread.plan}`,
+          `Beat progression plan: ${thread.beatProgression}`,
+          `Multiplayer notes: ${thread.multiplayerNotes}`,
           `Relationship to other threads: ${thread.relationshipToOtherThreads}`,
           "\nOutcomes that will get a milestone after this thread:",
           outcomesSection,
@@ -322,6 +340,6 @@ ${modeDescriptions[state.gameMode]}
       })
       .join("\n\n" + "-".repeat(40) + "\n\n");
 
-    return "\nCURRENT THREAD CONFIGURATION:\n\n" + threadConfigs;
+    return `\n${type.toUpperCase()} THREAD CONFIGURATION:\n\n${threadConfigs}`;
   }
 }

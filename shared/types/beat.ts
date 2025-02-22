@@ -6,6 +6,7 @@ import {
   statChangeSchema,
   newStoryElementSchema,
   addIntroductionOfStoryElementSchema,
+  newMilestoneSchema,
 } from "./change.js";
 
 export const beatTypeSchema = z.enum(["intro", "switch", "thread", "ending"]);
@@ -18,7 +19,9 @@ export const beatPlanSchema = z.object({
     ),
   beatTypeConsiderations: z
     .string()
-    .describe("Considerations based on the type of beat that we should create"),
+    .describe(
+      "Considerations based on the current switch/thread that this beat is implementing. For threads: mention the step in the thread progression that this beat is supposed to implement."
+    ),
   otherBeats: z
     .string()
     .describe(
@@ -44,10 +47,12 @@ export const beatPlanSchema = z.object({
     .describe(
       "List of facts about existing story elements that this beat is going to establish. Include every new detail about NPCs, locations, important item, rumor, mystery, etc. If you want to add a fact to a story element that isn't registered yet, chances are that you should create it. Use 'world' as the story element if you want to add a fact that doesn't belong to any specific story element."
     ),
-  optionIdeas: z
+  optionConsiderations: z
     .string()
     .describe(
-      "Things to keep in mind as you create the options for this beat."
+      "Answer the following questions: How to reinforce the story's key conflicts and focused types of decisions?\n" +
+        "Which stats (both individual and shared) should affect the design of the options?\n" +
+        "What are the requirements from the current switch/thread configuration?"
     ),
 });
 
@@ -82,12 +87,14 @@ export const beatGenerationSchema = z.object({
   options: z
     .array(z.string().describe("Text shown to player for this choice"))
     .describe(
-      "3 choices for the player from the list of options generated in the plan. (If you want a sharp focus for this beat, you can choose only 2 options.)"
+      "3 choices for the player from the list of options generated in the plan. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences."
     ),
 });
 
-export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
-  // Create a record of required beat generation schemas based on player count
+export const createSetOfBeatGenerationSchema = (
+  playerCount: PlayerCount,
+  canAddMilestones: boolean = false
+) => {
   const beatSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
       `player${i + 1}`,
@@ -95,25 +102,38 @@ export const createSetOfBeatGenerationSchema = (playerCount: PlayerCount) => {
     ])
   ) as Record<`player${number}`, typeof beatGenerationSchema>;
 
-  return z
-    .object({
-      decisionConsequences: z
-        .array(statChangeSchema)
-        .describe(
-          "List of stat changes based on players' decisions in the last beat that will be applied to the story state.\n" +
-            "Use only changes of type statChange.\n" +
-            "If this is the first set of beats, just return an empty list."
-        ),
-      ...beatSchemas,
-    })
-    .strict()
-    .describe("Set of beat generations for all players");
+  const baseSchema = {
+    statsAffectingDecisionConsequences: z
+      .array(z.string())
+      .describe(
+        "List of both individual and shared stats that seem relevant for deciding the consequences of player actions in the previous beat. Includes: stats affecting the chance of success, the scope of what is happening, and how the consequences play out."
+      ),
+    statChanges: z
+      .array(statChangeSchema)
+      .describe(
+        "List of stat changes based on players' decisions in the last beat that will be applied to the story state. If this is the first set of beats, just return an empty list."
+      ),
+    ...beatSchemas,
+  };
+
+  return z.object({
+    ...baseSchema,
+    newMilestones: canAddMilestones
+      ? z
+          .array(newMilestoneSchema)
+          .describe(
+            "List of milestones to be added based on the resolution of threads. Create one item for each outcome of each thread that has been concluded."
+          )
+      : z.literal(""),
+  });
 };
 
 export type BeatType = z.infer<typeof beatTypeSchema>;
 
 export type SetOfBeatGenerationSchema = {
-  decisionConsequences: Change[];
+  statsAffectingDecisionConsequences: string[];
+  statChanges: Change[];
+  newMilestones: Change[] | "";
 } & Record<`player${number}`, BeatGeneration>;
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {

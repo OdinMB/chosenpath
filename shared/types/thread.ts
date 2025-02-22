@@ -38,19 +38,29 @@ export const threadSchema = z.object({
     .describe(
       "Unique identifier for the thread. Use a short phrase with underscores, like 'search_for_timmy'."
     ),
-  plan: z
+  beatProgression: z
     .string()
     .describe(
-      "A flexible plan that outlines a logical flow of beats that creates tension over the course of the thread and how to coordinate several players in the same thread (if relevant)."
+      "A simple progression of beats that creates tension over the course of the thread."
+    ),
+  multiplayerNotes: z
+    .string()
+    .describe(
+      "Notes on how to coordinate several players in the same thread (if there are indeed several players)"
     ),
   relationshipToOtherThreads: z
     .string()
     .describe(
-      "How this thread relates to other threads (especially if what happens in this thread can be influenced by what happens in other threads or vice versa)"
+      "How this thread relates to other threads (especially if what happens in this thread can be influenced by what happens in other threads or vice versa). If this is a single-player game, just leave this blank."
     ),
 });
 
 export const threadAnalysisSchema = z.object({
+  coordinationPatternSummary: z
+    .string()
+    .describe(
+      "Write a summary of how you want to set up the threads based on the switch configuration and player choices. Especially which players should join the same thread. For single-player games, just leave this blank."
+    ),
   duration: z
     .number()
     .describe(

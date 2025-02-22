@@ -170,7 +170,7 @@ export class GameHandler {
     console.log("[GameHandler] Current beat type:", currentBeatType);
 
     if (currentBeatType === "intro" || currentBeatType === "switch") {
-      // Switch = kill previous switch/thread configurations
+      // Switch = store current thread analysis in previousThreadAnalysis and reset current switch/thread configurations
       console.log("[GameHandler] Resetting beat context");
       updatedState = this.resetBeatContext(updatedState);
       console.log("[GameHandler] Generating switches");
@@ -236,6 +236,7 @@ export class GameHandler {
       currentThreadAnalysis: null,
       currentThreadMaxBeats: 0,
       currentThreadBeatsCompleted: 0,
+      previousThreadAnalysis: state.currentThreadAnalysis,
     };
   }
 

@@ -135,6 +135,7 @@ export type StoryState = {
   currentThreadAnalysis: ThreadAnalysis | null;
   currentThreadMaxBeats: number;
   currentThreadBeatsCompleted: number;
+  previousThreadAnalysis: ThreadAnalysis | null; // to avoid confusion when a new switch has already been generated but not yet the associated threads
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;

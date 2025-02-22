@@ -31,6 +31,7 @@ import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { PLAYER_SLOTS } from "../../../shared/types/players.js";
+import { isFirstBeat } from "@shared/utils/storyUtils.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -85,6 +86,7 @@ export class AIStoryGenerator {
       currentThreadAnalysis: null,
       currentThreadMaxBeats: 0,
       currentThreadBeatsCompleted: 0,
+      previousThreadAnalysis: null,
       generateImages,
       images: [],
       playerCodes: {},
@@ -192,7 +194,9 @@ export class AIStoryGenerator {
     state: StoryState
   ): Promise<SetOfBeatGenerationSchema> {
     const schema = createSetOfBeatGenerationSchema(
-      Object.keys(state.players).length as PlayerCount
+      Object.keys(state.players).length as PlayerCount,
+      // canAddMilestones = true only if it's a switch and not the beginning of the story
+      state.currentBeatType === "switch" && !isFirstBeat(state)
     );
     const structuredModel = this.model.withStructuredOutput(schema);
 
@@ -275,7 +279,8 @@ export class AIStoryGenerator {
     );
 
     return [
-      ...(response.decisionConsequences || []),
+      ...(response.statChanges || []),
+      ...(response.newMilestones || []),
       ...allEstablishedFacts,
       ...allNewGameElements,
       ...allNewIntroductions,

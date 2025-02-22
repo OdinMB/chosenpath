@@ -81,36 +81,51 @@ export class ChangeService {
     change: Extract<Change, { type: "newMilestone" }>
   ): StoryState {
     console.log(
-      `Adding milestone to outcome ${change.outcome} for player ${change.player}: ${change.newMilestone}`
+      `Adding milestone to outcome ${change.outcome} (${change.outcomeGroup}): ${change.newMilestone}`
     );
 
-    const updatedPlayers = { ...state.players };
-    const player = updatedPlayers[change.player];
+    if (change.outcomeGroup === "shared") {
+      const updatedOutcomes = state.sharedOutcomes.map((outcome) => {
+        if (outcome.id !== change.outcome) return outcome;
+
+        return {
+          ...outcome,
+          milestones: [...(outcome.milestones || []), change.newMilestone],
+        };
+      });
+
+      return {
+        ...state,
+        sharedOutcomes: updatedOutcomes,
+      };
+    }
+
+    const player = state.players[change.outcomeGroup];
 
     if (!player) {
-      console.log(`Player ${change.player} not found`);
+      console.log(`Player ${change.outcomeGroup} not found`);
       return state;
     }
 
     const updatedOutcomes = player.outcomes.map((outcome) => {
       if (outcome.id !== change.outcome) return outcome;
 
-      const newMilestones = [
-        ...(outcome.milestones || []),
-        change.newMilestone,
-      ];
       return {
         ...outcome,
-        milestones: newMilestones,
+        milestones: [...(outcome.milestones || []), change.newMilestone],
       };
     });
 
-    updatedPlayers[change.player] = {
-      ...player,
-      outcomes: updatedOutcomes,
+    return {
+      ...state,
+      players: {
+        ...state.players,
+        [change.outcomeGroup]: {
+          ...player,
+          outcomes: updatedOutcomes,
+        },
+      },
     };
-
-    return { ...state, players: updatedPlayers };
   }
 
   private applyStatChange(

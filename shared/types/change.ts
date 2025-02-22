@@ -22,7 +22,7 @@ export const statChangeSchema = z.object({
   value: z
     .union([z.number(), z.string(), z.boolean()])
     .describe(
-      "Value to apply in the change. For setString and addElement, remember that the text is displayed to the players."
+      "Value to apply in the change. For setString and addElement, use values that can be displayed to players. ('Rumor of acient artifact' instead of 'ancient_artifact_hint')"
     ),
 });
 
@@ -42,19 +42,19 @@ export const newFactSchema = z
 
 export const newMilestoneSchema = z.object({
   type: z.literal("newMilestone"),
-  player: z
-    .enum(PLAYER_SLOTS as [string, ...string[]])
+  outcomeGroup: z
+    .enum(["shared", ...PLAYER_SLOTS] as [string, ...string[]])
     .describe(
-      "Player slot this milestone belongs to (player1, player2, etc.) Only players have outcomes."
+      "Group of outcomes that the outcome for this milestone belongs to. Player slot (player1, player2, etc.) for individual outcomes or 'shared' for shared outcomes."
     ),
   outcome: z
     .string()
     .describe("ID of the outcome that this new milestone will be added to."),
-  newMilestone: z.string().describe(
-    `One sentence summarizing the event/decision/realization that marks significant progress toward the outcome's resolution.
-      Simple beat summarizes and player choices are already tracked elsewhere. Only add a milestone if it describes a big step toward the outcome's resolution, or a clear signal which resolution the story is moving toward.
-      Consider how many milestones are left to bring the outcome to a resolution. The remaining 2 milestones must be significant enough to move from the current status to a resolution.`
-  ),
+  newMilestone: z
+    .string()
+    .describe(
+      `One sentence summarizing the event/decision/realization that marks significant progress toward the outcome's resolution. Only use this after a thread has been concluded.`
+    ),
 });
 
 export const newStoryElementSchema = z.object({

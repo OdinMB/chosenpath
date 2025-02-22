@@ -88,6 +88,11 @@ Story elements
 --- Example: "If players enter this location, the scene should involve a chance to die."
 --- Example: "If players enter this location, they should restore some of their health."
 
+No franchise copyright infringement!
+Don't borrow story elements from established franchises.
+Example: a story about a teenage wizard should not have NPCs named "Luna" or "Dumbledore".
+Example: a space opera should not have story elements from the universes of Enterprise and Firefly.
+
 Stat groups
 are used to group stats in the UI. Both character and shared stats can be grouped and will be displayed in the UI together.
 - Group stats in a way that is flavorful and makes sense for the story.
@@ -113,7 +118,9 @@ Stat guidelines
 - Stat names must be specific and mustn't include any placeholders.
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
---- Don't directly track progress towards individual or shared outcomes. Outcomes are tracked separately. If an outcome is "Does [player] find the murderer of [NPC]?", don't add a stat like "Investigation progress".
+--- Don't directly track progress towards individual or shared outcomes. Outcomes are tracked separately.
+----- Progress as percentages. If an outcome is "Does [player] find the murderer of [NPC]?", don't add a stat like "Investigation progress".
+----- Progress as stuff collected. If an outcome is "Does [player] unravel the mystery?", don't add a string[] stat for "Collected clues".
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately))
 - In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)

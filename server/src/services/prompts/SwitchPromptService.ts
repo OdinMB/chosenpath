@@ -16,7 +16,8 @@ export class SwitchPromptService {
     players: true,
     storyProgress: true,
     switchConfiguration: false,
-    threadConfiguration: true,
+    threadConfiguration: false,
+    previousThreadConfiguration: false,
   } as const;
 
   static createSwitchAnalysisPrompt(state: StoryState): string {
@@ -38,7 +39,7 @@ are a narrative structure of 2-4 beats that push one or more story outcomes clos
 For each outcome that this thread is about, the thread poses a question: "Which of these possible milestones will be added to that outcome at the end of the thread?"
 - Example: A thread could be about the outcome "Does [player] become a werewolf?". A thread relating to this outcome could pose the question "Does [player] want to become a member of [NPC]'s pack?" Possible milestones could be: "[Player] decides to convince [NPC] to turn them", "[Player] realizes that they don't want to lose their humanity."
 A thread can have one or more players involved. It can pose questions relating to one or more outcomes.
-Each player is link to a thread. If there are several threads, they happen in parallel.
+Each player is linked to a thread. If there are several threads, they happen in parallel.
 
 Switches
 are a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story.
@@ -136,9 +137,9 @@ Switch 2:
 - Players: player3
 
 IMPORTANT:
-This whole exercise is ONLY about designing a sensible flow of the story. The output is NOT about what the player should do.
+This whole exercise is ONLY about designing a sensible narrative structure. The output is NOT about what the player should do.
 The relevant questions are:
-- Given what has happened so far and the questions that the story wants to answer (for its ending), what should be the next thread (or set of threads)?
+- Given what has happened so far and the questions that the story wants to answer (for its ending), what could be the next thread (or set of threads)?
 - How much agency can we give the player over which outcome/question will be explored next?
 Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
 `;
