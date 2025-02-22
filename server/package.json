@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "cd ../shared && npm install && npm run build",
-    "build": "rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && ls -la dist/",
-    "prestart": "npm run build",
+    "build": "cd ../shared && npm install && npm run build && cd ../server && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && ls -la dist/",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js"
   },
