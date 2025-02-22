@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLAYER_SLOTS, PlayerCount } from "./players.js";
+import { PLAYER_SLOTS, PlayerCount } from "./player.js";
 
 export const switchTypeSchema = z
   .enum(["topic", "flavor"])

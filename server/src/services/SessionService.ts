@@ -1,5 +1,5 @@
 import type { StoryState } from "shared/types/story.js";
-import type { PlayerSlot } from "shared/types/players.js";
+import type { PlayerSlot } from "shared/types/player.js";
 
 interface PlayerContext {
   gameId: string;

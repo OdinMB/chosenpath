@@ -20,7 +20,8 @@ export class BeatPromptService {
       switchConfiguration: state.currentBeatType === "switch",
       threadConfiguration: state.currentBeatType === "thread",
       previousThreadConfiguration:
-        state.currentBeatType === "switch" &&
+        (state.currentBeatType === "switch" ||
+          state.currentBeatType === "ending") &&
         state.previousThreadAnalysis !== null,
     } as const;
   }
@@ -38,9 +39,9 @@ export class BeatPromptService {
   private static createInstructionsSection(state: StoryState): string {
     const gameWorldInstructions = this.createGameWorldInstructions(state);
 
-    return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${
-      state.currentBeatType?.toUpperCase() || "SWITCH"
-    } CONFIGURATION =======
+    return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${state.currentBeatType?.toUpperCase()}${
+      state.currentBeatType !== "ending" ? " CONFIGURATION" : ""
+    } =======
 
 1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS
 
@@ -61,13 +62,8 @@ ${
     : "- STAT CHANGES based on players' decisions in the last beat\n" +
       "--- Changes can affect both the shared stats and the individual stats of each player.\n" +
       "--- For string and string[] types of stats, make sure to set or add values that can be displayed to the player directly (e.g. 'Ring of Protection' instead of 'ring_of_protection').\n" +
-      (state.currentBeatType === "switch"
+      (state.currentBeatType === "switch" || state.currentBeatType === "ending"
         ? "- NEW MILESTONES: The previous thread (or set of threads) has ended. For each outcome associated with these concluded threads, decide which milestone best represents the resolution of the thread. Then add that milestone to the outcome with a newMilestone change.\n"
-        : "") +
-      "\nConsider the current value of both individual and shared stats to decide outcomes.\n" +
-      "- Example for simple success/failure: if a player character tries to be stealthy, but the character traits indicate that the character is more of a brute, the character should fail." +
-      (state.currentBeatType === "switch"
-        ? "\n- Example for milestones: if players fight the final battle, and a shared stat indicates that the opposing army is much larger, well...\n"
         : "")
 }
 
@@ -84,22 +80,21 @@ are a narrative structure of 2-4 beats that push one or more story outcomes clos
 For each outcome that this thread is about, the thread poses a question: "Which of these possible milestones will be added to that outcome at the end of the thread?"
 A thread can have one or more players involved. It can pose questions relating to one or more outcomes.
 Each player is linked to a thread. If there are several threads, they happen in parallel.
-
-Switches
-are a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story.
 ${
-  state.currentBeatType === "switch"
-    ? "There are two types of switches: topic switches and flavor switches.\n" +
-      "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
-      "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
-      "Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.\n" +
-      "- Example: You might determine that the next thread must be about the bounty hunters who are chasing the player. The player might choose between an evasive maneuver, a negotiation, or a direct confrontation.\n"
+  state.currentBeatType !== "ending"
+    ? "\nSwitches\nare a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story." +
+      (state.currentBeatType === "switch"
+        ? "There are two types of switches: topic switches and flavor switches.\n" +
+          "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
+          "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
+          "Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.\n" +
+          "- Example: You might determine that the next thread must be about the bounty hunters who are chasing the player. The player might choose between an evasive maneuver, a negotiation, or a direct confrontation.\n"
+        : "") +
+      "\nStory structure\n" +
+      "A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.\n" +
+      "It is time to create the next switch to this sequence.\n"
     : ""
 }
-Story structure
-A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.
-It is time to create the next switch to this sequence.
-
 How beats work mechanically:
 - Players have separate beat histories. No player can see the beats of other players.
 - Each beat must flow naturally from the previous beat OF THAT PLAYER.
@@ -110,7 +105,8 @@ How beats work mechanically:
 BEAT PLAN
 
 How to narrate consequences${
-      state.currentBeatType == "switch" && !isFirstBeat(state)
+      state.currentBeatType === "ending" ||
+      (state.currentBeatType == "switch" && !isFirstBeat(state))
         ? ", milestones,"
         : ""
     } and stat changes in the story?
@@ -122,13 +118,19 @@ ${
       "- statChanges you just applied (in so far as this beat's player should be aware of them).\n" +
       "- There should always be clear narrative feedback for players' decisions." +
       (state.currentBeatType == "switch"
-        ? "\n- Since a thread was just ended, describe the resolution of the thread in detail: milestones that were added to outcomes, how that affects the player (and other players), etc. This should make up most of the beat text."
+        ? "\n- Since a thread was just ended, describe the resolution of the thread in detail: milestones that were added to outcomes, how that affects the player (and other players), etc."
         : "")
 }
 
 How to implement the ${state.currentBeatType?.toUpperCase()}?
 ${
-  state.currentBeatType === "switch"
+  state.currentBeatType === "ending"
+    ? "From the summary of the previous thread, transition to an overall ending of the story for the player.\n" +
+      "- Touch on each individual and shared outcome that affects the player.\n" +
+      "--- Use the information why the outcome resonates with the player / why the outcome is important to them.\n" +
+      "--- For shared outcomes, touch on how the outcome affects the other players.\n" +
+      "- Include any individual and shared stats that you think are worth mentioning in the ending.\n"
+    : state.currentBeatType === "switch"
     ? "- For topic switches: Present options that let the player choose which outcome/question to focus on next\n" +
       "- If this is a flavor switch: Present options for different approaches to the predetermined outcome/question\n" +
       "- Ensure options align with the coordination pattern between players"
@@ -139,7 +141,7 @@ ${
       state.currentThreadMaxBeats +
       " of the current thread (or set of threads).\n" +
       (state.currentThreadBeatsCompleted + 1 == state.currentThreadMaxBeats
-        ? "- This is the last beat of the thread. Make sure that after this round player decisions, you can resolve each thread.\n"
+        ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
           "--- Example: Example: In a 3-beat thread, if the question is 'Will [player] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
@@ -152,20 +154,24 @@ Create a bullet list of things that happened in other beats that you already cre
 How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
 
-What should we consider as we create the options for this beat?
-- How can we reinforce the story's key conflicts and focused types of decisions?
-- Which stats (both individual and shared) should affect the design of the options?
---- Example: If the player has a high charisma stat, they might be able to convince someone to help them.
---- Example: If the player has an item, ally, companion, or anything else that could be of use, make sure that the options reflect that.
---- Example: If a shared stat shapes the surrounding of the situation, it might affect the options. (Tensions running high, the spaceship being damaged, etc.)
-- What are the requirements from the ${state.currentBeatType} configuration${
-      state.currentBeatType === "thread"
-        ? ", including the tentative plan for the thread progression"
-        : ""
-    }?
 ${
-  state.currentBeatType === "thread"
-    ? "- Make sure that the options push toward the resolution of the thread's question. Don't deviate from the core question that the thread is posing."
+  state.currentBeatType !== "ending"
+    ? "What should we consider as we create the options for this beat?\n" +
+      "- How can we reinforce the story's key conflicts and focused types of decisions?\n" +
+      "- Which stats (both individual and shared) should affect the design of the options?\n" +
+      "--- Example: If the player has a high charisma stat, they might be able to convince someone to help them.\n" +
+      "--- Example: If the player has an item, ally, companion, or anything else that could be of use, make sure that the options reflect that.\n" +
+      "--- Example: If a shared stat shapes the surrounding of the situation, it might affect the options. (Tensions running high, the spaceship being damaged, etc.)\n" +
+      "- What are the requirements from the " +
+      state.currentBeatType +
+      " configuration" +
+      (state.currentBeatType === "thread"
+        ? ", including the tentative plan for the thread progression"
+        : "") +
+      "?" +
+      (state.currentBeatType === "thread"
+        ? "\n- Make sure that the options push toward the resolution of the thread's question. Don't deviate from the core question that the thread is posing."
+        : "")
     : ""
 }
 
@@ -173,7 +179,9 @@ BEAT ATTRIBUTES
 
 Title: ${
       state.currentBeatType === "switch"
-        ? "[title of the switch that this beat implements]"
+        ? "[title of the switch that this beat implements and nothing else]"
+        : state.currentBeatType === "ending"
+        ? "The End"
         : "[title for the thread that this beat is part of] (" +
           (state.currentThreadBeatsCompleted + 1) +
           "/" +
@@ -192,58 +200,66 @@ ${
   !isFirstBeat(state) && state.currentBeatType === "switch"
     ? "- Most of the beat text\n" +
       "--- should be about the outcome of the previous thread that the player was involved in.\n" +
-      "--- Process the milestones that were added to outcomes.Make it feel relevant to the player.\n" +
+      "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
       "--- If several players were in the same thread, process also how the thread's resolution affects the other players."
     : ""
-}
-- If several players are in the same beat, include them in each other's beat text.
---- In multiplayer games, the goal is to have an interesting interplay between the players and their decisions.
---- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.
---- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.
-- Use direct speech
---- Both for the player characters and the NPCs.
---- Give characters a voice. Don't just say "you absorb the cryptic wisdom imparted by X" or "you talk to X".
---- Exception: you want to skip over a routine conversation that doesn't add to the story.
-- Story elements
---- If a player encounters a story element for the first time, introduce it properly.
---- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.
-- The last paragraph
---- Never mention, introduce, or even refer to the player's options and choices.
---- Players will see their options clearly below the beat text. Talking about them in the beat text is redundant.
---- AVOID all of these formulations: "The path before you ...", "Will you do X, or will you do Y?", "You must decide: ...", "You weigh your options carefully", "the complexity of your decision ..."
-
-Options
-- Offer 3 options.
-- Be specific.
---- Bad: "Propose a compromise". Good: Specify what the compromise is.
---- Bad: "Confront [NPC] physically". Good: Specify a concrete action like "punch [NPC] in the face".
-- Only include the action that the player can perform or the decision that they can make. Do NOT include the actual or likely consequences of a decision.
-- Make sure that the beat implements the current ${
-      state.currentBeatType
-    } configuration.
---- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${
-      state.currentBeatType
-    } in any other way.
-
-Remember: one key purpose of this beat (or set of beats) is to implement the ${
-      state.currentBeatType
-    } configuration. Move the story forward in a way that stays true to the ${
-      state.currentBeatType
-    }'s theme and goals.
+}${
+      state.currentBeatType === "ending"
+        ? "- Most of the beat text should be about the ending of the story for the player at hand.\n" +
+          "--- Process the outcome of the previous thread that the player was involved in, then transition to the overall ending of the story.\n"
+        : "- If several players are in the same beat, include them in each other's beat text.\n" +
+          "--- In multiplayer games, the goal is to have an interesting interplay between the players and their decisions.\n" +
+          "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n" +
+          "--- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.\n" +
+          "- Use direct speech\n" +
+          "--- Both for the player characters and the NPCs.\n" +
+          "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X' or 'you talk to X'.\n" +
+          "--- Exception: you want to skip over a routine conversation that doesn't add to the story.\n" +
+          "- Story elements\n" +
+          "--- If a player encounters a story element for the first time, introduce it properly.\n" +
+          "--- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.\n" +
+          "- The last paragraph\n" +
+          "--- Never mention, introduce, or even refer to the player's options and choices.\n" +
+          "--- Players will see their options clearly below the beat text. Talking about them in the beat text is redundant.\n" +
+          "--- AVOID all of these formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'\n" +
+          "\nOptions\n" +
+          "- Offer 3 options.\n" +
+          "- Be specific.\n" +
+          "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
+          "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
+          "- Only include the action that the player can perform or the decision that they can make. Do NOT include the actual or likely consequences of a decision.\n" +
+          "- Make sure that the beat implements the current " +
+          state.currentBeatType +
+          " configuration.\n" +
+          "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
+          state.currentBeatType +
+          " in any other way.\n" +
+          "\nRemember: one key purpose of this beat (or set of beats) is to implement the " +
+          state.currentBeatType +
+          " configuration. Move the story forward in a way that stays true to the " +
+          state.currentBeatType +
+          "'s theme and goals."
+    }
 `;
   }
 
   private static createGameWorldInstructions(state: StoryState): string {
-    let instructions = "";
     if (isFirstBeat(state)) {
-      instructions = this.createFirstBeatInstructions(state);
+      return this.createIntroductionInstructions(state);
+    } else if (state.currentBeatType === "ending") {
+      return this.createEndingInstructions(state);
     } else {
-      instructions = this.createSubsequentBeatInstructions(state);
+      return this.createNormalBeatInstructions(state);
     }
-    return instructions;
   }
 
-  private static createFirstBeatInstructions(state: StoryState): string {
+  private static createEndingInstructions(state: StoryState): string {
+    return `This is the ending of the story. DON'T ADD ANY NEW STORY ELEMENTS. Let's just give the player a proper ending.
+- Tie the ending to the individual and shared outcomes that affect the player.
+- Use references to important story elements and things that happened to the player.`;
+  }
+
+  private static createIntroductionInstructions(state: StoryState): string {
     return `This is the first beat of the story. DON'T ADD ANY NEW STORY ELEMENTS OR NEW FACTS. Let's just give the player a proper introduction to the existing story state.
 - Required: Introduce the player itself.
 - Required: Introduce the other players and their relationship to the player.
@@ -254,7 +270,7 @@ Remember: one key purpose of this beat (or set of beats) is to implement the ${
 Find a good balance between introducing the overall setup of the story, introducing some story elements, and still making this beat a good switch.`;
   }
 
-  private static createSubsequentBeatInstructions(state: StoryState): string {
+  private static createNormalBeatInstructions(state: StoryState): string {
     return `- Check if the player is going to encounter a story element that has not yet been introduced to the player.
 --- If so, introduce the element properly in the beat text and add the element id to the player's list of known story elements.
 - Check if you should add a new story element to the story state.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PlayerCount } from "./players.js";
+import { PlayerCount } from "./player.js";
 import {
   type Change,
   newFactSchema,
@@ -30,7 +30,7 @@ export const beatPlanSchema = z.object({
   worldBuilding: z
     .string()
     .describe(
-      "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Make absolutelyl sure that you don't create duplicate story elements or facts."
+      "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Don't create duplicate story elements or facts."
     ),
   newGameElements: z
     .array(newStoryElementSchema)
@@ -52,7 +52,8 @@ export const beatPlanSchema = z.object({
     .describe(
       "Answer the following questions: How to reinforce the story's key conflicts and focused types of decisions?\n" +
         "Which stats (both individual and shared) should affect the design of the options?\n" +
-        "What are the requirements from the current switch/thread configuration?"
+        "What are the requirements from the current switch/thread configuration?\n" +
+        "The ending doesn't need any options."
     ),
 });
 
@@ -61,7 +62,7 @@ export const beatGenerationSchema = z.object({
   title: z
     .string()
     .describe(
-      "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'."
+      "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'. If it's the ending, simple 'The End'."
     ),
   text: z
     .string()
@@ -87,7 +88,7 @@ export const beatGenerationSchema = z.object({
   options: z
     .array(z.string().describe("Text shown to player for this choice"))
     .describe(
-      "3 choices for the player from the list of options generated in the plan. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences."
+      "3 choices for the player from the list of options generated in the plan. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
     ),
 });
 
@@ -113,19 +114,21 @@ export const createSetOfBeatGenerationSchema = (
       .describe(
         "List of stat changes based on players' decisions in the last beat that will be applied to the story state. If this is the first set of beats, just return an empty list."
       ),
+    ...(canAddMilestones
+      ? {
+          newMilestones: z
+            .array(newMilestoneSchema)
+            .describe(
+              "List of milestones to be added based on the resolution of threads. Create one item for each outcome of each thread that has been concluded."
+            ),
+        }
+      : {
+          newMilestones: z.literal(""),
+        }),
     ...beatSchemas,
   };
 
-  return z.object({
-    ...baseSchema,
-    newMilestones: canAddMilestones
-      ? z
-          .array(newMilestoneSchema)
-          .describe(
-            "List of milestones to be added based on the resolution of threads. Create one item for each outcome of each thread that has been concluded."
-          )
-      : z.literal(""),
-  });
+  return z.object(baseSchema);
 };
 
 export type BeatType = z.infer<typeof beatTypeSchema>;

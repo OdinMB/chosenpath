@@ -264,8 +264,11 @@ ${modeDescriptions[state.gameMode]}
   }
 
   private static createStoryProgressSection(state: StoryState): string {
-    const turn = Object.values(state.players)[0].beatHistory.length + 1;
-    return `\nSTORY PROGRESS: Turn: ${turn}/${state.maxTurns}\n`;
+    const turnsDone = Object.values(state.players)[0].beatHistory.length;
+    const turnsLeft = state.maxTurns - turnsDone;
+    return `\nSTORY PROGRESS\nCurrent turn: ${turnsDone + 1}/${
+      state.maxTurns
+    }\nTurns left (including this one): ${turnsLeft}\n`;
   }
 
   private static createSharedOutcomesSection(state: StoryState): string {
@@ -331,7 +334,7 @@ ${modeDescriptions[state.gameMode]}
           .join("\n\n");
 
         return [
-          `Thread: ${thread.title} (${thread.id})`,
+          `== THREAD: ${thread.title} (${thread.id}) ==`,
           `Players: ${thread.players.join(", ")}`,
           `Beat progression plan: ${thread.beatProgression}`,
           `Multiplayer notes: ${thread.multiplayerNotes}`,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLAYER_SLOTS } from "./players.js";
+import { PLAYER_SLOTS } from "./player.js";
 import { storyElementSchema } from "./storyElement.js";
 
 export const statChangeSchema = z.object({

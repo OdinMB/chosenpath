@@ -2,7 +2,7 @@ import { Server, Socket } from "socket.io";
 import http from "http";
 import { SessionService } from "../services/SessionService.js";
 import { GameHandler } from "../handlers/GameHandler.js";
-import { PlayerCount } from "shared/types/players.js";
+import { PlayerCount } from "shared/types/player.js";
 import { config } from "../config/env.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import { GameMode } from "shared/types/story.js";

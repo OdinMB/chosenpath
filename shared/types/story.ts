@@ -9,7 +9,7 @@ import {
   PlayerCount,
   PlayerSlot,
   PCSchema,
-} from "./players.js";
+} from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { BeatType } from "./beat.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -151,4 +151,5 @@ export type ClientStoryState = {
   images: ImageLibrary;
   numberOfPlayers: number;
   pendingPlayers: PlayerSlot[];
+  gameOver: boolean;
 };

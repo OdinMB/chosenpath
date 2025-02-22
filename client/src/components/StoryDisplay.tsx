@@ -89,7 +89,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const isViewingLatestBeat = displayedBeatIndex === beatHistory.length - 1;
 
   const renderOptions = () => {
-    if (!currentBeat) return null;
+    if (!currentBeat || storyState?.gameOver) return null;
 
     // For previous beats or when a choice is made, only show the selected choice
     if ((!isViewingLatestBeat && currentBeat.choice !== -1) || choiceMade) {

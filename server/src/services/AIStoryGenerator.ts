@@ -20,7 +20,7 @@ import {
   type ThreadAnalysis,
   threadAnalysisSchema,
 } from "shared/types/thread.js";
-import type { PlayerCount } from "shared/types/players.js";
+import type { PlayerCount } from "shared/types/player.js";
 import { getPlayerSlots } from "shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "shared/types/beat.js";
 import type { BeatsNeedingImages } from "shared/types/image.js";
@@ -30,7 +30,7 @@ import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
-import { PLAYER_SLOTS } from "shared/types/players.js";
+import { PLAYER_SLOTS } from "shared/types/player.js";
 import { isFirstBeat } from "shared/utils/storyUtils.js";
 dotenv.config();
 
@@ -195,8 +195,9 @@ export class AIStoryGenerator {
   ): Promise<SetOfBeatGenerationSchema> {
     const schema = createSetOfBeatGenerationSchema(
       Object.keys(state.players).length as PlayerCount,
-      // canAddMilestones = true only if it's a switch and not the beginning of the story
-      state.currentBeatType === "switch" && !isFirstBeat(state)
+      // canAddMilestones = true only if it's the ending or (a switch and not the beginning of the story)
+      state.currentBeatType === "ending" ||
+        (state.currentBeatType === "switch" && !isFirstBeat(state))
     );
     const structuredModel = this.model.withStructuredOutput(schema);
 
@@ -211,6 +212,11 @@ export class AIStoryGenerator {
 
     console.log("Response:\n", JSON.stringify(response, null, 2));
     return response;
+  }
+
+  async generateEnding(state: StoryState): Promise<StoryState> {
+    // TODO: Generate ending
+    return state;
   }
 
   private processBeatsResponse(

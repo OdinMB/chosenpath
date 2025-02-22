@@ -4,6 +4,7 @@ Add mechanism to generate an ending (and stop the game from continuing)
 
 Improve generations
 
+- Save prompt context for switches/threads/beats?
 - Update the thread's plan with each beat?
 - Attach facts to players?
 - adjust scope of story setup based on the number of beats

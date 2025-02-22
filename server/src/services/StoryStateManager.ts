@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { connectionManager } from "./ConnectionManager.js";
 import type { StoryState } from "shared/types/story.js";
-import type { PlayerSlot } from "shared/types/players.js";
+import type { PlayerSlot } from "shared/types/player.js";
 
 export class StoryStateManager {
   private static instance: StoryStateManager;

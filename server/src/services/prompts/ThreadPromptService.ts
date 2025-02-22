@@ -91,12 +91,12 @@ must include the following attributes:
 We are looking for a rough structure, not a rigid script. The thread is supposed to evolve one beat at a time, not follow a predetermined path.
 
 4a) A simple progression of beats that builds dramatic tension over the course of the thread.
-- For each step, focus on the type of decision that the player(s) will make.
+- For each step, formulate a question indicating the type of choice that the player(s) will have to make.
+--- The question must be about player choices only.
 - For each step, say how it affects the thread's outcome.
-- Example (for a 3-beat thread)
---- 1. Greeting: How does [player] establish a first impression? (Good impression will make it easier to learn about interests or weaknesses in the next beat.)
---- 2. Conversation: How does [player] learn about interests or weaknesses? (Learning about weaknesses will make it easier to get the NPC to do what they want in the closing beat.)
---- 3. Closing: How does [player] get the NPC to do what they want? (This should be hard if the player has not learned about the weaknesses.)
+- Example (for a 2-beat negotiation)
+--- 1. Conversation: How does [player] learn about interests or weaknesses of [NPC]? (Learning about weaknesses will make it easier to get the NPC to do what they want in the closing beat.)
+--- 2. Closing: How does [player] get the NPC to do what they want? (This should be hard if the player has not learned about the weaknesses.)
 - Example (for a 3-beat thread)
 --- 1. Setup: How does [player] prepare for the encounter? (Choosing an approach that aligns with the player's strengths should give them an advantage in the encounter.)
 --- 2. Escalation: How does [player] behave during the encounter? (A second chance to establish an advantage or to squander the existing one.)

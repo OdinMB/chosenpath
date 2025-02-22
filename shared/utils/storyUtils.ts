@@ -1,5 +1,5 @@
 import type { StoryState } from "../types/story.js";
-import type { PlayerSlot } from "../types/players.js";
+import type { PlayerSlot } from "../types/player.js";
 import type { ClientStoryState } from "../types/story.ts";
 
 /**
@@ -110,5 +110,6 @@ export const filterStateForPlayer = (
     generateImages,
     images,
     pendingPlayers,
+    gameOver: state.currentBeatType === "ending",
   };
 };

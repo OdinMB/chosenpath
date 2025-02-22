@@ -3,13 +3,14 @@ import type { StoryState } from "shared/types/story.js";
 import { SessionService } from "../services/SessionService.js";
 import { AIImageGenerator } from "../services/AIImageGenerator.js";
 import { isValidPlayerCount } from "shared/utils/playerUtils.js";
-import type { PlayerCount, PlayerSlot } from "shared/types/players.js";
+import type { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { getPlayerSlots } from "shared/utils/playerUtils.js";
 import { StoryStateManager } from "../services/StoryStateManager.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import type { Server } from "socket.io";
 import { filterStateForPlayer } from "shared/utils/storyUtils.js";
 import { areAllChoicesSubmitted } from "shared/utils/storyUtils.js";
+import { getCurrentTurn } from "shared/utils/storyUtils.js";
 import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
 import type { GameMode } from "shared/types/story.js";
@@ -169,15 +170,17 @@ export class GameHandler {
 
     console.log("[GameHandler] Current beat type:", currentBeatType);
 
-    if (currentBeatType === "intro" || currentBeatType === "switch") {
-      // Switch = store current thread analysis in previousThreadAnalysis and reset current switch/thread configurations
+    if (currentBeatType === "ending") {
+      // Setting currentBeatType to "ending" will trigger a different prompt in the BeatGenerator
+      console.log("[GameHandler] Generating ending");
+      updatedState = this.resetBeatContext(updatedState);
+    } else if (currentBeatType === "intro" || currentBeatType === "switch") {
       console.log("[GameHandler] Resetting beat context");
       updatedState = this.resetBeatContext(updatedState);
       console.log("[GameHandler] Generating switches");
       updatedState = await this.aiStoryGenerator.generateSwitches(updatedState);
     } else {
-      // Thread = keep previous switch/thread configurations
-      // Create thread configuration if needed
+      // Thread => Create thread configuration if needed, otherwise just continue the thread
       if (
         state.currentThreadAnalysis === null ||
         state.currentThreadBeatsCompleted === 0
@@ -191,6 +194,7 @@ export class GameHandler {
     updatedState.currentBeatType = currentBeatType;
 
     // Better to not store and wait for the beats to be generated?
+    // If something goes wrong, we could start again with a clean story state from the end of the previous beat.
     this.storyStateManager.storeState(storyId, updatedState);
 
     await this.addBeats(storyId, updatedState);
@@ -217,8 +221,14 @@ export class GameHandler {
       lastBeatType === "thread" &&
       state.currentThreadMaxBeats === state.currentThreadBeatsCompleted
     ) {
-      currentBeatType = "switch";
-      console.log("[GameHandler] Thread completed, next beat will be switch");
+      // Check if we should end the story
+      if (getCurrentTurn(state) >= state.maxTurns) {
+        currentBeatType = "ending";
+        console.log("[GameHandler] Max turns reached, ending story");
+      } else {
+        currentBeatType = "switch";
+        console.log("[GameHandler] Thread completed, next beat will be switch");
+      }
     } else if (lastBeatType === "thread") {
       currentBeatType = "thread";
       console.log("[GameHandler] Continuing thread");
@@ -317,6 +327,12 @@ export class GameHandler {
       const currentBeat = player.beatHistory[player.beatHistory.length - 1];
       if (!currentBeat) {
         throw new Error(`No current beat for player ${playerInfo.playerSlot}`);
+      }
+
+      if (state.currentBeatType === "ending") {
+        throw new Error(
+          `Ending beats don't allow choices. Player: ${playerInfo.playerSlot}, beat #${player.beatHistory.length}`
+        );
       }
 
       // Validate the choice

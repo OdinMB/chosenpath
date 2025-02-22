@@ -1,4 +1,4 @@
-import type { PlayerSlot } from "../../../shared/types/players.js";
+import type { PlayerSlot } from "../../../shared/types/player.js";
 
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];

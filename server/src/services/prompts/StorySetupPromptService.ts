@@ -1,5 +1,5 @@
 import { type GameMode, GameModes } from "shared/types/story.js";
-import type { PlayerCount } from "shared/types/players.js";
+import type { PlayerCount } from "shared/types/player.js";
 
 const GAME_MODE_DESCRIPTIONS: Record<
   Exclude<GameModes, GameModes.SinglePlayer>,
@@ -106,6 +106,8 @@ Stat guidelines
 --- Exception: percentages/opposites for aspects that must be managed often and granularly (health, fuel)
 - Use the distribution of stats to shape the focus of the story.
 --- Example: In a space opera, having three percentage stats for relationships with crew members means that the story will focus heavily on these relationships. If you add a stat 'Crew Morale' (string[]), the focus of the story will be elsewhere.
+- Use a variety of stat types.
+--- Example for a teenage wizard story: string[] for friends, string for love interest, string[] for mastered spells, string for repuatation at school, percentage for academic performance, and number for pocket money.
 - If players are of the same type (e.g. all are time-traveling spies), use the same character stats for all players.
 --- Exception: Stats for relationships or individual side quests can be different for each player.
 --- Values for stats should of course be different for each player. This can include lists of items or skills.
