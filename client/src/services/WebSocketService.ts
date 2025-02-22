@@ -67,7 +67,10 @@ export class WebSocketService {
     this.isConnecting = true;
     this.sessionId = sessionId || null;
 
-    const socketUrl = `${window.location.protocol}//${window.location.hostname}:${config.wsPort}`;
+    const socketUrl =
+      process.env.NODE_ENV === "production"
+        ? config.wsServerUrl
+        : `${window.location.protocol}//${window.location.hostname}:${config.wsPort}`;
     console.log("[WebSocketService] Connecting to:", socketUrl);
 
     this.socket = io(socketUrl, {
