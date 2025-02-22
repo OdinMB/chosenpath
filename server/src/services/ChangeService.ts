@@ -16,21 +16,33 @@ export class ChangeService {
     for (const change of sortedChanges) {
       switch (change.type) {
         case "statChange":
-          updatedState = this.applyStatChange(updatedState, change);
+          updatedState = this.applyStatChange(
+            updatedState,
+            change as Change & { type: "statChange" }
+          );
           break;
         case "newFact":
-          updatedState = this.applyNewFact(updatedState, change);
+          updatedState = this.applyNewFact(
+            updatedState,
+            change as Change & { type: "newFact" }
+          );
           break;
         case "newMilestone":
-          updatedState = this.applyNewMilestone(updatedState, change);
+          updatedState = this.applyNewMilestone(
+            updatedState,
+            change as Change & { type: "newMilestone" }
+          );
           break;
         case "newStoryElement":
-          updatedState = this.applyNewStoryElement(updatedState, change);
+          updatedState = this.applyNewStoryElement(
+            updatedState,
+            change as Change & { type: "newStoryElement" }
+          );
           break;
         case "addIntroductionOfStoryElement":
           updatedState = this.applyAddIntroductionOfStoryElement(
             updatedState,
-            change
+            change as Change & { type: "addIntroductionOfStoryElement" }
           );
           break;
       }
@@ -41,7 +53,7 @@ export class ChangeService {
 
   private applyAddIntroductionOfStoryElement(
     state: StoryState,
-    change: Extract<Change, { type: "addIntroductionOfStoryElement" }>
+    change: Change & { type: "addIntroductionOfStoryElement" }
   ): StoryState {
     console.log(
       `Adding introduction of story element ${change.storyElementId} for player ${change.player}`
@@ -78,7 +90,7 @@ export class ChangeService {
 
   private applyNewMilestone(
     state: StoryState,
-    change: Extract<Change, { type: "newMilestone" }>
+    change: Change & { type: "newMilestone" }
   ): StoryState {
     console.log(
       `Adding milestone to outcome ${change.outcome} (${change.outcomeGroup}): ${change.newMilestone}`
@@ -130,7 +142,7 @@ export class ChangeService {
 
   private applyStatChange(
     state: StoryState,
-    change: Extract<Change, { type: "statChange" }>
+    change: Change & { type: "statChange" }
   ): StoryState {
     if (change.group === "shared") {
       return this.updateStatsArray(
@@ -169,7 +181,7 @@ export class ChangeService {
   private updateStatsArray(
     state: StoryState,
     stats: any[],
-    change: Extract<Change, { type: "statChange" }>,
+    change: Change & { type: "statChange" },
     updateState: (updatedStats: any[]) => StoryState
   ): StoryState {
     const statIndex = stats.findIndex((s) => s.id === change.stat);
@@ -199,10 +211,7 @@ export class ChangeService {
     return updateState(updatedStats);
   }
 
-  private updateStatValue(
-    stat: any,
-    change: Extract<Change, { type: "statChange" }>
-  ) {
+  private updateStatValue(stat: any, change: Change & { type: "statChange" }) {
     switch (change.change) {
       case "setBoolean":
         if (stat.type === "boolean") {
@@ -268,7 +277,7 @@ export class ChangeService {
 
   private applyNewFact(
     state: StoryState,
-    change: Extract<Change, { type: "newFact" }>
+    change: Change & { type: "newFact" }
   ): StoryState {
     console.log(`Adding new fact to ${change.storyElementId}: ${change.fact}`);
 
@@ -297,7 +306,7 @@ export class ChangeService {
 
   private applyNewStoryElement(
     state: StoryState,
-    change: Extract<Change, { type: "newStoryElement" }>
+    change: Change & { type: "newStoryElement" }
   ): StoryState {
     console.log(`Adding new story element: ${JSON.stringify(change.element)}`);
 

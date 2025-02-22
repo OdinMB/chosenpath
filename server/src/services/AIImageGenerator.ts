@@ -69,6 +69,9 @@ export class AIImageGenerator {
           // Add placeholder to image library
           const placeholderImage: Image = {
             ...imageGen,
+            id: imageGen.id || crypto.randomUUID(),
+            prompt: imageGen.prompt || "",
+            description: imageGen.description || "",
             status: "generating",
           };
           updatedState.images.push(placeholderImage);
@@ -81,6 +84,9 @@ export class AIImageGenerator {
             playerSlot,
             image: {
               ...imageGen,
+              id: imageGen.id || crypto.randomUUID(),
+              prompt: imageGen.prompt || "",
+              description: imageGen.description || "",
               url: imageUrl,
               status: "ready" as const,
             },

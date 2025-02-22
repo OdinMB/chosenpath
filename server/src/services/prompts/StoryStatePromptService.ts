@@ -152,7 +152,9 @@ ${modeDescriptions[state.gameMode]}
     ].join("\n");
   }
 
-  private static formatStatValue(stat: { type: string; value: any }): string {
+  private static formatStatValue(stat: { type?: string; value?: any }): string {
+    if (!stat.type || stat.value === undefined) return "";
+
     switch (stat.type) {
       case "percentage":
         return `${stat.value}%`;
