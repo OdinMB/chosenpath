@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../shared && npm install && npm run build && cd ../server && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && ls -la dist/",
+    "build": "cd ../shared && npm install && npm run build && cd ../server && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && tsc-alias",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node --es-module-specifier-resolution=node dist/index.js"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +28,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
+    "tsc-alias": "^1.8.8",
     "tsx": "^4.7.1",
     "typescript": "^5.0.0"
   }
