@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "prebuild": "cd ../shared && npm install && npm run build",
-    "build": "tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/",
+    "build": "rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/",
+    "prestart": "npm run build",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js"
   },
