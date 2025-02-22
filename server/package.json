@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../shared && npm install && npm run build && cd ../server && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && tsc-alias",
+    "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && tsc-alias",
     "dev": "tsx watch src/index.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js"
   },
