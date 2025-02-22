@@ -9,17 +9,17 @@
     "shared"
   ],
   "scripts": {
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm run dev",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "install:all": "npm install && npm run install:shared && npm run install:server && npm run install:client",
-    "install:shared": "cd shared && npm install",
-    "install:server": "cd server && npm install",
-    "install:client": "cd client && npm install",
     "build": "npm run build:shared && npm run build:server && npm run build:client",
     "build:shared": "cd shared && npm run build",
     "build:server": "cd server && npm run build",
-    "build:client": "cd client && npm run build"
+    "build:client": "cd client && npm run build",
+    "dev": "npm run build:shared && concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "install:all": "npm install && npm run install:shared && npm run install:server && npm run install:client",
+    "install:shared": "cd shared && npm install",
+    "install:server": "cd server && npm install",
+    "install:client": "cd client && npm install"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
