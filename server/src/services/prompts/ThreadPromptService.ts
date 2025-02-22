@@ -1,4 +1,4 @@
-import { type StoryState } from "../../../../shared/types/story.js";
+import { type StoryState } from "shared/types/story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,

@@ -1,5 +1,5 @@
-import { type StoryState, GameModes } from "../../../../shared/types/story.js";
-import { ThreadAnalysis } from "../../../../shared/types/thread.js";
+import { type StoryState, GameModes } from "shared/types/story.js";
+import { ThreadAnalysis } from "shared/types/thread.js";
 
 export interface SectionConfig {
   gameMode?: boolean;

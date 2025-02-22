@@ -1,9 +1,9 @@
-import { type StoryState } from "../../../../shared/types/story.js";
+import { type StoryState } from "shared/types/story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
-import { isFirstBeat } from "../../../../shared/utils/storyUtils.js";
+import { isFirstBeat } from "shared/utils/storyUtils.js";
 
 export class BeatPromptService {
   private static getSections(state: StoryState): SectionConfig {

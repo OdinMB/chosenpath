@@ -1,19 +1,19 @@
 import type { Socket } from "socket.io";
-import type { StoryState } from "../../../shared/types/story.js";
+import type { StoryState } from "shared/types/story.js";
 import { SessionService } from "../services/SessionService.js";
 import { AIImageGenerator } from "../services/AIImageGenerator.js";
-import { isValidPlayerCount } from "../../../shared/utils/playerUtils.js";
-import type { PlayerCount, PlayerSlot } from "../../../shared/types/players.js";
-import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
+import { isValidPlayerCount } from "shared/utils/playerUtils.js";
+import type { PlayerCount, PlayerSlot } from "shared/types/players.js";
+import { getPlayerSlots } from "shared/utils/playerUtils.js";
 import { StoryStateManager } from "../services/StoryStateManager.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import type { Server } from "socket.io";
-import { filterStateForPlayer } from "../../../shared/utils/storyUtils.js";
-import { areAllChoicesSubmitted } from "../../../shared/utils/storyUtils.js";
+import { filterStateForPlayer } from "shared/utils/storyUtils.js";
+import { areAllChoicesSubmitted } from "shared/utils/storyUtils.js";
 import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
-import type { GameMode } from "../../../shared/types/story.js";
-import type { BeatType } from "../../../shared/types/beat.js";
+import type { GameMode } from "shared/types/story.js";
+import type { BeatType } from "shared/types/beat.js";
 
 export class GameHandler {
   private sessionService: SessionService;

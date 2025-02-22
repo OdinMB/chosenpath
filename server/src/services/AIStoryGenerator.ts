@@ -3,35 +3,35 @@ import type {
   StoryState,
   StorySetup,
   PlayerStateGeneration,
-} from "../../../shared/types/story.js";
-import type { Change } from "../../../shared/types/change.js";
+} from "shared/types/story.js";
+import type { Change } from "shared/types/change.js";
 import type {
   Beat,
   BeatGeneration,
   SetOfBeatGenerationSchema,
-} from "../../../shared/types/beat.js";
+} from "shared/types/beat.js";
 import dotenv from "dotenv";
-import { createStorySetupSchema } from "../../../shared/types/story.js";
+import { createStorySetupSchema } from "shared/types/story.js";
 import {
   createSwitchAnalysisSchema,
   type SwitchAnalysis,
-} from "../../../shared/types/switch.js";
+} from "shared/types/switch.js";
 import {
   type ThreadAnalysis,
   threadAnalysisSchema,
-} from "../../../shared/types/thread.js";
-import type { PlayerCount } from "../../../shared/types/players.js";
-import { getPlayerSlots } from "../../../shared/utils/playerUtils.js";
-import { createSetOfBeatGenerationSchema } from "../../../shared/types/beat.js";
-import type { BeatsNeedingImages } from "../../../shared/types/image.js";
-import { type GameMode } from "../../../shared/types/story.js";
-import type { StoryElement } from "../../../shared/types/storyElement.js";
+} from "shared/types/thread.js";
+import type { PlayerCount } from "shared/types/players.js";
+import { getPlayerSlots } from "shared/utils/playerUtils.js";
+import { createSetOfBeatGenerationSchema } from "shared/types/beat.js";
+import type { BeatsNeedingImages } from "shared/types/image.js";
+import { type GameMode } from "shared/types/story.js";
+import type { StoryElement } from "shared/types/storyElement.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
-import { PLAYER_SLOTS } from "../../../shared/types/players.js";
-import { isFirstBeat } from "@shared/utils/storyUtils.js";
+import { PLAYER_SLOTS } from "shared/types/players.js";
+import { isFirstBeat } from "shared/utils/storyUtils.js";
 dotenv.config();
 
 export class AIStoryGenerator {

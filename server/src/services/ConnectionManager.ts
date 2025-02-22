@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io";
-import type { PlayerSlot } from "../../../shared/types/players.js";
-import type { StoryState } from "../../../shared/types/story.js";
+import type { PlayerSlot } from "shared/types/players.js";
+import type { StoryState } from "shared/types/story.js";
 import { storyStateManager } from "./StoryStateManager.js";
 
 interface PlayerConnection {

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "cd ../shared && npm run build",
+    "prebuild": "cd ../shared && npm run build && npm run copy-shared",
+    "copy-shared": "mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/",
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js"

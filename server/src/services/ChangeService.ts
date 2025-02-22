@@ -1,6 +1,6 @@
-import type { Change } from "../../../shared/types/change.js";
-import type { StoryState } from "../../../shared/types/story.js";
-import type { PlayerSlot } from "../../../shared/types/players.js";
+import type { Change } from "shared/types/change.js";
+import type { StoryState } from "shared/types/story.js";
+import type { PlayerSlot } from "shared/types/players.js";
 
 export class ChangeService {
   applyChanges(state: StoryState, changes: Change[]): StoryState {
