@@ -10,7 +10,7 @@ export abstract class BaseQueueProcessor<
   private queues: Map<string, string[]> = new Map();
   private processing: boolean = false;
   private processingItems: Set<string> = new Set();
-  protected events: EventEmitter & {
+  public events: EventEmitter & {
     emit: <K extends keyof QueueEvents>(
       event: K,
       arg: Parameters<QueueEvents[K]>[0]

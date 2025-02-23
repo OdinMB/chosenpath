@@ -63,7 +63,6 @@ export class GameWebSocketServer {
         }) => {
           console.log("[WebSocket] Initializing story with data:", data);
           await gameHandler.initializeStory(
-            data.sessionId,
             data.prompt,
             data.generateImages,
             data.playerCount as PlayerCount,

@@ -15,6 +15,8 @@ import { ChangeService } from "../services/ChangeService.js";
 import type { GameMode } from "shared/types/story.js";
 import type { BeatType } from "shared/types/beat.js";
 import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
+import { gameQueueProcessor } from "../services/GameQueueProcessor.js";
+import { randomUUID } from "crypto";
 
 export class GameHandler {
   private imageService: AIImageGenerator;
@@ -32,7 +34,23 @@ export class GameHandler {
     this.changeService = new ChangeService();
     this.io = socket.nsp.server;
     console.log("[GameHandler] Created new handler for socket:", socket.id);
+
+    // Add event listener for story initialization to emit codes when the initialization is complete
+    gameQueueProcessor.events.on("storyInitialized", ({ gameId, state }) => {
+      if (this.pendingInitializations.has(gameId)) {
+        const { resolve, codes } = this.pendingInitializations.get(gameId)!;
+        this.socket.emit("story_codes", { codes });
+        resolve();
+        this.pendingInitializations.delete(gameId);
+        this.moveStoryForward(gameId, state);
+      }
+    });
   }
+
+  private pendingInitializations = new Map<
+    string,
+    { resolve: () => void; codes: Record<PlayerSlot, string> }
+  >();
 
   private generatePlayerCodes(
     playerCount: PlayerCount
@@ -50,7 +68,6 @@ export class GameHandler {
   }
 
   async initializeStory(
-    sessionId: string,
     prompt: string,
     generateImages: boolean,
     playerCount: PlayerCount,
@@ -65,53 +82,37 @@ export class GameHandler {
         throw new Error(`Invalid max turns: ${maxTurns}`);
       }
 
-      const state = await this.aiStoryGenerator.createInitialState(
-        prompt,
-        generateImages,
-        playerCount,
-        maxTurns,
-        gameMode
-      );
-      console.log("[GameHandler] Created initial state");
-
-      // Generate player codes
+      const gameId = randomUUID();
       const playerCodes = this.generatePlayerCodes(playerCount);
-      const stateWithCodes = {
-        ...state,
-        playerCodes,
-      };
 
-      // Store state
-      const storyId = crypto.randomUUID();
-      await this.storyStateManager.storeState(storyId, stateWithCodes);
-      console.log("[GameHandler] Stored initial state");
-
-      // Register game session with ConnectionManager
-      connectionManager.createGameSession(storyId);
-
-      // Register codes with ConnectionManager (but don't connect any sockets yet)
+      // Register game session and codes
+      console.log("[GameHandler] Registering game session and codes");
+      connectionManager.createGameSession(gameId);
       Object.entries(playerCodes).forEach(([slot, code]) => {
-        console.log("[GameHandler] Registering code for slot:", {
-          slot,
-          code,
-          storyId,
+        connectionManager.registerCode(gameId, slot as PlayerSlot, code);
+      });
+
+      // Create a promise that will resolve when initialization is complete
+      await new Promise<void>((resolve) => {
+        this.pendingInitializations.set(gameId, {
+          resolve,
+          codes: playerCodes,
         });
-        connectionManager.registerCode(storyId, slot as PlayerSlot, code);
+
+        // Queue the story initialization
+        gameQueueProcessor.addOperation({
+          gameId,
+          type: "initializeStory",
+          input: {
+            prompt,
+            generateImages,
+            playerCount,
+            maxTurns,
+            gameMode,
+            playerCodes,
+          },
+        });
       });
-
-      // Emit codes
-      this.socket.emit("story_codes", {
-        codes: stateWithCodes.playerCodes,
-      });
-      console.log(
-        "[GameHandler] Emitted player codes: ",
-        stateWithCodes.playerCodes
-      );
-
-      // And go
-      await this.moveStoryForward(storyId, stateWithCodes);
-
-      // ToDo: call image generation once it has its own function
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
       this.socket.emit("error", { error: "Failed to initialize story" });

@@ -23,6 +23,7 @@ export interface GameOperations {
       playerCount: PlayerCount;
       maxTurns: number;
       gameMode: GameMode;
+      playerCodes: Record<PlayerSlot, string>;
     };
     state: StoryState;
   };
@@ -44,20 +45,23 @@ export interface GameOperations {
 // Generate operation types automatically
 export type GameOperationType = keyof GameOperations;
 
-export type GameOperationBase = QueueableOperation & {
+// Combine base operation properties with specific operation types
+export type GameOperation = QueueableOperation & {
   gameId: string;
-  type: GameOperationType;
-};
-
-export type GameOperation = {
-  [K in GameOperationType]: {
-    type: K;
-    input: GameOperations[K]["input"];
-  };
-}[GameOperationType];
-
-// Input types (without queue-managed properties)
-export type GameOperationInput = Omit<GameOperation, keyof QueueableOperation>;
+} & (
+    | {
+        type: "initializeStory";
+        input: GameOperations["initializeStory"]["input"];
+      }
+    | {
+        type: "recordChoice";
+        input: GameOperations["recordChoice"]["input"];
+      }
+    | {
+        type: "generateImages";
+        input: GameOperations["generateImages"]["input"];
+      }
+  );
 
 // Events
 export interface StateUpdateEvent {
