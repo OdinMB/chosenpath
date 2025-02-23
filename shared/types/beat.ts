@@ -88,7 +88,7 @@ export const beatGenerationSchema = z.object({
   options: z
     .array(z.string().describe("Text shown to player for this choice"))
     .describe(
-      "3 choices for the player from the list of options generated in the plan. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
+      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Don't re-offer options from previous beats, including doubling down on the same option. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
     ),
 });
 

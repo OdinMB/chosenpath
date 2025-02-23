@@ -1,12 +1,15 @@
 # Feature backlog
 
+More structured threads
+
+- Beat progression with typed schema.
+- Add mechanism to enable players to fail at things.
+- Give full context (text and options) for the current thread?
+
 Improve generations
 
-- Give full context (text and options) for the current thread?
-- Add mechanism to enable players to fail at things.
-- More efficient prompts for switches/threads/beats?
-- Update the thread's plan with each beat?
 - Attach facts to players?
+- More efficient prompts for switches/threads/beats?
 - adjust scope of story setup based on the number of beats
 - Multi-step flow for generating a stat schema?
 - Track story elements that a player has NOT been introduced to yet?
@@ -15,6 +18,7 @@ Improve generations
 Big features
 
 - Let player choose/adjust starting position (name, pronouns, stats)
+- Images: generate one for each player and story element and only use iamges from that list?
 - Multiplaer mode: shared perspective
   - majority vote
   - lottery

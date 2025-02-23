@@ -30,7 +30,9 @@ export class AIImageGenerator {
       imageGenerationSchema
     );
     const response = await structuredModel.invoke(
-      `We need an image for the following story beat: ${beat.text}\n\nSummary: ${beat.summary}`
+      `We need an image for the following story beat: ${beat.text}
+      
+      Include the terms 'digital art', 'illustration', and 'no text'. Keep it under 200 characters.`
     );
     console.log("Image generation response: ", response);
     return response;

@@ -32,7 +32,7 @@ export class BeatPromptService {
         state,
         this.getSections(state)
       ) + this.createInstructionsSection(state);
-    // console.log(prompt);
+    console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
@@ -188,7 +188,7 @@ Title: ${
           (state.currentThreadBeatsCompleted + 1) +
           "/" +
           state.currentThreadMaxBeats +
-          ")"
+          ")\nDon't change the information in the brackets. It marks the beat of the current thread and is correct."
     }
 
 Text
@@ -231,18 +231,13 @@ ${
           "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
           "- Don't offer options again that you already offered in previous beats.\n" +
           "--- This includes doubling down on the same option.\n" +
-          "- Only include the action that the player can perform or the decision that they can make. Do NOT include the actual or likely consequences of a decision.\n" +
+          "- Do NOT include the actual or likely consequences of a decision.\n" +
           "- Make sure that the beat implements the current " +
           state.currentBeatType +
           " configuration.\n" +
           "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
           state.currentBeatType +
-          " in any other way.\n" +
-          "\nRemember: one key purpose of this beat (or set of beats) is to implement the " +
-          state.currentBeatType +
-          " configuration. Move the story forward in a way that stays true to the " +
-          state.currentBeatType +
-          "'s theme and goals."
+          " in any other way."
     }
 `;
   }

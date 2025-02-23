@@ -6,7 +6,7 @@ export const imageGenerationSchema = z.object({
   prompt: z
     .string()
     .describe(
-      `Prompt for AI image generation. Include the terms 'digital art', 'illustration', and 'story book'. Keep it under 200 characters.`
+      `Prompt for AI image generation. Include the terms 'digital art', 'illustration', and 'no text'. Keep it under 200 characters.`
     ),
   description: z
     .string()

@@ -183,7 +183,8 @@ ${modeDescriptions[state.gameMode]}
     return Object.entries(state.players)
       .map(([slot, playerState]) => {
         const beatHistorySection = this.createBeatHistorySection(
-          playerState.beatHistory
+          playerState.beatHistory,
+          state.currentThreadBeatsCompleted
         );
         const separator = "#####################################";
 
@@ -211,18 +212,39 @@ ${modeDescriptions[state.gameMode]}
       .join("\n\n" + "=".repeat(80) + "\n\n");
   }
 
-  private static createBeatHistorySection(beatHistory: any[]): string {
+  private static createBeatHistorySection(
+    beatHistory: any[],
+    currentThreadBeatsCompleted?: number
+  ): string {
+    // Past threads: show only summary
+    // Current thread: show options and summary
+    // Previous beat: show options and full text
+
     return beatHistory
       .map((beat, index) => {
         const isLastBeat = index === beatHistory.length - 1;
-        const chosenOption =
-          beat.choice >= 0 ? beat.options[beat.choice] : null;
+        const isInCurrentThread =
+          currentThreadBeatsCompleted !== undefined &&
+          index >= beatHistory.length - currentThreadBeatsCompleted;
 
-        if (isLastBeat) {
+        if (isLastBeat || isInCurrentThread) {
+          const optionsText = beat.options?.length
+            ? "Options:\n" +
+              beat.options
+                .map(
+                  (opt: string, i: number) =>
+                    `- ${i === beat.choice ? "(Player choice) " : ""}${opt}`
+                )
+                .join("\n") +
+              "\n"
+            : "";
+
           return [
-            `- Beat ${index + 1} (previous beat) - full text for continuity:`,
-            beat.text,
-            chosenOption ? `Player choice: ${chosenOption}` : "",
+            `- Beat ${index + 1} ${
+              isInCurrentThread ? " (current thread)" : ""
+            } ${isLastBeat ? " (previous beat)" : ""}`,
+            isLastBeat ? beat.text : beat.summary,
+            optionsText,
           ]
             .filter(Boolean)
             .join("\n\n");
@@ -250,9 +272,9 @@ ${modeDescriptions[state.gameMode]}
     return outcomes
       .map((outcome) => {
         return [
-          `id: ${outcome.id}`,
-          outcome.question,
-          `Possible resolutions: ${outcome.possibleResolutions.join(" | ")}`,
+          `Question: ${outcome.question} (${outcome.id})`,
+          "Possible resolutions:\n" +
+            outcome.possibleResolutions.map((r: string) => `- ${r}`).join("\n"),
           `Resonance: ${outcome.resonance}`,
           `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
           outcome.milestones
@@ -327,7 +349,7 @@ ${modeDescriptions[state.gameMode]}
             return [
               `  Outcome ID: ${outcome.outcomeId}`,
               `  Question: ${outcome.question}`,
-              `  Possible Milestones:`,
+              `  Possible Milestones to add after this thread:`,
               outcome.possibleMilestones.map((m) => `    - ${m}`).join("\n"),
             ].join("\n");
           })

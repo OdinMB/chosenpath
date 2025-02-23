@@ -66,7 +66,7 @@ export class StorySetupPromptService {
 --- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
 --- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
---- Things that are shared between players (e.g. group/organization, a spaceship, a flat, a list of collected clues, etc.)
+--- Things that are shared between players (e.g. group/organization, a spaceship, a flat)
 --- Stats about the world (e.g. tension between factions, industry trends, etc.)
 - Any invisible shared stats that you think are important
 - Stats for scoring, pacing, and story flags if you think they are needed (if any)
@@ -156,7 +156,7 @@ Type of stats and what they are good for:
 - opposites: Two percentage stats in one. The second stat is always (100 - first stat). As percentages, only use this for qualitative aspects that will be changed often and granularly over the course of the story.
 --- Moral alignments (e.g., good|evil, order|chaos, tradition|progress)
 --- Competing influences (e.g., science|magic, empire|rebellion)
---- Character dispositions (e.g., cynicism|idealism, logic|emotion)
+--- Character dispositions (e.g., cynicism|idealism, logic|empathy)
 --- Devices to keep score for competitive, tug-of-war-like outcomes in multiplayer games(e.g., playerA|playerB territory control)
 
 - number: Only for countable quantities

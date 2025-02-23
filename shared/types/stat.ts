@@ -46,7 +46,7 @@ export const statSchema = z
   })
   .describe(
     "A variable that is tracked in the game state.\n" +
-      "Don't use stats to track progress toward outcomes. That will be done with narrative milestones."
+      "Don't use stats to directly track progress toward outcomes. No (percentage) 'progress' stats, no (string[]) 'clues' in mystery stories, etc."
   );
 
 export const statsSchema = z.array(statSchema);
