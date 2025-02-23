@@ -1,6 +1,7 @@
 import type { StoryState } from "../types/story.js";
 import type { PlayerSlot } from "../types/player.js";
 import type { ClientStoryState } from "../types/story.ts";
+import type { BeatType } from "../types/beat.js";
 
 /**
  * Get the current turn number (1-based) from the story state
@@ -113,3 +114,38 @@ export const filterStateForPlayer = (
     gameOver: state.currentBeatType === "ending",
   };
 };
+
+/**
+ * Determine the next beat type based on the current story state
+ */
+export function determineNextBeatType(state: StoryState): BeatType {
+  const lastBeatType = state.currentBeatType;
+
+  let currentBeatType: BeatType = "intro";
+
+  if (lastBeatType === "intro") {
+    currentBeatType = "switch";
+    // console.log("[StoryUtils] Intro beat = switch");
+  } else if (lastBeatType === "switch") {
+    currentBeatType = "thread";
+    // console.log("[StoryUtils] Last beat was switch, next beat will be thread");
+  } else if (
+    lastBeatType === "thread" &&
+    state.currentThreadMaxBeats === state.currentThreadBeatsCompleted
+  ) {
+    // Check if we should end the story
+    if (getCurrentTurn(state) >= state.maxTurns) {
+      currentBeatType = "ending";
+      // console.log("[StoryUtils] Max turns reached, ending story");
+    } else {
+      currentBeatType = "switch";
+      // console.log("[StoryUtils] Thread completed, next beat will be switch");
+    }
+  } else if (lastBeatType === "thread") {
+    currentBeatType = "thread";
+    // console.log("[StoryUtils] Continuing thread");
+  }
+
+  console.log("[StoryUtils] Next beat type:", currentBeatType);
+  return currentBeatType;
+}

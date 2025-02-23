@@ -45,14 +45,16 @@ export class BeatPromptService {
 
 1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS
 
-Given the previous set of beats and decisions of players, which stats seem relevant for deciding the consequences of player actions?
-
-Includes stats that affect
-- the chance of success. Example: Whether a player can successfully steal an artifact might depend on the that player's charisma stat.
-- the scope of what is happening. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.
-- how the consequences play out. Example: How the player escapes pursuer depends on the spells that the player has access to.
-
-Format: [statId]: [reason]
+${
+  isFirstBeat(state)
+    ? "Since this is the beginning of the story, there are no consequences of player actions to process. Just return an empty list."
+    : "Given the previous set of beats and decisions of players, which stats seem relevant for deciding the consequences of player actions?\n\n" +
+      "Includes stats that affect\n" +
+      "- the chance of success. Example: Whether a player can successfully steal an artifact might depend on the that player's charisma stat.\n" +
+      "- the scope of what is happening. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.\n" +
+      "- how the consequences play out. Example: How the player escapes pursuer depends on the spells that the player has access to.\n\n" +
+      "Format: [statId]: [reason]"
+}
 
 2. GENERATE CHANGES TO THE STORY STATE
 
@@ -159,7 +161,7 @@ ${
     ? "What should we consider as we create the options for this beat?\n" +
       "- How can we reinforce the story's key conflicts and focused types of decisions?\n" +
       "- Which stats (both individual and shared) should affect the design of the options?\n" +
-      "--- Example: If the player has a high charisma stat, they might be able to convince someone to help them.\n" +
+      "--- Example: If the player has a high charisma stat, they might want to convince someone to help them.\n" +
       "--- Example: If the player has an item, ally, companion, or anything else that could be of use, make sure that the options reflect that.\n" +
       "--- Example: If a shared stat shapes the surrounding of the situation, it might affect the options. (Tensions running high, the spaceship being damaged, etc.)\n" +
       "- What are the requirements from the " +
@@ -227,6 +229,8 @@ ${
           "- Be specific.\n" +
           "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
           "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
+          "- Don't offer options again that you already offered in previous beats.\n" +
+          "--- This includes doubling down on the same option.\n" +
           "- Only include the action that the player can perform or the decision that they can make. Do NOT include the actual or likely consequences of a decision.\n" +
           "- Make sure that the beat implements the current " +
           state.currentBeatType +

@@ -31,37 +31,37 @@ export interface GameOperations {
     input: {
       playerSlot: PlayerSlot;
       optionIndex: number;
+      state: StoryState;
+    };
+    state: StoryState;
+  };
+  moveStoryForward: {
+    input: {
+      state: StoryState;
     };
     state: StoryState;
   };
   generateImages: {
     input: {
       beatsNeedingImages: Record<string, Beat>;
+      state: StoryState;
     };
     state: StoryState;
   };
 }
 
-// Generate operation types automatically
 export type GameOperationType = keyof GameOperations;
 
-// Combine base operation properties with specific operation types
+type OperationForType<T extends GameOperationType> = {
+  type: T;
+  input: GameOperations[T]["input"];
+};
+
 export type GameOperation = QueueableOperation & {
   gameId: string;
-} & (
-    | {
-        type: "initializeStory";
-        input: GameOperations["initializeStory"]["input"];
-      }
-    | {
-        type: "recordChoice";
-        input: GameOperations["recordChoice"]["input"];
-      }
-    | {
-        type: "generateImages";
-        input: GameOperations["generateImages"]["input"];
-      }
-  );
+} & {
+    [K in GameOperationType]: OperationForType<K>;
+  }[GameOperationType];
 
 // Events
 export interface StateUpdateEvent {

@@ -50,9 +50,9 @@ export const beatPlanSchema = z.object({
   optionConsiderations: z
     .string()
     .describe(
-      "Answer the following questions: How to reinforce the story's key conflicts and focused types of decisions?\n" +
-        "Which stats (both individual and shared) should affect the design of the options?\n" +
-        "What are the requirements from the current switch/thread configuration?\n" +
+      "Answer the following questions:\n- How to reinforce the story's key conflicts and focused types of decisions?\n" +
+        "- Which stats (both individual and shared) should affect the design of the options and how?\n" +
+        "- What are the requirements from the current switch/thread configuration?\n" +
         "The ending doesn't need any options."
     ),
 });

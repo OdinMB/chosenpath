@@ -86,7 +86,7 @@ Story elements
 - Use the instructions attribute to establish story hints and gameplay mechanics.
 --- Example: "Mr. X only helps players in exchange for gold."
 --- Example: "If players enter this location, the scene should involve a chance to die."
---- Example: "If players enter this location, they should restore some of their health."
+--- Example: "If players enter this location, they should restore 10 health."
 
 No franchise copyright infringement!
 Don't borrow story elements from established franchises.
@@ -120,11 +120,10 @@ Stat guidelines
 - Stat names must be specific and mustn't include any placeholders.
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
---- Don't directly track progress towards individual or shared outcomes. Outcomes are tracked separately.
------ Progress as percentages. If an outcome is "Does [player] find the murderer of [NPC]?", don't add a stat like "Investigation progress".
------ Progress as stuff collected. If an outcome is "Does [player] unravel the mystery?", don't add a string[] stat for "Collected clues".
---- Don't track the number of remaining turns or story beats (tracked separately)
---- Don't track ordinary player decisions (tracked separately))
+- No direct outcome progress trackers of any kind!! Outcomes are tracked separately.
+--- Exmple: If an outcome is "Does [player] find the murderer of [NPC]?" or "Does [player] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
+- Don't track the number of remaining turns or story beats (tracked separately)
+- Don't track ordinary player decisions (tracked separately))
 - In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)
 - You can use the stat's grouping to shorten the stat name. For example, if a stat belongs to the group 'Relationships', 'Relationship with Mr. Kline' is unnecessarily long. 'Mr. Kline' is enough.
 
@@ -132,7 +131,7 @@ Type of stats and what they are good for:
 - string: Qualitative aspects that don't change often, or that don't have to be tracked granularly.
 --- Role that can be filled with the name of an NPC (e.g. Assistant, Mentor)
 --- Character conditions (e.g., healthy/injured/critical)
---- Relationship states for specific NPCs(e.g., stranger/acquaintance/friend/confidant)
+--- Relationship states for specific NPCs (e.g., stranger/acquaintance/friend/confidant)
 --- Rank (e.g. Private/Corporal/Captain/General)
 --- Equipment status (e.g., pristine/worn/damaged/broken)
 --- Faction standings (e.g., hostile/neutral/friendly/allied)
@@ -140,17 +139,18 @@ Type of stats and what they are good for:
 --- Level of influence (e.g. Can ask for favors/Can make decisions/Full control)
 
 - string[]: Lists of traits or collectibles
---- Character traits and abilities that are not supposed to change over the course of the story (e.g., ["Ambitious", "Empathic", "Spontaneous"] in a romance story, ["Telepathy", "Invisibility"] in a superhero story.)
+--- Character traits and abilities whose individual level of development are not important for the story (e.g., ["Ambitious", "Empathic", "Spontaneous"] in a romance story, ["Telepathy", "Invisibility"] in a superhero story.)
 --- Equipment/inventory (e.g., ["Laser sword", "Med kit"])
 --- Role that can be filled with the names of several NPCs (e.g. Friends, Love Interests)
 --- Issues (e.g. ["Poisoned", "Bleeding"] if avoiding and dealing with specific ailments is central to the story; otherwise, use a percentage for health)
 --- Contacts (e.g., ["Dealers", "Local Newspaper"] if using and building these contacts is central to the story; otherwise, use a string to represent the bredth of contacts)
+--- NOT good for tracking progress towards outcomes, as with a list of clues in a mystery story. Don't use a stat for this at all.
 
 - percentage: 0-100. Qualitative aspects that will be changed often and granularly over the course of the story.
 --- Resources with a capacity limit (e.g. mana, chi, stamina, fuel, energy, oxygen supply)
 --- Integrity statuses (e.g. health, spaceship integrity, mental stability)
 --- Skills ONLY IF it's a clearly defined skill and developing the skill is central to the story. ("Magic", "Mystic power", etc. are not clearly defined skills and are often better represented as a string[] of abilities.)
---- Relationship strength with NPCs ONLY IF managing that relationship is central; otherwise, use a string.
+--- Relationship strength with NPCs ONLY IF managing that one specific relationship is central; otherwise, use a string (to track that relationship less granularly) or string[] to allow several relationships to be categorized (as in a list of friends or contacts).
 --- Environmental conditions ONLY IF the condition must be managed often and granularly (e.g., radiation levels); otherwise, use a string.
 
 - opposites: Two percentage stats in one. The second stat is always (100 - first stat). As percentages, only use this for qualitative aspects that will be changed often and granularly over the course of the story.

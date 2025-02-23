@@ -25,7 +25,6 @@ export abstract class BaseQueueProcessor<
     operation: Omit<TOperation, keyof QueueableOperation>
   ): Promise<string> {
     const id = randomUUID();
-
     const fullOperation = {
       id,
       status: "pending" as const,
@@ -37,11 +36,18 @@ export abstract class BaseQueueProcessor<
 
     const queueId = this.getQueueId(fullOperation);
     if (!this.queues.has(queueId)) {
+      console.log(`[Queue] Creating new queue ${queueId.slice(-5)}`);
       this.queues.set(queueId, []);
     }
     this.queues.get(queueId)!.push(id);
+    console.log(
+      `[Queue] Added ${(fullOperation as any).type} operation ${id.slice(
+        -5
+      )} to queue ${queueId.slice(-5)}`
+    );
 
     if (!this.processing) {
+      console.log("[Queue] Starting processor");
       this.start();
     } else {
       this.events.emit("newOperation");
@@ -72,21 +78,32 @@ export abstract class BaseQueueProcessor<
   protected abstract processOperation(operation: TOperation): Promise<void>;
 
   private async processQueues(): Promise<void> {
+    console.log("[Queue] Process queues started");
     while (this.processing) {
       const queueIds = Array.from(this.queues.keys());
+      console.log(`[Queue] Processing ${queueIds.length} queues`);
 
       await Promise.all(
         queueIds.map(async (queueId) => {
-          if (this.processingItems.has(queueId)) return;
+          if (this.processingItems.has(queueId)) {
+            console.log(`[Queue] Queue ${queueId} is already processing`);
+            return;
+          }
 
           const queue = this.queues.get(queueId)!;
           if (queue.length === 0) return;
 
+          console.log(
+            `[Queue] Processing queue ${queueId.slice(-5)} with ${
+              queue.length
+            } items`
+          );
           await this.processQueue(queueId);
         })
       );
 
       if (this.allQueuesEmpty()) {
+        console.log("[Queue] All queues empty, waiting for new operations");
         await new Promise<void>((resolve) => {
           const handler = () => {
             this.events.removeListener("newOperation", handler);
@@ -106,6 +123,11 @@ export abstract class BaseQueueProcessor<
       const operationId = queue[0];
       const operation = this.operations.get(operationId)!;
 
+      console.log(
+        `[Queue] Processing ${
+          (operation as any).type
+        } operation ${operationId.slice(-5)} from queue ${queueId.slice(-5)}`
+      );
       operation.status = "processing";
       operation.startedAt = new Date();
 
@@ -114,12 +136,23 @@ export abstract class BaseQueueProcessor<
 
         operation.status = "completed";
         operation.completedAt = new Date();
+        console.log(
+          `[Queue] Completed ${
+            (operation as any).type
+          } operation ${operationId.slice(-5)}`
+        );
       } catch (error) {
         operation.status = "failed";
         operation.completedAt = new Date();
         operation.error =
           error instanceof Error ? error.message : String(error);
 
+        console.error(
+          `[Queue] Failed ${
+            (operation as any).type
+          } operation ${operationId.slice(-5)}:`,
+          operation.error
+        );
         this.events.emit("operationError", {
           queueId,
           operationId,
@@ -129,6 +162,7 @@ export abstract class BaseQueueProcessor<
 
       queue.shift();
       if (queue.length === 0) {
+        console.log(`[Queue] Queue ${queueId.slice(-5)} is now empty`);
         this.queues.delete(queueId);
       }
     } finally {

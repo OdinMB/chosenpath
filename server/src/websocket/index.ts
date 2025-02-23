@@ -22,6 +22,9 @@ export class GameWebSocketServer {
       path: "/socket.io",
     });
 
+    // Set io instance in ConnectionManager
+    connectionManager.setIo(this.io);
+
     this.setupSocketServer();
   }
 

@@ -3,6 +3,7 @@ import type { PlayerSlot } from "shared/types/player.js";
 import type { ClientStoryState, StoryState } from "shared/types/story.js";
 import { storyStateManager } from "./StoryStateManager.js";
 import { filterStateForPlayer } from "shared/utils/storyUtils.js";
+import { Server } from "socket.io";
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -23,11 +24,16 @@ export class ConnectionManager {
   private gameSessions: Map<string, GameSession>;
   private socketMap: Map<string, { storyId: string; playerSlot: PlayerSlot }>;
   private codeMap: Map<string, { storyId: string; playerSlot: PlayerSlot }>;
+  private io?: Server;
 
   constructor() {
     this.gameSessions = new Map();
     this.socketMap = new Map();
     this.codeMap = new Map();
+  }
+
+  setIo(io: Server): void {
+    this.io = io;
   }
 
   createGameSession(storyId: string, userId?: string): void {
@@ -332,6 +338,30 @@ export class ConnectionManager {
     // Remove socket from connection manager
     this.removeSocket(socketId);
     console.log("[ConnectionManager] Story exited successfully");
+  }
+
+  broadcastStateUpdate(storyId: string, state: StoryState): void {
+    if (!this.io) {
+      console.error("[ConnectionManager] Socket.IO instance not set");
+      return;
+    }
+
+    console.log(
+      "[ConnectionManager] Broadcasting state update for story:",
+      storyId
+    );
+
+    const playerSlots = Object.keys(state.players) as PlayerSlot[];
+
+    playerSlots.forEach((slot) => {
+      const sockets = this.getActiveSockets(storyId, slot);
+      const filteredState = filterStateForPlayer(state, slot);
+
+      sockets.forEach((socketId) => {
+        console.log("[ConnectionManager] Sending update to socket:", socketId);
+        this.io!.to(socketId).emit("state_update", { state: filteredState });
+      });
+    });
   }
 }
 
