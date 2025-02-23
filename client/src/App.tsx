@@ -153,6 +153,12 @@ function App() {
     gameService.makeChoice(optionIndex);
   };
 
+  const handleDeleteCode = useCallback(() => {
+    localStorage.removeItem(playerCodeKey);
+    setPlayerCode(null);
+    loggedSetViewState("WELCOME");
+  }, [playerCodeKey, loggedSetViewState]);
+
   // Add error display component
   const ErrorMessage = () =>
     error ? (
@@ -186,6 +192,7 @@ function App() {
             onCodeSubmit={handleCodeSubmit}
             onNewStory={handleNewStory}
             existingPlayerCode={playerCode}
+            onDeleteCode={handleDeleteCode}
           />
         );
 

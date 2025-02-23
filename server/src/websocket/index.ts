@@ -86,10 +86,6 @@ export class GameWebSocketServer {
         }
       });
 
-      socket.on("exit_story", async (data: { sessionId: string }) => {
-        await gameHandler.exitStory(data.sessionId);
-      });
-
       socket.on(
         "verify_code",
         async (data: { sessionId: string; code: string }) => {
@@ -98,40 +94,29 @@ export class GameWebSocketServer {
             code: data.code,
           });
 
-          const playerInfo = await connectionManager.getPlayerByCode(data.code);
+          // Get verification result from ConnectionManager
+          const result = await connectionManager.verifyCode(data.code);
 
-          if (!playerInfo) {
-            console.log("[WebSocket] Invalid code:", data.code);
-            socket.emit("verify_code_response", {
-              state: null,
-              error: "Invalid code",
-            });
-            return;
+          if (result.state) {
+            // Add this connection to the player's active connections
+            const playerInfo = await connectionManager.getPlayerByCode(
+              data.code
+            );
+            if (playerInfo) {
+              connectionManager.addPlayer(
+                playerInfo.storyId,
+                playerInfo.playerSlot,
+                data.code,
+                socket
+              );
+
+              // Join the socket to the game's room
+              socket.join(playerInfo.storyId);
+
+              // Notify all clients in the game about active players
+              this.broadcastActivePlayersUpdate(playerInfo.storyId);
+            }
           }
-
-          console.log("[WebSocket] Found player info:", playerInfo);
-
-          // Add this connection to the player's active connections
-          connectionManager.addPlayer(
-            playerInfo.storyId,
-            playerInfo.playerSlot,
-            data.code,
-            socket
-          );
-
-          // Join the socket to the game's room
-          socket.join(playerInfo.storyId);
-
-          // Notify all clients in the game about active players
-          this.broadcastActivePlayersUpdate(playerInfo.storyId);
-
-          // Get verification result from GameHandler
-          const result = await gameHandler.verifyCode(
-            data.sessionId,
-            data.code
-          );
-
-          // console.log("[WebSocket] Verification result:", result);
 
           // Send response to client
           socket.emit("verify_code_response", {
@@ -140,6 +125,11 @@ export class GameWebSocketServer {
           });
         }
       );
+
+      socket.on("exit_story", async () => {
+        await connectionManager.exitStory(socket.id);
+        socket.emit("exit_story_response");
+      });
 
       socket.on("disconnect", () => {
         connectionManager.removeSocket(socket.id);

@@ -1,7 +1,8 @@
 import type { Socket } from "socket.io";
 import type { PlayerSlot } from "shared/types/player.js";
-import type { StoryState } from "shared/types/story.js";
+import type { ClientStoryState, StoryState } from "shared/types/story.js";
 import { storyStateManager } from "./StoryStateManager.js";
+import { filterStateForPlayer } from "shared/utils/storyUtils.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -278,6 +279,59 @@ export class ConnectionManager {
     });
 
     console.log("[ConnectionManager] Finished reconstructing mappings");
+  }
+
+  async verifyCode(
+    code: string
+  ): Promise<{ state: ClientStoryState | null; error?: string }> {
+    console.log("[ConnectionManager] Verifying code:", code);
+
+    try {
+      const playerInfo = await this.getPlayerByCode(code);
+      if (!playerInfo) {
+        console.log("[ConnectionManager] Invalid code:", code);
+        return { state: null, error: "Invalid code" };
+      }
+
+      console.log("[ConnectionManager] Found player info:", playerInfo);
+
+      const state = await storyStateManager.getState(playerInfo.storyId);
+      if (!state) {
+        console.log(
+          "[ConnectionManager] Story state not found for:",
+          playerInfo.storyId
+        );
+        return { state: null, error: "Story state not found" };
+      }
+
+      console.log(
+        "[ConnectionManager] Found story state, filtering for player:",
+        playerInfo.playerSlot
+      );
+
+      // Filter state for specific player
+      const filteredState = filterStateForPlayer(state, playerInfo.playerSlot);
+
+      console.log("[ConnectionManager] Verification successful");
+      return { state: filteredState };
+    } catch (error) {
+      console.error("[ConnectionManager] Error verifying code:", error);
+      return { state: null, error: "Failed to verify code" };
+    }
+  }
+
+  async exitStory(socketId: string): Promise<void> {
+    console.log("[ConnectionManager] Exiting story for socket:", socketId);
+
+    const playerInfo = this.getPlayerBySocket(socketId);
+    if (!playerInfo) {
+      console.log("[ConnectionManager] No player info found for socket");
+      return;
+    }
+
+    // Remove socket from connection manager
+    this.removeSocket(socketId);
+    console.log("[ConnectionManager] Story exited successfully");
   }
 }
 

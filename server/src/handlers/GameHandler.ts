@@ -1,6 +1,5 @@
 import type { Socket } from "socket.io";
 import type { StoryState } from "shared/types/story.js";
-import { SessionService } from "../services/SessionService.js";
 import { AIImageGenerator } from "../services/AIImageGenerator.js";
 import { isValidPlayerCount } from "shared/utils/playerUtils.js";
 import type { PlayerCount, PlayerSlot } from "shared/types/player.js";
@@ -15,9 +14,9 @@ import { AIStoryGenerator } from "../services/AIStoryGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
 import type { GameMode } from "shared/types/story.js";
 import type { BeatType } from "shared/types/beat.js";
+import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
 
 export class GameHandler {
-  private sessionService: SessionService;
   private imageService: AIImageGenerator;
   protected storyStateManager: StoryStateManager;
   private socket: Socket;
@@ -28,7 +27,6 @@ export class GameHandler {
   constructor(socket: Socket) {
     this.socket = socket;
     this.aiStoryGenerator = new AIStoryGenerator();
-    this.sessionService = new SessionService();
     this.imageService = new AIImageGenerator();
     this.storyStateManager = StoryStateManager.getInstance();
     this.changeService = new ChangeService();
@@ -51,46 +49,6 @@ export class GameHandler {
     return codes;
   }
 
-  async verifyCode(sessionId: string, code: string) {
-    console.log("[GameHandler] Verifying code:", {
-      sessionId,
-      code,
-    });
-
-    try {
-      const playerInfo = await connectionManager.getPlayerByCode(code);
-      if (!playerInfo) {
-        console.log("[GameHandler] Invalid code:", code);
-        return { state: null, error: "Invalid code" };
-      }
-
-      console.log("[GameHandler] Found player info:", playerInfo);
-
-      const state = await this.storyStateManager.getState(playerInfo.storyId);
-      if (!state) {
-        console.log(
-          "[GameHandler] Story state not found for:",
-          playerInfo.storyId
-        );
-        return { state: null, error: "Story state not found" };
-      }
-
-      console.log(
-        "[GameHandler] Found story state, filtering for player:",
-        playerInfo.playerSlot
-      );
-
-      // Filter state for specific player and convert to ClientStoryState
-      const filteredState = filterStateForPlayer(state, playerInfo.playerSlot);
-
-      console.log("[GameHandler] Verification successful");
-      return { state: filteredState };
-    } catch (error) {
-      console.error("[GameHandler] Error verifying code:", error);
-      return { state: null, error: "Failed to verify code" };
-    }
-  }
-
   async initializeStory(
     sessionId: string,
     prompt: string,
@@ -102,6 +60,9 @@ export class GameHandler {
     try {
       if (!isValidPlayerCount(playerCount)) {
         throw new Error(`Invalid player count: ${playerCount}`);
+      }
+      if (maxTurns < MIN_TURNS || maxTurns > MAX_TURNS) {
+        throw new Error(`Invalid max turns: ${maxTurns}`);
       }
 
       const state = await this.aiStoryGenerator.createInitialState(
@@ -395,30 +356,5 @@ export class GameHandler {
         this.io.to(socketId).emit("state_update", { state: filteredState });
       });
     });
-  }
-
-  async exitStory(sessionId: string) {
-    console.log("[GameHandler] Exiting story:", {
-      sessionId,
-      socketId: this.socket.id,
-    });
-
-    try {
-      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
-      if (!playerInfo) {
-        console.log("[GameHandler] No player info found for socket");
-        this.socket.emit("exit_story_response");
-        return;
-      }
-
-      // Remove socket from connection manager
-      connectionManager.removeSocket(this.socket.id);
-
-      this.socket.emit("exit_story_response");
-      console.log("[GameHandler] Story exited successfully");
-    } catch (error) {
-      console.error("[GameHandler] Failed to exit story:", error);
-      this.socket.emit("error", { error: "Failed to exit story" });
-    }
   }
 }

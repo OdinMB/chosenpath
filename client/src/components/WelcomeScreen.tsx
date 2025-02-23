@@ -4,12 +4,14 @@ interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
   existingPlayerCode: string | null;
+  onDeleteCode: () => void;
 }
 
 export function WelcomeScreen({
   onCodeSubmit,
   onNewStory,
   existingPlayerCode,
+  onDeleteCode,
 }: WelcomeScreenProps) {
   const [code, setCode] = useState("");
 
@@ -29,6 +31,16 @@ export function WelcomeScreen({
     }
   };
 
+  const handleDeleteClick = () => {
+    if (
+      window.confirm(
+        "Are you sure you want to delete this story code? This cannot be undone."
+      )
+    ) {
+      onDeleteCode();
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
@@ -45,12 +57,20 @@ export function WelcomeScreen({
                   {existingPlayerCode}
                 </code>
               </div>
-              <button
-                onClick={handleResume}
-                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Resume your story
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleResume}
+                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Resume Your Story
+                </button>
+                <button
+                  onClick={handleDeleteClick}
+                  className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Delete Code
+                </button>
+              </div>
             </div>
 
             <div className="relative">

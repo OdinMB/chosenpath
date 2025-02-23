@@ -25,7 +25,7 @@ export class ThreadPromptService {
     const prompt =
       StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
       this.createInstructionsSection();
-    console.log(prompt);
+    // console.log(prompt);
     return prompt;
   }
 

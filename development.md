@@ -7,6 +7,7 @@ Improve generations
 - Attach facts to players?
 - adjust scope of story setup based on the number of beats
 - Multi-step flow for generating a stat schema?
+- Track story elements that a player has NOT been introduced to yet?
 
 Easy nice-to-haves
 
@@ -60,11 +61,10 @@ The implementation should:
 Please help me implement this step by step, starting with the basic queue manager structure and then adding operations one by one.
 
 Current relevant code includes:
-server/src/handlers/GameHandler.ts
-server/src/services/AIStoryGenerator.ts
-server/src/websocket/index.ts (WebSocket handling)
-server/src/services/SessionService.ts
-server/src/services/StoryStateManager.ts
+
+- server/src/handlers/GameHandler.ts
+- server/src/services/AIStoryGenerator.ts (example for async operations)
+- Connection/Session/State management: server/src/websocket/index.ts, server/src/services/SessionService.ts, server/src/services/ConnectionManager.ts, server/src/services/StoryStateManager.ts
 
 Answers to questions you asked me in a separate chat:
 
@@ -78,3 +78,16 @@ Answers to questions you asked me in a separate chat:
 
 We already created QueueProcessor.ts, which handles generic queue processing logic.
 We already created queue.ts, which defines based types and schemas.
+
+Queue-Centric approach
+
+- WebSocket receives message
+- GameHandler performs input checks, sends immediate acknowledgments back to clients when needed, and converts message to queue operation
+- QueueProcessor manages all state changes and service calls
+- Results broadcast back through WebSocket
+
+To initialize a new story, GameHandler should generate the gameId and playerCodes, call createGameSession in the ConnectionManager, and then let GameQueueProcesses handle the rest of the initialization (passing gameId and playerCodes).
+
+I want to move one game action after another over to the queue system.
+
+Let's start with initializing a new story.

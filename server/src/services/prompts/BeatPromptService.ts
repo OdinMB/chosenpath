@@ -32,7 +32,7 @@ export class BeatPromptService {
         state,
         this.getSections(state)
       ) + this.createInstructionsSection(state);
-    console.log(prompt);
+    // console.log(prompt);
     return prompt;
   }
 
