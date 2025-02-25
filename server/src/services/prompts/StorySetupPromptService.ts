@@ -79,7 +79,10 @@ Outcomes
 - In a story with 20 beats, every player should have 3 outcomes as the sum of individual and shared outcomes.
 - If an outcome is shared, it should not be repeated as an individual outcome.
 --- Example: If the shared (competitive) outcome is "Who will reign over the forst?", there should not be any individual outcome like "Will [player] become the new spirit leader?"
---- Example: If the shared (cooperative) outcome is "Who the group reach the lost city?", there should not be any individual outcome like "Will [player] find the lost city?"
+- Each outcome has 3 possible resolutions.
+- Individual and shared cooperative outcomes that have a success/failure structure, the possible resolutions should include one favorable (and/or particularly interesting), one unfavorable (and/or unsatisfactory), and one mixed.
+- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.
+- Exploratory outcomes (= anything other than success/failure and win/lose)can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.
 
 Story elements
 - For NPCs, include their preferred pronouns and motivations.

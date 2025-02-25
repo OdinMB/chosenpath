@@ -1,4 +1,39 @@
 import { z } from "zod";
+const standardResolutionsSchema = z
+  .object({
+    favorable: z
+      .string()
+      .describe(
+        "Resolution that is favorable to the player(s) and/or particularly interesting."
+      ),
+    unfavorable: z
+      .string()
+      .describe(
+        "Resolution that is unfavorable for the player(s) and/or unsatisfactory."
+      ),
+    mixed: z
+      .string()
+      .describe("A resolution that is between favorable and unfavorable."),
+  })
+  .describe("Use this for outcomes that can succeed or fail.");
+
+const contestedResolutionsSchema = z
+  .object({
+    sideAWins: z.string().describe("Resolution of side A winning."),
+    sideBWins: z.string().describe("Resolution of side B winning."),
+    mixed: z.string().describe("Resolution of a draw/compromise."),
+  })
+  .describe("Use this for outcomes that are contested between players.");
+
+const exploratoryResolutionsSchema = z
+  .object({
+    resolution1: z.string(),
+    resolution2: z.string(),
+    resolution3: z.string(),
+  })
+  .describe(
+    "Use this for outcomes that don't follow a success/failure and win/lose structure. Example: Does Alex choose loyalty to the family or their own ambitions?"
+  );
 
 export const outcomeSchema = z
   .object({
@@ -9,10 +44,12 @@ export const outcomeSchema = z
       ),
     question: z.string().describe("Question that defines the outcome"),
     possibleResolutions: z
-      .array(z.string())
-      .describe(
-        "List 2-3 potential resolutions that could result from player choices."
-      ),
+      .union([
+        standardResolutionsSchema,
+        contestedResolutionsSchema,
+        exploratoryResolutionsSchema,
+      ])
+      .describe("Possible resolutions for this outcome"),
     resonance: z
       .string()
       .describe(

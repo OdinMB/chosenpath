@@ -52,10 +52,21 @@ export const switchSchema = z.object({
     .describe(
       "If this is a flavor switch: The question that will be explored in the next thread to push the outcome forward. (Leave empty for topic switches)"
     ),
+  topicChoices: z
+    .array(
+      z
+        .string()
+        .describe(
+          "Possible next step that the player can make, and the associated outcome or outcomes that the thread could add a milestone to."
+        )
+    )
+    .describe(
+      "If this is a topic switch: Possible next steps that the players can make. (Leave empty for flavor switches)"
+    ),
   relationshipToOtherSwitches: z
     .string()
     .describe(
-      "How this switch relates to other switches (any other switch that allows a player to join the thread, fully independent, etc.)"
+      "How this switch relates to other switches (any other switch that allows a player to join the thread, fully independent, etc.). For single-player games, just say 'single-player'."
     ),
   title: z
     .string()
@@ -84,12 +95,12 @@ export const createSwitchAnalysisSchema = (playerCount: PlayerCount) => {
       coordinationPatternAnalysis: z
         .string()
         .describe(
-          "For multiplayer games, write a list of bullet points how the game mode and the current story situation should affect how players will be distributed between one or several switches."
+          "For multiplayer games, write a list of bullet points how the game mode and the current story situation should affect how players will be distributed between one or several switches. In single-player games, just say 'single-player'."
         ),
       coordinationPatternSummary: z
         .string()
         .describe(
-          "For multiplayer games, write a summary of how the switches relate to each other (grouped thread, opt-in grouping, parallel threads with intersection, independent threads, and combinations thereof)."
+          "For multiplayer games, write a summary of how the switches relate to each other (grouped thread, opt-in grouping, parallel threads with intersection, independent threads, and combinations thereof). In single-player games, just say 'single-player'."
         ),
       switches: z
         .array(switchSchema)

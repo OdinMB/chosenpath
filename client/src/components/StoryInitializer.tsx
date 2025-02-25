@@ -34,12 +34,14 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const storyPrompts = useMemo(
     () => ({
       singlePlayer: [
-        "I'm an evil coffee machine stirring up office drama...",
-        "I'm a fortune cookie writer whose predictions started coming true...",
         "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
         "I'm a teenage wizard trying to balance school, friends, and romance...",
         "I'm a psychic detective investigating crimes in dreams...",
         "I'm a corporate concierge for supernatural entities with impossible requests...",
+        "I'm a familiar trying to save my witch from a dark fate...",
+        "I'm a dragon hoarding treasure, subjugating the local population, and fending off pesky adventurers...",
+        "I'm a frontier sheriff maintaining order in a town caught between progress and tradition...",
+        "I'm the heir to a noble house navigating political intrigue and ancient family secrets...",
       ],
       cooperative: [
         "We're retired superheroes running a wedding planning business together...",

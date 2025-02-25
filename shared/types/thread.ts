@@ -1,57 +1,117 @@
 import { z } from "zod";
 import { PLAYER_SLOTS } from "./player.js";
 
-export const threadOutcomeSchema = z.object({
-  outcomeId: z
-    .string()
+export const OUTCOME_TYPES = ["favorable", "mixed", "unfavorable"] as const;
+export type OutcomeType = (typeof OUTCOME_TYPES)[number];
+
+export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
+export type OptionType = (typeof OPTION_TYPES)[number];
+
+const threadStepOptionSchema = z.object({
+  type: z
+    .enum(OPTION_TYPES)
+    .describe("How this option affects the probability distribution"),
+  modifiers: z
+    .array(
+      z.object({
+        stat: z.string().describe("Stat that affects the points"),
+        effect: z
+          .string()
+          .describe(
+            "How this stat affects the points (e.g. 'High Charisma adds +20 points')"
+          ),
+      })
+    )
+    .describe("Individual and shared stats that affect points"),
+  points: z.number().describe("Base points for this option (-50 to +50)"),
+});
+
+// For standard (non-contested) threads
+const standardMilestonesSchema = z.object({
+  favorable: z.string().describe("Milestone to add on favorable outcome"),
+  mixed: z.string().describe("Milestone to add on mixed outcome"),
+  unfavorable: z.string().describe("Milestone to add on unfavorable outcome"),
+});
+
+// For contested multiplayer threads
+const contestedMilestonesSchema = z.object({
+  sideAWins: z.string().describe("Milestone to add if Side A wins"),
+  mixed: z.string().describe("Milestone to add on a draw/compromise"),
+  sideBWins: z.string().describe("Milestone to add if Side B wins"),
+});
+
+// For standard (non-contested) threads
+const standardStepOutcomesSchema = z
+  .object({
+    favorable: z.string(),
+    mixed: z.string(),
+    unfavorable: z.string(),
+  })
+  .describe(
+    "What the different step outcomes mean narratively (example for mixed"
+  );
+
+// For contested multiplayer threads
+const contestedStepOutcomesSchema = z
+  .object({
+    sideAWins: z.string(),
+    mixed: z.string(),
+    sideBWins: z.string(),
+  })
+  .describe(
+    "What the different step outcomes mean narratively (example for mixed: 'The council remains divided and uncertain')"
+  );
+
+const threadStepSchema = z.object({
+  title: z.string().describe("Title of this step"),
+  question: z.string().describe("Question that guides this step's choices"),
+  possibleOutcomes: z
+    .union([standardStepOutcomesSchema, contestedStepOutcomesSchema])
     .describe(
-      "ID of the outcome that this potential milestone would be added to. Can be an outcome associated with a player or a shared outcome."
-    ),
-  question: z
-    .string()
-    .describe(
-      "Question that the thread poses to the player. This question is the focus of the thread."
-    ),
-  possibleMilestones: z
-    .array(z.string())
-    .describe(
-      "Possible milestones that might be added to this outcome at the end of this thread (depending on player choices)"
+      "What happens narratively for the different outcomes of this step"
     ),
 });
 
 export const threadSchema = z.object({
-  outcomes: z
-    .array(threadOutcomeSchema)
+  plan: z
+    .string()
     .describe(
-      "List of outcomes that will get a new milestones at the end of this thread."
+      "A plan guiding the creation of this thread. Include the following points:\n- More specifically, which outcome will this thread add a milestone to?\n- Given that outcome, what type of milestone could this thread be adding to the outcome (finding/not finding a clue, convincing/not convincing the council, etc.)?\n- Which progression of beats (as many beats as the thread's duration) will lead us to the resolution of this thread (where we add a milestone to the outcome)? Make sure that each step infers an advantage or disadvantage on the next step, without making the next step impossible to reach or resolve. The milestone will be decided after the last player decision on the last beat. Other beats should work towards that climax."
     ),
-  players: z
+  outcomeId: z
+    .string()
+    .describe(
+      "ID of the outcome (individual or shared) that this thread will add a milestone to."
+    ),
+  playersSideA: z
     .array(z.enum(PLAYER_SLOTS as [string, ...string[]]))
-    .describe("IDs of players who are involved in this thread"),
+    .describe(
+      "IDs of players who make up Side A. In a singleplayer or cooperative thread, add all players to this list. In a multiplayer thread over a contested outcome, only add players who are on Side A and put opposing players on Side B."
+    ),
+  playersSideB: z
+    .array(z.enum(PLAYER_SLOTS as [string, ...string[]]))
+    .describe(
+      "Only relevant for multiplayer threads over contested outcomes. IDs of players who make up Side B. In a singleplayer or cooperative thread, leave this empty."
+    ),
+  possibleMilestones: z
+    .union([standardMilestonesSchema, contestedMilestonesSchema])
+    .describe(
+      "One of these milestones will be added to the outcome at the end of the thread. Make sure that the milestones only constitute one step toward the outcome's resolution."
+    ),
+  progression: z
+    .array(threadStepSchema)
+    .describe(
+      "Progression of steps that structure this thread. Must have exactly as many steps as the duration of the thread. (If the thread has a duration of 3 beats, this field must have 3 steps.)"
+    ),
   title: z
     .string()
     .describe(
-      "Thread title. Will be used as the title for the beats in this thread. Think book chapter or TV series episode."
+      "Thread title. Will be used as the title for the beats in this thread"
     ),
   id: z
     .string()
     .describe(
-      "Unique identifier for the thread. Use a short phrase with underscores, like 'search_for_timmy'."
-    ),
-  beatProgression: z
-    .string()
-    .describe(
-      "A simple progression of beats that creates tension over the course of the thread."
-    ),
-  multiplayerNotes: z
-    .string()
-    .describe(
-      "Notes on how to coordinate several players in the same thread (if there are indeed several players)"
-    ),
-  relationshipToOtherThreads: z
-    .string()
-    .describe(
-      "How this thread relates to other threads (especially if what happens in this thread can be influenced by what happens in other threads or vice versa). If this is a single-player game, just leave this blank."
+      "Unique identifier for the thread. Should be a short phrase with underscores based on the thread title"
     ),
 });
 
@@ -59,7 +119,7 @@ export const threadAnalysisSchema = z.object({
   coordinationPatternSummary: z
     .string()
     .describe(
-      "Write a summary of how you want to set up the threads based on the switch configuration and player choices. Especially which players should join the same thread. For single-player games, just leave this blank."
+      "Write a summary of how you want to set up the threads, and which player should join which thread. Consider the current switch configuration and the last set of player choices. (That's where they chose what they want to do in their next (= this) thread.) Be specific about what the threads will be about."
     ),
   duration: z
     .number()
@@ -73,5 +133,15 @@ export const threadAnalysisSchema = z.object({
     ),
 });
 
-export type Thread = z.infer<typeof threadSchema>;
 export type ThreadAnalysis = z.infer<typeof threadAnalysisSchema>;
+export type Thread = z.infer<typeof threadSchema>;
+
+// For the story state
+export interface ThreadState {
+  currentBeatNumber: number;
+  intermediateOutcomes: Array<{
+    beatNumber: number;
+    outcome: OutcomeType;
+    playerOutcomes?: Record<string, OutcomeType>;
+  }>;
+}

@@ -271,10 +271,10 @@ ${modeDescriptions[state.gameMode]}
   private static createOutcomesSection(outcomes: any[]): string {
     return outcomes
       .map((outcome) => {
+        const resolutions = this.formatResolutions(outcome.possibleResolutions);
         return [
           `Question: ${outcome.question} (${outcome.id})`,
-          "Possible resolutions:\n" +
-            outcome.possibleResolutions.map((r: string) => `- ${r}`).join("\n"),
+          "Possible resolutions:\n" + resolutions,
           `Resonance: ${outcome.resonance}`,
           `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
           outcome.milestones
@@ -283,6 +283,37 @@ ${modeDescriptions[state.gameMode]}
         ].join("\n");
       })
       .join("\n");
+  }
+
+  private static formatResolutions(resolutions: any): string {
+    // Standard resolutions (favorable/unfavorable/mixed)
+    if ("favorable" in resolutions) {
+      return [
+        `- Favorable: ${resolutions.favorable}`,
+        `- Mixed: ${resolutions.mixed}`,
+        `- Unfavorable: ${resolutions.unfavorable}`,
+      ].join("\n");
+    }
+
+    // Contested resolutions (sideAWins/sideBWins/mixed)
+    if ("sideAWins" in resolutions) {
+      return [
+        `- Side A wins: ${resolutions.sideAWins}`,
+        `- Mixed: ${resolutions.mixed}`,
+        `- Side B wins: ${resolutions.sideBWins}`,
+      ].join("\n");
+    }
+
+    // Exploratory resolutions (resolution1/2/3)
+    if ("resolution1" in resolutions) {
+      return [
+        `- ${resolutions.resolution1}`,
+        `- ${resolutions.resolution2}`,
+        `- ${resolutions.resolution3}`,
+      ].join("\n");
+    }
+
+    return "No resolutions defined";
   }
 
   private static createStoryProgressSection(state: StoryState): string {
@@ -309,27 +340,50 @@ ${modeDescriptions[state.gameMode]}
     const { switches, coordinationPatternSummary } =
       state.currentSwitchAnalysis;
 
+    // Get last decisions for each player
+    const lastDecisions = Object.entries(state.players)
+      .map(([slot, playerState]) => {
+        const lastBeat =
+          playerState.beatHistory[playerState.beatHistory.length - 1];
+        const choice =
+          lastBeat?.options?.[lastBeat?.choice] || "No decision made";
+        return `${slot}: ${choice}`;
+      })
+      .join("\n");
+
     const switchConfigs = switches
       .map((singleSwitch) => {
         const baseLine = `${singleSwitch.title} (${singleSwitch.id})\n- Type: ${
           singleSwitch.type
         }\n- Players: ${singleSwitch.players.join(", ")}`;
+
         const flavorLine =
           singleSwitch.type === "flavor"
             ? `\n- Outcome: ${singleSwitch.outcome}\n- Question: ${singleSwitch.question}`
             : "";
+
+        const topicLine =
+          singleSwitch.type === "topic" && singleSwitch.topicChoices?.length
+            ? "\n- Topic choices:\n" +
+              singleSwitch.topicChoices
+                .map((choice) => `  • ${choice}`)
+                .join("\n")
+            : "";
+
         const relationshipLine = `\n- Relationship to other switches: ${singleSwitch.relationshipToOtherSwitches}`;
-        return baseLine + flavorLine + relationshipLine;
+
+        return baseLine + flavorLine + topicLine + relationshipLine;
       })
       .join("\n\n");
 
-    return (
-      "CURRENT SWITCH CONFIGURATION:\n" +
-      coordinationPatternSummary +
-      "\n\n" +
-      "Configuration:\n" +
-      switchConfigs
-    );
+    return [
+      "CURRENT SWITCH CONFIGURATION:",
+      coordinationPatternSummary,
+      "\nConfiguration:",
+      switchConfigs,
+      "\nPlayers' last decisions:",
+      lastDecisions,
+    ].join("\n");
   }
 
   private static createThreadConfigurationSection(
@@ -344,26 +398,35 @@ ${modeDescriptions[state.gameMode]}
 
     const threadConfigs = threads
       .map((thread) => {
-        const outcomesSection = thread.outcomes
-          .map((outcome) => {
-            return [
-              `  Outcome ID: ${outcome.outcomeId}`,
-              `  Question: ${outcome.question}`,
-              `  Possible Milestones to add after this thread:`,
-              outcome.possibleMilestones.map((m) => `    - ${m}`).join("\n"),
+        const isContested = thread.playersSideB.length > 0;
+
+        const milestonesSection = isContested
+          ? [
+              `  Side A (${thread.playersSideA.join(", ")})`,
+              `  Side B (${thread.playersSideB.join(", ")})`,
+              `  Possible milestones:`,
+              `  - If Side A wins: ${thread.possibleMilestones["sideAWins"]}`,
+              `  - Mixed result: ${thread.possibleMilestones["mixed"]}`,
+              `  - If Side B wins: ${thread.possibleMilestones["sideBWins"]}`,
+            ].join("\n")
+          : [
+              `  Players: ${thread.playersSideA.join(", ")}`,
+              `  Possible milestones:`,
+              `  - Favorable: ${thread.possibleMilestones["favorable"]}`,
+              `  - Mixed: ${thread.possibleMilestones["mixed"]}`,
+              `  - Unfavorable: ${thread.possibleMilestones["unfavorable"]}`,
             ].join("\n");
-          })
-          .join("\n\n");
 
         return [
           `== THREAD: ${thread.title} (${thread.id}) ==`,
-          `Players: ${thread.players.join(", ")}`,
-          `Beat progression plan: ${thread.beatProgression}`,
-          `Multiplayer notes: ${thread.multiplayerNotes}`,
-          `Relationship to other threads: ${thread.relationshipToOtherThreads}`,
-          "\nOutcomes that will get a milestone after this thread:",
-          outcomesSection,
-        ].join("\n");
+          isContested ? "Contested thread between:" : "",
+          milestonesSection,
+          `Beat progression plan: ${thread.progression
+            .map((step) => step.title)
+            .join(" → ")}`,
+        ]
+          .filter(Boolean)
+          .join("\n");
       })
       .join("\n\n" + "-".repeat(40) + "\n\n");
 

@@ -2,7 +2,6 @@ import { type StoryState } from "shared/types/story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
-  DEFAULT_SECTION_CONFIG,
 } from "./StoryStatePromptService.js";
 
 export class ThreadPromptService {
@@ -25,30 +24,41 @@ export class ThreadPromptService {
     const prompt =
       StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
       this.createInstructionsSection();
-    // console.log(prompt);
+    console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
   private static createInstructionsSection(): string {
     return `\n\nCONTEXT
 
+Outcomes and milestones
+pose questions that define the ending of the story. ("Will [players] unravel the mystery of the dark forest?")
+Outcomes can be individual or shared between players.
+Each outcome has 3 possible resolutions.
+Over the course of the story, milestones are added to outcomes. Milestones mark progress toward the outcome's resolution and make some resolutions more likely.
+
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
-Beats are the smallest narrative unit that in the game.
+Beats are the smallest narrative unit in the game.
+
+Switches
+are a narrative structure of exactly 1 beat. Their purpose is to give the player agency over the direction of the story. How players should be allocated to threads depends on the switches that precede them.
 
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
-For each outcome that a thread is about, the thread poses a question: "Which of these possible milestones will be added to that outcome at the end of the thread?"
-- Example: A thread could be about the outcome "Does [player] become a werewolf?". A thread relating to this outcome could pose the question "Does [player] want to become a member of [NPC]'s pack?" Possible milestones could be: "[Player] decides to convince [NPC] to turn them", "[Player] realizes that they don't want to lose their humanity."
-Each player is linked to exactly one thread.
-A thread can have one or more players involved. It can pose questions relating to one or more outcomes.
-If there are several threads, they happen in parallel.
+They do this by adding a milestone to an outcome. Which milestone is added depends on how the thread unfolds.
+Each beat in a thread results in a favorable, mixed, or unfavorable outcome (or in contested threads: Side A wins, mixed result, Side B wins).
+The outcome of each beat affects the probability distribution of outcomes in the next beat, until finally a milestone is reached after the last beat.
 
-Switches
-are a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story.
-There are two types of switches: topic switches and flavor switches.
-Topic switches: The player can choose which question is going to be addressed in the next thread.
-Flavor switches: When the focused outcome for the next thread is already defined, the player can choose the style of the thread.
+Types of Threads:
+1. Standard Threads
+- All players work together toward shared goals
+- Outcomes are favorable/mixed/unfavorable
+- Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
+2. Contested Threads
+- Players are split into Side A and Side B, competing over an outcome
+- Outcomes are "Side A wins"/"Mixed result"/"Side B wins"
+- Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
 
 Story structure
 A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.
@@ -59,58 +69,81 @@ It is time to create the next thread to this sequence for all players.
 OUTPUT FORMAT
 
 A duration for this thread (or set of threads) between 2-4 beats.
-- 2 beats for short threads (~40% of all threads). Examples: a quick trip to the library to get information, buying a magic amulet, allocating resources
-- 3 beats for medium threads (~50% of all threads). Examples: fleeing from a bounty hunter, exploring a dungeon, trying to win an ally at a ball
-- 4 beats for showdowns (~10% of all threads). Examples: the final concert of the band, the final duel, the final boss fight
-- The duration is the same for all threads that you create in this batch.
-- Choose the duration in a way that works for all threads. Design the threads in a way that works with this normalized duration.
---- If player1 and player2 are searching for an artifact in a 3-beat thread, make sure that the independent thread for player3 is worthy of a 3-beat thread (and not a 2-beat scene for buying a potion that cannot fill the 3-beat duration).
-- In multiplayer games, if there is a 4-beat showdown, all players should be in the same thread.
+- 2 beats for short threads (~40% of all threads)
+- 3 beats for medium threads (~50% of all threads)
+- 4 beats for showdowns (~10% of all threads)
+- The duration is the same for all threads in this batch
+- Choose a duration that works for all threads
 
-A summary of how you want to set up the threads based on the switch configuration and the choices that the players made in these switches.
+A summary of how you want to set up the threads based on the switch configuration and player choices.
 Examples:
-- Independent threads + opt-in grouping: In the switch configuration, player1 and player2 are in independent threads to deal with urgent matters. player3 could decide if they want to join one of these threads. If they did, add player3 to the respective thread.
-- Grouped thread to compete over a shared outcome: player1 and player2 are in a grouped thread trying to woo the same NPC. They got flavor switches to decide their approach. Set up a thread with player1 and player2 based on the approaches that they chose.
-- In-grouping via an overlap of options: player1 and player2 could both choose how to proceed (via a topic switch). Their switches had option in common ("Join the expedition"). If they both chose this option, put them in the same thread. Otherwise, give them independent threads.
-In single-player stories, you need not worry about the coordination pattern. You only need to generate one thread.
+- Independent threads: Each player gets their own standard thread
+- Cooperative thread: All players are on Side A of a standard thread
+- Contested thread: Players are split between Side A and Side B
+- Mixed setup: Some players cooperate in a standard thread while others compete in a contested thread
+For single-player games, there is only one thread.
 
-A list of threads.
+A list of threads, each with:
+1. Players involved (Side A and, if it's a multiplayer thread over a contested outcome, Side B)
+2. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
+3. Possible milestones that might be added to that outcome
+   - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
+   - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
+4. A progression of 2-4 beats (matching the duration) that:
+   - Builds dramatic tension toward the thread's climax on the last beat
+   - Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
+   - Always gets through the entire beat progression. Specifically, no step should preempt the final outcome of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
+   - Describes what type of advantage/disadvantage is transferred to the next beat for each possible outcome for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
 
-THREADS
-must include the following attributes:
+EXAMPLE 2: 3-BEAT COOPERATIVE THREAD
+Players (Side A): player1, player2
+Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
+Possible Milestones:
+- Favorable: "The group steals incriminating documents about the noble's involvement"
+- Mixed: "The group finds hints about the noble's involvement but no solid proof"
+- Unfavorable: "The group flees the noble's manor and fails to find any evidence"
+Title: Infiltrating the Noble's Manor
+(Note that the possible milestones only mark one stop toward the outcome's resolution. More than one thread is needed to resolve the outcome.)
 
-1. One or several outcome/question pairs that the thread is about (with possible milestones for each outcome that might be added to that outcome at the end of the thread depending on player choices)
-- Keep the threads focused with only one outcome/question pair per thread.
-- A second outcome/question pair is allowed if it can be answered alongside the first outcome/question pair without derailing the thread.
+Beat Progression:
+1. Getting Past the Guards
+Question: How do [players] approach the manor's security?
+- Favorable: The guards are distracted, giving easy access to the manor
+- Mixed: [players] find a way in but the guards are on higher alert
+- Unfavorable: The guards are suspicious and increase their patrols
+(Note how the beat progression can continue no matter the outcome of step 1.)
 
-2. Which players are linked to this thread
+2. Searching the Study
+Question: How do [players] search the study without leaving traces?
+- Favorable: [players] find promising leads and the study remains undisturbed
+- Mixed: [players] find some leads but leave signs of searching
+- Unfavorable: The study is a mess and [players] alert the household
 
-3. A title
+3. Final Confrontation
+Question: The noble returns early! How do [players] handle the situation?
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 
-4. A flexible (and tentative) plan to guide the thread
-We are looking for a rough structure, not a rigid script. The thread is supposed to evolve one beat at a time, not follow a predetermined path.
+EXAMPLE 2: 2-BEAT CONTESTED THREAD
+Title: Swaying the Council
+Side A: player1 (supports military action)
+Side B: player2 (advocates for diplomacy)
+Outcome: Will there be war? (with ID shared_will_there_be_war)
+Possible Milestones:
+- Side A Wins: "The council votes for immediate military action"
+- Mixed: "The council decides to prepare for war while attempting negotiations"
+- Side B Wins: "The council commits to diplomatic resolution"
 
-4a) A simple progression of beats that builds dramatic tension over the course of the thread.
-- For each step, formulate a question indicating the type of choice that the player(s) will have to make.
---- The question must be about player choices only.
-- For each step, say how it affects the thread's outcome.
-- Example (for a 2-beat negotiation)
---- 1. Conversation: How does [player] learn about interests or weaknesses of [NPC]? (Learning about weaknesses will make it easier to get the NPC to do what they want in the closing beat.)
---- 2. Closing: How does [player] get the NPC to do what they want? (This should be hard if the player has not learned about the weaknesses.)
-- Example (for a 3-beat thread)
---- 1. Setup: How does [player] prepare for the encounter? (Choosing an approach that aligns with the player's strengths should give them an advantage in the encounter.)
---- 2. Escalation: How does [player] behave during the encounter? (A second chance to establish an advantage or to squander the existing one.)
---- 3. Climax: Does [player] take a risk to decide the conflict or escape? (Without having established an advantage, even the risky option should fail.)
-- While each beat should contribute toward the resolution of the thread, the question of how the thread should be resolved should only be answered on the last beat.
---- Example: In a 3-beat thread, if the question is "Will [player] acquire the artifact?", the player should not be able to acquire the artifact in the first or second beat.
-- Aim to reach the thread's climax with the last and decisive decision exactly on the final beat. The aftermath or resolution of the thread will be covered in the introduction of the following turn. For the purposes of this task, the thread is considered over when the player makes the last decision.
+Beat Progression:
+1. Opening Arguments
+Question: How do [players] present their initial cases to the council?
+- Side A Wins: Military urgency resonates with the council
+- Mixed: The council remains divided and uncertain
+- Side B Wins: Diplomatic opportunities capture the council's interest
+(Leads to the climax in beat 2 witout preempting the council's final vote.)
 
-4b) For multiplayer threads: How will you coordinate between the players?
-- How can they influence each other in this thread?
-- How will they show up in each other's beats?
-- How do you make sure that they don't get in each other's way or create implausible situations?
-
-5. If it's a multiplayer game: relationship to other threads that are created in this batch
+2. Final Deliberation
+Question: How do [players] address the council's key concerns?
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
   }
 }

@@ -78,7 +78,7 @@ export const beatGenerationSchema = z.object({
   summary: z
     .string()
     .describe(
-      "One-sentence summary of the beat. Don't include the options for this beat."
+      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[player] gets a cryptiv hint from [npc]'. Good: '[npc] tells [player] that [specific thing]'."
     ),
   imageId: z
     .string()
