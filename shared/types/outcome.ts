@@ -59,7 +59,7 @@ export const outcomeSchema = z
     intendedNumberOfMilestones: z
       .number()
       .describe(
-        "The number of milestones needed to reach resolution. Consider the story length and this outcome's importance (whether individual or shared)."
+        "The number of milestones needed to reach a resolution. 1 for side-outcomes, 2 as a default, 3 for outcomes that are particularly important for the ending."
       ),
     milestones: z.array(z.string()).describe("Initially empty."),
   })

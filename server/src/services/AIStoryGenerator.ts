@@ -259,12 +259,14 @@ export class AIStoryGenerator {
       beatsNeedingImages[playerSlot] = {
         ...beatData,
         choice: -1,
+        resolution: null,
       };
     }
 
     const beat: Beat = {
       ...beatData,
       choice: -1,
+      resolution: null,
     };
     state.players[playerSlot].beatHistory.push(beat);
   }

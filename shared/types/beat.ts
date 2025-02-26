@@ -9,6 +9,76 @@ import {
   newMilestoneSchema,
 } from "./change.js";
 
+export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
+export type OptionType = (typeof OPTION_TYPES)[number];
+
+export const STEP_RESOLUTION_TYPES = [
+  "favorable",
+  "mixed",
+  "unfavorable",
+] as const;
+export type StepResolutionType = (typeof STEP_RESOLUTION_TYPES)[number];
+
+const optionBaseSchema = z
+  .object({
+    optionType: z
+      .literal("basic")
+      .describe("Discriminator field to identify the option type"),
+    text: z.string().describe("Text shown to player for this choice"),
+    statConsequences: z
+      .string()
+      .describe(
+        "Instructions for the AI on how to adjust stats just for activating this option. Examples: uses 10 mana, uses a bullet, adjusts logic/empathy toward logic, loses an item, etc. Only describe what choosing this option entails immediately. Don't include the results of the player's choice. (That will be processed later.)"
+      ),
+  })
+  .describe(
+    "Choose this type of option for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
+  );
+
+const optionSuccessFailureSchema = z
+  .object({
+    optionType: z
+      .literal("successFailure")
+      .describe("Discriminator field to identify the option type"),
+    text: z.string().describe("Text shown to player for this choice"),
+    statConsequences: z
+      .string()
+      .describe(
+        "Instructions for the AI on how to adjust individual or shared stats for activating this option. Examples: uses 10 mana (if players have mana for casting spells), uses a bullet (in games where bullets are scarce and tracked by a stat), adjusts logic/empathy toward logic (if that's a tracked disposition and the choice leans toward empathy). Don't include the results of the player's choice. (Those will be processed later.)"
+      ),
+    riskType: z
+      .enum(OPTION_TYPES)
+      .describe(
+        "How this option skews the probability distribution. Risky means more extreme outcomes. Safe means more mixed and fewer unfavorable outcomes."
+      ),
+    basePoints: z
+      .number()
+      .describe(
+        "Base points for this option (+25 to -25) depending on how much sense this option makes for achieving a favorable result / winning the contest."
+      ),
+    modifiers: z
+      .array(
+        z
+          .object({
+            stat: z.string().describe("Stat and why it affects the points"),
+            effect: z
+              .number()
+              .describe(
+                "How this stat affects the points. +20 to -20 for minor influences, +40 to -40 for major influences."
+              ),
+          })
+          .describe(
+            "Stat and how they affect the points of this option. Example: 'player1_charisma is 70/100, indicating that they are good at wooing [npc]' => +20)"
+          )
+      )
+      .describe(
+        "Individual and shared stats that affect how many points this options adds or substracts from the favorable/mixed/unfavorable probability distribution. List the 1-2 most relevant stats and their effects on the chances of success. (The stats you mention here don't change. They just influence how likely it is that this option leads to success.)"
+      ),
+  })
+  .describe(
+    "Choose this type of option for threads that follow a success/failure or win/lose pattern"
+  );
+
 export const beatTypeSchema = z.enum(["intro", "switch", "thread", "ending"]);
 
 export const beatPlanSchema = z.object({
@@ -53,6 +123,7 @@ export const beatPlanSchema = z.object({
       "Answer the following questions:\n- How to reinforce the story's key conflicts and focused types of decisions?\n" +
         "- Which stats (both individual and shared) should affect the design of the options and how?\n" +
         "- What are the requirements from the current switch/thread configuration?\n" +
+        "- If these are options for a topic switch, just say 'as in the topic switch configuration'.\n" +
         "The ending doesn't need any options."
     ),
 });
@@ -86,9 +157,14 @@ export const beatGenerationSchema = z.object({
       "Id of an image from the existing list of images. Leave empty if no image is available or fitting. Leave empty if you want the game app to generate a new image for this beat."
     ),
   options: z
-    .array(z.string().describe("Text shown to player for this choice"))
+    .array(
+      z.discriminatedUnion("optionType", [
+        optionBaseSchema,
+        optionSuccessFailureSchema,
+      ])
+    )
     .describe(
-      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Don't re-offer options from previous beats, including doubling down on the same option. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
+      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
     ),
 });
 
@@ -141,9 +217,14 @@ export type SetOfBeatGenerationSchema = {
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
+  resolution: StepResolutionType | null;
 };
 export type BeatHistory = Array<Beat>;
 
 export type BeatGeneration = z.infer<typeof beatGenerationSchema>;
 
 export type BeatPlan = z.infer<typeof beatPlanSchema>;
+
+export type BaseOption = z.infer<typeof optionBaseSchema>;
+export type SuccessFailureOption = z.infer<typeof optionSuccessFailureSchema>;
+export type BeatOption = BaseOption | SuccessFailureOption;

@@ -52,7 +52,7 @@ export class StorySetupPromptService {
   }
 
   private static getStatGuidelines(): string {
-    return `This is how a story with 20 beats could look like:
+    return `This is how a story with 25 beats could look like:
 - 3 overarching conflicts
 - 3 types of decisions that the players will be able to make
 - 6-8 story elements
@@ -61,8 +61,7 @@ export class StorySetupPromptService {
 --- 2-4 miscellaneous elements (like items, factions, organizations, dangers, mysteries, conflicts, or whatever the story might need)
 --- Add three facts about each story element.
 --- Don't include the player characters (main protagonists) in this list.
---- If a stat refers to something (a character, organization, faction, location, etc.), chances are that it should be a story element.
-- In multiplayer games, 0-3 shared outcomes with slots for 3 milestones each towards the outcome's resolution
+- In multiplayer games, 0-3 shared outcomes, with a total of 0-6 milestones towards the outcomes' resolution between them
 --- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
 --- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
@@ -71,30 +70,34 @@ export class StorySetupPromptService {
 - Any invisible shared stats that you think are important
 - Stats for scoring, pacing, and story flags if you think they are needed (if any)
 For each player
-- (3 - number of shared outcomes) individual outcomes with slots for 3 milestones each towards the outcome's resolution
+- (3 - number of shared outcomes) individual outcomes, with a total of (6 - milestones toward shared outcomes) milestones between them
 - 3-4 visible stats that are linked directly to that player (traits, skills, dispositions, health, personal relationships, personal resources, etc.)
 - Any invisible stats that are linked to that player that you think are important
 
 Outcomes
-- In a story with 20 beats, every player should have 3 outcomes as the sum of individual and shared outcomes.
+- In a story with 25 beats, every player should have 3 outcomes as the sum of individual and shared outcomes, with a total of 6 milestones towards these outcomes' resolutions.
+--- 1 milestone for side-outcomes
+--- 2 milestones as a default
+--- 3 milestones for outcomes that are particularly important for the ending.
+- Each outcome has 3 possible resolutions.
+--- The final resolution will be decided based on the milestones that have been established over the course of the story.
+--- Individual and shared cooperative outcomes that have a success/failure structure, the possible resolutions should include one favorable (and/or particularly interesting), one unfavorable (and/or unsatisfactory), and one mixed.
+--- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.
+--- Exploratory outcomes (= anything other than success/failure and win/lose) can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.
 - If an outcome is shared, it should not be repeated as an individual outcome.
 --- Example: If the shared (competitive) outcome is "Who will reign over the forst?", there should not be any individual outcome like "Will [player] become the new spirit leader?"
-- Each outcome has 3 possible resolutions.
-- Individual and shared cooperative outcomes that have a success/failure structure, the possible resolutions should include one favorable (and/or particularly interesting), one unfavorable (and/or unsatisfactory), and one mixed.
-- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.
-- Exploratory outcomes (= anything other than success/failure and win/lose)can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.
 
 Story elements
 - For NPCs, include their preferred pronouns and motivations.
 - Use the instructions attribute to establish story hints and gameplay mechanics.
 --- Example: "Mr. X only helps players in exchange for gold."
---- Example: "If players enter this location, the scene should involve a chance to die."
---- Example: "If players enter this location, they should restore 10 health."
+--- Example: "If players enter this location, the scene should involve significant danger."
+--- Example: "If players enter this location, they restore 10 health."
 
 No franchise copyright infringement!
 Don't borrow story elements from established franchises.
-Example: a story about a teenage wizard should not have NPCs named "Luna" or "Dumbledore".
-Example: a space opera should not have story elements from the universes of Enterprise and Firefly.
+- Example: a story about a teenage wizard should not have NPCs named "Luna" or "Dumbledore".
+- Example: a space opera should not have story elements from the universes of Star Trek Enterprise or Firefly.
 
 Stat groups
 are used to group stats in the UI. Both character and shared stats can be grouped and will be displayed in the UI together.

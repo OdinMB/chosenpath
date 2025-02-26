@@ -31,11 +31,13 @@ export class ThreadPromptService {
   private static createInstructionsSection(): string {
     return `\n\nCONTEXT
 
-Outcomes and milestones
+Outcomes
 pose questions that define the ending of the story. ("Will [players] unravel the mystery of the dark forest?")
 Outcomes can be individual or shared between players.
 Each outcome has 3 possible resolutions.
-Over the course of the story, milestones are added to outcomes. Milestones mark progress toward the outcome's resolution and make some resolutions more likely.
+
+Milestones
+are added to outcomes at the end of threads. Milestones mark progress toward the outcome's resolution and make some resolutions more likely.
 
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
@@ -55,10 +57,17 @@ Types of Threads:
 - All players work together toward shared goals
 - Outcomes are favorable/mixed/unfavorable
 - Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
+
 2. Contested Threads
 - Players are split into Side A and Side B, competing over an outcome
 - Outcomes are "Side A wins"/"Mixed result"/"Side B wins"
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
+
+3. Exploratory Threads
+- Players make choices that don't follow a success/failure structure but explore different narrative paths
+- Outcomes are "Option 1"/"Option 2"/"Option 3" representing different choices or directions
+- Example milestones (one will be added to the outcome at the end of the thread): "[player] takes over the family hotel", "[player] helps at the family hotel while doing occassional photography jobs", "[player] is no longer engaged in the family business"
+- Use for character development, moral dilemmas, or when multiple valid paths exist without clear "better" or "worse" options
 
 Story structure
 A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.
@@ -69,9 +78,23 @@ It is time to create the next thread to this sequence for all players.
 OUTPUT FORMAT
 
 A duration for this thread (or set of threads) between 2-4 beats.
-- 2 beats for short threads (~40% of all threads)
-- 3 beats for medium threads (~50% of all threads)
-- 4 beats for showdowns (~10% of all threads)
+- 2 beats: interludes, breathers, and simple transactions (~30% of all threads)
+--- Simple transactions (e.g. buying an artifact, meeting a friendly npc to get information)
+--- Reflections (e.g. a moment of realization, a moment of doubt)
+--- Resource gathering and management (e.g. gathering materials, buying supplies, finding a place to sleep, sending armies around)
+--- Maintenance (e.g. healing, repairing a ship, taking care of a pet)
+--- Quick decisions (e.g. deciding whether to trust someone, choosing a contract with the crew)
+--- Information exchange (e.g. interviewing a witness, consulting an expert, sharing intel)
+- 3 beats: drama and challenges (~50% of all threads)
+--- Encounters (e.g. a fight, an escape)
+--- Investigations (e.g. crime scene, tracking someone)
+--- Social challenges (e.g. navigating a social event, building alliances, resolving conflicts)
+--- Skill challenges (e.g. climbing a mountain, crafting a special item, performing a ritual)
+--- Journeys (e.g. traveling through dangerous territory, navigating obstacles)
+--- Character development (building a relationship, facing a fear)
+- 4 beats: endings and transformations (~20% of all threads)
+--- Showdowns (e.g. a epic battle, the make-or-break concert of the band, the council session to become the new king)
+--- Transformative events (e.g. ascension ceremonies, magical transformations, a coronation)
 - The duration is the same for all threads in this batch
 - Choose a duration that works for all threads
 
@@ -81,6 +104,7 @@ Examples:
 - Cooperative thread: All players are on Side A of a standard thread
 - Contested thread: Players are split between Side A and Side B
 - Mixed setup: Some players cooperate in a standard thread while others compete in a contested thread
+- Exploratory thread: Players face choices with multiple valid paths rather than success/failure outcomes
 For single-player games, there is only one thread.
 
 A list of threads, each with:
@@ -95,7 +119,7 @@ A list of threads, each with:
    - Always gets through the entire beat progression. Specifically, no step should preempt the final outcome of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
    - Describes what type of advantage/disadvantage is transferred to the next beat for each possible outcome for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
 
-EXAMPLE 2: 3-BEAT COOPERATIVE THREAD
+EXAMPLE 1: 3-BEAT COOPERATIVE THREAD
 Players (Side A): player1, player2
 Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
 Possible Milestones:
@@ -143,6 +167,27 @@ Question: How do [players] present their initial cases to the council?
 
 2. Final Deliberation
 Question: How do [players] address the council's key concerns?
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
+
+EXAMPLE 3: 2-BEAT EXPLORATORY THREAD
+Title: Personal Crossroads
+Players: player1
+Outcome: Will Alex choose family or ambition? (with ID player1_family_vs_ambition)
+Possible Milestones:
+- Option 1: "Alex prioritizes family obligations over the job opportunity"
+- Option 2: "Alex finds a compromise that partially satisfies both family and career"
+- Option 3: "Alex pursues the career opportunity despite family disapproval"
+
+Beat Progression:
+1. Weighing the Options
+Question: How does Alex approach the difficult conversation with family?
+- Option 1: Alex gains deeper understanding of family's perspective
+- Option 2: Alex identifies potential middle ground solutions
+- Option 3: Alex becomes more convinced of the career opportunity's importance
+(Each option provides different context for the final decision without forcing it.)
+
+2. Making the Choice
+Question: What does Alex ultimately prioritize when forced to choose?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
   }

@@ -101,7 +101,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               <div className="flex items-center gap-2">
                 <span className="font-bold">Choice: </span>
                 <span className="text-indigo-800">
-                  {currentBeat.options[choiceIndex]}
+                  {currentBeat.options[choiceIndex].text}
                 </span>
               </div>
             </div>
@@ -121,7 +121,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               className={`w-full p-4 text-lg text-left rounded-lg transition-colors 
                 bg-gray-100 hover:bg-gray-200 cursor-pointer`}
             >
-              {option}
+              {option.text}
             </button>
           ))}
         </div>

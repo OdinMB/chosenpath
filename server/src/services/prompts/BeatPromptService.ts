@@ -48,11 +48,10 @@ export class BeatPromptService {
 ${
   isFirstBeat(state)
     ? "Since this is the beginning of the story, there are no consequences of player actions to process. Just return an empty list."
-    : "Given the previous set of beats and decisions of players, which stats seem relevant for deciding the consequences of player actions?\n\n" +
+    : "For success/failure and sideA vs. sideB threads, we already determined if the results are favorable/mixed/unfavorable. This section is about identifying other narrative consequences.\n\n" +
       "Includes stats that affect\n" +
-      "- the chance of success. Example: Whether a player can successfully steal an artifact might depend on the that player's charisma stat.\n" +
-      "- the scope of what is happening. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.\n" +
-      "- how the consequences play out. Example: How the player escapes pursuer depends on the spells that the player has access to.\n\n" +
+      "- the scope of what is happening narratively. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.\n" +
+      "- how the consequences play out narratively. Example: How the player escapes pursuer depends on their stealth. If it's high, they escaped because of cunning. If it's low, there was a bit of luck involved.\n\n" +
       "Format: [statId]: [reason]"
 }
 
@@ -62,6 +61,8 @@ ${
   isFirstBeat(state)
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
     : "- STAT CHANGES based on players' decisions in the last beat\n" +
+      "--- Include stat changes that are part of the instructions of the options that players chose in the last beat. (These instructions represent stat changes that are part of making the choice in the first place, like losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition.)\n" +
+      "--- Identify any minor stat changes that are part of the consequences of the players' choices. (These are changes that are not part of making the choice, but rather the result of the choice.) Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
       "--- Changes can affect both the shared stats and the individual stats of each player.\n" +
       "--- For string and string[] types of stats, make sure to set or add values that can be displayed to the player directly (e.g. 'Ring of Protection' instead of 'ring_of_protection').\n" +
       (state.currentBeatType === "switch" || state.currentBeatType === "ending"
@@ -75,13 +76,19 @@ CONTEXT
 
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
-Beats are the smallest narrative unit that in the game.
+Beats are the smallest narrative unit that in the game.${
+      state.currentBeatType === "thread"
+        ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
+          "\nOptions can change this probability distribution with points. For example, it takes 50 points to change a 33/34/33 distribution to a 50/50/0 distribution (16 points to shift 16%-points from unfavorable to mixed, and 34 points to shift 17%-points from unfavorable to favorable)."
+        : ""
+    }
 
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
 For each outcome that this thread is about, the thread poses a question: "Which of these possible milestones will be added to that outcome at the end of the thread?"
 A thread can have one or more players involved. It can pose questions relating to one or more outcomes.
 Each player is linked to a thread. If there are several threads, they happen in parallel.
+Threads with a favorable/unfavorable or sideA/sideB wins format follow a progression of beats with increasing stakes. The result of each beat affects the success chances of the following beat. After the final beat, a favorable/mixed/unfavorable milestone is added to the outcome.
 ${
   state.currentBeatType !== "ending"
     ? "\nSwitches\nare a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story." +
@@ -168,12 +175,12 @@ ${
       state.currentBeatType +
       " configuration" +
       (state.currentBeatType === "thread"
-        ? ", including the tentative plan for the thread progression"
+        ? ", including the plan for the thread progression"
         : "") +
       "?" +
       (state.currentBeatType === "thread"
         ? "\n- Make sure that the options push toward the resolution of the thread's question. Don't deviate from the core question that the thread is posing."
-        : "")
+        : "\n- Topic switches already have their options defined in the switch configuration.")
     : ""
 }
 
@@ -197,7 +204,6 @@ Text
 --- Describe the immediate consequences of the player's decision.
 --- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.
 --- If the player was in a thread or switch with other players, also describe what the decisions and outcomes of the other players are. (Unless it would be implausible for the player to know about it.)
---- It often makes sense to include some reaction from the player's perspective, like a bodily sensation, a thought, or an emotion.
 ${
   !isFirstBeat(state) && state.currentBeatType === "switch"
     ? "- Most of the beat text\n" +
@@ -226,18 +232,32 @@ ${
           "--- AVOID all of these formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'\n" +
           "\nOptions\n" +
           "- Offer 3 options.\n" +
-          "- Be specific.\n" +
-          "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
-          "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
-          "- Don't offer options again that you already offered in previous beats.\n" +
-          "--- This includes doubling down on the same option.\n" +
-          "- Do NOT include the actual or likely consequences of a decision.\n" +
           "- Make sure that the beat implements the current " +
           state.currentBeatType +
           " configuration.\n" +
+          (state.currentBeatType === "thread"
+            ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n"
+            : "") +
           "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
           state.currentBeatType +
-          " in any other way."
+          " in any other way.\n" +
+          "- Be specific.\n" +
+          "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
+          "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
+          "--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'\n" +
+          "- Do NOT include the actual or likely consequences of a decision.\n" +
+          "- For each option, set the optionType field:\n" +
+          (state.currentBeatType === "switch"
+            ? "--- Use 'basic' for all options in switches.\n"
+            : "--- Use 'basic' for options in exploratory threads (that don't follow a success/failure or win/lose pattern).\n" +
+              "--- Use 'successFailure' for options in threads with favorable/unfavorable or sideA/sideB outcomes.\n") +
+          "- Define stat changes that are a necessary part of choosing the option (if any). Don't include the results of the player's choice. (Those will be processed later.) Example: Using a spell might use up some mana. Making a choice might change a logic/empathy disposition a bit toward empathy.\n" +
+          (state.currentBeatType === "thread"
+            ? "- For threads with favorable/unfavorable or sideA/sideB outcomes, define how the option affects the likelihood of different outcomes\n" +
+              "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring stats).\n" +
+              "--- modifiers: identify stats (individual and shared) that have an effect on the likelihood of success. Example: if the option is to woo an npc and player1_charisma is 70/100, you could assign a modifier of +20. If the group tries to escape the bounty hunters and their spaceship has status 'damaged', you could assign a modifier of -15.\n" +
+              "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
+            : "")
     }
 `;
   }

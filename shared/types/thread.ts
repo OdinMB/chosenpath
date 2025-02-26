@@ -1,31 +1,6 @@
 import { z } from "zod";
 import { PLAYER_SLOTS } from "./player.js";
 
-export const OUTCOME_TYPES = ["favorable", "mixed", "unfavorable"] as const;
-export type OutcomeType = (typeof OUTCOME_TYPES)[number];
-
-export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
-export type OptionType = (typeof OPTION_TYPES)[number];
-
-const threadStepOptionSchema = z.object({
-  type: z
-    .enum(OPTION_TYPES)
-    .describe("How this option affects the probability distribution"),
-  modifiers: z
-    .array(
-      z.object({
-        stat: z.string().describe("Stat that affects the points"),
-        effect: z
-          .string()
-          .describe(
-            "How this stat affects the points (e.g. 'High Charisma adds +20 points')"
-          ),
-      })
-    )
-    .describe("Individual and shared stats that affect points"),
-  points: z.number().describe("Base points for this option (-50 to +50)"),
-});
-
 // For standard (non-contested) threads
 const standardMilestonesSchema = z.object({
   favorable: z.string().describe("Milestone to add on favorable outcome"),
@@ -135,13 +110,3 @@ export const threadAnalysisSchema = z.object({
 
 export type ThreadAnalysis = z.infer<typeof threadAnalysisSchema>;
 export type Thread = z.infer<typeof threadSchema>;
-
-// For the story state
-export interface ThreadState {
-  currentBeatNumber: number;
-  intermediateOutcomes: Array<{
-    beatNumber: number;
-    outcome: OutcomeType;
-    playerOutcomes?: Record<string, OutcomeType>;
-  }>;
-}

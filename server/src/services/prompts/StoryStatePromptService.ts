@@ -1,5 +1,4 @@
 import { type StoryState, GameModes } from "shared/types/story.js";
-import { ThreadAnalysis } from "shared/types/thread.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -49,19 +48,13 @@ export class StoryStatePromptService {
       sections.storyProgress ? this.createStoryProgressSection(state) : "",
       sections.switchConfiguration ? this.getSwitchConfiguration(state) : "",
       sections.threadConfiguration
-        ? this.createThreadConfigurationSection(
-            state.currentThreadAnalysis,
-            "current"
-          ) +
+        ? this.createThreadConfigurationSection("current", state) +
           `\n\nCURRENT THREAD PROGRESSION: Turn ${
             state.currentThreadBeatsCompleted + 1
           }/${state.currentThreadMaxBeats}\n`
         : "",
       sections.previousThreadConfiguration
-        ? this.createThreadConfigurationSection(
-            state.previousThreadAnalysis,
-            "previous"
-          )
+        ? this.createThreadConfigurationSection("previous", state)
         : "",
     ]
       .filter(Boolean)
@@ -228,23 +221,17 @@ ${modeDescriptions[state.gameMode]}
           index >= beatHistory.length - currentThreadBeatsCompleted;
 
         if (isLastBeat || isInCurrentThread) {
-          const optionsText = beat.options?.length
-            ? "Options:\n" +
-              beat.options
-                .map(
-                  (opt: string, i: number) =>
-                    `- ${i === beat.choice ? "(Player choice) " : ""}${opt}`
-                )
-                .join("\n") +
-              "\n"
-            : "";
+          const playerChoice =
+            beat.options?.length && beat.choice !== undefined
+              ? `Player choice: ${beat.options[beat.choice].text}\n`
+              : "";
 
           return [
             `- Beat ${index + 1} ${
               isInCurrentThread ? " (current thread)" : ""
             } ${isLastBeat ? " (previous beat)" : ""}`,
             isLastBeat ? beat.text : beat.summary,
-            optionsText,
+            playerChoice,
           ]
             .filter(Boolean)
             .join("\n\n");
@@ -319,9 +306,9 @@ ${modeDescriptions[state.gameMode]}
   private static createStoryProgressSection(state: StoryState): string {
     const turnsDone = Object.values(state.players)[0].beatHistory.length;
     const turnsLeft = state.maxTurns - turnsDone;
-    return `\nSTORY PROGRESS\nCurrent turn: ${turnsDone + 1}/${
-      state.maxTurns
-    }\nTurns left (including this one): ${turnsLeft}\n`;
+    return `\n======= STORY PROGRESS =======\n\nCurrent turn: ${
+      turnsDone + 1
+    }/${state.maxTurns}\nTurns left (including this one): ${turnsLeft}\n`;
   }
 
   private static createSharedOutcomesSection(state: StoryState): string {
@@ -387,9 +374,14 @@ ${modeDescriptions[state.gameMode]}
   }
 
   private static createThreadConfigurationSection(
-    threadAnalysis: ThreadAnalysis | null,
-    type: "current" | "previous"
+    type: "current" | "previous",
+    state: StoryState
   ): string {
+    const threadAnalysis =
+      type === "current"
+        ? state.currentThreadAnalysis
+        : state.previousThreadAnalysis;
+
     if (!threadAnalysis) {
       return "";
     }
@@ -399,37 +391,141 @@ ${modeDescriptions[state.gameMode]}
     const threadConfigs = threads
       .map((thread) => {
         const isContested = thread.playersSideB.length > 0;
+        const hasExploratoryMilestones =
+          "resolution1" in thread.possibleMilestones;
 
-        const milestonesSection = isContested
+        const milestonesSection = hasExploratoryMilestones
           ? [
-              `  Side A (${thread.playersSideA.join(", ")})`,
-              `  Side B (${thread.playersSideB.join(", ")})`,
-              `  Possible milestones:`,
-              `  - If Side A wins: ${thread.possibleMilestones["sideAWins"]}`,
-              `  - Mixed result: ${thread.possibleMilestones["mixed"]}`,
-              `  - If Side B wins: ${thread.possibleMilestones["sideBWins"]}`,
+              `Players: ${thread.playersSideA.join(", ")}`,
+              `\nPossible milestones:`,
+              `- Option 1: ${thread.possibleMilestones["resolution1"]}`,
+              `- Option 2: ${thread.possibleMilestones["resolution2"]}`,
+              `- Option 3: ${thread.possibleMilestones["resolution3"]}`,
+            ].join("\n")
+          : isContested
+          ? [
+              `Side A (${thread.playersSideA.join(", ")})`,
+              `Side B (${thread.playersSideB.join(", ")})`,
+              `\nPossible milestones:`,
+              `- If Side A wins: ${thread.possibleMilestones["sideAWins"]}`,
+              `- Mixed result: ${thread.possibleMilestones["mixed"]}`,
+              `- If Side B wins: ${thread.possibleMilestones["sideBWins"]}`,
             ].join("\n")
           : [
-              `  Players: ${thread.playersSideA.join(", ")}`,
-              `  Possible milestones:`,
-              `  - Favorable: ${thread.possibleMilestones["favorable"]}`,
-              `  - Mixed: ${thread.possibleMilestones["mixed"]}`,
-              `  - Unfavorable: ${thread.possibleMilestones["unfavorable"]}`,
+              `Players: ${thread.playersSideA.join(", ")}`,
+              `\nPossible milestones:`,
+              `- Favorable: ${thread.possibleMilestones["favorable"]}`,
+              `- Mixed: ${thread.possibleMilestones["mixed"]}`,
+              `- Unfavorable: ${thread.possibleMilestones["unfavorable"]}`,
             ].join("\n");
 
+        const numberedProgression = thread.progression
+          .map((step, idx) => `(${idx + 1}) ${step.title}`)
+          .join(" → ");
+
+        // Get previous beat choices for this thread
+        const previousBeatChoices = [];
+        if (state.currentThreadBeatsCompleted > 0 && type === "current") {
+          // Find players in this thread
+          const threadPlayers = [
+            ...thread.playersSideA,
+            ...thread.playersSideB,
+          ];
+
+          // For each player, get their choices in the current thread
+          for (const playerId of threadPlayers) {
+            const player = state.players[playerId];
+            if (!player) continue;
+
+            // Calculate the starting index for the current thread in the beat history
+            const threadStartIndex =
+              player.beatHistory.length - state.currentThreadBeatsCompleted;
+
+            // Loop through all completed beats in the current thread
+            for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
+              const beatIndex = threadStartIndex + i;
+              if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
+                const beat = player.beatHistory[beatIndex];
+                if (beat && beat.options && beat.choice !== undefined) {
+                  previousBeatChoices.push(
+                    `- Beat ${i + 1}: (${playerId}) chose "${
+                      beat.options[beat.choice].text
+                    }"`
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        const currentBeatInfo = (beatsCompleted: number | undefined) => {
+          // Only show current beat info for current thread configuration
+          if (type !== "current") return "";
+
+          if (beatsCompleted === undefined) return "";
+          const currentBeat = thread.progression[beatsCompleted];
+          if (!currentBeat) return "";
+
+          // Determine outcome type
+          const hasContestedOutcomes =
+            "sideAWins" in currentBeat.possibleOutcomes;
+          const hasStandardOutcomes =
+            "favorable" in currentBeat.possibleOutcomes;
+          const hasExploratoryOutcomes =
+            "resolution1" in currentBeat.possibleOutcomes;
+
+          let outcomes: string[] = [];
+
+          if (hasContestedOutcomes) {
+            outcomes = [
+              `- If Side A wins: ${currentBeat.possibleOutcomes["sideAWins"]}`,
+              `- Mixed result: ${currentBeat.possibleOutcomes["mixed"]}`,
+              `- If Side B wins: ${currentBeat.possibleOutcomes["sideBWins"]}`,
+            ];
+          } else if (hasStandardOutcomes) {
+            outcomes = [
+              `- Favorable: ${currentBeat.possibleOutcomes["favorable"]}`,
+              `- Mixed: ${currentBeat.possibleOutcomes["mixed"]}`,
+              `- Unfavorable: ${currentBeat.possibleOutcomes["unfavorable"]}`,
+            ];
+          } else if (hasExploratoryOutcomes) {
+            outcomes = [
+              `- Option 1: ${currentBeat.possibleOutcomes["resolution1"]}`,
+              `- Option 2: ${currentBeat.possibleOutcomes["resolution2"]}`,
+              `- Option 3: ${currentBeat.possibleOutcomes["resolution3"]}`,
+            ];
+          } else {
+            outcomes = ["- No outcomes defined"];
+          }
+
+          return [
+            `\nCurrent beat (${beatsCompleted + 1}/${
+              state.currentThreadMaxBeats
+            }): ${currentBeat.title}`,
+            `Question: ${currentBeat.question}`,
+            `Possible outcomes:`,
+            outcomes.join("\n"),
+          ].join("\n");
+        };
+
         return [
-          `== THREAD: ${thread.title} (${thread.id}) ==`,
-          isContested ? "Contested thread between:" : "",
+          `==== THREAD: ${thread.title} (${thread.id}) ====`,
+          isContested
+            ? "Contested thread between:"
+            : hasExploratoryMilestones
+            ? "Exploratory thread:"
+            : "",
           milestonesSection,
-          `Beat progression plan: ${thread.progression
-            .map((step) => step.title)
-            .join(" → ")}`,
+          `\nBeat progression`,
+          `- Plan: ${numberedProgression}`,
+          previousBeatChoices.length > 0 ? previousBeatChoices.join("\n") : "",
+          currentBeatInfo(state.currentThreadBeatsCompleted),
         ]
           .filter(Boolean)
           .join("\n");
       })
       .join("\n\n" + "-".repeat(40) + "\n\n");
 
-    return `\n${type.toUpperCase()} THREAD CONFIGURATION:\n\n${threadConfigs}`;
+    return `\n======= ${type.toUpperCase()} THREAD CONFIGURATION =======\n\n${threadConfigs}`;
   }
 }
