@@ -9,8 +9,10 @@ import type { PlayerSlot } from "shared/types/player.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
 import { ChangeService } from "../services/ChangeService.js";
+import { OutcomeService } from "../services/OutcomeService.js";
 import { determineNextBeatType } from "shared/utils/storyUtils.js";
 import { areAllChoicesSubmitted } from "shared/utils/storyUtils.js";
+import { type Beat, type StepResolutionType } from "shared/types/beat.js";
 
 export interface QueueEvents {
   stateUpdated: (event: StateUpdateEvent) => void;
@@ -221,15 +223,22 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       optionIndex
     );
 
+    // Process success/failure outcomes if applicable
+    const stateWithOutcomes = this.processSuccessFailureOutcome(
+      updatedState,
+      playerSlot,
+      optionIndex
+    );
+
     // Emit state update
-    this.events.emit("stateUpdated", { gameId, state: updatedState });
+    this.events.emit("stateUpdated", { gameId, state: stateWithOutcomes });
 
     // Queue next operation if all choices are in
-    if (areAllChoicesSubmitted(updatedState)) {
+    if (areAllChoicesSubmitted(stateWithOutcomes)) {
       await this.addOperation({
         type: "moveStoryForward",
         gameId,
-        input: { state: updatedState },
+        input: { state: stateWithOutcomes },
       });
     }
   }
@@ -254,6 +263,176 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         },
       },
     };
+  }
+
+  /**
+   * Process success/failure outcomes for a player's choice
+   */
+  private processSuccessFailureOutcome(
+    state: StoryState,
+    playerSlot: PlayerSlot,
+    optionIndex: number
+  ): StoryState {
+    // If not a thread beat or no thread analysis, return state unchanged
+    if (
+      state.currentBeatType !== "thread" ||
+      !state.currentThreadAnalysis ||
+      state.players[playerSlot].beatHistory.length === 0
+    ) {
+      return state;
+    }
+
+    const updatedState = { ...state };
+    const player = updatedState.players[playerSlot];
+    const currentBeat = player.beatHistory[player.beatHistory.length - 1];
+
+    // Only process if the option is a success/failure type
+    if (currentBeat.options[optionIndex].optionType !== "successFailure") {
+      return updatedState;
+    }
+
+    // Get the previous beat for this player (if any)
+    const previousBeat =
+      player.beatHistory.length > 1
+        ? player.beatHistory[player.beatHistory.length - 2]
+        : null;
+
+    // Process the outcome
+    const outcomeResult = OutcomeService.processBeatOutcome(
+      currentBeat,
+      previousBeat
+    );
+
+    // Update the beat with the outcome result and resolution
+    const updatedBeat: Beat = {
+      ...currentBeat,
+      resolution: outcomeResult.resolution,
+      outcomeResult: outcomeResult,
+    };
+
+    // Update the player's beat history with the processed beat
+    const updatedPlayers = {
+      ...updatedState.players,
+      [playerSlot]: {
+        ...player,
+        beatHistory: [
+          ...player.beatHistory.slice(0, player.beatHistory.length - 1),
+          updatedBeat,
+        ],
+      },
+    };
+
+    const stateWithUpdatedPlayers = {
+      ...updatedState,
+      players: updatedPlayers,
+    };
+
+    // If this is a contested thread, check if we need to compare sides
+    this.processContestedThreadOutcomes(stateWithUpdatedPlayers);
+
+    return stateWithUpdatedPlayers;
+  }
+
+  /**
+   * Process contested thread outcomes by comparing sides
+   */
+  private processContestedThreadOutcomes(state: StoryState): void {
+    // Only process if this is a thread and all players have submitted choices
+    if (
+      state.currentBeatType !== "thread" ||
+      !state.currentThreadAnalysis ||
+      !areAllChoicesSubmitted(state)
+    ) {
+      return;
+    }
+
+    // Initialize the contest outcomes map if it doesn't exist
+    if (!state.currentThreadContestOutcomes) {
+      state.currentThreadContestOutcomes = {};
+    }
+
+    // Process each contested thread
+    state.currentThreadAnalysis.threads?.forEach((thread) => {
+      // Skip threads that aren't contested
+      if (!thread.playersSideB || thread.playersSideB.length === 0) {
+        return;
+      }
+
+      const { playersSideA, playersSideB, id } = thread;
+
+      // Get the latest beat for each player
+      const sideABeats = playersSideA
+        .map((playerSlot) => {
+          const player = state.players[playerSlot];
+          return player.beatHistory[player.beatHistory.length - 1];
+        })
+        .filter((beat) => beat.resolution !== null);
+
+      const sideBBeats = playersSideB
+        .map((playerSlot) => {
+          const player = state.players[playerSlot];
+          return player.beatHistory[player.beatHistory.length - 1];
+        })
+        .filter((beat) => beat.resolution !== null);
+
+      // Only proceed if all players have resolutions
+      if (
+        sideABeats.length !== playersSideA.length ||
+        sideBBeats.length !== playersSideB.length
+      ) {
+        return;
+      }
+
+      // Calculate the average outcome for each side
+      const sideAOutcome = this.calculateAverageOutcome(sideABeats);
+      const sideBOutcome = this.calculateAverageOutcome(sideBBeats);
+
+      // Compare the outcomes to determine the winner
+      const contestedOutcome = OutcomeService.compareContestedOutcomes(
+        sideAOutcome,
+        sideBOutcome
+      );
+
+      // Store the contested outcome in the state for this specific thread
+      if (id) {
+        state.currentThreadContestOutcomes[id] = contestedOutcome;
+      }
+    });
+  }
+
+  /**
+   * Calculate the average outcome from a list of beats
+   */
+  private calculateAverageOutcome(beats: Beat[]): StepResolutionType {
+    if (beats.length === 0) {
+      return "mixed"; // Default to mixed if no beats
+    }
+
+    // Count the occurrences of each outcome
+    const counts = {
+      favorable: 0,
+      mixed: 0,
+      unfavorable: 0,
+    };
+
+    for (const beat of beats) {
+      if (beat.resolution) {
+        counts[beat.resolution]++;
+      }
+    }
+
+    // Find the most common outcome
+    let maxCount = 0;
+    let maxOutcome: StepResolutionType = "mixed";
+
+    for (const [outcome, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        maxOutcome = outcome as StepResolutionType;
+      }
+    }
+
+    return maxOutcome;
   }
 }
 

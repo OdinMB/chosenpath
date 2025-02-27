@@ -11,7 +11,7 @@ import {
   PCSchema,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
-import { BeatType } from "./beat.js";
+import { BeatType, StepResolutionType } from "./beat.js";
 import { SwitchAnalysis } from "./switch.js";
 import { ThreadAnalysis } from "./thread.js";
 
@@ -135,6 +135,7 @@ export type StoryState = {
   currentThreadAnalysis: ThreadAnalysis | null;
   currentThreadMaxBeats: number;
   currentThreadBeatsCompleted: number;
+  currentThreadContestOutcomes: Record<string, StepResolutionType> | null; // Map of thread IDs to their contest outcomes
   previousThreadAnalysis: ThreadAnalysis | null; // to avoid confusion when a new switch has already been generated but not yet the associated threads
   generateImages: boolean;
   images: ImageLibrary;

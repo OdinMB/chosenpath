@@ -2,18 +2,37 @@ import { z } from "zod";
 import { PLAYER_SLOTS } from "./player.js";
 
 // For standard (non-contested) threads
-const standardMilestonesSchema = z.object({
-  favorable: z.string().describe("Milestone to add on favorable outcome"),
-  mixed: z.string().describe("Milestone to add on mixed outcome"),
-  unfavorable: z.string().describe("Milestone to add on unfavorable outcome"),
-});
+const standardMilestonesSchema = z
+  .object({
+    favorable: z.string().describe("Milestone to add on favorable outcome"),
+    mixed: z.string().describe("Milestone to add on mixed outcome"),
+    unfavorable: z.string().describe("Milestone to add on unfavorable outcome"),
+  })
+  .describe(
+    "Possible milestones for threads with a success/failure characteristic."
+  );
 
 // For contested multiplayer threads
-const contestedMilestonesSchema = z.object({
-  sideAWins: z.string().describe("Milestone to add if Side A wins"),
-  mixed: z.string().describe("Milestone to add on a draw/compromise"),
-  sideBWins: z.string().describe("Milestone to add if Side B wins"),
-});
+const contestedMilestonesSchema = z
+  .object({
+    sideAWins: z.string().describe("Milestone to add if Side A wins"),
+    mixed: z.string().describe("Milestone to add on a draw/compromise"),
+    sideBWins: z.string().describe("Milestone to add if Side B wins"),
+  })
+  .describe(
+    "Possible milestones for threads over contested outcomes in multiplayer games."
+  );
+
+// For exploratory threads
+const exploratoryMilestonesSchema = z
+  .object({
+    milestone1: z.string(),
+    milestone2: z.string(),
+    milestone3: z.string(),
+  })
+  .describe(
+    "Possible milestones for threads around character and narrative exploration whose outcomes don't have a success/failure characteristic."
+  );
 
 // For standard (non-contested) threads
 const standardStepOutcomesSchema = z
@@ -23,7 +42,7 @@ const standardStepOutcomesSchema = z
     unfavorable: z.string(),
   })
   .describe(
-    "What the different step outcomes mean narratively (example for mixed"
+    "What the different step outcomes in a thread with a success/failure characteristic mean narratively (example for unfavorable: '[player] stumbles and alerts the guards')"
   );
 
 // For contested multiplayer threads
@@ -34,14 +53,29 @@ const contestedStepOutcomesSchema = z
     sideBWins: z.string(),
   })
   .describe(
-    "What the different step outcomes mean narratively (example for mixed: 'The council remains divided and uncertain')"
+    "What the different step outcomes in a thread over a contested outcome mean narratively (example for mixed: 'The council remains divided and uncertain')"
+  );
+
+// For exploratory threads
+const exploratoryStepOutcomesSchema = z
+  .object({
+    outcome1: z.string(),
+    outcome2: z.string(),
+    outcome3: z.string(),
+  })
+  .describe(
+    "What the different step outcomes in an exploratory thread mean narratively (example for outcome1: '[player] chooses to talk to [npc]')"
   );
 
 const threadStepSchema = z.object({
   title: z.string().describe("Title of this step"),
   question: z.string().describe("Question that guides this step's choices"),
   possibleOutcomes: z
-    .union([standardStepOutcomesSchema, contestedStepOutcomesSchema])
+    .union([
+      standardStepOutcomesSchema,
+      contestedStepOutcomesSchema,
+      exploratoryStepOutcomesSchema,
+    ])
     .describe(
       "What happens narratively for the different outcomes of this step"
     ),
@@ -69,7 +103,11 @@ export const threadSchema = z.object({
       "Only relevant for multiplayer threads over contested outcomes. IDs of players who make up Side B. In a singleplayer or cooperative thread, leave this empty."
     ),
   possibleMilestones: z
-    .union([standardMilestonesSchema, contestedMilestonesSchema])
+    .union([
+      standardMilestonesSchema,
+      contestedMilestonesSchema,
+      // exploratoryMilestonesSchema,
+    ])
     .describe(
       "One of these milestones will be added to the outcome at the end of the thread. Make sure that the milestones only constitute one step toward the outcome's resolution."
     ),

@@ -209,37 +209,44 @@ ${modeDescriptions[state.gameMode]}
     beatHistory: any[],
     currentThreadBeatsCompleted?: number
   ): string {
-    // Past threads: show only summary
-    // Current thread: show options and summary
-    // Previous beat: show options and full text
+    if (beatHistory.length === 0) {
+      return "No beats yet.";
+    }
 
     return beatHistory
       .map((beat, index) => {
-        const isLastBeat = index === beatHistory.length - 1;
-        const isInCurrentThread =
-          currentThreadBeatsCompleted !== undefined &&
-          index >= beatHistory.length - currentThreadBeatsCompleted;
+        const choiceInfo =
+          beat.choice !== undefined
+            ? `\nChosen option: ${beat.options[beat.choice].text}`
+            : "\nNo choice made yet.";
 
-        if (isLastBeat || isInCurrentThread) {
-          const playerChoice =
-            beat.options?.length && beat.choice !== undefined
-              ? `Player choice: ${beat.options[beat.choice].text}\n`
-              : "";
+        const outcomeInfo = beat.resolution
+          ? `\nOutcome: ${beat.resolution.toUpperCase()}`
+          : "";
 
-          return [
-            `- Beat ${index + 1} ${
-              isInCurrentThread ? " (current thread)" : ""
-            } ${isLastBeat ? " (previous beat)" : ""}`,
-            isLastBeat ? beat.text : beat.summary,
-            playerChoice,
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-        }
+        const distributionInfo = beat.outcomeResult?.distribution
+          ? `\nProbability distribution: Favorable ${beat.outcomeResult.distribution.favorable}% / Mixed ${beat.outcomeResult.distribution.mixed}% / Unfavorable ${beat.outcomeResult.distribution.unfavorable}%`
+          : "";
 
-        return `- ${beat.summary}`;
+        const pointsInfo =
+          beat.outcomeResult?.points !== undefined
+            ? `\nPoints: ${beat.outcomeResult.points > 0 ? "+" : ""}${
+                beat.outcomeResult.points
+              }`
+            : "";
+
+        const optionTypeInfo = beat.outcomeResult?.optionType
+          ? `\nOption type: ${beat.outcomeResult.optionType.toUpperCase()}`
+          : "";
+
+        const outcomeDetails = beat.outcomeResult
+          ? `${distributionInfo}${pointsInfo}${optionTypeInfo}`
+          : "";
+
+        return `Beat ${index + 1}: ${beat.title}
+Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
       })
-      .join("\n");
+      .join("\n\n");
   }
 
   private static createCharacterStatsSection(stats: any[]): string {

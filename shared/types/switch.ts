@@ -57,7 +57,7 @@ export const switchSchema = z.object({
       z
         .string()
         .describe(
-          "Possible next step that the player can make, and the associated outcome or outcomes that the thread could add a milestone to."
+          "Possible next step that the player can make, and, in brackets, the ID of the associated outcome or outcomes that the thread would add a milestone to."
         )
     )
     .describe(

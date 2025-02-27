@@ -290,7 +290,23 @@ Find a good balance between introducing the overall setup of the story, introduc
   }
 
   private static createNormalBeatInstructions(state: StoryState): string {
-    return `- Check if the player is going to encounter a story element that has not yet been introduced to the player.
+    const isFirstBeatOfThread = state.currentThreadBeatsCompleted === 0;
+    const isLastBeatOfThread =
+      state.currentThreadMaxBeats - 1 === state.currentThreadBeatsCompleted;
+
+    const threadProgressionInstructions = isFirstBeatOfThread
+      ? "This is the first beat of the thread. Set up the situation and introduce the first step in the thread progression."
+      : isLastBeatOfThread
+      ? "This is the last beat of the thread. The outcome of this beat will determine which milestone is added to the outcome."
+      : "This is a middle beat in the thread progression. Build on the previous beat and move the thread forward.";
+
+    const previousBeatOutcomeInstructions = isFirstBeatOfThread
+      ? ""
+      : `\n\nPrevious Beat Outcomes:
+${this.createPreviousBeatOutcomeInstructions(state)}`;
+
+    const worldBuildingInstructions = `\n\nWorld Building Instructions:
+- Check if the player is going to encounter a story element that has not yet been introduced to the player.
 --- If so, introduce the element properly in the beat text and add the element id to the player's list of known story elements.
 - Check if you should add a new story element to the story state.
 --- Do this whenever a new element is introduced that is likely to be used in later beats.
@@ -303,5 +319,83 @@ Find a good balance between introducing the overall setup of the story, introduc
 --- Example categories for new facts: appearance (NPCs, items), history (NPCs, locations), quirks (NPCs), functionality (items), interactions (NPCs, locations), mood (locations), etc.
 --- Don't add facts for new story elements that you just created.
 - The players' decisions are tracked separately and don't have to be tracked.`;
+
+    return `2. GENERATE BEATS FOR EACH PLAYER
+
+${threadProgressionInstructions}
+
+For each player, create a beat that:
+- Narrates the consequences of their previous choice
+- Advances the thread according to the thread configuration
+- Presents 3 options for the player to choose from${previousBeatOutcomeInstructions}${worldBuildingInstructions}
+
+3. GENERATE IMAGES (OPTIONAL)
+
+If you want to generate an image for a beat, leave the imageId field empty.
+If you want to use an existing image, specify its ID.`;
+  }
+
+  private static createPreviousBeatOutcomeInstructions(
+    state: StoryState
+  ): string {
+    // For contested threads, include information about which side is currently winning
+    if (
+      state.currentThreadAnalysis?.threads?.some(
+        (thread) => thread.playersSideB?.length > 0
+      ) &&
+      state.currentThreadContestOutcomes
+    ) {
+      // Get all contested threads with their outcomes
+      const contestedThreads = state.currentThreadAnalysis.threads
+        ?.filter(
+          (thread) =>
+            thread.playersSideB?.length > 0 &&
+            thread.id &&
+            state.currentThreadContestOutcomes?.[thread.id]
+        )
+        .map((thread) => {
+          const outcome = thread.id
+            ? state.currentThreadContestOutcomes?.[thread.id]
+            : null;
+          return {
+            title: thread.title || thread.id || "Unnamed thread",
+            outcome,
+          };
+        });
+
+      if (contestedThreads?.length) {
+        return contestedThreads
+          .map((thread) => {
+            const { title, outcome } = thread;
+            return `This is a contested thread "${title}". Currently, ${
+              outcome === "favorable"
+                ? "Side A is winning"
+                : outcome === "unfavorable"
+                ? "Side B is winning"
+                : "the sides are evenly matched"
+            }. Adjust the narrative to reflect this dynamic.`;
+          })
+          .join("\n\n");
+      }
+    }
+
+    // For each player, include information about their previous beat outcome
+    return Object.entries(state.players)
+      .map(([playerSlot, player]) => {
+        if (player.beatHistory.length < 2) return "";
+
+        const previousBeat = player.beatHistory[player.beatHistory.length - 1];
+        if (!previousBeat.resolution) return "";
+
+        return `- ${playerSlot}: Previous beat outcome was ${previousBeat.resolution.toUpperCase()}. ${
+          previousBeat.resolution === "favorable"
+            ? "The player is in an advantageous position. Make this beat easier for them, reflecting their previous success."
+            : previousBeat.resolution === "unfavorable"
+            ? "The player is at a disadvantage. Make this beat more challenging, reflecting their previous setback."
+            : "The player is in a neutral position."
+        }`;
+      })
+      .filter(Boolean)
+      .join("\n");
   }
 }
