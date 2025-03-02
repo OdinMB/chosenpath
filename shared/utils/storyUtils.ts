@@ -28,6 +28,10 @@ export const isStoryComplete = (state: StoryState): boolean => {
   return getCurrentTurn(state) > state.maxTurns;
 };
 
+export const isMultiplayer = (state: StoryState): boolean => {
+  return Object.keys(state.players).length > 1;
+};
+
 /**
  * Get players who haven't submitted a choice for the current turn
  */

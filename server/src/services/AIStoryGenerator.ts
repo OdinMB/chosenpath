@@ -87,6 +87,7 @@ export class AIStoryGenerator {
       currentThreadMaxBeats: 0,
       currentThreadBeatsCompleted: 0,
       previousThreadAnalysis: null,
+      currentThreadContestOutcomes: {},
       generateImages,
       images: [],
       playerCodes: {},

@@ -176,8 +176,7 @@ ${modeDescriptions[state.gameMode]}
     return Object.entries(state.players)
       .map(([slot, playerState]) => {
         const beatHistorySection = this.createBeatHistorySection(
-          playerState.beatHistory,
-          state.currentThreadBeatsCompleted
+          playerState.beatHistory
         );
         const separator = "#####################################";
 
@@ -205,46 +204,28 @@ ${modeDescriptions[state.gameMode]}
       .join("\n\n" + "=".repeat(80) + "\n\n");
   }
 
-  private static createBeatHistorySection(
-    beatHistory: any[],
-    currentThreadBeatsCompleted?: number
-  ): string {
+  private static createBeatHistorySection(beatHistory: any[]): string {
     if (beatHistory.length === 0) {
       return "No beats yet.";
     }
 
     return beatHistory
       .map((beat, index) => {
-        const choiceInfo =
+        const choiceText =
           beat.choice !== undefined
-            ? `\nChosen option: ${beat.options[beat.choice].text}`
-            : "\nNo choice made yet.";
+            ? `${beat.options[beat.choice].text}`
+            : "No choice made yet";
 
-        const outcomeInfo = beat.resolution
-          ? `\nOutcome: ${beat.resolution.toUpperCase()}`
-          : "";
-
-        const distributionInfo = beat.outcomeResult?.distribution
-          ? `\nProbability distribution: Favorable ${beat.outcomeResult.distribution.favorable}% / Mixed ${beat.outcomeResult.distribution.mixed}% / Unfavorable ${beat.outcomeResult.distribution.unfavorable}%`
-          : "";
-
-        const pointsInfo =
-          beat.outcomeResult?.points !== undefined
-            ? `\nPoints: ${beat.outcomeResult.points > 0 ? "+" : ""}${
-                beat.outcomeResult.points
-              }`
-            : "";
-
-        const optionTypeInfo = beat.outcomeResult?.optionType
-          ? `\nOption type: ${beat.outcomeResult.optionType.toUpperCase()}`
-          : "";
-
-        const outcomeDetails = beat.outcomeResult
-          ? `${distributionInfo}${pointsInfo}${optionTypeInfo}`
+        const resultText = beat.resolution
+          ? ` (Result: ${
+              beat.resolution.charAt(0).toUpperCase() +
+              beat.resolution.slice(1).toLowerCase()
+            })`
           : "";
 
         return `Beat ${index + 1}: ${beat.title}
-Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
+Summary: ${beat.summary}
+Chosen option: ${choiceText}${resultText}`;
       })
       .join("\n\n");
   }
@@ -267,7 +248,8 @@ Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
       .map((outcome) => {
         const resolutions = this.formatResolutions(outcome.possibleResolutions);
         return [
-          `Question: ${outcome.question} (${outcome.id})`,
+          `ID: ${outcome.id}`,
+          `Question: ${outcome.question}`,
           "Possible resolutions:\n" + resolutions,
           `Resonance: ${outcome.resonance}`,
           `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
@@ -340,7 +322,7 @@ Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
         const lastBeat =
           playerState.beatHistory[playerState.beatHistory.length - 1];
         const choice =
-          lastBeat?.options?.[lastBeat?.choice] || "No decision made";
+          lastBeat?.options?.[lastBeat?.choice]?.text || "No decision made";
         return `${slot}: ${choice}`;
       })
       .join("\n");
@@ -426,44 +408,26 @@ Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
               `- Unfavorable: ${thread.possibleMilestones["unfavorable"]}`,
             ].join("\n");
 
-        const numberedProgression = thread.progression
-          .map((step, idx) => `(${idx + 1}) ${step.title}`)
-          .join(" → ");
+        // Create a detailed beat progression plan that includes questions
+        const detailedProgression = thread.progression
+          .map(
+            (step, idx) => `- Beat ${idx + 1}: ${step.title} - ${step.question}`
+          )
+          .join("\n");
 
-        // Get previous beat choices for this thread
-        const previousBeatChoices = [];
-        if (state.currentThreadBeatsCompleted > 0 && type === "current") {
-          // Find players in this thread
-          const threadPlayers = [
-            ...thread.playersSideA,
-            ...thread.playersSideB,
-          ];
+        // Get beat choices for this thread
+        const beatChoices = [];
 
-          // For each player, get their choices in the current thread
-          for (const playerId of threadPlayers) {
-            const player = state.players[playerId];
-            if (!player) continue;
-
-            // Calculate the starting index for the current thread in the beat history
-            const threadStartIndex =
-              player.beatHistory.length - state.currentThreadBeatsCompleted;
-
-            // Loop through all completed beats in the current thread
-            for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
-              const beatIndex = threadStartIndex + i;
-              if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
-                const beat = player.beatHistory[beatIndex];
-                if (beat && beat.options && beat.choice !== undefined) {
-                  previousBeatChoices.push(
-                    `- Beat ${i + 1}: (${playerId}) chose "${
-                      beat.options[beat.choice].text
-                    }"`
-                  );
-                }
-              }
-            }
+        // For previous threads, we need to get the beat history from a different location
+        const getThreadBeats = () => {
+          if (type === "current") {
+            return this.getCurrentThreadBeatChoices(thread, state);
+          } else {
+            return this.getPreviousThreadBeatChoices(thread, state);
           }
-        }
+        };
+
+        const beatChoicesResult = getThreadBeats();
 
         const currentBeatInfo = (beatsCompleted: number | undefined) => {
           // Only show current beat info for current thread configuration
@@ -523,9 +487,14 @@ Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
             ? "Exploratory thread:"
             : "",
           milestonesSection,
-          `\nBeat progression`,
-          `- Plan: ${numberedProgression}`,
-          previousBeatChoices.length > 0 ? previousBeatChoices.join("\n") : "",
+          // Only show beat progression plan for current threads
+          type === "current" ? `\nPlan for beat progression` : "",
+          type === "current" ? detailedProgression : "",
+          beatChoicesResult.length > 0
+            ? `\nBeat progression${
+                type === "previous" ? "" : " so far"
+              }:\n${beatChoicesResult.join("\n")}`
+            : "",
           currentBeatInfo(state.currentThreadBeatsCompleted),
         ]
           .filter(Boolean)
@@ -534,5 +503,147 @@ Summary: ${beat.summary}${choiceInfo}${outcomeInfo}${outcomeDetails}`;
       .join("\n\n" + "-".repeat(40) + "\n\n");
 
     return `\n======= ${type.toUpperCase()} THREAD CONFIGURATION =======\n\n${threadConfigs}`;
+  }
+
+  private static getCurrentThreadBeatChoices(
+    thread: any,
+    state: StoryState
+  ): string[] {
+    const previousBeatChoices: string[] = [];
+
+    if (state.currentThreadBeatsCompleted <= 0) {
+      return previousBeatChoices;
+    }
+
+    // Find players in this thread
+    const threadPlayers = [...thread.playersSideA, ...thread.playersSideB];
+
+    // Create a map to organize choices by beat number
+    const beatChoicesMap: Record<number, string[]> = {};
+
+    // For each player, get their choices in the current thread
+    for (const playerId of threadPlayers) {
+      const player = state.players[playerId];
+      if (!player) continue;
+
+      // Calculate the starting index for the current thread in the beat history
+      const threadStartIndex =
+        player.beatHistory.length - state.currentThreadBeatsCompleted;
+
+      // Loop through all completed beats in the current thread
+      for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
+        const beatIndex = threadStartIndex + i;
+        if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
+          const beat = player.beatHistory[beatIndex];
+          if (beat && beat.options && beat.choice !== undefined) {
+            const resultText = beat.resolution
+              ? ` Result: ${
+                  beat.resolution.charAt(0).toUpperCase() +
+                  beat.resolution.slice(1).toLowerCase()
+                }.`
+              : "";
+
+            // Initialize the array for this beat if it doesn't exist
+            if (!beatChoicesMap[i]) {
+              beatChoicesMap[i] = [];
+            }
+
+            // Add this player's choice to the appropriate beat
+            beatChoicesMap[i].push(
+              `--- (${playerId}) chose "${
+                beat.options[beat.choice].text
+              }"${resultText}`
+            );
+          }
+        }
+      }
+    }
+
+    // Convert the map to the format we want
+    for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
+      if (beatChoicesMap[i] && beatChoicesMap[i].length > 0) {
+        previousBeatChoices.push(
+          `- Beat ${i + 1}\n${beatChoicesMap[i].join("\n")}`
+        );
+      }
+    }
+
+    return previousBeatChoices;
+  }
+
+  private static getPreviousThreadBeatChoices(
+    thread: any,
+    state: StoryState
+  ): string[] {
+    const beatChoices: string[] = [];
+
+    if (!state.previousThreadAnalysis) {
+      return beatChoices;
+    }
+
+    // Find players in this thread
+    const threadPlayers = [...thread.playersSideA, ...thread.playersSideB];
+
+    // Create a map to organize choices by beat number
+    const beatChoicesMap: Record<number, string[]> = {};
+
+    // Get the number of beats from the thread's progression attribute
+    const previousThreadBeatsCount = thread.progression
+      ? thread.progression.length
+      : 0;
+
+    if (previousThreadBeatsCount <= 0) {
+      return beatChoices;
+    }
+
+    // For each player, find their choices from the previous thread
+    for (const playerId of threadPlayers) {
+      const player = state.players[playerId];
+      if (!player) continue;
+
+      // Calculate where the previous thread starts in the beat history
+      // It should be before the current thread
+      const currentThreadStartIndex =
+        player.beatHistory.length - (state.currentThreadBeatsCompleted || 0);
+      const previousThreadStartIndex =
+        currentThreadStartIndex - previousThreadBeatsCount;
+
+      // Loop through all beats in the previous thread
+      for (let i = 0; i < previousThreadBeatsCount; i++) {
+        const beatIndex = previousThreadStartIndex + i;
+        if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
+          const beat = player.beatHistory[beatIndex];
+          if (beat && beat.options && beat.choice !== undefined) {
+            const resultText = beat.resolution
+              ? ` Result: ${
+                  beat.resolution.charAt(0).toUpperCase() +
+                  beat.resolution.slice(1).toLowerCase()
+                }.`
+              : "";
+
+            // Initialize the array for this beat if it doesn't exist
+            if (!beatChoicesMap[i]) {
+              beatChoicesMap[i] = [];
+            }
+
+            // Add this player's choice to the appropriate beat
+            beatChoicesMap[i].push(
+              `--- (${playerId}) chose "${
+                beat.options[beat.choice].text
+              }"${resultText}`
+            );
+          }
+        }
+      }
+    }
+
+    // Convert the map to the format we want
+    for (let i = 0; i < previousThreadBeatsCount; i++) {
+      if (beatChoicesMap[i] && beatChoicesMap[i].length > 0) {
+        beatChoices.push(`- Beat ${i + 1}\n${beatChoicesMap[i].join("\n")}`);
+      }
+    }
+
+    return beatChoices;
   }
 }

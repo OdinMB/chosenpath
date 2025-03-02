@@ -3,7 +3,7 @@ import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
-import { isFirstBeat } from "shared/utils/storyUtils.js";
+import { isFirstBeat, isMultiplayer } from "shared/utils/storyUtils.js";
 
 export class BeatPromptService {
   private static getSections(state: StoryState): SectionConfig {
@@ -154,11 +154,15 @@ ${
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
           "--- Example: Example: In a 3-beat thread, if the question is 'Will [player] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
-How to stay consistent?
+${
+  isMultiplayer(state)
+    ? `How to stay consistent?
 Which information from other beats that you already created in this turn do we need to consider for this beat?
 Create a bullet list of things that happened in other beats that you already created in this turn that we should consider for this beat.
 - This is particularly important if several players are in the same thread or switch (so the beats for the different players are consistent with each other).
-- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.
+- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.`
+    : ""
+}
 
 How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
@@ -202,23 +206,35 @@ Text
 - The first paragraph
 --- Should continue exactly where the previous beat for this player ended
 --- Describe the immediate consequences of the player's decision.
---- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.
---- If the player was in a thread or switch with other players, also describe what the decisions and outcomes of the other players are. (Unless it would be implausible for the player to know about it.)
+--- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.${
+      state.currentBeatType === "thread" &&
+      state.currentThreadBeatsCompleted > 0
+        ? "\n- If the last beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult."
+        : ""
+    }${
+      isMultiplayer(state)
+        ? "\n- If the player was in a thread or switch with other players, also describe what the decisions and outcomes of the other players are. (Unless it would be implausible for the player to know about it.)"
+        : ""
+    }
 ${
   !isFirstBeat(state) && state.currentBeatType === "switch"
     ? "- Most of the beat text\n" +
       "--- should be about the outcome of the previous thread that the player was involved in.\n" +
       "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
-      "--- If several players were in the same thread, process also how the thread's resolution affects the other players."
+      (isMultiplayer(state)
+        ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players."
+        : "")
     : ""
 }${
       state.currentBeatType === "ending"
         ? "- Most of the beat text should be about the ending of the story for the player at hand.\n" +
           "--- Process the outcome of the previous thread that the player was involved in, then transition to the overall ending of the story.\n"
-        : "- If several players are in the same beat, include them in each other's beat text.\n" +
-          "--- In multiplayer games, the goal is to have an interesting interplay between the players and their decisions.\n" +
-          "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n" +
-          "--- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.\n" +
+        : (isMultiplayer(state)
+            ? "- If several players are in the same beat, include them in each other's beat text.\n" +
+              "--- The goal is to have an interesting interplay between the players and their decisions.\n" +
+              "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n" +
+              "--- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.\n"
+            : "") +
           "- Use direct speech\n" +
           "--- Both for the player characters and the NPCs.\n" +
           "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X' or 'you talk to X'.\n" +
@@ -320,9 +336,7 @@ ${this.createPreviousBeatOutcomeInstructions(state)}`;
 --- Don't add facts for new story elements that you just created.
 - The players' decisions are tracked separately and don't have to be tracked.`;
 
-    return `2. GENERATE BEATS FOR EACH PLAYER
-
-${threadProgressionInstructions}
+    return `\n${threadProgressionInstructions}
 
 For each player, create a beat that:
 - Narrates the consequences of their previous choice

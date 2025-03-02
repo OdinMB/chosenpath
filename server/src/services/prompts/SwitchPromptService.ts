@@ -17,14 +17,15 @@ export class SwitchPromptService {
     storyProgress: true,
     switchConfiguration: false,
     threadConfiguration: false,
-    previousThreadConfiguration: false,
+    previousThreadConfiguration: true,
   } as const;
 
   static createSwitchAnalysisPrompt(state: StoryState): string {
-    return (
+    const prompt =
       StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
-      this.createInstructionsSection()
-    );
+      this.createInstructionsSection();
+    console.log("\x1b[36m%s\x1b[0m", prompt);
+    return prompt;
   }
 
   private static createInstructionsSection(): string {

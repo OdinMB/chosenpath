@@ -18,36 +18,16 @@ export class OutcomeService {
     mixed: 34,
     unfavorable: 33,
   };
-
-  /**
-   * Calculate the probability distribution based on points and option type
-   */
-  static calculateDistribution(
-    points: number,
-    optionType: OptionType
-  ): ProbabilityDistribution {
-    console.log(
-      `[OutcomeService] Calculating distribution - Points: ${points}, Option Type: ${optionType}`
-    );
-
-    // Start with the base distribution based on option type
-    const distribution = this.getBaseDistributionByOptionType(optionType);
-    console.log(
-      `[OutcomeService] Base distribution for ${optionType}: F:${distribution.favorable}% / M:${distribution.mixed}% / U:${distribution.unfavorable}%`
-    );
-
-    // Apply the algorithm to calculate the distribution
-    const result = this.applyPointsToDistribution(
-      distribution,
-      points,
-      optionType
-    );
-    console.log(
-      `[OutcomeService] Final distribution: F:${result.favorable}% / M:${result.mixed}% / U:${result.unfavorable}%`
-    );
-
-    return result;
-  }
+  private static SAFE_DISTRIBUTION: ProbabilityDistribution = {
+    favorable: 25,
+    mixed: 50,
+    unfavorable: 25,
+  };
+  private static RISKY_DISTRIBUTION: ProbabilityDistribution = {
+    favorable: 40,
+    mixed: 20,
+    unfavorable: 40,
+  };
 
   /**
    * Get the base distribution based on option type
@@ -62,144 +42,231 @@ export class OutcomeService {
       case "normal":
         return { ...this.DEFAULT_DISTRIBUTION };
       case "safe":
-        return { favorable: 25, mixed: 50, unfavorable: 25 };
+        return { ...this.SAFE_DISTRIBUTION };
       case "risky":
-        return { favorable: 40, mixed: 20, unfavorable: 40 };
+        return { ...this.RISKY_DISTRIBUTION };
       default:
         return { ...this.DEFAULT_DISTRIBUTION };
     }
   }
 
-  /**
-   * Apply points to shift the probability distribution
-   *
-   * Principles:
-   * - Positive points: Take away from unfavorable until none are left; then mixed
-   * - Negative points: Take away from favorable until none are left; then mixed
-   * - Normal: distribute equally to the remaining categories
-   * - Safe: distribute to mixed first
-   * - Risky: distribute to favorable/unfavorable first
-   */
-  private static applyPointsToDistribution(
+  private static shiftPoints(
     distribution: ProbabilityDistribution,
+    points: number,
+    from: "favorable" | "mixed" | "unfavorable",
+    to:
+      | "favorable"
+      | "mixed"
+      | "unfavorable"
+      | "favorable-mixed"
+      | "mixed-unfavorable"
+  ): [ProbabilityDistribution, number] {
+    /*
+     * Move points from one category to another
+     * Returns the new distribution and the number of points left
+     */
+    let result = { ...distribution };
+    let pointsLeft = points;
+    let pointsPerShift = 0;
+
+    if (to === "favorable-mixed" || to === "mixed-unfavorable") {
+      pointsPerShift = 3;
+    } else if (to === "mixed") {
+      pointsPerShift = 1;
+    } else if (to === "unfavorable") {
+      pointsPerShift = from === "favorable" ? 2 : 1;
+    } else if (to === "favorable") {
+      pointsPerShift = from === "unfavorable" ? 2 : 1;
+    }
+
+    const adjustment = Math.min(
+      Math.floor(pointsLeft / pointsPerShift),
+      // If we are shifting to two categories, adjustment represents how much we add to both categories
+      result[from] /
+        (to === "favorable-mixed" || to === "mixed-unfavorable" ? 2 : 1)
+    );
+    result[from] -=
+      adjustment *
+      (to === "favorable-mixed" || to === "mixed-unfavorable" ? 2 : 1);
+    if (to === "favorable-mixed") {
+      result.favorable += adjustment;
+      result.mixed += adjustment;
+    } else if (to === "mixed-unfavorable") {
+      result.mixed += adjustment;
+      result.unfavorable += adjustment;
+    } else {
+      result[to] += adjustment;
+    }
+    pointsLeft -= adjustment * pointsPerShift;
+
+    console.log(
+      `[OutcomeService] Shifted ${adjustment} %-points from ${from} to ${to}. ${pointsLeft}/${points} points left.`
+    );
+
+    return [result, pointsLeft];
+  }
+
+  /**
+   * Calculate probability distribution directly from points and risk type
+   * This is a more elegant approach that replaces the complex point application logic
+   */
+  private static calculateDistribution(
     points: number,
     optionType: OptionType
   ): ProbabilityDistribution {
-    const result = { ...distribution };
+    // Start with the base distribution for the option type
+    const base = this.getBaseDistributionByOptionType(optionType);
+    // Clone the base distribution
+    let result: ProbabilityDistribution = { ...base };
 
     if (points === 0) {
       return result;
     }
 
-    console.log(`[OutcomeService] Applying ${points} points to distribution`);
-
+    // Calculate how much to adjust each category based on points and risk type
     if (points > 0) {
-      // Positive points: reduce unfavorable, then mixed
-      this.applyPositivePoints(result, points, optionType);
+      // Positive points: increase favorable, decrease unfavorable
+      if (optionType === "risky") {
+        // Risky: Move points directly from unfavorable to favorable
+        [result, points] = this.shiftPoints(
+          result,
+          points,
+          "unfavorable",
+          "favorable"
+        );
+        // Uneven points: 1 favorable left to move to mixed
+        if (points > 0) {
+          [result, points] = this.shiftPoints(
+            result,
+            points,
+            "unfavorable",
+            "mixed"
+          );
+        }
+        if (points > 0) {
+          [result, points] = this.shiftPoints(
+            result,
+            points,
+            "mixed",
+            "favorable"
+          );
+        }
+      } else if (optionType === "safe") {
+        // Safe: First move from unfavorable to mixed, then from mixed to favorable
+        [result, points] = this.shiftPoints(
+          result,
+          points,
+          "unfavorable",
+          "mixed"
+        );
+        if (points > 0) {
+          [result, points] = this.shiftPoints(
+            result,
+            points,
+            "mixed",
+            "favorable"
+          );
+        }
+      } else {
+        // Normal: Distribute evenly between favorable and mixed
+        [result, points] = this.shiftPoints(
+          result,
+          points,
+          "unfavorable",
+          "favorable-mixed"
+        );
+        if (points > 0) {
+          [result, points] = this.shiftPoints(
+            result,
+            points,
+            "unfavorable",
+            "mixed"
+          );
+        }
+        if (points > 0) {
+          [result, points] = this.shiftPoints(
+            result,
+            points,
+            "mixed",
+            "favorable"
+          );
+        }
+      }
     } else {
-      // Negative points: reduce favorable, then mixed
-      this.applyNegativePoints(result, Math.abs(points), optionType);
+      // Negative points: increase unfavorable, decrease favorable
+      let absPoints = Math.abs(points);
+
+      if (optionType === "risky") {
+        // Risky: Move points directly from favorable to unfavorable
+        [result, absPoints] = this.shiftPoints(
+          result,
+          absPoints,
+          "favorable",
+          "unfavorable"
+        );
+        // Uneven points: 1 favorable left to move to mixed
+        if (absPoints > 0) {
+          [result, absPoints] = this.shiftPoints(
+            result,
+            absPoints,
+            "favorable",
+            "mixed"
+          );
+        }
+        if (absPoints > 0) {
+          [result, absPoints] = this.shiftPoints(
+            result,
+            absPoints,
+            "mixed",
+            "unfavorable"
+          );
+        }
+      } else if (optionType === "safe") {
+        // Safe: First move from favorable to mixed, then from mixed to unfavorable
+        [result, absPoints] = this.shiftPoints(
+          result,
+          absPoints,
+          "favorable",
+          "mixed"
+        );
+        if (absPoints > 0) {
+          [result, absPoints] = this.shiftPoints(
+            result,
+            absPoints,
+            "mixed",
+            "unfavorable"
+          );
+        }
+      } else {
+        // Normal: Distribute evenly between unfavorable and mixed
+        [result, absPoints] = this.shiftPoints(
+          result,
+          absPoints,
+          "favorable",
+          "mixed-unfavorable"
+        );
+        if (absPoints > 0) {
+          [result, absPoints] = this.shiftPoints(
+            result,
+            absPoints,
+            "favorable",
+            "mixed"
+          );
+        }
+        if (absPoints > 0) {
+          [result, absPoints] = this.shiftPoints(
+            result,
+            absPoints,
+            "mixed",
+            "unfavorable"
+          );
+        }
+      }
     }
 
     // Ensure all values are integers and sum to 100
     this.normalizeDistribution(result);
     return result;
-  }
-
-  /**
-   * Apply positive points to the distribution
-   */
-  private static applyPositivePoints(
-    distribution: ProbabilityDistribution,
-    points: number,
-    optionType: OptionType
-  ): void {
-    // First, take points from unfavorable
-    const pointsFromUnfavorable = Math.min(points, distribution.unfavorable);
-    distribution.unfavorable -= pointsFromUnfavorable;
-
-    // Distribute these points based on risk type
-    if (optionType === "normal") {
-      // Normal: distribute equally
-      const toFavorable = Math.floor(pointsFromUnfavorable / 2);
-      const toMixed = pointsFromUnfavorable - toFavorable;
-      distribution.favorable += toFavorable;
-      distribution.mixed += toMixed;
-      console.log(
-        `[OutcomeService] Normal: ${pointsFromUnfavorable} from unfavorable → ${toFavorable} to favorable, ${toMixed} to mixed`
-      );
-    } else if (optionType === "safe") {
-      // Safe: distribute to mixed first
-      distribution.mixed += pointsFromUnfavorable;
-      console.log(
-        `[OutcomeService] Safe: ${pointsFromUnfavorable} from unfavorable → all to mixed`
-      );
-    } else if (optionType === "risky") {
-      // Risky: distribute to favorable first
-      distribution.favorable += pointsFromUnfavorable;
-      console.log(
-        `[OutcomeService] Risky: ${pointsFromUnfavorable} from unfavorable → all to favorable`
-      );
-    }
-
-    // If we still have points, take from mixed
-    const remainingPoints = points - pointsFromUnfavorable;
-    if (remainingPoints > 0) {
-      const pointsFromMixed = Math.min(remainingPoints, distribution.mixed);
-      distribution.mixed -= pointsFromMixed;
-      distribution.favorable += pointsFromMixed;
-      console.log(
-        `[OutcomeService] ${pointsFromMixed} from mixed → all to favorable`
-      );
-    }
-  }
-
-  /**
-   * Apply negative points to the distribution
-   */
-  private static applyNegativePoints(
-    distribution: ProbabilityDistribution,
-    points: number,
-    optionType: OptionType
-  ): void {
-    // First, take points from favorable
-    const pointsFromFavorable = Math.min(points, distribution.favorable);
-    distribution.favorable -= pointsFromFavorable;
-
-    // Distribute these points based on risk type
-    if (optionType === "normal") {
-      // Normal: distribute equally
-      const toUnfavorable = Math.floor(pointsFromFavorable / 2);
-      const toMixed = pointsFromFavorable - toUnfavorable;
-      distribution.unfavorable += toUnfavorable;
-      distribution.mixed += toMixed;
-      console.log(
-        `[OutcomeService] Normal: ${pointsFromFavorable} from favorable → ${toUnfavorable} to unfavorable, ${toMixed} to mixed`
-      );
-    } else if (optionType === "safe") {
-      // Safe: distribute to mixed first
-      distribution.mixed += pointsFromFavorable;
-      console.log(
-        `[OutcomeService] Safe: ${pointsFromFavorable} from favorable → all to mixed`
-      );
-    } else if (optionType === "risky") {
-      // Risky: distribute to unfavorable first
-      distribution.unfavorable += pointsFromFavorable;
-      console.log(
-        `[OutcomeService] Risky: ${pointsFromFavorable} from favorable → all to unfavorable`
-      );
-    }
-
-    // If we still have points, take from mixed
-    const remainingPoints = points - pointsFromFavorable;
-    if (remainingPoints > 0) {
-      const pointsFromMixed = Math.min(remainingPoints, distribution.mixed);
-      distribution.mixed -= pointsFromMixed;
-      distribution.unfavorable += pointsFromMixed;
-      console.log(
-        `[OutcomeService] ${pointsFromMixed} from mixed → all to unfavorable`
-      );
-    }
   }
 
   /**

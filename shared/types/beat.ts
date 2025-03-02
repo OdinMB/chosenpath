@@ -21,9 +21,7 @@ export type StepResolutionType = (typeof STEP_RESOLUTION_TYPES)[number];
 
 const optionBaseSchema = z
   .object({
-    optionType: z
-      .literal("basic")
-      .describe("Discriminator field to identify the option type"),
+    optionType: z.literal("basic"),
     text: z.string().describe("Text shown to player for this choice"),
     statConsequences: z
       .string()
@@ -37,9 +35,7 @@ const optionBaseSchema = z
 
 const optionSuccessFailureSchema = z
   .object({
-    optionType: z
-      .literal("successFailure")
-      .describe("Discriminator field to identify the option type"),
+    optionType: z.literal("successFailure"),
     text: z.string().describe("Text shown to player for this choice"),
     statConsequences: z
       .string()
@@ -95,7 +91,7 @@ export const beatPlanSchema = z.object({
   otherBeats: z
     .string()
     .describe(
-      "Bullet list with information from other beats in this turn that we must consider for this beat. If this is the beat for player1, leave this empty."
+      "For multiplayer games: Bullet list with information from other beats in this turn that we must consider for this beat. In single-player games, say 'single-player'. In multiplayer games, if this is the beat for player1, say 'player1'."
     ),
   worldBuilding: z
     .string()

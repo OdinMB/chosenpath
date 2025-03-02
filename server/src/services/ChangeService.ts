@@ -1,6 +1,7 @@
 import type { Change } from "shared/types/change.js";
 import type { StoryState } from "shared/types/story.js";
 import type { PlayerSlot } from "shared/types/player.js";
+import type { Stat } from "shared/types/stat.js";
 
 export class ChangeService {
   applyChanges(state: StoryState, changes: Change[]): StoryState {
@@ -145,6 +146,7 @@ export class ChangeService {
     change: Change & { type: "statChange" }
   ): StoryState {
     if (change.group === "shared") {
+      console.log(`Applying stat change to shared stat: ${change.stat}`);
       return this.updateStatsArray(
         state,
         state.sharedStats,
@@ -157,10 +159,15 @@ export class ChangeService {
     const player = state.players[playerSlot];
 
     if (!player) {
-      console.log(`Player ${playerSlot} not found`);
+      console.log(
+        `Player ${playerSlot} not found for stat change: ${change.stat}`
+      );
       return state;
     }
 
+    console.log(
+      `Applying stat change to player ${playerSlot}'s stat: ${change.stat}`
+    );
     return this.updateStatsArray(
       state,
       player.characterStats,
@@ -180,14 +187,20 @@ export class ChangeService {
 
   private updateStatsArray(
     state: StoryState,
-    stats: any[],
+    stats: Stat[],
     change: Change & { type: "statChange" },
-    updateState: (updatedStats: any[]) => StoryState
+    updateState: (updatedStats: Stat[]) => StoryState
   ): StoryState {
     const statIndex = stats.findIndex((s) => s.id === change.stat);
 
     if (statIndex === -1) {
-      console.log(`Stat ${change.stat} not found`);
+      console.log(
+        `Stat ${change.stat} not found in ${
+          change.group === "shared"
+            ? "shared stats"
+            : `player ${change.group}'s stats`
+        }`
+      );
       return state;
     }
 
@@ -195,14 +208,18 @@ export class ChangeService {
     const updatedStat = this.updateStatValue(stat, change);
 
     if (!updatedStat) {
-      console.log(`Stat ${stat.id} not updated`);
+      console.log(
+        `Stat ${stat.id} not updated. Incompatible change type "${change.change}" for stat type "${stat.type}"`
+      );
       return state;
     }
 
     console.log(
       `Updated stat ${stat.id} ${
         change.group === "shared" ? "(shared)" : `for player ${change.group}`
-      } from ${stat.value} to ${updatedStat.value}`
+      } from ${JSON.stringify(stat.value)} to ${JSON.stringify(
+        updatedStat.value
+      )}`
     );
 
     const updatedStats = [...stats];
@@ -211,10 +228,15 @@ export class ChangeService {
     return updateState(updatedStats);
   }
 
-  private updateStatValue(stat: any, change: Change & { type: "statChange" }) {
+  private updateStatValue(
+    stat: Stat,
+    change: Change & { type: "statChange" }
+  ): Stat | null {
     switch (change.change) {
       case "setBoolean":
-        if (stat.type === "boolean") {
+        // Boolean type is commented out in the schema but might be used in the future
+        // For now, we'll handle it but it won't match any current stat types
+        if (stat.type === ("boolean" as any)) {
           return { ...stat, value: change.value as boolean };
         }
         break;
@@ -225,13 +247,21 @@ export class ChangeService {
         break;
       case "addNumber":
       case "subtractNumber":
-        if (stat.type === "number" || stat.type === "percentage") {
-          const delta = change.change === "addNumber" ? 1 : -1;
-          let newValue =
-            (stat.value as number) + delta * (change.value as number);
+        if (
+          stat.type === "number" ||
+          stat.type === "percentage" ||
+          stat.type === "opposites"
+        ) {
+          // Fix: directly use the change value with appropriate sign
+          const valueToAdd =
+            change.change === "addNumber"
+              ? (change.value as number)
+              : -(change.value as number);
 
-          // Clamp percentage values between 0 and 100
-          if (stat.type === "percentage") {
+          let newValue = (stat.value as number) + valueToAdd;
+
+          // Clamp percentage and opposites values between 0 and 100
+          if (stat.type === "percentage" || stat.type === "opposites") {
             newValue = Math.max(0, Math.min(100, newValue));
           }
 
@@ -239,12 +269,16 @@ export class ChangeService {
         }
         break;
       case "setNumber":
-        if (stat.type === "number" || stat.type === "percentage") {
+        if (
+          stat.type === "number" ||
+          stat.type === "percentage" ||
+          stat.type === "opposites"
+        ) {
           console.log(`Setting number stat ${stat.id} to ${change.value}`);
           let newValue = change.value as number;
 
-          // Clamp percentage values between 0 and 100
-          if (stat.type === "percentage") {
+          // Clamp percentage and opposites values between 0 and 100
+          if (stat.type === "percentage" || stat.type === "opposites") {
             newValue = Math.max(0, Math.min(100, newValue));
           }
 
