@@ -1,13 +1,10 @@
 import {
   type Beat,
   type SuccessFailureOption,
-  type BeatOption,
   type ProbabilityDistribution,
   type StepResolutionType,
   type OptionType,
-  type OutcomeResult,
 } from "shared/types/beat.js";
-import { type Thread } from "shared/types/thread.js";
 
 export class OutcomeService {
   /**
@@ -358,12 +355,12 @@ export class OutcomeService {
   }
 
   /**
-   * Process a beat to determine its outcome
+   * Process a beat to determine its resolution type
    */
-  static processBeatOutcome(
+  static processBeatResolution(
     beat: Beat,
     previousBeat: Beat | null
-  ): OutcomeResult {
+  ): StepResolutionType {
     console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
 
     // Get the chosen option
@@ -406,15 +403,8 @@ export class OutcomeService {
     // Determine the outcome
     const resolution = this.determineOutcome(distribution);
 
-    const result = {
-      distribution,
-      resolution,
-      points,
-      optionType,
-    };
-
-    console.log(`[OutcomeService] Final outcome result:`, result);
-    return result;
+    console.log(`[OutcomeService] Final resolution:`, resolution);
+    return resolution;
   }
 
   /**

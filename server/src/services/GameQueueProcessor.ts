@@ -297,17 +297,16 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         ? player.beatHistory[player.beatHistory.length - 2]
         : null;
 
-    // Process the outcome
-    const outcomeResult = OutcomeService.processBeatOutcome(
+    // Process the beat resolution
+    const beatResolution = OutcomeService.processBeatResolution(
       currentBeat,
       previousBeat
     );
 
-    // Update the beat with the outcome result and resolution
+    // Update the beat with the resolution
     const updatedBeat: Beat = {
       ...currentBeat,
-      resolution: outcomeResult.resolution,
-      outcomeResult: outcomeResult,
+      resolution: beatResolution,
     };
 
     // Update the player's beat history with the processed beat

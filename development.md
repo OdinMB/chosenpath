@@ -18,7 +18,6 @@ Clean-up
 - Add exploratory threads back in
 - For potential results for the last beat of a thread: ask the AI to take the general milestones and make them more specific given how the thread has gone so far
 - don't send client secret option details
-- use OutcomeResult object only as a return object; consolidate with option type
 - Simplify stat changes: no statModifications as part of options (AI doesn't use them correctly anyway); expand prompt/descriptions for stat changes to be about both making the choice and its consequences
 - Allow shared outcomes only in multiplayer games?
 - Attach facts to players?

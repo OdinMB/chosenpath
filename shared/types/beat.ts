@@ -217,17 +217,9 @@ export interface ProbabilityDistribution {
   unfavorable: number;
 }
 
-export interface OutcomeResult {
-  distribution: ProbabilityDistribution;
-  resolution: StepResolutionType;
-  points: number;
-  optionType: OptionType;
-}
-
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
   resolution: StepResolutionType | null;
-  outcomeResult?: OutcomeResult;
 };
 
 export type BeatHistory = Array<Beat>;
