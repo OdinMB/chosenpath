@@ -1,4 +1,4 @@
-import { type StoryState } from "shared/types/story.js";
+import { type Story } from "../Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
@@ -20,9 +20,9 @@ export class SwitchPromptService {
     previousThreadConfiguration: true,
   } as const;
 
-  static createSwitchAnalysisPrompt(state: StoryState): string {
+  static createSwitchAnalysisPrompt(story: Story): string {
     const prompt =
-      StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
+      StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
       this.createInstructionsSection();
     console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;

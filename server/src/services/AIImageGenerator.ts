@@ -1,11 +1,12 @@
 import OpenAI from "openai";
 import type { Image, ImageGeneration } from "shared/types/image.js";
-import type { StoryState } from "shared/types/story.js";
 import type { Beat } from "shared/types/beat.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 import { imageGenerationSchema } from "shared/types/image.js";
 import type { BeatsNeedingImages } from "shared/types/image.js";
+import { Story } from "./Story.js";
+
 dotenv.config();
 
 export class AIImageGenerator {
@@ -54,10 +55,10 @@ export class AIImageGenerator {
   }
 
   async generateImagesForBeats(
-    state: StoryState,
+    story: Story,
     beatsNeedingImages: BeatsNeedingImages
-  ): Promise<StoryState> {
-    const updatedState = { ...state };
+  ): Promise<Story> {
+    let updatedStory = story;
 
     // Generate image requests and images in parallel
     const imagePromises = Object.entries(beatsNeedingImages).map(
@@ -76,59 +77,28 @@ export class AIImageGenerator {
             description: imageGen.description || "",
             status: "generating",
           };
-          updatedState.images.push(placeholderImage);
+          updatedStory = updatedStory.addImage(placeholderImage);
 
           // Generate actual image
           const imageUrl = await this.generateImage(imageGen.prompt);
+          const imageId = crypto.randomUUID();
 
-          // Return final image and player info
-          return {
-            playerSlot,
-            image: {
-              ...imageGen,
-              id: imageGen.id || crypto.randomUUID(),
-              prompt: imageGen.prompt || "",
-              description: imageGen.description || "",
-              url: imageUrl,
-              status: "ready" as const,
-            },
-          };
+          updatedStory = updatedStory.updateImage(imageId, {
+            url: imageUrl,
+            prompt: imageGen.prompt,
+            description: imageGen.description,
+          });
+
+          updatedStory = updatedStory.setCurrentBeatImage(playerSlot, imageId);
         } catch (error) {
-          console.error(`Failed to generate image for ${playerSlot}:`, error);
-          return {
-            playerSlot,
-            image: {
-              id: crypto.randomUUID(),
-              prompt: "",
-              description: "Failed to generate image",
-              status: "failed" as const,
-            },
-          };
+          console.error("Failed to generate image for beat:", error);
         }
       }
     );
 
-    const results = await Promise.all(imagePromises);
+    await Promise.all(imagePromises);
 
-    // Update state with generated images
-    results.forEach(({ playerSlot, image }) => {
-      // Update image in library
-      const imageIndex = updatedState.images.findIndex(
-        (img) => img.id === image.id
-      );
-      if (imageIndex !== -1) {
-        updatedState.images[imageIndex] = image;
-      }
-
-      // Update beat with image id
-      const player = updatedState.players[playerSlot];
-      if (player && player.beatHistory.length > 0) {
-        const lastBeat = player.beatHistory[player.beatHistory.length - 1];
-        lastBeat.imageId = image.id;
-      }
-    });
-
-    return updatedState;
+    return updatedStory;
   }
 }
 

@@ -1,9 +1,9 @@
 import type { Socket } from "socket.io";
-import type { StoryState } from "shared/types/story.js";
+import type { Story } from "../services/Story.js";
 import { isValidPlayerCount } from "shared/utils/playerUtils.js";
 import type { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { getPlayerSlots } from "shared/utils/playerUtils.js";
-import { StoryStateManager } from "../services/StoryStateManager.js";
+import { StoryRepository } from "../services/StoryRepository.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import type { GameMode } from "shared/types/story.js";
 import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
@@ -11,16 +11,16 @@ import { gameQueueProcessor } from "../services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
 
 export class GameHandler {
-  protected storyStateManager: StoryStateManager;
+  protected storyRepository: StoryRepository;
   private socket: Socket;
 
   constructor(socket: Socket) {
     this.socket = socket;
-    this.storyStateManager = StoryStateManager.getInstance();
+    this.storyRepository = StoryRepository.getInstance();
     console.log("[GameHandler] Created new handler for socket:", socket.id);
 
     // Add event listeners for queue processor events
-    gameQueueProcessor.events.on("storyInitialized", ({ gameId, state }) => {
+    gameQueueProcessor.events.on("storyInitialized", ({ gameId, story }) => {
       if (this.pendingInitializations.has(gameId)) {
         const { resolve, codes } = this.pendingInitializations.get(gameId)!;
         this.socket.emit("story_codes", { codes });
@@ -29,10 +29,10 @@ export class GameHandler {
       }
     });
 
-    gameQueueProcessor.events.on("stateUpdated", ({ gameId, state }) => {
-      console.log("[GameHandler] Received state update for game:", gameId);
-      this.storyStateManager.storeState(gameId, state);
-      connectionManager.broadcastStateUpdate(gameId, state);
+    gameQueueProcessor.events.on("storyUpdated", ({ gameId, story }) => {
+      console.log("[GameHandler] Received story update for game:", gameId);
+      this.storyRepository.storeStory(gameId, story);
+      connectionManager.broadcastStoryUpdate(gameId, story);
     });
   }
 
@@ -120,14 +120,14 @@ export class GameHandler {
         throw new Error("Player not found");
       }
 
-      // Get current state
-      const state = await this.storyStateManager.getState(playerInfo.storyId);
-      if (!state) {
-        throw new Error("Game state not found");
+      // Get current story
+      const story = await this.storyRepository.getStory(playerInfo.storyId);
+      if (!story) {
+        throw new Error("Story not found");
       }
 
       // Validate player state and choice
-      this.validateChoice(state, playerInfo.playerSlot, optionIndex);
+      this.validateChoice(story, playerInfo.playerSlot, optionIndex);
 
       // Queue the validated choice
       await gameQueueProcessor.addOperation({
@@ -136,7 +136,7 @@ export class GameHandler {
         input: {
           playerSlot: playerInfo.playerSlot,
           optionIndex,
-          state,
+          story,
         },
       });
     } catch (error) {
@@ -149,7 +149,7 @@ export class GameHandler {
   }
 
   private validateChoice(
-    state: StoryState,
+    story: Story,
     playerSlot: PlayerSlot,
     optionIndex: number
   ): void {
@@ -167,7 +167,7 @@ export class GameHandler {
       throw new Error("Socket connection needs refresh");
     }
 
-    const player = state.players[playerSlot];
+    const player = story.getPlayer(playerSlot);
     if (!player?.beatHistory?.length) {
       throw new Error("No beat history found for player");
     }
@@ -177,7 +177,7 @@ export class GameHandler {
       throw new Error("No current beat found");
     }
 
-    if (state.currentBeatType === "ending") {
+    if (story.getCurrentBeatType() === "ending") {
       throw new Error("Ending beats don't allow choices");
     }
 

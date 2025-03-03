@@ -73,3 +73,5 @@ export const outcomeSchema = z
   );
 
 export const outcomesSchema = z.array(outcomeSchema);
+
+export type Outcome = z.infer<typeof outcomeSchema>;

@@ -1,10 +1,12 @@
 import type { Change } from "shared/types/change.js";
-import type { StoryState } from "shared/types/story.js";
+import { Story } from "./Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import type { Stat } from "shared/types/stat.js";
+import type { StoryState } from "shared/types/story.js";
+import type { StoryElement } from "shared/types/storyElement.js";
 
 export class ChangeService {
-  applyChanges(state: StoryState, changes: Change[]): StoryState {
+  applyChanges(story: Story, changes: Change[]): Story {
     // Sort changes to process newStoryElement before newFact
     const sortedChanges = [...changes].sort((a, b) => {
       if (a.type === "newStoryElement" && b.type === "newFact") return -1;
@@ -12,70 +14,70 @@ export class ChangeService {
       return 0;
     });
 
-    let updatedState = { ...state };
+    let updatedStory = story;
 
     for (const change of sortedChanges) {
       switch (change.type) {
         case "statChange":
-          updatedState = this.applyStatChange(
-            updatedState,
+          updatedStory = this.applyStatChange(
+            updatedStory,
             change as Change & { type: "statChange" }
           );
           break;
         case "newFact":
-          updatedState = this.applyNewFact(
-            updatedState,
+          updatedStory = this.applyNewFact(
+            updatedStory,
             change as Change & { type: "newFact" }
           );
           break;
         case "newMilestone":
-          updatedState = this.applyNewMilestone(
-            updatedState,
+          updatedStory = this.applyNewMilestone(
+            updatedStory,
             change as Change & { type: "newMilestone" }
           );
           break;
         case "newStoryElement":
-          updatedState = this.applyNewStoryElement(
-            updatedState,
+          updatedStory = this.applyNewStoryElement(
+            updatedStory,
             change as Change & { type: "newStoryElement" }
           );
           break;
         case "addIntroductionOfStoryElement":
-          updatedState = this.applyAddIntroductionOfStoryElement(
-            updatedState,
+          updatedStory = this.applyAddIntroductionOfStoryElement(
+            updatedStory,
             change as Change & { type: "addIntroductionOfStoryElement" }
           );
           break;
       }
     }
 
-    return updatedState;
+    return updatedStory;
   }
 
   private applyAddIntroductionOfStoryElement(
-    state: StoryState,
+    story: Story,
     change: Change & { type: "addIntroductionOfStoryElement" }
-  ): StoryState {
+  ): Story {
     console.log(
       `Adding introduction of story element ${change.storyElementId} for player ${change.player}`
     );
 
+    const state = story.getState();
     const player = state.players[change.player];
 
     if (!player) {
       console.log(`Player ${change.player} not found`);
-      return state;
+      return story;
     }
 
     if (player.knownStoryElements.includes(change.storyElementId)) {
       console.log(
         `Story element ${change.storyElementId} is already known to player ${change.player}`
       );
-      return state;
+      return story;
     }
 
-    return {
-      ...state,
+    const updatedState = {
       players: {
         ...state.players,
         [change.player]: {
@@ -87,15 +89,19 @@ export class ChangeService {
         },
       },
     };
+
+    return story.applyChanges(updatedState);
   }
 
   private applyNewMilestone(
-    state: StoryState,
+    story: Story,
     change: Change & { type: "newMilestone" }
-  ): StoryState {
+  ): Story {
     console.log(
       `Adding milestone to outcome ${change.outcome} (${change.outcomeGroup}): ${change.newMilestone}`
     );
+
+    const state = story.getState();
 
     if (change.outcomeGroup === "shared") {
       const updatedOutcomes = state.sharedOutcomes.map((outcome) => {
@@ -107,17 +113,16 @@ export class ChangeService {
         };
       });
 
-      return {
-        ...state,
+      return story.applyChanges({
         sharedOutcomes: updatedOutcomes,
-      };
+      });
     }
 
     const player = state.players[change.outcomeGroup];
 
     if (!player) {
       console.log(`Player ${change.outcomeGroup} not found`);
-      return state;
+      return story;
     }
 
     const updatedOutcomes = player.outcomes.map((outcome) => {
@@ -129,8 +134,7 @@ export class ChangeService {
       };
     });
 
-    return {
-      ...state,
+    return story.applyChanges({
       players: {
         ...state.players,
         [change.outcomeGroup]: {
@@ -138,20 +142,22 @@ export class ChangeService {
           outcomes: updatedOutcomes,
         },
       },
-    };
+    });
   }
 
   private applyStatChange(
-    state: StoryState,
+    story: Story,
     change: Change & { type: "statChange" }
-  ): StoryState {
+  ): Story {
+    const state = story.getState();
+
     if (change.group === "shared") {
       console.log(`Applying stat change to shared stat: ${change.stat}`);
       return this.updateStatsArray(
-        state,
+        story,
         state.sharedStats,
         change,
-        (updatedStats) => ({ ...state, sharedStats: updatedStats })
+        (updatedStats) => ({ sharedStats: updatedStats })
       );
     }
 
@@ -162,18 +168,17 @@ export class ChangeService {
       console.log(
         `Player ${playerSlot} not found for stat change: ${change.stat}`
       );
-      return state;
+      return story;
     }
 
     console.log(
       `Applying stat change to player ${playerSlot}'s stat: ${change.stat}`
     );
     return this.updateStatsArray(
-      state,
+      story,
       player.characterStats,
       change,
       (updatedStats) => ({
-        ...state,
         players: {
           ...state.players,
           [playerSlot]: {
@@ -186,11 +191,12 @@ export class ChangeService {
   }
 
   private updateStatsArray(
-    state: StoryState,
+    story: Story,
     stats: Stat[],
     change: Change & { type: "statChange" },
-    updateState: (updatedStats: Stat[]) => StoryState
-  ): StoryState {
+    updateState: (updatedStats: Stat[]) => Partial<StoryState>
+  ): Story {
+    const state = story.getState();
     const statIndex = stats.findIndex((s) => s.id === change.stat);
 
     if (statIndex === -1) {
@@ -201,7 +207,7 @@ export class ChangeService {
             : `player ${change.group}'s stats`
         }`
       );
-      return state;
+      return story;
     }
 
     const stat = stats[statIndex];
@@ -211,7 +217,7 @@ export class ChangeService {
       console.log(
         `Stat ${stat.id} not updated. Incompatible change type "${change.change}" for stat type "${stat.type}"`
       );
-      return state;
+      return story;
     }
 
     console.log(
@@ -225,7 +231,7 @@ export class ChangeService {
     const updatedStats = [...stats];
     updatedStats[statIndex] = updatedStat;
 
-    return updateState(updatedStats);
+    return story.applyChanges(updateState(updatedStats));
   }
 
   private updateStatValue(
@@ -310,16 +316,17 @@ export class ChangeService {
   }
 
   private applyNewFact(
-    state: StoryState,
+    story: Story,
     change: Change & { type: "newFact" }
-  ): StoryState {
+  ): Story {
     console.log(`Adding new fact to ${change.storyElementId}: ${change.fact}`);
 
+    const state = story.getState();
+
     if (change.storyElementId === "world") {
-      return {
-        ...state,
+      return story.applyChanges({
         worldFacts: [...state.worldFacts, change.fact],
-      };
+      });
     }
 
     const updatedElements = state.storyElements.map((element) => {
@@ -332,29 +339,29 @@ export class ChangeService {
       return element;
     });
 
-    return {
-      ...state,
+    return story.applyChanges({
       storyElements: updatedElements,
-    };
+    });
   }
 
   private applyNewStoryElement(
-    state: StoryState,
+    story: Story,
     change: Change & { type: "newStoryElement" }
-  ): StoryState {
+  ): Story {
     console.log(`Adding new story element: ${JSON.stringify(change.element)}`);
+
+    const state = story.getState();
 
     // Check if element with this ID already exists
     if (
       state.storyElements.some((element) => element.id === change.element.id)
     ) {
       console.log(`Story element with ID ${change.element.id} already exists`);
-      return state;
+      return story;
     }
 
-    return {
-      ...state,
+    return story.applyChanges({
       storyElements: [...state.storyElements, change.element],
-    };
+    });
   }
 }

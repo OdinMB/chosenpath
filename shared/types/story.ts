@@ -11,7 +11,6 @@ import {
   PCSchema,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
-import { BeatType } from "./beat.js";
 import { SwitchAnalysis } from "./switch.js";
 import { ThreadAnalysis } from "./thread.js";
 
@@ -121,11 +120,12 @@ export type PlayerState = PlayerStateGeneration & {
 };
 
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;
+export type Guidelines = z.infer<typeof guidelinesSchema>;
 
 // Direct type definition for StoryState
 export type StoryState = {
   gameMode: GameMode;
-  guidelines: z.infer<typeof guidelinesSchema>;
+  guidelines: Guidelines;
   storyElements: StoryElement[];
   worldFacts: string[];
   sharedOutcomes: z.infer<typeof outcomesSchema>;
@@ -133,12 +133,6 @@ export type StoryState = {
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   storyPhases: StoryPhase[];
   maxTurns: number;
-  currentBeatType: BeatType | null;
-  currentSwitchAnalysis: SwitchAnalysis | null;
-  currentThreadAnalysis: ThreadAnalysis | null;
-  currentThreadMaxBeats: number;
-  currentThreadBeatsCompleted: number;
-  previousThreadAnalysis: ThreadAnalysis | null; // to avoid confusion when a new switch has already been generated but not yet the associated threads
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;

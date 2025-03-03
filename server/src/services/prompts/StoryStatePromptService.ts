@@ -1,4 +1,5 @@
 import { type StoryState, GameModes } from "shared/types/story.js";
+import { Story } from "../Story.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -32,29 +33,29 @@ export const DEFAULT_SECTION_CONFIG: SectionConfig = {
 
 export class StoryStatePromptService {
   static createStoryStatePrompt(
-    state: StoryState,
+    story: Story,
     sections: SectionConfig = DEFAULT_SECTION_CONFIG
   ): string {
     const prompt = [
       "======= CURRENT GAME STATE =======\n",
-      sections.gameMode ? this.createGameModeSection(state) : "",
-      sections.guidelines ? this.createGuidelinesSection(state) : "",
-      sections.storyElements ? this.createStoryElementsSection(state) : "",
-      sections.worldFacts ? this.createWorldFactsSection(state) : "",
-      sections.sharedOutcomes ? this.createSharedOutcomesSection(state) : "",
-      sections.sharedStats ? this.createSharedStatsSection(state) : "",
-      sections.imageLibrary ? this.createImageLibrarySection(state) : "",
-      sections.players ? this.createPlayersSection(state) : "",
-      sections.storyProgress ? this.createStoryProgressSection(state) : "",
-      sections.switchConfiguration ? this.getSwitchConfiguration(state) : "",
+      sections.gameMode ? this.createGameModeSection(story) : "",
+      sections.guidelines ? this.createGuidelinesSection(story) : "",
+      sections.storyElements ? this.createStoryElementsSection(story) : "",
+      sections.worldFacts ? this.createWorldFactsSection(story) : "",
+      sections.sharedOutcomes ? this.createSharedOutcomesSection(story) : "",
+      sections.sharedStats ? this.createSharedStatsSection(story) : "",
+      sections.imageLibrary ? this.createImageLibrarySection(story) : "",
+      sections.players ? this.createPlayersSection(story) : "",
+      sections.storyProgress ? this.createStoryProgressSection(story) : "",
+      sections.switchConfiguration ? this.getSwitchConfiguration(story) : "",
       sections.threadConfiguration
-        ? this.createThreadConfigurationSection("current", state) +
+        ? this.createThreadConfigurationSection("current", story) +
           `\n\nCURRENT THREAD PROGRESSION: Turn ${
-            state.currentThreadBeatsCompleted + 1
-          }/${state.currentThreadMaxBeats}\n`
+            story.getCurrentThreadBeatsCompleted() + 1
+          }/${story.getCurrentThreadDuration()}\n`
         : "",
       sections.previousThreadConfiguration
-        ? this.createThreadConfigurationSection("previous", state)
+        ? this.createThreadConfigurationSection("previous", story)
         : "",
     ]
       .filter(Boolean)
@@ -63,8 +64,8 @@ export class StoryStatePromptService {
     return prompt;
   }
 
-  private static createGameModeSection(state: StoryState): string {
-    if (Object.keys(state.players).length <= 1) return "";
+  private static createGameModeSection(story: Story): string {
+    if (!story.isMultiplayer()) return "";
 
     const modeDescriptions: Record<GameModes, string> = {
       [GameModes.Competitive]:
@@ -76,40 +77,50 @@ export class StoryStatePromptService {
       [GameModes.SinglePlayer]: "Single player story mode.",
     };
 
-    return `MULTIPLAYER GAME MODE: ${state.gameMode}
-${modeDescriptions[state.gameMode]}
+    return `MULTIPLAYER GAME MODE: ${story.getGameMode()}
+${modeDescriptions[story.getGameMode()]}
 
 `;
   }
 
-  private static createGuidelinesSection(state: StoryState): string {
+  private static createGuidelinesSection(story: Story): string {
     return [
       "STORY GUIDELINES",
-      `- World: ${state.guidelines.world}`,
-      `- Rules: ${state.guidelines.rules.join(", ")}`,
-      `- Tone: ${state.guidelines.tone.join(", ")}`,
-      `- Core conflicts: ${state.guidelines.conflicts.join(", ")}`,
-      `- Types of decisions that players will make: ${state.guidelines.decisions.join(
-        ", "
-      )}`,
+      `- World: ${story.getGuidelines().world}`,
+      `- Rules: ${story.getGuidelines().rules.join(", ")}`,
+      `- Tone: ${story.getGuidelines().tone.join(", ")}`,
+      `- Core conflicts: ${story.getGuidelines().conflicts.join(", ")}`,
+      `- Types of decisions that players will make: ${story
+        .getGuidelines()
+        .decisions.join(", ")}`,
       "",
     ].join("\n");
   }
 
-  private static createWorldFactsSection(state: StoryState): string {
-    if (state.worldFacts.length === 0) return "";
+  private static createWorldFactsSection(story: Story): string {
+    if (story.getWorldFacts().length === 0) return "";
 
     return [
       "GENERAL FACTS:",
-      state.worldFacts.map((fact) => `- ${fact}`).join("\n"),
+      story
+        .getWorldFacts()
+        .map((fact) => `- ${fact}`)
+        .join("\n"),
       "",
     ].join("\n");
   }
 
-  private static createStoryElementsSection(state: StoryState): string {
+  private static createStoryElementsSection(story: Story): string {
+    const storyElements = story.getStoryElements();
+
+    if (!storyElements || storyElements.length === 0) {
+      console.log("[StoryStatePromptService] No story elements found");
+      return "";
+    }
+
     return [
       "STORY ELEMENTS:",
-      state.storyElements
+      storyElements
         .map((element) => {
           const facts =
             element.facts && element.facts.length > 0
@@ -128,10 +139,11 @@ ${modeDescriptions[state.gameMode]}
     ].join("\n");
   }
 
-  private static createSharedStatsSection(state: StoryState): string {
+  private static createSharedStatsSection(story: Story): string {
     return [
       "SHARED STATS:",
-      state.sharedStats
+      story
+        .getSharedStats()
         .map((stat) => {
           const formattedValue = this.formatStatValue(stat);
           const visibility =
@@ -158,22 +170,23 @@ ${modeDescriptions[state.gameMode]}
     }
   }
 
-  private static createImageLibrarySection(state: StoryState): string {
-    if (!state.generateImages) return "";
+  private static createImageLibrarySection(story: Story): string {
+    if (!story.includesImages()) return "";
 
     return [
       "IMAGE LIBRARY:",
-      state.images.length === 0
+      story.getImages().length === 0
         ? "No images yet."
-        : state.images
+        : story
+            .getImages()
             .map((image) => `- ${image.id}: ${image.description}`)
             .join("\n"),
       "",
     ].join("\n");
   }
 
-  private static createPlayersSection(state: StoryState): string {
-    return Object.entries(state.players)
+  private static createPlayersSection(story: Story): string {
+    return Object.entries(story.getPlayers())
       .map(([slot, playerState]) => {
         const beatHistorySection = this.createBeatHistorySection(
           playerState.beatHistory
@@ -205,7 +218,7 @@ ${modeDescriptions[state.gameMode]}
   }
 
   private static createBeatHistorySection(beatHistory: any[]): string {
-    if (beatHistory.length === 0) {
+    if (!beatHistory || beatHistory.length === 0) {
       return "No beats yet.";
     }
 
@@ -292,35 +305,34 @@ Chosen option: ${choiceText}${resultText}`;
     return "No resolutions defined";
   }
 
-  private static createStoryProgressSection(state: StoryState): string {
-    const turnsDone = Object.values(state.players)[0].beatHistory.length;
-    const turnsLeft = state.maxTurns - turnsDone;
+  private static createStoryProgressSection(story: Story): string {
+    const turnsDone = story.getCurrentTurn();
+    const turnsLeft = story.getMaxTurns() - turnsDone;
     return `\n======= STORY PROGRESS =======\n\nCurrent turn: ${
       turnsDone + 1
-    }/${state.maxTurns}\nTurns left (including this one): ${turnsLeft}\n`;
+    }/${story.getMaxTurns()}\nTurns left (including this one): ${turnsLeft}\n`;
   }
 
-  private static createSharedOutcomesSection(state: StoryState): string {
+  private static createSharedOutcomesSection(story: Story): string {
     return [
       "SHARED OUTCOMES that will affect all players:",
-      this.createOutcomesSection(state.sharedOutcomes),
+      this.createOutcomesSection(story.getSharedOutcomes()),
       "",
     ].join("\n");
   }
 
-  public static getSwitchConfiguration(state: StoryState): string {
-    if (!state.currentSwitchAnalysis) {
+  public static getSwitchConfiguration(story: Story): string {
+    if (!story.getCurrentSwitchAnalysis()) {
       return "";
     }
 
     const { switches, coordinationPatternSummary } =
-      state.currentSwitchAnalysis;
+      story.getCurrentSwitchAnalysis();
 
-    // Get last decisions for each player
-    const lastDecisions = Object.entries(state.players)
-      .map(([slot, playerState]) => {
-        const lastBeat =
-          playerState.beatHistory[playerState.beatHistory.length - 1];
+    const lastDecisions = story
+      .getPlayerSlots()
+      .map((slot) => {
+        const lastBeat = story.getCurrentBeat(slot);
         const choice =
           lastBeat?.options?.[lastBeat?.choice]?.text || "No decision made";
         return `${slot}: ${choice}`;
@@ -364,12 +376,12 @@ Chosen option: ${choiceText}${resultText}`;
 
   private static createThreadConfigurationSection(
     type: "current" | "previous",
-    state: StoryState
+    story: Story
   ): string {
     const threadAnalysis =
       type === "current"
-        ? state.currentThreadAnalysis
-        : state.previousThreadAnalysis;
+        ? story.getCurrentThreadAnalysis()
+        : story.getPreviousThreadAnalysis();
 
     if (!threadAnalysis) {
       return "";
@@ -421,9 +433,9 @@ Chosen option: ${choiceText}${resultText}`;
         // For previous threads, we need to get the beat history from a different location
         const getThreadBeats = () => {
           if (type === "current") {
-            return this.getCurrentThreadBeatChoices(thread, state);
+            return this.getCurrentThreadBeatChoices(thread, story);
           } else {
-            return this.getPreviousThreadBeatChoices(thread, state);
+            return this.getPreviousThreadBeatChoices(thread, story);
           }
         };
 
@@ -470,9 +482,9 @@ Chosen option: ${choiceText}${resultText}`;
           }
 
           return [
-            `\nCurrent beat (${beatsCompleted + 1}/${
-              state.currentThreadMaxBeats
-            }): ${currentBeat.title}`,
+            `\nCurrent beat (${
+              beatsCompleted + 1
+            }/${story.getCurrentThreadDuration()}): ${currentBeat.title}`,
             `Question: ${currentBeat.question}`,
             `Possible outcomes:`,
             outcomes.join("\n"),
@@ -495,7 +507,7 @@ Chosen option: ${choiceText}${resultText}`;
                 type === "previous" ? "" : " so far"
               }:\n${beatChoicesResult.join("\n")}`
             : "",
-          currentBeatInfo(state.currentThreadBeatsCompleted),
+          currentBeatInfo(story.getCurrentThreadBeatsCompleted()),
         ]
           .filter(Boolean)
           .join("\n");
@@ -507,11 +519,11 @@ Chosen option: ${choiceText}${resultText}`;
 
   private static getCurrentThreadBeatChoices(
     thread: any,
-    state: StoryState
+    story: Story
   ): string[] {
     const previousBeatChoices: string[] = [];
 
-    if (state.currentThreadBeatsCompleted <= 0) {
+    if (story.getCurrentThreadBeatsCompleted() <= 0) {
       return previousBeatChoices;
     }
 
@@ -523,15 +535,15 @@ Chosen option: ${choiceText}${resultText}`;
 
     // For each player, get their choices in the current thread
     for (const playerId of threadPlayers) {
-      const player = state.players[playerId];
+      const player = story.getPlayer(playerId);
       if (!player) continue;
 
       // Calculate the starting index for the current thread in the beat history
       const threadStartIndex =
-        player.beatHistory.length - state.currentThreadBeatsCompleted;
+        player.beatHistory.length - story.getCurrentThreadBeatsCompleted();
 
       // Loop through all completed beats in the current thread
-      for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
+      for (let i = 0; i < story.getCurrentThreadBeatsCompleted(); i++) {
         const beatIndex = threadStartIndex + i;
         if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
           const beat = player.beatHistory[beatIndex];
@@ -560,7 +572,7 @@ Chosen option: ${choiceText}${resultText}`;
     }
 
     // Convert the map to the format we want
-    for (let i = 0; i < state.currentThreadBeatsCompleted; i++) {
+    for (let i = 0; i < story.getCurrentThreadBeatsCompleted(); i++) {
       if (beatChoicesMap[i] && beatChoicesMap[i].length > 0) {
         previousBeatChoices.push(
           `- Beat ${i + 1}\n${beatChoicesMap[i].join("\n")}`
@@ -573,11 +585,11 @@ Chosen option: ${choiceText}${resultText}`;
 
   private static getPreviousThreadBeatChoices(
     thread: any,
-    state: StoryState
+    story: Story
   ): string[] {
     const beatChoices: string[] = [];
 
-    if (!state.previousThreadAnalysis) {
+    if (!story.getPreviousThreadAnalysis()) {
       return beatChoices;
     }
 
@@ -598,13 +610,14 @@ Chosen option: ${choiceText}${resultText}`;
 
     // For each player, find their choices from the previous thread
     for (const playerId of threadPlayers) {
-      const player = state.players[playerId];
+      const player = story.getPlayer(playerId);
       if (!player) continue;
 
       // Calculate where the previous thread starts in the beat history
       // It should be before the current thread
       const currentThreadStartIndex =
-        player.beatHistory.length - (state.currentThreadBeatsCompleted || 0);
+        player.beatHistory.length -
+        (story.getCurrentThreadBeatsCompleted() || 0);
       const previousThreadStartIndex =
         currentThreadStartIndex - previousThreadBeatsCount;
 

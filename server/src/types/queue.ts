@@ -1,7 +1,7 @@
-import type { StoryState } from "shared/types/story.js";
+import type { Story } from "../services/Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import type { Beat } from "shared/types/beat.js";
-import type { GameMode } from "shared/types/story.js";
+import type { GameMode, StoryState } from "shared/types/story.js";
 import type { PlayerCount } from "shared/types/player.js";
 
 // Base operation type for any queueable operation
@@ -25,28 +25,28 @@ export interface GameOperations {
       gameMode: GameMode;
       playerCodes: Record<PlayerSlot, string>;
     };
-    state: StoryState;
+    story: Story;
   };
   recordChoice: {
     input: {
       playerSlot: PlayerSlot;
       optionIndex: number;
-      state: StoryState;
+      story: Story;
     };
-    state: StoryState;
+    story: Story;
   };
   moveStoryForward: {
     input: {
-      state: StoryState;
+      story: Story;
     };
-    state: StoryState;
+    story: Story;
   };
   generateImages: {
     input: {
       beatsNeedingImages: Record<string, Beat>;
-      state: StoryState;
+      story: Story;
     };
-    state: StoryState;
+    story: Story;
   };
 }
 
@@ -64,9 +64,9 @@ export type GameOperation = QueueableOperation & {
   }[GameOperationType];
 
 // Events
-export interface StateUpdateEvent {
+export interface StoryUpdateEvent {
   gameId: string;
-  state: StoryState;
+  story: Story;
 }
 
 export interface OperationErrorEvent {
@@ -76,7 +76,7 @@ export interface OperationErrorEvent {
 }
 
 export interface QueueEvents {
-  stateUpdated: (event: StateUpdateEvent) => void;
+  storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (data: {
     gameId: string;
     operationType: GameOperationType;

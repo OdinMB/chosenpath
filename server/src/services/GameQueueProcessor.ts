@@ -1,38 +1,32 @@
 import { BaseQueueProcessor } from "./QueueProcessor.js";
 import type {
   GameOperation,
-  StateUpdateEvent,
+  StoryUpdateEvent,
   OperationErrorEvent,
 } from "../types/queue.js";
-import type { StoryState } from "shared/types/story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
-import { ChangeService } from "../services/ChangeService.js";
 import { OutcomeService } from "../services/OutcomeService.js";
-import { determineNextBeatType } from "shared/utils/storyUtils.js";
-import { areAllChoicesSubmitted } from "shared/utils/storyUtils.js";
-import { type Beat } from "shared/types/beat.js";
+import { Story } from "./Story.js";
 
 export interface QueueEvents {
-  stateUpdated: (event: StateUpdateEvent) => void;
+  storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (event: OperationErrorEvent) => void;
-  storyInitialized: (event: { gameId: string; state: StoryState }) => void;
+  storyInitialized: (event: { gameId: string; story: Story }) => void;
 }
 
 export class GameQueueProcessor extends BaseQueueProcessor<
   GameOperation,
-  StoryState
+  Story
 > {
   private aiStoryGenerator: AIStoryGenerator;
   private aiImageGenerator: AIImageGenerator;
-  private changeService: ChangeService;
 
   constructor() {
     super();
     this.aiStoryGenerator = new AIStoryGenerator();
     this.aiImageGenerator = new AIImageGenerator();
-    this.changeService = new ChangeService();
   }
 
   protected getQueueId(operation: GameOperation): string {
@@ -40,7 +34,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
   }
 
   protected async processOperation(operation: GameOperation): Promise<void> {
-    let finalState: StoryState;
     switch (operation.type) {
       case "initializeStory":
         await this.handleInitializeStory(operation);
@@ -70,7 +63,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     } = input;
 
     // Create initial state
-    const state = await this.aiStoryGenerator.createInitialState(
+    const storyState = await this.aiStoryGenerator.createInitialState(
       prompt,
       generateImages,
       playerCount,
@@ -78,26 +71,27 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       gameMode
     );
 
+    const story = Story.create(storyState);
+
     // Add player codes to state
-    const stateWithCodes = {
-      ...state,
+    const storyWithCodes = story.clone({
       playerCodes,
-    };
+    });
 
     this.events.emit("storyInitialized", {
       gameId: operation.gameId,
-      state: stateWithCodes,
+      story: storyWithCodes,
     });
-    this.events.emit("stateUpdated", {
+    this.events.emit("storyUpdated", {
       gameId: operation.gameId,
-      state: stateWithCodes,
+      story: storyWithCodes,
     });
 
     // Queue the first moveStoryForward operation
     await this.addOperation({
       type: "moveStoryForward",
       gameId: operation.gameId,
-      input: { state: stateWithCodes },
+      input: { story: storyWithCodes },
     });
   }
 
@@ -105,7 +99,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     operation: GameOperation & { type: "moveStoryForward" }
   ): Promise<void> {
     const { gameId, input } = operation;
-    const { state } = input;
+    const { story } = input;
 
     try {
       console.log(
@@ -114,83 +108,56 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       );
 
       // Determine the thread (step) resolutions based on individual players' resolutions
-      let updatedState = state;
+      let updatedStory = story;
       // updatedState = await this.determineThreadResolutions(updatedState);
 
       // Determine next beat type and prepare state
-      const currentBeatType = determineNextBeatType(state);
-
-      // Reset beat context if needed
-      if (
-        currentBeatType === "ending" ||
-        currentBeatType === "intro" ||
-        currentBeatType === "switch"
-      ) {
-        console.log(
-          "[GameQueueProcessor] Resetting beat context for type:",
-          currentBeatType
-        );
-        updatedState = this.resetBeatContext(updatedState);
-      }
+      const currentBeatType = story.determineNextBeatType();
 
       // Generate content based on beat type
       if (currentBeatType === "switch") {
         console.log("[GameQueueProcessor] Generating switches");
-        updatedState = await this.aiStoryGenerator.generateSwitches(
-          updatedState
-        );
+        updatedStory = await this.aiStoryGenerator.generateSwitches(story);
       } else if (
         currentBeatType === "thread" &&
-        state.currentThreadBeatsCompleted === 0
+        story.getCurrentThreadBeatsCompleted() === 0
       ) {
         console.log("[GameQueueProcessor] Generating threads");
-        updatedState = await this.aiStoryGenerator.generateThreads(
-          updatedState
-        );
+        updatedStory = await this.aiStoryGenerator.generateThreads(story);
       }
-      updatedState.currentBeatType = currentBeatType;
 
       // Generate beats and list of beats needing images
       console.log("[GameQueueProcessor] Generating beats");
-      const [nextState, changes, beatsNeedingImages] =
-        await this.aiStoryGenerator.generateBeats(updatedState);
+      const [nextStory, changes, beatsNeedingImages] =
+        await this.aiStoryGenerator.generateBeats(updatedStory);
 
       // Apply changes
       console.log("[GameQueueProcessor] Applying changes to state");
-      const stateWithChanges = this.changeService.applyChanges(
-        nextState,
-        changes
-      );
-
-      // Update thread beat counter if needed
-      if (currentBeatType === "thread") {
-        console.log(
-          "[GameQueueProcessor] Updating thread beat counter:",
-          stateWithChanges.currentThreadBeatsCompleted + 1
-        );
-        stateWithChanges.currentThreadBeatsCompleted += 1;
-      }
+      const storyWithChanges = nextStory.applyStoryChanges(changes);
 
       // Save and broadcast state update
-      this.events.emit("stateUpdated", {
+      this.events.emit("storyUpdated", {
         gameId: operation.gameId,
-        state: stateWithChanges,
+        story: storyWithChanges,
       });
 
       // Generate images if needed
-      let finalState = stateWithChanges;
-      if (state.generateImages && Object.keys(beatsNeedingImages).length > 0) {
+      let finalStory = storyWithChanges;
+      if (
+        storyWithChanges.includesImages() &&
+        Object.keys(beatsNeedingImages).length > 0
+      ) {
         console.log("[GameQueueProcessor] Generating images for beats");
-        finalState = await this.aiImageGenerator.generateImagesForBeats(
-          stateWithChanges,
+        finalStory = await this.aiImageGenerator.generateImagesForBeats(
+          storyWithChanges,
           beatsNeedingImages
         );
       }
 
       // Save and broadcast state update for images
-      this.events.emit("stateUpdated", {
+      this.events.emit("storyUpdated", {
         gameId: operation.gameId,
-        state: finalState,
+        story: finalStory,
       });
     } catch (error) {
       console.error(
@@ -201,102 +168,59 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     }
   }
 
-  private resetBeatContext(state: StoryState): StoryState {
-    return {
-      ...state,
-      currentBeatType: null,
-      currentSwitchAnalysis: null,
-      currentThreadAnalysis: null,
-      currentThreadMaxBeats: 0,
-      currentThreadBeatsCompleted: 0,
-      previousThreadAnalysis: state.currentThreadAnalysis,
-    };
-  }
-
   private async handleRecordChoice(
     operation: GameOperation & { type: "recordChoice" }
   ): Promise<void> {
     const { gameId, input } = operation;
-    const { playerSlot, optionIndex, state } = input;
+    const { playerSlot, optionIndex, story } = input;
 
-    // Update state with the new choice
-    const updatedState = this.updateStateWithChoice(
-      state,
-      playerSlot,
-      optionIndex
-    );
+    // Update story with the new choice
+    const updatedStory = story.updateChoice(playerSlot, optionIndex);
 
-    // Process success/failure outcomes if applicable
-    const stateWithOutcomes = this.processIndividualStepResolution(
-      updatedState,
+    // Process success/failure resolutions if applicable
+    const storyWithResolutions = this.processIndividualStepResolution(
+      updatedStory,
       playerSlot,
       optionIndex
     );
 
     // Emit state update to update pending players lists
-    this.events.emit("stateUpdated", { gameId, state: stateWithOutcomes });
+    this.events.emit("storyUpdated", { gameId, story: updatedStory });
 
     // Queue next operation if all choices are in
-    if (areAllChoicesSubmitted(stateWithOutcomes)) {
+    if (storyWithResolutions.areAllChoicesSubmitted()) {
       // Move the story forward
       await this.addOperation({
         type: "moveStoryForward",
         gameId,
-        input: { state: stateWithOutcomes },
+        input: { story: storyWithResolutions },
       });
     }
   }
 
-  private updateStateWithChoice(
-    state: StoryState,
-    playerSlot: PlayerSlot,
-    optionIndex: number
-  ): StoryState {
-    const player = state.players[playerSlot];
-    return {
-      ...state,
-      players: {
-        ...state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: player.beatHistory.map((beat, index) =>
-            index === player.beatHistory.length - 1
-              ? { ...beat, choice: optionIndex }
-              : beat
-          ),
-        },
-      },
-    };
-  }
-
   private processIndividualStepResolution(
-    state: StoryState,
+    story: Story,
     playerSlot: PlayerSlot,
     optionIndex: number
-  ): StoryState {
+  ): Story {
     // If not a thread beat or no thread analysis, return state unchanged
     if (
-      state.currentBeatType !== "thread" ||
-      !state.currentThreadAnalysis ||
-      state.players[playerSlot].beatHistory.length === 0
+      story.getCurrentBeatType() !== "thread" ||
+      !story.getCurrentThreadAnalysis() ||
+      story.getCurrentTurn() === 0
     ) {
-      return state;
+      return story;
     }
 
-    const updatedState = { ...state };
-    const player = updatedState.players[playerSlot];
-    const currentBeat = player.beatHistory[player.beatHistory.length - 1];
+    const currentBeat = story.getCurrentBeat(playerSlot);
 
     // Only process if the option is a success/failure type
     if (currentBeat.options[optionIndex].optionType !== "successFailure") {
-      return updatedState;
+      return story;
     }
 
     // Get the previous beat for this player (if any)
-    const previousBeat =
-      player.beatHistory.length > 1
-        ? player.beatHistory[player.beatHistory.length - 2]
-        : null;
+    const previousBeat = story.getPreviousBeat(playerSlot);
 
     // Process the beat resolution
     const beatResolution = OutcomeService.processBeatResolution(
@@ -304,30 +228,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       previousBeat
     );
 
-    // Update the beat with the resolution
-    const updatedBeat: Beat = {
-      ...currentBeat,
-      resolution: beatResolution,
-    };
-
-    // Update the player's beat history with the processed beat
-    const updatedPlayers = {
-      ...updatedState.players,
-      [playerSlot]: {
-        ...player,
-        beatHistory: [
-          ...player.beatHistory.slice(0, player.beatHistory.length - 1),
-          updatedBeat,
-        ],
-      },
-    };
-
-    const stateWithUpdatedPlayers = {
-      ...updatedState,
-      players: updatedPlayers,
-    };
-
-    return stateWithUpdatedPlayers;
+    return story.updateBeatResolution(playerSlot, beatResolution);
   }
 }
 // Create singleton instance

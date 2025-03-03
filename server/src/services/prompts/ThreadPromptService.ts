@@ -1,4 +1,4 @@
-import { type StoryState } from "shared/types/story.js";
+import { Story } from "../Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
@@ -20,7 +20,7 @@ export class ThreadPromptService {
     previousThreadConfiguration: false,
   } as const;
 
-  static createThreadPrompt(state: StoryState): string {
+  static createThreadPrompt(state: Story): string {
     const prompt =
       StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
       this.createInstructionsSection();

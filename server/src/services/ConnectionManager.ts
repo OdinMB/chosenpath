@@ -1,8 +1,8 @@
 import type { Socket } from "socket.io";
 import type { PlayerSlot } from "shared/types/player.js";
 import type { ClientStoryState, StoryState } from "shared/types/story.js";
-import { storyStateManager } from "./StoryStateManager.js";
-import { filterStateForPlayer } from "shared/utils/storyUtils.js";
+import { storyRepository } from "./StoryRepository.js";
+import { Story } from "./Story.js";
 import { Server } from "socket.io";
 
 interface PlayerConnection {
@@ -139,10 +139,10 @@ export class ConnectionManager {
     console.log(
       "[ConnectionManager] Code not found in memory, searching files..."
     );
-    const result = await this.findStateByCode(code);
+    const result = await this.findStoryByCode(code);
 
     if (result) {
-      const { storyId, state } = result;
+      const { storyId, story } = result;
 
       // Create game session if it doesn't exist
       if (!this.gameSessions.has(storyId)) {
@@ -150,7 +150,7 @@ export class ConnectionManager {
       }
 
       // Register the found mapping
-      const playerSlot = Object.entries(state.playerCodes).find(
+      const playerSlot = Object.entries(story.getPlayerCodes()).find(
         ([_, c]) => c === code
       )?.[0] as PlayerSlot;
 
@@ -164,10 +164,10 @@ export class ConnectionManager {
     return undefined;
   }
 
-  private async findStateByCode(
+  private async findStoryByCode(
     code: string
-  ): Promise<{ storyId: string; state: StoryState } | null> {
-    return storyStateManager.findStateByCode(code);
+  ): Promise<{ storyId: string; story: Story } | null> {
+    return storyRepository.findStoryByCode(code);
   }
 
   getActivePlayersInGame(storyId: string): Array<{
@@ -301,8 +301,8 @@ export class ConnectionManager {
 
       console.log("[ConnectionManager] Found player info:", playerInfo);
 
-      const state = await storyStateManager.getState(playerInfo.storyId);
-      if (!state) {
+      const story = await storyRepository.getStory(playerInfo.storyId);
+      if (!story) {
         console.log(
           "[ConnectionManager] Story state not found for:",
           playerInfo.storyId
@@ -316,7 +316,7 @@ export class ConnectionManager {
       );
 
       // Filter state for specific player
-      const filteredState = filterStateForPlayer(state, playerInfo.playerSlot);
+      const filteredState = story.filterStateForPlayer(playerInfo.playerSlot);
 
       console.log("[ConnectionManager] Verification successful");
       return { state: filteredState };
@@ -340,7 +340,7 @@ export class ConnectionManager {
     console.log("[ConnectionManager] Story exited successfully");
   }
 
-  broadcastStateUpdate(storyId: string, state: StoryState): void {
+  broadcastStoryUpdate(storyId: string, story: Story): void {
     if (!this.io) {
       console.error("[ConnectionManager] Socket.IO instance not set");
       return;
@@ -351,11 +351,11 @@ export class ConnectionManager {
       storyId
     );
 
-    const playerSlots = Object.keys(state.players) as PlayerSlot[];
+    const playerSlots = story.getPlayerSlots();
 
     playerSlots.forEach((slot) => {
       const sockets = this.getActiveSockets(storyId, slot);
-      const filteredState = filterStateForPlayer(state, slot);
+      const filteredState = story.filterStateForPlayer(slot);
 
       sockets.forEach((socketId) => {
         console.log("[ConnectionManager] Sending update to socket:", socketId);

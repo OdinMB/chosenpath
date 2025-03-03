@@ -1,12 +1,11 @@
-import { type StoryState } from "shared/types/story.js";
+import { Story } from "../Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
-import { isFirstBeat, isMultiplayer } from "shared/utils/storyUtils.js";
 
 export class BeatPromptService {
-  private static getSections(state: StoryState): SectionConfig {
+  private static getSections(story: Story): SectionConfig {
     return {
       gameMode: true,
       guidelines: true,
@@ -17,36 +16,38 @@ export class BeatPromptService {
       imageLibrary: false,
       players: true,
       storyProgress: true,
-      switchConfiguration: state.currentBeatType === "switch",
-      threadConfiguration: state.currentBeatType === "thread",
+      switchConfiguration: story.getCurrentBeatType() === "switch",
+      threadConfiguration: story.getCurrentBeatType() === "thread",
       previousThreadConfiguration:
-        (state.currentBeatType === "switch" ||
-          state.currentBeatType === "ending") &&
-        state.previousThreadAnalysis !== null,
+        (story.getCurrentBeatType() === "switch" ||
+          story.getCurrentBeatType() === "ending") &&
+        story.getPreviousThreadAnalysis() !== null,
     } as const;
   }
 
-  static createBeatPrompt(state: StoryState): string {
+  static createBeatPrompt(story: Story): string {
     const prompt =
       StoryStatePromptService.createStoryStatePrompt(
-        state,
-        this.getSections(state)
-      ) + this.createInstructionsSection(state);
+        story,
+        this.getSections(story)
+      ) + this.createInstructionsSection(story);
     console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
-  private static createInstructionsSection(state: StoryState): string {
-    const gameWorldInstructions = this.createGameWorldInstructions(state);
+  private static createInstructionsSection(story: Story): string {
+    const gameWorldInstructions = this.createGameWorldInstructions(story);
 
-    return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${state.currentBeatType?.toUpperCase()}${
-      state.currentBeatType !== "ending" ? " CONFIGURATION" : ""
+    return `\n\n======= YOUR JOB: IDENTIFY CHANGES TO THE STORY STATE AND GENERATE THE NEXT SET OF STORY BEATS TO IMPLEMENT THE ${story
+      .getCurrentBeatType()
+      ?.toUpperCase()}${
+      story.getCurrentBeatType() !== "ending" ? " CONFIGURATION" : ""
     } =======
 
 1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS
 
 ${
-  isFirstBeat(state)
+  story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no consequences of player actions to process. Just return an empty list."
     : "For success/failure and sideA vs. sideB threads, we already determined if the results are favorable/mixed/unfavorable. This section is about identifying other narrative consequences.\n\n" +
       "Includes stats that affect\n" +
@@ -58,14 +59,15 @@ ${
 2. GENERATE CHANGES TO THE STORY STATE
 
 ${
-  isFirstBeat(state)
+  story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
     : "- STAT CHANGES based on players' decisions in the last beat\n" +
       "--- Include stat changes that are part of the instructions of the options that players chose in the last beat. (These instructions represent stat changes that are part of making the choice in the first place, like losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition.)\n" +
       "--- Identify any minor stat changes that are part of the consequences of the players' choices. (These are changes that are not part of making the choice, but rather the result of the choice.) Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
       "--- Changes can affect both the shared stats and the individual stats of each player.\n" +
       "--- For string and string[] types of stats, make sure to set or add values that can be displayed to the player directly (e.g. 'Ring of Protection' instead of 'ring_of_protection').\n" +
-      (state.currentBeatType === "switch" || state.currentBeatType === "ending"
+      (story.getCurrentBeatType() === "switch" ||
+      story.getCurrentBeatType() === "ending"
         ? "- NEW MILESTONES: The previous thread (or set of threads) has ended. For each outcome associated with these concluded threads, decide which milestone best represents the resolution of the thread. Then add that milestone to the outcome with a newMilestone change.\n"
         : "")
 }
@@ -77,7 +79,7 @@ CONTEXT
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.${
-      state.currentBeatType === "thread"
+      story.getCurrentBeatType() === "thread"
         ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
           "\nOptions can change this probability distribution with points. For example, it takes 50 points to change a 33/34/33 distribution to a 50/50/0 distribution (16 points to shift 16%-points from unfavorable to mixed, and 34 points to shift 17%-points from unfavorable to favorable)."
         : ""
@@ -90,9 +92,9 @@ A thread can have one or more players involved. It can pose questions relating t
 Each player is linked to a thread. If there are several threads, they happen in parallel.
 Threads with a favorable/unfavorable or sideA/sideB wins format follow a progression of beats with increasing stakes. The result of each beat affects the success chances of the following beat. After the final beat, a favorable/mixed/unfavorable milestone is added to the outcome.
 ${
-  state.currentBeatType !== "ending"
+  story.getCurrentBeatType() !== "ending"
     ? "\nSwitches\nare a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story." +
-      (state.currentBeatType === "switch"
+      (story.getCurrentBeatType() === "switch"
         ? "There are two types of switches: topic switches and flavor switches.\n" +
           "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
           "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
@@ -114,48 +116,49 @@ How beats work mechanically:
 BEAT PLAN
 
 How to narrate consequences${
-      state.currentBeatType === "ending" ||
-      (state.currentBeatType == "switch" && !isFirstBeat(state))
+      story.getCurrentBeatType() === "ending" ||
+      (story.getCurrentBeatType() == "switch" && !story.isFirstBeat())
         ? ", milestones,"
         : ""
     } and stat changes in the story?
 ${
-  isFirstBeat(state)
+  story.isFirstBeat()
     ? "This step is irrelevant since this is the first beat of the story."
     : "- The player's decisions in the last beat: mention what happened as a result of that action\n" +
       "- Same for the decisions of other players, especially if they were in the same thread as this beat's player.\n" +
       "- statChanges you just applied (in so far as this beat's player should be aware of them).\n" +
       "- There should always be clear narrative feedback for players' decisions." +
-      (state.currentBeatType == "switch"
+      (story.getCurrentBeatType() == "switch"
         ? "\n- Since a thread was just ended, describe the resolution of the thread in detail: milestones that were added to outcomes, how that affects the player (and other players), etc."
         : "")
 }
 
-How to implement the ${state.currentBeatType?.toUpperCase()}?
+How to implement the ${story.getCurrentBeatType()?.toUpperCase()}?
 ${
-  state.currentBeatType === "ending"
+  story.getCurrentBeatType() === "ending"
     ? "From the summary of the previous thread, transition to an overall ending of the story for the player.\n" +
       "- Touch on each individual and shared outcome that affects the player.\n" +
       "--- Use the information why the outcome resonates with the player / why the outcome is important to them.\n" +
       "--- For shared outcomes, touch on how the outcome affects the other players.\n" +
       "- Include any individual and shared stats that you think are worth mentioning in the ending.\n"
-    : state.currentBeatType === "switch"
+    : story.getCurrentBeatType() === "switch"
     ? "- For topic switches: Present options that let the player choose which outcome/question to focus on next\n" +
       "- If this is a flavor switch: Present options for different approaches to the predetermined outcome/question\n" +
       "- Ensure options align with the coordination pattern between players"
     : "- Follow the thread's plan. If it outlines a progression of beats like greeting (establishing first impression) / conversation (learning about interests or weaknesses) / call-to-action (success/failure), make sure that this progression is followed.\n" +
       "- Remember that this is beat " +
-      (state.currentThreadBeatsCompleted + 1) +
+      (story.getCurrentThreadBeatsCompleted() + 1) +
       "/" +
-      state.currentThreadMaxBeats +
+      story.getCurrentThreadDuration() +
       " of the current thread (or set of threads).\n" +
-      (state.currentThreadBeatsCompleted + 1 == state.currentThreadMaxBeats
+      (story.getCurrentThreadBeatsCompleted() + 1 ==
+      story.getCurrentThreadDuration()
         ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
           "--- Example: Example: In a 3-beat thread, if the question is 'Will [player] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
 ${
-  isMultiplayer(state)
+  story.isMultiplayer()
     ? `How to stay consistent?
 Which information from other beats that you already created in this turn do we need to consider for this beat?
 Create a bullet list of things that happened in other beats that you already created in this turn that we should consider for this beat.
@@ -168,7 +171,7 @@ How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
 
 ${
-  state.currentBeatType !== "ending"
+  story.getCurrentBeatType() !== "ending"
     ? "What should we consider as we create the options for this beat?\n" +
       "- How can we reinforce the story's key conflicts and focused types of decisions?\n" +
       "- Which stats (both individual and shared) should affect the design of the options?\n" +
@@ -176,13 +179,13 @@ ${
       "--- Example: If the player has an item, ally, companion, or anything else that could be of use, make sure that the options reflect that.\n" +
       "--- Example: If a shared stat shapes the surrounding of the situation, it might affect the options. (Tensions running high, the spaceship being damaged, etc.)\n" +
       "- What are the requirements from the " +
-      state.currentBeatType +
+      story.getCurrentBeatType() +
       " configuration" +
-      (state.currentBeatType === "thread"
+      (story.getCurrentBeatType() === "thread"
         ? ", including the plan for the thread progression"
         : "") +
       "?" +
-      (state.currentBeatType === "thread"
+      (story.getCurrentBeatType() === "thread"
         ? "\n- Make sure that the options push toward the resolution of the thread's question. Don't deviate from the core question that the thread is posing."
         : "\n- Topic switches already have their options defined in the switch configuration.")
     : ""
@@ -191,14 +194,14 @@ ${
 BEAT ATTRIBUTES
 
 Title: ${
-      state.currentBeatType === "switch"
+      story.getCurrentBeatType() === "switch"
         ? "[title of the switch that this beat implements and nothing else]"
-        : state.currentBeatType === "ending"
+        : story.getCurrentBeatType() === "ending"
         ? "The End"
         : "[title for the thread that this beat is part of] (" +
-          (state.currentThreadBeatsCompleted + 1) +
+          (story.getCurrentThreadBeatsCompleted() + 1) +
           "/" +
-          state.currentThreadMaxBeats +
+          story.getCurrentThreadDuration() +
           ")\nDon't change the information in the brackets. It marks the beat of the current thread and is correct."
     }
 
@@ -207,29 +210,29 @@ Text
 --- Should continue exactly where the previous beat for this player ended
 --- Describe the immediate consequences of the player's decision.
 --- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.${
-      state.currentBeatType === "thread" &&
-      state.currentThreadBeatsCompleted > 0
+      story.getCurrentBeatType() === "thread" &&
+      story.getCurrentThreadBeatsCompleted() > 0
         ? "\n- If the last beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult."
         : ""
     }${
-      isMultiplayer(state)
+      story.isMultiplayer()
         ? "\n- If the player was in a thread or switch with other players, also describe what the decisions and outcomes of the other players are. (Unless it would be implausible for the player to know about it.)"
         : ""
     }
 ${
-  !isFirstBeat(state) && state.currentBeatType === "switch"
+  !story.isFirstBeat() && story.getCurrentBeatType() === "switch"
     ? "- Most of the beat text\n" +
       "--- should be about the outcome of the previous thread that the player was involved in.\n" +
       "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
-      (isMultiplayer(state)
+      (story.isMultiplayer()
         ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players."
         : "")
     : ""
 }${
-      state.currentBeatType === "ending"
+      story.getCurrentBeatType() === "ending"
         ? "- Most of the beat text should be about the ending of the story for the player at hand.\n" +
           "--- Process the outcome of the previous thread that the player was involved in, then transition to the overall ending of the story.\n"
-        : (isMultiplayer(state)
+        : (story.isMultiplayer()
             ? "- If several players are in the same beat, include them in each other's beat text.\n" +
               "--- The goal is to have an interesting interplay between the players and their decisions.\n" +
               "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n" +
@@ -249,13 +252,13 @@ ${
           "\nOptions\n" +
           "- Offer 3 options.\n" +
           "- Make sure that the beat implements the current " +
-          state.currentBeatType +
+          story.getCurrentBeatType() +
           " configuration.\n" +
-          (state.currentBeatType === "thread"
+          (story.getCurrentBeatType() === "thread"
             ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n"
             : "") +
           "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
-          state.currentBeatType +
+          story.getCurrentBeatType() +
           " in any other way.\n" +
           "- Be specific.\n" +
           "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
@@ -263,12 +266,12 @@ ${
           "--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'\n" +
           "- Do NOT include the actual or likely consequences of a decision.\n" +
           "- For each option, set the optionType field:\n" +
-          (state.currentBeatType === "switch"
+          (story.getCurrentBeatType() === "switch"
             ? "--- Use 'basic' for all options in switches.\n"
             : "--- Use 'basic' for options in exploratory threads (that don't follow a success/failure or win/lose pattern).\n" +
               "--- Use 'successFailure' for options in threads with favorable/unfavorable or sideA/sideB outcomes.\n") +
           "- Define stat changes that are a necessary part of choosing the option (if any). Don't include the results of the player's choice. (Those will be processed later.) Example: Using a spell might use up some mana. Making a choice might change a logic/empathy disposition a bit toward empathy.\n" +
-          (state.currentBeatType === "thread"
+          (story.getCurrentBeatType() === "thread"
             ? "- For threads with favorable/unfavorable or sideA/sideB outcomes, define how the option affects the likelihood of different outcomes\n" +
               "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring stats).\n" +
               "--- modifiers: identify stats (individual and shared) that have an effect on the likelihood of success. Example: if the option is to woo an npc and player1_charisma is 70/100, you could assign a modifier of +20. If the group tries to escape the bounty hunters and their spaceship has status 'damaged', you could assign a modifier of -15.\n" +
@@ -278,23 +281,23 @@ ${
 `;
   }
 
-  private static createGameWorldInstructions(state: StoryState): string {
-    if (isFirstBeat(state)) {
-      return this.createIntroductionInstructions(state);
-    } else if (state.currentBeatType === "ending") {
-      return this.createEndingInstructions(state);
+  private static createGameWorldInstructions(story: Story): string {
+    if (story.isFirstBeat()) {
+      return this.createIntroductionInstructions(story);
+    } else if (story.getCurrentBeatType() === "ending") {
+      return this.createEndingInstructions(story);
     } else {
-      return this.createNormalBeatInstructions(state);
+      return this.createNormalBeatInstructions(story);
     }
   }
 
-  private static createEndingInstructions(state: StoryState): string {
+  private static createEndingInstructions(story: Story): string {
     return `This is the ending of the story. DON'T ADD ANY NEW STORY ELEMENTS. Let's just give the player a proper ending.
 - Tie the ending to the individual and shared outcomes that affect the player.
 - Use references to important story elements and things that happened to the player.`;
   }
 
-  private static createIntroductionInstructions(state: StoryState): string {
+  private static createIntroductionInstructions(story: Story): string {
     return `This is the first beat of the story. DON'T ADD ANY NEW STORY ELEMENTS OR NEW FACTS. Let's just give the player a proper introduction to the existing story state.
 - Required: Introduce the player itself.
 - Required: Introduce the other players and their relationship to the player.
@@ -305,10 +308,11 @@ ${
 Find a good balance between introducing the overall setup of the story, introducing some story elements, and still making this beat a good switch.`;
   }
 
-  private static createNormalBeatInstructions(state: StoryState): string {
-    const isFirstBeatOfThread = state.currentThreadBeatsCompleted === 0;
+  private static createNormalBeatInstructions(story: Story): string {
+    const isFirstBeatOfThread = story.getCurrentThreadBeatsCompleted() === 0;
     const isLastBeatOfThread =
-      state.currentThreadMaxBeats - 1 === state.currentThreadBeatsCompleted;
+      story.getCurrentThreadDuration() - 1 ===
+      story.getCurrentThreadBeatsCompleted();
 
     const threadProgressionInstructions = isFirstBeatOfThread
       ? "This is the first beat of the thread. Set up the situation and introduce the first step in the thread progression."
@@ -319,7 +323,7 @@ Find a good balance between introducing the overall setup of the story, introduc
     const previousBeatOutcomeInstructions = isFirstBeatOfThread
       ? ""
       : `\n\nPrevious Beat Outcomes:
-${this.createPreviousBeatOutcomeInstructions(state)}`;
+${this.createPreviousBeatOutcomeInstructions(story)}`;
 
     const worldBuildingInstructions = `\n\nWorld Building Instructions:
 - Check if the player is going to encounter a story element that has not yet been introduced to the player.
@@ -349,27 +353,26 @@ If you want to generate an image for a beat, leave the imageId field empty.
 If you want to use an existing image, specify its ID.`;
   }
 
-  private static createPreviousBeatOutcomeInstructions(
-    state: StoryState
-  ): string {
+  private static createPreviousBeatOutcomeInstructions(story: Story): string {
     // For contested threads, include information about which side is currently winning
     if (
-      state.currentThreadAnalysis?.threads?.some(
-        (thread) => thread.playersSideB?.length > 0
-      ) &&
-      state.currentThreadContestOutcomes
+      story
+        .getCurrentThreadAnalysis()
+        ?.threads?.some((thread) => thread.playersSideB?.length > 0) &&
+      story.getCurrentThreadContestOutcomes()
     ) {
       // Get all contested threads with their outcomes
-      const contestedThreads = state.currentThreadAnalysis.threads
-        ?.filter(
+      const contestedThreads = story
+        .getCurrentThreadAnalysis()
+        ?.threads?.filter(
           (thread) =>
             thread.playersSideB?.length > 0 &&
             thread.id &&
-            state.currentThreadContestOutcomes?.[thread.id]
+            story.getCurrentThreadContestOutcomes()?.[thread.id]
         )
         .map((thread) => {
           const outcome = thread.id
-            ? state.currentThreadContestOutcomes?.[thread.id]
+            ? story.getCurrentThreadContestOutcomes()?.[thread.id]
             : null;
           return {
             title: thread.title || thread.id || "Unnamed thread",
@@ -394,7 +397,7 @@ If you want to use an existing image, specify its ID.`;
     }
 
     // For each player, include information about their previous beat outcome
-    return Object.entries(state.players)
+    return Object.entries(story.getPlayers())
       .map(([playerSlot, player]) => {
         if (player.beatHistory.length < 2) return "";
 

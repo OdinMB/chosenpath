@@ -31,7 +31,7 @@ import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { PLAYER_SLOTS } from "shared/types/player.js";
-import { isFirstBeat } from "shared/utils/storyUtils.js";
+import { Story } from "./Story.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -65,28 +65,16 @@ export class AIStoryGenerator {
     );
 
     const players = this.createPlayersFromSetup(setup, playerCount);
-    const storyElements: StoryElement[] = setup.storyElements.map(
-      (element) => ({
-        ...element,
-        facts: [],
-      })
-    );
 
     return {
       gameMode,
       guidelines: setup.guidelines,
-      storyElements,
+      storyElements: setup.storyElements,
       worldFacts: [],
       sharedOutcomes: setup.sharedOutcomes,
       sharedStats: setup.sharedStats,
       players,
       storyPhases: [],
-      currentBeatType: "intro",
-      currentSwitchAnalysis: null,
-      currentThreadAnalysis: null,
-      currentThreadMaxBeats: 0,
-      currentThreadBeatsCompleted: 0,
-      previousThreadAnalysis: null,
       maxTurns,
       generateImages,
       images: [],
@@ -145,23 +133,23 @@ export class AIStoryGenerator {
     }
   }
 
-  async generateSwitches(state: StoryState): Promise<StoryState> {
+  async generateSwitches(story: Story): Promise<Story> {
     const schema = createSwitchAnalysisSchema(
-      Object.keys(state.players).length as PlayerCount
+      Object.keys(story.getPlayers()).length as PlayerCount
     );
     const structuredModel = this.model.withStructuredOutput(schema);
-    const prompt = SwitchPromptService.createSwitchAnalysisPrompt(state);
+    const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
     console.log("Response:\n", JSON.stringify(response, null, 2));
 
-    return { ...state, currentSwitchAnalysis: response };
+    return story.addPhase(response);
   }
 
-  async generateThreads(state: StoryState): Promise<StoryState> {
+  async generateThreads(story: Story): Promise<Story> {
     const schema = threadAnalysisSchema;
     const structuredModel = this.model.withStructuredOutput(schema);
-    const prompt = ThreadPromptService.createThreadPrompt(state);
+    const prompt = ThreadPromptService.createThreadPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
     console.log("Response:\n", JSON.stringify(response, null, 2));
@@ -190,25 +178,21 @@ export class AIStoryGenerator {
       threads: transformedThreads,
     };
 
-    return {
-      ...state,
-      currentThreadAnalysis: transformedResponse,
-      currentThreadMaxBeats: response.duration,
-    };
+    return story.addPhase(transformedResponse);
   }
 
   async generateBeats(
-    state: StoryState
-  ): Promise<[StoryState, Change[], BeatsNeedingImages]> {
+    story: Story
+  ): Promise<[Story, Change[], BeatsNeedingImages]> {
     try {
-      const response = await this.generateBeatsResponse(state);
-      const [updatedState, beatsNeedingImages] = this.processBeatsResponse(
-        state,
+      const response = await this.generateBeatsResponse(story);
+      const [updatedStory, beatsNeedingImages] = this.processBeatsResponse(
+        story,
         response
       );
       const mergedChanges = this.mergeChanges(response);
 
-      return [updatedState, mergedChanges, beatsNeedingImages];
+      return [updatedStory, mergedChanges, beatsNeedingImages];
     } catch (error) {
       console.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
@@ -216,39 +200,36 @@ export class AIStoryGenerator {
   }
 
   private async generateBeatsResponse(
-    state: StoryState
+    story: Story
   ): Promise<SetOfBeatGenerationSchema> {
     const schema = createSetOfBeatGenerationSchema(
-      Object.keys(state.players).length as PlayerCount,
+      story.getNumberOfPlayers(),
       // canAddMilestones = true only if it's the ending or (a switch and not the beginning of the story)
-      state.currentBeatType === "ending" ||
-        (state.currentBeatType === "switch" && !isFirstBeat(state))
+      story.getCurrentBeatType() === "ending" ||
+        (story.getCurrentBeatType() === "switch" && !story.isFirstBeat())
     );
     const structuredModel = this.model.withStructuredOutput(schema);
 
-    console.log(
-      "Generating beats for turn:",
-      Object.values(state.players)[0].beatHistory.length + 1
-    );
+    console.log("Generating beats for turn:", story.getCurrentTurn() + 1);
 
     const response = (await structuredModel.invoke(
-      BeatPromptService.createBeatPrompt(state)
+      BeatPromptService.createBeatPrompt(story)
     )) as SetOfBeatGenerationSchema;
 
     console.log("Response:\n", JSON.stringify(response, null, 2));
     return response;
   }
 
-  async generateEnding(state: StoryState): Promise<StoryState> {
+  async generateEnding(story: Story): Promise<Story> {
     // TODO: Generate ending
-    return state;
+    return story;
   }
 
   private processBeatsResponse(
-    state: StoryState,
+    story: Story,
     response: SetOfBeatGenerationSchema
-  ): [StoryState, BeatsNeedingImages] {
-    const updatedState = { ...state };
+  ): [Story, BeatsNeedingImages] {
+    let updatedStory = story.clone();
     const beatsNeedingImages: BeatsNeedingImages = {};
 
     Object.entries(response).forEach(([key, value]) => {
@@ -256,44 +237,31 @@ export class AIStoryGenerator {
         const playerSlot = key.toLowerCase();
         const beatData = value as BeatGeneration;
 
-        if (updatedState.players[playerSlot]) {
-          this.addBeatToPlayer(
-            updatedState,
-            beatsNeedingImages,
-            playerSlot,
-            beatData
+        if (updatedStory.getPlayer(playerSlot)) {
+          const beat: Beat = {
+            ...beatData,
+            choice: -1,
+            resolution: null,
+          };
+
+          updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
+
+          if (!beatData.imageId || beatData.imageId === "") {
+            beatsNeedingImages[playerSlot] = beat;
+          }
+        } else {
+          throw new Error(
+            `Player ${playerSlot} not found in story. This should never happen.`
           );
         }
       }
     });
 
-    return [updatedState, beatsNeedingImages];
+    return [updatedStory, beatsNeedingImages];
   }
 
   private isPlayerBeat(key: string): boolean {
     return PLAYER_SLOTS.includes(key.toLowerCase());
-  }
-
-  private addBeatToPlayer(
-    state: StoryState,
-    beatsNeedingImages: BeatsNeedingImages,
-    playerSlot: string,
-    beatData: BeatGeneration
-  ): void {
-    if (!beatData.imageId || beatData.imageId === "") {
-      beatsNeedingImages[playerSlot] = {
-        ...beatData,
-        choice: -1,
-        resolution: null,
-      };
-    }
-
-    const beat: Beat = {
-      ...beatData,
-      choice: -1,
-      resolution: null,
-    };
-    state.players[playerSlot].beatHistory.push(beat);
   }
 
   private mergeChanges(response: SetOfBeatGenerationSchema): Change[] {

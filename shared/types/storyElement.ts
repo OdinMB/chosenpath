@@ -20,14 +20,14 @@ export const storyElementSchema = z.object({
   facts: z
     .array(z.string())
     .describe(
-      "Three facts about the element that can be used to introduce the element to the player. For NPCs, include their preferred pronouns and motivations."
+      "Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
     ),
 });
 
 export const StoryElementsSchema = z
   .array(storyElementSchema)
   .describe(
-    "List of important elements in the story, including NPCs, locations, and miscellaneous elements (like items, organizations, mysteries, conflicts, etc.)"
+    "List of important elements in the story, including NPCs, locations, and miscellaneous elements (like items, organizations, mysteries, conflicts, etc.). Add an initial set of facts for each element."
   );
 
 export type StoryElement = z.infer<typeof storyElementSchema>;

@@ -1,0 +1,442 @@
+import {
+  StoryState,
+  ClientStoryState,
+  GameMode,
+  Guidelines,
+} from "shared/types/story.js";
+import { PlayerCount } from "shared/types/player.js";
+import { StoryElement } from "shared/types/storyelement.js";
+import { Outcome } from "shared/types/outcome.js";
+import { Stat } from "shared/types/stat.js";
+import { BeatType } from "shared/types/beat.js";
+import { SwitchAnalysis } from "shared/types/switch.js";
+import { ThreadAnalysis } from "shared/types/thread.js";
+import { PlayerSlot } from "shared/types/player.js";
+import { StoryPhase, PlayerState } from "shared/types/story.js";
+import { ImageLibrary } from "shared/types/image.js";
+import { Beat } from "shared/types/beat.js";
+import { Resolution } from "shared/types/thread.js";
+import { Change } from "shared/types/change.js";
+import { ChangeService } from "./ChangeService.js";
+import { Image } from "shared/types/image.js";
+
+/**
+ * Comprehensive manager for story state
+ * Encapsulates all story state management logic and provides a clean interface
+ */
+export class Story {
+  private state: StoryState;
+  private static changeService = new ChangeService();
+
+  constructor(state: StoryState) {
+    this.state = state;
+  }
+  static create(state: StoryState): Story {
+    return new Story(state);
+  }
+  clone(updatedState: Partial<StoryState> = {}): Story {
+    return new Story({
+      ...this.state,
+      ...updatedState,
+    });
+  }
+
+  /**
+   * Apply a list of changes to the story using the ChangeService
+   * @param changes List of changes to apply
+   * @returns Updated Story instance
+   */
+  applyStoryChanges(changes: Change[]): Story {
+    return Story.changeService.applyChanges(this, changes);
+  }
+
+  getState(): StoryState {
+    return this.state;
+  }
+
+  getGameMode(): GameMode {
+    return this.state.gameMode;
+  }
+  getGuidelines(): Guidelines {
+    return this.state.guidelines;
+  }
+  getStoryElements(): StoryElement[] {
+    return this.state.storyElements;
+  }
+  getWorldFacts(): string[] {
+    return this.state.worldFacts;
+  }
+  getSharedOutcomes(): Outcome[] {
+    return this.state.sharedOutcomes;
+  }
+  getSharedStats(): Stat[] {
+    return this.state.sharedStats;
+  }
+  getImages(): Image[] {
+    return this.state.images;
+  }
+  getPlayerCodes(): Record<PlayerSlot, string> {
+    return this.state.playerCodes;
+  }
+  getPlayerSlots(): PlayerSlot[] {
+    return Object.keys(this.state.players) as PlayerSlot[];
+  }
+  getNumberOfPlayers(): PlayerCount {
+    return Object.keys(this.state.players).length as PlayerCount;
+  }
+  getPlayers(): Record<PlayerSlot, PlayerState> {
+    return this.state.players;
+  }
+  getPlayer(playerSlot: PlayerSlot): PlayerState | null {
+    return this.state.players[playerSlot] || null;
+  }
+
+  getCurrentBeat(playerSlot: PlayerSlot): Beat | null {
+    const player = this.getPlayer(playerSlot);
+    if (!player) return null;
+    return player.beatHistory[this.getCurrentTurn() - 1] || null;
+  }
+  getPreviousBeat(playerSlot: PlayerSlot): Beat | null {
+    const player = this.getPlayer(playerSlot);
+    if (!player) return null;
+    return player.beatHistory[player.beatHistory.length - 2] || null;
+  }
+
+  includesImages(): boolean {
+    return this.state.generateImages;
+  }
+
+  getCurrentTurn(): number {
+    // If no players, return 0
+    if (Object.keys(this.state.players).length === 0) {
+      return 0;
+    }
+
+    // Get the first player's beat history length
+    const firstPlayerSlot = Object.keys(this.state.players)[0] as PlayerSlot;
+    return this.state.players[firstPlayerSlot].beatHistory.length;
+  }
+  getMaxTurns(): number {
+    return this.state.maxTurns;
+  }
+  isFirstBeat(): boolean {
+    return this.getCurrentTurn() === 0;
+  }
+  isStoryComplete(): boolean {
+    return this.getCurrentTurn() > this.state.maxTurns;
+  }
+
+  isMultiplayer(): boolean {
+    return this.getNumberOfPlayers() > 1;
+  }
+
+  getPendingPlayers(): PlayerSlot[] {
+    const currentTurn = this.getCurrentTurn();
+    return Object.entries(this.state.players)
+      .filter(([_, player]) => {
+        const currentBeat = player.beatHistory[currentTurn - 1];
+        return currentBeat?.choice === -1;
+      })
+      .map(([slot]) => slot as PlayerSlot);
+  }
+  areAllChoicesSubmitted(): boolean {
+    return this.getPendingPlayers().length === 0;
+  }
+
+  getPlayerSlotByCode(code: string): PlayerSlot | null {
+    const entry = Object.entries(this.state.playerCodes).find(
+      ([_, playerCode]) => playerCode === code
+    );
+    return entry ? (entry[0] as PlayerSlot) : null;
+  }
+
+  filterStateForPlayer(playerSlot: PlayerSlot): ClientStoryState {
+    // Create a deep copy to avoid mutating the original state
+    const filteredState = JSON.parse(JSON.stringify(this.state));
+
+    // Only include the specific player's data
+    const playerData = this.state.players[playerSlot];
+    // Filter out hidden player stats
+    playerData.characterStats = playerData.characterStats.filter(
+      (stat) => stat.isVisible !== false
+    );
+    filteredState.players = { [playerSlot]: playerData };
+
+    // Filter out hidden shared stats
+    filteredState.sharedStats = this.state.sharedStats.filter(
+      (stat) => stat.isVisible !== false
+    );
+
+    // Get pending players
+    const pendingPlayers = this.getPendingPlayers();
+
+    // Remove other players' codes
+    filteredState.playerCodes = {
+      [playerSlot]: this.state.playerCodes[playerSlot],
+    };
+
+    // Pick only the properties we want to send
+    const { players, sharedStats, maxTurns, generateImages, images, gameMode } =
+      filteredState;
+
+    return {
+      numberOfPlayers: Object.keys(this.state.players).length,
+      players,
+      gameMode,
+      sharedStats,
+      maxTurns,
+      generateImages,
+      images,
+      pendingPlayers,
+      gameOver: this.getCurrentBeatType() === "ending",
+    };
+  }
+
+  getCurrentPhase(): StoryPhase | null {
+    if (this.state.storyPhases.length === 0) {
+      return null;
+    }
+    return this.state.storyPhases[this.state.storyPhases.length - 1];
+  }
+  getPreviousPhase(): StoryPhase | null {
+    if (this.state.storyPhases.length < 2) {
+      return null;
+    }
+    return this.state.storyPhases[this.state.storyPhases.length - 2];
+  }
+  getCurrentBeatType(): BeatType | null {
+    // If there are no phases, return intro
+    if (this.state.storyPhases.length === 0) {
+      return "intro";
+    }
+
+    const currentPhase = this.getCurrentPhase();
+
+    // If the current phase is a SwitchAnalysis, return switch
+    if (this.isSwitchAnalysis(currentPhase)) {
+      return "switch";
+    }
+
+    // If the current phase is a ThreadAnalysis, return thread
+    if (this.isThreadAnalysis(currentPhase)) {
+      // If we've reached the max turns, return ending
+      if (
+        this.getCurrentTurn() >= this.state.maxTurns &&
+        this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
+      ) {
+        return "ending";
+      }
+      return "thread";
+    }
+
+    // Default to intro
+    return "intro";
+  }
+  determineNextBeatType(): BeatType {
+    const lastBeatType = this.getCurrentBeatType();
+
+    let nextBeatType: BeatType = "intro";
+
+    if (lastBeatType === "intro") {
+      nextBeatType = "switch";
+    } else if (lastBeatType === "switch") {
+      nextBeatType = "thread";
+    } else if (
+      lastBeatType === "thread" &&
+      this.getCurrentThreadDuration() === this.getCurrentThreadBeatsCompleted()
+    ) {
+      // Check if we should end the story
+      if (this.getCurrentTurn() >= this.state.maxTurns) {
+        nextBeatType = "ending";
+      } else {
+        nextBeatType = "switch";
+      }
+    } else if (lastBeatType === "thread") {
+      nextBeatType = "thread";
+    }
+
+    console.log("[StoryManager] Next beat type:", nextBeatType);
+    return nextBeatType;
+  }
+  private isSwitchAnalysis(phase: StoryPhase | null): phase is SwitchAnalysis {
+    if (!phase) return false;
+    return "switches" in phase;
+  }
+  private isThreadAnalysis(phase: StoryPhase | null): phase is ThreadAnalysis {
+    if (!phase) return false;
+    return "threads" in phase;
+  }
+  getCurrentSwitchAnalysis(): SwitchAnalysis | null {
+    const currentPhase = this.getCurrentPhase();
+    return this.isSwitchAnalysis(currentPhase) ? currentPhase : null;
+  }
+  getCurrentThreadAnalysis(): ThreadAnalysis | null {
+    const currentPhase = this.getCurrentPhase();
+    return this.isThreadAnalysis(currentPhase) ? currentPhase : null;
+  }
+  getPreviousThreadAnalysis(): ThreadAnalysis | null {
+    // Look through phases in reverse order to find the most recent ThreadAnalysis
+    // that isn't the current phase
+    const currentPhase = this.getCurrentPhase();
+
+    for (let i = this.state.storyPhases.length - 2; i >= 0; i--) {
+      const phase = this.state.storyPhases[i];
+      if (this.isThreadAnalysis(phase) && phase !== currentPhase) {
+        return phase;
+      }
+    }
+
+    return null;
+  }
+
+  getCurrentThreadDuration(): number {
+    const threadAnalysis = this.getCurrentThreadAnalysis();
+    return threadAnalysis ? threadAnalysis.duration : 0;
+  }
+  getCurrentThreadBeatsCompleted(): number {
+    // Count how many consecutive thread phases we have at the end of the phases array
+    let count = 0;
+    for (let i = this.state.storyPhases.length - 1; i >= 0; i--) {
+      const phase = this.state.storyPhases[i];
+      if (this.isThreadAnalysis(phase)) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+
+  addPhase(phase: StoryPhase): Story {
+    const updatedState = {
+      ...this.state,
+      storyPhases: [...this.state.storyPhases, phase],
+    };
+    return new Story(updatedState);
+  }
+
+  updatePlayers(players: Record<PlayerSlot, any>): Story {
+    return new Story({
+      ...this.state,
+      players,
+    });
+  }
+
+  applyChanges(updatedState: Partial<StoryState>): Story {
+    return new Story({
+      ...this.state,
+      ...updatedState,
+    });
+  }
+
+  addBeatToPlayer(playerSlot: PlayerSlot, beat: Beat): Story {
+    return new Story({
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [playerSlot]: {
+          ...this.state.players[playerSlot],
+          beatHistory: [...this.state.players[playerSlot].beatHistory, beat],
+        },
+      },
+    });
+  }
+
+  updateChoice(playerSlot: PlayerSlot, optionIndex: number): Story {
+    const player = this.getPlayer(playerSlot);
+    return new Story({
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [playerSlot]: {
+          ...player,
+          beatHistory: player.beatHistory.map((beat, index) =>
+            index === player.beatHistory.length - 1
+              ? { ...beat, choice: optionIndex }
+              : beat
+          ),
+        },
+      },
+    });
+  }
+
+  updateBeatResolution(playerSlot: PlayerSlot, resolution: Resolution): Story {
+    return new Story({
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [playerSlot]: {
+          ...this.state.players[playerSlot],
+          beatHistory: this.state.players[playerSlot].beatHistory.map(
+            (beat, index) =>
+              index === this.state.players[playerSlot].beatHistory.length - 1
+                ? { ...beat, resolution }
+                : beat
+          ),
+        },
+      },
+    });
+  }
+
+  /**
+   * Add a new image to the story's image library
+   * @param image The image to add
+   * @returns Updated Story instance
+   */
+  addImage(image: Image): Story {
+    return new Story({
+      ...this.state,
+      images: [...this.state.images, image],
+    });
+  }
+
+  /**
+   * Update an existing image in the story's image library
+   * @param imageId ID of the image to update
+   * @param updates Partial image object with fields to update
+   * @returns Updated Story instance
+   */
+  updateImage(imageId: string, updates: Partial<Image>): Story {
+    return new Story({
+      ...this.state,
+      images: this.state.images.map((image) =>
+        image.id === imageId
+          ? {
+              ...image,
+              ...updates,
+              status: updates.url ? "ready" : image.status,
+            }
+          : image
+      ),
+    });
+  }
+
+  /**
+   * Set the image for a player's current beat
+   * @param playerSlot The player slot
+   * @param imageId ID of the image to associate with the beat
+   * @returns Updated Story instance
+   */
+  setCurrentBeatImage(playerSlot: PlayerSlot, imageId: string): Story {
+    const player = this.getPlayer(playerSlot);
+    if (!player) return this;
+
+    const currentTurn = this.getCurrentTurn();
+    if (currentTurn <= 0) return this;
+
+    return new Story({
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [playerSlot]: {
+          ...player,
+          beatHistory: player.beatHistory.map((beat, index) =>
+            index === player.beatHistory.length - 1
+              ? { ...beat, imageId }
+              : beat
+          ),
+        },
+      },
+    });
+  }
+}
