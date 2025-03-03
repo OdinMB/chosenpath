@@ -104,12 +104,6 @@ export class WebSocketService {
           sessionId: this.sessionId || "",
           code: this.playerCode,
         });
-      } else if (this.sessionId) {
-        console.log(
-          "[WebSocketService] Joining existing session:",
-          this.sessionId
-        );
-        this.socket?.emit("join_session", this.sessionId);
       } else {
         console.log(
           "[WebSocketService] No existing session or code, creating new session"

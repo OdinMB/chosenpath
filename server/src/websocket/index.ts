@@ -1,6 +1,5 @@
 import { Server, Socket } from "socket.io";
 import http from "http";
-import { SessionService } from "../services/SessionService.js";
 import { GameHandler } from "../handlers/GameHandler.js";
 import { PlayerCount } from "shared/types/player.js";
 import { config } from "../config/env.js";
@@ -10,10 +9,8 @@ import { GameMode } from "shared/types/story.js";
 export class GameWebSocketServer {
   private io: Server;
   private clients: Map<string, Socket> = new Map();
-  private sessionService: SessionService;
 
   constructor(server: http.Server) {
-    this.sessionService = new SessionService();
     this.io = new Server(server, {
       cors: {
         origin: config.corsOrigin,
@@ -35,23 +32,10 @@ export class GameWebSocketServer {
       const gameHandler = new GameHandler(socket);
 
       socket.on("create_session", async () => {
-        const sessionId = this.sessionService.createSession();
+        const sessionId = crypto.randomUUID();
         connectionManager.createGameSession(sessionId);
         socket.emit("session_created", { sessionId });
         console.log("[WebSocket] Session created:", sessionId);
-      });
-
-      socket.on("join_session", async (sessionId: string) => {
-        const existingState = this.sessionService.getSession(sessionId);
-        if (existingState) {
-          socket.join(sessionId);
-          this.clients.set(sessionId, socket);
-          socket.emit("state_update", { state: existingState });
-          console.log("[WebSocket] Client joined session:", sessionId);
-        } else {
-          console.log("[WebSocket] Session not found:", sessionId);
-          socket.emit("error", "Session not found");
-        }
       });
 
       socket.on(
