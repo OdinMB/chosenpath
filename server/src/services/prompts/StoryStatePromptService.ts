@@ -439,31 +439,31 @@ Chosen option: ${choiceText}${resultText}`;
 
           // Determine outcome type
           const hasContestedOutcomes =
-            "sideAWins" in currentBeat.possibleOutcomes;
+            "sideAWins" in currentBeat.possibleResolutions;
           const hasStandardOutcomes =
-            "favorable" in currentBeat.possibleOutcomes;
+            "favorable" in currentBeat.possibleResolutions;
           const hasExploratoryOutcomes =
-            "resolution1" in currentBeat.possibleOutcomes;
+            "resolution1" in currentBeat.possibleResolutions;
 
           let outcomes: string[] = [];
 
           if (hasContestedOutcomes) {
             outcomes = [
-              `- If Side A wins: ${currentBeat.possibleOutcomes["sideAWins"]}`,
-              `- Mixed result: ${currentBeat.possibleOutcomes["mixed"]}`,
-              `- If Side B wins: ${currentBeat.possibleOutcomes["sideBWins"]}`,
+              `- If Side A wins: ${currentBeat.possibleResolutions["sideAWins"]}`,
+              `- Mixed result: ${currentBeat.possibleResolutions["mixed"]}`,
+              `- If Side B wins: ${currentBeat.possibleResolutions["sideBWins"]}`,
             ];
           } else if (hasStandardOutcomes) {
             outcomes = [
-              `- Favorable: ${currentBeat.possibleOutcomes["favorable"]}`,
-              `- Mixed: ${currentBeat.possibleOutcomes["mixed"]}`,
-              `- Unfavorable: ${currentBeat.possibleOutcomes["unfavorable"]}`,
+              `- Favorable: ${currentBeat.possibleResolutions["favorable"]}`,
+              `- Mixed: ${currentBeat.possibleResolutions["mixed"]}`,
+              `- Unfavorable: ${currentBeat.possibleResolutions["unfavorable"]}`,
             ];
           } else if (hasExploratoryOutcomes) {
             outcomes = [
-              `- Option 1: ${currentBeat.possibleOutcomes["resolution1"]}`,
-              `- Option 2: ${currentBeat.possibleOutcomes["resolution2"]}`,
-              `- Option 3: ${currentBeat.possibleOutcomes["resolution3"]}`,
+              `- Option 1: ${currentBeat.possibleResolutions["resolution1"]}`,
+              `- Option 2: ${currentBeat.possibleResolutions["resolution2"]}`,
+              `- Option 3: ${currentBeat.possibleResolutions["resolution3"]}`,
             ];
           } else {
             outcomes = ["- No outcomes defined"];

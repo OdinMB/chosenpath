@@ -1,6 +1,28 @@
 import { z } from "zod";
 import { PLAYER_SLOTS } from "./player.js";
 
+export const RESOLUTION_SUCCESS_FAILURE = [
+  "favorable",
+  "mixed",
+  "unfavorable",
+] as const;
+export type ResolutionSuccessFailure =
+  (typeof RESOLUTION_SUCCESS_FAILURE)[number];
+
+export const RESOLUTION_CONTESTED = [
+  "sideAWins",
+  "mixed",
+  "sideBWins",
+] as const;
+export type ResolutionContested = (typeof RESOLUTION_CONTESTED)[number];
+
+export const RESOLUTION = [
+  ...RESOLUTION_SUCCESS_FAILURE,
+  ...RESOLUTION_CONTESTED,
+  "exploration",
+] as const;
+export type Resolution = (typeof RESOLUTION)[number];
+
 // For standard (non-contested) threads
 const standardMilestonesSchema = z
   .object({
@@ -35,7 +57,7 @@ const exploratoryMilestonesSchema = z
   );
 
 // For standard (non-contested) threads
-const standardStepOutcomesSchema = z
+const standardStepResolutionsSchema = z
   .object({
     favorable: z.string(),
     mixed: z.string(),
@@ -46,7 +68,7 @@ const standardStepOutcomesSchema = z
   );
 
 // For contested multiplayer threads
-const contestedStepOutcomesSchema = z
+const contestedStepResolutionsSchema = z
   .object({
     sideAWins: z.string(),
     mixed: z.string(),
@@ -57,11 +79,11 @@ const contestedStepOutcomesSchema = z
   );
 
 // For exploratory threads
-const exploratoryStepOutcomesSchema = z
+const exploratoryStepResolutionsSchema = z
   .object({
-    outcome1: z.string(),
-    outcome2: z.string(),
-    outcome3: z.string(),
+    resolution1: z.string(),
+    resolution2: z.string(),
+    resolution3: z.string(),
   })
   .describe(
     "What the different step outcomes in an exploratory thread mean narratively (example for outcome1: '[player] chooses to talk to [npc]')"
@@ -70,11 +92,11 @@ const exploratoryStepOutcomesSchema = z
 const threadStepSchema = z.object({
   title: z.string().describe("Title of this step"),
   question: z.string().describe("Question that guides this step's choices"),
-  possibleOutcomes: z
+  possibleResolutions: z
     .union([
-      standardStepOutcomesSchema,
-      contestedStepOutcomesSchema,
-      exploratoryStepOutcomesSchema,
+      standardStepResolutionsSchema,
+      contestedStepResolutionsSchema,
+      exploratoryStepResolutionsSchema,
     ])
     .describe(
       "What happens narratively for the different outcomes of this step"
@@ -146,5 +168,20 @@ export const threadAnalysisSchema = z.object({
     ),
 });
 
-export type ThreadAnalysis = z.infer<typeof threadAnalysisSchema>;
-export type Thread = z.infer<typeof threadSchema>;
+export type ThreadStep = z.infer<typeof threadStepSchema> & {
+  resolution: Resolution | null;
+};
+
+export type Thread = Omit<z.infer<typeof threadSchema>, "progression"> & {
+  duration: number;
+  progression: ThreadStep[];
+  resolution: Resolution | null;
+  milestone: string | null;
+};
+
+export type ThreadAnalysis = Omit<
+  z.infer<typeof threadAnalysisSchema>,
+  "threads"
+> & {
+  threads: Thread[];
+};

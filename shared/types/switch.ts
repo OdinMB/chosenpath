@@ -112,8 +112,8 @@ export const createSwitchAnalysisSchema = (playerCount: PlayerCount) => {
     .describe("Set of switches for all players");
 };
 
-export type Switch = z.infer<typeof switchSchema>;
 export type SwitchType = z.infer<typeof switchTypeSchema>;
+export type Switch = z.infer<typeof switchSchema>;
 export type SwitchAnalysis = z.infer<
   ReturnType<typeof createSwitchAnalysisSchema>
 >;

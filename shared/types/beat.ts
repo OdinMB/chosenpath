@@ -8,16 +8,10 @@ import {
   addIntroductionOfStoryElementSchema,
   newMilestoneSchema,
 } from "./change.js";
+import { Resolution } from "./thread.js";
 
 export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
 export type OptionType = (typeof OPTION_TYPES)[number];
-
-export const STEP_RESOLUTION_TYPES = [
-  "favorable",
-  "mixed",
-  "unfavorable",
-] as const;
-export type StepResolutionType = (typeof STEP_RESOLUTION_TYPES)[number];
 
 const optionBaseSchema = z
   .object({
@@ -219,7 +213,7 @@ export interface ProbabilityDistribution {
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
-  resolution: StepResolutionType | null;
+  resolution: Resolution | null;
 };
 
 export type BeatHistory = Array<Beat>;

@@ -12,7 +12,7 @@ import { ChangeService } from "../services/ChangeService.js";
 import { OutcomeService } from "../services/OutcomeService.js";
 import { determineNextBeatType } from "shared/utils/storyUtils.js";
 import { areAllChoicesSubmitted } from "shared/utils/storyUtils.js";
-import { type Beat, type StepResolutionType } from "shared/types/beat.js";
+import { type Beat } from "shared/types/beat.js";
 
 export interface QueueEvents {
   stateUpdated: (event: StateUpdateEvent) => void;
@@ -113,11 +113,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         gameId
       );
 
-      // 1. Determine next beat type and prepare state
-      const currentBeatType = determineNextBeatType(state);
+      // Determine the thread (step) resolutions based on individual players' resolutions
       let updatedState = state;
+      // updatedState = await this.determineThreadResolutions(updatedState);
 
-      // 2. Reset beat context if needed
+      // Determine next beat type and prepare state
+      const currentBeatType = determineNextBeatType(state);
+
+      // Reset beat context if needed
       if (
         currentBeatType === "ending" ||
         currentBeatType === "intro" ||
@@ -130,7 +133,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         updatedState = this.resetBeatContext(updatedState);
       }
 
-      // 3. Generate content based on beat type
+      // Generate content based on beat type
       if (currentBeatType === "switch") {
         console.log("[GameQueueProcessor] Generating switches");
         updatedState = await this.aiStoryGenerator.generateSwitches(
@@ -147,19 +150,19 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       }
       updatedState.currentBeatType = currentBeatType;
 
-      // 4. Generate beats and list of beats needing images
+      // Generate beats and list of beats needing images
       console.log("[GameQueueProcessor] Generating beats");
       const [nextState, changes, beatsNeedingImages] =
         await this.aiStoryGenerator.generateBeats(updatedState);
 
-      // 5. Apply changes
+      // Apply changes
       console.log("[GameQueueProcessor] Applying changes to state");
       const stateWithChanges = this.changeService.applyChanges(
         nextState,
         changes
       );
 
-      // 6. Update thread beat counter if needed
+      // Update thread beat counter if needed
       if (currentBeatType === "thread") {
         console.log(
           "[GameQueueProcessor] Updating thread beat counter:",
@@ -174,7 +177,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         state: stateWithChanges,
       });
 
-      // 7. Generate images if needed
+      // Generate images if needed
       let finalState = stateWithChanges;
       if (state.generateImages && Object.keys(beatsNeedingImages).length > 0) {
         console.log("[GameQueueProcessor] Generating images for beats");
@@ -224,17 +227,18 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     );
 
     // Process success/failure outcomes if applicable
-    const stateWithOutcomes = this.processSuccessFailureOutcome(
+    const stateWithOutcomes = this.processIndividualStepResolution(
       updatedState,
       playerSlot,
       optionIndex
     );
 
-    // Emit state update
+    // Emit state update to update pending players lists
     this.events.emit("stateUpdated", { gameId, state: stateWithOutcomes });
 
     // Queue next operation if all choices are in
     if (areAllChoicesSubmitted(stateWithOutcomes)) {
+      // Move the story forward
       await this.addOperation({
         type: "moveStoryForward",
         gameId,
@@ -265,10 +269,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     };
   }
 
-  /**
-   * Process success/failure outcomes for a player's choice
-   */
-  private processSuccessFailureOutcome(
+  private processIndividualStepResolution(
     state: StoryState,
     playerSlot: PlayerSlot,
     optionIndex: number
@@ -326,114 +327,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       players: updatedPlayers,
     };
 
-    // If this is a contested thread, check if we need to compare sides
-    this.processContestedThreadOutcomes(stateWithUpdatedPlayers);
-
     return stateWithUpdatedPlayers;
   }
-
-  /**
-   * Process contested thread outcomes by comparing sides
-   */
-  private processContestedThreadOutcomes(state: StoryState): void {
-    // Only process if this is a thread and all players have submitted choices
-    if (
-      state.currentBeatType !== "thread" ||
-      !state.currentThreadAnalysis ||
-      !areAllChoicesSubmitted(state)
-    ) {
-      return;
-    }
-
-    // Initialize the contest outcomes map if it doesn't exist
-    if (!state.currentThreadContestOutcomes) {
-      state.currentThreadContestOutcomes = {};
-    }
-
-    // Process each contested thread
-    state.currentThreadAnalysis.threads?.forEach((thread) => {
-      // Skip threads that aren't contested
-      if (!thread.playersSideB || thread.playersSideB.length === 0) {
-        return;
-      }
-
-      const { playersSideA, playersSideB, id } = thread;
-
-      // Get the latest beat for each player
-      const sideABeats = playersSideA
-        .map((playerSlot) => {
-          const player = state.players[playerSlot];
-          return player.beatHistory[player.beatHistory.length - 1];
-        })
-        .filter((beat) => beat.resolution !== null);
-
-      const sideBBeats = playersSideB
-        .map((playerSlot) => {
-          const player = state.players[playerSlot];
-          return player.beatHistory[player.beatHistory.length - 1];
-        })
-        .filter((beat) => beat.resolution !== null);
-
-      // Only proceed if all players have resolutions
-      if (
-        sideABeats.length !== playersSideA.length ||
-        sideBBeats.length !== playersSideB.length
-      ) {
-        return;
-      }
-
-      // Calculate the average outcome for each side
-      const sideAOutcome = this.calculateAverageOutcome(sideABeats);
-      const sideBOutcome = this.calculateAverageOutcome(sideBBeats);
-
-      // Compare the outcomes to determine the winner
-      const contestedOutcome = OutcomeService.compareContestedOutcomes(
-        sideAOutcome,
-        sideBOutcome
-      );
-
-      // Store the contested outcome in the state for this specific thread
-      if (id) {
-        state.currentThreadContestOutcomes[id] = contestedOutcome;
-      }
-    });
-  }
-
-  /**
-   * Calculate the average outcome from a list of beats
-   */
-  private calculateAverageOutcome(beats: Beat[]): StepResolutionType {
-    if (beats.length === 0) {
-      return "mixed"; // Default to mixed if no beats
-    }
-
-    // Count the occurrences of each outcome
-    const counts = {
-      favorable: 0,
-      mixed: 0,
-      unfavorable: 0,
-    };
-
-    for (const beat of beats) {
-      if (beat.resolution) {
-        counts[beat.resolution]++;
-      }
-    }
-
-    // Find the most common outcome
-    let maxCount = 0;
-    let maxOutcome: StepResolutionType = "mixed";
-
-    for (const [outcome, count] of Object.entries(counts)) {
-      if (count > maxCount) {
-        maxCount = count;
-        maxOutcome = outcome as StepResolutionType;
-      }
-    }
-
-    return maxOutcome;
-  }
 }
-
 // Create singleton instance
 export const gameQueueProcessor = new GameQueueProcessor();

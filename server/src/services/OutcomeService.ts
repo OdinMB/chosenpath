@@ -2,9 +2,12 @@ import {
   type Beat,
   type SuccessFailureOption,
   type ProbabilityDistribution,
-  type StepResolutionType,
   type OptionType,
 } from "shared/types/beat.js";
+import {
+  ResolutionSuccessFailure,
+  ResolutionContested,
+} from "shared/types/thread.js";
 
 export class OutcomeService {
   /**
@@ -335,11 +338,11 @@ export class OutcomeService {
    */
   static determineOutcome(
     distribution: ProbabilityDistribution
-  ): StepResolutionType {
+  ): ResolutionSuccessFailure {
     const roll = Math.random() * 100;
     console.log(`[OutcomeService] Random roll: ${roll.toFixed(2)}`);
 
-    let outcome: StepResolutionType;
+    let outcome: ResolutionSuccessFailure;
     if (roll < distribution.favorable) {
       outcome = "favorable";
     } else if (roll < distribution.favorable + distribution.mixed) {
@@ -360,7 +363,7 @@ export class OutcomeService {
   static processBeatResolution(
     beat: Beat,
     previousBeat: Beat | null
-  ): StepResolutionType {
+  ): ResolutionSuccessFailure {
     console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
 
     // Get the chosen option
@@ -384,7 +387,7 @@ export class OutcomeService {
       // Add bonus points based on previous beat outcome
       if (previousBeat?.resolution) {
         const previousBeatPoints = this.getPointsFromPreviousBeat(
-          previousBeat.resolution
+          previousBeat.resolution as ResolutionSuccessFailure
         );
         points += previousBeatPoints;
         console.log(
@@ -411,7 +414,7 @@ export class OutcomeService {
    * Get bonus points based on the previous beat's outcome
    */
   private static getPointsFromPreviousBeat(
-    previousResolution: StepResolutionType
+    previousResolution: ResolutionSuccessFailure
   ): number {
     switch (previousResolution) {
       case "favorable":
@@ -429,9 +432,9 @@ export class OutcomeService {
    * Compare outcomes between sides in a contested thread
    */
   static compareContestedOutcomes(
-    sideAOutcome: StepResolutionType,
-    sideBOutcome: StepResolutionType
-  ): StepResolutionType {
+    sideAOutcome: ResolutionContested,
+    sideBOutcome: ResolutionContested
+  ): ResolutionContested {
     console.log(
       `[OutcomeService] Comparing contested outcomes - Side A: ${sideAOutcome}, Side B: ${sideBOutcome}`
     );
@@ -446,11 +449,11 @@ export class OutcomeService {
     const sideAValue = outcomeValues[sideAOutcome];
     const sideBValue = outcomeValues[sideBOutcome];
 
-    let result: StepResolutionType;
+    let result: ResolutionContested;
     if (sideAValue > sideBValue) {
-      result = "favorable"; // Side A wins
+      result = "sideAWins"; // Side A wins
     } else if (sideAValue < sideBValue) {
-      result = "unfavorable"; // Side B wins
+      result = "sideBWins"; // Side B wins
     } else {
       result = "mixed"; // Draw
     }

@@ -80,14 +80,14 @@ export class AIStoryGenerator {
       sharedOutcomes: setup.sharedOutcomes,
       sharedStats: setup.sharedStats,
       players,
-      maxTurns,
+      storyPhases: [],
       currentBeatType: "intro",
       currentSwitchAnalysis: null,
       currentThreadAnalysis: null,
       currentThreadMaxBeats: 0,
       currentThreadBeatsCompleted: 0,
       previousThreadAnalysis: null,
-      currentThreadContestOutcomes: {},
+      maxTurns,
       generateImages,
       images: [],
       playerCodes: {},
@@ -166,9 +166,33 @@ export class AIStoryGenerator {
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
     console.log("Response:\n", JSON.stringify(response, null, 2));
 
+    // Transform the threads to include the new properties
+    const transformedThreads = response.threads.map((thread) => {
+      // Transform each ThreadStep to include resolution
+      const transformedSteps = thread.progression.map((step) => ({
+        ...step,
+        resolution: null,
+      }));
+
+      // Transform the Thread to include the new properties
+      return {
+        ...thread,
+        duration: response.duration,
+        progression: transformedSteps,
+        resolution: null,
+        milestone: null,
+      };
+    });
+
+    // Create the transformed ThreadAnalysis
+    const transformedResponse: ThreadAnalysis = {
+      ...response,
+      threads: transformedThreads,
+    };
+
     return {
       ...state,
-      currentThreadAnalysis: response,
+      currentThreadAnalysis: transformedResponse,
       currentThreadMaxBeats: response.duration,
     };
   }
