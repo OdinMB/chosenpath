@@ -7,7 +7,6 @@ More structured threads
 Clean-up
 
 - +50/0/-50 effect based on previous beat on player level or step resolution on thread level?
-- don't send client option details
 - Add exploratory threads back in (BeatResolutionService, ThreadResolutionService)
 
 Improvements

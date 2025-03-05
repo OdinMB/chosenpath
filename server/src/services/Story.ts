@@ -151,10 +151,49 @@ export class Story {
 
     // Only include the specific player's data
     const playerData = this.state.players[playerSlot];
+
     // Filter out hidden player stats
     playerData.characterStats = playerData.characterStats.filter(
       (stat) => stat.isVisible !== false
     );
+
+    // Filter out outcomes if they exist
+    if (playerData.outcomes) {
+      delete playerData.outcomes;
+    }
+
+    // Filter out sensitive data from beat history
+    if (playerData.beatHistory && playerData.beatHistory.length > 0) {
+      playerData.beatHistory = playerData.beatHistory.map((beat) => {
+        const filteredBeat = { ...beat };
+
+        // Remove plan and summary from beats
+        delete filteredBeat.plan;
+        delete filteredBeat.summary;
+
+        // Filter options if they exist
+        if (filteredBeat.options && filteredBeat.options.length > 0) {
+          filteredBeat.options = filteredBeat.options.map((option) => {
+            const filteredOption = { ...option };
+
+            // Remove statConsequences from all option types
+            delete filteredOption.statConsequences;
+
+            // Remove properties specific to challenge options
+            if (filteredOption.optionType === "challenge") {
+              delete filteredOption.basePoints;
+              delete filteredOption.modifiers;
+              delete filteredOption.riskType;
+            }
+
+            return filteredOption;
+          });
+        }
+
+        return filteredBeat;
+      });
+    }
+
     filteredState.players = { [playerSlot]: playerData };
 
     // Filter out hidden shared stats
