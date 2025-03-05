@@ -13,9 +13,9 @@ import { Resolution } from "./thread.js";
 export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
 export type OptionType = (typeof OPTION_TYPES)[number];
 
-const optionBaseSchema = z
+const optionExplorationSchema = z
   .object({
-    optionType: z.literal("basic"),
+    optionType: z.literal("exploration"),
     text: z.string().describe("Text shown to player for this choice"),
     statConsequences: z
       .string()
@@ -27,9 +27,9 @@ const optionBaseSchema = z
     "Choose this type of option for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
   );
 
-const optionSuccessFailureSchema = z
+const optionChallengeSchema = z
   .object({
-    optionType: z.literal("successFailure"),
+    optionType: z.literal("challenge"),
     text: z.string().describe("Text shown to player for this choice"),
     statConsequences: z
       .string()
@@ -149,8 +149,8 @@ export const beatGenerationSchema = z.object({
   options: z
     .array(
       z.discriminatedUnion("optionType", [
-        optionBaseSchema,
-        optionSuccessFailureSchema,
+        optionExplorationSchema,
+        optionChallengeSchema,
       ])
     )
     .describe(
@@ -222,6 +222,6 @@ export type BeatGeneration = z.infer<typeof beatGenerationSchema>;
 
 export type BeatPlan = z.infer<typeof beatPlanSchema>;
 
-export type BaseOption = z.infer<typeof optionBaseSchema>;
-export type SuccessFailureOption = z.infer<typeof optionSuccessFailureSchema>;
-export type BeatOption = BaseOption | SuccessFailureOption;
+export type ExplorationOption = z.infer<typeof optionExplorationSchema>;
+export type ChallengeOption = z.infer<typeof optionChallengeSchema>;
+export type BeatOption = ExplorationOption | ChallengeOption;

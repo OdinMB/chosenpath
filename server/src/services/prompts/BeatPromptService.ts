@@ -198,11 +198,11 @@ Title: ${
         ? "[title of the switch that this beat implements and nothing else]"
         : story.getCurrentBeatType() === "ending"
         ? "The End"
-        : "[title for the thread that this beat is part of] (" +
+        : "[title for the thread that this beat is part of]\nAdd '(" +
           (story.getCurrentThreadBeatsCompleted() + 1) +
           "/" +
           story.getCurrentThreadDuration() +
-          ")\nDon't change the information in the brackets. It marks the beat of the current thread and is correct."
+          ")' after the title to indicate the beat number of the current thread."
     }
 
 Text
@@ -320,11 +320,6 @@ Find a good balance between introducing the overall setup of the story, introduc
       ? "This is the last beat of the thread. The outcome of this beat will determine which milestone is added to the outcome."
       : "This is a middle beat in the thread progression. Build on the previous beat and move the thread forward.";
 
-    const previousBeatOutcomeInstructions = isFirstBeatOfThread
-      ? ""
-      : `\n\nPrevious Beat Outcomes:
-${this.createPreviousBeatOutcomeInstructions(story)}`;
-
     const worldBuildingInstructions = `\n\nWorld Building Instructions:
 - Check if the player is going to encounter a story element that has not yet been introduced to the player.
 --- If so, introduce the element properly in the beat text and add the element id to the player's list of known story elements.
@@ -345,74 +340,11 @@ ${this.createPreviousBeatOutcomeInstructions(story)}`;
 For each player, create a beat that:
 - Narrates the consequences of their previous choice
 - Advances the thread according to the thread configuration
-- Presents 3 options for the player to choose from${previousBeatOutcomeInstructions}${worldBuildingInstructions}
+- Presents 3 options for the player to choose from${worldBuildingInstructions}
 
 3. GENERATE IMAGES (OPTIONAL)
 
 If you want to generate an image for a beat, leave the imageId field empty.
 If you want to use an existing image, specify its ID.`;
-  }
-
-  private static createPreviousBeatOutcomeInstructions(story: Story): string {
-    // For contested threads, include information about which side is currently winning
-    if (
-      story
-        .getCurrentThreadAnalysis()
-        ?.threads?.some((thread) => thread.playersSideB?.length > 0) &&
-      story.getCurrentThreadContestOutcomes()
-    ) {
-      // Get all contested threads with their outcomes
-      const contestedThreads = story
-        .getCurrentThreadAnalysis()
-        ?.threads?.filter(
-          (thread) =>
-            thread.playersSideB?.length > 0 &&
-            thread.id &&
-            story.getCurrentThreadContestOutcomes()?.[thread.id]
-        )
-        .map((thread) => {
-          const outcome = thread.id
-            ? story.getCurrentThreadContestOutcomes()?.[thread.id]
-            : null;
-          return {
-            title: thread.title || thread.id || "Unnamed thread",
-            outcome,
-          };
-        });
-
-      if (contestedThreads?.length) {
-        return contestedThreads
-          .map((thread) => {
-            const { title, outcome } = thread;
-            return `This is a contested thread "${title}". Currently, ${
-              outcome === "favorable"
-                ? "Side A is winning"
-                : outcome === "unfavorable"
-                ? "Side B is winning"
-                : "the sides are evenly matched"
-            }. Adjust the narrative to reflect this dynamic.`;
-          })
-          .join("\n\n");
-      }
-    }
-
-    // For each player, include information about their previous beat outcome
-    return Object.entries(story.getPlayers())
-      .map(([playerSlot, player]) => {
-        if (player.beatHistory.length < 2) return "";
-
-        const previousBeat = player.beatHistory[player.beatHistory.length - 1];
-        if (!previousBeat.resolution) return "";
-
-        return `- ${playerSlot}: Previous beat outcome was ${previousBeat.resolution.toUpperCase()}. ${
-          previousBeat.resolution === "favorable"
-            ? "The player is in an advantageous position. Make this beat easier for them, reflecting their previous success."
-            : previousBeat.resolution === "unfavorable"
-            ? "The player is at a disadvantage. Make this beat more challenging, reflecting their previous setback."
-            : "The player is in a neutral position."
-        }`;
-      })
-      .filter(Boolean)
-      .join("\n");
   }
 }

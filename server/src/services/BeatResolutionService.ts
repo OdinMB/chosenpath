@@ -1,15 +1,12 @@
 import {
   type Beat,
-  type SuccessFailureOption,
+  type ChallengeOption,
   type ProbabilityDistribution,
   type OptionType,
 } from "shared/types/beat.js";
-import {
-  ResolutionSuccessFailure,
-  ResolutionContested,
-} from "shared/types/thread.js";
+import { ResolutionChallenge } from "shared/types/thread.js";
 
-export class OutcomeService {
+export class BeatResolutionService {
   /**
    * Default probability distribution (33/34/33)
    */
@@ -28,6 +25,59 @@ export class OutcomeService {
     mixed: 20,
     unfavorable: 40,
   };
+
+  /**
+   * Process a beat to determine its resolution type
+   */
+  static getBeatResolution(
+    beat: Beat,
+    previousBeat: Beat | null
+  ): ResolutionChallenge {
+    console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
+
+    // Get the chosen option
+    const chosenOption = beat.options[beat.choice];
+    console.log(`[OutcomeService] Chosen option: "${chosenOption.text}"`);
+
+    // Default to normal option type if not a success/failure option
+    const optionType =
+      chosenOption.optionType === "challenge"
+        ? chosenOption.riskType
+        : "normal";
+    console.log(`[OutcomeService] Option type: ${optionType}`);
+
+    // Calculate points based on the option and previous beat
+    let points = 0;
+
+    if (chosenOption.optionType === "challenge") {
+      // Add base points from the option
+      points += this.calculateTotalPoints(chosenOption);
+
+      // Add bonus points based on previous beat outcome
+      if (previousBeat?.resolution) {
+        const previousBeatPoints = this.getPointsFromPreviousBeat(
+          previousBeat.resolution as ResolutionChallenge
+        );
+        points += previousBeatPoints;
+        console.log(
+          `[OutcomeService] Previous beat outcome (${previousBeat.resolution}): ${previousBeatPoints} points`
+        );
+      }
+    }
+
+    console.log(
+      `[OutcomeService] Final points for distribution calculation: ${points}`
+    );
+
+    // Calculate the probability distribution
+    const distribution = this.calculateDistribution(points, optionType);
+
+    // Determine the outcome
+    const resolution = this.determineBeatResolution(distribution);
+
+    console.log(`[OutcomeService] Final resolution:`, resolution);
+    return resolution;
+  }
 
   /**
    * Get the base distribution based on option type
@@ -314,7 +364,7 @@ export class OutcomeService {
   /**
    * Calculate the total points for a beat option
    */
-  static calculateTotalPoints(option: SuccessFailureOption): number {
+  static calculateTotalPoints(option: ChallengeOption): number {
     // Start with the base points
     let totalPoints = option.basePoints;
     console.log(`[OutcomeService] Base points: ${totalPoints}`);
@@ -334,15 +384,15 @@ export class OutcomeService {
   }
 
   /**
-   * Determine the outcome based on the probability distribution
+   * Determine the beat resolution based on the probability distribution
    */
-  static determineOutcome(
+  static determineBeatResolution(
     distribution: ProbabilityDistribution
-  ): ResolutionSuccessFailure {
+  ): ResolutionChallenge {
     const roll = Math.random() * 100;
     console.log(`[OutcomeService] Random roll: ${roll.toFixed(2)}`);
 
-    let outcome: ResolutionSuccessFailure;
+    let outcome: ResolutionChallenge;
     if (roll < distribution.favorable) {
       outcome = "favorable";
     } else if (roll < distribution.favorable + distribution.mixed) {
@@ -358,63 +408,10 @@ export class OutcomeService {
   }
 
   /**
-   * Process a beat to determine its resolution type
-   */
-  static processBeatResolution(
-    beat: Beat,
-    previousBeat: Beat | null
-  ): ResolutionSuccessFailure {
-    console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
-
-    // Get the chosen option
-    const chosenOption = beat.options[beat.choice];
-    console.log(`[OutcomeService] Chosen option: "${chosenOption.text}"`);
-
-    // Default to normal option type if not a success/failure option
-    const optionType =
-      chosenOption.optionType === "successFailure"
-        ? chosenOption.riskType
-        : "normal";
-    console.log(`[OutcomeService] Option type: ${optionType}`);
-
-    // Calculate points based on the option and previous beat
-    let points = 0;
-
-    if (chosenOption.optionType === "successFailure") {
-      // Add base points from the option
-      points += this.calculateTotalPoints(chosenOption);
-
-      // Add bonus points based on previous beat outcome
-      if (previousBeat?.resolution) {
-        const previousBeatPoints = this.getPointsFromPreviousBeat(
-          previousBeat.resolution as ResolutionSuccessFailure
-        );
-        points += previousBeatPoints;
-        console.log(
-          `[OutcomeService] Previous beat outcome (${previousBeat.resolution}): ${previousBeatPoints} points`
-        );
-      }
-    }
-
-    console.log(
-      `[OutcomeService] Final points for distribution calculation: ${points}`
-    );
-
-    // Calculate the probability distribution
-    const distribution = this.calculateDistribution(points, optionType);
-
-    // Determine the outcome
-    const resolution = this.determineOutcome(distribution);
-
-    console.log(`[OutcomeService] Final resolution:`, resolution);
-    return resolution;
-  }
-
-  /**
    * Get bonus points based on the previous beat's outcome
    */
   private static getPointsFromPreviousBeat(
-    previousResolution: ResolutionSuccessFailure
+    previousResolution: ResolutionChallenge
   ): number {
     switch (previousResolution) {
       case "favorable":
@@ -426,39 +423,5 @@ export class OutcomeService {
       default:
         return 0;
     }
-  }
-
-  /**
-   * Compare outcomes between sides in a contested thread
-   */
-  static compareContestedOutcomes(
-    sideAOutcome: ResolutionContested,
-    sideBOutcome: ResolutionContested
-  ): ResolutionContested {
-    console.log(
-      `[OutcomeService] Comparing contested outcomes - Side A: ${sideAOutcome}, Side B: ${sideBOutcome}`
-    );
-
-    // Convert outcomes to numeric values for comparison
-    const outcomeValues = {
-      favorable: 2,
-      mixed: 1,
-      unfavorable: 0,
-    };
-
-    const sideAValue = outcomeValues[sideAOutcome];
-    const sideBValue = outcomeValues[sideBOutcome];
-
-    let result: ResolutionContested;
-    if (sideAValue > sideBValue) {
-      result = "sideAWins"; // Side A wins
-    } else if (sideAValue < sideBValue) {
-      result = "sideBWins"; // Side B wins
-    } else {
-      result = "mixed"; // Draw
-    }
-
-    console.log(`[OutcomeService] Contest result: ${result.toUpperCase()}`);
-    return result;
   }
 }

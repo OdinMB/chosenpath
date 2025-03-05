@@ -49,23 +49,24 @@ are a narrative structure of exactly 1 beat. Their purpose is to give the player
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
 They do this by adding a milestone to an outcome. Which milestone is added depends on how the thread unfolds.
-Each beat in a thread results in a favorable, mixed, or unfavorable outcome (or in contested threads: Side A wins, mixed result, Side B wins).
-The outcome of each beat affects the probability distribution of outcomes in the next beat, until finally a milestone is reached after the last beat.
+Each beat in a thread results in a favorable, mixed, or unfavorable resolution (or in contested threads: Side A wins, mixed result, Side B wins).
+The resolution of each beat affects the probability distribution of resolutions in the next beat, until finally a milestone for the outcome can is determined after the last beat.
 
 Types of Threads:
-1. Standard Threads
+1. Challenge Threads
 - All players work together toward shared goals
-- Outcomes are favorable/mixed/unfavorable
+- Resolutions are favorable/mixed/unfavorable
 - Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
 
-2. Contested Threads
+2. Contest Threads
 - Players are split into Side A and Side B, competing over an outcome
-- Outcomes are "Side A wins"/"Mixed result"/"Side B wins"
+- Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
+- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")
 
-3. Exploratory Threads
+3. Exploration Threads
 - Players make choices that don't follow a success/failure structure but explore different narrative paths
-- Outcomes are "Option 1"/"Option 2"/"Option 3" representing different choices or directions
+- Resolutions are "Option 1"/"Option 2"/"Option 3" representing different choices or directions
 - Example milestones (one will be added to the outcome at the end of the thread): "[player] takes over the family hotel", "[player] helps at the family hotel while doing occassional photography jobs", "[player] is no longer engaged in the family business"
 - Use for character development, moral dilemmas, or when multiple valid paths exist without clear "better" or "worse" options
 
@@ -92,7 +93,7 @@ A duration for this thread (or set of threads) between 2-4 beats.
 --- Skill challenges (e.g. climbing a mountain, crafting a special item, performing a ritual)
 --- Journeys (e.g. traveling through dangerous territory, navigating obstacles)
 --- Character development (building a relationship, facing a fear)
-- 4 beats: endings and transformations (~20% of all threads)
+- 4 beats: showdowns and transformations (~20% of all threads)
 --- Showdowns (e.g. a epic battle, the make-or-break concert of the band, the council session to become the new king)
 --- Transformative events (e.g. ascension ceremonies, magical transformations, a coronation)
 - The duration is the same for all threads in this batch
@@ -104,7 +105,7 @@ Examples:
 - Cooperative thread: All players are on Side A of a standard thread
 - Contested thread: Players are split between Side A and Side B
 - Mixed setup: Some players cooperate in a standard thread while others compete in a contested thread
-- Exploratory thread: Players face choices with multiple valid paths rather than success/failure outcomes
+- Exploratory thread: Players face choices with multiple valid paths rather than resolutions that mark success/failure
 For single-player games, there is only one thread.
 
 A list of threads, each with:
@@ -115,9 +116,10 @@ A list of threads, each with:
    - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
 4. A progression of 2-4 beats (matching the duration) that:
    - Builds dramatic tension toward the thread's climax on the last beat
-   - Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
-   - Always gets through the entire beat progression. Specifically, no step should preempt the final outcome of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
-   - Describes what type of advantage/disadvantage is transferred to the next beat for each possible outcome for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
+   - For Challenge and Contest threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
+   - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
+   - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
+   - Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
 
 EXAMPLE 1: 3-BEAT COOPERATIVE THREAD
 Players (Side A): player1, player2
@@ -135,7 +137,7 @@ Question: How do [players] approach the manor's security?
 - Favorable: The guards are distracted, giving easy access to the manor
 - Mixed: [players] find a way in but the guards are on higher alert
 - Unfavorable: The guards are suspicious and increase their patrols
-(Note how the beat progression can continue no matter the outcome of step 1.)
+(Note how the beat progression can continue no matter the resolution of step 1.)
 
 2. Searching the Study
 Question: How do [players] search the study without leaving traces?

@@ -1,30 +1,38 @@
 import { z } from "zod";
 import { PLAYER_SLOTS } from "./player.js";
 
-export const RESOLUTION_SUCCESS_FAILURE = [
+export const THREAD_TYPE = ["challenge", "contest", "exploration"] as const;
+export type ThreadType = (typeof THREAD_TYPE)[number];
+
+export const getThreadType = (thread: Thread): ThreadType => {
+  if (thread.playersSideB.length > 0) {
+    return "contest";
+  } else if ("favorable" in thread.progression[0].possibleResolutions) {
+    return "challenge";
+  } else {
+    return "exploration";
+  }
+};
+
+export const RESOLUTION_CHALLENGE = [
   "favorable",
   "mixed",
   "unfavorable",
 ] as const;
-export type ResolutionSuccessFailure =
-  (typeof RESOLUTION_SUCCESS_FAILURE)[number];
+export type ResolutionChallenge = (typeof RESOLUTION_CHALLENGE)[number];
 
-export const RESOLUTION_CONTESTED = [
-  "sideAWins",
-  "mixed",
-  "sideBWins",
-] as const;
-export type ResolutionContested = (typeof RESOLUTION_CONTESTED)[number];
+export const RESOLUTION_CONTEST = ["sideAWins", "mixed", "sideBWins"] as const;
+export type ResolutionContest = (typeof RESOLUTION_CONTEST)[number];
 
 export const RESOLUTION = [
-  ...RESOLUTION_SUCCESS_FAILURE,
-  ...RESOLUTION_CONTESTED,
+  ...RESOLUTION_CHALLENGE,
+  ...RESOLUTION_CONTEST,
   "exploration",
 ] as const;
 export type Resolution = (typeof RESOLUTION)[number];
 
 // For standard (non-contested) threads
-const standardMilestonesSchema = z
+const challengeMilestonesSchema = z
   .object({
     favorable: z.string().describe("Milestone to add on favorable outcome"),
     mixed: z.string().describe("Milestone to add on mixed outcome"),
@@ -35,18 +43,18 @@ const standardMilestonesSchema = z
   );
 
 // For contested multiplayer threads
-const contestedMilestonesSchema = z
+const contestMilestonesSchema = z
   .object({
     sideAWins: z.string().describe("Milestone to add if Side A wins"),
     mixed: z.string().describe("Milestone to add on a draw/compromise"),
     sideBWins: z.string().describe("Milestone to add if Side B wins"),
   })
   .describe(
-    "Possible milestones for threads over contested outcomes in multiplayer games."
+    "Only in multiplayer games: Possible milestones for threads over outcomes that are contested between players."
   );
 
 // For exploratory threads
-const exploratoryMilestonesSchema = z
+const explorationMilestonesSchema = z
   .object({
     milestone1: z.string(),
     milestone2: z.string(),
@@ -57,7 +65,7 @@ const exploratoryMilestonesSchema = z
   );
 
 // For standard (non-contested) threads
-const standardStepResolutionsSchema = z
+const challengeStepResolutionsSchema = z
   .object({
     favorable: z.string(),
     mixed: z.string(),
@@ -68,7 +76,7 @@ const standardStepResolutionsSchema = z
   );
 
 // For contested multiplayer threads
-const contestedStepResolutionsSchema = z
+const contestStepResolutionsSchema = z
   .object({
     sideAWins: z.string(),
     mixed: z.string(),
@@ -79,7 +87,7 @@ const contestedStepResolutionsSchema = z
   );
 
 // For exploratory threads
-const exploratoryStepResolutionsSchema = z
+const explorationStepResolutionsSchema = z
   .object({
     resolution1: z.string(),
     resolution2: z.string(),
@@ -94,9 +102,9 @@ const threadStepSchema = z.object({
   question: z.string().describe("Question that guides this step's choices"),
   possibleResolutions: z
     .union([
-      standardStepResolutionsSchema,
-      contestedStepResolutionsSchema,
-      exploratoryStepResolutionsSchema,
+      challengeStepResolutionsSchema,
+      contestStepResolutionsSchema,
+      explorationStepResolutionsSchema,
     ])
     .describe(
       "What happens narratively for the different outcomes of this step"
@@ -126,9 +134,9 @@ export const threadSchema = z.object({
     ),
   possibleMilestones: z
     .union([
-      standardMilestonesSchema,
-      contestedMilestonesSchema,
-      // exploratoryMilestonesSchema,
+      challengeMilestonesSchema,
+      contestMilestonesSchema,
+      explorationMilestonesSchema,
     ])
     .describe(
       "One of these milestones will be added to the outcome at the end of the thread. Make sure that the milestones only constitute one step toward the outcome's resolution."

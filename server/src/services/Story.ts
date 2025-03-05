@@ -19,6 +19,7 @@ import { Resolution } from "shared/types/thread.js";
 import { Change } from "shared/types/change.js";
 import { ChangeService } from "./ChangeService.js";
 import { Image } from "shared/types/image.js";
+import { Thread } from "shared/types/thread.js";
 
 /**
  * Comprehensive manager for story state
@@ -41,11 +42,6 @@ export class Story {
     });
   }
 
-  /**
-   * Apply a list of changes to the story using the ChangeService
-   * @param changes List of changes to apply
-   * @returns Updated Story instance
-   */
   applyStoryChanges(changes: Change[]): Story {
     return Story.changeService.applyChanges(this, changes);
   }
@@ -53,7 +49,6 @@ export class Story {
   getState(): StoryState {
     return this.state;
   }
-
   getGameMode(): GameMode {
     return this.state.gameMode;
   }
@@ -294,17 +289,21 @@ export class Story {
     return threadAnalysis ? threadAnalysis.duration : 0;
   }
   getCurrentThreadBeatsCompleted(): number {
-    // Count how many consecutive thread phases we have at the end of the phases array
-    let count = 0;
-    for (let i = this.state.storyPhases.length - 1; i >= 0; i--) {
-      const phase = this.state.storyPhases[i];
-      if (this.isThreadAnalysis(phase)) {
-        count++;
-      } else {
-        break;
-      }
+    const threadAnalysis = this.getCurrentThreadAnalysis();
+    if (!threadAnalysis || threadAnalysis.threads.length === 0) {
+      return 0;
     }
-    return count;
+
+    // All threads in the same ThreadAnalysis have the same number of completed steps
+    // So we can just look at the first thread
+    const firstThread = threadAnalysis.threads[0];
+    return firstThread.progression.filter((step) => step.resolution !== null)
+      .length;
+  }
+  isCurrentThreadCompleted(): boolean {
+    return (
+      this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
+    );
   }
 
   addPhase(phase: StoryPhase): Story {
@@ -312,6 +311,132 @@ export class Story {
       ...this.state,
       storyPhases: [...this.state.storyPhases, phase],
     };
+    return new Story(updatedState);
+  }
+
+  /**
+   * Updates the current thread analysis with resolved threads
+   * @param thread The thread to update
+   * @param resolution The resolution of the thread
+   * @returns Updated Story instance
+   */
+  updateThreadResolution(thread: Thread, resolution: Resolution): Story {
+    const threadAnalysis = this.getCurrentThreadAnalysis();
+    if (!threadAnalysis) {
+      console.log("[Story] No thread analysis found to update resolutions");
+      return this;
+    }
+
+    // Get the current step index that needs to be updated
+    const currentStepIndex = this.getCurrentThreadBeatsCompleted();
+
+    // Update the thread with the resolution
+    const updatedThread = this.updateThreadWithResolution(
+      thread,
+      resolution,
+      currentStepIndex
+    );
+
+    console.log(
+      `[Story] Updated thread: ${JSON.stringify(updatedThread, null, 2)}`
+    );
+
+    // Update the thread analysis and story state
+    return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
+  }
+
+  /**
+   * Updates the milestone for a thread
+   * @param thread The thread to update
+   * @param milestone The milestone to set
+   * @returns Updated Story instance
+   */
+  updateThreadMilestone(thread: Thread, milestone: string): Story {
+    const threadAnalysis = this.getCurrentThreadAnalysis();
+    if (!threadAnalysis) {
+      console.log("[Story] No thread analysis found to update milestone");
+      return this;
+    }
+
+    // Update the thread with the milestone
+    const updatedThread: Thread = {
+      ...thread,
+      milestone,
+    };
+
+    console.log(
+      `[Story] Updated thread: ${JSON.stringify(updatedThread, null, 2)}`
+    );
+
+    // Update the thread analysis and story state
+    return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
+  }
+
+  /**
+   * Helper method to update a thread with a resolution
+   * @param thread The thread to update
+   * @param resolution The resolution to set
+   * @param stepIndex The index of the step to update
+   * @returns Updated Thread
+   */
+  private updateThreadWithResolution(
+    thread: Thread,
+    resolution: Resolution,
+    stepIndex: number
+  ): Thread {
+    // Create a new progression array with the updated step
+    const updatedProgression = [...thread.progression];
+    if (stepIndex >= 0 && stepIndex < updatedProgression.length) {
+      updatedProgression[stepIndex] = {
+        ...updatedProgression[stepIndex],
+        resolution,
+      };
+    }
+
+    // Create updated thread with the new progression
+    return {
+      ...thread,
+      progression: updatedProgression,
+      // If this is the last step, also update the thread's overall resolution
+      resolution:
+        stepIndex === thread.progression.length - 1
+          ? resolution
+          : thread.resolution,
+    };
+  }
+
+  /**
+   * Helper method to update a thread in the current thread analysis
+   * @param thread The updated thread
+   * @param threadAnalysis The current thread analysis
+   * @returns Updated Story instance
+   */
+  private updateThreadInAnalysis(
+    thread: Thread,
+    threadAnalysis: ThreadAnalysis
+  ): Story {
+    // Create updated thread analysis with the updated thread
+    const updatedThreadAnalysis: ThreadAnalysis = {
+      ...threadAnalysis,
+      threads: threadAnalysis.threads.map((t) =>
+        t.id === thread.id ? thread : t
+      ),
+    };
+
+    // Replace the current thread analysis in the story phases
+    const updatedStoryPhases = [...this.state.storyPhases];
+    const currentPhaseIndex = updatedStoryPhases.length - 1;
+
+    if (currentPhaseIndex >= 0) {
+      updatedStoryPhases[currentPhaseIndex] = updatedThreadAnalysis;
+    }
+
+    // Update the state with the new story phases
+    const updatedState = {
+      ...this.state,
+      storyPhases: updatedStoryPhases,
+    };
+
     return new Story(updatedState);
   }
 

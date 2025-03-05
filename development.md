@@ -6,24 +6,23 @@ More structured threads
 
 Clean-up
 
-- Create some sort of thread/switch history in the story state. Current state design is weird.
+- +50/0/-50 effect based on previous beat on player level or step resolution on thread level?
+- don't send client option details
+- Add exploratory threads back in (BeatResolutionService, ThreadResolutionService)
 
-  - store threat results in that new data structure (right now, in multiplayer games, it's not directly clear what the thread result is in the story state)
-  - previous thread configuration must highlight the actual results of the threads
-  - Simplify getCurrent/PreviousThreadBeatChoices nonsense in StoryStatePromptService
+Improvements
 
 - Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
 - thinking step for each option: which stats could be relevant?
 - stats: one field for narrative instructions, plus one for mechanics? (To be considered in option design and processing consequences)
-- Add exploratory threads back in
 - For potential results for the last beat of a thread: ask the AI to take the general milestones and make them more specific given how the thread has gone so far
-- don't send client secret option details
 - Simplify stat changes: no statModifications as part of options (AI doesn't use them correctly anyway); expand prompt/descriptions for stat changes to be about both making the choice and its consequences
 - Allow shared outcomes only in multiplayer games?
 - Attach facts to players?
 - More efficient prompts for switches/threads/beats?
   - only relevant parts
   - Context stuff first, switch/thread configurations last
+  - switches/threads much simpler for single-player games
   - beat planning: turn "which stats affect consequences" into "whatever affects consequences narratively"?
 - adjust scope of story setup based on the number of beats
 - Track story elements that a player has NOT been introduced to yet

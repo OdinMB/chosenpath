@@ -1,0 +1,185 @@
+import { getThreadType } from "shared/types/thread.js";
+import type { Resolution, Thread, ThreadType } from "shared/types/thread.js";
+import type { Story } from "./Story.js";
+
+/**
+ * Service for determining thread resolutions based on step outcomes
+ */
+export class ThreadResolutionService {
+  /**
+   * Determines the resolution for a thread based on its type and step resolutions
+   * @param thread The thread to determine resolution for
+   * @param story The story to determine the resolution for
+   * @returns The calculated resolution
+   */
+  static getThreadResolution(thread: Thread, story: Story): Resolution {
+    const threadType = getThreadType(thread);
+    console.log(
+      `[ThreadResolutionService] Determining resolution for thread ${thread.id} of type ${threadType}`
+    );
+
+    if (threadType === "challenge") {
+      return this.determineChallengeThreadResolution(thread, story);
+    } else if (threadType === "contest") {
+      return this.determineContestThreadResolution(thread, story);
+    } else {
+      // Exploratory threads
+      console.log(
+        `[ThreadResolutionService] Setting exploratory thread ${thread.id} resolution to 'exploration'`
+      );
+      return "exploration";
+    }
+  }
+
+  private static determineChallengeThreadResolution(
+    thread: Thread,
+    story: Story
+  ): Resolution {
+    console.log(
+      `[ThreadResolutionService] Determining Challenge thread resolution for ${thread.id}`
+    );
+
+    // Count the number of each resolution type
+    let favorableCount = 0;
+    let mixedCount = 0;
+    let unfavorableCount = 0;
+
+    // Go through all steps in the thread progression
+    thread.playersSideA.forEach((playerSlot, index) => {
+      const step = story.getCurrentBeat(playerSlot);
+      if (step.resolution === "favorable") {
+        favorableCount++;
+      } else if (step.resolution === "mixed") {
+        mixedCount++;
+      } else if (step.resolution === "unfavorable") {
+        unfavorableCount++;
+      }
+    });
+
+    console.log(
+      `[ThreadResolutionService] Counts - Favorable: ${favorableCount}, Mixed: ${mixedCount}, Unfavorable: ${unfavorableCount}`
+    );
+
+    // Calculate resolution based on counts
+    const totalResolutions = favorableCount + mixedCount + unfavorableCount;
+    const netFavorable = favorableCount - unfavorableCount;
+    const extremeEqualsFavorable = netFavorable >= 0;
+    const netExtreme = Math.abs(netFavorable);
+    const chanceForExtreme = (netExtreme / totalResolutions) * 100;
+    const randomValue = Math.random() * 100;
+    console.log(
+      `[ThreadResolutionService] Chance for extreme: ${chanceForExtreme}%, random value: ${randomValue}`
+    );
+    let result: Resolution | null = null;
+    if (randomValue < chanceForExtreme) {
+      if (extremeEqualsFavorable) {
+        result = "favorable";
+      } else {
+        result = "unfavorable";
+      }
+    } else {
+      result = "mixed";
+    }
+    console.log(
+      `[ThreadResolutionService] Thread ${thread.id} resolution: ${result}`
+    );
+    return result;
+  }
+
+  private static determineContestThreadResolution(
+    thread: Thread,
+    story: Story
+  ): Resolution {
+    console.log(
+      `[ThreadResolutionService] Determining Contest thread resolution for ${thread.id}`
+    );
+
+    // Count the number of each resolution type
+    let sideAFavorableCount = 0;
+    let sideAMixedCount = 0;
+    let sideAUnfavorableCount = 0;
+    let sideBFavorableCount = 0;
+    let sideBMixedCount = 0;
+    let sideBUnfavorableCount = 0;
+
+    // Go through all steps in the thread progression
+    thread.playersSideA.forEach((playerSlot, index) => {
+      const step = story.getCurrentBeat(playerSlot);
+      if (step.resolution === "favorable") {
+        sideAFavorableCount++;
+      } else if (step.resolution === "mixed") {
+        sideAMixedCount++;
+      } else if (step.resolution === "unfavorable") {
+        sideAUnfavorableCount++;
+      }
+    });
+
+    thread.playersSideB.forEach((playerSlot, index) => {
+      const step = story.getCurrentBeat(playerSlot);
+      if (step.resolution === "favorable") {
+        sideBFavorableCount++;
+      } else if (step.resolution === "mixed") {
+        sideBMixedCount++;
+      } else if (step.resolution === "unfavorable") {
+        sideBUnfavorableCount++;
+      }
+    });
+
+    console.log(
+      `[ThreadResolutionService] Counts - Side A: Favorable: ${sideAFavorableCount}, Mixed: ${sideAMixedCount}, Unfavorable: ${sideAUnfavorableCount}, Side B: Favorable: ${sideBFavorableCount}, Mixed: ${sideBMixedCount}, Unfavorable: ${sideBUnfavorableCount}`
+    );
+
+    let tugOfWar: number = 0;
+    tugOfWar += sideAFavorableCount;
+    tugOfWar -= sideAUnfavorableCount;
+    tugOfWar -= sideBFavorableCount;
+    tugOfWar += sideBUnfavorableCount;
+
+    let result: Resolution | null = null;
+    if (tugOfWar > 0) {
+      result = "sideAWins";
+    } else if (tugOfWar < 0) {
+      result = "sideBWins";
+    } else {
+      result = "mixed";
+    }
+    console.log(
+      `[ThreadResolutionService] Thread ${thread.id} resolution: ${result}`
+    );
+    return result;
+  }
+
+  /**
+   * Gets the milestone for a thread based on its resolution
+   * @param thread The thread to get the milestone for
+   * @param resolution The thread's resolution
+   * @returns The milestone string or null if no milestone applies
+   */
+  static getMilestone(thread: Thread, resolution: Resolution): string | null {
+    if (
+      "favorable" in thread.possibleMilestones &&
+      (resolution === "favorable" ||
+        resolution === "mixed" ||
+        resolution === "unfavorable")
+    ) {
+      const milestone = thread.possibleMilestones[resolution];
+      console.log(
+        `[ThreadResolutionService] Thread ${thread.id} milestone set to: ${milestone}`
+      );
+      return milestone;
+    } else if (
+      "sideAWins" in thread.possibleMilestones &&
+      (resolution === "sideAWins" ||
+        resolution === "mixed" ||
+        resolution === "sideBWins")
+    ) {
+      const milestone = thread.possibleMilestones[resolution];
+      console.log(
+        `[ThreadResolutionService] Thread ${thread.id} milestone set to: ${milestone}`
+      );
+      return milestone;
+    }
+
+    return null;
+  }
+}
