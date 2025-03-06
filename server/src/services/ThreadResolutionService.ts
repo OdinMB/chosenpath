@@ -23,12 +23,21 @@ export class ThreadResolutionService {
     } else if (threadType === "contest") {
       return this.determineContestThreadResolution(thread, story);
     } else {
-      // Exploratory threads
-      console.log(
-        `[ThreadResolutionService] Setting exploratory thread ${thread.id} resolution to 'exploration'`
-      );
-      return "exploration";
+      return this.determineExplorationThreadResolution(thread, story);
     }
+  }
+
+  private static determineExplorationThreadResolution(
+    thread: Thread,
+    story: Story
+  ): Resolution {
+    console.log(
+      `[ThreadResolutionService] Determining exploration thread resolution for ${thread.id}`
+    );
+    // for now, just choose whatever the one player in the thread chose
+    const playerSlot = thread.playersSideA[0];
+    const step = story.getCurrentBeat(playerSlot);
+    return step.resolution;
   }
 
   private static determineChallengeThreadResolution(

@@ -4,7 +4,7 @@ import {
   type ProbabilityDistribution,
   type OptionType,
 } from "shared/types/beat.js";
-import { ResolutionChallenge } from "shared/types/thread.js";
+import { ResolutionChallenge, Resolution } from "shared/types/thread.js";
 
 export class BeatResolutionService {
   /**
@@ -31,7 +31,7 @@ export class BeatResolutionService {
    */
   static getBeatResolution(
     beat: Beat,
-    previousBeat: Beat | null
+    previousResolution: Resolution | null
   ): ResolutionChallenge {
     console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
 
@@ -53,14 +53,13 @@ export class BeatResolutionService {
       // Add base points from the option
       points += this.calculateTotalPoints(chosenOption);
 
-      // Add bonus points based on previous beat outcome
-      if (previousBeat?.resolution) {
-        const previousBeatPoints = this.getPointsFromPreviousBeat(
-          previousBeat.resolution as ResolutionChallenge
-        );
-        points += previousBeatPoints;
+      // Add bonus points based on previous resolution
+      if (previousResolution) {
+        const previousStepResolutionPoints =
+          this.getPointsFromPreviousResolution(previousResolution);
+        points += previousStepResolutionPoints;
         console.log(
-          `[OutcomeService] Previous beat outcome (${previousBeat.resolution}): ${previousBeatPoints} points`
+          `[OutcomeService] Previous resolution (${previousResolution}): ${previousStepResolutionPoints} points`
         );
       }
     }
@@ -114,6 +113,7 @@ export class BeatResolutionService {
     /*
      * Move points from one category to another
      * Returns the new distribution and the number of points left
+     * Only full multiples of pointsPerShift can be shifted
      */
     let result = { ...distribution };
     let pointsLeft = points;
@@ -129,15 +129,25 @@ export class BeatResolutionService {
       pointsPerShift = from === "unfavorable" ? 2 : 1;
     }
 
-    const adjustment = Math.min(
-      Math.floor(pointsLeft / pointsPerShift),
-      // If we are shifting to two categories, adjustment represents how much we add to both categories
-      result[from] /
-        (to === "favorable-mixed" || to === "mixed-unfavorable" ? 2 : 1)
+    // Calculate how many full shifts we can make based on available points
+    const maxShiftsFromPoints = Math.floor(pointsLeft / pointsPerShift);
+
+    // Calculate how many shifts we can make based on source category availability
+    const isDoubleShift =
+      to === "favorable-mixed" || to === "mixed-unfavorable";
+    const maxShiftsFromSource = Math.floor(
+      result[from] / (isDoubleShift ? 2 : 1)
     );
-    result[from] -=
-      adjustment *
-      (to === "favorable-mixed" || to === "mixed-unfavorable" ? 2 : 1);
+
+    // Take the minimum of the two constraints
+    const adjustment = Math.min(maxShiftsFromPoints, maxShiftsFromSource);
+
+    // Calculate exactly how many points will be used
+    const pointsUsed = adjustment * pointsPerShift;
+
+    // Update the distribution
+    result[from] -= adjustment * (isDoubleShift ? 2 : 1);
+
     if (to === "favorable-mixed") {
       result.favorable += adjustment;
       result.mixed += adjustment;
@@ -147,7 +157,8 @@ export class BeatResolutionService {
     } else {
       result[to] += adjustment;
     }
-    pointsLeft -= adjustment * pointsPerShift;
+
+    pointsLeft -= pointsUsed;
 
     console.log(
       `[OutcomeService] Shifted ${adjustment} %-points from ${from} to ${to}. ${pointsLeft}/${points} points left.`
@@ -410,8 +421,8 @@ export class BeatResolutionService {
   /**
    * Get bonus points based on the previous beat's outcome
    */
-  private static getPointsFromPreviousBeat(
-    previousResolution: ResolutionChallenge
+  private static getPointsFromPreviousResolution(
+    previousResolution: Resolution
   ): number {
     switch (previousResolution) {
       case "favorable":
@@ -420,7 +431,21 @@ export class BeatResolutionService {
         return 0; // No advantage or disadvantage
       case "unfavorable":
         return -50; // Significant disadvantage
+      // Contest resolutions are already mapped to favorable/mixed/unfavorable
+      // in the Story.getThreadLastStepResolution method
+      case "sideAWins":
+      case "sideBWins":
+      case "resolution1":
+      case "resolution2":
+      case "resolution3":
+        console.log(
+          `[BeatResolutionService] Previous resolution: ${previousResolution}). THIS SHOULD NEVER HAPPEN.`
+        );
+        return 0;
       default:
+        console.log(
+          `[BeatResolutionService] Previous resolution: ${previousResolution}. THIS SHOULD NEVER HAPPEN.`
+        );
         return 0;
     }
   }

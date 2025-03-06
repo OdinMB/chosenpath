@@ -5,31 +5,43 @@ import {
 } from "./StoryStatePromptService.js";
 
 export class SwitchPromptService {
-  private static readonly SECTIONS: SectionConfig = {
+  private static readonly SECTIONS_GAME_STATE: SectionConfig = {
     gameMode: true,
     guidelines: true,
     storyElements: true,
     worldFacts: true,
     sharedOutcomes: true,
     sharedStats: true,
-    imageLibrary: false,
     players: true,
     storyProgress: true,
-    switchConfiguration: false,
-    threadConfiguration: false,
-    previousThreadConfiguration: true,
   } as const;
+
+  private static readonly SECTIONS_PREVIOUS_THREAD: SectionConfig = {
+    previousThreadConfiguration: true,
+  };
 
   static createSwitchAnalysisPrompt(story: Story): string {
     const prompt =
-      StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
-      this.createInstructionsSection();
+      this.createContextSection() +
+      "\n" +
+      "======= CURRENT GAME STATE =======\n" +
+      StoryStatePromptService.createStoryStatePrompt(
+        story,
+        this.SECTIONS_GAME_STATE
+      ) +
+      "\n\n" +
+      this.createInstructionsSection() +
+      "\n\n" +
+      StoryStatePromptService.createStoryStatePrompt(
+        story,
+        this.SECTIONS_PREVIOUS_THREAD
+      );
     console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
-  private static createInstructionsSection(): string {
-    return `\n\n======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
+  private static createContextSection(): string {
+    return `CONTEXT
 
 Beats
 are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
@@ -55,6 +67,11 @@ Flavor switches: When the focused outcome for the next thread is already defined
 Thread sequencing
 A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.
 It is time to create the next switch to this sequence.
+`;
+  }
+
+  private static createInstructionsSection(): string {
+    return `\n\n======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
 
 Follow these steps:
 

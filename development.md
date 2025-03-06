@@ -6,8 +6,13 @@ More structured threads
 
 Clean-up
 
-- +50/0/-50 effect based on previous beat on player level or step resolution on thread level?
-- Add exploratory threads back in (BeatResolutionService, ThreadResolutionService)
+- Make last beat texts available again in beat prompt
+- How to add milestones to outcomes?
+  determineThreadResolutions or as a change in beats
+  => change in beats (give instructions to adjust the exact phrasing based on thread resolution and beat text)
+- Add exploratory threads back in
+  - BeatResolutionService, ThreadResolutionService
+  - getThreadResolution
 
 Improvements
 
@@ -20,7 +25,6 @@ Improvements
 - Attach facts to players?
 - More efficient prompts for switches/threads/beats?
   - only relevant parts
-  - Context stuff first, switch/thread configurations last
   - switches/threads much simpler for single-player games
   - beat planning: turn "which stats affect consequences" into "whatever affects consequences narratively"?
 - adjust scope of story setup based on the number of beats
@@ -28,6 +32,7 @@ Improvements
 
 New features
 
+- Library of stories with pre-configured setups
 - Difficulty level (affecting base points)
 - Limited tokens to see option stats (costs more for later beats in a thread)
 - Titles for stories (show in resume story section in Welcome screen)

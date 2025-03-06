@@ -5,18 +5,10 @@ import type {
   OperationErrorEvent,
 } from "../types/queue.js";
 import type { PlayerSlot } from "shared/types/player.js";
-import { getThreadType } from "shared/types/thread.js";
-import type {
-  Resolution,
-  Thread,
-  ThreadType,
-  ThreadAnalysis,
-} from "shared/types/thread.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "./Story.js";
-import type { StoryState, StoryPhase } from "shared/types/story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 
 export interface QueueEvents {
@@ -116,36 +108,53 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         gameId
       );
 
-      let updatedStory = story;
+      let updatedStory = story.clone();
 
-      // If the current thread is not completed, determine the resolutions for the previous set of beats
+      // If the current thread is not resolved, determine the resolutions for the previous set of beats
       if (
-        story.getCurrentBeatType() === "thread" &&
-        !story.isCurrentThreadCompleted()
+        updatedStory.getCurrentBeatType() === "thread" &&
+        !updatedStory.isCurrentThreadResolved()
       ) {
         console.log(
           "[GameQueueProcessor] Determining resolutions for previous set of beats"
         );
         updatedStory = await this.determineThreadResolutions(updatedStory);
+
+        console.log(
+          `[GameQueueProcessor] After resolution - Is current thread resolved: ${updatedStory.isCurrentThreadResolved()}`
+        );
       }
 
       // Determine next beat type and prepare state
-      const currentBeatType = story.determineNextBeatType();
+      console.log("Determining next beat type to create");
+      const nextBeatTypeToCreate = updatedStory.determineNextBeatType();
+
+      console.log(
+        `[GameQueueProcessor] Next beat type to create: ${nextBeatTypeToCreate}`
+      );
 
       // Preparatory steps before beat generation
-      if (currentBeatType === "switch") {
+      if (nextBeatTypeToCreate === "switch") {
         console.log("[GameQueueProcessor] Generating switches");
-        updatedStory = await this.aiStoryGenerator.generateSwitches(story);
+        updatedStory = await this.aiStoryGenerator.generateSwitches(
+          updatedStory
+        );
       } else if (
-        currentBeatType === "thread" &&
+        nextBeatTypeToCreate === "thread" &&
         updatedStory.getCurrentThreadBeatsCompleted() === 0
       ) {
         console.log("[GameQueueProcessor] Generating threads");
-        updatedStory = await this.aiStoryGenerator.generateThreads(story);
+        updatedStory = await this.aiStoryGenerator.generateThreads(
+          updatedStory
+        );
       }
 
       // Generate beats and list of beats needing images
       console.log("[GameQueueProcessor] Generating beats");
+      console.log(
+        `[GameQueueProcessor] Current turn: ${updatedStory.getCurrentTurn()}`
+      );
+
       const [nextStory, changes, beatsNeedingImages] =
         await this.aiStoryGenerator.generateBeats(updatedStory);
 
@@ -233,17 +242,18 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     const currentBeat = story.getCurrentBeat(playerSlot);
 
     // Only process if the option is a success/failure type
-    if (currentBeat.options[optionIndex].optionType !== "challenge") {
+    if (currentBeat.options[optionIndex].optionType === "exploration") {
       return story;
     }
 
-    // Get the previous beat for this player (if any)
-    const previousBeat = story.getPreviousBeat(playerSlot);
+    // Get the thread's last step resolution for this player
+    const threadLastStepResolution =
+      story.getCurrentThreadLastStepResolution(playerSlot);
 
     // Process the beat resolution
     const beatResolution = BeatResolutionService.getBeatResolution(
       currentBeat,
-      previousBeat
+      threadLastStepResolution
     );
 
     return story.updateBeatResolution(playerSlot, beatResolution);
@@ -254,34 +264,51 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       "[GameQueueProcessor] Starting thread resolution determination"
     );
 
-    const threadAnalysis = story.getCurrentThreadAnalysis();
+    let updatedStory: Story = story.clone();
+
+    const threadAnalysis = updatedStory.getCurrentThreadAnalysis();
     if (!threadAnalysis) {
       console.log(
-        "[GameQueueProcessor] No thread analysis found, returning story unchanged"
+        "[GameQueueProcessor] ERROR: No thread analysis found, returning story unchanged"
       );
       return story;
     }
 
-    let updatedStory: Story = story.clone();
-    // Process each thread to determine its resolution and milestone
-    threadAnalysis.threads.forEach((thread) => {
+    // Process each thread to determine its next step's resolution
+    for (const thread of threadAnalysis.threads) {
       // Determine the resolution for this thread
       const resolution = ThreadResolutionService.getThreadResolution(
         thread,
-        story
+        updatedStory
+      );
+
+      console.log(
+        `[GameQueueProcessor] Determined resolution for thread ${thread.id}: ${resolution}`
       );
 
       updatedStory = updatedStory.updateThreadResolution(thread, resolution);
+    }
 
-      // If the previous beat was the last beat in the thread: set the milestone
-      if (story.isCurrentThreadCompleted()) {
+    // If the threads are resolved, set the milestones
+    if (updatedStory.isCurrentThreadResolved()) {
+      console.log(
+        "[GameQueueProcessor] Threads are resolved, setting milestones"
+      );
+
+      const updatedThreadAnalysis = updatedStory.getCurrentThreadAnalysis();
+      for (const thread of updatedThreadAnalysis.threads) {
         const milestone = ThreadResolutionService.getMilestone(
           thread,
-          resolution
+          thread.resolution
         );
+
+        console.log(
+          `[GameQueueProcessor] Setting milestone for thread ${thread.id}: ${milestone}`
+        );
+
         updatedStory = updatedStory.updateThreadMilestone(thread, milestone);
       }
-    });
+    }
 
     return updatedStory;
   }

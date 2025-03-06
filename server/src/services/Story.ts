@@ -3,23 +3,19 @@ import {
   ClientStoryState,
   GameMode,
   Guidelines,
+  StoryPhase,
+  PlayerState,
 } from "shared/types/story.js";
-import { PlayerCount } from "shared/types/player.js";
+import { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { StoryElement } from "shared/types/storyelement.js";
 import { Outcome } from "shared/types/outcome.js";
 import { Stat } from "shared/types/stat.js";
-import { BeatType } from "shared/types/beat.js";
+import { Beat, BeatType } from "shared/types/beat.js";
 import { SwitchAnalysis } from "shared/types/switch.js";
-import { ThreadAnalysis } from "shared/types/thread.js";
-import { PlayerSlot } from "shared/types/player.js";
-import { StoryPhase, PlayerState } from "shared/types/story.js";
-import { ImageLibrary } from "shared/types/image.js";
-import { Beat } from "shared/types/beat.js";
-import { Resolution } from "shared/types/thread.js";
+import { ThreadAnalysis, Thread, Resolution } from "shared/types/thread.js";
+import { Image, ImageLibrary } from "shared/types/image.js";
 import { Change } from "shared/types/change.js";
 import { ChangeService } from "./ChangeService.js";
-import { Image } from "shared/types/image.js";
-import { Thread } from "shared/types/thread.js";
 
 /**
  * Comprehensive manager for story state
@@ -150,7 +146,7 @@ export class Story {
     const filteredState = JSON.parse(JSON.stringify(this.state));
 
     // Only include the specific player's data
-    const playerData = this.state.players[playerSlot];
+    const playerData = filteredState.players[playerSlot];
 
     // Filter out hidden player stats
     playerData.characterStats = playerData.characterStats.filter(
@@ -197,7 +193,7 @@ export class Story {
     filteredState.players = { [playerSlot]: playerData };
 
     // Filter out hidden shared stats
-    filteredState.sharedStats = this.state.sharedStats.filter(
+    filteredState.sharedStats = filteredState.sharedStats.filter(
       (stat) => stat.isVisible !== false
     );
 
@@ -206,7 +202,7 @@ export class Story {
 
     // Remove other players' codes
     filteredState.playerCodes = {
-      [playerSlot]: this.state.playerCodes[playerSlot],
+      [playerSlot]: filteredState.playerCodes[playerSlot],
     };
 
     // Pick only the properties we want to send
@@ -269,16 +265,17 @@ export class Story {
   determineNextBeatType(): BeatType {
     const lastBeatType = this.getCurrentBeatType();
 
+    console.log(
+      `[Story] determineNextBeatType - lastBeatType: ${lastBeatType}, isCurrentThreadResolved: ${this.isCurrentThreadResolved()}`
+    );
+
     let nextBeatType: BeatType = "intro";
 
     if (lastBeatType === "intro") {
       nextBeatType = "switch";
     } else if (lastBeatType === "switch") {
       nextBeatType = "thread";
-    } else if (
-      lastBeatType === "thread" &&
-      this.getCurrentThreadDuration() === this.getCurrentThreadBeatsCompleted()
-    ) {
+    } else if (lastBeatType === "thread" && this.isCurrentThreadResolved()) {
       // Check if we should end the story
       if (this.getCurrentTurn() >= this.state.maxTurns) {
         nextBeatType = "ending";
@@ -289,7 +286,7 @@ export class Story {
       nextBeatType = "thread";
     }
 
-    console.log("[StoryManager] Next beat type:", nextBeatType);
+    console.log("[Story] Next beat type:", nextBeatType);
     return nextBeatType;
   }
   private isSwitchAnalysis(phase: StoryPhase | null): phase is SwitchAnalysis {
@@ -339,7 +336,82 @@ export class Story {
     return firstThread.progression.filter((step) => step.resolution !== null)
       .length;
   }
-  isCurrentThreadCompleted(): boolean {
+  getCurrentThreadLastStepResolution(
+    playerSlot: PlayerSlot
+  ): Resolution | null {
+    const threadAnalysis = this.getCurrentThreadAnalysis();
+    if (!threadAnalysis || threadAnalysis.threads.length === 0) {
+      return null;
+    }
+
+    // Find the current thread
+    const currentThread = threadAnalysis.threads.find((thread) => {
+      // For challenge threads, check if player is in playersSideA
+      if (thread.playersSideA.includes(playerSlot)) {
+        return true;
+      }
+      // For contest threads, check if player is in either side
+      if (thread.playersSideB.includes(playerSlot)) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (!currentThread) {
+      return null;
+    }
+
+    // Get the last completed step
+    const completedSteps = currentThread.progression.filter(
+      (step) => step.resolution !== null
+    );
+
+    if (completedSteps.length === 0) {
+      return null;
+    }
+
+    const lastStep = completedSteps[completedSteps.length - 1];
+
+    // For contest threads, map the resolution based on which side the player is on
+    if (currentThread.playersSideB.length > 0) {
+      // This is a contest thread
+      if (currentThread.playersSideA.includes(playerSlot)) {
+        // Player is on side A
+        switch (lastStep.resolution) {
+          case "sideAWins":
+            return "favorable";
+          case "mixed":
+            return "mixed";
+          case "sideBWins":
+            return "unfavorable";
+          default:
+            return null;
+        }
+      } else if (currentThread.playersSideB.includes(playerSlot)) {
+        // Player is on side B
+        switch (lastStep.resolution) {
+          case "sideAWins":
+            return "unfavorable";
+          case "mixed":
+            return "mixed";
+          case "sideBWins":
+            return "favorable";
+          default:
+            return null;
+        }
+      }
+    } else {
+      // This is a challenge thread, return the resolution directly
+      return lastStep.resolution;
+    }
+
+    return null;
+  }
+  isCurrentThreadResolved(): boolean {
+    console.log(
+      `[Story] isCurrentThreadResolved. steps completed: ${this.getCurrentThreadBeatsCompleted()} >= thread duration: ${this.getCurrentThreadDuration()}`
+    );
     return (
       this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
     );
@@ -369,6 +441,10 @@ export class Story {
     // Get the current step index that needs to be updated
     const currentStepIndex = this.getCurrentThreadBeatsCompleted();
 
+    console.log(
+      `[Story] Updating thread ${thread.id} resolution at step ${currentStepIndex} to ${resolution}`
+    );
+
     // Update the thread with the resolution
     const updatedThread = this.updateThreadWithResolution(
       thread,
@@ -376,20 +452,10 @@ export class Story {
       currentStepIndex
     );
 
-    console.log(
-      `[Story] Updated thread: ${JSON.stringify(updatedThread, null, 2)}`
-    );
-
     // Update the thread analysis and story state
     return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
   }
 
-  /**
-   * Updates the milestone for a thread
-   * @param thread The thread to update
-   * @param milestone The milestone to set
-   * @returns Updated Story instance
-   */
   updateThreadMilestone(thread: Thread, milestone: string): Story {
     const threadAnalysis = this.getCurrentThreadAnalysis();
     if (!threadAnalysis) {
@@ -403,21 +469,10 @@ export class Story {
       milestone,
     };
 
-    console.log(
-      `[Story] Updated thread: ${JSON.stringify(updatedThread, null, 2)}`
-    );
-
     // Update the thread analysis and story state
     return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
   }
 
-  /**
-   * Helper method to update a thread with a resolution
-   * @param thread The thread to update
-   * @param resolution The resolution to set
-   * @param stepIndex The index of the step to update
-   * @returns Updated Thread
-   */
   private updateThreadWithResolution(
     thread: Thread,
     resolution: Resolution,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-const standardResolutionsSchema = z
+const challengeResolutionsSchema = z
   .object({
     favorable: z
       .string()
@@ -17,7 +17,7 @@ const standardResolutionsSchema = z
   })
   .describe("Use this for outcomes that can succeed or fail.");
 
-const contestedResolutionsSchema = z
+const contestResolutionsSchema = z
   .object({
     sideAWins: z.string().describe("Resolution of side A winning."),
     sideBWins: z.string().describe("Resolution of side B winning."),
@@ -25,7 +25,7 @@ const contestedResolutionsSchema = z
   })
   .describe("Use this for outcomes that are contested between players.");
 
-const exploratoryResolutionsSchema = z
+const explorationResolutionsSchema = z
   .object({
     resolution1: z.string(),
     resolution2: z.string(),
@@ -45,9 +45,9 @@ export const outcomeSchema = z
     question: z.string().describe("Question that defines the outcome"),
     possibleResolutions: z
       .union([
-        standardResolutionsSchema,
-        contestedResolutionsSchema,
-        exploratoryResolutionsSchema,
+        challengeResolutionsSchema,
+        contestResolutionsSchema,
+        explorationResolutionsSchema,
       ])
       .describe("Possible resolutions for this outcome"),
     resonance: z
@@ -71,7 +71,5 @@ export const outcomeSchema = z
       "Shared competitive: 'Which player gains control of the artifact?'\n" +
       "Questions and options must be specific and depend on player choices."
   );
-
-export const outcomesSchema = z.array(outcomeSchema);
 
 export type Outcome = z.infer<typeof outcomeSchema>;

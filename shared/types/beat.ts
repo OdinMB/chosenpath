@@ -173,7 +173,7 @@ export const createSetOfBeatGenerationSchema = (
     statsAffectingDecisionConsequences: z
       .array(z.string())
       .describe(
-        "List of both individual and shared stats that seem relevant for deciding the consequences of player actions in the previous beat. Includes: stats affecting the chance of success, the scope of what is happening, and how the consequences play out."
+        "List of stats (individual and shared) that are relevant for deciding the consequences of player actions in the previous beat. Whether actions were successful or not (if that's relevant) has already been determined. This is about a) any costs involved in making a choice, b) any dispositions or alignments that might change in virtue of the player's choice, c) any consequences that happen because of players' choices. For each item, list the stat id and its effect on the consequences of players' decisions in the last beat."
       ),
     statChanges: z
       .array(statChangeSchema)

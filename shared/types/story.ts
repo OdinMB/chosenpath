@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ImageLibrary } from "./image.js";
 import { BeatHistory } from "./beat.js";
 import { statsSchema, statSchema } from "./stat.js";
-import { outcomesSchema } from "./outcome.js";
+import { outcomeSchema, Outcome } from "./outcome.js";
 import {
   PLAYER_SLOTS,
   ExactPlayerMap,
@@ -61,9 +61,11 @@ export const guidelinesSchema = z
 
 export const playerStateGenerationSchema = z.object({
   character: PCSchema,
-  outcomes: outcomesSchema.describe(
-    "Individual outcomes that (together with shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
-  ),
+  outcomes: z
+    .array(outcomeSchema)
+    .describe(
+      "Individual outcomes that (together with shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
+    ),
   characterStats: z
     .array(statSchema)
     .describe("Stats belonging to this player character"),
@@ -89,9 +91,11 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
     .object({
       guidelines: guidelinesSchema,
       storyElements: StoryElementsSchema,
-      sharedOutcomes: outcomesSchema.describe(
-        "Shared outcomes that (together with individual outcomes) will make up the endings of the story for all players. Can include both shared goals and questions that players compete over. No intermediate outcomes, only elements of the ending."
-      ),
+      sharedOutcomes: z
+        .array(outcomeSchema)
+        .describe(
+          "Shared outcomes that (together with individual outcomes) will make up the endings of the story for all players. Can include both shared goals and questions that players compete over. No intermediate outcomes, only elements of the ending."
+        ),
       statGroups: statGroupsSchema,
       ...playerSchemas,
       sharedStats: z
@@ -106,7 +110,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
 export type StorySetup<N extends PlayerCount> = {
   guidelines: z.infer<typeof guidelinesSchema>;
   storyElements: z.infer<typeof StoryElementsSchema>;
-  sharedOutcomes: z.infer<typeof outcomesSchema>;
+  sharedOutcomes: Outcome[];
   statGroups: z.infer<typeof statGroupsSchema>;
   sharedStats: z.infer<typeof statSchema>[];
 } & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
@@ -128,7 +132,7 @@ export type StoryState = {
   guidelines: Guidelines;
   storyElements: StoryElement[];
   worldFacts: string[];
-  sharedOutcomes: z.infer<typeof outcomesSchema>;
+  sharedOutcomes: Outcome[];
   sharedStats: z.infer<typeof statsSchema>;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   storyPhases: StoryPhase[];

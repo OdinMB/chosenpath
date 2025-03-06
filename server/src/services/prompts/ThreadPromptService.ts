@@ -12,24 +12,33 @@ export class ThreadPromptService {
     worldFacts: true,
     sharedStats: true,
     sharedOutcomes: true,
-    imageLibrary: false,
     players: true,
-    storyProgress: true,
+    // storyProgress: true,
+  } as const;
+
+  private static readonly SECTIONS_SWITCH: SectionConfig = {
     switchConfiguration: true,
-    threadConfiguration: false,
-    previousThreadConfiguration: false,
   } as const;
 
   static createThreadPrompt(state: Story): string {
     const prompt =
+      this.createContextSection() +
+      "\n\n" +
+      "======= CURRENT GAME STATE =======\n" +
       StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
-      this.createInstructionsSection();
+      "\n\n" +
+      this.createInstructionsSection() +
+      "\n\n" +
+      StoryStatePromptService.createStoryStatePrompt(
+        state,
+        this.SECTIONS_SWITCH
+      );
     console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
-  private static createInstructionsSection(): string {
-    return `\n\nCONTEXT
+  private static createContextSection(): string {
+    return `CONTEXT
 
 Outcomes
 pose questions that define the ending of the story. ("Will [players] unravel the mystery of the dark forest?")
@@ -49,32 +58,14 @@ are a narrative structure of exactly 1 beat. Their purpose is to give the player
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
 They do this by adding a milestone to an outcome. Which milestone is added depends on how the thread unfolds.
-Each beat in a thread results in a favorable, mixed, or unfavorable resolution (or in contested threads: Side A wins, mixed result, Side B wins).
-The resolution of each beat affects the probability distribution of resolutions in the next beat, until finally a milestone for the outcome can is determined after the last beat.
-
-Types of Threads:
-1. Challenge Threads
-- All players work together toward shared goals
-- Resolutions are favorable/mixed/unfavorable
-- Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
-
-2. Contest Threads
-- Players are split into Side A and Side B, competing over an outcome
-- Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
-- Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
-- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")
-
-3. Exploration Threads
-- Players make choices that don't follow a success/failure structure but explore different narrative paths
-- Resolutions are "Option 1"/"Option 2"/"Option 3" representing different choices or directions
-- Example milestones (one will be added to the outcome at the end of the thread): "[player] takes over the family hotel", "[player] helps at the family hotel while doing occassional photography jobs", "[player] is no longer engaged in the family business"
-- Use for character development, moral dilemmas, or when multiple valid paths exist without clear "better" or "worse" options
 
 Story structure
 A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.
-It is time to create the next thread to this sequence for all players.
+It is time to create the next thread to this sequence for all players.`;
+  }
 
-======= YOUR JOB: GENERATE THE NEXT THREAD (OR SET OF THREADS) TO MOVE THE STORY FORWARD =======
+  private static createInstructionsSection(): string {
+    return `======= YOUR JOB: GENERATE THE NEXT THREAD (OR SET OF THREADS) TO MOVE THE STORY FORWARD =======
 
 OUTPUT FORMAT
 
@@ -100,16 +91,33 @@ A duration for this thread (or set of threads) between 2-4 beats.
 - Choose a duration that works for all threads
 
 A summary of how you want to set up the threads based on the switch configuration and player choices.
-Examples:
-- Independent threads: Each player gets their own standard thread
-- Cooperative thread: All players are on Side A of a standard thread
-- Contested thread: Players are split between Side A and Side B
-- Mixed setup: Some players cooperate in a standard thread while others compete in a contested thread
-- Exploratory thread: Players face choices with multiple valid paths rather than resolutions that mark success/failure
-For single-player games, there is only one thread.
 
-A list of threads, each with:
-1. Players involved (Side A and, if it's a multiplayer thread over a contested outcome, Side B)
+Possible player configurations:
+- Independent threads: Each player gets their own standard thread
+- Shared threads: All players are in the same thread
+- Mixed setup: Some players are in a joint thread while others are in independent threads.
+For single-player games, there is always only one thread.
+
+Types of Threads:
+1. Challenge Threads
+- One or several players work towards a goal
+- Resolutions are favorable/mixed/unfavorable
+- Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
+- This is the default type of thread. You must have good reasons to use a different type of thread.
+2. Contest Threads
+- Players are split into Side A and Side B, competing over an outcome
+- Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
+- Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
+- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")
+3. Exploration Threads
+- Players make choices that don't follow a success/failure structure. They explore characters (preferences, morality, etc.) or choose among equally valid narrative paths
+- Resolutions are "Resolution 1"/"Resolution 2"/"Resolution 3" representing different choices or directions
+- Example milestones (one will be added to the outcome at the end of the thread): "[player] takes over the family hotel", "[player] helps at the family hotel while doing occassional photography jobs", "[player] is no longer engaged in the family business"
+- Use for character development, or when multiple valid paths exist without clear "better" or "worse" options
+- Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
+
+Create a list of threads, each with:
+1. Players involved (Side A and, if it's a Contest thread, Side B)
 2. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
 3. Possible milestones that might be added to that outcome
    - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
@@ -117,11 +125,11 @@ A list of threads, each with:
 4. A progression of 2-4 beats (matching the duration) that:
    - Builds dramatic tension toward the thread's climax on the last beat
    - For Challenge and Contest threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
+   - For Challenge and Contest threads: Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
    - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
    - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
-   - Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
 
-EXAMPLE 1: 3-BEAT COOPERATIVE THREAD
+EXAMPLE 1: 3-BEAT CHALLENGE THREAD
 Players (Side A): player1, player2
 Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
 Possible Milestones:
@@ -149,7 +157,7 @@ Question: How do [players] search the study without leaving traces?
 Question: The noble returns early! How do [players] handle the situation?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 
-EXAMPLE 2: 2-BEAT CONTESTED THREAD
+EXAMPLE 2: 2-BEAT CONTEST THREAD
 Title: Swaying the Council
 Side A: player1 (supports military action)
 Side B: player2 (advocates for diplomacy)
@@ -176,17 +184,19 @@ Title: Personal Crossroads
 Players: player1
 Outcome: Will Alex choose family or ambition? (with ID player1_family_vs_ambition)
 Possible Milestones:
-- Option 1: "Alex prioritizes family obligations over the job opportunity"
-- Option 2: "Alex finds a compromise that partially satisfies both family and career"
-- Option 3: "Alex pursues the career opportunity despite family disapproval"
+- Resolution 1: "Alex prioritizes family obligations over the job opportunity"
+- Resolution 2: "Alex finds a compromise that partially satisfies both family and career"
+- Resolution 3: "Alex pursues the career opportunity despite family disapproval"
 
 Beat Progression:
 1. Weighing the Options
 Question: How does Alex approach the difficult conversation with family?
-- Option 1: Alex gains deeper understanding of family's perspective
-- Option 2: Alex identifies potential middle ground solutions
-- Option 3: Alex becomes more convinced of the career opportunity's importance
-(Each option provides different context for the final decision without forcing it.)
+- Resolution 1: Alex tries to find out what is important to his family
+- Resolution 2: Alex tries to convince his family that following the job opportunity is a good idea
+- Resolution 3: Alex lies about the job opportunity to make it seem more appealing
+(Each resolution provides different context for the final decision without avoiding it or forcing any particular final resolution.
+Each resolution says something about Alex's character and motivations.
+The beat is not about succeeding or failing, but about exploring Alex's character.)
 
 2. Making the Choice
 Question: What does Alex ultimately prioritize when forced to choose?

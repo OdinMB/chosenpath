@@ -1,4 +1,4 @@
-import { type StoryState, GameModes } from "shared/types/story.js";
+import { GameModes } from "shared/types/story.js";
 import { Story } from "../Story.js";
 
 export interface SectionConfig {
@@ -16,52 +16,55 @@ export interface SectionConfig {
   previousThreadConfiguration?: boolean;
 }
 
-export const DEFAULT_SECTION_CONFIG: SectionConfig = {
-  gameMode: true,
-  guidelines: true,
-  storyElements: true,
-  worldFacts: true,
-  sharedStats: true,
-  sharedOutcomes: true,
-  imageLibrary: true,
-  players: true,
-  storyProgress: true,
-  switchConfiguration: true,
-  threadConfiguration: true,
-  previousThreadConfiguration: false,
-} as const;
-
 export class StoryStatePromptService {
-  static createStoryStatePrompt(
-    story: Story,
-    sections: SectionConfig = DEFAULT_SECTION_CONFIG
-  ): string {
-    const prompt = [
-      "======= CURRENT GAME STATE =======\n",
-      sections.gameMode ? this.createGameModeSection(story) : "",
-      sections.guidelines ? this.createGuidelinesSection(story) : "",
-      sections.storyElements ? this.createStoryElementsSection(story) : "",
-      sections.worldFacts ? this.createWorldFactsSection(story) : "",
-      sections.sharedOutcomes ? this.createSharedOutcomesSection(story) : "",
-      sections.sharedStats ? this.createSharedStatsSection(story) : "",
-      sections.imageLibrary ? this.createImageLibrarySection(story) : "",
-      sections.players ? this.createPlayersSection(story) : "",
-      sections.storyProgress ? this.createStoryProgressSection(story) : "",
-      sections.switchConfiguration ? this.getSwitchConfiguration(story) : "",
-      sections.threadConfiguration
-        ? this.createThreadConfigurationSection("current", story) +
+  static createStoryStatePrompt(story: Story, sections: SectionConfig): string {
+    const promptSections: string[] = [];
+
+    if (sections.gameMode) {
+      promptSections.push(this.createGameModeSection(story));
+    }
+    if (sections.guidelines) {
+      promptSections.push(this.createGuidelinesSection(story));
+    }
+    if (sections.storyElements) {
+      promptSections.push(this.createStoryElementsSection(story));
+    }
+    if (sections.worldFacts) {
+      promptSections.push(this.createWorldFactsSection(story));
+    }
+    if (sections.sharedOutcomes) {
+      promptSections.push(this.createSharedOutcomesSection(story));
+    }
+    if (sections.sharedStats) {
+      promptSections.push(this.createSharedStatsSection(story));
+    }
+    if (sections.imageLibrary) {
+      promptSections.push(this.createImageLibrarySection(story));
+    }
+    if (sections.players) {
+      promptSections.push(this.createPlayersSection(story));
+    }
+    if (sections.storyProgress) {
+      promptSections.push(this.createStoryProgressSection(story));
+    }
+    if (sections.switchConfiguration) {
+      promptSections.push(this.getSwitchConfiguration(story));
+    }
+    if (sections.threadConfiguration) {
+      promptSections.push(
+        this.createThreadConfigurationSection("current", story) +
           `\n\nCURRENT THREAD PROGRESSION: Turn ${
             story.getCurrentThreadBeatsCompleted() + 1
           }/${story.getCurrentThreadDuration()}\n`
-        : "",
-      sections.previousThreadConfiguration
-        ? this.createThreadConfigurationSection("previous", story)
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+      );
+    }
+    if (sections.previousThreadConfiguration) {
+      promptSections.push(
+        this.createThreadConfigurationSection("previous", story)
+      );
+    }
 
-    return prompt;
+    return promptSections.filter(Boolean).join("\n");
   }
 
   private static createGameModeSection(story: Story): string {
@@ -192,7 +195,6 @@ ${modeDescriptions[story.getGameMode()]}
           playerState.beatHistory
         );
         const separator = "#####################################";
-
         return [
           separator,
           `######## PLAYER ID: ${slot} ########`,
@@ -433,80 +435,8 @@ Chosen option: ${choiceText}${resultText}`;
               .join("\n")
           : "";
 
-        // Create a detailed beat progression plan that includes questions and resolutions
-        const detailedProgression = thread.progression
-          .map((step, idx) => {
-            const resolutionText = step.resolution
-              ? ` [Resolution: ${
-                  step.resolution.charAt(0).toUpperCase() +
-                  step.resolution.slice(1)
-                }]`
-              : "";
-            return `- Beat ${idx + 1}: ${step.title} - ${
-              step.question
-            }${resolutionText}`;
-          })
-          .join("\n");
-
         // Get beat choices for this thread
-        const beatChoices = [];
-
-        // Get the beat history for this thread
-        const beatChoicesResult = this.getThreadBeatChoices(
-          thread,
-          story,
-          type
-        );
-
-        const currentBeatInfo = (beatsCompleted: number | undefined) => {
-          // Only show current beat info for current thread configuration
-          if (type !== "current") return "";
-
-          if (beatsCompleted === undefined) return "";
-          const currentBeat = thread.progression[beatsCompleted];
-          if (!currentBeat) return "";
-
-          // Determine outcome type
-          const hasContestedOutcomes =
-            "sideAWins" in currentBeat.possibleResolutions;
-          const hasStandardOutcomes =
-            "favorable" in currentBeat.possibleResolutions;
-          const hasExploratoryOutcomes =
-            "resolution1" in currentBeat.possibleResolutions;
-
-          let outcomes: string[] = [];
-
-          if (hasContestedOutcomes) {
-            outcomes = [
-              `- If Side A wins: ${currentBeat.possibleResolutions["sideAWins"]}`,
-              `- Mixed result: ${currentBeat.possibleResolutions["mixed"]}`,
-              `- If Side B wins: ${currentBeat.possibleResolutions["sideBWins"]}`,
-            ];
-          } else if (hasStandardOutcomes) {
-            outcomes = [
-              `- Favorable: ${currentBeat.possibleResolutions["favorable"]}`,
-              `- Mixed: ${currentBeat.possibleResolutions["mixed"]}`,
-              `- Unfavorable: ${currentBeat.possibleResolutions["unfavorable"]}`,
-            ];
-          } else if (hasExploratoryOutcomes) {
-            outcomes = [
-              `- Option 1: ${currentBeat.possibleResolutions["resolution1"]}`,
-              `- Option 2: ${currentBeat.possibleResolutions["resolution2"]}`,
-              `- Option 3: ${currentBeat.possibleResolutions["resolution3"]}`,
-            ];
-          } else {
-            outcomes = ["- No outcomes defined"];
-          }
-
-          return [
-            `\nCurrent beat (${
-              beatsCompleted + 1
-            }/${story.getCurrentThreadDuration()}): ${currentBeat.title}`,
-            `Question: ${currentBeat.question}`,
-            `Possible outcomes:`,
-            outcomes.join("\n"),
-          ].join("\n");
-        };
+        const beatProgressionItems = this.formatBeatProgression(thread, type);
 
         return [
           `==== THREAD: ${thread.title} (${thread.id}) ====`,
@@ -517,15 +447,8 @@ Chosen option: ${choiceText}${resultText}`;
             : "",
           milestonesSection,
           threadResolutionSection,
-          // Only show beat progression plan for current threads
-          type === "current" ? `\nPlan for beat progression` : "",
-          type === "current" ? detailedProgression : "",
-          beatChoicesResult.length > 0
-            ? `\nBeat progression${
-                type === "previous" ? "" : " so far"
-              }:\n${beatChoicesResult.join("\n")}`
-            : "",
-          currentBeatInfo(story.getCurrentThreadBeatsCompleted()),
+          type === "current" ? `\nBeat progression` : "",
+          beatProgressionItems,
         ]
           .filter(Boolean)
           .join("\n");
@@ -535,105 +458,99 @@ Chosen option: ${choiceText}${resultText}`;
     return `\n======= ${type.toUpperCase()} THREAD CONFIGURATION =======\n\n${threadConfigs}`;
   }
 
-  private static getThreadBeatChoices(
+  private static formatBeatProgression(
     thread: any,
-    story: Story,
-    threadType: "current" | "previous"
-  ): string[] {
-    const beatChoices: string[] = [];
+    type: "current" | "previous"
+  ): string {
+    const beatsCompleted = thread.progression.filter(
+      (beat: any) => beat.resolution !== null
+    ).length;
 
-    // Early return conditions based on thread type
-    if (threadType === "current") {
-      if (story.getCurrentThreadBeatsCompleted() <= 0) {
-        return beatChoices;
-      }
-    } else {
-      if (!story.getPreviousThreadAnalysis()) {
-        return beatChoices;
-      }
+    if (!thread.progression || thread.progression.length === 0) {
+      return "";
     }
 
-    // Find players in this thread
-    const threadPlayers = [...thread.playersSideA, ...thread.playersSideB];
+    // Format each beat in the progression
+    return thread.progression
+      .map((beat: any, index: number) => {
+        const beatNumber = index + 1;
+        const totalBeats = thread.duration;
+        const beatLabel = `Beat ${beatNumber}/${totalBeats}`;
 
-    // Create a map to organize choices by beat number
-    const beatChoicesMap: Record<number, string[]> = {};
-
-    // Get the number of beats based on thread type
-    const beatsCount =
-      threadType === "current"
-        ? story.getCurrentThreadBeatsCompleted()
-        : thread.progression
-        ? thread.progression.length
-        : 0;
-
-    if (beatsCount <= 0) {
-      return beatChoices;
-    }
-
-    // For each player, get their choices in the thread
-    for (const playerId of threadPlayers) {
-      const player = story.getPlayer(playerId);
-      if (!player) continue;
-
-      // Calculate the starting index for the thread in the beat history
-      let threadStartIndex: number;
-
-      if (threadType === "current") {
-        threadStartIndex = player.beatHistory.length - beatsCount;
-      } else {
-        const currentThreadStartIndex =
-          player.beatHistory.length -
-          (story.getCurrentThreadBeatsCompleted() || 0);
-        threadStartIndex = currentThreadStartIndex - beatsCount;
-      }
-
-      // Loop through all beats in the thread
-      for (let i = 0; i < beatsCount; i++) {
-        const beatIndex = threadStartIndex + i;
-        if (beatIndex >= 0 && beatIndex < player.beatHistory.length) {
-          const beat = player.beatHistory[beatIndex];
-          if (beat && beat.options && beat.choice !== undefined) {
-            const resultText = beat.resolution
-              ? ` Result: ${
-                  beat.resolution.charAt(0).toUpperCase() +
-                  beat.resolution.slice(1)
-                }`
-              : "";
-
-            // Initialize the array for this beat if it doesn't exist
-            if (!beatChoicesMap[i]) {
-              beatChoicesMap[i] = [];
-            }
-
-            // Add this player's choice to the appropriate beat
-            beatChoicesMap[i].push(
-              `--- (${playerId}) chose "${
-                beat.options[beat.choice].text
-              }"${resultText}`
-            );
+        // Determine if this is the current or previous beat
+        let beatStatus = "";
+        if (type === "current") {
+          if (index === beatsCompleted) {
+            beatStatus = " (CURRENT BEAT)";
+          } else if (index === beatsCompleted - 1) {
+            beatStatus = " (PREVIOUS BEAT)";
           }
         }
-      }
-    }
 
-    // Convert the map to the format we want
-    for (let i = 0; i < beatsCount; i++) {
-      if (beatChoicesMap[i] && beatChoicesMap[i].length > 0) {
-        // Add the thread step resolution if available
-        const stepResolution = thread.progression[i]?.resolution
-          ? `\n--- Step Resolution: ${
-              thread.progression[i].resolution.charAt(0).toUpperCase() +
-              thread.progression[i].resolution.slice(1)
-            }`
+        // Get resolution text if available
+        const resolutionText = beat.resolution
+          ? `Resolution: ${
+              beat.resolution.charAt(0).toUpperCase() + beat.resolution.slice(1)
+            }.`
           : "";
 
-        beatChoices.push(
-          `- Beat ${i + 1}\n${beatChoicesMap[i].join("\n")}${stepResolution}`
-        );
-      }
-    }
+        // For completed beats, include the resolution description if available
+        let resolutionDescription = "";
+        if (
+          beat.resolution &&
+          beat.possibleResolutions &&
+          beat.resolution in beat.possibleResolutions
+        ) {
+          resolutionDescription = ` ${
+            beat.possibleResolutions[beat.resolution]
+          }`;
+        }
 
-    return beatChoices;
+        // For the current beat, show possible outcomes
+        let outcomesSection = "";
+        if (type === "current" && index === beatsCompleted) {
+          const hasContestedOutcomes = "sideAWins" in beat.possibleResolutions;
+          const hasStandardOutcomes = "favorable" in beat.possibleResolutions;
+          const hasExploratoryOutcomes =
+            "resolution1" in beat.possibleResolutions;
+
+          let outcomes: string[] = [];
+
+          if (hasContestedOutcomes) {
+            outcomes = [
+              `- If Side A wins: ${beat.possibleResolutions["sideAWins"]}`,
+              `- Mixed result: ${beat.possibleResolutions["mixed"]}`,
+              `- If Side B wins: ${beat.possibleResolutions["sideBWins"]}`,
+            ];
+          } else if (hasStandardOutcomes) {
+            outcomes = [
+              `- Favorable: ${beat.possibleResolutions["favorable"]}`,
+              `- Mixed: ${beat.possibleResolutions["mixed"]}`,
+              `- Unfavorable: ${beat.possibleResolutions["unfavorable"]}`,
+            ];
+          } else if (hasExploratoryOutcomes) {
+            outcomes = [
+              `- Option 1: ${beat.possibleResolutions["resolution1"]}`,
+              `- Option 2: ${beat.possibleResolutions["resolution2"]}`,
+              `- Option 3: ${beat.possibleResolutions["resolution3"]}`,
+            ];
+          }
+
+          if (outcomes.length > 0) {
+            outcomesSection = `\nPossible outcomes:\n${outcomes.join("\n")}`;
+          }
+        }
+
+        // Combine all parts
+        return [
+          `- ${beatLabel}${beatStatus}: ${beat.title}`,
+          `Question: ${beat.question}`,
+          resolutionText ? `${resolutionText}${resolutionDescription}` : "",
+          outcomesSection,
+        ]
+          .filter(Boolean)
+          .join("\n");
+      })
+      .join("\n");
   }
 }

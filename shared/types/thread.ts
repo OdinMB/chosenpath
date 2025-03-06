@@ -24,10 +24,17 @@ export type ResolutionChallenge = (typeof RESOLUTION_CHALLENGE)[number];
 export const RESOLUTION_CONTEST = ["sideAWins", "mixed", "sideBWins"] as const;
 export type ResolutionContest = (typeof RESOLUTION_CONTEST)[number];
 
+export const RESOLUTION_EXPLORATION = [
+  "resolution1",
+  "resolution2",
+  "resolution3",
+] as const;
+export type ResolutionExploration = (typeof RESOLUTION_EXPLORATION)[number];
+
 export const RESOLUTION = [
   ...RESOLUTION_CHALLENGE,
   ...RESOLUTION_CONTEST,
-  "exploration",
+  ...RESOLUTION_EXPLORATION,
 ] as const;
 export type Resolution = (typeof RESOLUTION)[number];
 
@@ -56,9 +63,9 @@ const contestMilestonesSchema = z
 // For exploratory threads
 const explorationMilestonesSchema = z
   .object({
-    milestone1: z.string(),
-    milestone2: z.string(),
-    milestone3: z.string(),
+    resolution1: z.string(),
+    resolution2: z.string(),
+    resolution3: z.string(),
   })
   .describe(
     "Possible milestones for threads around character and narrative exploration whose outcomes don't have a success/failure characteristic."
