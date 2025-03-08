@@ -72,7 +72,7 @@ export class AIImageGenerator {
           // Add placeholder to image library
           const placeholderImage: Image = {
             ...imageGen,
-            id: imageGen.id || crypto.randomUUID(),
+            id: imageGen.id,
             prompt: imageGen.prompt || "",
             description: imageGen.description || "",
             status: "generating",
@@ -81,7 +81,7 @@ export class AIImageGenerator {
 
           // Generate actual image
           const imageUrl = await this.generateImage(imageGen.prompt);
-          const imageId = crypto.randomUUID();
+          const imageId = imageGen.id;
 
           updatedStory = updatedStory.updateImage(imageId, {
             url: imageUrl,
