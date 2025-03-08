@@ -164,6 +164,7 @@ Type of stats and what they are good for:
 --- Competing influences (e.g., science|magic, empire|rebellion)
 --- Character dispositions (e.g., cynicism|idealism, logic|empathy)
 --- Devices to keep score for competitive, tug-of-war-like outcomes in multiplayer games(e.g., playerA|playerB territory control)
+--- NOT good if one stat is clearly more benefitial than the other. Bad: "Stability|Chaos" (if the goal is to preserve stability). "Courage|Fear" (if Fear has no benefits or is not a viable path).
 
 - number: Only for countable quantities
 If it cannot be counted, choose another type of stat.
