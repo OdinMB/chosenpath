@@ -7,7 +7,7 @@ import {
   PlayerState,
 } from "shared/types/story.js";
 import { PlayerCount, PlayerSlot } from "shared/types/player.js";
-import { StoryElement } from "shared/types/storyelement.js";
+import { StoryElement } from "shared/types/storyElement.js";
 import { Outcome } from "shared/types/outcome.js";
 import { Stat } from "shared/types/stat.js";
 import { Beat, BeatType } from "shared/types/beat.js";

@@ -3,7 +3,6 @@ import { Story } from "./Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import type { Stat } from "shared/types/stat.js";
 import type { StoryState } from "shared/types/story.js";
-import type { StoryElement } from "shared/types/storyElement.js";
 
 export class ChangeService {
   applyChanges(story: Story, changes: Change[]): Story {

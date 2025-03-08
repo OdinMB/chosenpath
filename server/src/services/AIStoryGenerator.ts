@@ -25,7 +25,6 @@ import { getPlayerSlots } from "shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "shared/types/beat.js";
 import type { BeatsNeedingImages } from "shared/types/image.js";
 import { type GameMode } from "shared/types/story.js";
-import type { StoryElement } from "shared/types/storyElement.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
