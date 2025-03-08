@@ -324,6 +324,12 @@ export class ChangeService {
     const state = story.getState();
 
     if (change.storyElementId === "world") {
+      // Check if the fact already exists in worldFacts
+      if (state.worldFacts.includes(change.fact)) {
+        console.log(`Fact already exists in worldFacts: ${change.fact}`);
+        return story;
+      }
+
       return story.applyChanges({
         worldFacts: [...state.worldFacts, change.fact],
       });
@@ -331,6 +337,14 @@ export class ChangeService {
 
     const updatedElements = state.storyElements.map((element) => {
       if (element.id === change.storyElementId) {
+        // Check if the fact already exists for this story element
+        if (element.facts.includes(change.fact)) {
+          console.log(
+            `Fact already exists for story element ${element.id}: ${change.fact}`
+          );
+          return element;
+        }
+
         return {
           ...element,
           facts: [...element.facts, change.fact],

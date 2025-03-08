@@ -4,9 +4,23 @@ import {
   type ProbabilityDistribution,
   type OptionType,
 } from "shared/types/beat.js";
-import { ResolutionChallenge, Resolution } from "shared/types/thread.js";
+import {
+  ResolutionChallenge,
+  Resolution,
+  ResolutionExploration,
+} from "shared/types/thread.js";
 
 export class BeatResolutionService {
+  static getExplorationBeatResolution(beat: Beat): ResolutionExploration {
+    // For exploration beats, the resolution is based on the option index
+    const resolutionIndex = (beat.choice % 3) + 1;
+    const resolution = `resolution${resolutionIndex}` as ResolutionExploration;
+    console.log(
+      `[BeatResolutionService] Exploration resolution: ${resolution}`
+    );
+    return resolution;
+  }
+
   /**
    * Default probability distribution (33/34/33)
    */
@@ -26,46 +40,46 @@ export class BeatResolutionService {
     unfavorable: 40,
   };
 
-  /**
-   * Process a beat to determine its resolution type
-   */
-  static getBeatResolution(
+  static getChallengeBeatResolution(
     beat: Beat,
     previousResolution: Resolution | null
   ): ResolutionChallenge {
-    console.log(`[OutcomeService] Processing outcome for beat: ${beat.title}`);
+    console.log(
+      `[BeatResolutionService] Processing outcome for beat: ${beat.title}`
+    );
 
     // Get the chosen option
     const chosenOption = beat.options[beat.choice];
-    console.log(`[OutcomeService] Chosen option: "${chosenOption.text}"`);
+    console.log(
+      `[BeatResolutionService] Chosen option: "${chosenOption.text}"`
+    );
 
-    // Default to normal option type if not a success/failure option
-    const optionType =
-      chosenOption.optionType === "challenge"
-        ? chosenOption.riskType
-        : "normal";
-    console.log(`[OutcomeService] Option type: ${optionType}`);
+    if (chosenOption.optionType !== "challenge") {
+      throw new Error("Beat resolution service only supports challenge beats");
+    }
+
+    // Challenge Beats
+    const optionType = chosenOption.riskType;
+    console.log(`[BeatResolutionService] Option type: ${optionType}`);
 
     // Calculate points based on the option and previous beat
     let points = 0;
 
-    if (chosenOption.optionType === "challenge") {
-      // Add base points from the option
-      points += this.calculateTotalPoints(chosenOption);
+    // Add base points from the option
+    points += this.calculateTotalPoints(chosenOption);
 
-      // Add bonus points based on previous resolution
-      if (previousResolution) {
-        const previousStepResolutionPoints =
-          this.getPointsFromPreviousResolution(previousResolution);
-        points += previousStepResolutionPoints;
-        console.log(
-          `[OutcomeService] Previous resolution (${previousResolution}): ${previousStepResolutionPoints} points`
-        );
-      }
+    // Add bonus points based on previous resolution
+    if (previousResolution) {
+      const previousStepResolutionPoints =
+        this.getPointsFromPreviousResolution(previousResolution);
+      points += previousStepResolutionPoints;
+      console.log(
+        `[BeatResolutionService] Previous resolution (${previousResolution}): ${previousStepResolutionPoints} points`
+      );
     }
 
     console.log(
-      `[OutcomeService] Final points for distribution calculation: ${points}`
+      `[BeatResolutionService] Final points for distribution calculation: ${points}`
     );
 
     // Calculate the probability distribution
@@ -74,7 +88,7 @@ export class BeatResolutionService {
     // Determine the outcome
     const resolution = this.determineBeatResolution(distribution);
 
-    console.log(`[OutcomeService] Final resolution:`, resolution);
+    console.log(`[BeatResolutionService] Final resolution:`, resolution);
     return resolution;
   }
 
@@ -161,7 +175,7 @@ export class BeatResolutionService {
     pointsLeft -= pointsUsed;
 
     console.log(
-      `[OutcomeService] Shifted ${adjustment} %-points from ${from} to ${to}. ${pointsLeft}/${points} points left.`
+      `[BeatResolutionService] Shifted ${adjustment} %-points from ${from} to ${to}. ${pointsLeft}/${points} points left.`
     );
 
     return [result, pointsLeft];
@@ -349,7 +363,7 @@ export class BeatResolutionService {
     if (sum !== 100) {
       const diff = 100 - sum;
       console.log(
-        `[OutcomeService] Distribution sum is ${sum}, adjusting by ${diff}`
+        `[BeatResolutionService] Distribution sum is ${sum}, adjusting by ${diff}`
       );
 
       // Add or subtract the difference from the largest value
@@ -358,16 +372,16 @@ export class BeatResolutionService {
         distribution.favorable >= distribution.unfavorable
       ) {
         distribution.favorable += diff;
-        console.log(`[OutcomeService] Adjusted favorable by ${diff}`);
+        console.log(`[BeatResolutionService] Adjusted favorable by ${diff}`);
       } else if (
         distribution.mixed >= distribution.favorable &&
         distribution.mixed >= distribution.unfavorable
       ) {
         distribution.mixed += diff;
-        console.log(`[OutcomeService] Adjusted mixed by ${diff}`);
+        console.log(`[BeatResolutionService] Adjusted mixed by ${diff}`);
       } else {
         distribution.unfavorable += diff;
-        console.log(`[OutcomeService] Adjusted unfavorable by ${diff}`);
+        console.log(`[BeatResolutionService] Adjusted unfavorable by ${diff}`);
       }
     }
   }
@@ -378,19 +392,19 @@ export class BeatResolutionService {
   static calculateTotalPoints(option: ChallengeOption): number {
     // Start with the base points
     let totalPoints = option.basePoints;
-    console.log(`[OutcomeService] Base points: ${totalPoints}`);
+    console.log(`[BeatResolutionService] Base points: ${totalPoints}`);
 
     // Add points from modifiers
     if (option.modifiers) {
       for (const modifier of option.modifiers) {
         totalPoints += modifier.effect;
         console.log(
-          `[OutcomeService] Added modifier: ${modifier.stat} => ${modifier.effect} points`
+          `[BeatResolutionService] Added modifier: ${modifier.stat} => ${modifier.effect} points`
         );
       }
     }
 
-    console.log(`[OutcomeService] Total points: ${totalPoints}`);
+    console.log(`[BeatResolutionService] Total points: ${totalPoints}`);
     return totalPoints;
   }
 
@@ -401,7 +415,7 @@ export class BeatResolutionService {
     distribution: ProbabilityDistribution
   ): ResolutionChallenge {
     const roll = Math.random() * 100;
-    console.log(`[OutcomeService] Random roll: ${roll.toFixed(2)}`);
+    console.log(`[BeatResolutionService] Random roll: ${roll.toFixed(2)}`);
 
     let outcome: ResolutionChallenge;
     if (roll < distribution.favorable) {
@@ -412,9 +426,6 @@ export class BeatResolutionService {
       outcome = "unfavorable";
     }
 
-    console.log(
-      `[OutcomeService] Outcome determined: ${outcome.toUpperCase()}`
-    );
     return outcome;
   }
 

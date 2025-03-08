@@ -4,6 +4,7 @@ import type { ClientStoryState, StoryState } from "shared/types/story.js";
 import { storyRepository } from "./StoryRepository.js";
 import { Story } from "./Story.js";
 import { Server } from "socket.io";
+import { Logger } from "../utils/logger.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -37,10 +38,11 @@ export class ConnectionManager {
   }
 
   createGameSession(storyId: string, userId?: string): void {
-    console.log("[ConnectionManager] Creating game session:", {
+    Logger.ConnectionManager.log("Creating game session:", {
       storyId,
       userId,
     });
+
     this.gameSessions.set(storyId, {
       storyId,
       players: new Map(),
@@ -56,7 +58,7 @@ export class ConnectionManager {
     socket: Socket,
     userId?: string
   ): void {
-    console.log("[ConnectionManager] Adding player:", {
+    Logger.ConnectionManager.log("Adding player:", {
       storyId,
       playerSlot,
       code,
@@ -66,14 +68,14 @@ export class ConnectionManager {
 
     const session = this.gameSessions.get(storyId);
     if (!session) {
-      console.error("[ConnectionManager] Game session not found:", storyId);
+      Logger.ConnectionManager.error("Game session not found:", storyId);
       throw new Error(`Game session ${storyId} not found`);
     }
 
     // Create or update player connection
     const existingPlayer = session.players.get(playerSlot);
     if (existingPlayer) {
-      console.log("[ConnectionManager] Updating existing player connection:", {
+      Logger.ConnectionManager.log("Updating existing player connection:", {
         playerSlot,
         previousSocketCount: existingPlayer.socketIds.size,
       });
@@ -81,7 +83,7 @@ export class ConnectionManager {
       existingPlayer.lastActive = new Date();
       if (userId) existingPlayer.userId = userId;
     } else {
-      console.log("[ConnectionManager] Creating new player connection:", {
+      Logger.ConnectionManager.log("Creating new player connection:", {
         playerSlot,
       });
       session.players.set(playerSlot, {
@@ -126,18 +128,18 @@ export class ConnectionManager {
   async getPlayerByCode(
     code: string
   ): Promise<{ storyId: string; playerSlot: PlayerSlot } | undefined> {
-    console.log("[ConnectionManager] Looking up player by code:", code);
+    Logger.ConnectionManager.log("Looking up player by code:", code);
 
     // Check in-memory mapping first
     const mapping = this.codeMap.get(code);
     if (mapping) {
-      console.log("[ConnectionManager] Found code mapping in memory");
+      Logger.ConnectionManager.log("Found code mapping in memory");
       return mapping;
     }
 
     // If not found, try to find the story file containing this code
-    console.log(
-      "[ConnectionManager] Code not found in memory, searching files..."
+    Logger.ConnectionManager.log(
+      "Code not found in memory, searching files..."
     );
     const result = await this.findStoryByCode(code);
 
@@ -160,7 +162,7 @@ export class ConnectionManager {
       }
     }
 
-    console.log("[ConnectionManager] Code not found in any story");
+    Logger.ConnectionManager.log("Code not found in any story");
     return undefined;
   }
 
@@ -243,7 +245,7 @@ export class ConnectionManager {
   }
 
   registerCode(storyId: string, playerSlot: PlayerSlot, code: string): void {
-    console.log("[ConnectionManager] Registering code:", {
+    Logger.ConnectionManager.log("Registering code:", {
       storyId,
       playerSlot,
       code,
@@ -251,7 +253,7 @@ export class ConnectionManager {
 
     const session = this.gameSessions.get(storyId);
     if (!session) {
-      console.error("[ConnectionManager] Game session not found:", storyId);
+      Logger.ConnectionManager.error("Game session not found:", storyId);
       throw new Error(`Game session ${storyId} not found`);
     }
 
@@ -263,8 +265,8 @@ export class ConnectionManager {
   reconstructFromStoryStates(
     stories: Array<{ storyId: string; state: StoryState }>
   ): void {
-    console.log(
-      "[ConnectionManager] Reconstructing mappings from story states..."
+    Logger.ConnectionManager.log(
+      "Reconstructing mappings from story states..."
     );
 
     stories.forEach(({ storyId, state }) => {
@@ -274,7 +276,7 @@ export class ConnectionManager {
       // Register codes from state
       if (state.playerCodes) {
         Object.entries(state.playerCodes).forEach(([slot, code]) => {
-          console.log("[ConnectionManager] Reconstructing code mapping:", {
+          Logger.ConnectionManager.log("Reconstructing code mapping:", {
             storyId,
             slot,
             code,
@@ -284,70 +286,70 @@ export class ConnectionManager {
       }
     });
 
-    console.log("[ConnectionManager] Finished reconstructing mappings");
+    Logger.ConnectionManager.log("Finished reconstructing mappings");
   }
 
   async verifyCode(
     code: string
   ): Promise<{ state: ClientStoryState | null; error?: string }> {
-    console.log("[ConnectionManager] Verifying code:", code);
+    Logger.ConnectionManager.log("Verifying code:", code);
 
     try {
       const playerInfo = await this.getPlayerByCode(code);
       if (!playerInfo) {
-        console.log("[ConnectionManager] Invalid code:", code);
+        Logger.ConnectionManager.log("Invalid code:", code);
         return { state: null, error: "Invalid code" };
       }
 
-      console.log("[ConnectionManager] Found player info:", playerInfo);
+      Logger.ConnectionManager.log("Found player info:", playerInfo);
 
       const story = await storyRepository.getStory(playerInfo.storyId);
       if (!story) {
-        console.log(
-          "[ConnectionManager] Story state not found for:",
+        Logger.ConnectionManager.log(
+          "Story state not found for:",
           playerInfo.storyId
         );
         return { state: null, error: "Story state not found" };
       }
 
-      console.log(
-        "[ConnectionManager] Found story state, filtering for player:",
+      Logger.ConnectionManager.log(
+        "Found story state, filtering for player:",
         playerInfo.playerSlot
       );
 
       // Filter state for specific player
       const filteredState = story.filterStateForPlayer(playerInfo.playerSlot);
 
-      console.log("[ConnectionManager] Verification successful");
+      Logger.ConnectionManager.log("Verification successful");
       return { state: filteredState };
     } catch (error) {
-      console.error("[ConnectionManager] Error verifying code:", error);
+      Logger.ConnectionManager.error("Error verifying code:", error);
       return { state: null, error: "Failed to verify code" };
     }
   }
 
   async exitStory(socketId: string): Promise<void> {
-    console.log("[ConnectionManager] Exiting story for socket:", socketId);
+    Logger.ConnectionManager.log("Exiting story for socket:", socketId);
 
     const playerInfo = this.getPlayerBySocket(socketId);
     if (!playerInfo) {
-      console.log("[ConnectionManager] No player info found for socket");
+      Logger.ConnectionManager.log("No player info found for socket");
       return;
     }
 
     // Remove socket from connection manager
     this.removeSocket(socketId);
-    console.log("[ConnectionManager] Story exited successfully");
+    Logger.ConnectionManager.log("Story exited successfully");
   }
 
   broadcastStoryUpdate(storyId: string, story: Story): void {
     if (!this.io) {
-      console.error("[ConnectionManager] Socket.IO instance not set");
+      Logger.ConnectionManager.error("Socket.IO instance not set");
       return;
     }
 
-    console.log(
-      "[ConnectionManager] Broadcasting state update for story:",
+    Logger.ConnectionManager.log(
+      "Broadcasting state update for story:",
       storyId
     );
 
@@ -358,7 +360,7 @@ export class ConnectionManager {
       const filteredState = story.filterStateForPlayer(slot);
 
       sockets.forEach((socketId) => {
-        console.log("[ConnectionManager] Sending update to socket:", socketId);
+        Logger.ConnectionManager.log("Sending update to socket:", socketId);
         this.io!.to(socketId).emit("state_update", { state: filteredState });
       });
     });

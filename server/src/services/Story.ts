@@ -60,6 +60,37 @@ export class Story {
   getSharedOutcomes(): Outcome[] {
     return this.state.sharedOutcomes;
   }
+
+  /**
+   * Get an outcome by its ID from both shared outcomes and player outcomes
+   * @param outcomeId The ID of the outcome to retrieve
+   * @returns The outcome with the specified ID, or null if not found
+   */
+  getOutcomeById(outcomeId: string): Outcome | null {
+    // First check shared outcomes
+    const sharedOutcome = this.state.sharedOutcomes.find(
+      (outcome) => outcome.id === outcomeId
+    );
+    if (sharedOutcome) {
+      return sharedOutcome;
+    }
+
+    // Then check player outcomes
+    for (const playerSlot of Object.keys(this.state.players) as PlayerSlot[]) {
+      const player = this.state.players[playerSlot];
+      if (player.outcomes) {
+        const playerOutcome = player.outcomes.find(
+          (outcome) => outcome.id === outcomeId
+        );
+        if (playerOutcome) {
+          return playerOutcome;
+        }
+      }
+    }
+
+    return null;
+  }
+
   getSharedStats(): Stat[] {
     return this.state.sharedStats;
   }
@@ -265,10 +296,6 @@ export class Story {
   determineNextBeatType(): BeatType {
     const lastBeatType = this.getCurrentBeatType();
 
-    console.log(
-      `[Story] determineNextBeatType - lastBeatType: ${lastBeatType}, isCurrentThreadResolved: ${this.isCurrentThreadResolved()}`
-    );
-
     let nextBeatType: BeatType = "intro";
 
     if (lastBeatType === "intro") {
@@ -409,9 +436,6 @@ export class Story {
     return null;
   }
   isCurrentThreadResolved(): boolean {
-    console.log(
-      `[Story] isCurrentThreadResolved. steps completed: ${this.getCurrentThreadBeatsCompleted()} >= thread duration: ${this.getCurrentThreadDuration()}`
-    );
     return (
       this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
     );
@@ -442,7 +466,9 @@ export class Story {
     const currentStepIndex = this.getCurrentThreadBeatsCompleted();
 
     console.log(
-      `[Story] Updating thread ${thread.id} resolution at step ${currentStepIndex} to ${resolution}`
+      `[Story] Updating thread ${thread.id} resolution at step ${
+        currentStepIndex + 1
+      } to ${resolution}`
     );
 
     // Update the thread with the resolution
@@ -657,5 +683,46 @@ export class Story {
         },
       },
     });
+  }
+
+  /**
+   * Gets the beat texts for a specific thread
+   * @param thread The thread to get beat texts for
+   * @returns A record mapping player slots to their beat history for this thread
+   */
+  getThreadBeatTexts(thread: Thread): Record<string, Beat[]> {
+    const result: Record<string, Beat[]> = {};
+
+    // Collect beat texts for all players in the thread
+    [...thread.playersSideA, ...thread.playersSideB].forEach((playerSlot) => {
+      const playerState = this.getPlayer(playerSlot);
+      if (!playerState) return;
+
+      // Get the beat history for this player
+      const beatHistory = playerState.beatHistory || [];
+
+      // Find the beats that belong to this thread
+      // This is a simplification - in a real implementation, you would need to
+      // match beats to thread steps more precisely
+      result[playerSlot] = beatHistory.slice(-thread.duration);
+    });
+
+    return result;
+  }
+
+  /**
+   * Gets the last beat text for each player in a thread
+   * @param thread The thread to get the last beat text for
+   * @returns A record mapping player slots to their last beat in this thread
+   */
+  getThreadLastBeatTexts(thread: Thread): Record<string, Beat | null> {
+    const result: Record<string, Beat | null> = {};
+    const threadBeatTexts = this.getThreadBeatTexts(thread);
+
+    Object.entries(threadBeatTexts).forEach(([playerSlot, beats]) => {
+      result[playerSlot] = beats.length > 0 ? beats[beats.length - 1] : null;
+    });
+
+    return result;
   }
 }

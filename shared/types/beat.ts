@@ -24,7 +24,7 @@ const optionExplorationSchema = z
       ),
   })
   .describe(
-    "Choose this type of option for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
+    "Exploration options. Choose this type for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
   );
 
 const optionChallengeSchema = z
@@ -34,7 +34,7 @@ const optionChallengeSchema = z
     statConsequences: z
       .string()
       .describe(
-        "Instructions for the AI on how to adjust individual or shared stats for activating this option. Examples: uses 10 mana (if players have mana for casting spells), uses a bullet (in games where bullets are scarce and tracked by a stat), adjusts logic/empathy toward logic (if that's a tracked disposition and the choice leans toward empathy). Don't include the results of the player's choice. (Those will be processed later.)"
+        "Instructions for the AI on how to adjust individual or shared stats for activating this option. Examples: uses 10 mana (if players have mana for casting spells), uses a bullet (in games where bullets are scarce and tracked by a stat), adjusts logic/empathy toward logic (if that's a player stat). Don't include the results of the player's choice. (Those will be processed later.)"
       ),
     riskType: z
       .enum(OPTION_TYPES)
@@ -66,7 +66,7 @@ const optionChallengeSchema = z
       ),
   })
   .describe(
-    "Choose this type of option for threads that follow a success/failure or win/lose pattern"
+    "Challenge options. Choose this type for Challenge and Contest threads (with a success/failure or win/lose pattern)"
   );
 
 export const beatTypeSchema = z.enum(["intro", "switch", "thread", "ending"]);
@@ -85,7 +85,7 @@ export const beatPlanSchema = z.object({
   otherBeats: z
     .string()
     .describe(
-      "For multiplayer games: Bullet list with information from other beats in this turn that we must consider for this beat. In single-player games, say 'single-player'. In multiplayer games, if this is the beat for player1, say 'player1'."
+      "For multiplayer games: Bullet list with specific facts and events that occurred in other beats for this turn that you created before this one and that we must consider for this beat. This is important for consistency. In single-player games, say 'single-player'. In multiplayer games, if this is the beat for player1, say 'player1'."
     ),
   worldBuilding: z
     .string()
@@ -108,13 +108,37 @@ export const beatPlanSchema = z.object({
       "List of facts about existing story elements that this beat is going to establish. Include every new detail about NPCs, locations, important item, rumor, mystery, etc. If you want to add a fact to a story element that isn't registered yet, chances are that you should create it. Use 'world' as the story element if you want to add a fact that doesn't belong to any specific story element."
     ),
   optionConsiderations: z
-    .string()
+    .union([
+      z
+        .string()
+        .describe(
+          "Simple string response for special cases. Use 'as in the topic switch configuration' for topic switches or 'ending' for the ending."
+        ),
+      z.object({
+        keyConflictsAndDecisions: z
+          .string()
+          .describe(
+            "How to reinforce the story's key conflicts and focused types of decisions?"
+          ),
+        statsAffectingOptions: z
+          .string()
+          .describe(
+            "Which stats (both individual and shared) should affect the design of the options and how?"
+          ),
+        phaseRequirements: z
+          .string()
+          .describe(
+            "What are the requirements from the current switch/thread configuration?"
+          ),
+        multiplayerCoordination: z
+          .string()
+          .describe(
+            "In multiplayer games: If several players are on the same side, how do you ensure that their options are a) different from each other, b) consistent, and c) coordinated with each other? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: [player name] will lead the neogiation, while [player name 2] will be offered supporting actions."
+          ),
+      }),
+    ])
     .describe(
-      "Answer the following questions:\n- How to reinforce the story's key conflicts and focused types of decisions?\n" +
-        "- Which stats (both individual and shared) should affect the design of the options and how?\n" +
-        "- What are the requirements from the current switch/thread configuration?\n" +
-        "- If these are options for a topic switch, just say 'as in the topic switch configuration'.\n" +
-        "The ending doesn't need any options."
+      "Considerations for designing the options for this beat. Can be either a detailed object with considerations or a simple string for special cases like 'as in the topic switch configuration' or 'ending'."
     ),
 });
 
@@ -129,8 +153,10 @@ export const beatGenerationSchema = z.object({
     .string()
     .describe(
       "Main narrative text for this player.\n" +
-        "- Write 4-5 paragraphs.\n" +
+        "- Write 5-6 paragraphs.\n" +
         "- Use present tense.\n" +
+        "- Start exactly where the previous beat for this player ended.\n" +
+        "- Describe the player's actions and the following events. Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
         "- NEVER introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- AVOID all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
@@ -139,7 +165,7 @@ export const beatGenerationSchema = z.object({
   summary: z
     .string()
     .describe(
-      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[player] gets a cryptiv hint from [npc]'. Good: '[npc] tells [player] that [specific thing]'."
+      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [player name] that [specific thing]'."
     ),
   imageId: z
     .string()
@@ -154,7 +180,7 @@ export const beatGenerationSchema = z.object({
       ])
     )
     .describe(
-      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. For the ending, just leave the array empty."
+      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences."
     ),
 });
 
@@ -173,12 +199,12 @@ export const createSetOfBeatGenerationSchema = (
     statsAffectingDecisionConsequences: z
       .array(z.string())
       .describe(
-        "List of stats (individual and shared) that are relevant for deciding the consequences of player actions in the previous beat. Whether actions were successful or not (if that's relevant) has already been determined. This is about a) any costs involved in making a choice, b) any dispositions or alignments that might change in virtue of the player's choice, c) any consequences that happen because of players' choices. For each item, list the stat id and its effect on the consequences of players' decisions in the last beat."
+        "List of stats (individual and shared) that are relevant for deciding the consequences of player actions in the previous beat. Whether actions were successful or not (if that's relevant) has already been determined. This is about a) any costs involved in making a choice, b) any dispositions or alignments that might change in virtue of the player's choice, c) any consequences that happen because of players' choices. For each item, list the stat id and its effect on the consequences of players' decisions."
       ),
     statChanges: z
       .array(statChangeSchema)
       .describe(
-        "List of stat changes based on players' decisions in the last beat that will be applied to the story state. If this is the first set of beats, just return an empty list."
+        "List of stat changes based on players' decisions in the previous beat that will be applied to the story state. If this is the first set of beats, just return an empty list."
       ),
     ...(canAddMilestones
       ? {

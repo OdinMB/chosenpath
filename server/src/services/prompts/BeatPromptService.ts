@@ -20,8 +20,9 @@ export class BeatPromptService {
   private static getSectionsForContext(story: Story): SectionConfig {
     return {
       switchConfiguration: story.getCurrentBeatType() === "switch",
-      threadConfiguration: story.getCurrentBeatType() === "thread",
-      previousThreadConfiguration:
+      threadConfigurationForThreadBeats:
+        story.getCurrentBeatType() === "thread",
+      threadConfigurationForSwitchBeats:
         (story.getCurrentBeatType() === "switch" ||
           story.getCurrentBeatType() === "ending") &&
         story.getPreviousThreadAnalysis() !== null,
@@ -31,8 +32,8 @@ export class BeatPromptService {
   static createBeatPrompt(story: Story): string {
     const prompt =
       this.createContextSection(story) +
-      "\n\n" +
-      "======= CURRENT GAME STATE =======\n" +
+      "\n" +
+      "======= CURRENT GAME STATE =======\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,
         this.SECTIONS_GAME_STATE
@@ -52,7 +53,7 @@ export class BeatPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.${
       story.getCurrentBeatType() === "thread"
         ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
@@ -72,7 +73,7 @@ ${
       (story.getCurrentBeatType() === "switch"
         ? "There are two types of switches: topic switches and flavor switches.\n" +
           "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
-          "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
+          "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player name] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
           "Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.\n" +
           "- Example: You might determine that the next thread must be about the bounty hunters who are chasing the player. The player might choose between an evasive maneuver, a negotiation, or a direct confrontation.\n"
         : "") +
@@ -99,12 +100,12 @@ How beats work mechanically:
       story.getCurrentBeatType() !== "ending" ? " CONFIGURATION" : ""
     } =======
 
-1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS IN THE LAST BEAT
+1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS IN THE PREVIOUS BEAT
 
 ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no consequences of player actions to process. Just return an empty list."
-    : "For success/failure and sideA vs. sideB threads, we already determined which side won or if the results are favorable/mixed/unfavorable. This section is about identifying other narrative consequences.\n\n" +
+    : "For Challenge and Contest threads, we already determined which side won or if the results are favorable/mixed/unfavorable. This section is about identifying other narrative consequences.\n\n" +
       "Includes stats that affect\n" +
       "- the scope of what is happening narratively. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.\n" +
       "- how the consequences play out narratively. Example: How the player escapes pursuer depends on their stealth. If it's high, they escaped because of cunning. If it's low, there was a bit of luck involved.\n\n" +
@@ -116,14 +117,15 @@ ${
 ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
-    : "- STAT CHANGES based on players' decisions in the last beat\n" +
-      "--- Include stat changes that are part of the instructions of the options that players chose in the last beat. (These instructions represent stat changes that are part of making the choice in the first place, like losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition.)\n" +
+    : "- STAT CHANGES based on players' decisions in the previous beat\n" +
+      "--- Include stat changes that are part of the instructions of the options that players chose in the previous beat. (These instructions represent stat changes that are part of making the choice in the first place, like losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition.)\n" +
       "--- Identify any minor stat changes that are part of the consequences of the players' choices. (These are changes that are not part of making the choice, but rather the result of the choice.) Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
       "--- Changes can affect both the shared stats and the individual stats of each player.\n" +
       "--- For string and string[] types of stats, make sure to set or add values that can be displayed to the player directly (e.g. 'Ring of Protection' instead of 'ring_of_protection').\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
-        ? "- NEW MILESTONES: The previous thread (or set of threads) has ended. For each outcome associated with these concluded threads, decide which milestone best represents the resolution of the thread. Then add that milestone to the outcome with a newMilestone change.\n"
+        ? "- NEW MILESTONES: The previous thread (or set of threads) was just resolved. For each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
+          "--- Adjust the threads' general resolutions based on the thread's narrative to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
         : "")
 }
 
@@ -140,12 +142,17 @@ How to narrate consequences${
 ${
   story.isFirstBeat()
     ? "This step is irrelevant since this is the first beat of the story."
-    : "- The player's decisions in the last beat: mention what happened as a result of that action\n" +
-      "- Same for the decisions of other players, especially if they were in the same thread as this beat's player.\n" +
+    : "- The player's decisions in the previous beat: mention what happened as a result of that action\n" +
+      (story.isMultiplayer()
+        ? "- Same for the decisions of other players, especially if they were in the same thread as this beat's player.\n"
+        : "") +
       "- statChanges you just applied (in so far as this beat's player should be aware of them).\n" +
       "- There should always be clear narrative feedback for players' decisions." +
       (story.getCurrentBeatType() == "switch"
-        ? "\n- Since a thread was just ended, describe the resolution of the thread in detail: milestones that were added to outcomes, how that affects the player (and other players), etc."
+        ? "\n- Since a thread was just resolved, describe the resolution of the thread in detail. Focus on the milestones that were added to outcomes and how that affects the player" +
+          story.isMultiplayer()
+          ? " (and other players)."
+          : "."
         : "")
 }
 
@@ -175,7 +182,7 @@ ${
       story.getCurrentThreadDuration()
         ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
-          "--- Example: Example: In a 3-beat thread, if the question is 'Will [player] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
+          "--- Example: Example: In a 3-beat thread, if the question is 'Will [player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
 ${
   story.isMultiplayer()
@@ -192,7 +199,7 @@ ${gameWorldInstructions}
 
 ${
   story.getCurrentBeatType() !== "ending"
-    ? "What should we consider as we create the options for this beat?\n" +
+    ? "What should we consider as we create the options for this beat? Cover the following points:\n" +
       "- How can we reinforce the story's key conflicts and focused types of decisions?\n" +
       "- Which stats (both individual and shared) should affect the design of the options?\n" +
       "--- Example: If the player has a high charisma stat, they might want to convince someone to help them.\n" +
@@ -202,11 +209,15 @@ ${
       story.getCurrentBeatType() +
       " configuration" +
       (story.getCurrentBeatType() === "thread"
-        ? ", including the plan for the thread progression"
-        : "") +
+        ? ", especially the plan for the thread's progression?"
+        : "?") +
       "?" +
       (story.getCurrentBeatType() === "thread"
-        ? "\n- Make sure that the options push toward the resolution of the thread's question. Don't deviate from the core question that the thread is posing."
+        ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
+          "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
+          (story.isMultiplayer()
+            ? "\n- If several players are on the same side, how do you ensure that their options are different from and both consistent and coordinated with each other? No combination of choices should lead to inconsistencies in the story."
+            : "")
         : "\n- Topic switches already have their options defined in the switch configuration.")
     : ""
 }
@@ -229,10 +240,11 @@ Text
 - The first paragraph
 --- Should continue exactly where the previous beat for this player ended
 --- Describe the immediate consequences of the player's decision.
+--- Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.
 --- Be specific. Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.${
       story.getCurrentBeatType() === "thread" &&
       story.getCurrentThreadBeatsCompleted() > 0
-        ? "\n- If the last beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult."
+        ? "\n- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult."
         : ""
     }${
       story.isMultiplayer()
@@ -283,6 +295,13 @@ ${
           "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
           story.getCurrentBeatType() +
           " in any other way.\n" +
+          (story.isMultiplayer()
+            ? "- If several players are on the same side, their options must be different and both consistent and coordinated with each other.\n" +
+              "--- No combination of choices should lead to inconsistencies in the story.\n" +
+              "--- Example: If players are negotiating, one might make a proposal while another might make compliments, look menacing, or provide supporting information.\n" +
+              "--- Example: If players are in combat, one player might get options to attack directly while another gets options to flank, provide cover, or use supportive abilities.\n" +
+              "--- Example: If players are investigating a scene, one player might get options to examine specific evidence while another gets options to question witnesses or secure the perimeter.\n"
+            : "") +
           "- Be specific.\n" +
           "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
           "--- Bad: 'Confront [NPC] physically'. Good: Specify a concrete action like 'punch [NPC] in the face'.\n" +
@@ -295,7 +314,7 @@ ${
               "--- Use 'challenge' for options in threads with favorable/unfavorable or sideA/sideB outcomes.\n") +
           "- Define stat changes that are a necessary part of choosing the option (if any). Don't include the results of the player's choice. (Those will be processed later.) Example: Using a spell might use up some mana. Making a choice might change a logic/empathy disposition a bit toward empathy.\n" +
           (story.getCurrentBeatType() === "thread"
-            ? "- For threads with favorable/unfavorable or sideA/sideB outcomes, define how the option affects the likelihood of different outcomes\n" +
+            ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
               "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring stats).\n" +
               "--- modifiers: identify stats (individual and shared) that have an effect on the likelihood of success. Example: if the option is to woo an npc and player1_charisma is 70/100, you could assign a modifier of +20. If the group tries to escape the bounty hunters and their spaceship has status 'damaged', you could assign a modifier of -15.\n" +
               "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"

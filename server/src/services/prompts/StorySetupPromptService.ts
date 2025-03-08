@@ -85,7 +85,7 @@ Outcomes
 --- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.
 --- Exploratory outcomes (= anything other than success/failure and win/lose) can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.
 - If an outcome is shared, it should not be repeated as an individual outcome.
---- Example: If the shared (competitive) outcome is "Who will reign over the forst?", there should not be any individual outcome like "Will [player] become the new spirit leader?"
+--- Example: If the shared (competitive) outcome is "Who will reign over the forst?", there should not be any individual outcome like "Will [player name] become the new spirit leader?"
 
 Story elements
 - For NPCs, include their preferred pronouns and motivations.
@@ -127,7 +127,7 @@ Stat guidelines
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
 - No direct outcome progress trackers of any kind!! Outcomes are tracked separately.
---- Exmple: If an outcome is "Does [player] find the murderer of [NPC]?" or "Does [player] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
+--- Exmple: If an outcome is "Does [player name] find the murderer of [NPC]?" or "Does [player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
 - Don't track the number of remaining turns or story beats (tracked separately)
 - Don't track ordinary player decisions (tracked separately))
 - In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)

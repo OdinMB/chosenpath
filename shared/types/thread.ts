@@ -79,7 +79,7 @@ const challengeStepResolutionsSchema = z
     unfavorable: z.string(),
   })
   .describe(
-    "What the different step outcomes in a thread with a success/failure characteristic mean narratively (example for unfavorable: '[player] stumbles and alerts the guards')"
+    "What the different step outcomes in a thread with a success/failure characteristic mean narratively (example for unfavorable: '[player name] stumbles and alerts the guards')"
   );
 
 // For contested multiplayer threads
@@ -101,12 +101,16 @@ const explorationStepResolutionsSchema = z
     resolution3: z.string(),
   })
   .describe(
-    "What the different step outcomes in an exploratory thread mean narratively (example for outcome1: '[player] chooses to talk to [npc]')"
+    "What the different step outcomes in an exploratory thread mean narratively (example for outcome1: '[player name] chooses to talk to [npc]')"
   );
 
 const threadStepSchema = z.object({
   title: z.string().describe("Title of this step"),
-  question: z.string().describe("Question that guides this step's choices"),
+  question: z
+    .string()
+    .describe(
+      "Question that will be answered by the players' choices and that determines the kinds of choices that are available to players. Example: 'How will [player names] close the deal?'"
+    ),
   possibleResolutions: z
     .union([
       challengeStepResolutionsSchema,

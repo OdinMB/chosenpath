@@ -34,7 +34,7 @@ export class ThreadResolutionService {
     console.log(
       `[ThreadResolutionService] Determining exploration thread resolution for ${thread.id}`
     );
-    // for now, just choose whatever the one player in the thread chose
+    // for now, just choose whatever the (hopefully) one player in the thread chose
     const playerSlot = thread.playersSideA[0];
     const step = story.getCurrentBeat(playerSlot);
     return step.resolution;

@@ -10,7 +10,7 @@ import { AIImageGenerator } from "./AIImageGenerator.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "./Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
-
+import { Resolution } from "shared/types/thread.js";
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (event: OperationErrorEvent) => void;
@@ -126,7 +126,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       }
 
       // Determine next beat type and prepare state
-      console.log("Determining next beat type to create");
       const nextBeatTypeToCreate = updatedStory.determineNextBeatType();
 
       console.log(
@@ -204,7 +203,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     // Update story with the new choice
     const updatedStory = story.updateChoice(playerSlot, optionIndex);
 
-    // Process success/failure resolutions if applicable
     const storyWithBeatResolution = this.processBeatResolution(
       updatedStory,
       playerSlot,
@@ -212,7 +210,10 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     );
 
     // Emit state update to update pending players lists
-    this.events.emit("storyUpdated", { gameId, story: updatedStory });
+    this.events.emit("storyUpdated", {
+      gameId,
+      story: storyWithBeatResolution,
+    });
 
     // Queue next operation if all choices are in
     if (storyWithBeatResolution.areAllChoicesSubmitted()) {
@@ -230,32 +231,31 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     playerSlot: PlayerSlot,
     optionIndex: number
   ): Story {
-    // If not a thread beat or no thread analysis, return state unchanged
-    if (
-      story.getCurrentBeatType() !== "thread" ||
-      !story.getCurrentThreadAnalysis() ||
-      story.getCurrentTurn() === 0
-    ) {
-      return story;
-    }
-
     const currentBeat = story.getCurrentBeat(playerSlot);
 
-    // Only process if the option is a success/failure type
+    let beatResolution: Resolution | null = null;
+    // For Exploration Beats, just set the resolution directly
     if (currentBeat.options[optionIndex].optionType === "exploration") {
-      return story;
+      beatResolution =
+        BeatResolutionService.getExplorationBeatResolution(currentBeat);
+    } else {
+      // Get the thread's last step resolution for this player
+      const threadLastStepResolution =
+        story.getCurrentThreadLastStepResolution(playerSlot);
+
+      // Process the beat resolution
+      beatResolution = BeatResolutionService.getChallengeBeatResolution(
+        currentBeat,
+        threadLastStepResolution
+      );
     }
 
-    // Get the thread's last step resolution for this player
-    const threadLastStepResolution =
-      story.getCurrentThreadLastStepResolution(playerSlot);
-
-    // Process the beat resolution
-    const beatResolution = BeatResolutionService.getBeatResolution(
-      currentBeat,
-      threadLastStepResolution
+    console.log(
+      "[GameQueueProcessor] Updating beat resolution for ",
+      playerSlot,
+      "to",
+      beatResolution
     );
-
     return story.updateBeatResolution(playerSlot, beatResolution);
   }
 

@@ -17,7 +17,7 @@ export class ThreadPromptService {
   } as const;
 
   private static readonly SECTIONS_SWITCH: SectionConfig = {
-    switchConfiguration: true,
+    switchWithDecisionsConfiguration: true,
   } as const;
 
   static createThreadPrompt(state: Story): string {
@@ -41,7 +41,7 @@ export class ThreadPromptService {
     return `CONTEXT
 
 Outcomes
-pose questions that define the ending of the story. ("Will [players] unravel the mystery of the dark forest?")
+pose questions that define the ending of the story. ("Will [player names] unravel the mystery of the dark forest?")
 Outcomes can be individual or shared between players.
 Each outcome has 3 possible resolutions.
 
@@ -49,7 +49,7 @@ Milestones
 are added to outcomes at the end of threads. Milestones mark progress toward the outcome's resolution and make some resolutions more likely.
 
 Beats
-are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
 Beats are the smallest narrative unit in the game.
 
 Switches
@@ -110,9 +110,11 @@ Types of Threads:
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
 - Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")
 3. Exploration Threads
-- Players make choices that don't follow a success/failure structure. They explore characters (preferences, morality, etc.) or choose among equally valid narrative paths
+- Players explore their characters (preferences, morality, etc.) or choose among equally valid narrative paths
+- Exploration Threads should not include any challenges or contests.
+- Steps in Exploration Threads should never be about succeeding or failing at something.
 - Resolutions are "Resolution 1"/"Resolution 2"/"Resolution 3" representing different choices or directions
-- Example milestones (one will be added to the outcome at the end of the thread): "[player] takes over the family hotel", "[player] helps at the family hotel while doing occassional photography jobs", "[player] is no longer engaged in the family business"
+- Example milestones (one will be added to the outcome at the end of the thread): "[player name] takes over the family hotel", "[player name] helps at the family hotel while doing occassional photography jobs", "[player name] is no longer engaged in the family business"
 - Use for character development, or when multiple valid paths exist without clear "better" or "worse" options
 - Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
 
@@ -141,20 +143,20 @@ Title: Infiltrating the Noble's Manor
 
 Beat Progression:
 1. Getting Past the Guards
-Question: How do [players] approach the manor's security?
+Question: How do [player names] approach the manor's security?
 - Favorable: The guards are distracted, giving easy access to the manor
-- Mixed: [players] find a way in but the guards are on higher alert
+- Mixed: [player names] find a way in but the guards are on higher alert
 - Unfavorable: The guards are suspicious and increase their patrols
 (Note how the beat progression can continue no matter the resolution of step 1.)
 
 2. Searching the Study
-Question: How do [players] search the study without leaving traces?
-- Favorable: [players] find promising leads and the study remains undisturbed
-- Mixed: [players] find some leads but leave signs of searching
-- Unfavorable: The study is a mess and [players] alert the household
+Question: How do [player names] search the study without leaving traces?
+- Favorable: [player names] find promising leads and the study remains undisturbed
+- Mixed: [player names] find some leads but leave signs of searching
+- Unfavorable: The study is a mess and [player names] alert the household
 
 3. Final Confrontation
-Question: The noble returns early! How do [players] handle the situation?
+Question: The noble returns early! How do [player names] handle the situation?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 
 EXAMPLE 2: 2-BEAT CONTEST THREAD
@@ -169,14 +171,14 @@ Possible Milestones:
 
 Beat Progression:
 1. Opening Arguments
-Question: How do [players] present their initial cases to the council?
+Question: How do [player names] present their initial cases to the council?
 - Side A Wins: Military urgency resonates with the council
 - Mixed: The council remains divided and uncertain
 - Side B Wins: Diplomatic opportunities capture the council's interest
 (Leads to the climax in beat 2 witout preempting the council's final vote.)
 
 2. Final Deliberation
-Question: How do [players] address the council's key concerns?
+Question: How do [player names] address the council's key concerns?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 
 EXAMPLE 3: 2-BEAT EXPLORATORY THREAD

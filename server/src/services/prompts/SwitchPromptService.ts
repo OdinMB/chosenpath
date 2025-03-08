@@ -17,7 +17,7 @@ export class SwitchPromptService {
   } as const;
 
   private static readonly SECTIONS_PREVIOUS_THREAD: SectionConfig = {
-    previousThreadConfiguration: true,
+    threadConfigurationForSwitches: true,
   };
 
   static createSwitchAnalysisPrompt(story: Story): string {
@@ -44,13 +44,13 @@ export class SwitchPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 4-5 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.
 
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
 For each outcome that this thread is about, the thread poses a question: "Which of these possible milestones will be added to that outcome at the end of the thread?"
-- Example: A thread could be about the outcome "Does [player] become a werewolf?". A thread relating to this outcome could pose the question "Does [player] want to become a member of [NPC]'s pack?" Possible milestones could be: "[Player] decides to convince [NPC] to turn them", "[Player] realizes that they don't want to lose their humanity."
+- Example: A thread could be about the outcome "Does [player name] become a werewolf?". A thread relating to this outcome could pose the question "Does [player name] want to become a member of [NPC]'s pack?" Possible milestones could be: "[Player] decides to convince [NPC] to turn them", "[Player] realizes that they don't want to lose their humanity."
 A thread can have one or more players involved. It can pose questions relating to one or more outcomes.
 Each player is linked to a thread. If there are several threads, they happen in parallel.
 
@@ -58,9 +58,9 @@ Switches
 are a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story.
 There are two types of switches: topic switches and flavor switches.
 Topic switches: The player can choose which question is going to be addressed in the next thread.
-- Example: A player might choose between exploring the wastelands (pushing the outcome "Does [player] unravel [mystery]?") and attending a meeting of the resistance (pushing the outcome "Will the resistance be able to take over [city]?").
+- Example: A player might choose between exploring the wastelands (pushing the outcome "Does [player name] unravel [mystery]?") and attending a meeting of the resistance (pushing the outcome "Will the resistance be able to take over [city]?").
 Topic switches can be used to identify a player's priorities. In some cases, that can be a milestone toward an outcome in its own right.
-- Example: If the player chooses between "Ask [NPC] out to a picnic" and "Ask [other NPC] out to a theater play", the choice could be a milestone toward the outcome "Does [player] end up in a relationship?"
+- Example: If the player chooses between "Ask [NPC] out to a picnic" and "Ask [other NPC] out to a theater play", the choice could be a milestone toward the outcome "Does [player name] end up in a relationship?"
 Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.
 - Example: You might determine that the next thread must be about the bounty hunters who are chasing the player. The player might choose between an evasive maneuver, a negotiation, or a direct confrontation.
 
@@ -87,7 +87,7 @@ The following cases are NOT important enough to force an outcome/question pair b
 - It seems like the player would be stupid if they ignored an opportunity. (It's enough to present the opportunity is one of several options of a topic switch.)
 
 b) Priority. Is there any outcome/question pair that must be addressed now to allow all outcomes to be resolved before the story ends?
-- Example: There are only 10 beats left in the story, and the outcome "Does [player] become a famous musician?" only has 1/4 milestones. It must be pushed now to get a resolution before the story ends.
+- Example: There are only 10 beats left in the story, and the outcome "Does [player name] become a famous musician?" only has 1/4 milestones. It must be pushed now to get a resolution before the story ends.
 
 Only mark an outcome/question pair as important for Continuity or Priority if it is forced as a next thread for narrative reasons.
 Player agency in the form of a topic switch is valuable and should not be squandered.

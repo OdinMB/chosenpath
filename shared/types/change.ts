@@ -53,7 +53,7 @@ export const newMilestoneSchema = z.object({
   newMilestone: z
     .string()
     .describe(
-      `One sentence summarizing the event/decision/realization that marks significant progress toward the outcome's resolution. Only use this after a thread has been concluded.`
+      `One sentence summarizing the event/decision/realization that marks significant progress toward the outcome's resolution. Adjust the threads' general resolutions based on the thread's narrative to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'`
     ),
 });
 
