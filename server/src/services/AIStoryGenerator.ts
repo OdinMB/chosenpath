@@ -205,7 +205,9 @@ export class AIStoryGenerator {
       story.getNumberOfPlayers(),
       // canAddMilestones = true only if it's the ending or (a switch and not the beginning of the story)
       story.getCurrentBeatType() === "ending" ||
-        (story.getCurrentBeatType() === "switch" && !story.isFirstBeat())
+        (story.getCurrentBeatType() === "switch" && !story.isFirstBeat()),
+      // multiplayerCoordination = true only if it's a multiplayer game
+      story.isMultiplayer()
     );
     const structuredModel = this.model.withStructuredOutput(schema);
 

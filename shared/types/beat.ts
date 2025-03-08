@@ -123,17 +123,12 @@ export const beatPlanSchema = z.object({
         statsAffectingOptions: z
           .string()
           .describe(
-            "Which stats (both individual and shared) should affect the design of the options and how?"
+            "Which stats (both individual and shared) should affect the design of the options and how? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has spendable resources like mana or money, consider adding an option that uses those resources."
           ),
         phaseRequirements: z
           .string()
           .describe(
             "What are the requirements from the current switch/thread configuration?"
-          ),
-        multiplayerCoordination: z
-          .string()
-          .describe(
-            "In multiplayer games: If several players are on the same side, how do you ensure that their options are a) different from each other, b) consistent, and c) coordinated with each other? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: [player name] will lead the neogiation, while [player name 2] will be offered supporting actions."
           ),
       }),
     ])
@@ -156,7 +151,7 @@ export const beatGenerationSchema = z.object({
         "- Write 5-6 paragraphs.\n" +
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
-        "- Describe the player's actions and the following events. Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.\n" +
+        "- Describe the player's actions following their decision in the previous beat and the consequences of that decision. Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
         "- NEVER introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- AVOID all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
@@ -186,7 +181,8 @@ export const beatGenerationSchema = z.object({
 
 export const createSetOfBeatGenerationSchema = (
   playerCount: PlayerCount,
-  canAddMilestones: boolean = false
+  canAddMilestones: boolean = false,
+  multiplayerCoordination: boolean = false
 ) => {
   const beatSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
@@ -217,6 +213,18 @@ export const createSetOfBeatGenerationSchema = (
       : {
           newMilestones: z.literal(""),
         }),
+    ...(multiplayerCoordination
+      ? {
+          multiplayerCoordination: z
+            .string()
+            .describe(
+              "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: [player name] will get options for proposals in a neogiation, while [player name 2] will get options to shift the atmosphere in the negotiation."
+            ),
+        }
+      : {
+          multiplayerCoordination: z.literal(""),
+        }),
+
     ...beatSchemas,
   };
 

@@ -2,20 +2,20 @@ Smaller and more commits!
 
 # Feature backlog
 
-Improvements
+Improve stat handling
 
-- Improve option consistency between players in the same thread. Maybe even extra-step just for this (instead of optionConsiderations in the individual beat generation)
-- Move newMilestone changes to switch generation (away from beat generation)
-- Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
 - thinking step for each option: which stats could be relevant?
 - stats: one field for narrative instructions, plus one for mechanics? (To be considered in option design and processing consequences)
 - Simplify stat changes: no statModifications as part of options (AI doesn't use them correctly anyway); expand prompt/descriptions for stat changes to be about both making the choice and its consequences
+- beat planning: turn "which stats affect consequences" into "whatever affects consequences narratively"?
+
+Improvements
+
+- Move newMilestone changes to switch generation (away from beat generation)
+- Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
 - For potential results for the last beat of a thread: ask the AI to take the general milestones and make them more specific given how the thread has gone so far
 - Allow shared outcomes only in multiplayer games?
 - Attach facts to players?
-- More efficient prompts for switches/threads/beats?
-  - only relevant parts
-  - beat planning: turn "which stats affect consequences" into "whatever affects consequences narratively"?
 - adjust scope of story setup based on the number of beats
 - Track story elements that a player has NOT been introduced to yet
 
@@ -35,6 +35,7 @@ New features
   - majority vote
   - lottery
   - setting for % players who must have voted to continue)
+- New switch type using this voting mechanism to decide which direction to take among several players (plus instructions for how to resolve draws)
 - Select language
   - different ones for different players
 - User accounts

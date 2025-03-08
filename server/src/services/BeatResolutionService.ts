@@ -341,6 +341,9 @@ export class BeatResolutionService {
 
     // Ensure all values are integers and sum to 100
     this.normalizeDistribution(result);
+    console.log(
+      `[BeatResolutionService] Final distribution: ${JSON.stringify(result)}`
+    );
     return result;
   }
 

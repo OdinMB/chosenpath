@@ -20,17 +20,17 @@ export class ThreadPromptService {
     switchWithDecisionsConfiguration: true,
   } as const;
 
-  static createThreadPrompt(state: Story): string {
+  static createThreadPrompt(story: Story): string {
     const prompt =
       this.createContextSection() +
       "\n\n" +
       "======= CURRENT GAME STATE =======\n" +
-      StoryStatePromptService.createStoryStatePrompt(state, this.SECTIONS) +
+      StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
       "\n\n" +
-      this.createInstructionsSection() +
+      this.createInstructionsSection(story) +
       "\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
-        state,
+        story,
         this.SECTIONS_SWITCH
       );
     console.log("\x1b[36m%s\x1b[0m", prompt);
@@ -64,8 +64,8 @@ A story follows the following structure: Switch, Thread, Switch, Thread, ..., En
 It is time to create the next thread to this sequence for all players.`;
   }
 
-  private static createInstructionsSection(): string {
-    return `======= YOUR JOB: GENERATE THE NEXT THREAD (OR SET OF THREADS) TO MOVE THE STORY FORWARD =======
+  private static createInstructionsSection(story: Story): string {
+    let instructions = `======= YOUR JOB: GENERATE THE NEXT THREAD (OR SET OF THREADS) TO MOVE THE STORY FORWARD =======
 
 OUTPUT FORMAT
 
@@ -88,28 +88,43 @@ A duration for this thread (or set of threads) between 2-4 beats.
 --- Showdowns (e.g. a epic battle, the make-or-break concert of the band, the council session to become the new king)
 --- Transformative events (e.g. ascension ceremonies, magical transformations, a coronation)
 - The duration is the same for all threads in this batch
-- Choose a duration that works for all threads
+- Choose a duration that works for all threads`;
+
+    if (story.isMultiplayer()) {
+      instructions += `
 
 A summary of how you want to set up the threads based on the switch configuration and player choices.
 
 Possible player configurations:
 - Independent threads: Each player gets their own standard thread
 - Shared threads: All players are in the same thread
-- Mixed setup: Some players are in a joint thread while others are in independent threads.
-For single-player games, there is always only one thread.
+- Mixed setup: Some players are in a joint thread while others are in independent threads.`;
+    } else {
+      instructions += `
+
+For single-player games, there is always only one thread.`;
+    }
+
+    instructions += `
 
 Types of Threads:
 1. Challenge Threads
 - One or several players work towards a goal
 - Resolutions are favorable/mixed/unfavorable
 - Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
-- This is the default type of thread. You must have good reasons to use a different type of thread.
+- This is the default type of thread. You must have good reasons to use a different type of thread.`;
+
+    if (story.isMultiplayer()) {
+      instructions += `
 2. Contest Threads
 - Players are split into Side A and Side B, competing over an outcome
 - Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
-- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")
-3. Exploration Threads
+- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")`;
+    }
+
+    instructions += `
+${story.isMultiplayer() ? "3" : "2"}. Exploration Threads
 - Players explore their characters (preferences, morality, etc.) or choose among equally valid narrative paths
 - Exploration Threads should not include any challenges or contests.
 - Steps in Exploration Threads should never be about succeeding or failing at something.
@@ -126,8 +141,12 @@ Create a list of threads, each with:
    - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
 4. A progression of 2-4 beats (matching the duration) that:
    - Builds dramatic tension toward the thread's climax on the last beat
-   - For Challenge and Contest threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
-   - For Challenge and Contest threads: Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
+   - For Challenge ${
+     story.isMultiplayer() ? " and Contest" : ""
+   }threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
+   - For Challenge ${
+     story.isMultiplayer() ? " and Contest" : ""
+   }threads: Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
    - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
    - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
 
@@ -157,7 +176,10 @@ Question: How do [player names] search the study without leaving traces?
 
 3. Final Confrontation
 Question: The noble returns early! How do [player names] handle the situation?
-Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
+
+    if (story.isMultiplayer()) {
+      instructions += `
 
 EXAMPLE 2: 2-BEAT CONTEST THREAD
 Title: Swaying the Council
@@ -179,9 +201,12 @@ Question: How do [player names] present their initial cases to the council?
 
 2. Final Deliberation
 Question: How do [player names] address the council's key concerns?
-Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
+    }
 
-EXAMPLE 3: 2-BEAT EXPLORATORY THREAD
+    instructions += `
+
+EXAMPLE ${story.isMultiplayer() ? "3" : "2"}: 2-BEAT EXPLORATORY THREAD
 Title: Personal Crossroads
 Players: player1
 Outcome: Will Alex choose family or ambition? (with ID player1_family_vs_ambition)
@@ -204,5 +229,7 @@ The beat is not about succeeding or failing, but about exploring Alex's characte
 Question: What does Alex ultimately prioritize when forced to choose?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
+
+    return instructions;
   }
 }

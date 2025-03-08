@@ -49,6 +49,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "We're a group of strangers trying to survive in a giant mole apocalypse...",
         "We're retired imaginary friends trying to solve a murder mystery with our special skills...",
         "We're space cowboys trying to make an honest living in a lawless part of the galaxy...",
+        "We're a group of children books trying to save our library from getting closed down...",
       ],
       competitive: [
         "We're apartment hunters fighting over the last affordable flat in Berlin...",

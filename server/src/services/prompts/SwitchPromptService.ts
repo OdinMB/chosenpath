@@ -3,6 +3,7 @@ import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
+import { GameModes } from "shared/types/story.js";
 
 export class SwitchPromptService {
   private static readonly SECTIONS_GAME_STATE: SectionConfig = {
@@ -30,7 +31,7 @@ export class SwitchPromptService {
         this.SECTIONS_GAME_STATE
       ) +
       "\n\n" +
-      this.createInstructionsSection() +
+      this.createInstructionsSection(story) +
       "\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,
@@ -70,21 +71,24 @@ It is time to create the next switch to this sequence.
 `;
   }
 
-  private static createInstructionsSection(): string {
-    return `\n\n======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
+  private static createInstructionsSection(story: Story): string {
+    let instructions = `\n\n======= YOUR JOB: CONTINUE THE STORY WITH A SWITCH =======
 
 Follow these steps:
 
 1. Determine the story situation for each player
 
-a) Continuity. Based on the last thread (or story setup, if this is the first beat), is there an outcome/question pair that is forced as the focus of the next thread?
+a) Continuity. Based on the ${
+      story.getCurrentTurn() === 0 ? "story setup" : "previous thread"
+    }, is there an outcome/question pair that is forced as the focus of the next thread?
 Consider these cases:
-- The immediate consequences of the last thread must be addressed in the next thread for narrative reasons. Example: If the player just betrayed an NPC, and the NPC launches a revenge operation, the next thread should address the revenge operation.
+- The immediate consequences of the last thread must be addressed in the next thread for narrative reasons. Example: If the player just betrayed an NPC, and the NPC launches a revenge operation, the next beat should address the revenge operation.
 - Events are interfering with the story that cannot be ignored for narrative reasons. Example: If a bomb is about to explode, the next thread must deal with defusing it or escaping.
 - Switching focus would be illogical from a narrative perspective. Example: If the player just avoided dangerous traps to venture further into the mines, the next thread should be about exploring the mines.
 The following cases are NOT important enough to force an outcome/question pair because of Continuity:
 - Something is time-sensitive, but the story can continue without addressing it. (It's enough to present dealing with the issue as one of the options of a topic switch.)
 - It seems like the player would be stupid if they ignored an opportunity. (It's enough to present the opportunity is one of several options of a topic switch.)
+- The player tried to deal with an issue but failed or only succeeded partially. (It's enough to present dealing with the issue again as one of the options of a topic switch.)
 
 b) Priority. Is there any outcome/question pair that must be addressed now to allow all outcomes to be resolved before the story ends?
 - Example: There are only 10 beats left in the story, and the outcome "Does [player name] become a famous musician?" only has 1/4 milestones. It must be pushed now to get a resolution before the story ends.
@@ -94,25 +98,33 @@ Player agency in the form of a topic switch is valuable and should not be squand
 
 c) Decision. Justify your choice of using a flavor switch or a topic switch.
 
-Consider both player outcomes and shared outcomes throughout this process.
+Consider both player outcomes and shared outcomes throughout this process.`;
 
-2. For multiplayer stories, determine switch coordination between players
+    if (story.isMultiplayer()) {
+      instructions += `\n\n2. Determine switch coordination between players
 
-a) Consider the game mode's implications:
-- Cooperative: Prioritize shared outcomes and opportunities for players to help each other
-  Example: Players should often get switches that let them contribute to shared goals
-- Competitive: Focus on personal outcomes and meaningful competition opportunities
-  Example: Players' switches should create interesting points of conflict or resource competition
-- Cooperative-competitive: Balance shared and competing interests
-  Example: Players might need to choose between advancing personal goals or shared objectives
+a) Consider the game mode's implications
+${
+  story.getGameMode() === GameModes.Cooperative
+    ? "This game is marked as Cooperative. Prioritize shared outcomes and opportunities for players to help each other\n  Example: Players should often get switches that let them contribute to shared goals"
+    : ""
+}${
+        story.getGameMode() === GameModes.Competitive
+          ? "This game is marked as Competitive. Focus on personal outcomes and meaningful competition opportunities\n  Example: Players' switches should create interesting points of conflict or resource competition"
+          : ""
+      }${
+        story.getGameMode() === GameModes.CooperativeCompetitive
+          ? "This game is marked as Cooperative-competitive. Balance shared and competing interests\n  Example: Players might need to choose between advancing personal goals or shared objectives"
+          : ""
+      }
 
-b) Analyze potential for player coordination based on:
+b) Analyze potential for player coordination based on
 - Narrative proximity: Are players physically or narratively close enough to interact?
 - Shared stakes: Do players have overlapping interests in any outcomes?
 - Story momentum: Would bringing players together or keeping them separate serve the story better?
 - Game mode alignment: Does the coordination serve the intended cooperative/competitive dynamic?
 
-c) Choose a coordination pattern:
+c) Choose a coordination pattern
 - Grouped thread: All players get flavor switches for the same outcome/question when the story demands their cooperation
   Example: All players must deal with an incoming invasion, but each can choose their approach
 - Opt-in grouping: Players can choose to join a grouped thread with a topic switch.
@@ -122,19 +134,25 @@ c) Choose a coordination pattern:
 
 You can also combine these patterns.
 
-Examples:
+Examples
 - Independent threads + opt-in grouping: player1 and player2 are in independent threads (with a flavor switch) to deal with urgent matters. player3 can decide which player's thread they want to join with a topic switch.
 - Grouped thread to compete over a shared outcome: player1 and player2 are in a grouped thread trying to woo the same NPC. They get flavor switches to decide their approach.
 - In-grouping via an overlap of options: player1 and player2 can both choose how to proceed with a topic switch. Their switches should have one option in common ("Join the expedition"). If they both choose this option, they will be in the same thread.
 
 Follow steps 1a-c for each player, then apply step 2 to determine how their switches should relate to each other.
+`;
+    }
 
-YOUR OUTPUT FORMAT:
+    instructions += `\n\nYOUR OUTPUT FORMAT:
 
 A list of switches, including
 
 1. Switch type (topic/flavor) and justification
-2. Relationship to other switches
+2. Relationship to other switches${
+      story.isMultiplayer()
+        ? ""
+        : ". Since this is a single-player story, you can ignore this step."
+    }
 3. If flavor switch: Outcome/question that will be explored in the next thread
 4. Which players are linked to this thread
 
@@ -161,5 +179,7 @@ The relevant questions are:
 - How much agency can we give the player over which outcome/question will be explored next?
 Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
 `;
+
+    return instructions;
   }
 }
