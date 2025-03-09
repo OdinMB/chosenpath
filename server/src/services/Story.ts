@@ -209,7 +209,7 @@ export class Story {
             // Remove properties specific to challenge options
             if (filteredOption.optionType === "challenge") {
               delete filteredOption.basePoints;
-              delete filteredOption.modifiers;
+              delete filteredOption.modifiersToSuccessRate;
               delete filteredOption.riskType;
             }
 

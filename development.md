@@ -5,6 +5,8 @@ Smaller and more commits!
 Improve stat handling
 
 - how to improve stat definitions at game init?
+  - more structured considerations for narrative/mechanics? threshold_triggers, usage_bonuses, etc. etc.
+  - extra LLM step just for stats?
 - schema-based thinking step for each option: which stats could be relevant?
 - option type enum for schemas? (temptation, resource spent, normal)
 

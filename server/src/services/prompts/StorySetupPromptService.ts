@@ -80,7 +80,7 @@ Outcomes
 ${
   isMultiplayer
     ? "- If an outcome is shared, it should not be repeated as an individual outcome.\n" +
-      "--- Example: If the shared (competitive) outcome is 'Who will reign over the forst?', there should not be any individual outcome like 'Will [player name] become the new spirit leader?'\n"
+      "--- Example: If the shared (competitive) outcome is 'Who will reign over the forst?', there should not be any individual outcome like 'Will [insert player name] become the new spirit leader?'\n"
     : ""
 }
 Story elements
@@ -124,7 +124,7 @@ Stat guidelines
 - Stat names must be specific and mustn't include any placeholders.
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
---- No direct outcome progress trackers of any kind!! Outcomes are tracked separately. Example: If an outcome is "Does [player name] find the murderer of [NPC]?" or "Does [player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
+--- No direct outcome progress trackers of any kind!! Outcomes are tracked separately. Example: If an outcome is "Does [insert player name] find the murderer of [NPC]?" or "Does [insert player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately)
 - In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)
@@ -273,10 +273,6 @@ Premise: Nature spirits guard the forest and compete for followers (cooperative-
     Value: 80%.
     Narrative: At ≤40%, the spirit appears visibly weakened, affecting NPC reactions.
     Mechanics: Regenerate 5% after a resolved thread for each special follower. Using a power costs 20% energy. Below 30%, powers are less effective (-10 points).
---- (Spirit) Harmony|Dominance (opposites).
-    Value: 50-50.
-    Narrative: Harmony focuses on cooperation with other spirits and creatures, Dominance on control.
-    Mechanics: Shifts 5-15% based on decisions. >70% Harmony grants +15 in cooperative threads but -10 in contests. >70% Dominance grants +15 in contests but -10 in cooperative threads.
 --- (Following) Followers (number).
     Value: 20.
     Narrative: Determines influence in the forest and ability to affect change.
@@ -344,7 +340,7 @@ Premise: The last rock band on Mars tries to make it while following individual 
 
   private static getGameModeInstructions(gameMode: GameMode): string {
     return (
-      "\n\n" +
+      "\n" +
       (GAME_MODE_DESCRIPTIONS[
         gameMode as keyof typeof GAME_MODE_DESCRIPTIONS
       ] || "") +

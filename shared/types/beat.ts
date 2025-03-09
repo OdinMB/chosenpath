@@ -34,29 +34,36 @@ const optionChallengeSchema = z
     basePoints: z
       .number()
       .describe(
-        "Base points for this option (+25 to -25) depending on how much sense this option makes for achieving a favorable result / winning the contest."
+        "Base points for this option (+25 to -25) depending on how much sense this option makes for achieving a favorable result / winning the contest.\n" +
+          "If this option gives a reward, it should come with negative base points.\n" +
+          "If this option requires spending resources or willingly accepting a hit to reputation or a relationship status, the option should have a high base points value."
       ),
-    modifiers: z
+    modifiersToSuccessRate: z
       .array(
         z
           .object({
-            stat: z
+            statId: z
               .string()
               .describe(
-                "Stat and why it affects the points. Format: [stat id]: [reason why it affects the points]"
+                "Id of the stat that is affecting the success rate of this option"
+              ),
+            reason: z
+              .string()
+              .describe(
+                "Reason why this stat affects the success rate of this option. If relevant, refer to the stat's game mechanics."
               ),
             effect: z
               .number()
               .describe(
-                "How this stat affects the points. +/- 10 for minor influences, +/- 30 for major influences."
+                "Number of points that this modifier adds to or substracts from the success rate of this option. +/- 10 for minor influences, +/- 30 for major influences."
               ),
           })
           .describe(
-            "Stat and how they affect the points of this option. Example: 'player1_charisma is 70/100, which grants +20 to social interactions' => +20)"
+            "Stat and how they affect the points of this option. Example: 'player1_charisma', 'game mechanics of charisma indicate that 70/100 grants +20 to social interactions', +20)"
           )
       )
       .describe(
-        "2 most relevant stats (individual and/or shared) that affect how many points this options adds or substracts from the favorable/mixed/unfavorable probability distribution. (The stats you mention here don't change. They just influence how likely it is that this option leads to success.)"
+        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Only mention stats that change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
       ),
   })
   .describe(
@@ -154,7 +161,7 @@ export const beatGenerationSchema = z.object({
   summary: z
     .string()
     .describe(
-      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [player name] that [specific thing]'."
+      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[insert player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [insert player name] that [specific thing]'."
     ),
   imageId: z
     .string()
@@ -212,7 +219,7 @@ export const createSetOfBeatGenerationSchema = (
           multiplayerCoordination: z
             .string()
             .describe(
-              "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: [player name] will get options for proposals in a neogiation, while [player name 2] will get options to shift the atmosphere in the negotiation."
+              "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: [insert player name] will get options for proposals in a neogiation, while [player name 2] will get options to shift the atmosphere in the negotiation."
             ),
         }
       : {

@@ -398,11 +398,11 @@ export class BeatResolutionService {
     console.log(`[BeatResolutionService] Base points: ${totalPoints}`);
 
     // Add points from modifiers
-    if (option.modifiers) {
-      for (const modifier of option.modifiers) {
+    if (option.modifiersToSuccessRate) {
+      for (const modifier of option.modifiersToSuccessRate) {
         totalPoints += modifier.effect;
         console.log(
-          `[BeatResolutionService] Added modifier: ${modifier.stat} => ${modifier.effect} points`
+          `[BeatResolutionService] Added modifier: ${modifier.statId} (${modifier.reason}) => ${modifier.effect} points`
         );
       }
     }

@@ -41,7 +41,7 @@ export class ThreadPromptService {
     return `CONTEXT
 
 Outcomes
-pose questions that define the ending of the story. ("Will [player names] unravel the mystery of the dark forest?")
+pose questions that define the ending of the story. ("Will [insert player names] unravel the mystery of the dark forest?")
 Outcomes can be individual or shared between players.
 Each outcome has 3 possible resolutions.
 
@@ -129,7 +129,7 @@ ${story.isMultiplayer() ? "3" : "2"}. Exploration Threads
 - Exploration Threads should not include any challenges or contests.
 - Steps in Exploration Threads should never be about succeeding or failing at something.
 - Resolutions are "Resolution 1"/"Resolution 2"/"Resolution 3" representing different choices or directions
-- Example milestones (one will be added to the outcome at the end of the thread): "[player name] takes over the family hotel", "[player name] helps at the family hotel while doing occassional photography jobs", "[player name] is no longer engaged in the family business"
+- Example milestones (one will be added to the outcome at the end of the thread): "[insert player name] takes over the family hotel", "[insert player name] helps at the family hotel while doing occassional photography jobs", "[insert player name] is no longer engaged in the family business"
 - Use for character development, or when multiple valid paths exist without clear "better" or "worse" options
 - Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
 
@@ -162,20 +162,20 @@ Title: Infiltrating the Noble's Manor
 
 Beat Progression:
 1. Getting Past the Guards
-Question: How do [player names] approach the manor's security?
+Question: How do [insert player names] approach the manor's security?
 - Favorable: The guards are distracted, giving easy access to the manor
-- Mixed: [player names] find a way in but the guards are on higher alert
+- Mixed: [insert player names] find a way in but the guards are on higher alert
 - Unfavorable: The guards are suspicious and increase their patrols
 (Note how the beat progression can continue no matter the resolution of step 1.)
 
 2. Searching the Study
-Question: How do [player names] search the study without leaving traces?
-- Favorable: [player names] find promising leads and the study remains undisturbed
-- Mixed: [player names] find some leads but leave signs of searching
-- Unfavorable: The study is a mess and [player names] alert the household
+Question: How do [insert player names] search the study without leaving traces?
+- Favorable: [insert player names] find promising leads and the study remains undisturbed
+- Mixed: [insert player names] find some leads but leave signs of searching
+- Unfavorable: The study is a mess and [insert player names] alert the household
 
 3. Final Confrontation
-Question: The noble returns early! How do [player names] handle the situation?
+Question: The noble returns early! How do [insert player names] handle the situation?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
 
     if (story.isMultiplayer()) {
@@ -193,14 +193,14 @@ Possible Milestones:
 
 Beat Progression:
 1. Opening Arguments
-Question: How do [player names] present their initial cases to the council?
+Question: How do [insert player names] present their initial cases to the council?
 - Side A Wins: Military urgency resonates with the council
 - Mixed: The council remains divided and uncertain
 - Side B Wins: Diplomatic opportunities capture the council's interest
 (Leads to the climax in beat 2 witout preempting the council's final vote.)
 
 2. Final Deliberation
-Question: How do [player names] address the council's key concerns?
+Question: How do [insert player names] address the council's key concerns?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
     }
 

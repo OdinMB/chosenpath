@@ -73,7 +73,7 @@ ${
       (story.getCurrentBeatType() === "switch"
         ? "There are two types of switches: topic switches and flavor switches.\n" +
           "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
-          "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [player name] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
+          "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [insert player name] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
           "Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.\n" +
           "- Example: You might determine that the next thread must be about the bounty hunters who are chasing the player. The player might choose between an evasive maneuver, a negotiation, or a direct confrontation.\n"
         : "") +
@@ -132,7 +132,7 @@ ${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
           "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated ? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story.\n" +
-          "- Example: In thread tense_negotiation, we must ensure that [player names] don't represent the group in an inconsistent way. Let's give [player name 1] options for proposals, while [player name 2] gets options for shifting the atmosphere in the negotiation.\n" +
+          "- Example: In thread tense_negotiation, we must ensure that [insert player names] don't represent the group in an inconsistent way. Let's give [player name 1] options for proposals, while [player name 2] gets options for shifting the atmosphere in the negotiation.\n" +
           "- Example: In thread investigating_manor, we must ensure that the players don't investigate the scene in an inconsistent way. Let's give [player name 1] options for examining specific evidence, while [player name 2] gets options for questioning witnesses or securing the perimeter."
         : ""
     }
@@ -190,7 +190,7 @@ ${
       story.getCurrentThreadDuration()
         ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
-          "--- Example: Example: In a 3-beat thread, if the question is 'Will [player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
+          "--- Example: Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
 ${
   story.isMultiplayer()
@@ -317,7 +317,7 @@ ${
           " in any other way.\n" +
           (story.isMultiplayer()
             ? "- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
-              "- Never offer options like 'Collaborate with [player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this.\n"
+              "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this.\n"
             : "") +
           "- Be specific.\n" +
           "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
@@ -332,7 +332,7 @@ ${
           "- Define stat changes that are a necessary part of choosing the option (if any). Don't include the results of the player's choice. (Those will be processed later.) Example: Using a spell might use up some mana. Making a choice might change a logic/empathy disposition a bit toward empathy.\n" +
           (story.getCurrentBeatType() === "thread"
             ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
-              "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). Options that give other benefits (like items, resources, etc.) should have negative base points (so that there is a tradeoff between the chance of success and the other benefits).\n" +
+              "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). Options that give other benefits (like items, resources, etc.) should have negative base points (so that there is a tradeoff between the chance of success and the other benefits). Options that require some sort of investment should have high base points (to compensate for the investment).\n" +
               "--- modifiers: identify stats (individual and shared) that have an effect on the likelihood of success. Example: if the option is to woo an npc and player1_charisma is 70/100, you could assign a modifier of +20. If the group tries to escape the bounty hunters and their spaceship has status 'damaged', you could assign a modifier of -15.\n" +
               "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
             : "")

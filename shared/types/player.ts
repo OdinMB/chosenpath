@@ -36,7 +36,11 @@ export type ExactPlayerMap<T, N extends PlayerCount> = {
 
 export const PCSchema = z
   .object({
-    name: z.string().describe("Player character's name"),
+    name: z
+      .string()
+      .describe(
+        "Player character's name. Will be displayed to the user and will be used exactly like this in the story. Bad: 'Lord/Lady [Player Name]'. Good: 'Lady Grunfeld'."
+      ),
     pronouns: z.string().describe("Player character's preferred pronouns"),
     fluff: z
       .string()
