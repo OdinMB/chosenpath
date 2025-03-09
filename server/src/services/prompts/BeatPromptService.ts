@@ -100,32 +100,33 @@ How beats work mechanically:
       story.getCurrentBeatType() !== "ending" ? " CONFIGURATION" : ""
     } =======
 
-1. IDENTIFY STATS THAT AFFECT THE CONSEQUENCES OF PLAYER ACTIONS IN THE PREVIOUS BEAT
+1. IDENTIFY STATS AND STORY ELEMENTS THAT AFFECT THE NARRATIVE CONSEQUENCES OF PLAYER DECISIONS IN THE PREVIOUS BEAT
 
 ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no consequences of player actions to process. Just return an empty list."
-    : "For Challenge and Contest threads, we already determined which side won or if the results are favorable/mixed/unfavorable. This section is about identifying other narrative consequences.\n\n" +
-      "Includes stats that affect\n" +
-      "- the scope of what is happening narratively. Example: If the player has a trusted bodyguard among their companions, that character might be injured in the encounter.\n" +
-      "- how the consequences play out narratively. Example: How the player escapes pursuer depends on their stealth. If it's high, they escaped because of cunning. If it's low, there was a bit of luck involved.\n\n" +
-      "Format: [statId]: [reason]"
+    : "We already determined the resolution of the previous beat. This part is only about how these resolutions should be narrated.\n\n" +
+      "Includes stats and story elements that affect\n" +
+      "- the scope of what must be covered in the narrative. Example: If the player has a bodyguard, that NPC might be injured in the encounter.\n" +
+      "- how the resolution came about. Example: The thread might have determined that the player escapes their pursuer, but how they do it depends on their stealth. If it's high, they escaped because of cunning or agility. If it's low, there was a bit of luck involved.\n\n" +
+      "Format: [Id of the stat or story element]: [effect on how the previous beat's resolution is narrated]"
 }
 
-2. GENERATE CHANGES TO THE STORY STATE
+2. IDENTIFY CHANGES TO THE STORY STATE BASED ON PLAYER DECISIONS IN THE PREVIOUS BEAT
 
 ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
-    : "- STAT CHANGES based on players' decisions in the previous beat\n" +
-      "--- Include stat changes that are part of the instructions of the options that players chose in the previous beat. (These instructions represent stat changes that are part of making the choice in the first place, like losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition.)\n" +
-      "--- Identify any minor stat changes that are part of the consequences of the players' choices. (These are changes that are not part of making the choice, but rather the result of the choice.) Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
-      "--- Changes can affect both the shared stats and the individual stats of each player.\n" +
-      "--- For string and string[] types of stats, make sure to set or add values that can be displayed to the player directly (e.g. 'Ring of Protection' instead of 'ring_of_protection').\n" +
+    : "- STAT CHANGES\n" +
+      "Consider especially the game mechanics attributes of individual and shared stats.\n" +
+      "--- Some options require stat changes just for picking them. Examples: losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition based on a moral choice.\n" +
+      "--- Give players their reward if they accepted a lower chance of success. Examples: add 'Medical Plants' to resources if the player looked for them when the main goal of the beat was to travel fast.\n" +
+      "--- For beat resolutions, minor stat changes can be warrented as part of the consequences of the players' choices. Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
-        ? "- NEW MILESTONES: The previous thread (or set of threads) was just resolved. For each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
-          "--- Adjust the threads' general resolutions based on the thread's narrative to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
+        ? "--- For thread resolutions, larger stat changes can be warrented. Consider what was at stake and the thread's resolution.\n" +
+          "- NEW MILESTONES: The previous thread (or set of threads) was just resolved. For each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
+          "--- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
         : "")
 }${
       story.isMultiplayer()
@@ -218,14 +219,16 @@ ${
       (story.getCurrentBeatType() === "thread"
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
-          "\n- Can we offer interesting tradeoffs between the chance of success and other benefits?" +
-          "\n--- Example: If the group is trying to move silently through a forest, a risky option (with negative base points) could be to search for medical plants."
+          "\n- Can we tempt the player to chase a reward in exchange for a lower probability of success? These options should apply a large malus to success chances." +
+          "\n--- Example: If the group is trying to move silently through a forest, a reward option (with negative base points) could be to search for medical plants." +
+          "\n- Can the player use up resources to give them an advantage (including relationship status, reputation, etc.)? These options should grant a large bonus to success chances." +
+          "\n--- Example: The player's gold stat might specify that 50 gold can be used to bribe NPCs." +
+          "\n--- Example: The player can use special abilities for mana/energy/stamina."
         : "\n- Topic switches already have their options defined in the switch configuration.")
     : "" +
-      "- Which stats (both individual and shared) should affect the design of the options?\n" +
-      "--- Example: If the player has a high charisma stat, they might want to convince someone to help them.\n" +
-      "--- Example: If the player has an item, ally, companion, or anything else that could be of use, make sure that the options reflect that.\n" +
-      "--- Example: If a shared stat shapes the surrounding of the situation, it might affect the options. (Tensions running high, the spaceship being damaged, etc.)\n"
+      "- Which stats (both individual and shared) should affect which options are available to the player narratively?\n" +
+      "--- Consider especially the narrative function of stats.\n" +
+      "--- Example: If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
 }
 
 BEAT ATTRIBUTES

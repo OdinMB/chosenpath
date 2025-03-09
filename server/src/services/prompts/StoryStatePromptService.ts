@@ -40,7 +40,16 @@ export class StoryStatePromptService {
       promptSections.push(this.createSharedOutcomesSection(story));
     }
     if (sections.sharedStats) {
-      promptSections.push(this.createSharedStatsSection(story));
+      promptSections.push(
+        [
+          "SHARED STATS:",
+          story
+            .getSharedStats()
+            .map((stat) => this.formatStatDisplay(stat))
+            .join("\n"),
+          "",
+        ].join("\n")
+      );
     }
     if (sections.imageLibrary) {
       promptSections.push(this.createImageLibrarySection(story));
@@ -154,20 +163,17 @@ ${modeDescriptions[story.getGameMode()]}
     ].join("\n");
   }
 
-  private static createSharedStatsSection(story: Story): string {
-    return [
-      "SHARED STATS:",
-      story
-        .getSharedStats()
-        .map((stat) => {
-          const formattedValue = this.formatStatValue(stat);
-          const visibility =
-            stat.isVisible === false ? " (not visible to the player)" : "";
-          const hint = stat.hint ? `\nHint: ${stat.hint}` : "";
+  private static createImageLibrarySection(story: Story): string {
+    if (!story.includesImages()) return "";
 
-          return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${visibility}${hint}`;
-        })
-        .join("\n"),
+    return [
+      "IMAGE LIBRARY:",
+      story.getImages().length === 0
+        ? "No images yet."
+        : story
+            .getImages()
+            .map((image) => `- ${image.id}: ${image.description}`)
+            .join("\n"),
       "",
     ].join("\n");
   }
@@ -185,19 +191,18 @@ ${modeDescriptions[story.getGameMode()]}
     }
   }
 
-  private static createImageLibrarySection(story: Story): string {
-    if (!story.includesImages()) return "";
+  private static formatStatDisplay(stat: any): string {
+    const formattedValue = this.formatStatValue(stat);
+    const visibility =
+      stat.isVisible === false ? " (not visible to the player)" : "";
+    const narrativeFunction = stat.narrativeFunctions
+      ? `\nNarrative functions: ${stat.narrativeFunctions.join(", ")}`
+      : "";
+    const gameMechanics = stat.gameMechanics
+      ? `\nGame mechanics: ${stat.gameMechanics.join(", ")}`
+      : "";
 
-    return [
-      "IMAGE LIBRARY:",
-      story.getImages().length === 0
-        ? "No images yet."
-        : story
-            .getImages()
-            .map((image) => `- ${image.id}: ${image.description}`)
-            .join("\n"),
-      "",
-    ].join("\n");
+    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${visibility}${narrativeFunction}${gameMechanics}`;
   }
 
   private static createPlayersSection(story: Story): string {
@@ -216,7 +221,9 @@ ${modeDescriptions[story.getGameMode()]}
           playerState.character.fluff,
           "",
           "CHARACTER STATS:",
-          this.createCharacterStatsSection(playerState.characterStats),
+          playerState.characterStats
+            .map((stat) => this.formatStatDisplay(stat))
+            .join("\n"),
           "",
           "OUTCOMES that will define this character's story ending:",
           this.createOutcomesSection(playerState.outcomes),
@@ -255,19 +262,6 @@ Summary: ${beat.summary}
 Chosen option: ${choiceText}${resultText}`;
       })
       .join("\n\n");
-  }
-
-  private static createCharacterStatsSection(stats: any[]): string {
-    return stats
-      .map((stat) => {
-        const formattedValue = this.formatStatValue(stat);
-        return `- ${stat.name} (id: ${stat.id}, type: ${
-          stat.type
-        }): ${formattedValue}${
-          stat.isVisible === false ? " (not visible to the player)" : ""
-        }${stat.hint ? `\nHint: ${stat.hint}` : ""}`;
-      })
-      .join("\n");
   }
 
   private static createOutcomesSection(outcomes: any[]): string {

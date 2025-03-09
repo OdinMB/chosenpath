@@ -25,7 +25,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [generateImages, setGenerateImages] = useState(false);
   const [playerCount, setPlayerCount] = useState(1);
   const [gameMode, setGameMode] = useState<GameMode>(GameModes.Cooperative);
-  const [maxTurns, setMaxTurns] = useState(DEFAULT_TURNS);
+  const [maxTurns] = useState(DEFAULT_TURNS);
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
@@ -248,23 +248,25 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               />
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-2">
-              <label className="text-sm md:text-base font-medium text-gray-700">
-                Story Length: {maxTurns} decisions
-              </label>
-              <input
-                type="range"
-                min={MIN_TURNS}
-                max={MAX_TURNS}
-                step={5}
-                value={maxTurns}
-                onChange={(e) => setMaxTurns(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
-                disabled={isLoading}
-              />
-              <div className="flex justify-between text-xs md:text-sm text-gray-500">
-                <span>{MIN_TURNS} decisions</span>
-                <span>{MAX_TURNS} decisions</span>
+            {/* Story Length section - temporarily hidden but preserved for future use */}
+            <div className="hidden">
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-2">
+                <label className="text-sm md:text-base font-medium text-gray-700">
+                  Story Length: {maxTurns} decisions
+                </label>
+                <input
+                  type="range"
+                  min={MIN_TURNS}
+                  max={MAX_TURNS}
+                  step={5}
+                  value={maxTurns}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
+                  disabled={true}
+                />
+                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                  <span>{MIN_TURNS} decisions</span>
+                  <span>{MAX_TURNS} decisions</span>
+                </div>
               </div>
             </div>
 

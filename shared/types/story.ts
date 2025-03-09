@@ -64,7 +64,7 @@ export const playerStateGenerationSchema = z.object({
   outcomes: z
     .array(outcomeSchema)
     .describe(
-      "Individual outcomes that (together with shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
+      "Individual outcomes that (together with any shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
     ),
   characterStats: z
     .array(statSchema)

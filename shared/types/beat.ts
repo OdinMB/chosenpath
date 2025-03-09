@@ -17,11 +17,6 @@ const optionExplorationSchema = z
   .object({
     optionType: z.literal("exploration"),
     text: z.string().describe("Text shown to player for this choice"),
-    statConsequences: z
-      .string()
-      .describe(
-        "Instructions for the AI on how to adjust stats just for activating this option. Examples: uses 10 mana, uses a bullet, adjusts logic/empathy toward logic, loses an item, etc. Only describe what choosing this option entails immediately. Don't include the results of the player's choice. (That will be processed later.)"
-      ),
   })
   .describe(
     "Exploration options. Choose this type for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
@@ -31,11 +26,6 @@ const optionChallengeSchema = z
   .object({
     optionType: z.literal("challenge"),
     text: z.string().describe("Text shown to player for this choice"),
-    statConsequences: z
-      .string()
-      .describe(
-        "Instructions for the AI on how to adjust individual or shared stats for activating this option. Examples: uses 10 mana (if players have mana for casting spells), uses a bullet (in games where bullets are scarce and tracked by a stat), adjusts logic/empathy toward logic (if that's a player stat). Don't include the results of the player's choice. (Those will be processed later.)"
-      ),
     riskType: z
       .enum(OPTION_TYPES)
       .describe(
@@ -50,19 +40,23 @@ const optionChallengeSchema = z
       .array(
         z
           .object({
-            stat: z.string().describe("Stat and why it affects the points"),
+            stat: z
+              .string()
+              .describe(
+                "Stat and why it affects the points. Format: [stat id]: [reason why it affects the points]"
+              ),
             effect: z
               .number()
               .describe(
-                "How this stat affects the points. +20 to -20 for minor influences, +40 to -40 for major influences."
+                "How this stat affects the points. +/- 10 for minor influences, +/- 30 for major influences."
               ),
           })
           .describe(
-            "Stat and how they affect the points of this option. Example: 'player1_charisma is 70/100, indicating that they are good at wooing [npc]' => +20)"
+            "Stat and how they affect the points of this option. Example: 'player1_charisma is 70/100, which grants +20 to social interactions' => +20)"
           )
       )
       .describe(
-        "Individual and shared stats that affect how many points this options adds or substracts from the favorable/mixed/unfavorable probability distribution. List the 1-2 most relevant stats and their effects on the chances of success. (The stats you mention here don't change. They just influence how likely it is that this option leads to success.)"
+        "2 most relevant stats (individual and/or shared) that affect how many points this options adds or substracts from the favorable/mixed/unfavorable probability distribution. (The stats you mention here don't change. They just influence how likely it is that this option leads to success.)"
       ),
   })
   .describe(
@@ -120,15 +114,15 @@ export const beatPlanSchema = z.object({
           .describe(
             "How to reinforce the story's key conflicts and focused types of decisions?"
           ),
-        statsAffectingOptions: z
-          .string()
-          .describe(
-            "Which stats (both individual and shared) should affect the design of the options and how? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has spendable resources like mana or money, consider adding an option that uses those resources."
-          ),
         phaseRequirements: z
           .string()
           .describe(
             "What are the requirements from the current switch/thread configuration?"
+          ),
+        statsAffectingOptions: z
+          .string()
+          .describe(
+            "Which stats (both individual and shared) should affect which options are available to the player narratively? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
           ),
       }),
     ])

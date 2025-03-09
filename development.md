@@ -4,13 +4,13 @@ Smaller and more commits!
 
 Improve stat handling
 
-- thinking step for each option: which stats could be relevant?
-- stats: one field for narrative instructions, plus one for mechanics? (To be considered in option design and processing consequences)
-- Simplify stat changes: no statModifications as part of options (AI doesn't use them correctly anyway); expand prompt/descriptions for stat changes to be about both making the choice and its consequences
-- beat planning: turn "which stats affect consequences" into "whatever affects consequences narratively"?
+- how to improve stat definitions at game init?
+- schema-based thinking step for each option: which stats could be relevant?
+- option type enum for schemas? (temptation, resource spent, normal)
 
 Improvements
 
+- section: use outcomes parameter for determining both player and shared outcome display. Don't show outcomes in thread generation prompt.
 - Move newMilestone changes to switch generation (away from beat generation)
 - Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
 - For potential results for the last beat of a thread: ask the AI to take the general milestones and make them more specific given how the thread has gone so far
