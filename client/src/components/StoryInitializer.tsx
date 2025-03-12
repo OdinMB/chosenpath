@@ -6,8 +6,8 @@ import {
   MIN_TURNS,
   MAX_TURNS,
   DEFAULT_TURNS,
-} from "../../../shared/config.js";
-import { GameMode, GameModes } from "../../../shared/types/story.js";
+} from "shared/config.js";
+import { GameMode, GameModes } from "shared/types/story.js";
 
 interface StoryInitializerProps {
   onSetup: (options: {

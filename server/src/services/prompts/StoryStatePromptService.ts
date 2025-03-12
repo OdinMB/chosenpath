@@ -2,6 +2,7 @@ import { GameModes } from "shared/types/story.js";
 import { Story } from "../Story.js";
 import { Thread } from "shared/types/thread.js";
 import { getThreadType } from "shared/types/thread.js";
+import { Stat } from "shared/types/stat.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -191,18 +192,29 @@ ${modeDescriptions[story.getGameMode()]}
     }
   }
 
-  private static formatStatDisplay(stat: any): string {
+  private static formatStatDisplay(stat: Stat): string {
     const formattedValue = this.formatStatValue(stat);
     const visibility =
       stat.isVisible === false ? " (not visible to the player)" : "";
-    const narrativeFunction = stat.narrativeFunctions
-      ? `\nNarrative functions: ${stat.narrativeFunctions.join(", ")}`
+    const narrativeImplications = stat.narrativeImplications?.length
+      ? `\nNarrative: ${stat.narrativeImplications.join(", ")}`
       : "";
-    const gameMechanics = stat.gameMechanics
-      ? `\nGame mechanics: ${stat.gameMechanics.join(", ")}`
+    const effectOnPoints = stat.effectOnPoints?.length
+      ? `\nChallenges: ${stat.effectOnPoints.join(", ")}`
+      : "";
+    const optionsToSacrifice = stat.optionsToSacrifice
+      ? `\nAs sacrifice: ${stat.optionsToSacrifice}`
+      : "";
+    const optionsToGainAsReward = stat.optionsToGainAsReward
+      ? `\nAs reward: ${stat.optionsToGainAsReward}`
+      : "";
+    const adjustmentsAfterThreads = stat.adjustmentsAfterThreads?.length
+      ? `\nAdjustments after threads: ${stat.adjustmentsAfterThreads.join(
+          ", "
+        )}`
       : "";
 
-    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${visibility}${narrativeFunction}${gameMechanics}`;
+    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}`;
   }
 
   private static createPlayersSection(story: Story): string {

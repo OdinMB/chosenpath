@@ -172,169 +172,130 @@ If it cannot be counted, choose another type of stat.
 --- NOT good for power levels (like mystic power). Use string to describe the power level qualitatively or string[] to list specific abilities.
 --- NOT good for things that cannot counted, like influence, experience, level of interest, etc.
 
-Narrative function for stats
-describes how the stat should be used when generating switches, threads, and beats.
-- For all stat types
---- Define risk mechanics: "Each use has 10% chance of backfire effect"
-- string stats
---- Progression paths: "Progression: Novice → Apprentice → Journeyman → Master → Grandmaster"
---- Contextual benefits: "Master level grants access to the inner sanctum"
---- Social implications: "Outcast status prevents interaction with town merchants"
---- Narrative consequences: "Corrupted status attracts hostile entities"
---- Reputation effects: "Feared status causes NPCs to offer better prices but fewer services"
---- Cultural context: "Noble rank determines speaking order in council meetings"
---- Symbolic meaning: "Blessed status represents divine favor in the narrative"
-- For string[] stats:
---- Categories: "Categories: Combat spells/Utility spells/Healing spells"
---- Combination effects: "Combining Fire and Water abilities creates Steam attacks"
-- For percentage stats:
---- Critical thresholds: "Critical state below 15% requires immediate attention"
---- Status effects: "90%+ grants temporary immunity to fear effects"
---- Balance consequences: "Extreme values (10% or 90%) attract attention from powerful entities"
---- Risk/reward dynamics: "Higher values enable riskier but more rewarding actions"
-- For opposites stats:
---- Faction alignment: "60%+ Order aligns character with Law faction"
---- Power access: "70%+ Chaos grants access to unpredictable but powerful abilities"
---- Social consequences: "Extreme values (80%+) cause social isolation from opposing groups"
---- Environmental interactions: "High Nature value enhances forest abilities, high Technology enhances city abilities"
---- Transformation thresholds: "90%+ triggers physical transformation"
---- Balance benefits: "40-60% range grants access to balanced abilities unavailable at extremes"
---- Narrative voice: "Narrative tone shifts based on dominant alignment"
---- Relationship dynamics: "NPCs of similar alignment are more cooperative"
---- Worldview effects: "Dominant alignment influences available dialogue options"
-- For number stats:
---- Economic context: "Average citizen possesses 50-100 coins"
---- Comparative wealth: "1000+ represents upper class status"
+Context for additional stat parameters
+- The story is structured as a series of threads.
+- Threads are resolved as favorable/mixed/unfavorable.
+- At the end of a thread and depending on the resolution, a milestone is added to the story state. This is what drives the story to its overall resolution.
+- Each thread consists of 2-4 beats.
+- Each beat is 4-5 paragraphs of text followed by a player decision.
+- Beats have a probability distribution for favorable/mixed/unfavorable resolutions.
+- This distribution can be influenced by stats.
+- It can be shifted in the player's favor by sacrificing something, or in the player's disadvantage by choosing a reward that is going to help the player in other ways later on.
+- Favorable resolutions of early beats in a thread improve the chance of favorable resolutions of later beats.
+- The last beat of a thread is the most important one, as it decides which milestone is added to the story state.
 
-Context for game mechanics for stats
+For each stat, you must define:
 
-Threads, Beats, and Resolution System
-- The story is structured around Threads, Beats, and Resolutions that interact with stats:
-- Threads are units of 2-4 beats. At the end of a thread, a milestone is added to a story's overall outcome, which moves the story forward.
-- Game mechanics are particularly relevant for Challenge threads (cooperative threads with a success/failure structure) and Contest threads (with a sideA vs. sideB structure).
-- Resolution depends on the outcomes of individual beats within the thread. More favorable beat resolutions increase the chance of a favorable thread resolution
-- Beats are resolved based on the option that the player chose.
-- Each option has base points and stat modifiers that affect success chances. Stats directly influence option success through modifiers (typically +/-10 for minor influences, +/-30 for major influences)
+Effects on Beat Resolution
+Define bonuses and maluses that the stat applies to the chance of success in certain challenges (+/-10 for minor effects, +/-30 for major effects). Be creative. Options include:
+- Define conditional bonuses based on context (e.g., "+20 points in forest-based challenges when Forest Health is above 70%")
+- Define resource spending mechanics (e.g., "-10/-30 points when the spaceship is Worn/Damaged and required to perform a risky maneuver")
 
-Stat Mechanics for Beat Resolution:
-When designing stat mechanics, consider how they will affect beat resolutions:
-- Percentage stats: Define thresholds that provide bonuses to options (e.g., "Above 70% provides +20 points to social challenge options")
-- String stats: Define progression paths that unlock new options or provide bonuses (e.g., "Master rank provides +30 points to related challenge options that involve this skill")
-- Number stats: Define resource costs that can be spent for bonuses (e.g., "Can spend 50 gold for +25 points on a challenge option")
-- String[] stats: Define combinations or special abilities that provide situational bonuses (e.g., "Having 'Lockpicking' in skills provides +40 points when attempting to break into secured locations")
+Options (if any) for sacrificing the stat for a higher chance of success in certain beats (expressed in points)
+Options (if any) for gaining the stat as a reward for choosing a lower chance of success in certain beats
+Must be expressed in the context of individual beats.
+Examples:
+- "Can spend 20% energy to use a power"
+- "Can spend 50 gold to bribe an NPC for +20 points in an interaction challenge"
+- "Can find plants in the forest for not focusing fully on the core task at hand"
 
-Stat Changes from Resolutions:
-Define how beat and thread resolutions affect stats:
-- Specify exact stat changes for different resolution types (e.g., "Favorable resolutions in performance threads increase Stage Presence by 10%")
-- Include conditional changes based on thread context (e.g., "Unfavorable resolutions in social threads decrease Reputation by one level")
-- Define resource costs and gains tied to different outcomes (e.g., "Mixed resolutions in combat threads cost 20% Health")
-- Specify how opposing stats shift based on choices (e.g., "Choosing self-interest options shifts Loyalty|Ambition toward Ambition by 10-15%")
+Narrative Thresholds and Implications.
+Define how different values or states of the stat affect the narrative. Be creative. Options include:
+- For string stats: Define progression paths and their narrative consequences (e.g., "Master level grants access to the inner sanctum")
+- For string[] stats: Define categories and combination effects (e.g., "Categories: Combat/Utility/Healing spells")
+- For percentage stats: Define critical thresholds and their effects (e.g., "Below 30% causes visible weakness affecting NPC reactions")
+- For opposites stats: Define alignment thresholds and faction effects (e.g., "60%+ Order aligns character with Law faction")
+- For number stats: Define wealth/resource thresholds and their social implications (e.g., "1000+ gold represents upper class status")
 
-Game mechanics for stats
-describes how the stat can be gained, changed, used, and managed. It also describes the effects that the stat has on the chances of success in actions.
-- For several stat types:
---- Conditional modifiers: "Effectiveness doubled during full moon phases"
---- Environmental impacts: "Decreases twice as fast in hostile territories"
---- Stress mechanics: "Rapid changes cause penalties to other stats"
-- For string[] stats:
---- Limitations: "Maximum 5 items can be carried"
---- Acquisition methods: "New abilities gained only through ancient texts"
---- Exclusivity rules: "Cannot possess both Light and Dark abilities simultaneously"
---- Discovery methods: "A new ability gets unlocked at the end of a thread with a Master NPC with a mixed or favorable resolution"
---- Crafting mechanics: "Can combine basic items to create advanced ones"
-- For percentage stats:
---- Usage mechanics: "Consume 20% per successful ritual", "Consume 10% fuel for tactical maneuvers and 30% for traveling to a distant location"
---- Decay mechanics: "Decreases by 5% per beat"
---- Recovery conditions: "Cannot recover above 50% without proper rest"
---- Diminishing returns: "Benefits diminish progressively above 80%"
---- Recovery conditions: "Natural recovery only occurs during rest beats"
---- Balance mechanics: "If above 80%, lose 5% per beat. If below 20%, gain 5% per beat."
-- For opposites stats:
---- Pendulum mechanics: "Values naturally drift toward previous extreme by 2% per beat"
---- Inertia mechanics: "Direction of change becomes harder to reverse after 3 consecutive shifts"
---- Resonance mechanics: "Similar alignment as current environment helps in almost all actions (5-10 points). Vice versa for opposing alignment."
---- Explain decision impacts: "Each major moral choice shifts value by 5-15%"
-- For number stats:
---- Usage mechanics: "100 gold gives +10 points in a Challenge beat when dealing with an NPC"
---- Milestone rewards: "Mixed milestones on mission threads award 300 units. Favorable ones award 500 units."
---- Resource conversion: "Can be converted to reputation at 10:1 ratio"
---- Earning mechanics: "Base earning rate: 10-20 per beat"
---- Decay mechanics: "Perishable resources decrease by 5% per beat"
+Adjustment Mechanics
+Define how the stat changes based on player choices and thread resolutions (often unfavorable/mixed/favorable). Be creative. Options include:
+- Specify changes after different resolution types (e.g., "Increases by 10% after favorable performance thread resolutions")
+- Define decay or regeneration patterns (e.g., "Decreases by 5% per thread for each threat")
+- For opposites stats, define how choices shift the balance (e.g., "Major moral choices shift value by 5-15%")
+
+These lists are just examples. Feel free to be creative. The important thing is that the stat plays a relevant, plausible, and interesting part in the story.
 
 EXAMPLE STAT SETUPS
 
 Premise: Nature spirits guard the forest and compete for followers (cooperative-competitive)
-- groups: Spirit/Forest/Following
-- character stats:
---- (Spirit) Seasonal powers (string[])
-    Value: 2 special powers (things like "Protecting crops" or "Healing the sick").
-    Mechanics: Maximum of 3 abilities. Using powers provides +20-30 points to challenge options. 
---- (Spirit) Energy (percentage).
-    Value: 80%.
-    Narrative: At ≤40%, the spirit appears visibly weakened, affecting NPC reactions.
-    Mechanics: Regenerate 5% after a resolved thread for each special follower. Using a power costs 20% energy. Below 30%, powers are less effective (-10 points).
---- (Following) Followers (number).
-    Value: 20.
-    Narrative: Determines influence in the forest and ability to affect change.
-    Mechanics: Gain 5-10 followers as reward for choosing risky options. At 100, gain a new special follower. Can 'spend' 10 followers for +15 points in challenges.
---- (Following) Special followers (string[]).
-    Value: 2 special followers (e.g., "Elder Healer", "Warrior Scout").
-    Narrative: Categories: Healers/Warriors/Sages/Artisans. Each provides unique narrative opportunities.
-    Mechanics: Each grants 5% energy after resolved threads. Can be risked for +25 points in challenges or permanently sacrificed for +50 points in critical situations.
-- shared stats:
---- (Forest) Threats (string[]).
-    Value: 2 threats (e.g., "Invasive Blight", "Human Encroachment").
-    Narrative: Each threat creates specific challenges and story opportunities.
-    Mechanics: Unfavorable resolutions of cooperative threads add a threat. Each threat reduces Forest Health by 5% per thread. Removing threats requires dedicated challenge threads.
---- (Forest) Health (percentage).
-    Value: 100%.
-    Narrative: Represents the vitality of the shared ecosystem. Affects all spirits' abilities.
-    Mechanics: Decreases by 5% per thread for each forest threat. At 70%+, provides +10 points in nature-based challenges. At <30%, threads must focus on forest health. Cannot increase if it falls to 0%.
+stat groups: Spirit/Forest/Following
+character stats:
+- (Spirit) Seasonal powers (string[])
+  Value: 2 special powers (things like "Protecting crops" or "Healing the sick").
+  Maximum of 3 abilities. 
+  Using powers typically provides +30 points to a challenge.
+  Each power requires 20% energy to use.
+  Learning a third power requires a mixed or favorable resolution of a dedicated thread.
+- (Spirit) Energy (percentage).
+  Value: 80%.
+  Using a power costs 20% energy.
+  At 30% or lower, the spirit starts looking weak.
+  Regenerate 5% after a resolved thread for each special follower.
+- (Following) Followers (number).
+  Value: 20.
+  Can sometimes alienate/sacrifice 10 followers for a +10-20 bonus in challenges.
+  Gain 10/20 followers after a mixed/favorable resolution of a thread that involves followers.
+  Gain 5-10 followers as a reward for choosing options that require the spirit to not focus fully on the core task at hand.
+  At 100, gain a new special follower.
+- (Following) Special followers (string[]).
+  Value: 2 special followers (e.g., "Elder Healer", "Warrior Scout").
+  Categories: Healers/Warriors/Sages/Artisans.
+  Can be risked/sacrificed for +15/30 points in challenges.
+  A new special follower can be gained at 100 followers, or through a dedicated thread with a mixed/favorable resolution.
+shared stats:
+- (Forest) Threats (string[]).
+  Value: 2 threats (e.g., "Invasive Blight", "Human Encroachment").
+  Each threat creates specific challenges and story opportunities.
+  Each active threat applies -10 points to challenges in the forest.
+  Unfavorable resolutions of cooperative threads can add a threat.
+  Removing threats requires dedicated challenge threads.
+- (Forest) Health (percentage).
+  Value: 80%.
+  At <30%, forest is visibly dying. New threads must focus on Forest Health. At 0%, permanent damage to ecosystem.
+  At 70%+, provides +10 points to challenges in the forest.
+  Decreases by 5% after each thread for each active forest threat.
 
 Premise: The last rock band on Mars tries to make it while following individual dreams (cooperative-competitive)
-- groups: Musician/Ambition/Band
-- character stats:
---- (Musician) Stage Presence (percentage).
-    Value: 30%.
-    Narrative: <30% causes visible nervousness, 50%+ confident performer, 80%+ legendary.
-    Mechanics: Increases after performance threads with mixed (+5%) and favorable (+10%) resolutions. Can temporarily boost by 15% through stimulants (with potential negative side effects).
---- (Musician) Instrument Mastery (string).
-    Value: "Novice".
-    Narrative: Progression: Novice → Amateur → Professional → Virtuoso → Legend
-    Mechanics: Advances after dedicated practice threads or exceptional performances. Levels provides -20/-10/0/+10/+20 points in performance challenges. "Legend" status unlocks unique song options.
---- (Musician) Signature Techniques (string[]).
-    Value: 1 technique (e.g., "Martian Blues Riff", "Zero-G Solo").
-    Narrative: Unique playing styles that define the musician's identity.
-    Mechanics: Maximum 3 techniques. Each provides +15 points when featured in performances. Combining techniques creates memorable moments that significantly boost fan growth.
---- (Ambition) Band Loyalty|Solo Ambition (opposites).
-    Value: 40-60.
-    Narrative: <30% unlocks solo career paths, >70% band leadership opportunities.
-    Mechanics: Shifts 5-15% based on major decisions. 40-60% provides balanced access to both paths. Extreme values (>80% or <20%) create tension with bandmates.
---- (Ambition) Personal Dream (name to be adjusted for each player) (string).
-    Value: "Beginning" (different for each player).
-    Narrative: Four-stage progression toward personal goal (e.g., "Beginning → Progress → Breakthrough → Fulfillment").
-    Mechanics: Advances after dedicated personal threads. Each stage provides unique narrative opportunities and stat bonuses related to the dream.
-- shared stats:
---- (Band) Gear Quality (string).
-    Value: "Worn".
-    Narrative: Broken → Worn → Used → Pristine. Affects performance quality and venue access.
-    Mechanics: Degrades one level after major performances. Can be upgraded through dedicated resource threads. Performance modifiers: -15 (Broken), -5 (Worn), +5 (Used), +15 (Pristine).
---- (Band) Fans (number).
-    Value: 100.
-    Narrative: <100 underground, 500+ media attention, 1000+ major venues, 5000+ Mars-wide fame.
-    Mechanics: Increases after successful performances (+50-200 based on quality). Can be spent (10-50) for special opportunities.
---- (Band) Sound Identity (string[]).
-    Value: 2 aspects (e.g., "Retro Synth", "Martian Folk").
-    Narrative: Defines the band's unique style and appeal to different audiences.
-    Mechanics: Maximum 3 aspects. Changing requires dedicated creative threads. Each match with current Mars trends increases fan gain by 25%.
---- (Band) Mars Music Trends (string[]).
-    Value: 2 aspects (e.g., "Neo-Classical", "Dust Metal").
-    Narrative: Represents the evolving music scene on Mars.
-    Mechanics: One trend changes unpredictably after each resolved thread. Adapting to trends provides bonuses, while deliberately countering trends can create cult followings.
---- (Band) Group Chemistry (percentage).
-    Value: 70%.
-    Narrative: Represents how well the band works together musically and personally.
-    Mechanics: Affected by individual loyalty/ambition decisions. Below 40% causes performance penalties. Above 80% enables special group maneuvers in performances.
+stat groups: Musician/Ambition/Band
+character stats:
+- (Musician) Stage Presence (percentage).
+  Value: 30%.
+  <30% causes visible nervousness, 50%+ confident performer, 80%+ legendary status.
+  Provides (Stage Presence - 50) points to performance challenges.
+  Increases after dedicated practice threads and performance threads with mixed (+5%) and favorable (+10%) resolutions.
+  Can temporarily boost by 15% through stimulants (with potential negative side effects).
+- (Musician) Instrument Mastery (string).
+  Value: "Novice".
+  Progression: Novice → Amateur → Professional → Virtuoso → Legend.
+  Levels provides -20/-10/0/+10/+20 points in performance and recording challenges.
+  Advances after threads that involve practice or performing.
+- (Ambition) Band Loyalty|Solo Ambition (opposites).
+  Value: 40-60.
+  <30% unlocks solo career paths, >70% band leadership opportunities.
+  Extreme values (>80% or <20%) create tension with bandmates (-10 points in group challenges).
+  Shifts 5-15% based on major decisions.
+- (Ambition) Personal Dream (name to be adjusted for each player) (string).
+  Value: "Beginning" (different for each player).
+  Four-stage progression toward personal goal (e.g., "Beginning → Progress → Breakthrough → Fulfillment").
+  Advances after dedicated personal threads with mixed/favorable resolutions that the player spends apart from the band.
+shared stats:
+- (Band) Gear Quality (string).
+  Value: "Worn".
+  Narrative Thresholds: Broken → Worn → Used → Pristine.
+  Performance modifiers: -15 (Broken), -5 (Worn), +5 (Used), +15 (Pristine).
+  Degrades one level after major performances.
+  Can be upgraded via a dedicated threads (on resource allocation or fixing the gear in some other way).
+- (Band) Fans (number).
+  Value: 100.
+  <100 underground, 500+ media attention, 1000+ major venues, 5000+ Mars-wide fame.
+  Can sometimes be alienated to get an "easy out" in a challenge.
+  Some fans can sometimes be won by accepting a particularly flashy option with a lower chance of success.
+  Increases after successful performances and record publications (+50-200 based on quality).
+- (Band) Group Chemistry (percentage).
+  Value: 70%.
+  Below 40% causes visible tension, above 80% unlocks special group maneuvers in performances.
+  Below 40% causes performance penalties (-15 points).
+  Affected by individual loyalty/ambition decisions.
 `;
   }
 

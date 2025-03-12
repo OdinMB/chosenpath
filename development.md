@@ -4,11 +4,13 @@ Smaller and more commits!
 
 Improve stat handling
 
-- how to improve stat definitions at game init?
-  - more structured considerations for narrative/mechanics? threshold_triggers, usage_bonuses, etc. etc.
-  - extra LLM step just for stats?
+- stats: MUST specify at which level which kinds of point benefits are awarded
+- stats: can be changed after beat (how?), can be changed after thread (how?)
+  - consider in beat prompt
+- options: add enum for type: normal, temptation, resource sacrifice (including exploration beats)
+  - show in prompts
+  - consider in beat prompt
 - schema-based thinking step for each option: which stats could be relevant?
-- option type enum for schemas? (temptation, resource spent, normal)
 
 Improvements
 

@@ -63,7 +63,7 @@ const optionChallengeSchema = z
           )
       )
       .describe(
-        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Only mention stats that change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
+        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Only mention stats that with their current value change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
       ),
   })
   .describe(
