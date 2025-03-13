@@ -118,16 +118,17 @@ ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
     : "- STAT CHANGES\n" +
-      "Consider especially the game mechanics attributes of individual and shared stats.\n" +
-      "--- Some options require stat changes just for picking them. Examples: losing a bullet if a gun was fired, spending mana on a spell, or changing a character disposition based on a moral choice.\n" +
-      "--- Give players their reward if they accepted a lower chance of success. Examples: add 'Medical Plants' to resources if the player looked for them when the main goal of the beat was to travel fast.\n" +
-      "--- For beat resolutions, minor stat changes can be warrented as part of the consequences of the players' choices. Example: A player might slightly improve a skill, a spaceship might take some damage, etc.\n" +
+      "--- If a player chose a sacrifice option to gain a higher chance of success, that player should lose whatever was sacrificed.\n" +
+      "--- If a player chose a reward option and accepted a lower chance of success, that player should gain their reward.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
-        ? "--- For thread resolutions, larger stat changes can be warrented. Consider what was at stake and the thread's resolution.\n" +
+        ? "--- For thread resolutions, meaningful stat changes can be warrented.\n" +
+          "--- Consider what was at stake in the previous thread and the thread's resolution.\n" +
+          "--- Keep the story state in mind when determining what changes are warrented (parameter 'Adjustments after threads' in the stat definitions).\n" +
+          "--- When a thread is resolved, all stats can change, not just the ones that are marked as 'can be changed in beat resolutions'.\n" +
           "- NEW MILESTONES: The previous thread (or set of threads) was just resolved. For each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
           "--- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
-        : "")
+        : "--- For beat resolutions, only stats that are marked as 'can be changed in beat resolutions' can be changed. Even then, keep the changes minor.\n")
 }${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
@@ -219,17 +220,17 @@ ${
       (story.getCurrentBeatType() === "thread"
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
-          "\n- Can we tempt the player to chase a reward in exchange for a lower probability of success? These options should apply a large malus to success chances." +
+          "\n- Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? These options should apply a large malus to success chances." +
           "\n--- Example: If the group is trying to move silently through a forest, a reward option (with negative base points) could be to search for medical plants." +
-          "\n- Can the player use up resources to give them an advantage (including relationship status, reputation, etc.)? These options should grant a large bonus to success chances." +
+          "\n- Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? These options should grant a large bonus to success chances." +
           "\n--- Example: The player's gold stat might specify that 50 gold can be used to bribe NPCs." +
-          "\n--- Example: The player can use special abilities for mana/energy/stamina."
+          "\n--- Example: The player can use special abilities for mana/energy/stamina." +
+          "\n- Which stats and their current values (both individual and shared) affect which options are available to the player narratively (not mechanically in terms of success chances)? Consider especially the narrative function of stats." +
+          "\n--- Example: If force|agility stat leans toward force, the options should be forceful rather than sneaky."
         : "\n- Topic switches already have their options defined in the switch configuration.")
-    : "" +
-      "- Which stats (both individual and shared) should affect which options are available to the player narratively?\n" +
-      "--- Consider especially the narrative function of stats.\n" +
-      "--- Example: If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
+    : ""
 }
+
 
 BEAT ATTRIBUTES
 
@@ -322,18 +323,20 @@ ${
           "- Be specific.\n" +
           "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
           "--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'\n" +
-          "- Do NOT include the actual or likely consequences of a decision.\n" +
+          "- Do NOT include the actual or likely consequences of a decision. (Except for mentioning the stat that is sacrificed or gained as a reward in sacrifice and reward options.)\n" +
           "- Options determine how the story will continue after this beat. Whatever happened in the beat text is already established.\n" +
           "- For each option, set the optionType field:\n" +
           (story.getCurrentBeatType() === "switch"
             ? "--- Use 'exploration' for all options in switches.\n"
             : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
               "--- Use 'challenge' for options in Challenge threads and Contest threads.\n") +
-          "- Define stat changes that are a necessary part of choosing the option (if any). Don't include the results of the player's choice. (Those will be processed later.) Example: Using a spell might use up some mana. Making a choice might change a logic/empathy disposition a bit toward empathy.\n" +
+          "- Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).\n" +
+          "--- You can only define sacrifice and reward options for stats that have defined options to be sacrificed or gained as reward in the story state.\n" +
+          "--- Only have a maximum of 1 sacrifice/reward option per beat. 2-3 options must not involve any stat sacrifices and rewards.\n" +
           (story.getCurrentBeatType() === "thread"
             ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
-              "--- basePoints: assign a value between +25 to -25 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). Options that give other benefits (like items, resources, etc.) should have negative base points (so that there is a tradeoff between the chance of success and the other benefits). Options that require some sort of investment should have high base points (to compensate for the investment).\n" +
-              "--- modifiers: identify stats (individual and shared) that have an effect on the likelihood of success. Example: if the option is to woo an npc and player1_charisma is 70/100, you could assign a modifier of +20. If the group tries to escape the bounty hunters and their spaceship has status 'damaged', you could assign a modifier of -15.\n" +
+              "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +20 - +30 for sacrifice options. -20 - -30 for reward options.\n" +
+              "--- modifiers: identify stats (individual and shared) that given their current value have an effect on the likelihood of success. This must be consistent with the stat's 'effects on challenge success' in the story state. Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere.\n" +
               "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
             : "")
     }

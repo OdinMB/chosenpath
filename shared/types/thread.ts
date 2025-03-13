@@ -109,7 +109,7 @@ const threadStepSchema = z.object({
   question: z
     .string()
     .describe(
-      "Question that will be answered by the players' choices and that determines the kinds of choices that are available to players. Example: 'How will [insert player names] close the deal?'"
+      "Question about how the players act given this step's challenge or decision. Bad: 'What do [insert player names] find in the cellar?' (not related to player choices). Good: 'How do [insert player names] search for clues in the cellar?'"
     ),
   possibleResolutions: z
     .union([
@@ -193,6 +193,7 @@ export type ThreadStep = z.infer<typeof threadStepSchema> & {
 
 export type Thread = Omit<z.infer<typeof threadSchema>, "progression"> & {
   duration: number;
+  firstBeatIndex: number;
   progression: ThreadStep[];
   resolution: Resolution | null;
   milestone: string | null;
@@ -202,5 +203,6 @@ export type ThreadAnalysis = Omit<
   z.infer<typeof threadAnalysisSchema>,
   "threads"
 > & {
+  firstBeatIndex: number;
   threads: Thread[];
 };

@@ -1,8 +1,9 @@
-import { GameModes } from "shared/types/story.js";
+import { GameModes, PlayerState } from "shared/types/story.js";
 import { Story } from "../Story.js";
 import { Thread } from "shared/types/thread.js";
 import { getThreadType } from "shared/types/thread.js";
 import { Stat } from "shared/types/stat.js";
+import { Beat } from "shared/types/beat.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -47,7 +48,7 @@ export class StoryStatePromptService {
           story
             .getSharedStats()
             .map((stat) => this.formatStatDisplay(stat))
-            .join("\n"),
+            .join("\n\n"),
           "",
         ].join("\n")
       );
@@ -197,24 +198,31 @@ ${modeDescriptions[story.getGameMode()]}
     const visibility =
       stat.isVisible === false ? " (not visible to the player)" : "";
     const narrativeImplications = stat.narrativeImplications?.length
-      ? `\nNarrative: ${stat.narrativeImplications.join(", ")}`
+      ? `\n  - Narrative: ${stat.narrativeImplications.join(", ")}`
       : "";
     const effectOnPoints = stat.effectOnPoints?.length
-      ? `\nChallenges: ${stat.effectOnPoints.join(", ")}`
+      ? `\n  - Effects on challenge success: ${stat.effectOnPoints.join(", ")}`
       : "";
-    const optionsToSacrifice = stat.optionsToSacrifice
-      ? `\nAs sacrifice: ${stat.optionsToSacrifice}`
-      : "";
-    const optionsToGainAsReward = stat.optionsToGainAsReward
-      ? `\nAs reward: ${stat.optionsToGainAsReward}`
-      : "";
+    const optionsToSacrifice =
+      stat.optionsToSacrifice && stat.optionsToSacrifice !== "None"
+        ? `\n  - As sacrifice: ${stat.optionsToSacrifice}`
+        : "";
+    const optionsToGainAsReward =
+      stat.optionsToGainAsReward && stat.optionsToGainAsReward !== "None"
+        ? `\n  - As a reward: ${stat.optionsToGainAsReward}`
+        : "";
     const adjustmentsAfterThreads = stat.adjustmentsAfterThreads?.length
-      ? `\nAdjustments after threads: ${stat.adjustmentsAfterThreads.join(
+      ? `\n  - Adjustments after threads: ${stat.adjustmentsAfterThreads.join(
           ", "
         )}`
       : "";
+    const canBeChangedInBeatResolutions = stat.canBeChangedInBeatResolutions
+      ? `\n  - Can be changed in beat resolutions`
+      : "\n  - Cannot be changed in beat resolutions";
 
-    return `- ${stat.name} (id: ${stat.id}, type: ${stat.type}): ${formattedValue}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}`;
+    return `- ${stat.name.toUpperCase()} (id: ${stat.id}, type: ${
+      stat.type
+    }): ${formattedValue}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}${canBeChangedInBeatResolutions}`;
   }
 
   private static createPlayersSection(story: Story): string {
@@ -235,7 +243,7 @@ ${modeDescriptions[story.getGameMode()]}
           "CHARACTER STATS:",
           playerState.characterStats
             .map((stat) => this.formatStatDisplay(stat))
-            .join("\n"),
+            .join("\n\n"),
           "",
           "OUTCOMES that will define this character's story ending:",
           this.createOutcomesSection(playerState.outcomes),
@@ -262,6 +270,13 @@ ${modeDescriptions[story.getGameMode()]}
             ? `${beat.options[beat.choice].text}`
             : "No choice made yet";
 
+        // Add resource type indicator
+        const resourceTypeIndicator =
+          beat.choice !== undefined &&
+          beat.options[beat.choice].resourceType !== "normal"
+            ? ` [${beat.options[beat.choice].resourceType}]`
+            : "";
+
         const resultText = beat.resolution
           ? ` (Result: ${
               beat.resolution.charAt(0).toUpperCase() +
@@ -271,7 +286,7 @@ ${modeDescriptions[story.getGameMode()]}
 
         return `Beat ${index + 1}: ${beat.title}
 Summary: ${beat.summary}
-Chosen option: ${choiceText}${resultText}`;
+Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
       })
       .join("\n\n");
   }
@@ -411,7 +426,7 @@ Chosen option: ${choiceText}${resultText}`;
       .join("\n\n");
 
     return [
-      "CURRENT SWITCH CONFIGURATION:",
+      "======= CURRENT SWITCH CONFIGURATION =======",
       coordinationPatternSummary,
       "\nConfiguration:",
       switchConfigs,
@@ -523,44 +538,75 @@ Chosen option: ${choiceText}${resultText}`;
       return "";
     }
 
+    // Format the beat progression overview
+    const beatProgressionOverview = this.formatBeatProgressionOverview(thread);
+
     // Switch prompts only need the last beat's text for each player
     if (lastBeatOnly) {
       const lastBeatIndex = thread.progression.length - 1;
-
-      // Format the last beat with its text for each player
-      const playerTexts = [...thread.playersSideA, ...thread.playersSideB]
-        .map((playerSlot) => {
-          // Get the beat text for this player from the player's beat history
-          const threadBeatTexts = story.getThreadBeatTexts(thread);
-          const playerBeats = threadBeatTexts[playerSlot] || [];
-          const lastBeatText =
-            playerBeats[lastBeatIndex]?.text || "No text available";
-
-          return `Player ${playerSlot}:\n${lastBeatText}`;
-        })
-        .join("\n\n");
-
-      // Format the beat progression as before
-      const beatProgressionItems = this.formatBeatProgressionOverview(thread);
-
-      // Combine the beat progression with the last beat text
-      return `${beatProgressionItems}\n\PREVIOUS BEAT TEXT:\n${playerTexts}`;
+      const playerTexts = this.formatPlayerBeatTexts(
+        thread,
+        story,
+        lastBeatIndex,
+        lastBeatIndex
+      );
+      return `${beatProgressionOverview}\n\nPREVIOUS BEAT TEXT:\n${playerTexts}`;
     }
 
-    // For current threads, include all previous beat texts and player choices
-    const playerBeatTexts = [...thread.playersSideA, ...thread.playersSideB]
+    // For current threads, include all previous beat texts but only show special options for the last completed beat
+    const playerBeatTexts = this.formatPlayerBeatTexts(
+      thread,
+      story,
+      0,
+      beatsCompleted - 1
+    );
+
+    // Combine the beat progression overview with the beat texts
+    return `\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
+  }
+
+  /**
+   * Format beat texts for all players in a thread
+   * @param thread The thread to format beat texts for
+   * @param story The story instance
+   * @param startIndex The start index of beats to include
+   * @param endIndex The end index of beats to include (inclusive)
+   * @returns Formatted beat texts for all players
+   */
+  private static formatPlayerBeatTexts(
+    thread: Thread,
+    story: Story,
+    startIndex: number,
+    endIndex: number
+  ): string {
+    return [...thread.playersSideA, ...thread.playersSideB]
       .map((playerSlot) => {
         // Get the beat texts for this player from the player's beat history
         const threadBeatTexts = story.getThreadBeatTexts(thread);
         const playerBeats = threadBeatTexts[playerSlot] || [];
+        const player = story.getPlayer(playerSlot);
 
-        // Only include completed beats
-        const completedBeats = thread.progression
-          .slice(0, beatsCompleted)
-          .map((beat, index) => {
-            const beatNumber = index + 1;
+        // Format each beat in the requested range
+        const formattedBeats = playerBeats
+          .slice(startIndex, endIndex + 1)
+          .map((beatText, relativeIndex) => {
+            const absoluteIndex = startIndex + relativeIndex;
+            const beat = thread.progression[absoluteIndex];
+
+            if (!beat) return "";
+
+            const beatNumber = absoluteIndex + 1;
             const totalBeats = thread.duration;
-            const beatText = playerBeats[index]?.text || "No text available";
+
+            // Get the corresponding beat from the player's history
+            const playerBeatIndex = thread.firstBeatIndex + absoluteIndex;
+            const playerBeat = player?.beatHistory?.[playerBeatIndex];
+
+            // Get special option text if this beat has a resolution
+            let specialOptionText = "";
+            if (beat.resolution !== null && playerBeat?.choice !== undefined) {
+              specialOptionText = this.getSpecialOptionFromBeat(playerBeat);
+            }
 
             const resolution = beat.resolution
               ? `${
@@ -576,21 +622,37 @@ Chosen option: ${choiceText}${resultText}`;
                 ? beat.possibleResolutions[beat.resolution]
                 : "";
 
-            return `Beat ${beatNumber}/${totalBeats}: ${
-              beat.title
-            }\n\n${beatText}\n\nResolution: ${resolution.toUpperCase()}. ${resolutionDescription}`;
+            return `Beat ${beatNumber}/${totalBeats}: ${beat.title}\n\n${
+              beatText?.text || "No text available"
+            }\n\n${
+              specialOptionText ? specialOptionText + "\n" : ""
+            }RESOLUTION: ${resolution.toUpperCase()}. ${resolutionDescription}`;
           })
           .join("\n\n");
 
-        return `BEAT TEXTS for Player ${playerSlot}:\n${completedBeats}`;
+        return `BEAT TEXTS for Player ${playerSlot}:\n${formattedBeats}`;
       })
       .join("\n\n");
+  }
 
-    // Format the beat progression overview (simplified to only show overall resolutions)
-    const beatProgressionOverview = this.formatBeatProgressionOverview(thread);
+  /**
+   * Get special option text (sacrifice/reward) directly from a beat
+   * @param beat The player's beat
+   * @returns Formatted special option text if applicable, empty string otherwise
+   */
+  private static getSpecialOptionFromBeat(beat: Beat): string {
+    if (beat.choice === undefined || !beat.options) return "";
 
-    // Combine the beat progression overview with the beat texts
-    return `\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
+    const chosenOption = beat.options[beat.choice];
+    if (!chosenOption) return "";
+
+    if (chosenOption.resourceType === "sacrifice") {
+      return `SACRIFICE OPTION: ${chosenOption.text}`;
+    } else if (chosenOption.resourceType === "reward") {
+      return `REWARD OPTION: ${chosenOption.text}`;
+    }
+
+    return "";
   }
 
   /**

@@ -32,12 +32,20 @@ export class StorySetupPromptService {
       playerCount +
       " player" +
       (playerCount > 1 ? "s" : "") +
-      " based on this prompt:\n\n" +
+      " based on the following prompt:\n\n" +
       '"' +
-      prompt +
-      '".' +
+      prompt.toUpperCase() +
+      '"' +
+      "\n\n" +
+      "#".repeat(100) +
+      "\n\n" +
       this.getGameModeInstructions(gameMode) +
-      this.getStatGuidelines(playerCount > 1);
+      this.getStatGuidelines(playerCount > 1) +
+      "\n\n" +
+      "#".repeat(100) +
+      'Remember: these are all just examples. The story setup that you will be creating now has to work for the following prompt:\n\n"' +
+      prompt.toUpperCase() +
+      '"';
 
     console.log("\x1b[36m%s\x1b[0m", setupPrompt);
     return setupPrompt;
@@ -207,95 +215,300 @@ Define how different values or states of the stat affect the narrative. Be creat
 - For opposites stats: Define alignment thresholds and faction effects (e.g., "60%+ Order aligns character with Law faction")
 - For number stats: Define wealth/resource thresholds and their social implications (e.g., "1000+ gold represents upper class status")
 
-Adjustment Mechanics
+Adjustments after threads
 Define how the stat changes based on player choices and thread resolutions (often unfavorable/mixed/favorable). Be creative. Options include:
 - Specify changes after different resolution types (e.g., "Increases by 10% after favorable performance thread resolutions")
 - Define decay or regeneration patterns (e.g., "Decreases by 5% per thread for each threat")
 - For opposites stats, define how choices shift the balance (e.g., "Major moral choices shift value by 5-15%")
+
+Can be changed in beat resolutions
+Define if the stat can be changed in beat resolutions.
+- If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly.
+- If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect. This should only happen after a relevant thread is resolved.
 
 These lists are just examples. Feel free to be creative. The important thing is that the stat plays a relevant, plausible, and interesting part in the story.
 
 EXAMPLE STAT SETUPS
 
 Premise: Nature spirits guard the forest and compete for followers (cooperative-competitive)
-stat groups: Spirit/Forest/Following
-character stats:
-- (Spirit) Seasonal powers (string[])
-  Value: 2 special powers (things like "Protecting crops" or "Healing the sick").
-  Maximum of 3 abilities. 
-  Using powers typically provides +30 points to a challenge.
-  Each power requires 20% energy to use.
-  Learning a third power requires a mixed or favorable resolution of a dedicated thread.
-- (Spirit) Energy (percentage).
-  Value: 80%.
-  Using a power costs 20% energy.
-  At 30% or lower, the spirit starts looking weak.
-  Regenerate 5% after a resolved thread for each special follower.
-- (Following) Followers (number).
-  Value: 20.
-  Can sometimes alienate/sacrifice 10 followers for a +10-20 bonus in challenges.
-  Gain 10/20 followers after a mixed/favorable resolution of a thread that involves followers.
-  Gain 5-10 followers as a reward for choosing options that require the spirit to not focus fully on the core task at hand.
-  At 100, gain a new special follower.
-- (Following) Special followers (string[]).
-  Value: 2 special followers (e.g., "Elder Healer", "Warrior Scout").
-  Categories: Healers/Warriors/Sages/Artisans.
-  Can be risked/sacrificed for +15/30 points in challenges.
-  A new special follower can be gained at 100 followers, or through a dedicated thread with a mixed/favorable resolution.
+player stats:
+- Seasonal powers (string[])
+  id: player1_powers
+  possibleValues: "Nature abilities (max 3)"
+  value: ["Healing Aura", "Plant Growth"]
+  effectOnPoints: [
+    "+30 points when using a specific power in a challenge directly related to that power",
+    "+15 points in challenges within the spirit's seasonal domain",
+    "-10 points when attempting to use powers outside the spirit's natural affinity"
+  ]
+  optionsToSacrifice: "Can spend 20% energy to use a power for +30 points in a relevant challenge"
+  optionsToGainAsReward: "None"
+  narrativeImplications: [
+    "Each power grants access to specific story opportunities and NPC interactions",
+    "Having 3 powers marks the spirit as exceptionally versatile among their peers",
+    "Powers from opposing seasons create internal conflict reflected in dialogue"
+  ]
+  adjustmentsAfterThreads: [
+    "Can gain a new power after a favorable resolution of a thread focused on spiritual growth",
+    "Powers may temporarily weaken (-10 points effectiveness) after an unfavorable resolution in a thread where they were heavily relied upon",
+    "Powers can evolve to more potent versions after repeated successful use in critical moments"
+  ]
+
+- Energy (percentage)
+  id: player1_energy
+  value: 80
+  effectOnPoints: [
+    "Below 30% applies -15 points when interacting with human NPCs due to visible weakness",
+    "50-80% provides no modifier to challenges",
+    "Above 80% provides +10 points to challenges involving spiritual influence"
+  ]
+  optionsToSacrifice: "Can spend 20% energy to use a Seasonal Power or 30% energy for a +20 point boost in any spiritual challenge"
+  optionsToGainAsReward: "Can choose to rest and recover energy instead of pursuing immediate goals"
+  narrativeImplications: [
+    "Below 30% causes the spirit to appear faded and translucent to NPCs",
+    "Above 80% causes the spirit to radiate visibly, impressing mortal NPCs"
+  ]
+  adjustmentsAfterThreads: [
+    "Regenerates 5% after each thread resolution for each special follower in your following",
+    "Decreases by 10% after unfavorable resolutions in threads involving intense spiritual activity",
+    "Can be fully restored after a favorable resolution in a thread focused on spiritual renewal"
+  ]
+
+- Followers (number)
+  id: player1_followers_count
+  value: 20
+  effectOnPoints: [
+    "+1 point for every 10 followers in social influence challenges",
+    "+15 points in challenges where followers can directly assist (maximum +30)",
+    "-10 points in stealth challenges for each 20 followers due to increased visibility"
+  ]
+  optionsToSacrifice: "Can risk 10 followers (potentially losing them) for a +20 bonus in critical challenges"
+  optionsToGainAsReward: "Can gain 5-10 followers by choosing to perform public demonstrations of power instead of more discreet actions"
+  narrativeImplications: [
+    "Below 10 followers marks the spirit as struggling and vulnerable",
+    "50+ followers grants recognition among other spirits",
+    "100+ followers allows establishing a formal shrine with permanent benefits"
+  ]
+  adjustmentsAfterThreads: [
+    "Gain 10/20 followers after mixed/favorable resolution of a thread involving public displays of power",
+    "Lose 5-15 followers after unfavorable resolutions where the spirit appears weak"
+  ]
+
+- Special followers (string[])
+  id: player1_special_followers
+  possibleValues: "Healers/Warriors/Sages/Artisans (max 4)"
+  value: ["Elder Healer", "Warrior Scout"]
+  effectOnPoints: [
+    "+15 points in challenges where a special follower's expertise directly applies",
+    "+10 points in social challenges with NPCs from the same profession as your special followers",
+    "Combinations of complementary followers (e.g., Sage + Artisan) provide +20 points in creative problem-solving"
+  ]
+  optionsToSacrifice: "Can send a special follower on a dangerous mission for a +30 bonus, risking their permanent loss"
+  optionsToGainAsReward: "Can recruit a special follower by choosing to help a skilled individual instead of pursuing the main objective"
+  narrativeImplications: [
+    "Each special follower unlocks unique dialogue options and quest opportunities",
+    "Having followers from all four categories grants the 'Balanced Circle' status, respected by all factions",
+    "Special followers may develop their own storylines and conflicts requiring resolution"
+  ]
+  adjustmentsAfterThreads: [
+    "Can gain a new special follower at 100 regular followers or through a dedicated recruitment thread",
+    "Special followers may leave after consecutive unfavorable thread resolutions",
+    "Special followers can evolve to more powerful versions after contributing to favorable thread resolutions"
+  ]
+
 shared stats:
-- (Forest) Threats (string[]).
-  Value: 2 threats (e.g., "Invasive Blight", "Human Encroachment").
-  Each threat creates specific challenges and story opportunities.
-  Each active threat applies -10 points to challenges in the forest.
-  Unfavorable resolutions of cooperative threads can add a threat.
-  Removing threats requires dedicated challenge threads.
-- (Forest) Health (percentage).
-  Value: 80%.
-  At <30%, forest is visibly dying. New threads must focus on Forest Health. At 0%, permanent damage to ecosystem.
-  At 70%+, provides +10 points to challenges in the forest.
-  Decreases by 5% after each thread for each active forest threat.
+- Threats (string[])
+  id: shared_forest_threats
+  possibleValues: "Environmental/Human/Spiritual threats"
+  value: ["Invasive Blight", "Human Encroachment"]
+  effectOnPoints: [
+    "Each active threat applies -10 points to all challenges in the affected forest regions",
+    "Threats matching a spirit's seasonal weakness apply an additional -10 points to that spirit",
+    "+15 points in challenges directly addressing a specific threat"
+  ]
+  optionsToSacrifice: "None"
+  optionsToGainAsReward: "None"
+  narrativeImplications: [
+    "Each threat creates specific environmental descriptions and NPC reactions",
+    "Multiple threats of the same category (e.g., two Human threats) intensify their narrative impact",
+    "Unaddressed threats escalate over time, changing their description and increasing their penalties"
+  ]
+  adjustmentsAfterThreads: [
+    "New threats may appear after unfavorable resolutions of cooperative threads",
+    "Threats can be removed through dedicated challenge threads with favorable resolutions",
+    "Threats may evolve or combine if multiple remain unaddressed for several threads"
+  ]
+
+- Health (percentage)
+  id: shared_forest_health
+  value: 80
+  effectOnPoints: [
+    "Below 30% applies -20 points to all nature-based challenges due to dying ecosystem",
+    "30-70% provides no modifier to challenges",
+    "Above 70% provides +15 points to all nature-based challenges and +10 to all other challenges in the forest"
+  ]
+  optionsToSacrifice: "Can channel forest health (reducing it by 10%) for a +25 bonus in critical challenges"
+  optionsToGainAsReward: "Can focus on forest restoration instead of pursuing immediate goals"
+  narrativeImplications: [
+    "Below 30% causes visible withering, affecting all descriptions and NPC reactions",
+    "At 0%, permanent damage occurs, changing the nature of available challenges",
+    "Above 90% creates a vibrant, almost magical atmosphere that impresses visitors"
+  ]
+  adjustmentsAfterThreads: [
+    "Decreases by 5% after each thread for each active forest threat",
+    "Increases by 20% after favorable resolutions in threads focused on healing the forest",
+    "Can be permanently reduced by certain unfavorable thread resolutions"
+  ]
 
 Premise: The last rock band on Mars tries to make it while following individual dreams (cooperative-competitive)
-stat groups: Musician/Ambition/Band
-character stats:
-- (Musician) Stage Presence (percentage).
-  Value: 30%.
-  <30% causes visible nervousness, 50%+ confident performer, 80%+ legendary status.
-  Provides (Stage Presence - 50) points to performance challenges.
-  Increases after dedicated practice threads and performance threads with mixed (+5%) and favorable (+10%) resolutions.
-  Can temporarily boost by 15% through stimulants (with potential negative side effects).
-- (Musician) Instrument Mastery (string).
-  Value: "Novice".
-  Progression: Novice → Amateur → Professional → Virtuoso → Legend.
-  Levels provides -20/-10/0/+10/+20 points in performance and recording challenges.
-  Advances after threads that involve practice or performing.
-- (Ambition) Band Loyalty|Solo Ambition (opposites).
-  Value: 40-60.
-  <30% unlocks solo career paths, >70% band leadership opportunities.
-  Extreme values (>80% or <20%) create tension with bandmates (-10 points in group challenges).
-  Shifts 5-15% based on major decisions.
-- (Ambition) Personal Dream (name to be adjusted for each player) (string).
-  Value: "Beginning" (different for each player).
-  Four-stage progression toward personal goal (e.g., "Beginning → Progress → Breakthrough → Fulfillment").
-  Advances after dedicated personal threads with mixed/favorable resolutions that the player spends apart from the band.
+player stats:
+- Stage Presence (percentage)
+  id: player1_stage_presence
+  value: 30
+  effectOnPoints: [
+    "Provides (Stage Presence - 50) points to performance challenges (negative at low values, positive at high values)",
+    "+20 points in social challenges with fans when above 70%",
+    "-15 points in precision-based musical challenges when above 80% due to showboating tendencies"
+  ]
+  optionsToSacrifice: "Can push limits for a temporary +20 boost in a beat for a permanent -5% Stage Presence after the challenge"
+  optionsToGainAsReward: "Can choose riskier, more flamboyant performance options that might fail but build presence if successful"
+  narrativeImplications: [
+    "Below 30% causes visible nervousness affecting all performance descriptions",
+    "50-80% represents confident, engaging performances that satisfy audiences",
+    "Above 80% creates legendary moments that become part of Mars music history"
+  ]
+  adjustmentsAfterThreads: [
+    "Increases by 10% after mixed resolutions in performance threads",
+    "Increases by 20% after favorable resolutions in performance threads",
+    "Decreases by 5-10% after public failures or embarrassments"
+  ]
+
+- Instrument Mastery (string)
+  id: player1_instrument_mastery
+  possibleValues: "Novice → Amateur → Professional → Virtuoso → Legend"
+  value: "Novice"
+  effectOnPoints: [
+    "Provides -20/-10/0/+10/+20 points in performance and recording challenges based on level",
+    "+15 points in challenges involving musicians of the same or lower mastery level",
+    "-10 points in challenges involving musicians of higher mastery levels"
+  ]
+  optionsToSacrifice: "None"
+  optionsToGainAsReward: "None"
+  narrativeImplications: [
+    "Each level unlocks new performance techniques and composition options",
+    "Professional level required for mainstream venue acceptance",
+    "Legend status attracts collaboration offers from famous Martian artists"
+  ]
+  adjustmentsAfterThreads: [
+    "Advances one level after favorable resolutions in threads focused on practice or performance",
+    "Virtuoso and Legend levels require dedicated mastery threads with favorable resolutions"
+  ]
+
+- Band Loyalty|Solo Ambition (opposites)
+  id: player1_loyalty_ambition
+  value: 60
+  effectOnPoints: [
+    "Band Loyalty >70% provides +15 points in collaborative challenges but -10 in solo opportunities",
+    "Solo Ambition >70% provides +15 points in individual challenges but -10 in group performances",
+    "Values between 40-60 provide +5 points in both collaborative and solo challenges due to balanced approach"
+  ]
+  optionsToSacrifice: "None"
+  optionsToGainAsReward: "None"
+  narrativeImplications: [
+    "Below 30% Band Loyalty unlocks solo career opportunities and tensions with bandmates",
+    "Above 70% Band Loyalty enables leadership positions and deeper band relationships",
+    "Extreme values (>80% or <20%) create significant narrative consequences in band dynamics"
+  ]
+  adjustmentsAfterThreads: [
+    "Shifts 5-15% toward Solo Ambition after favorable resolutions in personal achievement threads",
+    "Shifts 5-15% toward Band Loyalty after favorable resolutions in collaborative threads",
+    "Major decisions in critical moments can cause shifts of up to 20%"
+  ]
+
+- Personal Dream (string)
+  id: player1_personal_dream
+  possibleValues: "Beginning → Progress → Breakthrough → Fulfillment"
+  value: "Beginning"
+  effectOnPoints: [
+    "Starting at Breakthrough level: -10 to performances (not fully motivated anymore)",
+    "+5/+10/+15/+20 points in creative challenges based on dream progression level",
+    "-5 points in challenges that conflict with your dream's direction"
+  ]
+  optionsToSacrifice: "Can temporarily set aside personal dream pursuits to focus on band needs"
+  optionsToGainAsReward: "Can choose options that advance personal goals at the cost of immediate band success"
+  narrativeImplications: [
+    "Each stage unlocks new personal storylines and opportunities",
+    "Breakthrough stage attracts attention from influential industry figures",
+    "Fulfillment affects the character's endgame options and satisfaction"
+  ]
+  adjustmentsAfterThreads: [
+    "Advances one stage after favorable resolutions in threads focused on personal development",
+    "Final stage requires a dedicated culmination thread with favorable resolution"
+  ]
+
 shared stats:
-- (Band) Gear Quality (string).
-  Value: "Worn".
-  Narrative Thresholds: Broken → Worn → Used → Pristine.
-  Performance modifiers: -15 (Broken), -5 (Worn), +5 (Used), +15 (Pristine).
-  Degrades one level after major performances.
-  Can be upgraded via a dedicated threads (on resource allocation or fixing the gear in some other way).
-- (Band) Fans (number).
-  Value: 100.
-  <100 underground, 500+ media attention, 1000+ major venues, 5000+ Mars-wide fame.
-  Can sometimes be alienated to get an "easy out" in a challenge.
-  Some fans can sometimes be won by accepting a particularly flashy option with a lower chance of success.
-  Increases after successful performances and record publications (+50-200 based on quality).
-- (Band) Group Chemistry (percentage).
-  Value: 70%.
-  Below 40% causes visible tension, above 80% unlocks special group maneuvers in performances.
-  Below 40% causes performance penalties (-15 points).
-  Affected by individual loyalty/ambition decisions.
+- Gear Quality (string)
+  id: shared_gear_quality
+  possibleValues: "Broken → Worn → Used → Pristine"
+  value: "Worn"
+  effectOnPoints: [
+    "Provides -15 (Broken), -5 (Worn), +5 (Used), or +15 (Pristine) points to all performance and recording challenges",
+    "Broken gear creates -20 points in professional venue challenges due to credibility loss",
+    "Pristine gear provides +10 points in impression challenges with industry professionals"
+  ]
+  optionsToSacrifice: "Can push equipment beyond limits"
+  optionsToGainAsReward: "Can choose to maintain or upgrade equipment instead of pursuing immediate opportunities"
+  narrativeImplications: [
+    "Gear quality affects all performance descriptions and audience reactions",
+    "Broken gear prevents access to professional venues and recording opportunities",
+    "Pristine gear attracts attention from tech sponsors and collectors"
+  ]
+  adjustmentsAfterThreads: [
+    "Degrades one level after major performances",
+    "Can improve one level after favorable resolutions in threads focused on equipment acquisition or repair",
+    "Extreme performance conditions (dust storms, temperature) may cause unexpected degradation"
+  ]
+
+- Fans (number)
+  id: shared_fan_count
+  value: 100
+  effectOnPoints: [
+    "+1 point for every 100 fans in performance challenges (maximum +20)",
+    "+15 points in social media challenges when above 500 fans",
+    "-10 points in underground venue challenges when above 1000 fans due to 'selling out' perception"
+  ]
+  optionsToSacrifice: "Can alienate 50-100 fans for bonuses in artistic integrity challenges"
+  optionsToGainAsReward: "Can choose crowd-pleasing options over artistic expression to gain 50 fans"
+  narrativeImplications: [
+    "Below 100 fans represents underground status with cult following",
+    "500+ fans attracts media attention and mid-tier venue access",
+    "5000+ fans represents Mars-wide fame with major commercial opportunities"
+  ]
+  adjustmentsAfterThreads: [
+    "Increases by 50-200 after favorable resolutions in performance threads",
+    "Decreases by 50-100 after unfavorable resolutions that disappoint audiences"
+  ]
+
+- Group Chemistry (percentage)
+  id: shared_group_chemistry
+  value: 70
+  effectOnPoints: [
+    "Below 40% applies -15 points to all collaborative challenges due to visible tension",
+    "40-70% provides no modifier to challenges",
+    "Above 70% provides +10 points to collaborative challenges, increasing to +20 above 90%"
+  ]
+  optionsToSacrifice: "Can cover up disagreements temporarily to get through a challenge (losing 5% Chemistry permenently)"
+  optionsToGainAsReward: "Can choose band bonding activities over immediate career opportunities (for a 5% Chemistry gain)"
+  narrativeImplications: [
+    "Below 40% creates visible tension in all band interactions and performances",
+    "Above 80% unlocks special collaborative techniques and musical innovations",
+    "Chemistry level affects all inter-band dialogue and decision options"
+  ]
+  adjustmentsAfterThreads: [
+    "Increases by 5-10% after favorable resolutions in collaborative threads",
+    "Decreases by 5-15% after conflicts or when individual ambitions are prioritized",
+    "Affected by the average Band Loyalty|Solo Ambition balance across all players"
+  ]
 `;
   }
 
@@ -305,7 +518,7 @@ shared stats:
       (GAME_MODE_DESCRIPTIONS[
         gameMode as keyof typeof GAME_MODE_DESCRIPTIONS
       ] || "") +
-      "\n\n"
+      "\n"
     );
   }
 }

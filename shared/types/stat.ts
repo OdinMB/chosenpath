@@ -36,25 +36,30 @@ export const statSchema = z
     effectOnPoints: z
       .array(z.string())
       .describe(
-        "Bonuses and maluses that this stat applies to the chance of success in certain beats. +/-10 points is a minor effect, +/-30 is a major effect. Be creative. Options include:\n" +
-          "- Can define thresholds for different effects (e.g., 'Above 70% provides +20 points to social challenges').\n" +
-          "- Can define conditional effects (e.g., '-10/-20 points when the spaceship is Worn/Damaged and required to perform a risky maneuver').\n" +
-          "- Can define resource-based effects (e.g., '+25 when bribing an NPC with gold')."
+        "Bonuses and maluses that this stat applies to the chance of success in certain beats. +/-10 points is a minor effect, +/-20 is a major effect. Be creative. List 3 ways in which this stat can be relevant for the player's chance of success. We must get a good sense of which values of the stat give what kinds of bonuses and maluses in which situations. Examples:\n" +
+          "- Scope: 'Applies only when dealing with members of this faction'.\n" +
+          "- Thresholds: 'Above 70% provides +15 points to social challenges'\n" +
+          "- Conditions: '-10/-20 points if the spaceship is Worn/Damaged and required to perform a risky maneuver'\n" +
+          "Always define specific thresholds and point values in absolute terms.\n" +
+          "Remember: at least 3 items in this list!"
       ),
     optionsToSacrifice: z
       .string()
       .describe(
-        "Options for sacrificing this stat to gain a higher chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options. Examples:\n" +
-          "- for percentage stats: Define usage costs (e.g., 'Can spend 20% energy to use a Power').\n" +
-          "- for number stats: Define spending mechanics (e.g., 'Can spend 50 gold to bribe an NPC').\n" +
-          "- for string[] stats: Define how items/abilities can be used (e.g., 'Can send a special follower on a dangerous mission').\n" +
-          "- for string stats: Define how conditions affect options (e.g., 'Gives bonuses and maluses for actions that align/misalign with the current emotion').\n" +
-          "- for opposites stats: Define how extreme values unlock special options."
+        "Options for sacrificing (some of) this stat to gain a higher chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options. Examples:\n" +
+          "- for percentage stats: 'Can spend 20% energy to use a Power'\n" +
+          "- for number stats: 'Can spend 50 gold to bribe an NPC'\n" +
+          "- for string[] stats: 'Can send special followers on dangerous missions'\n" +
+          "- for string stats: 'Gives bonuses and maluses for actions that align/misalign with the current emotion'\n" +
+          "- for opposites stats: 'Can accept loss of sanity to stay level-headed'\n" +
+          "Don't mention how large the point bonus is for sacrificing this stat. That bonus is the same for all sacrifice options. Only define how much of the stat the player has to sacrifice to gain that bonus.\n" +
+          "Large things like the tension between factions on a 4-step scale cannot be sacrificed for a bonus in a single beat. This should only happen in unfavorable resolutions of entire threads."
       ),
     optionsToGainAsReward: z
       .string()
       .describe(
-        "Options for gaining this stat as a reward for choosing a lower chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options."
+        "Options for gaining this stat as a reward for choosing a lower chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options.\n" +
+          "Large things like a new superpower should not be offered as a reward for a malus in a single beat. This should only happen in favorable resolutions of entire threads."
       ),
     narrativeImplications: z
       .array(z.string())
@@ -68,12 +73,18 @@ export const statSchema = z
     adjustmentsAfterThreads: z
       .array(z.string())
       .describe(
-        "Which resolutions should cause this stat to change, and how? Be creative. Options include:\n" +
-          "- Define exact stat changes for different resolution types (e.g., 'Favorable resolutions in performance threads increase Stage Presence by 10%').\n" +
-          "- Include conditional changes based on thread context (e.g., 'Fame increases one step after a favorable resolution of a thread that involves a concert').\n" +
-          "- Define resource regeneration patterns (e.g., 'Mana regenerates by 10% after each thread').\n" +
-          "- Define decay patterns (e.g., 'Equipment quality degrades one level after major action threads').\n" +
-          "- For opposites stats: Define how choices shift the balance (e.g., 'Choosing self-interest options shifts Loyalty|Ambition toward Ambition by 10-15%')."
+        "Which thread resolutions should cause this stat to change, and how? Be creative. Examples:\n" +
+          "- Exact stat changes for different resolution types (e.g., 'Favorable resolutions in performance threads increase Stage Presence by 10%').\n" +
+          "- Conditional changes based on thread context (e.g., 'Fame increases one step after a favorable resolution of a thread that involves a concert').\n" +
+          "- Resource regeneration patterns (e.g., 'Mana regenerates by 10% after each thread').\n" +
+          "- Cecay patterns (e.g., 'Equipment quality degrades one level after major action threads').\n" +
+          "- For opposites stats: Shifting the balance (e.g., 'Choosing self-interest options shifts Loyalty|Ambition toward Ambition by 10-15%').\n" +
+          "Stat changes after resolved threads can be noticeable and meaningful. Changes after unfavorable resolutions can be real setbacks."
+      ),
+    canBeChangedInBeatResolutions: z
+      .boolean()
+      .describe(
+        "Whether this stat can be changed in beat resolutions. If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly and where changes are not particularly impactful. If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect (important world stats, special powers or relationships, etc.) These larger changes should only happen after a relevant thread is resolved."
       ),
     isVisible: z
       .boolean()

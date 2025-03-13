@@ -142,7 +142,17 @@ export class AIStoryGenerator {
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
     console.log("Response:\n", JSON.stringify(response, null, 2));
 
-    return story.addPhase(response);
+    const currentBeatIndex = story.getCurrentTurn() - 1;
+    const firstBeatIndexOfSwitch = currentBeatIndex + 1;
+
+    // Create the transformed ThreadAnalysis
+    const transformedResponse: SwitchAnalysis = {
+      ...response,
+      firstBeatIndex: firstBeatIndexOfSwitch,
+      duration: 1,
+    };
+
+    return story.addPhase(transformedResponse);
   }
 
   async generateThreads(story: Story): Promise<Story> {
@@ -152,6 +162,9 @@ export class AIStoryGenerator {
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
     console.log("Response:\n", JSON.stringify(response, null, 2));
+
+    const currentBeatIndex = story.getCurrentTurn() - 1;
+    const firstBeatIndexOfThread = currentBeatIndex + 1;
 
     // Transform the threads to include the new properties
     const transformedThreads = response.threads.map((thread) => {
@@ -164,6 +177,7 @@ export class AIStoryGenerator {
       // Transform the Thread to include the new properties
       return {
         ...thread,
+        firstBeatIndex: firstBeatIndexOfThread,
         duration: response.duration,
         progression: transformedSteps,
         resolution: null,
@@ -174,6 +188,7 @@ export class AIStoryGenerator {
     // Create the transformed ThreadAnalysis
     const transformedResponse: ThreadAnalysis = {
       ...response,
+      firstBeatIndex: firstBeatIndexOfThread,
       threads: transformedThreads,
     };
 

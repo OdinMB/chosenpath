@@ -144,10 +144,8 @@ Create a list of threads, each with:
    - For Challenge ${
      story.isMultiplayer() ? " and Contest" : ""
    }threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
-   - For Challenge ${
-     story.isMultiplayer() ? " and Contest" : ""
-   }threads: Describes what type of advantage/disadvantage is transferred to the next beat for each possible resolution for each beat of the thread. We only need general terms, like types of first impressions, level of alarm that the guards are on, etc. Don't mention what the players are doing or how the how the advantage/disadvantage comes about. We will flesh out these details later.
    - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
+   - Each progression step is defined by a question about how the players are acting to deal with this step's challenge or decision. Bad: "What do [insert player names] find in the cellar?" Good: "How do [insert player names] search for clues in the cellar?"
    - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
 
 EXAMPLE 1: 3-BEAT CHALLENGE THREAD

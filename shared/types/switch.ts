@@ -116,4 +116,7 @@ export type SwitchType = z.infer<typeof switchTypeSchema>;
 export type Switch = z.infer<typeof switchSchema>;
 export type SwitchAnalysis = z.infer<
   ReturnType<typeof createSwitchAnalysisSchema>
->;
+> & {
+  firstBeatIndex: number;
+  duration: number;
+};

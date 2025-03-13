@@ -10,12 +10,20 @@ import {
 } from "./change.js";
 import { Resolution } from "./thread.js";
 
-export const OPTION_TYPES = ["normal", "safe", "risky"] as const;
-export type OptionType = (typeof OPTION_TYPES)[number];
+export const OPTION_RISK_TYPES = ["normal", "safe", "risky"] as const;
+export type OptionRiskType = (typeof OPTION_RISK_TYPES)[number];
+
+export const OPTION_RESOURCE_TYPES = ["normal", "sacrifice", "reward"] as const;
+export type OptionResourceType = (typeof OPTION_RESOURCE_TYPES)[number];
 
 const optionExplorationSchema = z
   .object({
     optionType: z.literal("exploration"),
+    resourceType: z
+      .enum(OPTION_RESOURCE_TYPES)
+      .describe(
+        "Whether this option involves sacrificing a stat to unlock this option ('sacrifice'), gaining a stat as a reward for choosing this option ('reward'), or none of these two ('normal')."
+      ),
     text: z.string().describe("Text shown to player for this choice"),
   })
   .describe(
@@ -25,18 +33,27 @@ const optionExplorationSchema = z
 const optionChallengeSchema = z
   .object({
     optionType: z.literal("challenge"),
-    text: z.string().describe("Text shown to player for this choice"),
+    resourceType: z
+      .enum(OPTION_RESOURCE_TYPES)
+      .describe(
+        "Whether this option involves sacrificing a stat in exchange for a higher chance of success ('sacrifice'), gaining a stat as a reward for choosing an option with lower chance of success ('reward'), or none of these two ('normal')."
+      ),
+    text: z
+      .string()
+      .describe(
+        "Text shown to player for this choice. For sacrifice and reward options, mention which stat exactly will be sacrificed or gained (regardless of the resolution of this beat)."
+      ),
     riskType: z
-      .enum(OPTION_TYPES)
+      .enum(OPTION_RISK_TYPES)
       .describe(
         "How this option skews the probability distribution. Risky means more extreme outcomes. Safe means more mixed and fewer unfavorable outcomes."
       ),
     basePoints: z
       .number()
       .describe(
-        "Base points for this option (+25 to -25) depending on how much sense this option makes for achieving a favorable result / winning the contest.\n" +
-          "If this option gives a reward, it should come with negative base points.\n" +
-          "If this option requires spending resources or willingly accepting a hit to reputation or a relationship status, the option should have a high base points value."
+        "For normal resource types: +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest.\n" +
+          "For sacrifice resource types: +20 to +30 depending on how much is sacrificed and how much sense this option makes for achieving a favorable result / winning the contest.\n" +
+          "For reward resource types: -20 to -30 depending on how much is gained and how much sense this option makes for achieving a favorable result / winning the contest."
       ),
     modifiersToSuccessRate: z
       .array(
@@ -50,20 +67,20 @@ const optionChallengeSchema = z
             reason: z
               .string()
               .describe(
-                "Reason why this stat affects the success rate of this option. If relevant, refer to the stat's game mechanics."
+                "Reason why this stat with its current value affects the success rate of this option. Must be consistent with the stat's 'effects on challenge success' parameter in the story state."
               ),
             effect: z
               .number()
               .describe(
-                "Number of points that this modifier adds to or substracts from the success rate of this option. +/- 10 for minor influences, +/- 30 for major influences."
+                "Number of points that this modifier with its current value adds to or substracts from the success rate of this option. Between -15 and +15."
               ),
           })
           .describe(
-            "Stat and how they affect the points of this option. Example: 'player1_charisma', 'game mechanics of charisma indicate that 70/100 grants +20 to social interactions', +20)"
+            "Stat and how they affect the points of this option. Example: 'player1_charisma', 'game mechanics of charisma indicate that 70/100 grants +15 to social interactions' => +15. Must be based on the stat's actual, current value and consistent with the stat's 'effects on challenge success' parameter in the story state."
           )
       )
       .describe(
-        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Only mention stats that with their current value change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
+        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Only mention stats that with their current value change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
       ),
   })
   .describe(
@@ -129,7 +146,12 @@ export const beatPlanSchema = z.object({
         statsAffectingOptions: z
           .string()
           .describe(
-            "Which stats (both individual and shared) should affect which options are available to the player narratively? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
+            "Which stats and their current values (both individual and shared) should affect which options are available to the player narratively? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
+          ),
+        opportunityForSacrificesOrRewards: z
+          .string()
+          .describe(
+            "Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? Describe how these mechanics can be used in this beat or 'None' if there are no relevant opportunities."
           ),
       }),
     ])
@@ -201,7 +223,7 @@ export const createSetOfBeatGenerationSchema = (
     statChanges: z
       .array(statChangeSchema)
       .describe(
-        "List of stat changes based on players' decisions in the previous beat that will be applied to the story state. If this is the first set of beats, just return an empty list."
+        "List of stat changes based on players' decisions in the previous beat that will be applied to the story state. Include stat sacrifices and rewards for sacrifice and reward options. If this is the first set of beats, just return an empty list."
       ),
     ...(canAddMilestones
       ? {

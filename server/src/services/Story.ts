@@ -179,10 +179,19 @@ export class Story {
     // Only include the specific player's data
     const playerData = filteredState.players[playerSlot];
 
-    // Filter out hidden player stats
-    playerData.characterStats = playerData.characterStats.filter(
-      (stat) => stat.isVisible !== false
-    );
+    // Filter out hidden player stats and remove specified parameters
+    playerData.characterStats = playerData.characterStats
+      .filter((stat) => stat.isVisible !== false)
+      .map((stat) => {
+        const filteredStat = { ...stat };
+        delete filteredStat.adjustmentsAfterThreads;
+        delete filteredStat.canBeChangedInBeatResolutions;
+        delete filteredStat.effectOnPoints;
+        delete filteredStat.narrativeImplications;
+        delete filteredStat.optionsToGainAsReward;
+        delete filteredStat.possibleValues;
+        return filteredStat;
+      });
 
     // Filter out outcomes if they exist
     if (playerData.outcomes) {
@@ -223,10 +232,19 @@ export class Story {
 
     filteredState.players = { [playerSlot]: playerData };
 
-    // Filter out hidden shared stats
-    filteredState.sharedStats = filteredState.sharedStats.filter(
-      (stat) => stat.isVisible !== false
-    );
+    // Filter out hidden shared stats and remove specified parameters
+    filteredState.sharedStats = filteredState.sharedStats
+      .filter((stat) => stat.isVisible !== false)
+      .map((stat) => {
+        const filteredStat = { ...stat };
+        delete filteredStat.adjustmentsAfterThreads;
+        delete filteredStat.canBeChangedInBeatResolutions;
+        delete filteredStat.effectOnPoints;
+        delete filteredStat.narrativeImplications;
+        delete filteredStat.optionsToGainAsReward;
+        delete filteredStat.possibleValues;
+        return filteredStat;
+      });
 
     // Get pending players
     const pendingPlayers = this.getPendingPlayers();
