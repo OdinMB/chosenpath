@@ -2,7 +2,7 @@ import {
   type Beat,
   type ChallengeOption,
   type ProbabilityDistribution,
-  type OptionType,
+  type OptionRiskType,
 } from "shared/types/beat.js";
 import {
   ResolutionChallenge,
@@ -98,10 +98,10 @@ export class BeatResolutionService {
    * - safe: 25/50/25 (skewed toward mixed results)
    * - risky: 40/20/40 (skewed toward extreme results)
    */
-  private static getBaseDistributionByOptionType(
-    optionType: OptionType
+  private static getBaseDistributionByOptionRiskType(
+    optionRiskType: OptionRiskType
   ): ProbabilityDistribution {
-    switch (optionType) {
+    switch (optionRiskType) {
       case "normal":
         return { ...this.DEFAULT_DISTRIBUTION };
       case "safe":
@@ -187,10 +187,10 @@ export class BeatResolutionService {
    */
   private static calculateDistribution(
     points: number,
-    optionType: OptionType
+    optionRiskType: OptionRiskType
   ): ProbabilityDistribution {
     // Start with the base distribution for the option type
-    const base = this.getBaseDistributionByOptionType(optionType);
+    const base = this.getBaseDistributionByOptionRiskType(optionRiskType);
     // Clone the base distribution
     let result: ProbabilityDistribution = { ...base };
 
@@ -201,7 +201,7 @@ export class BeatResolutionService {
     // Calculate how much to adjust each category based on points and risk type
     if (points > 0) {
       // Positive points: increase favorable, decrease unfavorable
-      if (optionType === "risky") {
+      if (optionRiskType === "risky") {
         // Risky: Move points directly from unfavorable to favorable
         [result, points] = this.shiftPoints(
           result,
@@ -226,7 +226,7 @@ export class BeatResolutionService {
             "favorable"
           );
         }
-      } else if (optionType === "safe") {
+      } else if (optionRiskType === "safe") {
         // Safe: First move from unfavorable to mixed, then from mixed to favorable
         [result, points] = this.shiftPoints(
           result,
@@ -271,7 +271,7 @@ export class BeatResolutionService {
       // Negative points: increase unfavorable, decrease favorable
       let absPoints = Math.abs(points);
 
-      if (optionType === "risky") {
+      if (optionRiskType === "risky") {
         // Risky: Move points directly from favorable to unfavorable
         [result, absPoints] = this.shiftPoints(
           result,
@@ -296,7 +296,7 @@ export class BeatResolutionService {
             "unfavorable"
           );
         }
-      } else if (optionType === "safe") {
+      } else if (optionRiskType === "safe") {
         // Safe: First move from favorable to mixed, then from mixed to unfavorable
         [result, absPoints] = this.shiftPoints(
           result,
