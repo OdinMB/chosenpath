@@ -42,6 +42,9 @@ export class Story {
     return Story.changeService.applyChanges(this, changes);
   }
 
+  getTitle(): string {
+    return this.state.title;
+  }
   getState(): StoryState {
     return this.state;
   }
@@ -88,24 +91,7 @@ export class Story {
       }
     }
 
-    console.log(
-      "[StoryStatePromptService] ERROR: Outcome not found for id " + outcomeId
-    );
-    let outcome: Outcome = {
-      id:
-        outcomeId +
-        " (ID INVALID. TRY TO DETERMINE THE CORRECT OUTCOME BY CONTEXT)",
-      question: "OUTCOME QUESTION NOT CLEAR",
-      possibleResolutions: {
-        resolution1: "RESOLUTION 1 NOT CLEAR",
-        resolution2: "RESOLUTION 2 NOT CLEAR",
-        resolution3: "RESOLUTION 3 NOT CLEAR",
-      },
-      resonance: "RESONANCE NOT CLEAR",
-      intendedNumberOfMilestones: 0,
-    };
-
-    return outcome;
+    return null;
   }
 
   getSharedStats(): Stat[] {
@@ -611,20 +597,28 @@ export class Story {
   }
 
   addBeatToPlayer(playerSlot: PlayerSlot, beat: Beat): Story {
+    const player = this.state.players[playerSlot];
     return new Story({
       ...this.state,
       players: {
         ...this.state.players,
         [playerSlot]: {
-          ...this.state.players[playerSlot],
-          beatHistory: [...this.state.players[playerSlot].beatHistory, beat],
-        },
+          ...player,
+          beatHistory: [...player.beatHistory, beat],
+        } as PlayerState,
       },
     });
   }
 
   updateChoice(playerSlot: PlayerSlot, optionIndex: number): Story {
     const player = this.getPlayer(playerSlot);
+    if (!player) {
+      console.log(
+        "[Story] Error: No player found to update choice for " + playerSlot
+      );
+      return this;
+    }
+
     return new Story({
       ...this.state,
       players: {
@@ -636,25 +630,25 @@ export class Story {
               ? { ...beat, choice: optionIndex }
               : beat
           ),
-        },
+        } as PlayerState,
       },
     });
   }
 
   updateBeatResolution(playerSlot: PlayerSlot, resolution: Resolution): Story {
+    const player = this.state.players[playerSlot];
     return new Story({
       ...this.state,
       players: {
         ...this.state.players,
         [playerSlot]: {
-          ...this.state.players[playerSlot],
-          beatHistory: this.state.players[playerSlot].beatHistory.map(
-            (beat, index) =>
-              index === this.state.players[playerSlot].beatHistory.length - 1
-                ? { ...beat, resolution }
-                : beat
+          ...player,
+          beatHistory: player.beatHistory.map((beat, index) =>
+            index === player.beatHistory.length - 1
+              ? { ...beat, resolution }
+              : beat
           ),
-        },
+        } as PlayerState,
       },
     });
   }

@@ -7,12 +7,12 @@
     "paths": {
       "shared/*": ["../shared/*"]
     },
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
     "useUnknownInCatchVariables": false,
-    "strictFunctionTypes": false,
-    "strictPropertyInitialization": false,
+    "strictFunctionTypes": true,
+    "noImplicitAny": false,
     "noImplicitThis": false,
     "alwaysStrict": false
   },

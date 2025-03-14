@@ -167,7 +167,7 @@ export class StoryRepository {
   async getActiveStories(): Promise<
     Array<{ storyId: string; playerCount: number }>
   > {
-    const result = [];
+    const result: Array<{ storyId: string; playerCount: number }> = [];
 
     for (const [storyId, story] of this.storyStates) {
       const activePlayers = connectionManager.getActivePlayersInGame(storyId);

@@ -233,6 +233,15 @@ export class GameQueueProcessor extends BaseQueueProcessor<
   ): Story {
     const currentBeat = story.getCurrentBeat(playerSlot);
 
+    // If no beat exists, return the story unchanged
+    if (!currentBeat) {
+      console.log(
+        "[GameQueueProcessor] ERROR: No current beat found for",
+        playerSlot
+      );
+      return story;
+    }
+
     let beatResolution: Resolution | null = null;
     // For Exploration Beats, just set the resolution directly
     if (currentBeat.options[optionIndex].optionType === "exploration") {
@@ -296,7 +305,22 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       );
 
       const updatedThreadAnalysis = updatedStory.getCurrentThreadAnalysis();
+      if (!updatedThreadAnalysis) {
+        console.log(
+          "[GameQueueProcessor] ERROR: No thread analysis found after resolution"
+        );
+        return updatedStory;
+      }
+
       for (const thread of updatedThreadAnalysis.threads) {
+        // Skip threads with null resolution
+        if (!thread.resolution) {
+          console.log(
+            `[GameQueueProcessor] ERROR: Thread ${thread.id} has no resolution, skipping milestone`
+          );
+          continue;
+        }
+
         const milestone = ThreadResolutionService.getMilestone(
           thread,
           thread.resolution
@@ -306,7 +330,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<
           `[GameQueueProcessor] Setting milestone for thread ${thread.id}: ${milestone}`
         );
 
-        updatedStory = updatedStory.updateThreadMilestone(thread, milestone);
+        // Only update if milestone is not null
+        if (milestone) {
+          updatedStory = updatedStory.updateThreadMilestone(thread, milestone);
+        } else {
+          console.log(
+            `[GameQueueProcessor] ERROR: No milestone generated for thread ${thread.id}`
+          );
+        }
       }
     }
 

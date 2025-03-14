@@ -39,7 +39,7 @@ export const PCSchema = z
     name: z
       .string()
       .describe(
-        "Player character's name. Will be displayed to the user and will be used exactly like this in the story. Bad: 'Lord/Lady [Player Name]'. Good: 'Lady Grunfeld'."
+        "Player character's name. Will be displayed to the user and will be used exactly like this in the story. Do NOT include placeholders like '[Player Name]'. Generate the name of the character or entity that the player will be playing. Bad: 'Lord/Lady [Player Name]'. Good: 'Lady Grunfeld'."
       ),
     pronouns: z.string().describe("Player character's preferred pronouns"),
     fluff: z

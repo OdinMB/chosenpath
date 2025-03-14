@@ -372,12 +372,16 @@ ${modeDescriptions[story.getGameMode()]}
     story: Story,
     withDecisions: boolean
   ): string {
-    if (!story.getCurrentSwitchAnalysis()) {
+    const switchAnalysis = story.getCurrentSwitchAnalysis();
+    if (!switchAnalysis) {
+      console.log(
+        "[StoryStatePromptService] ERROR: No switch analysis found for story " +
+          story.getTitle()
+      );
       return "";
     }
 
-    const { switches, coordinationPatternSummary } =
-      story.getCurrentSwitchAnalysis();
+    const { switches, coordinationPatternSummary } = switchAnalysis;
 
     // Get player decisions if needed
     const playerDecisionsSection = withDecisions
@@ -476,12 +480,21 @@ ${modeDescriptions[story.getGameMode()]}
 
         // Get the outcome that will receive a milestone
         let outcome = story.getOutcomeById(thread.outcomeId);
+        if (!outcome) {
+          console.log(
+            "[StoryStatePromptService] ERROR: Outcome not found for thread " +
+              thread.id
+          );
+        }
+        const outcomeInfo = outcome
+          ? `\nRelated Outcome: ${outcome.question} (${outcome.id})`
+          : `\nRelated Outcome: Unknown (ID: ${thread.outcomeId})`;
 
         const milestonesSection =
           threadType === "exploration"
             ? [
                 `Players: ${thread.playersSideA.join(", ")}`,
-                `\nRelated Outcome: ${outcome.question} (${outcome.id})`,
+                outcomeInfo,
                 `Possible milestones:`,
                 `- Option 1: ${thread.possibleMilestones["resolution1"]}`,
                 `- Option 2: ${thread.possibleMilestones["resolution2"]}`,
@@ -491,7 +504,7 @@ ${modeDescriptions[story.getGameMode()]}
             ? [
                 `Side A (${thread.playersSideA.join(", ")})`,
                 `Side B (${thread.playersSideB.join(", ")})`,
-                `\nRelated Outcome: ${outcome.question} (${outcome.id})`,
+                outcomeInfo,
                 `Possible milestones:`,
                 `- If Side A wins: ${thread.possibleMilestones["sideAWins"]}`,
                 `- Mixed result: ${thread.possibleMilestones["mixed"]}`,
@@ -499,7 +512,7 @@ ${modeDescriptions[story.getGameMode()]}
               ].join("\n")
             : [
                 `Players: ${thread.playersSideA.join(", ")}`,
-                `\nRelated Outcome: ${outcome.question} (${outcome.id})`,
+                outcomeInfo,
                 `Possible milestones:`,
                 `- Favorable: ${thread.possibleMilestones["favorable"]}`,
                 `- Mixed: ${thread.possibleMilestones["mixed"]}`,

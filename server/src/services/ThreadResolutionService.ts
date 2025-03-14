@@ -1,5 +1,5 @@
 import { getThreadType } from "shared/types/thread.js";
-import type { Resolution, Thread, ThreadType } from "shared/types/thread.js";
+import type { Resolution, Thread } from "shared/types/thread.js";
 import type { Story } from "./Story.js";
 
 /**
@@ -37,6 +37,15 @@ export class ThreadResolutionService {
     // for now, just choose whatever the (hopefully) one player in the thread chose
     const playerSlot = thread.playersSideA[0];
     const step = story.getCurrentBeat(playerSlot);
+
+    // If step is null or resolution is null, default to "mixed"
+    if (!step || step.resolution === null) {
+      console.log(
+        `[ThreadResolutionService] ERROR: No valid step or resolution found, defaulting to "mixed"`
+      );
+      return "mixed";
+    }
+
     return step.resolution;
   }
 
@@ -56,6 +65,13 @@ export class ThreadResolutionService {
     // Go through all steps in the thread progression
     thread.playersSideA.forEach((playerSlot, index) => {
       const step = story.getCurrentBeat(playerSlot);
+      if (!step || step.resolution === null) {
+        console.log(
+          `[ThreadResolutionService] ERROR: No valid step or resolution found for player ${playerSlot} in thread ${thread.id}, defaulting to "mixed"`
+        );
+        return;
+      }
+
       if (step.resolution === "favorable") {
         favorableCount++;
       } else if (step.resolution === "mixed") {
@@ -71,6 +87,15 @@ export class ThreadResolutionService {
 
     // Calculate resolution based on counts
     const totalResolutions = favorableCount + mixedCount + unfavorableCount;
+
+    // If no valid resolutions, default to mixed
+    if (totalResolutions === 0) {
+      console.log(
+        `[ThreadResolutionService] ERROR: No valid resolutions found, defaulting to "mixed"`
+      );
+      return "mixed";
+    }
+
     const netFavorable = favorableCount - unfavorableCount;
     const extremeEqualsFavorable = netFavorable >= 0;
     const netExtreme = Math.abs(netFavorable);
@@ -114,6 +139,13 @@ export class ThreadResolutionService {
     // Go through all steps in the thread progression
     thread.playersSideA.forEach((playerSlot, index) => {
       const step = story.getCurrentBeat(playerSlot);
+      if (!step || step.resolution === null) {
+        console.log(
+          `[ThreadResolutionService] ERROR: No valid step or resolution found for player ${playerSlot} in thread ${thread.id}, defaulting to "mixed"`
+        );
+        return;
+      }
+
       if (step.resolution === "favorable") {
         sideAFavorableCount++;
       } else if (step.resolution === "mixed") {
@@ -125,6 +157,13 @@ export class ThreadResolutionService {
 
     thread.playersSideB.forEach((playerSlot, index) => {
       const step = story.getCurrentBeat(playerSlot);
+      if (!step || step.resolution === null) {
+        console.log(
+          `[ThreadResolutionService] ERROR: No valid step or resolution found for player ${playerSlot} in thread ${thread.id}, defaulting to "mixed"`
+        );
+        return;
+      }
+
       if (step.resolution === "favorable") {
         sideBFavorableCount++;
       } else if (step.resolution === "mixed") {
@@ -138,13 +177,29 @@ export class ThreadResolutionService {
       `[ThreadResolutionService] Counts - Side A: Favorable: ${sideAFavorableCount}, Mixed: ${sideAMixedCount}, Unfavorable: ${sideAUnfavorableCount}, Side B: Favorable: ${sideBFavorableCount}, Mixed: ${sideBMixedCount}, Unfavorable: ${sideBUnfavorableCount}`
     );
 
+    // Check if we have any valid resolutions
+    const totalResolutions =
+      sideAFavorableCount +
+      sideAMixedCount +
+      sideAUnfavorableCount +
+      sideBFavorableCount +
+      sideBMixedCount +
+      sideBUnfavorableCount;
+
+    if (totalResolutions === 0) {
+      console.log(
+        `[ThreadResolutionService] ERROR: No valid resolutions found, defaulting to "mixed"`
+      );
+      return "mixed";
+    }
+
     let tugOfWar: number = 0;
     tugOfWar += sideAFavorableCount;
     tugOfWar -= sideAUnfavorableCount;
     tugOfWar -= sideBFavorableCount;
     tugOfWar += sideBUnfavorableCount;
 
-    let result: Resolution | null = null;
+    let result: Resolution;
     if (tugOfWar > 0) {
       result = "sideAWins";
     } else if (tugOfWar < 0) {
