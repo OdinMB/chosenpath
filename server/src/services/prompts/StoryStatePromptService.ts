@@ -404,7 +404,7 @@ ${modeDescriptions[story.getGameMode()]}
 
         const flavorLine =
           singleSwitch.type === "flavor"
-            ? `\n- Outcome: ${singleSwitch.outcome}\n- Question: ${singleSwitch.question}`
+            ? `\n- Outcome ID: ${singleSwitch.outcomeId}\n- Question: ${singleSwitch.question}`
             : "";
 
         const topicLine =
@@ -475,7 +475,7 @@ ${modeDescriptions[story.getGameMode()]}
         let threadTypeString = getThreadType(thread).toUpperCase() + " THREAD";
 
         // Get the outcome that will receive a milestone
-        const outcome = story.getOutcomeById(thread.outcomeId);
+        let outcome = story.getOutcomeById(thread.outcomeId);
 
         const milestonesSection =
           threadType === "exploration"

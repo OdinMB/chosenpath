@@ -42,10 +42,10 @@ export const switchSchema = z.object({
       "List of players who are involved in this switch and will be part of the resulting thread"
     ),
   type: switchTypeSchema,
-  outcome: z
+  outcomeId: z
     .string()
     .describe(
-      "If this is a flavor switch: The story outcome that this switch relates to. (Leave empty for topic switches)"
+      "If this is a flavor switch: The id of the story outcome that this switch relates to. (Leave empty for topic switches)"
     ),
   question: z
     .string()

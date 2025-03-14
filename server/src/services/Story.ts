@@ -88,7 +88,24 @@ export class Story {
       }
     }
 
-    return null;
+    console.log(
+      "[StoryStatePromptService] ERROR: Outcome not found for id " + outcomeId
+    );
+    let outcome: Outcome = {
+      id:
+        outcomeId +
+        " (ID INVALID. TRY TO DETERMINE THE CORRECT OUTCOME BY CONTEXT)",
+      question: "OUTCOME QUESTION NOT CLEAR",
+      possibleResolutions: {
+        resolution1: "RESOLUTION 1 NOT CLEAR",
+        resolution2: "RESOLUTION 2 NOT CLEAR",
+        resolution3: "RESOLUTION 3 NOT CLEAR",
+      },
+      resonance: "RESONANCE NOT CLEAR",
+      intendedNumberOfMilestones: 0,
+    };
+
+    return outcome;
   }
 
   getSharedStats(): Stat[] {

@@ -31,12 +31,16 @@ New features
 - Include generic story music (identify right track for each story)
 - System to view/navigate save files
 
-Small stuff
+Improvements
 
+- Check if ids actually exist (e.g. outcome ID)
+- Retry mechanism for queue actions
+- Send error messages to frontend
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Attach facts to players
 - adjust scope of story setup based on the number of beats
 - Track story elements that a player has NOT been introduced to yet
+
 - Move newMilestone changes to switch generation (away from beat generation)?
 - Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
 - Allow shared outcomes only in multiplayer games?
