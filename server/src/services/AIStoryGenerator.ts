@@ -66,6 +66,7 @@ export class AIStoryGenerator {
     const players = this.createPlayersFromSetup(setup, playerCount);
 
     return {
+      title: setup.title,
       gameMode,
       guidelines: setup.guidelines,
       storyElements: setup.storyElements,

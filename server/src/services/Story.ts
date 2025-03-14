@@ -259,6 +259,7 @@ export class Story {
       filteredState;
 
     return {
+      title: filteredState.title,
       numberOfPlayers: Object.keys(this.state.players).length,
       players,
       gameMode,

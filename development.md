@@ -2,29 +2,26 @@ Smaller and more commits!
 
 # Feature backlog
 
-Improvements
+Improve stat setups and option definitions
 
-- repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
-  - Alternatively, break this whole 20-step mess down into smaller LLM interactions?
-- Attach facts to players?
-- adjust scope of story setup based on the number of beats
-- Track story elements that a player has NOT been introduced to yet
-- Move newMilestone changes to switch generation (away from beat generation)?
-- Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
-- Allow shared outcomes only in multiplayer games?
+- Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
+- Break this whole 20-step mess down into smaller LLM interactions?
+- Make prompts more concise?
 
 New features
 
+- Titles for stories (show in resume story section in Welcome screen)
+- Let player choose/adjust starting position (name, pronouns, stats)
 - Library of stories with pre-configured setups
+- Images: generate one for each player and story element and only use iamges from that list?
 - Difficulty level (affecting base points)
 - Limited tokens to see option stats (costs more for later beats in a thread)
-- Titles for stories (show in resume story section in Welcome screen)
-- Dynamically add new outcomes, e.g. based on exploration threads.
 - Prettier welcome/setup views with shifting images?
-- Include generic story music (identify right track for each story)
-- Let player choose/adjust starting position (name, pronouns, stats)
-- Images: generate one for each player and story element and only use iamges from that list?
-- Multi-step flow for generating a stat schema?
+- User accounts
+  - Manage games
+  - Invite specific account to a player slot
+  - Game history
+- Dynamically add new outcomes, e.g. based on exploration threads.
 - Multiplaer mode: shared perspective
   - majority vote
   - lottery
@@ -32,9 +29,16 @@ New features
 - New switch type using this voting mechanism to decide which direction to take among several players (plus instructions for how to resolve draws)
 - Select language
   - different ones for different players
-- User accounts
-  - Manage games
-  - Invite specific account to a player slot
-  - Game history
+- Include generic story music (identify right track for each story)
 - System to view/navigate save files
+
+Small stuff
+
+- For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
+- Attach facts to players
+- adjust scope of story setup based on the number of beats
+- Track story elements that a player has NOT been introduced to yet
+- Move newMilestone changes to switch generation (away from beat generation)?
+- Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!
+- Allow shared outcomes only in multiplayer games?
 - Add setup and deployment instructions

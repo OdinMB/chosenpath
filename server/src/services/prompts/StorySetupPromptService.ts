@@ -43,7 +43,7 @@ export class StorySetupPromptService {
       this.getStatGuidelines(playerCount > 1) +
       "\n\n" +
       "#".repeat(100) +
-      '\n\nRemember: these are all just examples. The story setup that you will be creating now has to work for the following prompt:\n\n"' +
+      '\n\nRemember: these are all just examples. The story setup that you will be creating now must be fully custimized to work for the following prompt:\n\n"' +
       prompt.toUpperCase() +
       '"';
 

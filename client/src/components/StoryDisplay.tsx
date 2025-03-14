@@ -181,6 +181,11 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         <div className="space-y-4 md:space-y-6">
           {currentBeat && (
             <>
+              {displayedBeatIndex === 0 && (
+                <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-indigo-800">
+                  {storyState.title}
+                </h1>
+              )}
               <h2 className="text-xl md:text-2xl font-bold text-center">
                 {currentBeat.title}
               </h2>

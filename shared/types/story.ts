@@ -101,6 +101,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
       sharedStats: z
         .array(statSchema)
         .describe("Stats that are shared among players"),
+      title: z.string().describe("Title of the story"),
     })
     .strict()
     .describe("Initial setup for the story");
@@ -108,6 +109,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
 
 // Helper type for the response - simplified by using ExactPlayerMap
 export type StorySetup<N extends PlayerCount> = {
+  title: string;
   guidelines: z.infer<typeof guidelinesSchema>;
   storyElements: z.infer<typeof StoryElementsSchema>;
   sharedOutcomes: Outcome[];
@@ -128,6 +130,7 @@ export type Guidelines = z.infer<typeof guidelinesSchema>;
 
 // Direct type definition for StoryState
 export type StoryState = {
+  title: string;
   gameMode: GameMode;
   guidelines: Guidelines;
   storyElements: StoryElement[];
@@ -144,6 +147,7 @@ export type StoryState = {
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
+  title: string;
   gameMode: GameMode;
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   sharedStats: z.infer<typeof statsSchema>;

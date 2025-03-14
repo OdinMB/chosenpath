@@ -141,7 +141,7 @@ ${
         : ""
     }
 
-${story.isMultiplayer ? "4." : "3."} GENERATE ONE STORY BEAT FOR EACH PLAYER
+${story.isMultiplayer() ? "4." : "3."} GENERATE ONE STORY BEAT FOR EACH PLAYER
 
 BEAT PLAN
 

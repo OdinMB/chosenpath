@@ -210,14 +210,19 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
             />
           </div>
 
-          <button
-            onClick={onExitGame}
-            className="mt-4 text-sm font-medium transition-colors duration-200
-              md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
-              w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
-          >
-            Exit story
-          </button>
+          <div className="mt-4 text-center">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              {storyState.title}
+            </h3>
+            <button
+              onClick={onExitGame}
+              className="text-sm font-medium transition-colors duration-200
+                md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
+                w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
+            >
+              Exit story
+            </button>
+          </div>
         </aside>
 
         {/* Main Content Area */}

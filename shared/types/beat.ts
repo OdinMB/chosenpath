@@ -36,7 +36,7 @@ const optionChallengeSchema = z
     resourceType: z
       .enum(OPTION_RESOURCE_TYPES)
       .describe(
-        "Whether this option involves sacrificing a stat in exchange for a higher chance of success ('sacrifice'), gaining a stat as a reward for choosing an option with lower chance of success ('reward'), or none of these two ('normal'). Sacrifice and reward options can only be created for stats that allow for sacrifices and serving as rewards in their stat definitions."
+        "Whether this option involves sacrificing a stat in exchange for a higher chance of success ('sacrifice'), gaining a stat as a reward for choosing an option with lower chance of success ('reward'), or none of these two ('normal'). Sacrifice and reward options can only be created for stats that allow for sacrifices and serving as rewards in their stat definitions. Sacrificed stats are always lost, and rewards are always gained (not a matter of chance)."
       ),
     text: z
       .string()
