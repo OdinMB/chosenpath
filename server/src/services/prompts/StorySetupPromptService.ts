@@ -43,7 +43,7 @@ export class StorySetupPromptService {
       this.getStatGuidelines(playerCount > 1) +
       "\n\n" +
       "#".repeat(100) +
-      'Remember: these are all just examples. The story setup that you will be creating now has to work for the following prompt:\n\n"' +
+      '\n\nRemember: these are all just examples. The story setup that you will be creating now has to work for the following prompt:\n\n"' +
       prompt.toUpperCase() +
       '"';
 
@@ -204,7 +204,7 @@ Options (if any) for gaining the stat as a reward for choosing a lower chance of
 Must be expressed in the context of individual beats.
 Examples:
 - "Can spend 20% energy to use a power"
-- "Can spend 50 gold to bribe an NPC for +20 points in an interaction challenge"
+- "Can spend 50 gold to bribe an NPC in an interaction challenge"
 - "Can find plants in the forest for not focusing fully on the core task at hand"
 
 Narrative Thresholds and Implications.
@@ -253,6 +253,7 @@ player stats:
     "Powers may temporarily weaken (-10 points effectiveness) after an unfavorable resolution in a thread where they were heavily relied upon",
     "Powers can evolve to more potent versions after repeated successful use in critical moments"
   ]
+  canBeChangedInBeatResolutions: false (seasonal powers require dedicated threads to evolve)
 
 - Energy (percentage)
   id: player1_energy
@@ -273,6 +274,7 @@ player stats:
     "Decreases by 10% after unfavorable resolutions in threads involving intense spiritual activity",
     "Can be fully restored after a favorable resolution in a thread focused on spiritual renewal"
   ]
+  canBeChangedInBeatResolutions: true (energy can fluctuate in a single beat)
 
 - Followers (number)
   id: player1_followers_count
@@ -293,6 +295,7 @@ player stats:
     "Gain 10/20 followers after mixed/favorable resolution of a thread involving public displays of power",
     "Lose 5-15 followers after unfavorable resolutions where the spirit appears weak"
   ]
+  canBeChangedInBeatResolutions: true (followers can be gained or lost in a single beat)
 
 - Special followers (string[])
   id: player1_special_followers
@@ -301,7 +304,7 @@ player stats:
   effectOnPoints: [
     "+15 points in challenges where a special follower's expertise directly applies",
     "+10 points in social challenges with NPCs from the same profession as your special followers",
-    "Combinations of complementary followers (e.g., Sage + Artisan) provide +20 points in creative problem-solving"
+    "Combinations of complementary followers (e.g., Sage + Artisan) can provide bonsues for creative problem-solving"
   ]
   optionsToSacrifice: "Can send a special follower on a dangerous mission for a +30 bonus, risking their permanent loss"
   optionsToGainAsReward: "Can recruit a special follower by choosing to help a skilled individual instead of pursuing the main objective"
@@ -315,6 +318,7 @@ player stats:
     "Special followers may leave after consecutive unfavorable thread resolutions",
     "Special followers can evolve to more powerful versions after contributing to favorable thread resolutions"
   ]
+  canBeChangedInBeatResolutions: false (special followers are too important to be lost or added within a single beat, except through sacrifices or reward options)
 
 shared stats:
 - Threats (string[])
@@ -338,6 +342,7 @@ shared stats:
     "Threats can be removed through dedicated challenge threads with favorable resolutions",
     "Threats may evolve or combine if multiple remain unaddressed for several threads"
   ]
+  canBeChangedInBeatResolutions: false (forest threats are too big to be solved or added within a single beat)
 
 - Health (percentage)
   id: shared_forest_health
@@ -359,6 +364,9 @@ shared stats:
     "Increases by 20% after favorable resolutions in threads focused on healing the forest",
     "Can be permanently reduced by certain unfavorable thread resolutions"
   ]
+  canBeChangedInBeatResolutions: true (forest health can fluctuate a little in a single beat)
+
+##########
 
 Premise: The last rock band on Mars tries to make it while following individual dreams (cooperative-competitive)
 player stats:
@@ -382,6 +390,7 @@ player stats:
     "Increases by 20% after favorable resolutions in performance threads",
     "Decreases by 5-10% after public failures or embarrassments"
   ]
+  canBeChangedInBeatResolutions: false (stage presence should only be changed after a thread is resolved, except for sacrifice and reward options)
 
 - Instrument Mastery (string)
   id: player1_instrument_mastery
@@ -403,6 +412,7 @@ player stats:
     "Advances one level after favorable resolutions in threads focused on practice or performance",
     "Virtuoso and Legend levels require dedicated mastery threads with favorable resolutions"
   ]
+  canBeChangedInBeatResolutions: false (same as stage presence)
 
 - Band Loyalty|Solo Ambition (opposites)
   id: player1_loyalty_ambition
@@ -424,6 +434,7 @@ player stats:
     "Shifts 5-15% toward Band Loyalty after favorable resolutions in collaborative threads",
     "Major decisions in critical moments can cause shifts of up to 20%"
   ]
+  canBeChangedInBeatResolutions: false (should be decided by threads, not as random adjustments in single beats)
 
 - Personal Dream (string)
   id: player1_personal_dream
@@ -445,6 +456,7 @@ player stats:
     "Advances one stage after favorable resolutions in threads focused on personal development",
     "Final stage requires a dedicated culmination thread with favorable resolution"
   ]
+  canBeChangedInBeatResolutions: false (requires dedicated threads to evolve)
 
 shared stats:
 - Gear Quality (string)
@@ -468,6 +480,7 @@ shared stats:
     "Can improve one level after favorable resolutions in threads focused on equipment acquisition or repair",
     "Extreme performance conditions (dust storms, temperature) may cause unexpected degradation"
   ]
+  canBeChangedInBeatResolutions: false (as a percentage stat, it could be changed in a single beat, but as a 4-stage string stat, it should only be changed after a thread is resolved or through sacrifices and rewards)
 
 - Fans (number)
   id: shared_fan_count
@@ -488,6 +501,7 @@ shared stats:
     "Increases by 50-200 after favorable resolutions in performance threads",
     "Decreases by 50-100 after unfavorable resolutions that disappoint audiences"
   ]
+  canBeChangedInBeatResolutions: true (some fans can be gained or lost in a single beat)
 
 - Group Chemistry (percentage)
   id: shared_group_chemistry
@@ -509,6 +523,7 @@ shared stats:
     "Decreases by 5-15% after conflicts or when individual ambitions are prioritized",
     "Affected by the average Band Loyalty|Solo Ambition balance across all players"
   ]
+  canBeChangedInBeatResolutions: true (group chemistry can fluctuate a little in a single beat)
 `;
   }
 

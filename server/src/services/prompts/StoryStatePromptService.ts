@@ -10,8 +10,9 @@ export interface SectionConfig {
   guidelines?: boolean;
   storyElements?: boolean;
   worldFacts?: boolean;
-  sharedStats?: boolean;
-  sharedOutcomes?: boolean;
+  stats?: boolean;
+  detailedStats?: boolean;
+  outcomes?: boolean;
   imageLibrary?: boolean;
   players?: boolean;
   storyProgress?: boolean;
@@ -38,16 +39,16 @@ export class StoryStatePromptService {
     if (sections.worldFacts) {
       promptSections.push(this.createWorldFactsSection(story));
     }
-    if (sections.sharedOutcomes) {
-      promptSections.push(this.createSharedOutcomesSection(story));
+    if (sections.outcomes) {
+      promptSections.push(this.createOutcomesSection(story));
     }
-    if (sections.sharedStats) {
+    if (sections.stats) {
       promptSections.push(
         [
           "SHARED STATS:",
           story
             .getSharedStats()
-            .map((stat) => this.formatStatDisplay(stat))
+            .map((stat) => this.formatStatDisplay(stat, sections.detailedStats))
             .join("\n\n"),
           "",
         ].join("\n")
@@ -57,7 +58,7 @@ export class StoryStatePromptService {
       promptSections.push(this.createImageLibrarySection(story));
     }
     if (sections.players) {
-      promptSections.push(this.createPlayersSection(story));
+      promptSections.push(this.createPlayersSection(story, sections));
     }
     if (sections.storyProgress) {
       promptSections.push(this.createStoryProgressSection(story));
@@ -193,8 +194,28 @@ ${modeDescriptions[story.getGameMode()]}
     }
   }
 
-  private static formatStatDisplay(stat: Stat): string {
+  private static formatStatDisplay(
+    stat: Stat,
+    detailed: boolean = true
+  ): string {
     const formattedValue = this.formatStatValue(stat);
+
+    // Basic stat information
+    const basicInfo = `- ${stat.name.toUpperCase()} (id: ${stat.id}, type: ${
+      stat.type
+    }): ${formattedValue}`;
+
+    if (!detailed) {
+      // Only include narrative implications for non-detailed view
+      const narrativeImplications = stat.narrativeImplications?.length
+        ? `\n${
+            detailed ? "  - Narrative: " : ""
+          }${stat.narrativeImplications.join(", ")}`
+        : "";
+      return basicInfo + narrativeImplications;
+    }
+
+    // Detailed stat information
     const visibility =
       stat.isVisible === false ? " (not visible to the player)" : "";
     const narrativeImplications = stat.narrativeImplications?.length
@@ -217,22 +238,51 @@ ${modeDescriptions[story.getGameMode()]}
         )}`
       : "";
     const canBeChangedInBeatResolutions = stat.canBeChangedInBeatResolutions
-      ? `\n  - Can be changed in beat resolutions`
-      : "\n  - Cannot be changed in beat resolutions";
+      ? `\n  - Can be adjusted anytime`
+      : "\n  - Can only be changed when a thread gets resolved or through sacrifice/reward options";
 
-    return `- ${stat.name.toUpperCase()} (id: ${stat.id}, type: ${
-      stat.type
-    }): ${formattedValue}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}${canBeChangedInBeatResolutions}`;
+    return `${basicInfo}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}${canBeChangedInBeatResolutions}`;
   }
 
-  private static createPlayersSection(story: Story): string {
+  private static createOutcomesSection(story: Story): string {
+    // Only display shared outcomes
+    return [
+      "SHARED OUTCOMES that will affect all players:",
+      this.createOutcomesListSection(story.getSharedOutcomes()),
+      "",
+    ].join("\n");
+  }
+
+  private static createOutcomesListSection(outcomes: any[]): string {
+    return outcomes
+      .map((outcome) => {
+        const resolutions = this.formatResolutions(outcome.possibleResolutions);
+        return [
+          `ID: ${outcome.id}`,
+          `Question: ${outcome.question}`,
+          "Possible resolutions:\n" + resolutions,
+          `Resonance: ${outcome.resonance}`,
+          `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
+          outcome.milestones
+            .map((milestone: string) => `- ${milestone}`)
+            .join("\n"),
+        ].join("\n");
+      })
+      .join("\n");
+  }
+
+  private static createPlayersSection(
+    story: Story,
+    sections?: SectionConfig
+  ): string {
     return Object.entries(story.getPlayers())
       .map(([slot, playerState]) => {
         const beatHistorySection = this.createBeatHistorySection(
           playerState.beatHistory
         );
         const separator = "#####################################";
-        return [
+
+        const playerSections = [
           separator,
           `######## PLAYER ID: ${slot} ########`,
           separator,
@@ -240,20 +290,39 @@ ${modeDescriptions[story.getGameMode()]}
           `${playerState.character.name} (${playerState.character.pronouns})`,
           playerState.character.fluff,
           "",
-          "CHARACTER STATS:",
-          playerState.characterStats
-            .map((stat) => this.formatStatDisplay(stat))
-            .join("\n\n"),
-          "",
-          "OUTCOMES that will define this character's story ending:",
-          this.createOutcomesSection(playerState.outcomes),
-          "",
+        ];
+
+        // Only include character stats if the stats setting is true
+        if (sections?.stats) {
+          playerSections.push(
+            "CHARACTER STATS:",
+            playerState.characterStats
+              .map((stat) =>
+                this.formatStatDisplay(stat, sections.detailedStats)
+              )
+              .join("\n\n"),
+            ""
+          );
+        }
+
+        // Only include outcomes if the setting is true
+        if (sections?.outcomes) {
+          playerSections.push(
+            "OUTCOMES that will define this character's story ending:",
+            this.createOutcomesListSection(playerState.outcomes),
+            ""
+          );
+        }
+
+        playerSections.push(
           "STORY ELEMENTS THAT THIS CHARACTER HAS BEEN INTRODUCED TO: ",
           playerState.knownStoryElements.join(", "),
           "",
           "BEAT HISTORY:",
-          beatHistorySection,
-        ].join("\n");
+          beatHistorySection
+        );
+
+        return playerSections.join("\n");
       })
       .join("\n\n" + "=".repeat(80) + "\n\n");
   }
@@ -284,60 +353,11 @@ ${modeDescriptions[story.getGameMode()]}
             })`
           : "";
 
-        return `Beat ${index + 1}: ${beat.title}
-Summary: ${beat.summary}
-Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
-      })
-      .join("\n\n");
-  }
-
-  private static createOutcomesSection(outcomes: any[]): string {
-    return outcomes
-      .map((outcome) => {
-        const resolutions = this.formatResolutions(outcome.possibleResolutions);
-        return [
-          `ID: ${outcome.id}`,
-          `Question: ${outcome.question}`,
-          "Possible resolutions:\n" + resolutions,
-          `Resonance: ${outcome.resonance}`,
-          `Milestones (${outcome.milestones.length} / ${outcome.intendedNumberOfMilestones} to resolution):`,
-          outcome.milestones
-            .map((milestone: string) => `- ${milestone}`)
-            .join("\n"),
-        ].join("\n");
+        return `- Beat ${index + 1}: ${beat.title}
+  Summary: ${beat.summary}
+  Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
       })
       .join("\n");
-  }
-
-  private static formatResolutions(resolutions: any): string {
-    // Standard resolutions (favorable/unfavorable/mixed)
-    if ("favorable" in resolutions) {
-      return [
-        `- Favorable: ${resolutions.favorable}`,
-        `- Mixed: ${resolutions.mixed}`,
-        `- Unfavorable: ${resolutions.unfavorable}`,
-      ].join("\n");
-    }
-
-    // Contested resolutions (sideAWins/sideBWins/mixed)
-    if ("sideAWins" in resolutions) {
-      return [
-        `- Side A wins: ${resolutions.sideAWins}`,
-        `- Mixed: ${resolutions.mixed}`,
-        `- Side B wins: ${resolutions.sideBWins}`,
-      ].join("\n");
-    }
-
-    // Exploratory resolutions (resolution1/2/3)
-    if ("resolution1" in resolutions) {
-      return [
-        `- ${resolutions.resolution1}`,
-        `- ${resolutions.resolution2}`,
-        `- ${resolutions.resolution3}`,
-      ].join("\n");
-    }
-
-    return "No resolutions defined";
   }
 
   private static createStoryProgressSection(story: Story): string {
@@ -346,14 +366,6 @@ Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
     return `\n======= STORY PROGRESS =======\n\nCurrent turn: ${
       turnsDone + 1
     }/${story.getMaxTurns()}\nTurns left (including this one): ${turnsLeft}\n`;
-  }
-
-  private static createSharedOutcomesSection(story: Story): string {
-    return [
-      "SHARED OUTCOMES that will affect all players:",
-      this.createOutcomesSection(story.getSharedOutcomes()),
-      "",
-    ].join("\n");
   }
 
   public static getSwitchConfiguration(
@@ -741,5 +753,36 @@ Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
           .join("\n");
       })
       .join("\n");
+  }
+
+  private static formatResolutions(resolutions: any): string {
+    // Standard resolutions (favorable/unfavorable/mixed)
+    if ("favorable" in resolutions) {
+      return [
+        `- Favorable: ${resolutions.favorable}`,
+        `- Mixed: ${resolutions.mixed}`,
+        `- Unfavorable: ${resolutions.unfavorable}`,
+      ].join("\n");
+    }
+
+    // Contested resolutions (sideAWins/sideBWins/mixed)
+    if ("sideAWins" in resolutions) {
+      return [
+        `- Side A wins: ${resolutions.sideAWins}`,
+        `- Mixed: ${resolutions.mixed}`,
+        `- Side B wins: ${resolutions.sideBWins}`,
+      ].join("\n");
+    }
+
+    // Exploratory resolutions (resolution1/2/3)
+    if ("resolution1" in resolutions) {
+      return [
+        `- ${resolutions.resolution1}`,
+        `- ${resolutions.resolution2}`,
+        `- ${resolutions.resolution3}`,
+      ].join("\n");
+    }
+
+    return "No resolutions defined";
   }
 }

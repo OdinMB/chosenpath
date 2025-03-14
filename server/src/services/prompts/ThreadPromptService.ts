@@ -10,8 +10,9 @@ export class ThreadPromptService {
     guidelines: true,
     storyElements: true,
     worldFacts: true,
-    sharedStats: true,
-    sharedOutcomes: true,
+    stats: true,
+    detailedStats: false,
+    outcomes: false,
     players: true,
     // storyProgress: true,
   } as const;

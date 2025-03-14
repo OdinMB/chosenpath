@@ -4,7 +4,6 @@ Smaller and more commits!
 
 Improvements
 
-- story state sections: use outcomes parameter for determining both player and shared outcome display. Don't show outcomes in thread generation prompt.
 - repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
   - Alternatively, break this whole 20-step mess down into smaller LLM interactions?
 - Attach facts to players?

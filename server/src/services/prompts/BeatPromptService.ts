@@ -10,8 +10,8 @@ export class BeatPromptService {
     guidelines: true,
     storyElements: true,
     worldFacts: true,
-    sharedOutcomes: true,
-    sharedStats: true,
+    stats: true,
+    detailedStats: true,
     imageLibrary: true,
     players: true,
     storyProgress: true,
@@ -30,14 +30,17 @@ export class BeatPromptService {
   }
 
   static createBeatPrompt(story: Story): string {
+    // Create a copy of SECTIONS_GAME_STATE and set outcomes based on beat type
+    const sections = {
+      ...this.SECTIONS_GAME_STATE,
+      outcomes: story.getCurrentBeatType() === "switch",
+    };
+
     const prompt =
       this.createContextSection(story) +
       "\n" +
       "======= CURRENT GAME STATE =======\n\n" +
-      StoryStatePromptService.createStoryStatePrompt(
-        story,
-        this.SECTIONS_GAME_STATE
-      ) +
+      StoryStatePromptService.createStoryStatePrompt(story, sections) +
       "\n\n" +
       this.createInstructionsSection(story) +
       "\n\n" +
@@ -117,18 +120,18 @@ ${
 ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
-    : "- STAT CHANGES\n" +
-      "--- If a player chose a sacrifice option to gain a higher chance of success, that player should lose whatever was sacrificed.\n" +
-      "--- If a player chose a reward option and accepted a lower chance of success, that player should gain their reward.\n" +
+    : "STAT CHANGES\n" +
+      "- If a player chose a sacrifice option to gain a higher chance of success, that player should lose whatever was sacrificed.\n" +
+      "- If a player chose a reward option and accepted a lower chance of success, that player should gain their reward.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
-        ? "--- For thread resolutions, meaningful stat changes can be warrented.\n" +
-          "--- Consider what was at stake in the previous thread and the thread's resolution.\n" +
-          "--- Keep the story state in mind when determining what changes are warrented (parameter 'Adjustments after threads' in the stat definitions).\n" +
-          "--- When a thread is resolved, all stats can change, not just the ones that are marked as 'can be changed in beat resolutions'.\n" +
-          "- NEW MILESTONES: The previous thread (or set of threads) was just resolved. For each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
-          "--- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
-        : "--- For beat resolutions, only stats that are marked as 'can be changed in beat resolutions' can be changed. Even then, keep the changes minor.\n")
+        ? "- The previous thread (or set of threads) was just resolved, so some meaningful stat changes might be warrented.\n" +
+          "- Consider what was at stake in the previous thread and the thread's resolution.\n" +
+          "- Stats define how they should be adjusted after threads. Consider the 'Adjustments after threads' parameter in the stat definitions.\n" +
+          "- When a thread is resolved, all stats can change, not just the ones that are marked as 'can be changed in beat resolutions'.\n" +
+          "\nNEW MILESTONES: To resolve the previous set of threads, for each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
+          "- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
+        : "- For beat resolutions, only stats that are marked as 'can always be adjusted' can be changed. Even then, keep the changes minor.\n")
 }${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
@@ -199,10 +202,10 @@ ${
 Which information from other beats that you already created in this turn do we need to consider for this beat?
 Create a bullet list of things that happened in other beats that you already created in this turn that we should consider for this beat.
 - This is particularly important if several players are in the same thread or switch (so the beats for the different players are consistent with each other).
-- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.`
+- If this is the first beat you are creating in this turn (for player1), there is nothing to consider.
+`
     : ""
 }
-
 How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
 
@@ -221,10 +224,12 @@ ${
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
           "\n- Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? These options should apply a large malus to success chances." +
-          "\n--- Example: If the group is trying to move silently through a forest, a reward option (with negative base points) could be to search for medical plants." +
+          "\n--- Only offer reward options for stats that allow for rewards in their stat definitions." +
+          "\n--- Example: An energy stat might specify that it can be used as a reward when the player chooses to rest instead of focusing on the thread's goal." +
           "\n- Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? These options should grant a large bonus to success chances." +
+          "\n--- Only offer sacrifice options for stats that allow for sacrifices in their stat definitions." +
           "\n--- Example: The player's gold stat might specify that 50 gold can be used to bribe NPCs." +
-          "\n--- Example: The player can use special abilities for mana/energy/stamina." +
+          "\n--- Example: The player's mana stat might specify that the player can use special abilities for 20 mana each." +
           "\n- Which stats and their current values (both individual and shared) affect which options are available to the player narratively (not mechanically in terms of success chances)? Consider especially the narrative function of stats." +
           "\n--- Example: If force|agility stat leans toward force, the options should be forceful rather than sneaky."
         : "\n- Topic switches already have their options defined in the switch configuration.")
@@ -255,20 +260,19 @@ Text
 ${
   story.getCurrentBeatType() === "thread" &&
   story.getCurrentThreadBeatsCompleted() > 0
-    ? "- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult."
-    : ""
-}
-${
-  !story.isFirstBeat() && story.getCurrentBeatType() === "switch"
-    ? "- Most of the beat text\n" +
-      "--- should be about the resolution of the previous thread that the player was involved in.\n" +
-      "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
-      (story.isMultiplayer()
-        ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players.\n" +
-          "--- If there were other threads than the one with the player, describe the resolution of the other threads. (Unless it would be implausible for the player to know about it.)"
-        : "")
+    ? "- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult.\n"
     : ""
 }${
+      !story.isFirstBeat() && story.getCurrentBeatType() === "switch"
+        ? "- Most of the beat text\n" +
+          "--- should be about the resolution of the previous thread that the player was involved in.\n" +
+          "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
+          (story.isMultiplayer()
+            ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players.\n" +
+              "--- If there were other threads than the one with the player, describe the resolution of the other threads. (Unless it would be implausible for the player to know about it.)"
+            : "")
+        : ""
+    }${
       story.getCurrentBeatType() === "ending"
         ? "- Most of the beat text should be about the ending of the story for the player at hand.\n" +
           "--- Process the outcome of the previous thread that the player was involved in, then transition to the overall ending of the story.\n"
@@ -331,8 +335,8 @@ ${
             : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
               "--- Use 'challenge' for options in Challenge threads and Contest threads.\n") +
           "- Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).\n" +
-          "--- You can only define sacrifice and reward options for stats that have defined options to be sacrificed or gained as reward in the story state.\n" +
-          "--- Only have a maximum of 1 sacrifice/reward option per beat. 2-3 options must not involve any stat sacrifices and rewards.\n" +
+          "--- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.\n" +
+          "--- You can only generate 0-1 sacrifice/reward option per beat. 2-3 options must be normal.\n" +
           (story.getCurrentBeatType() === "thread"
             ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
               "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +20 - +30 for sacrifice options. -20 - -30 for reward options.\n" +

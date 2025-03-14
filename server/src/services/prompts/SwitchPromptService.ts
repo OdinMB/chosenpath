@@ -11,8 +11,10 @@ export class SwitchPromptService {
     guidelines: true,
     storyElements: true,
     worldFacts: true,
-    sharedOutcomes: true,
-    sharedStats: true,
+    stats: true,
+    detailedStats: false,
+    outcomes: true,
+    imageLibrary: true,
     players: true,
     storyProgress: true,
   } as const;
