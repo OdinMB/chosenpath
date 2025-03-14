@@ -212,8 +212,7 @@ ${gameWorldInstructions}
 ${
   story.getCurrentBeatType() !== "ending"
     ? "What should we consider as we create the options for this beat? Cover the following points:\n" +
-      "- How can we reinforce the story's key conflicts and focused types of decisions?\n" +
-      "- What are the requirements from the " +
+      "- Most important: What are the requirements from the " +
       story.getCurrentBeatType() +
       " configuration" +
       (story.getCurrentBeatType() === "thread"
@@ -232,10 +231,10 @@ ${
           "\n--- Example: The player's mana stat might specify that the player can use special abilities for 20 mana each." +
           "\n- Which stats and their current values (both individual and shared) affect which options are available to the player narratively (not mechanically in terms of success chances)? Consider especially the narrative function of stats." +
           "\n--- Example: If force|agility stat leans toward force, the options should be forceful rather than sneaky."
-        : "\n- Topic switches already have their options defined in the switch configuration.")
+        : "\n- How can we reinforce the story's key conflicts and focused types of decisions?" +
+          "\n- Remember that topic switches already have their options defined in the switch configuration.")
     : ""
 }
-
 
 BEAT ATTRIBUTES
 
