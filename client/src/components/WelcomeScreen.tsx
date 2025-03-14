@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AppTitle } from "./AppTitle";
 
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
@@ -34,7 +35,7 @@ export function WelcomeScreen({
   const handleDeleteClick = () => {
     if (
       window.confirm(
-        "Are you sure you want to delete this story code? This cannot be undone."
+        "Are you sure you want to delete this player code? This cannot be undone."
       )
     ) {
       onDeleteCode();
@@ -42,35 +43,28 @@ export function WelcomeScreen({
   };
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Multiplayer Interactive Fiction Generator
-      </h1>
+    <div className="max-w-md mx-auto p-6 font-lora">
+      <AppTitle size="large" className="mb-10" />
 
       <div className="space-y-6">
         {existingPlayerCode && (
           <>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">Your story code:</span>
-                <code className="bg-gray-100 px-3 py-1 rounded-lg font-mono text-sm text-gray-800">
-                  {existingPlayerCode}
-                </code>
+            <div className="flex flex-row gap-3">
+              <div className="flex-1 h-10 px-4 py-2 border rounded-lg bg-gray-100 font-mono text-sm text-gray-800 flex items-center">
+                {existingPlayerCode}
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleResume}
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Resume Your Story
-                </button>
-                <button
-                  onClick={handleDeleteClick}
-                  className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  Delete Code
-                </button>
-              </div>
+              <button
+                onClick={handleResume}
+                className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 whitespace-nowrap flex-shrink-0"
+              >
+                Resume Story
+              </button>
+              <button
+                onClick={handleDeleteClick}
+                className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 whitespace-nowrap flex-shrink-0"
+              >
+                Delete
+              </button>
             </div>
 
             <div className="relative">
@@ -85,32 +79,24 @@ export function WelcomeScreen({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="code"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              {existingPlayerCode
-                ? "Have a different player code?"
-                : "Have a player code?"}
-            </label>
+          <div className="flex flex-row gap-3">
             <input
               id="code"
               type="text"
               value={code}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
               placeholder="Enter your player code"
             />
-          </div>
 
-          <button
-            type="submit"
-            disabled={!code.trim()}
-            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Join Game
-          </button>
+            <button
+              type="submit"
+              disabled={!code.trim()}
+              className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
+            >
+              Join Game
+            </button>
+          </div>
         </form>
 
         <div className="relative">
@@ -124,7 +110,7 @@ export function WelcomeScreen({
 
         <button
           onClick={onNewStory}
-          className="w-full py-2 px-4 border-2 border-indigo-600 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="w-full h-10 py-2 px-4 border-2 border-indigo-600 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           Start New Story
         </button>

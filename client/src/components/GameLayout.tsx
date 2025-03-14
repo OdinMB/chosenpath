@@ -101,7 +101,7 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
   const allStats = [...player.characterStats, ...storyState.sharedStats];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen font-lora">
       {/* Mobile Stats Toggle */}
       <button
         onClick={() => setShowStats(!showStats)}

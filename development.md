@@ -10,7 +10,6 @@ Improve stat setups and option definitions
 
 New features
 
-- Titles for stories (show in resume story section in Welcome screen)
 - Let player choose/adjust starting position (name, pronouns, stats)
 - Library of stories with pre-configured setups
 - Images: generate one for each player and story element and only use iamges from that list?

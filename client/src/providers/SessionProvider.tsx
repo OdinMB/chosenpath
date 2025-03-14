@@ -61,7 +61,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("story_codes", (data: WSServerMessage) => {
       if (data.type === "story_codes") {
-        console.log("[SessionProvider] Received story codes:", data.codes);
+        console.log("[SessionProvider] Received player codes:", data.codes);
         setStoryCodes(data.codes);
         setIsLoading(false);
       }

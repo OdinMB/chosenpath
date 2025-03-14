@@ -139,7 +139,7 @@ export class WebSocketService {
 
     // Add handler for story_codes events
     this.socket.on("story_codes", (data: { codes: Record<string, string> }) => {
-      console.log("[WebSocketService] Story codes received:", data);
+      console.log("[WebSocketService] Player codes received:", data);
       const handler = this.messageHandlers.get("story_codes");
       if (handler) {
         handler({ type: "story_codes", codes: data.codes });

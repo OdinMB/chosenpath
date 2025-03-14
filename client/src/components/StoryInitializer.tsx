@@ -8,6 +8,7 @@ import {
   DEFAULT_TURNS,
 } from "shared/config.js";
 import { GameMode, GameModes } from "shared/types/story.js";
+import { AppTitle } from "./AppTitle";
 
 interface StoryInitializerProps {
   onSetup: (options: {
@@ -146,11 +147,9 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 text-center">
-          Interactive Fiction Generator
-        </h1>
+        <AppTitle size="large" className="mb-10" />
 
         {isConnecting ? (
           <div className="text-center py-4">

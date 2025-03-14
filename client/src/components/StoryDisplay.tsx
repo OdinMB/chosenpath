@@ -119,7 +119,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               key={index}
               onClick={() => handleChoiceClick(index)}
               className={`w-full p-4 text-lg text-left rounded-lg transition-colors 
-                bg-gray-100 hover:bg-gray-200 cursor-pointer`}
+                bg-gray-100 hover:bg-gray-200 cursor-pointer font-lora`}
             >
               {option.text}
             </button>
@@ -135,7 +135,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   if (playerState.beatHistory.length === 0) {
     return (
-      <div className="story-display h-full flex items-center justify-center">
+      <div className="story-display h-full flex items-center justify-center font-lora">
         <div className="text-center">
           <svg
             className="animate-spin h-8 w-8 text-gray-600 mx-auto mb-4"
@@ -166,7 +166,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   }
 
   return (
-    <div className="story-display relative flex flex-col h-full">
+    <div className="story-display relative flex flex-col h-full font-lora">
       <div className="sticky top-0 bg-white z-10">
         {beatHistory.length > 0 && (
           <BeatHistory
