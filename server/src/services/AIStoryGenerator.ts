@@ -49,6 +49,21 @@ export class AIStoryGenerator {
     });
   }
 
+  private getDefaultStatValue(statType: string): number | string | string[] {
+    switch (statType) {
+      case "number":
+      case "percentage":
+      case "opposites":
+        return -1;
+      case "string":
+        return "fix me";
+      case "string[]":
+        return ["fix me"];
+      default:
+        return -1;
+    }
+  }
+
   public async createInitialState(
     prompt: string,
     generateImages: boolean,
@@ -80,7 +95,9 @@ export class AIStoryGenerator {
 
       return {
         ...stat,
-        value: statValueEntry ? statValueEntry.value : 0,
+        value: statValueEntry
+          ? statValueEntry.value
+          : this.getDefaultStatValue(stat.type),
       };
     });
 
@@ -129,7 +146,7 @@ export class AIStoryGenerator {
             name: "", // Will be set during character selection
             pronouns: "", // Will be set during character selection
             fluff: "", // Will be set during character selection
-            outcomes: [], // Will be set during character selection? Otherwise: playerData.outcomes,
+            outcomes: playerData.outcomes,
             stats: [], // Will be set during character selection
             knownStoryElements: [],
             beatHistory: [],

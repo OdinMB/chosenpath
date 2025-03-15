@@ -287,8 +287,8 @@ ${modeDescriptions[story.getGameMode()]}
           `######## PLAYER ID: ${slot} ########`,
           separator,
           "",
-          `${playerState.character.name} (${playerState.character.pronouns})`,
-          playerState.character.fluff,
+          `${playerState.name} (${playerState.pronouns})`,
+          playerState.fluff,
           "",
         ];
 
@@ -296,8 +296,8 @@ ${modeDescriptions[story.getGameMode()]}
         if (sections?.stats) {
           playerSections.push(
             "CHARACTER STATS:",
-            playerState.characterStats
-              .map((stat) =>
+            playerState.stats
+              .map((stat: Stat) =>
                 this.formatStatDisplay(stat, sections.detailedStats)
               )
               .join("\n\n"),

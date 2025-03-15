@@ -5,6 +5,7 @@ import {
   statsSchema,
   statSchema,
   Stat,
+  ClientStat,
   statValueEntrySchema,
   StatValueEntry,
   initialStatValueDescription,
@@ -185,9 +186,17 @@ export type StoryState = {
 export type ClientStoryState = {
   title: string;
   gameMode: GameMode;
-  players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
-  sharedStats: z.infer<typeof statsSchema>;
+  players: Record<
+    (typeof PLAYER_SLOTS)[number],
+    Omit<PlayerState, "stats"> & { stats: ClientStat[] }
+  >;
+  sharedStats: ClientStat[];
   maxTurns: number;
+  characterSelectionCompleted: boolean;
+  characterSelectionOptions: Record<
+    (typeof PLAYER_SLOTS)[number],
+    PlayerOptionsGeneration
+  >;
   generateImages: boolean;
   images: ImageLibrary;
   numberOfPlayers: number;

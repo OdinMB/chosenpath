@@ -1,19 +1,16 @@
 import { useSession } from "../hooks/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
-import { z } from "zod";
-import { statSchema } from "../../../shared/types/stat";
+import { ClientStat } from "../../../shared/types/stat";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers";
-
-type Stat = z.infer<typeof statSchema>;
 
 interface Props {
   onExitGame: () => void;
   onChoiceSelected: (optionIndex: number) => void;
 }
 
-function StatGroup({ title, stats }: { title: string; stats: Stat[] }) {
+function StatGroup({ title, stats }: { title: string; stats: ClientStat[] }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
@@ -55,9 +52,15 @@ function StatGroup({ title, stats }: { title: string; stats: Stat[] }) {
   );
 }
 
-function StatSection({ title, stats }: { title?: string; stats: Stat[] }) {
+function StatSection({
+  title,
+  stats,
+}: {
+  title?: string;
+  stats: ClientStat[];
+}) {
   const visibleStats = stats.filter((stat) => stat.isVisible !== false);
-  const groupedStats = visibleStats.reduce<Record<string, Stat[]>>(
+  const groupedStats = visibleStats.reduce<Record<string, ClientStat[]>>(
     (acc, stat) => {
       const group = stat.group || "Other";
       acc[group] = [...(acc[group] || []), stat];
@@ -98,7 +101,7 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
   const playerSlot = Object.keys(storyState.players)[0];
   const player = storyState.players[playerSlot];
 
-  const allStats = [...player.characterStats, ...storyState.sharedStats];
+  const allStats: ClientStat[] = [...player.stats, ...storyState.sharedStats];
 
   return (
     <div className="min-h-screen font-lora">
@@ -158,7 +161,7 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
           <section className="mb-6 pb-4">
             <div className="flex items-center justify-center gap-2">
               <h2 className="text-xl font-semibold text-gray-900 mb-1">
-                {player.character.name}
+                {player.name}
               </h2>
               <button
                 onClick={() => setShowFluff(!showFluff)}
@@ -186,14 +189,10 @@ export function GameLayout({ onExitGame, onChoiceSelected }: Props) {
                 </svg>
               </button>
             </div>
-            <p className="text-gray-600 text-center">
-              {player.character.pronouns}
-            </p>
+            <p className="text-gray-600 text-center">{player.pronouns}</p>
             {showFluff && (
               <div className="bg-gray-50 rounded-lg p-3 mt-4 border border-gray-100">
-                <p className="text-gray-600 text-sm">
-                  {player.character.fluff}
-                </p>
+                <p className="text-gray-600 text-sm">{player.fluff}</p>
               </div>
             )}
           </section>

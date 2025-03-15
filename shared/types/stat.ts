@@ -136,3 +136,15 @@ export const statSchema = z
 
 export const statsSchema = z.array(statSchema);
 export type Stat = z.infer<typeof statSchema> & { value: StatValue };
+
+// Client-side version of Stat with sensitive fields omitted
+export type ClientStat = Omit<
+  Stat,
+  | "adjustmentsAfterThreads"
+  | "canBeChangedInBeatResolutions"
+  | "effectOnPoints"
+  | "narrativeImplications"
+  | "optionsToGainAsReward"
+  | "optionsToSacrifice"
+  | "possibleValues"
+>;

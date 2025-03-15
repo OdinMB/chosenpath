@@ -9,7 +9,7 @@ import {
 import { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { StoryElement } from "shared/types/storyElement.js";
 import { Outcome } from "shared/types/outcome.js";
-import { Stat } from "shared/types/stat.js";
+import { Stat, ClientStat } from "shared/types/stat.js";
 import { Beat, BeatType } from "shared/types/beat.js";
 import { SwitchAnalysis } from "shared/types/switch.js";
 import { ThreadAnalysis, Thread, Resolution } from "shared/types/thread.js";
@@ -175,6 +175,29 @@ export class Story {
     return entry ? (entry[0] as PlayerSlot) : null;
   }
 
+  /**
+   * Convert a Stat to a ClientStat by removing sensitive fields
+   */
+  private convertToClientStat(stat: Stat): ClientStat {
+    const {
+      adjustmentsAfterThreads,
+      canBeChangedInBeatResolutions,
+      effectOnPoints,
+      narrativeImplications,
+      optionsToSacrifice,
+      optionsToGainAsReward,
+      possibleValues,
+      ...clientStat
+    } = stat;
+
+    // Ensure value property exists
+    if (!("value" in clientStat)) {
+      console.error(`Stat ${stat.id} is missing value property`);
+    }
+
+    return clientStat as ClientStat;
+  }
+
   filterStateForPlayer(playerSlot: PlayerSlot): ClientStoryState {
     // Create a deep copy to avoid mutating the original state
     const filteredState = JSON.parse(JSON.stringify(this.state));
@@ -182,19 +205,10 @@ export class Story {
     // Only include the specific player's data
     const playerData = filteredState.players[playerSlot];
 
-    // Filter out hidden player stats and remove specified parameters
-    playerData.characterStats = playerData.characterStats
-      .filter((stat) => stat.isVisible !== false)
-      .map((stat) => {
-        const filteredStat = { ...stat };
-        delete filteredStat.adjustmentsAfterThreads;
-        delete filteredStat.canBeChangedInBeatResolutions;
-        delete filteredStat.effectOnPoints;
-        delete filteredStat.narrativeImplications;
-        delete filteredStat.optionsToGainAsReward;
-        delete filteredStat.possibleValues;
-        return filteredStat;
-      });
+    // Filter out hidden player stats and convert to ClientStat
+    playerData.stats = playerData.stats
+      .filter((stat: Stat) => stat.isVisible !== false)
+      .map((stat: Stat) => this.convertToClientStat(stat));
 
     // Filter out outcomes if they exist
     if (playerData.outcomes) {
@@ -235,19 +249,10 @@ export class Story {
 
     filteredState.players = { [playerSlot]: playerData };
 
-    // Filter out hidden shared stats and remove specified parameters
+    // Filter out hidden shared stats and convert to ClientStat
     filteredState.sharedStats = filteredState.sharedStats
-      .filter((stat) => stat.isVisible !== false)
-      .map((stat) => {
-        const filteredStat = { ...stat };
-        delete filteredStat.adjustmentsAfterThreads;
-        delete filteredStat.canBeChangedInBeatResolutions;
-        delete filteredStat.effectOnPoints;
-        delete filteredStat.narrativeImplications;
-        delete filteredStat.optionsToGainAsReward;
-        delete filteredStat.possibleValues;
-        return filteredStat;
-      });
+      .filter((stat: Stat) => stat.isVisible !== false)
+      .map((stat: Stat) => this.convertToClientStat(stat));
 
     // Get pending players
     const pendingPlayers = this.getPendingPlayers();
@@ -257,22 +262,28 @@ export class Story {
       [playerSlot]: filteredState.playerCodes[playerSlot],
     };
 
-    // Pick only the properties we want to send
-    const { players, sharedStats, maxTurns, generateImages, images, gameMode } =
-      filteredState;
+    // Filter characterSelectionOptions to only include data for this player
+    if (filteredState.characterSelectionOptions) {
+      filteredState.characterSelectionOptions = {
+        [playerSlot]: filteredState.characterSelectionOptions[playerSlot],
+      };
+    }
 
+    // Return only the properties needed for the client
     return {
       title: filteredState.title,
       numberOfPlayers: Object.keys(this.state.players).length,
-      players,
-      gameMode,
-      sharedStats,
-      maxTurns,
-      generateImages,
-      images,
+      players: filteredState.players,
+      gameMode: filteredState.gameMode,
+      sharedStats: filteredState.sharedStats,
+      maxTurns: filteredState.maxTurns,
+      characterSelectionCompleted: filteredState.characterSelectionCompleted,
+      characterSelectionOptions: filteredState.characterSelectionOptions,
+      generateImages: filteredState.generateImages,
+      images: filteredState.images,
       pendingPlayers,
       gameOver: this.getCurrentBeatType() === "ending",
-    };
+    } as ClientStoryState;
   }
 
   getCurrentPhase(): StoryPhase | null {

@@ -4,7 +4,7 @@ Smaller and more commits!
 
 Improve stat setups and option definitions
 
-- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values.
+- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values. (See getDefaultStatValue for "fix me" indicators.)
 - Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
 - Break this whole 20-step mess down into smaller LLM interactions?
 - Make prompts more concise?

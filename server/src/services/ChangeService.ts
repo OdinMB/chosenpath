@@ -175,14 +175,14 @@ export class ChangeService {
     );
     return this.updateStatsArray(
       story,
-      player.characterStats,
+      player.stats,
       change,
       (updatedStats) => ({
         players: {
           ...state.players,
           [playerSlot]: {
             ...player,
-            characterStats: updatedStats,
+            stats: updatedStats,
           },
         },
       })
@@ -238,13 +238,6 @@ export class ChangeService {
     change: Change & { type: "statChange" }
   ): Stat | null {
     switch (change.change) {
-      case "setBoolean":
-        // Boolean type is commented out in the schema but might be used in the future
-        // For now, we'll handle it but it won't match any current stat types
-        if (stat.type === ("boolean" as any)) {
-          return { ...stat, value: change.value as boolean };
-        }
-        break;
       case "setString":
         if (stat.type === "string") {
           return { ...stat, value: change.value as string };
