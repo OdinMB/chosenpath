@@ -31,11 +31,28 @@ export class GameWebSocketServer {
 
       const gameHandler = new GameHandler(socket);
 
+      // Set up global error handler for socket errors
+      socket.on("error", (error) => {
+        console.error("[WebSocket] Socket error:", error);
+        socket.emit("error", {
+          error: "Connection error",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      });
+
       socket.on("create_session", async () => {
-        const sessionId = crypto.randomUUID();
-        connectionManager.createGameSession(sessionId);
-        socket.emit("session_created", { sessionId });
-        console.log("[WebSocket] Session created:", sessionId);
+        try {
+          const sessionId = crypto.randomUUID();
+          connectionManager.createGameSession(sessionId);
+          socket.emit("session_created", { sessionId });
+          console.log("[WebSocket] Session created:", sessionId);
+        } catch (error) {
+          console.error("[WebSocket] Error creating session:", error);
+          socket.emit("error", {
+            error: "Failed to create session",
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
       });
 
       socket.on(
@@ -48,14 +65,19 @@ export class GameWebSocketServer {
           maxTurns: number;
           gameMode: GameMode;
         }) => {
-          console.log("[WebSocket] Initializing story with data:", data);
-          await gameHandler.initializeStory(
-            data.prompt,
-            data.generateImages,
-            data.playerCount as PlayerCount,
-            data.maxTurns,
-            data.gameMode
-          );
+          try {
+            console.log("[WebSocket] Initializing story with data:", data);
+            await gameHandler.initializeStory(
+              data.prompt,
+              data.generateImages,
+              data.playerCount as PlayerCount,
+              data.maxTurns,
+              data.gameMode
+            );
+          } catch (error) {
+            // Error is already handled by GameHandler, no need to emit again
+            console.error("[WebSocket] Error initializing story:", error);
+          }
         }
       );
 
@@ -63,70 +85,86 @@ export class GameWebSocketServer {
         try {
           await gameHandler.makeChoice(data.optionIndex);
         } catch (error) {
-          socket.emit("error", {
-            error:
-              error instanceof Error
-                ? error.message
-                : "Failed to process choice",
-          });
+          // Error is already handled by GameHandler, no need to emit again
+          console.error("[WebSocket] Error making choice:", error);
         }
       });
 
       socket.on(
         "verify_code",
         async (data: { sessionId: string; code: string }) => {
-          console.log("[WebSocket] Verifying code:", {
-            sessionId: data.sessionId,
-            code: data.code,
-          });
+          try {
+            console.log("[WebSocket] Verifying code:", {
+              sessionId: data.sessionId,
+              code: data.code,
+            });
 
-          // Get verification result from ConnectionManager
-          const result = await connectionManager.verifyCode(data.code);
+            // Get verification result from ConnectionManager
+            const result = await connectionManager.verifyCode(data.code);
 
-          if (result.state) {
-            // Add this connection to the player's active connections
-            const playerInfo = await connectionManager.getPlayerByCode(
-              data.code
-            );
-            if (playerInfo) {
-              connectionManager.addPlayer(
-                playerInfo.storyId,
-                playerInfo.playerSlot,
-                data.code,
-                socket
+            if (result.state) {
+              // Add this connection to the player's active connections
+              const playerInfo = await connectionManager.getPlayerByCode(
+                data.code
               );
+              if (playerInfo) {
+                connectionManager.addPlayer(
+                  playerInfo.storyId,
+                  playerInfo.playerSlot,
+                  data.code,
+                  socket
+                );
 
-              // Join the socket to the game's room
-              socket.join(playerInfo.storyId);
+                // Join the socket to the game's room
+                socket.join(playerInfo.storyId);
 
-              // Notify all clients in the game about active players
-              this.broadcastActivePlayersUpdate(playerInfo.storyId);
+                // Notify all clients in the game about active players
+                this.broadcastActivePlayersUpdate(playerInfo.storyId);
+              }
             }
-          }
 
-          // Send response to client
-          socket.emit("verify_code_response", {
-            type: "verify_code_response",
-            ...result,
-          });
+            // Send response to client
+            socket.emit("verify_code_response", {
+              type: "verify_code_response",
+              ...result,
+            });
+          } catch (error) {
+            console.error("[WebSocket] Error verifying code:", error);
+            socket.emit("error", {
+              error: "Failed to verify code",
+              details: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       );
 
       socket.on("exit_story", async () => {
-        await connectionManager.exitStory(socket.id);
-        socket.emit("exit_story_response");
+        try {
+          await connectionManager.exitStory(socket.id);
+          socket.emit("exit_story_response");
+        } catch (error) {
+          console.error("[WebSocket] Error exiting story:", error);
+          socket.emit("error", {
+            error: "Failed to exit story",
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
       });
 
       socket.on("disconnect", () => {
-        connectionManager.removeSocket(socket.id);
-        // Find affected game sessions and broadcast updates
-        this.broadcastActivePlayersUpdatesForSocket(socket.id);
-        console.log("[WebSocket] Client disconnected");
-        for (const [sessionId, clientSocket] of this.clients.entries()) {
-          if (clientSocket === socket) {
-            this.clients.delete(sessionId);
-            break;
+        try {
+          connectionManager.removeSocket(socket.id);
+          // Find affected game sessions and broadcast updates
+          this.broadcastActivePlayersUpdatesForSocket(socket.id);
+          console.log("[WebSocket] Client disconnected");
+          for (const [sessionId, clientSocket] of this.clients.entries()) {
+            if (clientSocket === socket) {
+              this.clients.delete(sessionId);
+              break;
+            }
           }
+        } catch (error) {
+          console.error("[WebSocket] Error handling disconnect:", error);
         }
       });
     });

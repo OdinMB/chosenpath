@@ -155,14 +155,58 @@ export class WebSocketService {
     });
 
     // Handle error events
-    this.socket.on("error", (error: string) => {
-      console.log("[WebSocketService] Socket error:", error);
-      if (error === "Session not found" || error === "Invalid session") {
-        this.sessionId = null;
-        localStorage.removeItem("sessionId");
-        this.socket?.emit("create_session");
+    this.socket.on(
+      "error",
+      (errorData: string | { error: string; operationType?: string }) => {
+        // Handle string errors (backward compatibility)
+        if (typeof errorData === "string") {
+          console.log("[WebSocketService] Socket error:", errorData);
+          if (
+            errorData === "Session not found" ||
+            errorData === "Invalid session"
+          ) {
+            this.sessionId = null;
+            localStorage.removeItem("sessionId");
+            this.socket?.emit("create_session");
+          }
+
+          // Forward string errors to any registered handlers
+          const handler = this.messageHandlers.get("error");
+          if (handler) {
+            handler({
+              type: "error",
+              error: errorData,
+            });
+          }
+        }
+        // Handle new error object format
+        else {
+          console.log(
+            "[WebSocketService] Socket error:",
+            errorData.error,
+            errorData.operationType ? `(${errorData.operationType})` : ""
+          );
+          if (
+            errorData.error === "Session not found" ||
+            errorData.error === "Invalid session"
+          ) {
+            this.sessionId = null;
+            localStorage.removeItem("sessionId");
+            this.socket?.emit("create_session");
+          }
+
+          // Forward the error to any registered handlers
+          const handler = this.messageHandlers.get("error");
+          if (handler) {
+            handler({
+              type: "error",
+              error: errorData.error,
+              operationType: errorData.operationType,
+            });
+          }
+        }
       }
-    });
+    );
 
     // Handle verify_code_response events
     this.socket.on(

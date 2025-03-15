@@ -9,10 +9,15 @@ import type { GameMode } from "shared/types/story.js";
 import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
 import { gameQueueProcessor } from "../services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
+import type { OperationErrorEvent } from "../types/queue.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
   private socket: Socket;
+  private pendingOperations: Map<
+    string,
+    { resolve: () => void; reject: (error: Error) => void }
+  > = new Map();
 
   constructor(socket: Socket) {
     this.socket = socket;
@@ -34,6 +39,63 @@ export class GameHandler {
       this.storyRepository.storeStory(gameId, story);
       connectionManager.broadcastStoryUpdate(gameId, story);
     });
+
+    // Add centralized error handler
+    gameQueueProcessor.events.on(
+      "operationError",
+      this.handleOperationError.bind(this)
+    );
+  }
+
+  /**
+   * Centralized error handler for all operation errors
+   */
+  private handleOperationError(event: OperationErrorEvent): void {
+    console.error(`[GameHandler] Operation error: ${event.error}`);
+    if (event.stack) {
+      console.error(`[GameHandler] Stack trace: ${event.stack}`);
+    }
+
+    // Create a user-friendly error message without technical details
+    let userFriendlyMessage: string;
+
+    switch (event.operationType) {
+      case "initializeStory":
+        userFriendlyMessage =
+          "Unable to create your story. Please try again with a different prompt.";
+        break;
+      case "recordChoice":
+        userFriendlyMessage =
+          "Unable to process your choice. Please try again.";
+        break;
+      case "moveStoryForward":
+        userFriendlyMessage = "Unable to continue the story. Please try again.";
+        break;
+      case "generateImages":
+        userFriendlyMessage =
+          "Unable to generate images. The story will continue without images.";
+        break;
+      default:
+        userFriendlyMessage = `Something went wrong with operation ${event.operationType}. Please try again.`;
+    }
+
+    // Send only the user-friendly message to the client
+    this.socket.emit("error", {
+      error: userFriendlyMessage,
+      operationType: event.operationType,
+    });
+
+    // Resolve any pending operations with error
+    if (this.pendingOperations.has(event.operationId)) {
+      const { reject } = this.pendingOperations.get(event.operationId)!;
+      reject(new Error(event.error));
+      this.pendingOperations.delete(event.operationId);
+    }
+
+    // Also check pending initializations
+    if (this.pendingInitializations.has(event.gameId)) {
+      this.pendingInitializations.delete(event.gameId);
+    }
   }
 
   private pendingInitializations = new Map<
@@ -83,29 +145,40 @@ export class GameHandler {
       });
 
       // Create a promise that will resolve when initialization is complete
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         this.pendingInitializations.set(gameId, {
           resolve,
           codes: playerCodes,
         });
 
         // Queue the story initialization
-        gameQueueProcessor.addOperation({
-          gameId,
-          type: "initializeStory",
-          input: {
-            prompt,
-            generateImages,
-            playerCount,
-            maxTurns,
-            gameMode,
-            playerCodes,
-          },
-        });
+        gameQueueProcessor
+          .addOperation({
+            gameId,
+            type: "initializeStory",
+            input: {
+              prompt,
+              generateImages,
+              playerCount,
+              maxTurns,
+              gameMode,
+              playerCodes,
+            },
+          })
+          .then((operationId) => {
+            // Store the operation ID for error handling
+            this.pendingOperations.set(operationId, { resolve, reject });
+          });
       });
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
-      this.socket.emit("error", { error: "Failed to initialize story" });
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.socket.emit("error", {
+        error: "Failed to initialize story",
+        details: errorMessage,
+      });
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
@@ -130,7 +203,7 @@ export class GameHandler {
       this.validateChoice(story, playerInfo.playerSlot, optionIndex);
 
       // Queue the validated choice
-      await gameQueueProcessor.addOperation({
+      const operationId = await gameQueueProcessor.addOperation({
         gameId: playerInfo.storyId,
         type: "recordChoice",
         input: {
@@ -139,12 +212,18 @@ export class GameHandler {
           story,
         },
       });
+
+      // Create a promise that will resolve when the operation is complete
+      await new Promise<void>((resolve, reject) => {
+        this.pendingOperations.set(operationId, { resolve, reject });
+      });
     } catch (error) {
       console.error("[GameHandler] Error processing choice:", error);
       this.socket.emit("error", {
         error:
           error instanceof Error ? error.message : "Failed to process choice",
       });
+      throw error; // Re-throw to allow caller to handle
     }
   }
 

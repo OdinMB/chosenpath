@@ -72,15 +72,16 @@ export interface StoryUpdateEvent {
 export interface OperationErrorEvent {
   queueId: string;
   operationId: string;
+  gameId: string;
+  operationType: GameOperationType;
   error: string;
+  details?: string;
+  stack?: string;
 }
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
-  operationError: (data: {
-    gameId: string;
-    operationType: GameOperationType;
-    error: string;
-  }) => void;
+  operationError: (event: OperationErrorEvent) => void;
+  storyInitialized: (event: { gameId: string; story: Story }) => void;
   newOperation: () => void;
 }

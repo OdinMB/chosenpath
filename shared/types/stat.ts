@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+export const initialStatValueDescription = `Value of the variable when the game starts.
+For string stats: Initial state or level (e.g., 'Novice', 'Healthy').
+- For string[] stats: Initial list of items, traits, or abilities (e.g., ['Sword', 'Shield']).
+- For percentage stats: Initial percentage value (0-100).
+- For opposites stats: Initial value of the first stat (second stat will be 100 - this value).
+- For number stats: Initial count or quantity (e.g., 50 gold).`;
+
+export const statValueSchema = z.union([
+  z.number(),
+  z.string(),
+  z.array(z.string()),
+]);
+export type StatValue = z.infer<typeof statValueSchema>;
+
+// Character background schema (fluff text and stats)
+export const statValueEntrySchema = z.object({
+  statId: z.string().describe("ID of the stat"),
+  value: statValueSchema.describe("Value for this stat"),
+});
+export type StatValueEntry = z.infer<typeof statValueEntrySchema>;
+
 export const statSchema = z
   .object({
     type: z
@@ -18,12 +39,12 @@ export const statSchema = z
       .describe(
         "Name of the variable that will be displayed to the player.\n" +
           "- Must be specific and immediately convey the stat's meaning and function.\n" +
-          "- For opposites type, use the '|' character to separate the two traits (e.g., 'Brutality|Finesse')."
+          "- For opposites type, use '|' to separate the two traits (e.g., 'Brutality|Finesse')."
       ),
     id: z
       .string()
       .describe(
-        "Unique identifier for the stat. Use a short phrase with underscores, like 'relationship_x'."
+        "Unique identifier for the stat. Use a short phrase with underscores and indicate whether this is a player or shared stat, like 'player_energy' or 'shared_spaceship_status'."
       ),
     possibleValues: z
       .string()
@@ -105,17 +126,6 @@ export const statSchema = z
       .describe(
         "Name of the group of stats that this stat will be displayed in. Only affects the UI."
       ),
-    value: z
-      .union([z.number(), z.boolean(), z.string(), z.array(z.string())])
-      .describe(
-        "Value of the variable when the game starts.\n" +
-          "- For string stats: Initial state or level (e.g., 'Novice', 'Healthy').\n" +
-          "- For string[] stats: Initial list of items, traits, or abilities (e.g., ['Sword', 'Shield']).\n" +
-          "- For percentage stats: Initial percentage value (0-100).\n" +
-          "- For opposites stats: Initial value of the first stat (second stat will be 100 - this value).\n" +
-          "- For number stats: Initial count or quantity (e.g., 50 gold).\n" +
-          "- In multiplayer games, aim for a fair initial distribution of stat values across players."
-      ),
   })
   .describe(
     "A variable that is tracked in the game state.\n" +
@@ -125,4 +135,4 @@ export const statSchema = z
   );
 
 export const statsSchema = z.array(statSchema);
-export type Stat = z.infer<typeof statSchema>;
+export type Stat = z.infer<typeof statSchema> & { value: StatValue };

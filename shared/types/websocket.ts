@@ -35,5 +35,5 @@ export type WSServerMessage =
       state: ClientStoryState | null;
       error?: string;
     }
-  | { type: "error"; error: string }
+  | { type: "error"; error: string; operationType?: string }
   | { type: "exit_story_response" };

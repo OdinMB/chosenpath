@@ -49,12 +49,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("error", (data: WSServerMessage) => {
       if (data.type === "error") {
-        if (data.error === "Session not found") {
-          console.warn("[SessionProvider] Session not found - reconnecting");
-          return;
+        // Handle simple string errors
+        if (typeof data.error === "string") {
+          if (data.error === "Session not found") {
+            console.warn("[SessionProvider] Session not found - reconnecting");
+            return;
+          }
+          console.error(
+            `[SessionProvider] WebSocket error${
+              data.operationType ? ` (${data.operationType})` : ""
+            }:`,
+            data.error
+          );
+          setError(data.error);
         }
-        console.error("[SessionProvider] WebSocket error:", data.error);
-        setError(data.error);
+
         setIsLoading(false);
       }
     });

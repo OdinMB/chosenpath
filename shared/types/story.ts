@@ -1,14 +1,22 @@
 import { z } from "zod";
 import { ImageLibrary } from "./image.js";
 import { BeatHistory } from "./beat.js";
-import { statsSchema, statSchema } from "./stat.js";
+import {
+  statsSchema,
+  statSchema,
+  Stat,
+  statValueEntrySchema,
+  StatValueEntry,
+  initialStatValueDescription,
+} from "./stat.js";
 import { outcomeSchema, Outcome } from "./outcome.js";
 import {
   PLAYER_SLOTS,
   ExactPlayerMap,
   PlayerCount,
   PlayerSlot,
-  PCSchema,
+  characterIdentitySchema,
+  characterBackgroundSchema,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -59,18 +67,26 @@ export const guidelinesSchema = z
   })
   .describe("Story guidelines and parameters");
 
-export const playerStateGenerationSchema = z.object({
-  character: PCSchema,
+export const playerOptionsGenerationSchema = z.object({
   outcomes: z
     .array(outcomeSchema)
     .describe(
       "Individual outcomes that (together with any shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
     ),
-  characterStats: z
-    .array(statSchema)
-    .describe("Stats belonging to this player character"),
+  possibleCharacterIdentities: z
+    .array(characterIdentitySchema)
+    .describe(
+      "Generate 3 possible identities that the player can choose from."
+    ),
+  possibleCharacterBackgrounds: z
+    .array(characterBackgroundSchema)
+    .describe(
+      "Generate 3 possible backgrounds that the player can choose from. Make sure that the stats are balanced and meaningfully different from each other."
+    ),
 });
-export type PlayerStateGeneration = z.infer<typeof playerStateGenerationSchema>;
+export type PlayerOptionsGeneration = z.infer<
+  typeof playerOptionsGenerationSchema
+>;
 
 export const statGroupsSchema = z
   .array(z.string())
@@ -83,9 +99,9 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   const playerSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
       `player${i + 1}`,
-      playerStateGenerationSchema,
+      playerOptionsGenerationSchema,
     ])
-  ) as Record<`player${number}`, typeof playerStateGenerationSchema>;
+  ) as Record<`player${number}`, typeof playerOptionsGenerationSchema>;
 
   return z
     .object({
@@ -97,13 +113,21 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
           "Shared outcomes that (together with individual outcomes) will make up the endings of the story for all players. Can include both shared goals and questions that players compete over. No intermediate outcomes, only elements of the ending."
         ),
       statGroups: statGroupsSchema,
-      ...playerSchemas,
+      playerStats: z
+        .array(statSchema)
+        .describe("Stats that each player has individually"),
       sharedStats: z
         .array(statSchema)
         .describe("Stats that are shared among players"),
+      initialSharedStatValues: z
+        .array(statValueEntrySchema)
+        .describe(
+          "Initial values for the shared stats. Array of {statId, value} objects.\n" +
+            initialStatValueDescription
+        ),
+      ...playerSchemas,
       title: z.string().describe("Title of the story"),
     })
-    .strict()
     .describe("Initial setup for the story");
 };
 
@@ -114,13 +138,20 @@ export type StorySetup<N extends PlayerCount> = {
   storyElements: z.infer<typeof StoryElementsSchema>;
   sharedOutcomes: Outcome[];
   statGroups: z.infer<typeof statGroupsSchema>;
+  playerStats: z.infer<typeof statSchema>[];
   sharedStats: z.infer<typeof statSchema>[];
-} & ExactPlayerMap<z.infer<typeof playerStateGenerationSchema>, N>;
+  initialSharedStatValues: StatValueEntry[];
+} & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
 
 // TYPES USED BY APP (not LLM)
 
 // Direct type definition for PlayerState
-export type PlayerState = PlayerStateGeneration & {
+export type PlayerState = {
+  name: string;
+  pronouns: string;
+  fluff: string;
+  outcomes: Outcome[];
+  stats: Stat[];
   knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
 };
@@ -136,10 +167,15 @@ export type StoryState = {
   storyElements: StoryElement[];
   worldFacts: string[];
   sharedOutcomes: Outcome[];
-  sharedStats: z.infer<typeof statsSchema>;
+  sharedStats: Stat[];
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   storyPhases: StoryPhase[];
   maxTurns: number;
+  characterSelectionCompleted: boolean;
+  characterSelectionOptions: Record<
+    (typeof PLAYER_SLOTS)[number],
+    PlayerOptionsGeneration
+  >;
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;

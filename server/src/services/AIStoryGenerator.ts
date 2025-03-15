@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import type {
   StoryState,
   StorySetup,
-  PlayerStateGeneration,
+  PlayerOptionsGeneration,
 } from "shared/types/story.js";
 import type { Change } from "shared/types/change.js";
 import type {
@@ -65,21 +65,51 @@ export class AIStoryGenerator {
 
     const players = this.createPlayersFromSetup(setup, playerCount);
 
-    return {
+    // Convert sharedStats to include values from initialSharedStatsValues
+    const sharedStats = setup.sharedStats.map((stat) => {
+      // Find the stat value entry for this stat ID
+      const statValueEntry = setup.initialSharedStatValues.find(
+        (entry) => entry.statId === stat.id
+      );
+
+      if (!statValueEntry) {
+        console.error(
+          `ERROR: No initial value defined for shared stat: ${stat.id}`
+        );
+      }
+
+      return {
+        ...stat,
+        value: statValueEntry ? statValueEntry.value : 0,
+      };
+    });
+
+    const initialState: StoryState = {
       title: setup.title,
       gameMode,
       guidelines: setup.guidelines,
       storyElements: setup.storyElements,
       worldFacts: [],
       sharedOutcomes: setup.sharedOutcomes,
-      sharedStats: setup.sharedStats,
+      sharedStats,
       players,
       storyPhases: [],
       maxTurns,
+      characterSelectionCompleted: false,
+      characterSelectionOptions: Object.fromEntries(
+        getPlayerSlots(playerCount).map((slot) => {
+          const playerKey = slot as keyof StorySetup<typeof playerCount>;
+          return [slot, setup[playerKey] as PlayerOptionsGeneration];
+        })
+      ),
       generateImages,
       images: [],
       playerCodes: {},
     };
+
+    // Create a Story instance to ensure proper state management
+    const story = Story.create(initialState);
+    return story.getState();
   }
 
   private createPlayersFromSetup(
@@ -89,13 +119,18 @@ export class AIStoryGenerator {
     return Object.fromEntries(
       getPlayerSlots(playerCount).map((slot) => {
         const playerKey = slot as keyof StorySetup<typeof playerCount>;
-        const playerData = setup[playerKey] as PlayerStateGeneration;
+        const playerData = setup[playerKey] as PlayerOptionsGeneration;
+
+        // Create minimal PlayerState with only outcomes defined
+        // name, pronouns, fluff, and stats will be added after character selection
         return [
           slot,
           {
-            character: playerData.character,
-            outcomes: playerData.outcomes,
-            characterStats: playerData.characterStats,
+            name: "", // Will be set during character selection
+            pronouns: "", // Will be set during character selection
+            fluff: "", // Will be set during character selection
+            outcomes: [], // Will be set during character selection? Otherwise: playerData.outcomes,
+            stats: [], // Will be set during character selection
             knownStoryElements: [],
             beatHistory: [],
           },
@@ -123,10 +158,9 @@ export class AIStoryGenerator {
         maxTurns
       );
 
-      const response = await structuredModel.invoke(setupPrompt);
-      console.log("Raw response:", JSON.stringify(response, null, 2));
-
-      return response as StorySetup<typeof playerCount>;
+      const result = await structuredModel.invoke(setupPrompt);
+      console.log("Raw response:", JSON.stringify(result, null, 2));
+      return result as StorySetup<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
@@ -146,7 +180,7 @@ export class AIStoryGenerator {
     const currentBeatIndex = story.getCurrentTurn() - 1;
     const firstBeatIndexOfSwitch = currentBeatIndex + 1;
 
-    // Create the transformed ThreadAnalysis
+    // Create the transformed SwitchAnalysis
     const transformedResponse: SwitchAnalysis = {
       ...response,
       firstBeatIndex: firstBeatIndexOfSwitch,

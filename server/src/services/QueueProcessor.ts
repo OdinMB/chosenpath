@@ -1,5 +1,9 @@
 import { randomUUID } from "crypto";
-import type { QueueableOperation, QueueEvents } from "../types/queue.js";
+import type {
+  QueueableOperation,
+  QueueEvents,
+  OperationErrorEvent,
+} from "../types/queue.js";
 import EventEmitter from "events";
 import { Logger } from "../utils/logger.js";
 
@@ -76,6 +80,45 @@ export abstract class BaseQueueProcessor<
   protected abstract getQueueId(operation: TOperation): string;
   protected abstract processOperation(operation: TOperation): Promise<void>;
 
+  /**
+   * Centralized error handler for all operations
+   * This method is called whenever an operation fails
+   */
+  protected handleOperationError(operation: TOperation, error: unknown): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    const details = error instanceof Error ? (error as any).cause : undefined;
+
+    // Log the error (fix argument count)
+    Logger.Queue.error(
+      `Failed ${(operation as any).type} operation ${operation.id.slice(
+        -5
+      )}: ${errorMessage}`
+    );
+    if (stack) {
+      Logger.Queue.error(`Stack trace: ${stack}`);
+    }
+
+    // Update operation status
+    operation.status = "failed";
+    operation.completedAt = new Date();
+    operation.error = errorMessage;
+
+    // Create error event with detailed information
+    const errorEvent: OperationErrorEvent = {
+      queueId: this.getQueueId(operation),
+      operationId: operation.id,
+      gameId: (operation as any).gameId,
+      operationType: (operation as any).type,
+      error: errorMessage,
+      details: details ? String(details) : undefined,
+      stack,
+    };
+
+    // Emit error event
+    this.events.emit("operationError", errorEvent);
+  }
+
   private async processQueues(): Promise<void> {
     Logger.Queue.log("Process queues started");
     while (this.processing) {
@@ -139,22 +182,8 @@ export abstract class BaseQueueProcessor<
           )}`
         );
       } catch (error) {
-        operation.status = "failed";
-        operation.completedAt = new Date();
-        operation.error =
-          error instanceof Error ? error.message : String(error);
-
-        Logger.Queue.error(
-          `Failed ${(operation as any).type} operation ${operationId.slice(
-            -5
-          )}:`,
-          operation.error
-        );
-        this.events.emit("operationError", {
-          queueId,
-          operationId,
-          error: operation.error,
-        });
+        // Use the centralized error handler
+        this.handleOperationError(operation, error);
       }
 
       queue.shift();

@@ -66,7 +66,7 @@ export class StorySetupPromptService {
 --- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
 --- Things that are shared between players (e.g. group/organization, a spaceship, a flat)
---- Stats about the world (e.g. tension between factions, industry trends, etc.)
+--- Stats about the world (e.g. tension between factions, environment conditions, etc.)
 - Any invisible shared stats that you think are important
 - Stats for scoring, pacing, and story flags if you think they are needed (if any)
 For each player
@@ -232,10 +232,9 @@ EXAMPLE STAT SETUPS
 
 Premise: Nature spirits guard the forest and compete for followers (cooperative-competitive)
 player stats:
-- Seasonal powers (string[])
-  id: player1_powers
+- Seasonal Powers (string[])
+  id: player_powers
   possibleValues: "Nature abilities (max 3)"
-  value: ["Healing Aura", "Plant Growth"]
   effectOnPoints: [
     "+30 points when using a specific power in a challenge directly related to that power",
     "+15 points in challenges within the spirit's seasonal domain",
@@ -254,10 +253,10 @@ player stats:
     "Powers can evolve to more potent versions after repeated successful use in critical moments"
   ]
   canBeChangedInBeatResolutions: false (seasonal powers require dedicated threads to evolve)
+  Initial values in player backgrounds: 1-2 powers around a seasonal theme, e.g. ["Healing Aura", "Plant Growth"] (balance with other player stats)
 
 - Energy (percentage)
-  id: player1_energy
-  value: 80
+  id: player_energy
   effectOnPoints: [
     "Below 30% applies -15 points when interacting with human NPCs due to visible weakness",
     "50-80% provides no modifier to challenges",
@@ -275,10 +274,10 @@ player stats:
     "Can be fully restored after a favorable resolution in a thread focused on spiritual renewal"
   ]
   canBeChangedInBeatResolutions: true (energy can fluctuate in a single beat)
-
+  Initial values in player backgrounds: 40-80 (balance with other player stats)
+  
 - Followers (number)
-  id: player1_followers_count
-  value: 20
+  id: player_followers_count
   effectOnPoints: [
     "+1 point for every 10 followers in social influence challenges",
     "+15 points in challenges where followers can directly assist (maximum +30)",
@@ -296,11 +295,11 @@ player stats:
     "Lose 5-15 followers after unfavorable resolutions where the spirit appears weak"
   ]
   canBeChangedInBeatResolutions: true (followers can be gained or lost in a single beat)
+  Initial values in player backgrounds: 20-50 (balance with other player stats)
 
 - Special followers (string[])
-  id: player1_special_followers
+  id: player_special_followers
   possibleValues: "Healers/Warriors/Sages/Artisans (max 4)"
-  value: ["Elder Healer", "Warrior Scout"]
   effectOnPoints: [
     "+15 points in challenges where a special follower's expertise directly applies",
     "+10 points in social challenges with NPCs from the same profession as your special followers",
@@ -319,12 +318,12 @@ player stats:
     "Special followers can evolve to more powerful versions after contributing to favorable thread resolutions"
   ]
   canBeChangedInBeatResolutions: false (special followers are too important to be lost or added within a single beat, except through sacrifices or reward options)
+  Initial values in player backgrounds: 1-3 special followers, e.g. ["Elder Healer", "Warrior Scout"] (balance with other player stats)
 
 shared stats:
 - Threats (string[])
   id: shared_forest_threats
   possibleValues: "Environmental/Human/Spiritual threats"
-  value: ["Invasive Blight", "Human Encroachment"]
   effectOnPoints: [
     "Each active threat applies -10 points to all challenges in the affected forest regions",
     "Threats matching a spirit's seasonal weakness apply an additional -10 points to that spirit",
@@ -343,10 +342,10 @@ shared stats:
     "Threats may evolve or combine if multiple remain unaddressed for several threads"
   ]
   canBeChangedInBeatResolutions: false (forest threats are too big to be solved or added within a single beat)
+  Initial value: ["Invasive Blight", "Human Encroachment"]
 
 - Health (percentage)
   id: shared_forest_health
-  value: 80
   effectOnPoints: [
     "Below 30% applies -20 points to all nature-based challenges due to dying ecosystem",
     "30-70% provides no modifier to challenges",
@@ -365,14 +364,14 @@ shared stats:
     "Can be permanently reduced by certain unfavorable thread resolutions"
   ]
   canBeChangedInBeatResolutions: true (forest health can fluctuate a little in a single beat)
+  Initial value: 80
 
 ##########
 
 Premise: The last rock band on Mars tries to make it while following individual dreams (cooperative-competitive)
 player stats:
 - Stage Presence (percentage)
-  id: player1_stage_presence
-  value: 30
+  id: player_stage_presence
   effectOnPoints: [
     "Provides (Stage Presence - 50) points to performance challenges (negative at low values, positive at high values)",
     "+20 points in social challenges with fans when above 70%",
@@ -391,11 +390,11 @@ player stats:
     "Decreases by 5-10% after public failures or embarrassments"
   ]
   canBeChangedInBeatResolutions: false (stage presence should only be changed after a thread is resolved, except for sacrifice and reward options)
+  Initial values in player backgrounds: 20-50 (balance with instrument mastery)
 
 - Instrument Mastery (string)
-  id: player1_instrument_mastery
+  id: player_instrument_mastery
   possibleValues: "Novice → Amateur → Professional → Virtuoso → Legend"
-  value: "Novice"
   effectOnPoints: [
     "Provides -20/-10/0/+10/+20 points in performance and recording challenges based on level",
     "+15 points in challenges involving musicians of the same or lower mastery level",
@@ -413,10 +412,10 @@ player stats:
     "Virtuoso and Legend levels require dedicated mastery threads with favorable resolutions"
   ]
   canBeChangedInBeatResolutions: false (same as stage presence)
+  Initial values in player backgrounds: Novice or Amateur (balance with stage presence)
 
 - Band Loyalty|Solo Ambition (opposites)
-  id: player1_loyalty_ambition
-  value: 60
+  id: player_loyalty_ambition
   effectOnPoints: [
     "Band Loyalty >70% provides +15 points in collaborative challenges but -10 in solo opportunities",
     "Solo Ambition >70% provides +15 points in individual challenges but -10 in group performances",
@@ -435,11 +434,12 @@ player stats:
     "Major decisions in critical moments can cause shifts of up to 20%"
   ]
   canBeChangedInBeatResolutions: false (should be decided by threads, not as random adjustments in single beats)
+  Initial value: 50 (no variation)
+
 
 - Personal Dream (string)
-  id: player1_personal_dream
+  id: player_personal_dream
   possibleValues: "Beginning → Progress → Breakthrough → Fulfillment"
-  value: "Beginning"
   effectOnPoints: [
     "Starting at Breakthrough level: -10 to performances (not fully motivated anymore)",
     "+5/+10/+15/+20 points in creative challenges based on dream progression level",
@@ -457,12 +457,12 @@ player stats:
     "Final stage requires a dedicated culmination thread with favorable resolution"
   ]
   canBeChangedInBeatResolutions: false (requires dedicated threads to evolve)
+  Initial value: "Beginning" (no variation)
 
 shared stats:
 - Gear Quality (string)
   id: shared_gear_quality
   possibleValues: "Broken → Worn → Used → Pristine"
-  value: "Worn"
   effectOnPoints: [
     "Provides -15 (Broken), -5 (Worn), +5 (Used), or +15 (Pristine) points to all performance and recording challenges",
     "Broken gear creates -20 points in professional venue challenges due to credibility loss",
@@ -481,10 +481,10 @@ shared stats:
     "Extreme performance conditions (dust storms, temperature) may cause unexpected degradation"
   ]
   canBeChangedInBeatResolutions: false (as a percentage stat, it could be changed in a single beat, but as a 4-stage string stat, it should only be changed after a thread is resolved or through sacrifices and rewards)
+  Initial value: "Worn"
 
 - Fans (number)
   id: shared_fan_count
-  value: 100
   effectOnPoints: [
     "+1 point for every 100 fans in performance challenges (maximum +20)",
     "+15 points in social media challenges when above 500 fans",
@@ -502,10 +502,10 @@ shared stats:
     "Decreases by 50-100 after unfavorable resolutions that disappoint audiences"
   ]
   canBeChangedInBeatResolutions: true (some fans can be gained or lost in a single beat)
+  Initial value: 100
 
 - Group Chemistry (percentage)
   id: shared_group_chemistry
-  value: 70
   effectOnPoints: [
     "Below 40% applies -15 points to all collaborative challenges due to visible tension",
     "40-70% provides no modifier to challenges",
@@ -524,6 +524,7 @@ shared stats:
     "Affected by the average Band Loyalty|Solo Ambition balance across all players"
   ]
   canBeChangedInBeatResolutions: true (group chemistry can fluctuate a little in a single beat)
+  Initial value: 70
 `;
   }
 

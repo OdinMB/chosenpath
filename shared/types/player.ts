@@ -1,5 +1,6 @@
 import { MIN_PLAYERS, MAX_PLAYERS } from "../config.js";
 import { z } from "zod";
+import { statValueEntrySchema, initialStatValueDescription } from "./stat.js";
 
 // Create union type from range MIN_PLAYERS to MAX_PLAYERS
 type NumberRange<Start extends number, End extends number> =
@@ -34,18 +35,36 @@ export type ExactPlayerMap<T, N extends PlayerCount> = {
   [K in `player${NumberRange<1, N>}`]: T;
 };
 
-export const PCSchema = z
+// Character identity schema (name and pronouns)
+export const characterIdentitySchema = z.object({
+  name: z.string().describe("Name of the character/entity"),
+  pronouns: z
+    .string()
+    .describe(
+      "Character/entity pronouns (e.g., 'he/him', 'she/her', 'they/them', 'it/its')"
+    ),
+});
+export type CharacterIdentity = z.infer<typeof characterIdentitySchema>;
+
+export const characterBackgroundSchema = z
   .object({
-    name: z
+    title: z
+      .string()
+      .describe("Title of this background. Will be shown to the player."),
+    fluffTemplate: z
       .string()
       .describe(
-        "Player character's name. Will be displayed to the user and will be used exactly like this in the story. Do NOT include placeholders like '[Player Name]'. Generate the name of the character or entity that the player will be playing. Bad: 'Lord/Lady [Player Name]'. Good: 'Lady Grunfeld'."
+        "Character background description with placeholders for {name}, {personal pronoun}, {possessive pronoun}, and {reflexive pronoun} (that will be replaced with the actual values later)"
       ),
-    pronouns: z.string().describe("Player character's preferred pronouns"),
-    fluff: z
-      .string()
+    initialPlayerStatValues: z
+      .array(statValueEntrySchema)
       .describe(
-        "Fluff text about the player character that will be referenced in the story."
+        "Initial stat values for player stats for this background. Provide an initial value for each player stat. Array of {statId, value} objects.\n" +
+          initialStatValueDescription
       ),
   })
-  .describe("Basic player character info.");
+  .describe(
+    "A possible character background / starting point for this player."
+  );
+
+export type CharacterBackground = z.infer<typeof characterBackgroundSchema>;

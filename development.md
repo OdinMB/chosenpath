@@ -4,17 +4,17 @@ Smaller and more commits!
 
 Improve stat setups and option definitions
 
+- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values.
 - Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
 - Break this whole 20-step mess down into smaller LLM interactions?
 - Make prompts more concise?
 
 New features
 
-- Let player choose/adjust starting position (name, pronouns, stats)
 - Library of stories with pre-configured setups
 - Images: generate one for each player and story element and only use iamges from that list?
 - Difficulty level (affecting base points)
-- Limited tokens to see option stats (costs more for later beats in a thread)
+- Allow users to see some option stats like risky/safe or even modifiers / final probability distribution. Costs more for later beats in a thread.
 - Prettier welcome/setup views with shifting images?
 - User accounts
   - Manage games
