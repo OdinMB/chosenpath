@@ -45,6 +45,9 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       case "recordChoice":
         await this.handleRecordChoice(operation);
         break;
+      case "recordCharacterSelection":
+        await this.handleRecordCharacterSelection(operation);
+        break;
       default:
         throw new Error(`Unknown operation type: ${operation.type}`);
     }
@@ -266,6 +269,67 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       beatResolution
     );
     return story.updateBeatResolution(playerSlot, beatResolution);
+  }
+
+  private async handleRecordCharacterSelection(
+    operation: GameOperation & { type: "recordCharacterSelection" }
+  ): Promise<void> {
+    const { gameId, input } = operation;
+    const { playerSlot, identityIndex, backgroundIndex, story } = input;
+
+    console.log(
+      `[GameQueueProcessor] Processing character selection for ${playerSlot}: identity=${identityIndex}, background=${backgroundIndex}`
+    );
+
+    // Get the selected identity and background
+    const options = story.getState().characterSelectionOptions[playerSlot];
+    if (!options) {
+      throw new Error(`No character options found for player ${playerSlot}`);
+    }
+
+    const selectedIdentity = options.possibleCharacterIdentities[identityIndex];
+    const selectedBackground =
+      options.possibleCharacterBackgrounds[backgroundIndex];
+
+    if (!selectedIdentity || !selectedBackground) {
+      throw new Error("Invalid identity or background selection");
+    }
+
+    // Update the player's character information
+    let updatedStory = story.updatePlayerCharacter(
+      playerSlot,
+      selectedIdentity,
+      selectedBackground
+    );
+
+    // Emit state update to update pending players lists
+    this.events.emit("storyUpdated", {
+      gameId,
+      story: updatedStory,
+    });
+
+    // Check if all players have completed character selection
+    if (updatedStory.areAllCharactersSelected()) {
+      console.log(
+        "[GameQueueProcessor] All characters selected, completing character selection"
+      );
+
+      // Mark character selection as completed
+      updatedStory = updatedStory.completeCharacterSelection();
+
+      // Emit state update with completed character selection
+      this.events.emit("storyUpdated", {
+        gameId,
+        story: updatedStory,
+      });
+
+      // Queue the moveStoryForward operation to start the game
+      await this.addOperation({
+        type: "moveStoryForward",
+        gameId,
+        input: { story: updatedStory },
+      });
+    }
   }
 
   private async determineThreadResolutions(story: Story): Promise<Story> {

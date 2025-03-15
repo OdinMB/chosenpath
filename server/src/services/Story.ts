@@ -13,9 +13,10 @@ import { Stat, ClientStat } from "shared/types/stat.js";
 import { Beat, BeatType } from "shared/types/beat.js";
 import { SwitchAnalysis } from "shared/types/switch.js";
 import { ThreadAnalysis, Thread, Resolution } from "shared/types/thread.js";
-import { Image, ImageLibrary } from "shared/types/image.js";
+import { Image } from "shared/types/image.js";
 import { Change } from "shared/types/change.js";
 import { ChangeService } from "./ChangeService.js";
+import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
 
 /**
  * Comprehensive manager for story state
@@ -643,20 +644,36 @@ export class Story {
   }
 
   updateBeatResolution(playerSlot: PlayerSlot, resolution: Resolution): Story {
-    const player = this.state.players[playerSlot];
-    return new Story({
-      ...this.state,
-      players: {
-        ...this.state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: player.beatHistory.map((beat, index) =>
-            index === player.beatHistory.length - 1
-              ? { ...beat, resolution }
-              : beat
-          ),
-        } as PlayerState,
+    const player = this.getPlayer(playerSlot);
+    if (!player) {
+      console.error(`Player ${playerSlot} not found`);
+      return this;
+    }
+
+    if (!player.beatHistory || player.beatHistory.length === 0) {
+      console.error(`No beat history for player ${playerSlot}`);
+      return this;
+    }
+
+    // Get the current beat (last in history)
+    const currentBeatIndex = player.beatHistory.length - 1;
+    const updatedBeatHistory = [...player.beatHistory];
+    updatedBeatHistory[currentBeatIndex] = {
+      ...updatedBeatHistory[currentBeatIndex],
+      resolution,
+    };
+
+    // Update the player with the new beat history
+    const updatedPlayers = {
+      ...this.state.players,
+      [playerSlot]: {
+        ...player,
+        beatHistory: updatedBeatHistory,
       },
+    };
+
+    return this.clone({
+      players: updatedPlayers,
     });
   }
 
@@ -761,5 +778,51 @@ export class Story {
     });
 
     return result;
+  }
+
+  updatePlayerCharacter(
+    playerSlot: PlayerSlot,
+    identity: any,
+    background: any
+  ): Story {
+    const player = this.getPlayer(playerSlot);
+    if (!player) {
+      console.error(`Player ${playerSlot} not found`);
+      return this;
+    }
+
+    // Update player with selected character information
+    const updatedPlayer = {
+      ...player,
+      name: identity.name,
+      pronouns: identity.pronouns,
+      appearance: identity.appearance,
+      fluff: replacePronounPlaceholders(background.fluffTemplate, identity),
+      statValues: background.initialPlayerStatValues,
+      characterSelected: true,
+    };
+
+    // Update the players object with the updated player
+    const updatedPlayers = {
+      ...this.state.players,
+      [playerSlot]: updatedPlayer,
+    };
+
+    return this.clone({
+      players: updatedPlayers,
+    });
+  }
+
+  areAllCharactersSelected(): boolean {
+    const playerSlots = this.getPlayerSlots();
+    return playerSlots.every(
+      (slot) => this.getPlayer(slot)?.characterSelected === true
+    );
+  }
+
+  completeCharacterSelection(): Story {
+    return this.clone({
+      characterSelectionCompleted: true,
+    });
   }
 }

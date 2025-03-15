@@ -35,6 +35,15 @@ export interface GameOperations {
     };
     story: Story;
   };
+  recordCharacterSelection: {
+    input: {
+      playerSlot: PlayerSlot;
+      identityIndex: number;
+      backgroundIndex: number;
+      story: Story;
+    };
+    story: Story;
+  };
   moveStoryForward: {
     input: {
       story: Story;

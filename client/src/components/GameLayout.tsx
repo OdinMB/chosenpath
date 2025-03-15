@@ -135,35 +135,40 @@ export function GameLayout({
     }
   };
 
-  // Simplified sidebar for character selection mode
   const renderSidebar = () => {
+    // Common sidebar props
+    const sidebarClassName = `
+      w-80 bg-white shadow-sm 
+      fixed md:sticky top-0 h-screen 
+      z-20 md:z-0 
+      transform transition-transform duration-200 ease-in-out 
+      ${showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      overflow-y-auto md:overflow-visible 
+      p-4 flex flex-col
+    `;
+
+    // Common footer with title and exit button
+    const renderFooter = () => (
+      <div className="mt-4 text-center">
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          {storyState.title}
+        </h3>
+        <button
+          onClick={onExitGame}
+          className="text-sm font-medium transition-colors duration-200
+            md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
+            w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
+        >
+          Exit story
+        </button>
+      </div>
+    );
+
     if (isCharacterSelectionMode) {
       return (
-        <aside
-          className={`
-          w-80 bg-white shadow-sm 
-          fixed md:sticky top-0 h-screen 
-          z-20 md:z-0 
-          transform transition-transform duration-200 ease-in-out 
-          ${showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-          overflow-y-auto md:overflow-visible 
-          p-4 flex flex-col
-        `}
-        >
+        <aside className={sidebarClassName}>
           <div className="flex-grow"></div>
-          <div className="mt-4 text-center">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              {storyState.title}
-            </h3>
-            <button
-              onClick={onExitGame}
-              className="text-sm font-medium transition-colors duration-200
-                md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
-                w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
-            >
-              Exit story
-            </button>
-          </div>
+          {renderFooter()}
         </aside>
       );
     }
@@ -183,10 +188,10 @@ export function GameLayout({
       // For shared stats, we need to look them up from the player's statValues
       // or from a separate array if it exists
       // First try to find in player's statValues (some implementations might include shared stats here)
-      const sharedStatInPlayer = player.statValues.find(
+      const sharedStatValue = storyState.sharedStatValues.find(
         (entry: StatValueEntry) => entry.statId === statId
       );
-      if (sharedStatInPlayer) return sharedStatInPlayer.value;
+      if (sharedStatValue) return sharedStatValue.value;
 
       // If we can't find it, return a default value based on the stat type
       // Find the stat definition to determine its type
@@ -219,18 +224,7 @@ export function GameLayout({
     };
 
     return (
-      <aside
-        className={`
-          w-80 bg-white shadow-sm
-          fixed md:sticky top-0 h-screen
-          z-20 md:z-0
-          transform transition-transform duration-200 ease-in-out
-          ${showStats ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-          overflow-y-auto md:overflow-visible
-          p-4
-          flex flex-col
-        `}
-      >
+      <aside className={sidebarClassName}>
         <section className="mb-6 pb-4">
           <div className="flex items-center justify-center gap-2">
             <h2 className="text-xl font-semibold text-gray-900 mb-1">
@@ -267,7 +261,9 @@ export function GameLayout({
           </p>
           {showFluff && (
             <div className="bg-gray-50 rounded-lg p-3 mt-4 border border-gray-100">
-              <p className="text-gray-600 text-sm">{player.fluff}</p>
+              <p className="text-gray-600 text-sm">
+                {player.appearance} {player.fluff}
+              </p>
             </div>
           )}
         </section>
@@ -287,19 +283,7 @@ export function GameLayout({
           />
         </div>
 
-        <div className="mt-4 text-center">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            {storyState.title}
-          </h3>
-          <button
-            onClick={onExitGame}
-            className="text-sm font-medium transition-colors duration-200
-              md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
-              w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
-          >
-            Exit story
-          </button>
-        </div>
+        {renderFooter()}
       </aside>
     );
   };

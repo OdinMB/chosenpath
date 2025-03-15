@@ -15,6 +15,7 @@ export type WSClientMessage =
       gameMode: GameMode;
     }
   | { type: "make_choice"; optionIndex: number }
+  | { type: "select_character"; identityIndex: number; backgroundIndex: number }
   | { type: "verify_code"; sessionId: string; code: string }
   | { type: "exit_story" };
 

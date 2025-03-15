@@ -227,6 +227,113 @@ export class GameHandler {
     }
   }
 
+  async selectCharacter(identityIndex: number, backgroundIndex: number) {
+    console.log(
+      `\n====== [GameHandler] Processing character selection: identity=${identityIndex}, background=${backgroundIndex} ======`
+    );
+
+    try {
+      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+      if (!playerInfo) {
+        throw new Error("Player not found");
+      }
+
+      // Get current story
+      const story = await this.storyRepository.getStory(playerInfo.storyId);
+      if (!story) {
+        throw new Error("Story not found");
+      }
+
+      // Validate character selection
+      this.validateCharacterSelection(
+        story,
+        playerInfo.playerSlot,
+        identityIndex,
+        backgroundIndex
+      );
+
+      // Queue the character selection
+      const operationId = await gameQueueProcessor.addOperation({
+        gameId: playerInfo.storyId,
+        type: "recordCharacterSelection",
+        input: {
+          playerSlot: playerInfo.playerSlot,
+          identityIndex,
+          backgroundIndex,
+          story,
+        },
+      });
+
+      // Create a promise that will resolve when the operation is complete
+      await new Promise<void>((resolve, reject) => {
+        this.pendingOperations.set(operationId, { resolve, reject });
+      });
+    } catch (error) {
+      console.error(
+        "[GameHandler] Error processing character selection:",
+        error
+      );
+      this.socket.emit("error", {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to process character selection",
+      });
+      throw error; // Re-throw to allow caller to handle
+    }
+  }
+
+  private validateCharacterSelection(
+    story: Story,
+    playerSlot: PlayerSlot,
+    identityIndex: number,
+    backgroundIndex: number
+  ): void {
+    // Ensure player's socket is still valid
+    const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+    if (!playerInfo) {
+      throw new Error("Player not found");
+    }
+
+    const activeSockets = connectionManager.getActiveSockets(
+      playerInfo.storyId,
+      playerSlot
+    );
+    if (!activeSockets.has(this.socket.id)) {
+      throw new Error("Socket connection needs refresh");
+    }
+
+    // Check if character selection is available
+    if (!story.getState().characterSelectionOptions) {
+      throw new Error("Character selection not available");
+    }
+
+    // Check if player has already selected a character
+    if (story.getState().characterSelectionCompleted) {
+      throw new Error("Character selection already completed");
+    }
+
+    // Validate indices
+    const options = story.getState().characterSelectionOptions[playerSlot];
+    if (!options) {
+      throw new Error("No character options found for player");
+    }
+
+    if (
+      identityIndex < 0 ||
+      identityIndex >= options.possibleCharacterIdentities.length
+    ) {
+      throw new Error("Invalid identity index");
+    }
+
+    if (
+      backgroundIndex < 0 ||
+      backgroundIndex >= options.possibleCharacterBackgrounds.length
+    ) {
+      throw new Error("Invalid background index");
+    }
+  }
+
   private validateChoice(
     story: Story,
     playerSlot: PlayerSlot,

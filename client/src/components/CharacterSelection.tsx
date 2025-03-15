@@ -6,6 +6,7 @@ import {
 } from "../../../shared/types/player";
 import { PlayerOptionsGeneration } from "../../../shared/types/story";
 import { StatDisplay } from "./StatDisplay";
+import { replacePronounPlaceholders } from "../../../shared/utils/playerUtils.js";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -49,43 +50,6 @@ export function CharacterSelection({
     if (selectedIdentity !== null && selectedBackground !== null) {
       onCharacterSelected(selectedIdentity, selectedBackground);
     }
-  };
-
-  // Helper function to replace pronoun placeholders with actual pronouns
-  const replacePronounPlaceholders = (
-    text: string,
-    identity: CharacterIdentity | null
-  ): string => {
-    if (!identity) return text;
-
-    // Replace both lowercase and capitalized placeholders
-    return text
-      .replace(/{name}/g, identity.name)
-      .replace(/{Name}/g, identity.name)
-      .replace(/{personal}/g, identity.pronouns.personal)
-      .replace(
-        /{Personal}/g,
-        identity.pronouns.personal.charAt(0).toUpperCase() +
-          identity.pronouns.personal.slice(1)
-      )
-      .replace(/{object}/g, identity.pronouns.object)
-      .replace(
-        /{Object}/g,
-        identity.pronouns.object.charAt(0).toUpperCase() +
-          identity.pronouns.object.slice(1)
-      )
-      .replace(/{possessive}/g, identity.pronouns.possessive)
-      .replace(
-        /{Possessive}/g,
-        identity.pronouns.possessive.charAt(0).toUpperCase() +
-          identity.pronouns.possessive.slice(1)
-      )
-      .replace(/{reflexive}/g, identity.pronouns.reflexive)
-      .replace(
-        /{Reflexive}/g,
-        identity.pronouns.reflexive.charAt(0).toUpperCase() +
-          identity.pronouns.reflexive.slice(1)
-      );
   };
 
   const renderIdentityCard = (identity: CharacterIdentity, index: number) => (

@@ -91,6 +91,21 @@ export class GameWebSocketServer {
       });
 
       socket.on(
+        "select_character",
+        async (data: { identityIndex: number; backgroundIndex: number }) => {
+          try {
+            await gameHandler.selectCharacter(
+              data.identityIndex,
+              data.backgroundIndex
+            );
+          } catch (error) {
+            // Error is already handled by GameHandler, no need to emit again
+            console.error("[WebSocket] Error selecting character:", error);
+          }
+        }
+      );
+
+      socket.on(
         "verify_code",
         async (data: { sessionId: string; code: string }) => {
           try {

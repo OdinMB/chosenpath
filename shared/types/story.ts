@@ -160,6 +160,7 @@ export type PlayerState = {
   statValues: StatValueEntry[];
   knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
+  characterSelected?: boolean; // Whether the player has selected a character
 };
 
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;
@@ -195,6 +196,7 @@ export type ClientStoryState = {
   title: string;
   gameMode: GameMode;
   sharedStats: ClientStat[];
+  sharedStatValues: StatValueEntry[];
   playerStats: ClientStat[];
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   maxTurns: number;
