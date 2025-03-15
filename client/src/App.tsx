@@ -153,6 +153,24 @@ function App() {
     gameService.makeChoice(optionIndex);
   };
 
+  const handleCharacterSelected = (
+    identityIndex: number,
+    backgroundIndex: number
+  ) => {
+    if (!storyState) {
+      console.warn("[App] Cannot select character: missing storyState");
+      return;
+    }
+
+    console.log("[App] Processing character selection:", {
+      identityIndex,
+      backgroundIndex,
+    });
+
+    setIsLoading(true);
+    gameService.selectCharacter(identityIndex, backgroundIndex);
+  };
+
   const handleDeleteCode = useCallback(() => {
     localStorage.removeItem(playerCodeKey);
     setPlayerCode(null);
@@ -231,6 +249,7 @@ function App() {
             <GameLayout
               onExitGame={handleExitGame}
               onChoiceSelected={handlePlayerChoice}
+              onCharacterSelected={handleCharacterSelected}
             />
           </div>
         );

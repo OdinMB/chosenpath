@@ -2,7 +2,6 @@ import { z } from "zod";
 import { ImageLibrary } from "./image.js";
 import { BeatHistory } from "./beat.js";
 import {
-  statsSchema,
   statSchema,
   Stat,
   ClientStat,
@@ -18,6 +17,9 @@ import {
   PlayerSlot,
   characterIdentitySchema,
   characterBackgroundSchema,
+  Pronouns,
+  characterSelectionIntroductionSchema,
+  CharacterSelectionIntroduction,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -77,12 +79,12 @@ export const playerOptionsGenerationSchema = z.object({
   possibleCharacterIdentities: z
     .array(characterIdentitySchema)
     .describe(
-      "Generate 3 possible identities that the player can choose from."
+      "Generate exactly 3 possible identities that the player can choose from."
     ),
   possibleCharacterBackgrounds: z
     .array(characterBackgroundSchema)
     .describe(
-      "Generate 3 possible backgrounds that the player can choose from. Make sure that the stats are balanced and meaningfully different from each other."
+      "Generate exactly 3 possible backgrounds that the player can choose from. Make sure that the stats for each background are meaningfully different from each other but still balanced. For example, if one stat in background 1 is better than the same stat in background 2, another stat in background 1 should be worse than the same stat in background 2."
     ),
 });
 export type PlayerOptionsGeneration = z.infer<
@@ -128,6 +130,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
         ),
       ...playerSchemas,
       title: z.string().describe("Title of the story"),
+      characterSelectionIntroduction: characterSelectionIntroductionSchema,
     })
     .describe("Initial setup for the story");
 };
@@ -142,6 +145,7 @@ export type StorySetup<N extends PlayerCount> = {
   playerStats: z.infer<typeof statSchema>[];
   sharedStats: z.infer<typeof statSchema>[];
   initialSharedStatValues: StatValueEntry[];
+  characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
 
 // TYPES USED BY APP (not LLM)
@@ -149,10 +153,11 @@ export type StorySetup<N extends PlayerCount> = {
 // Direct type definition for PlayerState
 export type PlayerState = {
   name: string;
-  pronouns: string;
+  pronouns: Pronouns;
+  appearance: string;
   fluff: string;
   outcomes: Outcome[];
-  stats: Stat[];
+  statValues: StatValueEntry[];
   knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
 };
@@ -169,6 +174,8 @@ export type StoryState = {
   worldFacts: string[];
   sharedOutcomes: Outcome[];
   sharedStats: Stat[];
+  sharedStatValues: StatValueEntry[];
+  playerStats: Stat[];
   players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   storyPhases: StoryPhase[];
   maxTurns: number;
@@ -177,6 +184,7 @@ export type StoryState = {
     (typeof PLAYER_SLOTS)[number],
     PlayerOptionsGeneration
   >;
+  characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
@@ -186,17 +194,16 @@ export type StoryState = {
 export type ClientStoryState = {
   title: string;
   gameMode: GameMode;
-  players: Record<
-    (typeof PLAYER_SLOTS)[number],
-    Omit<PlayerState, "stats"> & { stats: ClientStat[] }
-  >;
   sharedStats: ClientStat[];
+  playerStats: ClientStat[];
+  players: Record<(typeof PLAYER_SLOTS)[number], PlayerState>;
   maxTurns: number;
   characterSelectionCompleted: boolean;
   characterSelectionOptions: Record<
     (typeof PLAYER_SLOTS)[number],
     PlayerOptionsGeneration
   >;
+  characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;
   images: ImageLibrary;
   numberOfPlayers: number;

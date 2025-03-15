@@ -35,14 +35,49 @@ export type ExactPlayerMap<T, N extends PlayerCount> = {
   [K in `player${NumberRange<1, N>}`]: T;
 };
 
+export const pronounsSchema = z.object({
+  personal: z
+    .string()
+    .describe("Personal pronoun (e.g., 'he', 'she', 'they', 'it')"),
+  object: z
+    .string()
+    .describe("Object pronoun (e.g., 'him', 'her', 'them', 'it')"),
+  possessive: z
+    .string()
+    .describe("Possessive pronoun (e.g., 'his', 'her', 'their', 'its')"),
+  reflexive: z
+    .string()
+    .describe(
+      "Reflexive pronoun (e.g., 'himself', 'herself', 'themselves', 'itself')"
+    ),
+});
+export type Pronouns = z.infer<typeof pronounsSchema>;
+
+export const characterSelectionIntroductionSchema = z
+  .object({
+    title: z
+      .string()
+      .describe(
+        "Title of the character selection screen. Something flavorful that fits the story."
+      ),
+    text: z
+      .string()
+      .describe(
+        "Text of the character selection screen. Very short introduction to the setting, followed by a question about the player's identity and background."
+      ),
+  })
+  .describe(
+    "Introduction to the character selection phase. This will be the first thing that the players see in the game as they select their player identity and background."
+  );
+export type CharacterSelectionIntroduction = z.infer<
+  typeof characterSelectionIntroductionSchema
+>;
+
 // Character identity schema (name and pronouns)
 export const characterIdentitySchema = z.object({
   name: z.string().describe("Name of the character/entity"),
-  pronouns: z
-    .string()
-    .describe(
-      "Character/entity pronouns (e.g., 'he/him', 'she/her', 'they/them', 'it/its')"
-    ),
+  pronouns: pronounsSchema,
+  appearance: z.string().describe("Appearance of the character/entity"),
 });
 export type CharacterIdentity = z.infer<typeof characterIdentitySchema>;
 
@@ -54,7 +89,7 @@ export const characterBackgroundSchema = z
     fluffTemplate: z
       .string()
       .describe(
-        "Character background description with placeholders for {name}, {personal pronoun}, {possessive pronoun}, and {reflexive pronoun} (that will be replaced with the actual values later)"
+        "Character background description with placeholders: '{name}' for the character's name, and the following ones for pronouns (for the character, not any other other entities): '{personal}' (for he/she/they/it), '{object}' (for him/her/them/it), '{possessive}' (for his/her/their/its), and '{reflexive}' (for himself/herself/themselves/itself). Use '{Personal}' instead of '{personal}' if you want the first letter to be uppercase (e.g. 'He' instead of 'he')."
       ),
     initialPlayerStatValues: z
       .array(statValueEntrySchema)

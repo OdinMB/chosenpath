@@ -190,31 +190,19 @@ export class Story {
       ...clientStat
     } = stat;
 
-    // Ensure value property exists
-    if (!("value" in clientStat)) {
-      console.error(`Stat ${stat.id} is missing value property`);
-    }
-
     return clientStat as ClientStat;
   }
 
   filterStateForPlayer(playerSlot: PlayerSlot): ClientStoryState {
     // Create a deep copy to avoid mutating the original state
-    const filteredState = JSON.parse(JSON.stringify(this.state));
+    let filteredState = JSON.parse(JSON.stringify(this.state));
 
     // Only include the specific player's data
-    const playerData = filteredState.players[playerSlot];
-
-    // Filter out hidden player stats and convert to ClientStat
-    playerData.stats = playerData.stats
-      .filter((stat: Stat) => stat.isVisible !== false)
-      .map((stat: Stat) => this.convertToClientStat(stat));
-
+    let playerData = filteredState.players[playerSlot];
     // Filter out outcomes if they exist
     if (playerData.outcomes) {
       delete playerData.outcomes;
     }
-
     // Filter out sensitive data from beat history
     if (playerData.beatHistory && playerData.beatHistory.length > 0) {
       playerData.beatHistory = playerData.beatHistory.map((beat) => {
@@ -246,13 +234,24 @@ export class Story {
         return filteredBeat;
       });
     }
-
     filteredState.players = { [playerSlot]: playerData };
 
-    // Filter out hidden shared stats and convert to ClientStat
+    // Filter out hidden player stats and certain stat attributes
+    filteredState.playerStats = filteredState.playerStats
+      .filter((stat: Stat) => stat.isVisible !== false)
+      .map((stat: Stat) => this.convertToClientStat(stat));
+
+    // Filter out hidden shared stats and certain stat attributes
     filteredState.sharedStats = filteredState.sharedStats
       .filter((stat: Stat) => stat.isVisible !== false)
       .map((stat: Stat) => this.convertToClientStat(stat));
+
+    // Filter characterSelectionOptions to only include data for this player
+    if (filteredState.characterSelectionOptions) {
+      filteredState.characterSelectionOptions = {
+        [playerSlot]: filteredState.characterSelectionOptions[playerSlot],
+      };
+    }
 
     // Get pending players
     const pendingPlayers = this.getPendingPlayers();
@@ -262,23 +261,20 @@ export class Story {
       [playerSlot]: filteredState.playerCodes[playerSlot],
     };
 
-    // Filter characterSelectionOptions to only include data for this player
-    if (filteredState.characterSelectionOptions) {
-      filteredState.characterSelectionOptions = {
-        [playerSlot]: filteredState.characterSelectionOptions[playerSlot],
-      };
-    }
-
     // Return only the properties needed for the client
     return {
       title: filteredState.title,
       numberOfPlayers: Object.keys(this.state.players).length,
-      players: filteredState.players,
       gameMode: filteredState.gameMode,
       sharedStats: filteredState.sharedStats,
+      sharedStatValues: filteredState.sharedStatValues,
+      playerStats: filteredState.playerStats,
+      players: filteredState.players,
       maxTurns: filteredState.maxTurns,
       characterSelectionCompleted: filteredState.characterSelectionCompleted,
       characterSelectionOptions: filteredState.characterSelectionOptions,
+      characterSelectionIntroduction:
+        filteredState.characterSelectionIntroduction,
       generateImages: filteredState.generateImages,
       images: filteredState.images,
       pendingPlayers,

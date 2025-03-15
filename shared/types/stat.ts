@@ -23,6 +23,13 @@ export type StatValueEntry = z.infer<typeof statValueEntrySchema>;
 
 export const statSchema = z
   .object({
+    name: z
+      .string()
+      .describe(
+        "Name of the variable that will be displayed to the player.\n" +
+          "- Must be specific and immediately convey the stat's meaning and function.\n" +
+          "- For opposites type, use '|' to separate the two traits (e.g., 'Brutality|Finesse')."
+      ),
     type: z
       .enum(["string", "string[]", "percentage", "opposites", "number"])
       .describe(
@@ -33,13 +40,6 @@ export const statSchema = z
           "- opposites: Two percentage stats in one where second stat = (100 - first stat) (e.g., order|chaos, logic|empathy).\n" +
           "- number: Only for countable quantities (e.g., money, ammunition, followers).\n" +
           "As a general tendency, favor string and string[] over percentage/opposites/number unless for countable things whose management is central to the story (number), and percentages/opposites for aspects that must be managed by the player often and granularly."
-      ),
-    name: z
-      .string()
-      .describe(
-        "Name of the variable that will be displayed to the player.\n" +
-          "- Must be specific and immediately convey the stat's meaning and function.\n" +
-          "- For opposites type, use '|' to separate the two traits (e.g., 'Brutality|Finesse')."
       ),
     id: z
       .string()
@@ -135,7 +135,7 @@ export const statSchema = z
   );
 
 export const statsSchema = z.array(statSchema);
-export type Stat = z.infer<typeof statSchema> & { value: StatValue };
+export type Stat = z.infer<typeof statSchema>;
 
 // Client-side version of Stat with sensitive fields omitted
 export type ClientStat = Omit<

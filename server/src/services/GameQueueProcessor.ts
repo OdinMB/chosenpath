@@ -88,12 +88,12 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       story: storyWithCodes,
     });
 
-    // Queue the first moveStoryForward operation
-    await this.addOperation({
-      type: "moveStoryForward",
-      gameId: operation.gameId,
-      input: { story: storyWithCodes },
-    });
+    // Character selection => No more queueing the first moveStoryForward operation
+    // await this.addOperation({
+    //   type: "moveStoryForward",
+    //   gameId: operation.gameId,
+    //   input: { story: storyWithCodes },
+    // });
   }
 
   private async handleMoveStoryForward(

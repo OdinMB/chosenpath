@@ -35,7 +35,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const storyPrompts = useMemo(
     () => ({
       singlePlayer: [
-        "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
+        // "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
         "I'm a teenage wizard trying to balance school, friends, and romance...",
         "I'm a psychic detective investigating crimes in dreams...",
         "I'm a corporate concierge for supernatural entities with impossible requests...",
@@ -177,7 +177,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   disabled={isLoading}
                 />
                 <div className="flex justify-between text-xs md:text-sm text-gray-500">
-                  <span>Single Player</span>
+                  <span>1 Player</span>
                   <span>{MAX_PLAYERS} Players</span>
                 </div>
               </div>

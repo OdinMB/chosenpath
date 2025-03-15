@@ -135,9 +135,15 @@ Stat guidelines
 --- No direct outcome progress trackers of any kind!! Outcomes are tracked separately. Example: If an outcome is "Does [insert player name] find the murderer of [NPC]?" or "Does [insert player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately)
-- In multiplayer games, aim for a fair initial distribution of stat values. (Above-average values in one stat should be offset by below-average values in another stat.)
-- You can use the stat's grouping to shorten the stat name. For example, if a stat belongs to the group 'Relationships', 'Relationship with Mr. Kline' is unnecessarily long. 'Mr. Kline' is enough.
-
+- For the character selection options, make sure that the stats in the different backgrounds are different and balanced.
+--- Stat packages should be meaningfully different from each other. The background should play markedly different in the story.
+--- No background should be obviously better than another. If one stat is better in one background, another stat should be worse in that background.
+${
+  isMultiplayer
+    ? "- In multiplayer games, make sure that the backgrounds for different players are consinstent with each other, no matter which backgrounds the players choose.\n" +
+      "--- Example: In a space western, only one player should be the pilot. In a band, only one player should be the lead guitarist.\n"
+    : ""
+}
 Type of stats and what they are good for:
 - string: Qualitative aspects that don't change often, or that don't have to be tracked granularly.
 --- Role that can be filled with the name of an NPC (e.g. Assistant, Mentor)
@@ -185,7 +191,7 @@ Context for additional stat parameters
 - Threads are resolved as favorable/mixed/unfavorable.
 - At the end of a thread and depending on the resolution, a milestone is added to the story state. This is what drives the story to its overall resolution.
 - Each thread consists of 2-4 beats.
-- Each beat is 4-5 paragraphs of text followed by a player decision.
+- Each beat is 5-6 paragraphs of text followed by a player decision.
 - Beats have a probability distribution for favorable/mixed/unfavorable resolutions.
 - This distribution can be influenced by stats.
 - It can be shifted in the player's favor by sacrificing something, or in the player's disadvantage by choosing a reward that is going to help the player in other ways later on.
@@ -390,7 +396,7 @@ player stats:
     "Decreases by 5-10% after public failures or embarrassments"
   ]
   canBeChangedInBeatResolutions: false (stage presence should only be changed after a thread is resolved, except for sacrifice and reward options)
-  Initial values in player backgrounds: 20-50 (balance with instrument mastery)
+  Initial values in player backgrounds: 20-60 (balance with instrument mastery)
 
 - Instrument Mastery (string)
   id: player_instrument_mastery
@@ -412,7 +418,7 @@ player stats:
     "Virtuoso and Legend levels require dedicated mastery threads with favorable resolutions"
   ]
   canBeChangedInBeatResolutions: false (same as stage presence)
-  Initial values in player backgrounds: Novice or Amateur (balance with stage presence)
+  Initial values in player backgrounds: Novice/Amateur/Professional (balance with stage presence)
 
 - Band Loyalty|Solo Ambition (opposites)
   id: player_loyalty_ambition

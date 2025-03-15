@@ -31,6 +31,7 @@ import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { PLAYER_SLOTS } from "shared/types/player.js";
 import { Story } from "./Story.js";
+import { PlayerState } from "shared/types/story.js";
 dotenv.config();
 
 export class AIStoryGenerator {
@@ -80,27 +81,6 @@ export class AIStoryGenerator {
 
     const players = this.createPlayersFromSetup(setup, playerCount);
 
-    // Convert sharedStats to include values from initialSharedStatsValues
-    const sharedStats = setup.sharedStats.map((stat) => {
-      // Find the stat value entry for this stat ID
-      const statValueEntry = setup.initialSharedStatValues.find(
-        (entry) => entry.statId === stat.id
-      );
-
-      if (!statValueEntry) {
-        console.error(
-          `ERROR: No initial value defined for shared stat: ${stat.id}`
-        );
-      }
-
-      return {
-        ...stat,
-        value: statValueEntry
-          ? statValueEntry.value
-          : this.getDefaultStatValue(stat.type),
-      };
-    });
-
     const initialState: StoryState = {
       title: setup.title,
       gameMode,
@@ -108,7 +88,9 @@ export class AIStoryGenerator {
       storyElements: setup.storyElements,
       worldFacts: [],
       sharedOutcomes: setup.sharedOutcomes,
-      sharedStats,
+      sharedStats: setup.sharedStats,
+      sharedStatValues: setup.initialSharedStatValues,
+      playerStats: setup.playerStats,
       players,
       storyPhases: [],
       maxTurns,
@@ -119,6 +101,7 @@ export class AIStoryGenerator {
           return [slot, setup[playerKey] as PlayerOptionsGeneration];
         })
       ),
+      characterSelectionIntroduction: setup.characterSelectionIntroduction,
       generateImages,
       images: [],
       playerCodes: {},
@@ -132,7 +115,7 @@ export class AIStoryGenerator {
   private createPlayersFromSetup(
     setup: StorySetup<PlayerCount>,
     playerCount: PlayerCount
-  ) {
+  ): Record<string, PlayerState> {
     return Object.fromEntries(
       getPlayerSlots(playerCount).map((slot) => {
         const playerKey = slot as keyof StorySetup<typeof playerCount>;
@@ -144,10 +127,16 @@ export class AIStoryGenerator {
           slot,
           {
             name: "", // Will be set during character selection
-            pronouns: "", // Will be set during character selection
+            pronouns: {
+              personal: "",
+              object: "",
+              possessive: "",
+              reflexive: "",
+            }, // Will be set during character selection
+            appearance: "", // Will be set during character selection
             fluff: "", // Will be set during character selection
             outcomes: playerData.outcomes,
-            stats: [], // Will be set during character selection
+            statValues: [], // Will be set during character selection
             knownStoryElements: [],
             beatHistory: [],
           },

@@ -33,6 +33,7 @@ New features
 
 Improvements
 
+- Client: When new beat arrives on small devices, scroll up automatically
 - Check if ids actually exist (e.g. outcome ID)
 - Retry mechanism for queue actions
 - Send error messages to frontend

@@ -50,6 +50,18 @@ class GameService {
     });
   }
 
+  selectCharacter(identityIndex: number, backgroundIndex: number) {
+    console.log("[GameService] Selecting character:", {
+      identityIndex,
+      backgroundIndex,
+    });
+    wsService.sendMessage({
+      type: "select_character",
+      identityIndex,
+      backgroundIndex,
+    });
+  }
+
   exitStory() {
     const sessionId = wsService.getSessionId();
     if (!sessionId) {
