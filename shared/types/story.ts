@@ -20,6 +20,8 @@ import {
   Pronouns,
   characterSelectionIntroductionSchema,
   CharacterSelectionIntroduction,
+  characterSelectionPlanSchema,
+  CharacterSelectionPlan,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -116,9 +118,6 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
           "Shared outcomes that (together with individual outcomes) will make up the endings of the story for all players. Can include both shared goals and questions that players compete over. No intermediate outcomes, only elements of the ending."
         ),
       statGroups: statGroupsSchema,
-      playerStats: z
-        .array(statSchema)
-        .describe("Stats that each player has individually"),
       sharedStats: z
         .array(statSchema)
         .describe("Stats that are shared among players"),
@@ -128,6 +127,10 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
           "Initial values for the shared stats. Array of {statId, value} objects.\n" +
             initialStatValueDescription
         ),
+      playerStats: z
+        .array(statSchema)
+        .describe("Stats that each player has individually"),
+      characterSelectionPlan: characterSelectionPlanSchema,
       ...playerSchemas,
       title: z.string().describe("Title of the story"),
       characterSelectionIntroduction: characterSelectionIntroductionSchema,
@@ -145,6 +148,7 @@ export type StorySetup<N extends PlayerCount> = {
   playerStats: z.infer<typeof statSchema>[];
   sharedStats: z.infer<typeof statSchema>[];
   initialSharedStatValues: StatValueEntry[];
+  characterSelectionPlan: CharacterSelectionPlan;
   characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
 
@@ -181,6 +185,7 @@ export type StoryState = {
   storyPhases: StoryPhase[];
   maxTurns: number;
   characterSelectionCompleted: boolean;
+  characterSelectionPlan: CharacterSelectionPlan;
   characterSelectionOptions: Record<
     (typeof PLAYER_SLOTS)[number],
     PlayerOptionsGeneration

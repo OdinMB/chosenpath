@@ -77,7 +77,11 @@ export type CharacterSelectionIntroduction = z.infer<
 export const characterIdentitySchema = z.object({
   name: z.string().describe("Name of the character/entity"),
   pronouns: pronounsSchema,
-  appearance: z.string().describe("Appearance of the character/entity"),
+  appearance: z
+    .string()
+    .describe(
+      "Appearance of the character/entity. Focus on superficial things, as anything you say about personality traits or skills might be at odds with the background that the player can choose independently."
+    ),
 });
 export type CharacterIdentity = z.infer<typeof characterIdentitySchema>;
 
@@ -103,3 +107,36 @@ export const characterBackgroundSchema = z
   );
 
 export type CharacterBackground = z.infer<typeof characterBackgroundSchema>;
+
+export const characterSelectionPlanSchema = z.object({
+  playerStatConversionRates: z
+    .array(
+      z
+        .string()
+        .describe(
+          "A rough conversion rate for player stats. Example: '10 points of Village Loyalty are worth 1 step of Adventurer Threat'"
+        )
+    )
+    .describe(
+      "List three rough conversion rates between player stats. This will help ensure that the background options for each player are balanced, with no option being clearly better than another."
+    ),
+  playerBackgroundVariety: z
+    .array(
+      z
+        .string()
+        .describe(
+          "Particular tradeoff between player stats. Example: 'Impoverished folk hero: no starting gold, but high reputation and high loyalty'"
+        )
+    )
+    .describe(
+      "How do you ensure that the background options for each player are markedly different from each other but still balanced? Outline 3 potential archetypes that the backgrounds could fall into. Consider the player stat conversion rates."
+    ),
+  multiplayerCoordination: z
+    .string()
+    .describe(
+      "For multiplayer games: how do you ensure that the options for identities and backgrounds for each player are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: 'player1 will get options for being the thief, while player2 will get options for being the cleric' (in a fantasy adventure story)."
+    ),
+});
+export type CharacterSelectionPlan = z.infer<
+  typeof characterSelectionPlanSchema
+>;

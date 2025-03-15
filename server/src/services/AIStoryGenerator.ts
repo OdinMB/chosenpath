@@ -95,6 +95,7 @@ export class AIStoryGenerator {
       storyPhases: [],
       maxTurns,
       characterSelectionCompleted: false,
+      characterSelectionPlan: setup.characterSelectionPlan,
       characterSelectionOptions: Object.fromEntries(
         getPlayerSlots(playerCount).map((slot) => {
           const playerKey = slot as keyof StorySetup<typeof playerCount>;
