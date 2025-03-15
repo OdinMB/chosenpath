@@ -44,10 +44,6 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
             </span>
             <span className="font-henny-penny text-rose-600 transform inline-block hover:scale-110 hover:-rotate-2 transition-all duration-300 text-[80%] relative">
               E
-              {/* Info icon with animation - now positioned further right and up */}
-              <span className="absolute -top-6 -right-6 w-5 h-5 border border-gray-400 rounded-full flex items-center justify-center text-xs text-gray-400 transition-all hover:scale-110 hover:rotate-12 duration-300 bg-white">
-                i
-              </span>
             </span>
 
             {/* .ai suffix - positioned further right and down with animation */}
