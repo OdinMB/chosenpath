@@ -195,7 +195,9 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   min={0}
                   max={2}
                   value={
-                    gameMode === GameModes.Cooperative
+                    playerCount === 1
+                      ? 0
+                      : gameMode === GameModes.Cooperative
                       ? 0
                       : gameMode === GameModes.CooperativeCompetitive
                       ? 1
