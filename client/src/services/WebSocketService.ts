@@ -95,15 +95,27 @@ export class WebSocketService {
       });
 
       if (this.playerCode) {
-        console.log(
-          "[WebSocketService] Attempting to reconnect with player code:",
-          this.playerCode
-        );
-        this.sendMessage({
-          type: "verify_code",
-          sessionId: this.sessionId || "",
-          code: this.playerCode,
-        });
+        // Check if the player code is still in localStorage
+        const playerCodeKey = `playerCode_${this.tabId}`;
+        const storedCode = localStorage.getItem(playerCodeKey);
+
+        if (storedCode === this.playerCode) {
+          console.log(
+            "[WebSocketService] Attempting to reconnect with player code:",
+            this.playerCode
+          );
+          this.sendMessage({
+            type: "verify_code",
+            sessionId: this.sessionId || "",
+            code: this.playerCode,
+          });
+        } else {
+          console.log(
+            "[WebSocketService] Player code no longer valid, creating new session"
+          );
+          this.playerCode = null;
+          this.socket?.emit("create_session");
+        }
       } else {
         console.log(
           "[WebSocketService] No existing session or code, creating new session"
@@ -213,6 +225,16 @@ export class WebSocketService {
       "verify_code_response",
       (data: { state: ClientStoryState | null; error?: string }) => {
         console.log("[WebSocketService] Code verification response:", data);
+
+        // If there's an error, clear the player code
+        if (data.error) {
+          console.log(
+            "[WebSocketService] Code verification failed:",
+            data.error
+          );
+          this.clearPlayerCode();
+        }
+
         const handler = this.messageHandlers.get("verify_code_response");
         if (handler) {
           handler({ type: "verify_code_response", ...data });
@@ -264,13 +286,24 @@ export class WebSocketService {
     this.clearSession();
   }
 
-  disconnect() {
+  disconnect(clearCode = false) {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
     this.sessionId = null;
     this.isConnecting = false;
+
+    if (clearCode) {
+      this.clearPlayerCode();
+    }
+  }
+
+  clearPlayerCode() {
+    console.log("[WebSocketService] Clearing player code:", this.playerCode);
+    this.playerCode = null;
+    const playerCodeKey = `playerCode_${this.tabId}`;
+    localStorage.removeItem(playerCodeKey);
   }
 
   setPlayerCode(code: string) {

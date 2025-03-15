@@ -95,12 +95,38 @@ function App() {
     loggedSetViewState,
   ]);
 
+  // Monitor WebSocket connection status and reconnect if needed
   useEffect(() => {
-    if (!sessionId && !isCreatingSession && wsService.isConnected()) {
-      console.log("[App] No session found, requesting new session");
-      setIsCreatingSession(true);
-      wsService.sendMessage({ type: "create_session" });
-    }
+    const checkConnection = () => {
+      if (!wsService.isConnected()) {
+        console.log("[App] WebSocket not connected, reconnecting");
+        wsService.connect();
+      }
+    };
+
+    // Check connection status periodically
+    const interval = setInterval(checkConnection, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Monitor WebSocket connection status
+  useEffect(() => {
+    const checkSession = () => {
+      if (wsService.isConnected() && !sessionId && !isCreatingSession) {
+        console.log("[App] Connected but no session, requesting new session");
+        setIsCreatingSession(true);
+        wsService.sendMessage({ type: "create_session" });
+      }
+    };
+
+    // Check immediately
+    checkSession();
+
+    // Set up interval to check session status
+    const interval = setInterval(checkSession, 1000);
+
+    return () => clearInterval(interval);
   }, [sessionId, isCreatingSession]);
 
   useEffect(() => {
@@ -181,18 +207,29 @@ function App() {
   };
 
   const handleDeleteCode = useCallback(() => {
+    console.log("[App] Deleting player code:", playerCode);
+
+    // Clear player code from local storage and state
     localStorage.removeItem(playerCodeKey);
     setPlayerCode(null);
 
-    // If we're connected but have no session, we should go to WELCOME
-    if (wsService.isConnected()) {
-      loggedSetViewState("WELCOME");
-    } else {
-      // If we're not connected, we need to reconnect
-      wsService.connect();
-      loggedSetViewState("WELCOME");
-    }
-  }, [playerCodeKey, loggedSetViewState]);
+    // Reset session state
+    setSessionId(null);
+    localStorage.removeItem("sessionId");
+
+    // Force reconnection to ensure we have a valid connection
+    // Pass true to clear the player code in WebSocketService
+    wsService.disconnect(true);
+    wsService.connect();
+
+    // Reset creating session flag to trigger a new session request
+    setIsCreatingSession(false);
+
+    // Set view state to WELCOME
+    loggedSetViewState("WELCOME");
+
+    console.log("[App] Player code deleted");
+  }, [playerCode, playerCodeKey, loggedSetViewState, setSessionId]);
 
   // Add error display component
   const ErrorMessage = () =>

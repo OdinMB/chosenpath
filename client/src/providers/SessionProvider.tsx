@@ -84,8 +84,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
           setIsConnecting(false);
         } else if (data.error) {
+          console.log(
+            "[SessionProvider] Code verification failed:",
+            data.error
+          );
           setError(data.error);
           setIsLoading(false);
+
+          // Clear the story state since the code is invalid
+          setStoryState(null);
         }
       }
     });
