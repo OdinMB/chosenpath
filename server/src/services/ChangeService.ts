@@ -1,7 +1,7 @@
 import type { Change } from "shared/types/change.js";
 import { Story } from "./Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
-import type { Stat } from "shared/types/stat.js";
+import type { Stat, StatValue, StatValueEntry } from "shared/types/stat.js";
 import type { StoryState } from "shared/types/story.js";
 
 export class ChangeService {
@@ -152,11 +152,12 @@ export class ChangeService {
 
     if (change.group === "shared") {
       console.log(`Applying stat change to shared stat: ${change.stat}`);
-      return this.updateStatsArray(
+      return this.updateStatValues(
         story,
+        state.sharedStatValues,
         state.sharedStats,
         change,
-        (updatedStats) => ({ sharedStats: updatedStats })
+        (updatedStatValues) => ({ sharedStatValues: updatedStatValues })
       );
     }
 
@@ -173,82 +174,85 @@ export class ChangeService {
     console.log(
       `Applying stat change to player ${playerSlot}'s stat: ${change.stat}`
     );
-    return this.updateStatsArray(
+    return this.updateStatValues(
       story,
-      player.stats,
+      player.statValues,
+      state.playerStats,
       change,
-      (updatedStats) => ({
+      (updatedStatValues) => ({
         players: {
           ...state.players,
           [playerSlot]: {
             ...player,
-            stats: updatedStats,
+            statValues: updatedStatValues,
           },
         },
       })
     );
   }
 
-  private updateStatsArray(
+  private updateStatValues(
     story: Story,
+    statValues: StatValueEntry[],
     stats: Stat[],
     change: Change & { type: "statChange" },
-    updateState: (updatedStats: Stat[]) => Partial<StoryState>
+    updateState: (updatedStatValues: StatValueEntry[]) => Partial<StoryState>
   ): Story {
-    const state = story.getState();
-    const statIndex = stats.findIndex((s) => s.id === change.stat);
-
-    if (statIndex === -1) {
-      console.log(
-        `Stat ${change.stat} not found in ${
-          change.group === "shared"
-            ? "shared stats"
-            : `player ${change.group}'s stats`
-        }`
-      );
+    const statDef = stats.find((s) => s.id === change.stat);
+    if (!statDef) {
+      console.log(`Stat definition for ${change.stat} not found`);
       return story;
     }
 
-    const stat = stats[statIndex];
-    const updatedStat = this.updateStatValue(stat, change);
+    const statValueIndex = statValues.findIndex(
+      (sv) => sv.statId === change.stat
+    );
+    if (statValueIndex === -1) {
+      console.log(`Stat value for ${change.stat} not found`);
+      return story;
+    }
 
-    if (!updatedStat) {
+    const statValue = statValues[statValueIndex];
+    const updatedStatValue = this.updateStatValue(statDef, statValue, change);
+
+    if (!updatedStatValue) {
       console.log(
-        `Stat ${stat.id} not updated. Incompatible change type "${change.change}" for stat type "${stat.type}"`
+        `Stat ${statDef.id} not updated. Incompatible change type "${change.change}" for stat type "${statDef.type}"`
       );
       return story;
     }
 
     console.log(
-      `Updated stat ${stat.id} ${
+      `Updated stat ${statDef.id} ${
         change.group === "shared" ? "(shared)" : `for player ${change.group}`
-      } from ${JSON.stringify(stat.value)} to ${JSON.stringify(
-        updatedStat.value
+      } from ${JSON.stringify(statValue.value)} to ${JSON.stringify(
+        updatedStatValue.value
       )}`
     );
 
-    const updatedStats = [...stats];
-    updatedStats[statIndex] = updatedStat;
+    const updatedStatValues = [...statValues];
+    updatedStatValues[statValueIndex] = updatedStatValue;
 
-    return story.applyChanges(updateState(updatedStats));
+    return story.applyChanges(updateState(updatedStatValues));
   }
 
   private updateStatValue(
-    stat: Stat,
+    statDef: Stat,
+    statValue: StatValueEntry,
     change: Change & { type: "statChange" }
-  ): Stat | null {
+  ): StatValueEntry | null {
     switch (change.change) {
       case "setString":
-        if (stat.type === "string") {
-          return { ...stat, value: change.value as string };
+        if (statDef.type === "string") {
+          return { ...statValue, value: change.value as string };
         }
         break;
       case "addNumber":
       case "subtractNumber":
         if (
-          stat.type === "number" ||
-          stat.type === "percentage" ||
-          stat.type === "opposites"
+          statDef.type === "number" ||
+          statDef.type === "percentage" ||
+          statDef.type === "opposites"
         ) {
           // Fix: directly use the change value with appropriate sign
           const valueToAdd =
@@ -256,50 +260,52 @@ export class ChangeService {
               ? (change.value as number)
               : -(change.value as number);
 
-          let newValue = (stat.value as number) + valueToAdd;
+          let newValue = (statValue.value as number) + valueToAdd;
 
           // Clamp percentage and opposites values between 0 and 100
-          if (stat.type === "percentage" || stat.type === "opposites") {
+          if (statDef.type === "percentage" || statDef.type === "opposites") {
             newValue = Math.max(0, Math.min(100, newValue));
           }
 
-          return { ...stat, value: newValue };
+          return { ...statValue, value: newValue };
         }
         break;
       case "setNumber":
         if (
-          stat.type === "number" ||
-          stat.type === "percentage" ||
-          stat.type === "opposites"
+          statDef.type === "number" ||
+          statDef.type === "percentage" ||
+          statDef.type === "opposites"
         ) {
-          console.log(`Setting number stat ${stat.id} to ${change.value}`);
+          console.log(`Setting number stat ${statDef.id} to ${change.value}`);
           let newValue = change.value as number;
 
           // Clamp percentage and opposites values between 0 and 100
-          if (stat.type === "percentage" || stat.type === "opposites") {
+          if (statDef.type === "percentage" || statDef.type === "opposites") {
             newValue = Math.max(0, Math.min(100, newValue));
           }
 
-          return { ...stat, value: newValue };
+          return { ...statValue, value: newValue };
         }
         break;
       case "addElement":
-        if (stat.type === "string[]") {
-          const currentValue = stat.value as string[];
+        if (statDef.type === "string[]") {
+          const currentValue = statValue.value as string[];
           if (!currentValue.includes(change.value as string)) {
             return {
-              ...stat,
+              ...statValue,
               value: [...currentValue, change.value as string],
             };
           }
-          return stat;
+          return statValue;
         }
         break;
       case "removeElement":
-        if (stat.type === "string[]") {
+        if (statDef.type === "string[]") {
           return {
-            ...stat,
-            value: (stat.value as string[]).filter((v) => v !== change.value),
+            ...statValue,
+            value: (statValue.value as string[]).filter(
+              (v) => v !== change.value
+            ),
           };
         }
         break;

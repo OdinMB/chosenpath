@@ -2,7 +2,7 @@ import { GameModes, PlayerState } from "shared/types/story.js";
 import { Story } from "../Story.js";
 import { Thread } from "shared/types/thread.js";
 import { getThreadType } from "shared/types/thread.js";
-import { Stat } from "shared/types/stat.js";
+import { Stat, StatValueEntry } from "shared/types/stat.js";
 import { Beat } from "shared/types/beat.js";
 
 export interface SectionConfig {
@@ -44,14 +44,7 @@ export class StoryStatePromptService {
     }
     if (sections.stats) {
       promptSections.push(
-        [
-          "SHARED STATS:",
-          story
-            .getSharedStats()
-            .map((stat) => this.formatStatDisplay(stat, sections.detailedStats))
-            .join("\n\n"),
-          "",
-        ].join("\n")
+        this.createStatsSection(story, sections.detailedStats)
       );
     }
     if (sections.imageLibrary) {
@@ -187,6 +180,8 @@ ${modeDescriptions[story.getGameMode()]}
     switch (stat.type) {
       case "percentage":
         return `${stat.value}%`;
+      case "opposite":
+        return `${stat.value}|${100 - stat.value}`;
       case "string[]":
         return Array.isArray(stat.value) ? stat.value.join(", ") : stat.value;
       default:
@@ -196,9 +191,12 @@ ${modeDescriptions[story.getGameMode()]}
 
   private static formatStatDisplay(
     stat: Stat,
+    statValue: StatValueEntry | undefined,
     detailed: boolean = true
   ): string {
-    const formattedValue = this.formatStatValue(stat);
+    const formattedValue = statValue
+      ? this.formatStatValue({ type: stat.type, value: statValue.value })
+      : "Values in player sections below";
 
     // Basic stat information
     const basicInfo = `- ${stat.name.toUpperCase()} (id: ${stat.id}, type: ${
@@ -275,6 +273,8 @@ ${modeDescriptions[story.getGameMode()]}
     story: Story,
     sections?: SectionConfig
   ): string {
+    const state = story.getState();
+
     return Object.entries(story.getPlayers())
       .map(([slot, playerState]) => {
         const beatHistorySection = this.createBeatHistorySection(
@@ -287,20 +287,27 @@ ${modeDescriptions[story.getGameMode()]}
           `######## PLAYER ID: ${slot} ########`,
           separator,
           "",
-          `${playerState.name} (${playerState.pronouns})`,
-          playerState.fluff,
+          `${playerState.name} (${playerState.pronouns.personal}/${playerState.pronouns.possessive})`,
+          playerState.appearance + " " + playerState.fluff,
           "",
         ];
 
         // Only include character stats if the stats setting is true
         if (sections?.stats) {
           playerSections.push(
-            "CHARACTER STATS:",
-            playerState.stats
-              .map((stat: Stat) =>
-                this.formatStatDisplay(stat, sections.detailedStats)
-              )
-              .join("\n\n"),
+            "CHARACTER STAT VALUES:",
+            playerState.statValues
+              .map((statValue) => {
+                const statDef = state.playerStats.find(
+                  (s) => s.id === statValue.statId
+                );
+                if (!statDef)
+                  return `- ${statValue.statId}: ${statValue.value} (definition not found)`;
+                return `- ${statDef.name.toUpperCase()}: ${this.formatStatValue(
+                  { type: statDef.type, value: statValue.value }
+                )}`;
+              })
+              .join("\n"),
             ""
           );
         }
@@ -797,5 +804,42 @@ ${modeDescriptions[story.getGameMode()]}
     }
 
     return "No resolutions defined";
+  }
+
+  private static createStatsSection(
+    story: Story,
+    detailed: boolean = true
+  ): string {
+    const state = story.getState();
+    const sharedStats = story.getSharedStats();
+    const sharedStatValues = state.sharedStatValues;
+    const playerStats = state.playerStats;
+
+    const sections: string[] = [];
+
+    // Shared stats with values
+    sections.push(
+      "SHARED STATS:",
+      sharedStats
+        .map((stat) => {
+          const statValue = sharedStatValues.find(
+            (sv) => sv.statId === stat.id
+          );
+          return this.formatStatDisplay(stat, statValue, detailed);
+        })
+        .join("\n\n"),
+      ""
+    );
+
+    // Player stat definitions (without values)
+    sections.push(
+      "PLAYER STAT DEFINITIONS:",
+      playerStats
+        .map((stat) => this.formatStatDisplay(stat, undefined, detailed))
+        .join("\n\n"),
+      ""
+    );
+
+    return sections.join("\n");
   }
 }

@@ -30,6 +30,8 @@ export class ThreadPromptService {
       "\n\n" +
       this.createInstructionsSection(story) +
       "\n\n" +
+      "#".repeat(100) +
+      "\n\nRemember: these are just examples. The thread (or set of threads) that you will be creating now must be fully custimized to work for the current story\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,
         this.SECTIONS_SWITCH

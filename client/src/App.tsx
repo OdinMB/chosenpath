@@ -55,25 +55,34 @@ function App() {
 
   // Replace all setViewState calls with loggedSetViewState
   useEffect(() => {
-    if (!sessionId && !playerCode) {
-      loggedSetViewState("CONNECTING");
-    } else if (viewState === "SETUP") {
-      // nothing
-    } else if (viewState === "PLAYER_CODES") {
-      if (storyState) {
+    // If we have a session or player code, we're in a valid state
+    if (sessionId || playerCode) {
+      if (viewState === "CONNECTING") {
+        loggedSetViewState("WELCOME");
+      } else if (viewState === "SETUP") {
+        // Stay in setup
+      } else if (viewState === "PLAYER_CODES") {
+        if (storyState) {
+          loggedSetViewState("GAME");
+        }
+      } else if (storyState) {
         loggedSetViewState("GAME");
+      } else if (viewState !== "WELCOME") {
+        loggedSetViewState("WELCOME");
       }
-    } else if (storyState) {
-      loggedSetViewState("GAME");
-    } else {
-      loggedSetViewState("WELCOME");
-    }
-    if (viewState === "WELCOME") {
-      if (storyState) {
-        loggedSetViewState("GAME");
+    } else if (wsService.isConnected()) {
+      // If we're connected but have no session or player code, go to welcome
+      if (viewState === "CONNECTING") {
+        loggedSetViewState("WELCOME");
       }
     }
 
+    // Handle transitions based on story state
+    if (viewState === "WELCOME" && storyState) {
+      loggedSetViewState("GAME");
+    }
+
+    // Handle transitions based on story codes
     if (storyCodes && viewState === "SETUP") {
       loggedSetViewState("PLAYER_CODES");
     }
@@ -174,7 +183,15 @@ function App() {
   const handleDeleteCode = useCallback(() => {
     localStorage.removeItem(playerCodeKey);
     setPlayerCode(null);
-    loggedSetViewState("WELCOME");
+
+    // If we're connected but have no session, we should go to WELCOME
+    if (wsService.isConnected()) {
+      loggedSetViewState("WELCOME");
+    } else {
+      // If we're not connected, we need to reconnect
+      wsService.connect();
+      loggedSetViewState("WELCOME");
+    }
   }, [playerCodeKey, loggedSetViewState]);
 
   // Add error display component
