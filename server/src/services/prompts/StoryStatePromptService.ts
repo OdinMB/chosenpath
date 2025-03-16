@@ -662,7 +662,7 @@ ${modeDescriptions[story.getGameMode()]}
           })
           .join("\n\n");
 
-        return `BEAT TEXTS for Player ${playerSlot}:\n${formattedBeats}`;
+        return `BEAT TEXTS for ${playerSlot}:\n${formattedBeats}`;
       })
       .join("\n\n");
   }

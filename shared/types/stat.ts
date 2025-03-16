@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-export const initialStatValueDescription = `Value of the variable when the game starts.
-For string stats: Initial state or level (e.g., 'Novice', 'Healthy').
-- For string[] stats: Initial list of items, traits, or abilities (e.g., ['Sword', 'Shield']).
-- For percentage stats: Initial percentage value (0-100).
-- For opposites stats: Initial value of the first stat (second stat will be 100 - this value).
-- For number stats: Initial count or quantity (e.g., 50 gold).`;
-
 export const statValueSchema = z.union([
   z.number(),
   z.string(),
@@ -23,13 +16,6 @@ export type StatValueEntry = z.infer<typeof statValueEntrySchema>;
 
 export const statSchema = z
   .object({
-    name: z
-      .string()
-      .describe(
-        "Name of the variable that will be displayed to the player.\n" +
-          "- Must be specific and immediately convey the stat's meaning and function.\n" +
-          "- For opposites type, use '|' to separate the two traits (e.g., 'Brutality|Finesse')."
-      ),
     type: z
       .enum(["string", "string[]", "percentage", "opposites", "number"])
       .describe(
@@ -41,6 +27,13 @@ export const statSchema = z
           "- number: Only for countable quantities (e.g., money, ammunition, followers).\n" +
           "As a general tendency, favor string and string[] over percentage/opposites/number unless for countable things whose management is central to the story (number), and percentages/opposites for aspects that must be managed by the player often and granularly."
       ),
+    name: z
+      .string()
+      .describe(
+        "Name of the variable that will be displayed to the player.\n" +
+          "- Must be specific and immediately convey the stat's meaning and function.\n" +
+          "- For opposites type, use '|' to separate the two traits (e.g., 'Brutality|Finesse')."
+      ),
     id: z
       .string()
       .describe(
@@ -51,7 +44,7 @@ export const statSchema = z
       .describe(
         "Only for string and string[] stats.\n" +
           "- For string stats: Can define progression paths (e.g., 'Novice, Apprentice, Master').\n" +
-          "- For string[] stats: Can define categories (e.g., 'Healers/Warriors/Sages/Artisans' for special followers). You can also define a limit (e.g., '(max 3)').\n" +
+          "- For string[] stats: Can define categories (e.g., 'only minor spells', 'possible contacts are [names of three npcs]'). You can also define a limit (e.g., '(max 4 items)').\n" +
           "- For percentage, opposites, and numbers stats, leave this empty."
       ),
     effectOnPoints: z

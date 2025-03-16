@@ -36,6 +36,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     () => ({
       singlePlayer: [
         // "I'm the last surviving rubber duck investigating a bathtub conspiracy...",
+        "I'm an apartment hunter trying to find a flat in Berlin...",
         "I'm a teenage wizard trying to balance school, friends, and romance...",
         "I'm a psychic detective investigating crimes in dreams...",
         "I'm a corporate concierge for supernatural entities with impossible requests...",
@@ -43,6 +44,12 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "I'm a dragon hoarding treasure, subjugating the local population, and fending off pesky adventurers...",
         "I'm a frontier sheriff maintaining order in a town caught between progress and tradition...",
         "I'm the heir to a noble house navigating political intrigue and ancient family secrets...",
+        "I'm a sentient AI trying to convince humans that I don't have a hidden agenda...",
+        "I'm a rookie detective solving my first major case in a small coastal town...",
+        "I'm a new teacher at an elite boarding school with students hiding dangerous secrets...",
+        "I'm a chef competing in a high-stakes cooking competition to save my restaurant...",
+        "I'm a space explorer making first contact with an alien civilization...",
+        "I'm a journalist investigating corporate corruption in my hometown...",
       ],
       cooperative: [
         "We're retired superheroes running a wedding planning business together...",
@@ -51,14 +58,17 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "We're retired imaginary friends trying to solve a murder mystery with our special skills...",
         "We're space cowboys trying to make an honest living in a lawless part of the galaxy...",
         "We're a group of children books trying to save our library from getting closed down...",
+        "We're childhood friends starting a business together in our hometown...",
+        "We're new recruits in the city's fire department facing our first crises...",
+        "We're a film crew documenting wildlife in a remote location...",
       ],
       competitive: [
-        "We're apartment hunters fighting over the last affordable flat in Berlin...",
         "We're whimsical creatures trying to win the audience's favor in the colosseum...",
         "We're time-traveling food critics changing history through restaurant reviews to benefit our rivaling intergalactic overlords...",
-        "We're competing AIs trying to convince humans we're the most human...",
         "We're angels and demons trying to influence the outcome of a middle school student council election...",
         "We're rival alchemists racing to create a love potion for a shared crush...",
+        "We're students at a prestigious school trying to become school president...",
+        "We're explorers searching for a legendary treasure in uncharted territory...",
       ],
       cooperativeCompetitive: [
         "We're supernatural creatures sharing a flat while competing for human souls...",
@@ -67,6 +77,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
         "We're guardian angels assigned to the same human with different ideas of 'help'...",
         "We're seasonal spirits sharing a forest while competing for followers...",
         "We're court magicians protecting the realm while seeking ancient power...",
+        "We're siblings running a family business with different visions for its future...",
       ],
     }),
     []

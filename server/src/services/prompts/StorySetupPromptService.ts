@@ -135,9 +135,6 @@ Stat guidelines
 --- No direct outcome progress trackers of any kind!! Outcomes are tracked separately. Example: If an outcome is "Does [insert player name] find the murderer of [NPC]?" or "Does [insert player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately)
-- For the character selection options, make sure that the stats in the different backgrounds are different and balanced.
---- Stat packages should be meaningfully different from each other. The background should play markedly different in the story.
---- No background should be obviously better than another. If one stat is better in one background, another stat should be worse in that background.
 ${
   isMultiplayer
     ? "- In multiplayer games, make sure that the backgrounds for different players are consinstent with each other, no matter which backgrounds the players choose.\n" +
@@ -233,6 +230,8 @@ Define if the stat can be changed in beat resolutions.
 - If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect. This should only happen after a relevant thread is resolved.
 
 These lists are just examples. Feel free to be creative. The important thing is that the stat plays a relevant, plausible, and interesting part in the story.
+
+##########
 
 EXAMPLE STAT SETUPS
 
@@ -531,6 +530,37 @@ shared stats:
   ]
   canBeChangedInBeatResolutions: true (group chemistry can fluctuate a little in a single beat)
   Initial value: 70
+
+##########
+
+Character Selection Instructions
+
+For the character selection options, make sure that the stats in the different backgrounds are different and balanced.
+${
+  isMultiplayer
+    ? `
+multiplayerCoordination:
+For this multiplayer game, ensure that the options for identities and backgrounds for each player are meaningfully different from and consistent with each other. Examples:
+- Different roles within the group: 'player1 gets different choices for the role of the thief, while player2 gets different choices for the role of the cleric'
+- No overlaps in special traits: 'the superpowers of player1 will be around a certain theme, while the superpowers of player2 will be around a different theme'
+- No overlaps in personal background details: 'player1 comes from a certain place, while player2 comes from a different place'
+Tailor these mechanisms to the setting of the story.
+`
+    : ``
+}
+playerStatConversionRates:
+- List three conversion rates between player stats to ensure balance.
+- Example: '10 points of Village Loyalty are worth 1 level of Adventurer Threat'
+- Example: '20% Stage Presence equals one level of Instrument Mastery'
+- Example: '50 Followers equals one Special Follower'
+
+playerBackgroundVariety:
+Outline generic archetypes that the backgrounds could implement and flesh out.
+- Consider the player stat conversion rates.
+- Each archetype should represent a particular tradeoff between player stats.
+- Generic archetypes will be turned into more flavorful backgrounds later.
+- Example: 'No starting gold, but high reputation and high loyalty'
+- Example: 'High Instrument Mastery, but low Stage Presence'
 `;
   }
 

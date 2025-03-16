@@ -7,7 +7,6 @@ import {
   ClientStat,
   statValueEntrySchema,
   StatValueEntry,
-  initialStatValueDescription,
 } from "./stat.js";
 import { outcomeSchema, Outcome } from "./outcome.js";
 import {
@@ -76,7 +75,7 @@ export const playerOptionsGenerationSchema = z.object({
   outcomes: z
     .array(outcomeSchema)
     .describe(
-      "Individual outcomes that (together with any shared outcomes) will make up the ending of the story for this player. No intermediate outcomes, only elements of the ending."
+      "Individual outcomes that will define the ending of the story for this player. No intermediate outcomes, only elements of the ending. No shared outcomes (those are generated elsewhere)."
     ),
   possibleCharacterIdentities: z
     .array(characterIdentitySchema)
@@ -86,7 +85,7 @@ export const playerOptionsGenerationSchema = z.object({
   possibleCharacterBackgrounds: z
     .array(characterBackgroundSchema)
     .describe(
-      "Generate exactly 3 possible backgrounds that the player can choose from. Make sure that the stats for each background are meaningfully different from each other but still balanced. For example, if one stat in background 1 is better than the same stat in background 2, another stat in background 1 should be worse than the same stat in background 2."
+      "Generate exactly 3 possible backgrounds that the player can choose from. Implement the background archetypes in the character selection plan."
     ),
 });
 export type PlayerOptionsGeneration = z.infer<
@@ -120,12 +119,13 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
       statGroups: statGroupsSchema,
       sharedStats: z
         .array(statSchema)
-        .describe("Stats that are shared among players"),
+        .describe(
+          "Stats that are shared among players. For multiplayer games with a competitive element, consider adding an opposite stat to track who is in the lead (for 2 players) or a string to track which player currently has the most momentum (for 3+ players)."
+        ),
       initialSharedStatValues: z
         .array(statValueEntrySchema)
         .describe(
-          "Initial values for the shared stats. Array of {statId, value} objects.\n" +
-            initialStatValueDescription
+          "Initial values for the shared stats. Array of {statId, value} objects."
         ),
       playerStats: z
         .array(statSchema)
@@ -164,7 +164,7 @@ export type PlayerState = {
   statValues: StatValueEntry[];
   knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
-  characterSelected?: boolean; // Whether the player has selected a character
+  characterSelected: boolean; // Whether the player has selected an identity and background
 };
 
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;

@@ -1,6 +1,6 @@
 import { MIN_PLAYERS, MAX_PLAYERS } from "../config.js";
 import { z } from "zod";
-import { statValueEntrySchema, initialStatValueDescription } from "./stat.js";
+import { statValueEntrySchema } from "./stat.js";
 
 // Create union type from range MIN_PLAYERS to MAX_PLAYERS
 type NumberRange<Start extends number, End extends number> =
@@ -63,7 +63,7 @@ export const characterSelectionIntroductionSchema = z
     text: z
       .string()
       .describe(
-        "Text of the character selection screen. Very short introduction to the setting, followed by a question about the player's identity and background."
+        "Text of the character selection screen. Very short introduction to the setting, followed by a question about the player's identity and background. Don't frame this as a choice. The player merely tells you who they've been all along."
       ),
   })
   .describe(
@@ -75,7 +75,11 @@ export type CharacterSelectionIntroduction = z.infer<
 
 // Character identity schema (name and pronouns)
 export const characterIdentitySchema = z.object({
-  name: z.string().describe("Name of the character/entity"),
+  name: z
+    .string()
+    .describe(
+      "Name of the character/entity. For multiplayer games, make sure that no two players can have the same name."
+    ),
   pronouns: pronounsSchema,
   appearance: z
     .string()
@@ -98,43 +102,48 @@ export const characterBackgroundSchema = z
     initialPlayerStatValues: z
       .array(statValueEntrySchema)
       .describe(
-        "Initial stat values for player stats for this background. Provide an initial value for each player stat. Array of {statId, value} objects.\n" +
-          initialStatValueDescription
+        "Initial stat values for player stats for this background. Provide an initial value for each player stat. Array of {statId, value} objects."
       ),
   })
   .describe(
-    "A possible character background / starting point for this player."
+    "A possible character background / starting point for this player. Consider the background archetypes. For multiplayer games, make sure that the backgrounds don't overlap and that the background options for different players are consistent with each other."
   );
 
 export type CharacterBackground = z.infer<typeof characterBackgroundSchema>;
 
 export const characterSelectionPlanSchema = z.object({
+  multiplayerCoordination: z
+    .array(
+      z
+        .string()
+        .describe(
+          "Mechanism to ensure that there is no overlap between the options for identities and backgrounds for different players. Examples: 'player1 will get options for the role of the thief, while player2 will get options for the role of the cleric', 'player1 comes from a certain place, while player2 comes from a different place'"
+        )
+    )
+    .describe(
+      "For multiplayer games: how do you ensure that the options for identities and backgrounds for each player are meaningfully different from and consistent with each other? List three mechanisms to avoid duplication and inconsistencies between players. For single-player games, this array can be left empty."
+    ),
   playerStatConversionRates: z
     .array(
       z
         .string()
         .describe(
-          "A rough conversion rate for player stats. Example: '10 points of Village Loyalty are worth 1 step of Adventurer Threat'"
+          "A rough conversion rate for player stats. Example: '10 points of Village Loyalty are worth 1 level of Adventurer Threat', '20% Stage Presence equals one level of Instrument Mastery', '50 Followers equals one Special Follower'"
         )
     )
     .describe(
       "List three rough conversion rates between player stats. This will help ensure that the background options for each player are balanced, with no option being clearly better than another."
     ),
-  playerBackgroundVariety: z
+  backgroundArchetypes: z
     .array(
       z
         .string()
         .describe(
-          "Particular tradeoff between player stats. Example: 'Impoverished folk hero: no starting gold, but high reputation and high loyalty'"
+          "Generic archetype with tradeoffs between player stats. Example: 'No starting gold, but high reputation and high loyalty', 'High Instrument Mastery, but low Stage Presence'"
         )
     )
     .describe(
-      "How do you ensure that the background options for each player are markedly different from each other but still balanced? Outline 3 potential archetypes that the backgrounds could fall into. Consider the player stat conversion rates."
-    ),
-  multiplayerCoordination: z
-    .string()
-    .describe(
-      "For multiplayer games: how do you ensure that the options for identities and backgrounds for each player are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story. Example: 'player1 will get options for being the thief, while player2 will get options for being the cleric' (in a fantasy adventure story)."
+      "Outline 3 generic archetypes that the background options for the players could implement. Each archetype should represent a particular tradeoff between player stats, considering the player stat conversion rates. These generic archetypes will be turned into more flavorful backgrounds later."
     ),
 });
 export type CharacterSelectionPlan = z.infer<

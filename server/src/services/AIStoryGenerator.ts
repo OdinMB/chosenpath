@@ -140,6 +140,7 @@ export class AIStoryGenerator {
             statValues: [], // Will be set during character selection
             knownStoryElements: [],
             beatHistory: [],
+            characterSelected: false,
           },
         ];
       })
