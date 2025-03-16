@@ -63,7 +63,7 @@ export const characterSelectionIntroductionSchema = z
     text: z
       .string()
       .describe(
-        "Text of the character selection screen. Very short introduction to the setting, followed by a question about the player's identity and background. Don't frame this as a choice. The player merely tells you who they've been all along."
+        "Text of the character selection screen. Very short introduction to the setting, followed by a question about the player's identity and background. Don't frame this as a way to intervene in the story. The player merely tells you who they've been all along. For example: 'Remind me, which superhero were you again?', 'The expedition is dangerious, but you know what you are doing. You are ...'"
       ),
   })
   .describe(

@@ -24,10 +24,10 @@ const optionExplorationSchema = z
       .describe(
         "Whether this option involves sacrificing a stat to unlock this option ('sacrifice'), gaining a stat as a reward for choosing this option ('reward'), or none of these two ('normal')."
       ),
-    text: z.string().describe("Text shown to player for this choice"),
+    text: z.string().describe("Text shown to player for this choice."),
   })
   .describe(
-    "Exploration options. Choose this type for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern)"
+    "Exploration options. Choose this type for switches and exploratory threads (that don't follow a success/failure or win/lose pattern pattern). Options must always work narratively no matter which option the other players choose. (Bad: 'collaborate with [insert player name]', as that can lead to inconsistencies.)"
   );
 
 const optionChallengeSchema = z
