@@ -44,6 +44,10 @@ export function CharacterSelection({
   const options: PlayerOptionsGeneration =
     storyState.characterSelectionOptions[playerSlot];
 
+  // Check if the current player has already selected a character
+  const currentPlayer = storyState.players[playerSlot];
+  const hasSelectedCharacter = currentPlayer?.characterSelected === true;
+
   if (!options) return null;
 
   const handleConfirmSelection = () => {
@@ -51,6 +55,12 @@ export function CharacterSelection({
       onCharacterSelected(selectedIdentity, selectedBackground);
     }
   };
+
+  // If the player has already selected a character, return null
+  // The GameLayout component will handle showing the waiting screen
+  if (hasSelectedCharacter) {
+    return null;
+  }
 
   const renderIdentityCard = (identity: CharacterIdentity, index: number) => (
     <div
@@ -163,12 +173,12 @@ export function CharacterSelection({
         </div>
       </div>
 
-      <div className="flex justify-center mt-8">
+      <div className="flex flex-col items-center mt-8">
         <button
           onClick={handleConfirmSelection}
           disabled={selectedIdentity === null || selectedBackground === null}
           className={`
-            px-6 py-3 rounded-lg font-medium text-white
+            px-6 py-3 rounded-lg font-medium text-white mb-6
             ${
               selectedIdentity !== null && selectedBackground !== null
                 ? "bg-indigo-600 hover:bg-indigo-700"

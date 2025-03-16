@@ -34,6 +34,7 @@ New features
 Improvements
 
 - Client: When new beat arrives on small devices, scroll up automatically
+- Make sure that there are only 3 backgrounds per player, turn backgrounds into background1-3, or just delete duplicate backgrounds.
 - Check if ids actually exist (e.g. outcome ID)
 - Retry mechanism for queue actions
 - Send error messages to frontend

@@ -1,4 +1,5 @@
 import type { PlayerSlot } from "../../../shared/types/player.js";
+import { useSession } from "../hooks/useSession";
 
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];
@@ -11,6 +12,10 @@ export function PendingPlayers({
   currentPlayer,
   numberOfPlayers,
 }: PendingPlayersProps) {
+  const { storyState } = useSession();
+  const isCharacterSelectionPhase =
+    storyState && !storyState.characterSelectionCompleted;
+
   const showLoadingSpinner = pendingPlayers.length === 0;
   const showPendingPlayers = numberOfPlayers >= 2 && pendingPlayers.length > 0;
 
@@ -19,7 +24,7 @@ export function PendingPlayers({
   }
 
   return (
-    <div className="rounded-md bg-gray-50 p-3">
+    <div className="rounded-md bg-gray-50 p-3 border border-gray-200 shadow-sm">
       {showLoadingSpinner && (
         <div className="flex items-center gap-2">
           <svg
@@ -42,29 +47,37 @@ export function PendingPlayers({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <p className="text-sm text-gray-600">Generating next story beat...</p>
+          <p className="text-sm text-gray-600">
+            {isCharacterSelectionPhase
+              ? "Waiting for all players to select characters..."
+              : "Generating next story beat..."}
+          </p>
         </div>
       )}
 
       {showPendingPlayers && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium text-gray-700">
-            Waiting for {pendingPlayers.length}/{numberOfPlayers}:
+            {isCharacterSelectionPhase
+              ? "Waiting for players to select characters:"
+              : "Waiting for choices from:"}
           </span>
-          {pendingPlayers.map((slot) => (
-            <span
-              key={slot}
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                slot === currentPlayer
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {slot === currentPlayer
-                ? "You"
-                : `Player ${slot.replace("player", "")}`}
-            </span>
-          ))}
+          <div className="flex flex-wrap gap-1.5 mt-1 w-full">
+            {pendingPlayers.map((slot) => (
+              <span
+                key={slot}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  slot === currentPlayer
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {slot === currentPlayer
+                  ? "You"
+                  : `Player ${slot.replace("player", "")}`}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>

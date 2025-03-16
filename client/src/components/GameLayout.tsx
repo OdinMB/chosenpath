@@ -9,6 +9,7 @@ import {
 } from "../../../shared/types/stat";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface Props {
   onExitGame: () => void;
@@ -126,7 +127,15 @@ export function GameLayout({
 
   if (!storyState) return null;
 
-  const isCharacterSelectionMode = !storyState.characterSelectionCompleted;
+  // Get the current player's slot
+  const playerSlot = Object.keys(storyState.players)[0];
+  const currentPlayer = storyState.players[playerSlot];
+
+  // Character selection mode is active if:
+  // 1. Character selection is not completed globally AND
+  // 2. The current player hasn't selected a character yet
+  const isCharacterSelectionMode =
+    !storyState.characterSelectionCompleted && !currentPlayer.characterSelected;
 
   const handleMainContentClick = () => {
     // Only collapse sidebar on small screens
@@ -168,13 +177,26 @@ export function GameLayout({
       return (
         <aside className={sidebarClassName}>
           <div className="flex-grow"></div>
+
+          {storyState.numberOfPlayers > 1 && (
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">
+                Players Status
+              </h3>
+              <PendingPlayers
+                pendingPlayers={storyState.pendingPlayers}
+                numberOfPlayers={storyState.numberOfPlayers}
+                currentPlayer={playerSlot}
+              />
+            </div>
+          )}
+
           {renderFooter()}
         </aside>
       );
     }
 
     // Regular sidebar for game mode
-    const playerSlot = Object.keys(storyState.players)[0];
     const player = storyState.players[playerSlot];
 
     // Function to get stat value from player or shared stats
@@ -340,6 +362,26 @@ export function GameLayout({
         <main className="flex-1" onClick={handleMainContentClick}>
           {isCharacterSelectionMode && onCharacterSelected ? (
             <CharacterSelection onCharacterSelected={onCharacterSelected} />
+          ) : !storyState.characterSelectionCompleted ? (
+            // Show loading spinner when character selection is not completed globally
+            // but the current player has already selected their character
+            <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
+              <h1 className="text-2xl font-bold mb-6 text-indigo-800">
+                Character Selected
+              </h1>
+
+              <LoadingSpinner size="large" message="" />
+
+              {storyState.numberOfPlayers > 1 && (
+                <div className="mt-8 w-full max-w-md">
+                  <PendingPlayers
+                    pendingPlayers={storyState.pendingPlayers}
+                    numberOfPlayers={storyState.numberOfPlayers}
+                    currentPlayer={playerSlot}
+                  />
+                </div>
+              )}
+            </div>
           ) : (
             <StoryDisplay onChoiceSelected={onChoiceSelected} />
           )}

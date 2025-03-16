@@ -165,6 +165,19 @@ export class Story {
       })
       .map(([slot]) => slot as PlayerSlot);
   }
+
+  getPendingCharacterSelections(): PlayerSlot[] {
+    // If character selection is completed, return empty array
+    if (this.state.characterSelectionCompleted) {
+      return [];
+    }
+
+    // Return players who haven't selected a character yet
+    return Object.entries(this.state.players)
+      .filter(([_, player]) => !player.characterSelected)
+      .map(([slot]) => slot as PlayerSlot);
+  }
+
   areAllChoicesSubmitted(): boolean {
     return this.getPendingPlayers().length === 0;
   }
@@ -257,6 +270,12 @@ export class Story {
     // Get pending players
     const pendingPlayers = this.getPendingPlayers();
 
+    // Get pending character selections if in character selection mode
+    const pendingCharacterSelections =
+      !filteredState.characterSelectionCompleted
+        ? this.getPendingCharacterSelections()
+        : [];
+
     // Remove other players' codes
     filteredState.playerCodes = {
       [playerSlot]: filteredState.playerCodes[playerSlot],
@@ -278,7 +297,9 @@ export class Story {
         filteredState.characterSelectionIntroduction,
       generateImages: filteredState.generateImages,
       images: filteredState.images,
-      pendingPlayers,
+      pendingPlayers: filteredState.characterSelectionCompleted
+        ? pendingPlayers
+        : pendingCharacterSelections,
       gameOver: this.getCurrentBeatType() === "ending",
     } as ClientStoryState;
   }
