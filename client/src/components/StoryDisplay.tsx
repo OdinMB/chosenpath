@@ -55,13 +55,29 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       setLocalSelectedChoice(undefined);
       setPreviousBeatCount(currentBeatCount);
       setDisplayedBeatIndex(currentBeatCount - 1);
+    }
+  }, [beatHistory.length, previousBeatCount]);
 
-      // Scroll to top when a new beat arrives
+  // Scroll to top when displayed beat changes
+  React.useEffect(() => {
+    if (displayedBeatIndex !== null) {
+      // Try multiple scroll approaches to ensure it works across browsers
       if (contentRef.current) {
         contentRef.current.scrollTop = 0;
       }
+
+      // Also try scrolling the window as a fallback
+      window.scrollTo(0, 0);
+
+      // And try with a timeout as a last resort
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+      }, 100);
     }
-  }, [beatHistory.length, previousBeatCount]);
+  }, [displayedBeatIndex]);
 
   // Initialize displayedBeatIndex if null
   React.useEffect(() => {
