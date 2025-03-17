@@ -10,12 +10,12 @@ export function BeatHistory({
   onBeatChange,
 }: BeatHistoryProps) {
   return (
-    <div className="py-2">
+    <div className="py-2 border-b border-accent-100">
       <div className="flex items-center justify-center space-x-4">
         <button
           onClick={() => onBeatChange(currentBeatIndex - 1)}
           disabled={currentBeatIndex === 0}
-          className="p-2 rounded-lg disabled:opacity-50 hover:bg-gray-100"
+          className="p-2 rounded-lg disabled:opacity-50 hover:bg-primary-50 text-primary"
           aria-label="Previous beat"
         >
           <svg
@@ -33,14 +33,14 @@ export function BeatHistory({
           </svg>
         </button>
 
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-primary-600">
           Beat {currentBeatIndex + 1} of {totalBeats}
         </span>
 
         <button
           onClick={() => onBeatChange(currentBeatIndex + 1)}
           disabled={currentBeatIndex === totalBeats - 1}
-          className="p-2 rounded-lg disabled:opacity-50 hover:bg-gray-100"
+          className="p-2 rounded-lg disabled:opacity-50 hover:bg-primary-50 text-primary"
           aria-label="Next beat"
         >
           <svg

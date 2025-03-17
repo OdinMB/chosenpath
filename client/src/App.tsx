@@ -234,11 +234,11 @@ function App() {
   // Add error display component
   const ErrorMessage = () =>
     error ? (
-      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-primary border border-accent text-white px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
         <div className="mr-2 whitespace-pre-wrap">{error}</div>
         <button
           onClick={() => setError(null)}
-          className="text-red-700 hover:text-red-900 ml-auto"
+          className="text-accent hover:text-tertiary ml-auto"
           aria-label="Close"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
@@ -259,8 +259,8 @@ function App() {
         return (
           <div className="app flex items-center justify-center min-h-screen">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Connecting...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-primary-600">Connecting...</p>
             </div>
           </div>
         );

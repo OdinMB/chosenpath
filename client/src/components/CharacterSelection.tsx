@@ -7,6 +7,7 @@ import {
 import { PlayerOptionsGeneration } from "../../../shared/types/story";
 import { StatDisplay } from "./StatDisplay";
 import { replacePronounPlaceholders } from "../../../shared/utils/playerUtils.js";
+import { CharacterCard } from "./CharacterCard";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -63,24 +64,17 @@ export function CharacterSelection({
   }
 
   const renderIdentityCard = (identity: CharacterIdentity, index: number) => (
-    <div
+    <CharacterCard
       key={`identity-${index}`}
-      className={`
-        border rounded-lg p-4 cursor-pointer transition-all
-        ${
-          selectedIdentity === index
-            ? "border-indigo-500 bg-indigo-50 shadow-md"
-            : "border-gray-200 hover:border-indigo-300 hover:bg-gray-50"
-        }
-      `}
+      isSelected={selectedIdentity === index}
       onClick={() => setSelectedIdentity(index)}
     >
-      <h3 className="font-bold text-lg">{identity.name}</h3>
-      <p className="text-gray-600 mb-2">
+      <h3 className="font-bold text-lg text-primary">{identity.name}</h3>
+      <p className="text-primary-700 mb-2">
         {identity.pronouns.personal}/{identity.pronouns.object}
       </p>
-      <p className="text-gray-600 text-sm">{identity.appearance}</p>
-    </div>
+      <p className="text-primary-600 text-sm">{identity.appearance}</p>
+    </CharacterCard>
   );
 
   const renderBackgroundCard = (
@@ -93,21 +87,16 @@ export function CharacterSelection({
         : null;
 
     return (
-      <div
+      <CharacterCard
         key={`background-${index}`}
-        className={`
-          border rounded-lg p-4 cursor-pointer transition-all flex flex-col h-full
-          ${
-            selectedBackground === index
-              ? "border-indigo-500 bg-indigo-50 shadow-md"
-              : "border-gray-200 hover:border-indigo-300 hover:bg-gray-50"
-          }
-        `}
+        isSelected={selectedBackground === index}
         onClick={() => setSelectedBackground(index)}
       >
         <div>
-          <h3 className="font-bold text-lg mb-2">{background.title}</h3>
-          <div className="text-gray-600 text-sm mb-4 min-h-[80px]">
+          <h3 className="font-bold text-lg mb-2 text-primary">
+            {background.title}
+          </h3>
+          <div className="text-primary-600 text-sm mb-4 min-h-[80px]">
             {replacePronounPlaceholders(
               background.fluffTemplate,
               selectedIdentityData
@@ -141,18 +130,18 @@ export function CharacterSelection({
             })}
           </div>
         </div>
-      </div>
+      </CharacterCard>
     );
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto font-lora">
-      <h1 className="text-2xl font-bold text-center mb-2 text-indigo-800">
+      <h1 className="text-2xl font-bold text-center mb-2 text-primary">
         {storyState.characterSelectionIntroduction?.title || "Who are you?"}
       </h1>
 
       {storyState.characterSelectionIntroduction?.text ? (
-        <p className="mb-8 text-gray-700">
+        <p className="mb-8 text-primary-700">
           {storyState.characterSelectionIntroduction.text}
         </p>
       ) : (
@@ -160,14 +149,14 @@ export function CharacterSelection({
       )}
 
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Identity</h2>
+        <h2 className="text-xl font-semibold mb-4 text-primary">Identity</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {options.possibleCharacterIdentities.map(renderIdentityCard)}
         </div>
       </div>
 
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Background</h2>
+        <h2 className="text-xl font-semibold mb-4 text-primary">Background</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {options.possibleCharacterBackgrounds.map(renderBackgroundCard)}
         </div>
@@ -178,11 +167,11 @@ export function CharacterSelection({
           onClick={handleConfirmSelection}
           disabled={selectedIdentity === null || selectedBackground === null}
           className={`
-            px-6 py-3 rounded-lg font-medium text-white mb-6
+            w-full max-w-md py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold transition-all duration-300
             ${
               selectedIdentity !== null && selectedBackground !== null
-                ? "bg-indigo-600 hover:bg-indigo-700"
-                : "bg-gray-400 cursor-not-allowed"
+                ? "text-primary bg-white border-l-8 border border-accent shadow-md hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                : "text-primary-400 bg-white border border-primary-100 cursor-not-allowed opacity-50"
             }
           `}
         >

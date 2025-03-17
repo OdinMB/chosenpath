@@ -19,6 +19,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const [displayedBeatIndex, setDisplayedBeatIndex] = React.useState<
     number | null
   >(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Memoize player data calculations
   const playerSlotId = React.useMemo(
@@ -54,6 +55,11 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       setLocalSelectedChoice(undefined);
       setPreviousBeatCount(currentBeatCount);
       setDisplayedBeatIndex(currentBeatCount - 1);
+
+      // Scroll to top when a new beat arrives
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
     }
   }, [beatHistory.length, previousBeatCount]);
 
@@ -97,11 +103,11 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       const choiceIndex = choiceMade ? selectedChoice! : currentBeat.choice;
       return (
         <div className="space-y-4">
-          <div className="mt-6">
-            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Choice: </span>
-                <span className="text-indigo-800">
+          <div className="mt-6 max-w-2xl mx-auto">
+            <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-primary">Choice: </span>
+                <span className="text-primary">
                   {currentBeat.options[choiceIndex].text}
                 </span>
               </div>
@@ -114,13 +120,19 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     // For the current beat with no choice made, show all options as buttons
     return (
       <div className="space-y-4">
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-3 max-w-2xl mx-auto">
           {currentBeat.options.map((option, index) => (
             <button
               key={index}
               onClick={() => handleChoiceClick(index)}
-              className={`w-full p-4 text-lg text-left rounded-lg transition-colors 
-                bg-gray-100 hover:bg-gray-200 cursor-pointer font-lora`}
+              className={`
+                w-full p-4 text-lg text-left rounded-lg transition-all duration-300
+                bg-white text-primary cursor-pointer font-lora
+                border-l-8 border border-accent shadow-md
+                hover:border-l-8 hover:border-secondary hover:shadow-lg
+                hover:translate-x-1
+                focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
+              `}
             >
               {option.text}
             </button>
@@ -146,6 +158,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           <LoadingSpinner
             size="large"
             message="First story beat is being generated..."
+            messageSize="large"
           />
         </div>
       </div>
@@ -154,7 +167,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   return (
     <div className="story-display relative flex flex-col h-full font-lora">
-      <div className="sticky top-0 bg-white z-10">
+      <div className="sticky top-0 bg-white z-10 border-b border-primary-100">
         {beatHistory.length > 0 && (
           <BeatHistory
             currentBeatIndex={displayedBeatIndex || 0}
@@ -164,16 +177,16 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div ref={contentRef} className="flex-1 p-4 md:p-6 overflow-y-auto">
         <div className="space-y-4 md:space-y-6">
           {currentBeat && (
             <>
               {displayedBeatIndex === 0 && (
-                <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-indigo-800">
+                <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-primary">
                   {storyState.title}
                 </h1>
               )}
-              <h2 className="text-xl md:text-2xl font-bold text-center">
+              <h2 className="text-xl md:text-2xl font-bold text-center text-primary">
                 {currentBeat.title}
               </h2>
               <div className="narrative-container relative">
@@ -202,10 +215,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                             (img) => img.id === currentBeat.imageId
                           )?.description ?? ""
                         }
-                        className="w-full h-full object-cover rounded-lg shadow-lg"
+                        className="w-full h-full object-cover rounded-lg shadow-md border-l-4 border border-accent"
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                      <div className="w-full h-full flex flex-col items-center justify-center border-l-4 border border-accent rounded-lg shadow-md bg-white">
                         <LoadingSpinner
                           size="small"
                           message="Generating image..."
@@ -215,7 +228,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                   </div>
                 )}
 
-                <div className="narrative-text text-base md:text-lg [&>p]:mb-4">
+                <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
                   {React.createElement(
                     ReactMarkdown as ComponentType<{
                       children: string;
@@ -227,7 +240,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               </div>
               {renderOptions()}
               {currentBeat && storyState?.pendingPlayers.length == 0 && (
-                <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
                   <LoadingSpinner
                     size="small"
                     message="Generating next story beat..."
@@ -241,7 +254,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             isLoading &&
             storyState.characterSelectionCompleted && (
               <div className="h-full flex items-center justify-center py-8">
-                <div className="text-center">
+                <div className="text-center p-6 bg-white rounded-lg border border-primary-100 shadow-md">
                   <LoadingSpinner
                     size="large"
                     message="First story beat is being generated..."

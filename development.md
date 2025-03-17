@@ -2,13 +2,6 @@ Smaller and more commits!
 
 # Feature backlog
 
-Improve stat setups and option definitions
-
-- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values. (See getDefaultStatValue for "fix me" indicators.)
-- Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
-- Break this whole 20-step mess down into smaller LLM interactions?
-- Make prompts more concise?
-
 New features
 
 - Library of stories with pre-configured setups
@@ -20,6 +13,8 @@ New features
   - Manage games
   - Invite specific account to a player slot
   - Game history
+- Credits system for generating stories
+- Stripe integration
 - Dynamically add new outcomes, e.g. based on exploration threads.
 - Multiplaer mode: shared perspective
   - majority vote
@@ -31,13 +26,21 @@ New features
 - Include generic story music (identify right track for each story)
 - System to view/navigate save files
 
-Improvements
+Error resilience
 
-- Client: When new beat arrives on small devices, scroll up automatically
+- Retry mechanism for queue actions
+- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values. (See getDefaultStatValue for "fix me" indicators.)
 - Make sure that there are only 3 backgrounds per player, turn backgrounds into background1-3, or just delete duplicate backgrounds.
 - Check if ids actually exist (e.g. outcome ID)
-- Retry mechanism for queue actions
-- Send error messages to frontend
+
+Improve stat setups and option definitions
+
+- Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
+- Break this whole 20-step mess down into smaller LLM interactions?
+
+Other improvements
+
+- Client: When new beat arrives on small devices, scroll up automatically
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Attach facts to players
 - adjust scope of story setup based on the number of beats

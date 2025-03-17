@@ -9,6 +9,7 @@ import {
 } from "shared/config.js";
 import { GameMode, GameModes } from "shared/types/story.js";
 import { AppTitle } from "./AppTitle";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface StoryInitializerProps {
   onSetup: (options: {
@@ -31,6 +32,31 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     new Set()
   );
   const { isLoading, isConnecting } = useSession();
+
+  // Completely separate the game mode state for single player and multiplayer
+  const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
+  const [multiplayerMode, setMultiplayerMode] = useState<GameMode>(
+    GameModes.Cooperative
+  );
+
+  // Compute the effective game mode based on player count
+  const effectiveGameMode =
+    playerCount === 1 ? singlePlayerMode : multiplayerMode;
+
+  // Update gameMode when playerCount changes
+  useEffect(() => {
+    setGameMode(effectiveGameMode);
+  }, [effectiveGameMode]);
+
+  // Handle game mode slider changes
+  const handleGameModeChange = (value: number) => {
+    const values = [
+      GameModes.Cooperative,
+      GameModes.CooperativeCompetitive,
+      GameModes.Competitive,
+    ] as const;
+    setMultiplayerMode(values[value]);
+  };
 
   const storyPrompts = useMemo(
     () => ({
@@ -82,15 +108,6 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     }),
     []
   );
-
-  // Update gameMode when playerCount changes
-  useEffect(() => {
-    if (playerCount === 1) {
-      setGameMode(GameModes.SinglePlayer);
-    } else if (gameMode === GameModes.SinglePlayer) {
-      setGameMode(GameModes.Cooperative);
-    }
-  }, [playerCount, gameMode]);
 
   const getPlaceholderText = useCallback(() => {
     if (playerCount === 1) {
@@ -164,16 +181,48 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
         {isConnecting ? (
           <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Connecting to server...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-100 border-t-accent border-r-secondary mx-auto"></div>
+            <p className="mt-2 text-primary-600">Connecting to server...</p>
+          </div>
+        ) : isLoading ? (
+          <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
+            <h2 className="text-xl font-semibold text-primary mb-4">
+              Creating Your Story
+            </h2>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+                {playerCount === 1 ? "Single-player" : `${playerCount} players`}
+              </span>
+
+              {playerCount > 1 && (
+                <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+                  {gameMode === GameModes.Cooperative
+                    ? "Cooperative"
+                    : gameMode === GameModes.Competitive
+                    ? "Competitive"
+                    : "Mixed"}
+                </span>
+              )}
+
+              <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+                {generateImages ? "Images" : "No images"}
+              </span>
+            </div>
+
+            <div className="mb-6 p-4 bg-primary-50 rounded-md text-primary">
+              {prompt}
+            </div>
+
+            <LoadingSpinner message="Creating your story..." />
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-6">
+            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
               <div className="space-y-2">
                 <label
                   htmlFor="player-count"
-                  className="text-sm md:text-base font-medium text-gray-700"
+                  className="text-sm md:text-base font-medium text-primary"
                 >
                   Number of Players: {playerCount}
                 </label>
@@ -184,10 +233,10 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   max={MAX_PLAYERS}
                   value={playerCount}
                   onChange={(e) => setPlayerCount(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x"
                   disabled={isLoading}
                 />
-                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                <div className="flex justify-between text-xs md:text-sm text-primary-600">
                   <span>1 Player</span>
                   <span>{MAX_PLAYERS} Players</span>
                 </div>
@@ -198,7 +247,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   playerCount === 1 ? "opacity-50" : ""
                 }`}
               >
-                <label className="text-sm md:text-base font-medium text-gray-700">
+                <label className="text-sm md:text-base font-medium text-primary">
                   Multiplayer Mode
                 </label>
                 <input
@@ -208,24 +257,17 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   value={
                     playerCount === 1
                       ? 0
-                      : gameMode === GameModes.Cooperative
+                      : multiplayerMode === GameModes.Cooperative
                       ? 0
-                      : gameMode === GameModes.CooperativeCompetitive
+                      : multiplayerMode === GameModes.CooperativeCompetitive
                       ? 1
                       : 2
                   }
-                  onChange={(e) => {
-                    const values = [
-                      GameModes.Cooperative,
-                      GameModes.CooperativeCompetitive,
-                      GameModes.Competitive,
-                    ] as const;
-                    setGameMode(values[Number(e.target.value)]);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  onChange={(e) => handleGameModeChange(Number(e.target.value))}
+                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x"
                   disabled={isLoading || playerCount === 1}
                 />
-                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                <div className="flex justify-between text-xs md:text-sm text-primary-600">
                   <span>Shared Goals</span>
                   <span>Mixed Goals</span>
                   <span>Competing Goals</span>
@@ -233,18 +275,18 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
                 <label
                   htmlFor="prompt"
-                  className="text-sm md:text-base font-medium text-gray-700"
+                  className="text-sm md:text-base font-medium text-primary"
                 >
                   What kind of story would you like to experience?
                 </label>
                 <button
                   type="button"
                   onClick={handleSuggestion}
-                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors duration-200"
+                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-accent hover:text-secondary hover:bg-primary-50 rounded-md transition-colors duration-200"
                   disabled={isLoading}
                 >
                   Get suggestion
@@ -254,7 +296,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 id="prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-gray-300 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
                 placeholder={getPlaceholderText()}
                 disabled={isLoading}
               />
@@ -262,8 +304,8 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
             {/* Story Length section - temporarily hidden but preserved for future use */}
             <div className="hidden">
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm space-y-2">
-                <label className="text-sm md:text-base font-medium text-gray-700">
+              <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-2">
+                <label className="text-sm md:text-base font-medium text-primary">
                   Story Length: {maxTurns} decisions
                 </label>
                 <input
@@ -272,28 +314,28 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   max={MAX_TURNS}
                   step={5}
                   value={maxTurns}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
+                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
                   disabled={true}
                 />
-                <div className="flex justify-between text-xs md:text-sm text-gray-500">
+                <div className="flex justify-between text-xs md:text-sm text-primary-600">
                   <span>{MIN_TURNS} decisions</span>
                   <span>{MAX_TURNS} decisions</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md">
               <input
                 id="generate-images"
                 type="checkbox"
                 checked={generateImages}
                 onChange={(e) => setGenerateImages(e.target.checked)}
-                className="h-5 w-5 md:h-6 md:w-6 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
                 disabled={isLoading}
               />
               <label
                 htmlFor="generate-images"
-                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-gray-700"
+                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
               >
                 Generate images for the story
               </label>
@@ -303,7 +345,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               <button
                 type="button"
                 onClick={onBack}
-                className="w-full sm:w-1/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                className="w-full sm:w-1/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
               >
                 Back
               </button>
@@ -311,7 +353,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               <button
                 type="submit"
                 disabled={isLoading || !prompt.trim() || isConnecting}
-                className="w-full sm:w-2/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors duration-200"
+                className="w-full sm:w-2/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
               >
                 {isLoading ? "Creating Story..." : "Create Story"}
               </button>

@@ -7,6 +7,9 @@ interface AppTitleProps {
 
 export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [hoverChosen, setHoverChosen] = useState(false);
+  const [hoverPath, setHoverPath] = useState(false);
+  const [hoverAi, setHoverAi] = useState(false);
 
   // Size-based classes for the main title
   const sizeClasses = {
@@ -25,47 +28,74 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
   return (
     <div className={`text-center ${className}`}>
       <div className="inline-block relative">
-        {/* Main title with MIFE - only this has tooltip trigger */}
+        {/* Main title with ChosenPath */}
         <h1 className={`font-bold ${sizeClasses[size]}`}>
           <span
             className="relative inline-block cursor-help"
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
           >
-            {/* MIFE with colorful letters and story-like styling */}
-            <span className="font-henny-penny text-emerald-600 transform inline-block hover:scale-110 hover:rotate-2 transition-all duration-300 text-[90%]">
-              J
-            </span>
-            <span className="font-henny-penny text-amber-600 transform inline-block hover:scale-110 hover:-rotate-2 transition-all duration-300 text-[80%]">
-              I
-            </span>
-            <span className="font-henny-penny text-indigo-600 transform inline-block hover:scale-110 hover:rotate-2 transition-all duration-300">
-              F
-            </span>
-            <span className="font-henny-penny text-rose-600 transform inline-block hover:scale-110 hover:-rotate-2 transition-all duration-300 text-[80%] relative">
-              E
+            {/* "Chosen" as a group */}
+            <span
+              className="inline-block"
+              onMouseEnter={() => setHoverChosen(true)}
+              onMouseLeave={() => setHoverChosen(false)}
+            >
+              <span
+                className={`font-henny-penny text-accent transform inline-block ${
+                  hoverChosen ? "scale-110 rotate-2" : ""
+                } transition-all duration-300 text-[90%] drop-shadow-md`}
+              >
+                Chosen
+              </span>
             </span>
 
-            {/* .ai suffix - positioned further right and down with animation */}
-            <span className="font-henny-penny text-gray-600 inline-block text-[50%] relative top-1 ml-2 transform hover:scale-110 hover:rotate-2 transition-all duration-300">
-              .ai
+            {/* "Path" as a group */}
+            <span
+              className="inline-block"
+              onMouseEnter={() => setHoverPath(true)}
+              onMouseLeave={() => setHoverPath(false)}
+            >
+              <span
+                className={`font-henny-penny text-secondary transform inline-block ${
+                  hoverPath ? "scale-110 -rotate-2" : ""
+                } transition-all duration-300 text-[90%] drop-shadow-md`}
+              >
+                Path
+              </span>
+            </span>
+
+            {/* ".ai" as a group */}
+            <span
+              className="inline-block"
+              onMouseEnter={() => setHoverAi(true)}
+              onMouseLeave={() => setHoverAi(false)}
+            >
+              <span
+                className={`font-henny-penny text-black inline-block text-[50%] relative top-1 ml-2 transform ${
+                  hoverAi ? "scale-110 rotate-2" : ""
+                } transition-all duration-300`}
+              >
+                .ai
+              </span>
             </span>
           </span>
         </h1>
 
         {/* Tagline on its own line - no tooltip trigger */}
         <p
-          className={`${taglineSizeClasses[size]} text-gray-700 font-henny-penny mt-4`}
+          className={`${taglineSizeClasses[size]} text-primary font-henny-penny mt-4`}
         >
-          Where Stories Connect
+          Any story. Anytime.
         </p>
 
         {/* Tooltip - positioned below without diamond */}
         {showTooltip && (
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-10 px-4 py-2 bg-gray-800 text-white text-sm rounded-md shadow-lg whitespace-nowrap z-10 animate-fadeIn">
-            <div>Joint Interactive Fiction Engine</div>
-            <div className="text-gray-300 text-s mt-1">
-              Create stories for multiple players to experience together
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-10 px-6 py-4 bg-white text-primary text-sm rounded-md shadow-lg z-10 animate-fadeIn border border-primary-100 w-72 md:w-96">
+            <div className="text-left">
+              Step into an <strong>interactive story</strong> where your choices
+              shape the journey. <strong>Play solo or with friends</strong> and
+              create unforgettable adventures, anytime.
             </div>
           </div>
         )}

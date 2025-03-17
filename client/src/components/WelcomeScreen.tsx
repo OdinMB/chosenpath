@@ -49,30 +49,48 @@ export function WelcomeScreen({
       <div className="space-y-6">
         {existingPlayerCode && (
           <>
-            <div className="flex flex-row gap-3">
-              <div className="flex-1 h-10 px-4 py-2 border rounded-lg bg-gray-100 font-mono text-sm text-gray-800 flex items-center">
-                {existingPlayerCode}
+            <div className="flex flex-col gap-3">
+              <div className="w-full flex items-center justify-between gap-3">
+                <div className="flex-1 h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono flex items-center opacity-75">
+                  {existingPlayerCode}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleResume}
+                    className="h-10 py-2 px-4 border-l-8 border border-accent rounded-lg shadow-md text-sm font-semibold text-primary bg-white hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 transition-all duration-300 whitespace-nowrap flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    onClick={handleDeleteClick}
+                    className="h-10 py-2 px-4 rounded-lg text-sm font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm flex items-center gap-2"
+                    title="Delete code"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-red-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={handleResume}
-                className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 whitespace-nowrap flex-shrink-0"
-              >
-                Resume Story
-              </button>
-              <button
-                onClick={handleDeleteClick}
-                className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 whitespace-nowrap flex-shrink-0"
-              >
-                Delete
-              </button>
             </div>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+                <div className="w-full border-t border-primary-100"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">or</span>
+                <span className="px-2 bg-white text-primary-600">or</span>
               </div>
             </div>
           </>
@@ -85,14 +103,14 @@ export function WelcomeScreen({
               type="text"
               value={code}
               onChange={handleInputChange}
-              className="flex-1 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your player code"
+              className="flex-1 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm font-mono placeholder-primary-400"
+              placeholder="Enter your 6-letter code"
             />
 
             <button
               type="submit"
               disabled={!code.trim()}
-              className="h-10 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
+              className="h-10 py-2 px-4 border-l-8 border border-accent rounded-lg shadow-md text-sm font-semibold text-primary bg-white hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
             >
               Join Game
             </button>
@@ -101,16 +119,16 @@ export function WelcomeScreen({
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-primary-100"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">or</span>
+            <span className="px-2 bg-white text-primary-600">or</span>
           </div>
         </div>
 
         <button
           onClick={onNewStory}
-          className="w-full h-10 py-2 px-4 border-2 border-indigo-600 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="w-full py-3 px-4 border-l-8 border border-accent rounded-lg shadow-md text-base font-semibold text-primary bg-white hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-300"
         >
           Start New Story
         </button>

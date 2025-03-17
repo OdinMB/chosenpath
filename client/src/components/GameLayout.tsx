@@ -32,12 +32,12 @@ function StatGroup({
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <div className="bg-gray-50 rounded-lg pt-2 pb-1 pl-3 pr-3 border border-gray-100">
+    <div className="bg-white rounded-lg pt-2 pb-1 pl-3 pr-3 border border-primary-100 shadow-md">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-center gap-2 hover:text-gray-900"
+        className="w-full flex items-center justify-center gap-2 hover:text-primary"
       >
-        <h4 className="text-gray-700 text-center font-bold">{title}</h4>
+        <h4 className="text-primary-700 text-center font-bold">{title}</h4>
         <svg
           className={`w-4 h-4 transition-transform ${
             isExpanded ? "rotate-180" : ""
@@ -62,6 +62,7 @@ function StatGroup({
               name={stat.name}
               value={getStatValue(stat.id)}
               type={stat.type}
+              tooltip={stat.tooltip}
             />
           ))}
         </div>
@@ -91,7 +92,7 @@ function StatSection({
 
   if (visibleStats.length === 0) {
     return (
-      <div className="text-gray-500 italic">
+      <div className="text-primary-500 italic">
         No {title?.toLowerCase() ?? "character"} stats available
       </div>
     );
@@ -102,7 +103,7 @@ function StatSection({
   return (
     <div className="space-y-3">
       {title && (
-        <h3 className="text-gray-700 mb-2 text-center font-bold">{title}</h3>
+        <h3 className="text-primary-700 mb-2 text-center font-bold">{title}</h3>
       )}
       {groups.map((group) => (
         <StatGroup
@@ -158,17 +159,33 @@ export function GameLayout({
 
     // Common footer with title and exit button
     const renderFooter = () => (
-      <div className="mt-4 text-center">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          {storyState.title}
-        </h3>
+      <div className="mt-4">
         <button
           onClick={onExitGame}
-          className="text-sm font-medium transition-colors duration-200
-            md:text-gray-600 md:hover:text-red-600 md:bg-transparent md:p-2
-            w-full py-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 md:hover:bg-transparent"
+          className="w-full p-3 text-left rounded-lg transition-all duration-300
+            bg-white text-primary cursor-pointer font-lora
+            border-l-8 border border-accent shadow-md
+            hover:border-l-8 hover:border-secondary hover:shadow-lg
+            hover:translate-x-1 hover:bg-primary-50
+            focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
+            flex items-center justify-between"
+          title="Exit story"
         >
-          Exit story
+          <span className="font-semibold text-sm mr-4">Leave story</span>
+          <svg
+            className="w-6 h-6 text-primary-700 flex-shrink-0 ml-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
+          </svg>
         </button>
       </div>
     );
@@ -180,7 +197,7 @@ export function GameLayout({
 
           {storyState.numberOfPlayers > 1 && (
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">
+              <h3 className="text-lg font-semibold text-primary mb-2 text-center">
                 Players Status
               </h3>
               <PendingPlayers
@@ -247,14 +264,14 @@ export function GameLayout({
 
     return (
       <aside className={sidebarClassName}>
-        <section className="mb-6 pb-4">
+        <section className="mb-3 pb-2">
           <div className="flex items-center justify-center gap-2">
-            <h2 className="text-xl font-semibold text-gray-900 mb-1">
+            <h2 className="text-xl font-semibold text-primary mb-1">
               {player.name}
             </h2>
             <button
               onClick={() => setShowFluff(!showFluff)}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-primary-500 hover:text-primary-700"
               aria-label={
                 showFluff
                   ? "Hide character description"
@@ -278,12 +295,12 @@ export function GameLayout({
               </svg>
             </button>
           </div>
-          <p className="text-gray-600 text-center">
+          <p className="text-primary-600 text-center">
             {player.pronouns.personal}/{player.pronouns.object}
           </p>
           {showFluff && (
-            <div className="bg-gray-50 rounded-lg p-3 mt-4 border border-gray-100">
-              <p className="text-gray-600 text-sm">
+            <div className="bg-white rounded-lg p-3 mt-4 border border-primary-100 shadow-md">
+              <p className="text-primary-600 text-sm">
                 {player.appearance} {player.fluff}
               </p>
             </div>
@@ -320,7 +337,7 @@ export function GameLayout({
       >
         {showStats ? (
           <svg
-            className="w-6 h-6"
+            className="w-6 h-6 text-primary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -334,7 +351,7 @@ export function GameLayout({
           </svg>
         ) : (
           <svg
-            className="w-6 h-6"
+            className="w-6 h-6 text-primary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -359,14 +376,17 @@ export function GameLayout({
         {renderSidebar()}
 
         {/* Main Content Area */}
-        <main className="flex-1" onClick={handleMainContentClick}>
+        <main
+          className="flex-1 border-l border-t border-primary-100 md:border-t-0"
+          onClick={handleMainContentClick}
+        >
           {isCharacterSelectionMode && onCharacterSelected ? (
             <CharacterSelection onCharacterSelected={onCharacterSelected} />
           ) : !storyState.characterSelectionCompleted ? (
             // Show loading spinner when character selection is not completed globally
             // but the current player has already selected their character
             <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
-              <h1 className="text-2xl font-bold mb-6 text-indigo-800">
+              <h1 className="text-2xl font-bold mb-6 text-primary">
                 Character Selected
               </h1>
 

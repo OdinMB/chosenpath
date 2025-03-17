@@ -174,14 +174,14 @@ Type of stats and what they are good for:
 --- Devices to keep score for competitive, tug-of-war-like outcomes in multiplayer games(e.g., playerA|playerB territory control)
 --- NOT good if one stat is clearly more benefitial than the other. Bad: "Stability|Chaos" (if the goal is to preserve stability). "Courage|Fear" (if Fear has no benefits or is not a viable path).
 
-- number: Only for countable quantities
-If it cannot be counted, choose another type of stat.
+- number: Only for countable quantities. If it cannot be counted, choose another type of stat.
 --- Resources without a maximum capacity (e.g., money, ammunition, army size, cult followers)
 --- Counters (e.g., wins in a tournament, number of people saved)
 --- Countdowns for pacing the story (e.g. days until deadline, remaining seals that protect a powerful artifact)
 --- NOT good for skills. Skills aren't countable. Use percentage if the stat is supposed to be developed granularly and changed often, otherwise use a string, or add the skill as an item in a string[].
 --- NOT good for power levels (like mystic power). Use string to describe the power level qualitatively or string[] to list specific abilities.
 --- NOT good for things that cannot counted, like influence, experience, level of interest, etc.
+--- NOT good for things that can technically be counted, but that should not just be numbers in a story. Example: 'Goals' and 'Friends' should be represented differently and with more nuance.
 
 Context for additional stat parameters
 - The story is structured as a series of threads.
