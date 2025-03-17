@@ -10,7 +10,7 @@ import { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { StoryElement } from "shared/types/storyElement.js";
 import { Outcome } from "shared/types/outcome.js";
 import { Stat, ClientStat } from "shared/types/stat.js";
-import { Beat, BeatType } from "shared/types/beat.js";
+import { Beat, BeatType, ResolutionDetails } from "shared/types/beat.js";
 import { SwitchAnalysis } from "shared/types/switch.js";
 import { ThreadAnalysis, Thread, Resolution } from "shared/types/thread.js";
 import { Image } from "shared/types/image.js";
@@ -682,6 +682,49 @@ export class Story {
     updatedBeatHistory[currentBeatIndex] = {
       ...updatedBeatHistory[currentBeatIndex],
       resolution,
+    };
+
+    // Update the player with the new beat history
+    const updatedPlayers = {
+      ...this.state.players,
+      [playerSlot]: {
+        ...player,
+        beatHistory: updatedBeatHistory,
+      },
+    };
+
+    return this.clone({
+      players: updatedPlayers,
+    });
+  }
+
+  /**
+   * Update the current beat with resolution details for visualization
+   * @param playerSlot The player slot
+   * @param resolutionDetails Details about the resolution including distribution and roll
+   * @returns Updated Story instance
+   */
+  updateBeatResolutionDetails(
+    playerSlot: PlayerSlot,
+    resolutionDetails: ResolutionDetails
+  ): Story {
+    const player = this.getPlayer(playerSlot);
+    if (!player) {
+      console.error(`Player ${playerSlot} not found`);
+      return this;
+    }
+
+    if (!player.beatHistory || player.beatHistory.length === 0) {
+      console.error(`No beat history for player ${playerSlot}`);
+      return this;
+    }
+
+    // Get the current beat (last in history)
+    const currentBeatIndex = player.beatHistory.length - 1;
+    const updatedBeatHistory = [...player.beatHistory];
+    updatedBeatHistory[currentBeatIndex] = {
+      ...updatedBeatHistory[currentBeatIndex],
+      resolutionDetails,
     };
 
     // Update the player with the new beat history

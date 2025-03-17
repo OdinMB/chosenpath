@@ -268,9 +268,16 @@ export interface ProbabilityDistribution {
   unfavorable: number;
 }
 
+export interface ResolutionDetails {
+  distribution: ProbabilityDistribution;
+  roll?: number;
+  points: number;
+}
+
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
   resolution: Resolution | null;
+  resolutionDetails?: ResolutionDetails;
 };
 
 export type BeatHistory = Array<Beat>;

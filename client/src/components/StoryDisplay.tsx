@@ -5,6 +5,7 @@ import { BeatHistory } from "./BeatHistory";
 import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -111,8 +112,44 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   const choiceMade = selectedChoice !== undefined;
   const isViewingLatestBeat = displayedBeatIndex === beatHistory.length - 1;
 
+  // Check if we're waiting for the next beat (choice made but next beat not loaded yet)
+  const isWaitingForNextBeat =
+    currentBeat &&
+    currentBeat.choice !== -1 &&
+    storyState?.pendingPlayers?.length === 0 &&
+    isViewingLatestBeat;
+
+  // The current beat may have resolution details we need to show
+  const hasCurrentBeatResolutionDetails =
+    currentBeat &&
+    currentBeat.resolution &&
+    currentBeat.resolutionDetails &&
+    currentBeat.choice !== -1 &&
+    currentBeat.options[currentBeat.choice].optionType === "challenge";
+
+  // Check if current beat should show a resolution from the previous beat
+  const shouldShowPreviousBeatResolution = () => {
+    // When viewing beat n > 1, check if beat n-1 had a challenge resolution
+    if (
+      displayedBeatIndex &&
+      displayedBeatIndex > 0 &&
+      beatHistory.length > 1
+    ) {
+      const prevBeat = beatHistory[displayedBeatIndex - 1];
+      return (
+        prevBeat &&
+        prevBeat.resolution &&
+        prevBeat.resolutionDetails &&
+        prevBeat.choice !== -1 &&
+        prevBeat.options[prevBeat.choice].optionType === "challenge"
+      );
+    }
+    return false;
+  };
+
   const renderOptions = () => {
-    if (!currentBeat || storyState?.gameOver) return null;
+    if (!currentBeat || storyState?.gameOver || isWaitingForNextBeat)
+      return null;
 
     // For previous beats or when a choice is made, only show the selected choice
     if ((!isViewingLatestBeat && currentBeat.choice !== -1) || choiceMade) {
@@ -158,6 +195,145 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     );
   };
 
+  // Render function for the current beat content or loading state
+  const renderBeatContent = () => {
+    // If we're waiting for the next beat and the current beat has resolution details,
+    // show them along with a loading spinner
+    if (
+      isWaitingForNextBeat &&
+      hasCurrentBeatResolutionDetails &&
+      currentBeat
+    ) {
+      return (
+        <>
+          <h2 className="text-xl md:text-2xl font-bold text-center text-primary mb-6">
+            Resolving Action...
+          </h2>
+
+          {/* Show resolution visualizer for the current beat */}
+          <div className="my-4 max-w-2xl mx-auto">
+            <ChallengeResolutionVisualizer
+              resolutionDetails={currentBeat.resolutionDetails!}
+              resolution={currentBeat.resolution!}
+            />
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
+            <LoadingSpinner
+              size="small"
+              message="Generating next story beat..."
+            />
+          </div>
+        </>
+      );
+    }
+
+    // Normal beat display
+    if (currentBeat && storyState) {
+      return (
+        <>
+          {displayedBeatIndex === 0 && (
+            <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-primary">
+              {storyState.title}
+            </h1>
+          )}
+          <h2 className="text-xl md:text-2xl font-bold text-center text-primary">
+            {currentBeat.title}
+          </h2>
+
+          {/* Show resolution from previous beat if applicable */}
+          {shouldShowPreviousBeatResolution() && displayedBeatIndex && (
+            <div className="my-4 max-w-2xl mx-auto">
+              <ChallengeResolutionVisualizer
+                resolutionDetails={
+                  beatHistory[displayedBeatIndex - 1].resolutionDetails!
+                }
+                resolution={beatHistory[displayedBeatIndex - 1].resolution!}
+              />
+            </div>
+          )}
+
+          <div className="narrative-container relative">
+            {storyState.generateImages && (
+              <div
+                className={`
+                w-full sm:w-64 sm:float-right sm:ml-6 mb-4 
+                aspect-square sm:h-64
+                max-w-[256px] mx-auto
+                ${!currentBeat.imageId ? "bg-gray-50" : ""}
+              `}
+              >
+                {currentBeat.imageId &&
+                storyState.images.find(
+                  (img) =>
+                    img.id === currentBeat.imageId && img.status === "ready"
+                ) ? (
+                  <img
+                    src={
+                      storyState.images.find(
+                        (img) => img.id === currentBeat.imageId
+                      )?.url
+                    }
+                    alt={
+                      storyState.images.find(
+                        (img) => img.id === currentBeat.imageId
+                      )?.description ?? ""
+                    }
+                    className="w-full h-full object-cover rounded-lg shadow-md border-l-4 border border-accent"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center border-l-4 border border-accent rounded-lg shadow-md bg-white">
+                    <LoadingSpinner
+                      size="small"
+                      message="Generating image..."
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
+              {React.createElement(
+                ReactMarkdown as ComponentType<{
+                  children: string;
+                  breaks?: boolean;
+                }>,
+                { breaks: true, children: currentBeat.text }
+              )}
+            </div>
+          </div>
+          {renderOptions()}
+          {!isWaitingForNextBeat &&
+            currentBeat.choice !== -1 &&
+            storyState?.pendingPlayers?.length === 0 && (
+              <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
+                <LoadingSpinner
+                  size="small"
+                  message="Generating next story beat..."
+                />
+              </div>
+            )}
+        </>
+      );
+    }
+
+    // Loading the first beat
+    if (isLoading && storyState?.characterSelectionCompleted) {
+      return (
+        <div className="h-full flex items-center justify-center py-8">
+          <div className="text-center p-6 bg-white rounded-lg border border-primary-100 shadow-md">
+            <LoadingSpinner
+              size="large"
+              message="First story beat is being generated..."
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   if (!storyState || !playerState) {
     return null;
   }
@@ -194,91 +370,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       </div>
 
       <div ref={contentRef} className="flex-1 p-4 md:p-6 overflow-y-auto">
-        <div className="space-y-4 md:space-y-6">
-          {currentBeat && (
-            <>
-              {displayedBeatIndex === 0 && (
-                <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-primary">
-                  {storyState.title}
-                </h1>
-              )}
-              <h2 className="text-xl md:text-2xl font-bold text-center text-primary">
-                {currentBeat.title}
-              </h2>
-              <div className="narrative-container relative">
-                {storyState.generateImages && (
-                  <div
-                    className={`
-                    w-full sm:w-64 sm:float-right sm:ml-6 mb-4 
-                    aspect-square sm:h-64
-                    max-w-[256px] mx-auto
-                    ${!currentBeat.imageId ? "bg-gray-50" : ""}
-                  `}
-                  >
-                    {currentBeat.imageId &&
-                    storyState.images.find(
-                      (img) =>
-                        img.id === currentBeat.imageId && img.status === "ready"
-                    ) ? (
-                      <img
-                        src={
-                          storyState.images.find(
-                            (img) => img.id === currentBeat.imageId
-                          )?.url
-                        }
-                        alt={
-                          storyState.images.find(
-                            (img) => img.id === currentBeat.imageId
-                          )?.description ?? ""
-                        }
-                        className="w-full h-full object-cover rounded-lg shadow-md border-l-4 border border-accent"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center border-l-4 border border-accent rounded-lg shadow-md bg-white">
-                        <LoadingSpinner
-                          size="small"
-                          message="Generating image..."
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
-                  {React.createElement(
-                    ReactMarkdown as ComponentType<{
-                      children: string;
-                      breaks?: boolean;
-                    }>,
-                    { breaks: true, children: currentBeat.text }
-                  )}
-                </div>
-              </div>
-              {renderOptions()}
-              {currentBeat && storyState?.pendingPlayers.length == 0 && (
-                <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
-                  <LoadingSpinner
-                    size="small"
-                    message="Generating next story beat..."
-                  />
-                </div>
-              )}
-            </>
-          )}
-
-          {!currentBeat &&
-            isLoading &&
-            storyState.characterSelectionCompleted && (
-              <div className="h-full flex items-center justify-center py-8">
-                <div className="text-center p-6 bg-white rounded-lg border border-primary-100 shadow-md">
-                  <LoadingSpinner
-                    size="large"
-                    message="First story beat is being generated..."
-                  />
-                </div>
-              </div>
-            )}
-        </div>
+        <div className="space-y-4 md:space-y-6">{renderBeatContent()}</div>
       </div>
     </div>
   );

@@ -11,6 +11,11 @@ import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "./Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 import { Resolution } from "shared/types/thread.js";
+import {
+  ResolutionDetails,
+  ProbabilityDistribution,
+} from "shared/types/beat.js";
+
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (event: OperationErrorEvent) => void;
@@ -246,29 +251,51 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     }
 
     let beatResolution: Resolution | null = null;
+    let updatedStory = story;
+
     // For Exploration Beats, just set the resolution directly
     if (currentBeat.options[optionIndex].optionType === "exploration") {
       beatResolution =
         BeatResolutionService.getExplorationBeatResolution(currentBeat);
-    } else {
-      // Get the thread's last step resolution for this player
-      const threadLastStepResolution =
-        story.getCurrentThreadLastStepResolution(playerSlot);
 
-      // Process the beat resolution
-      beatResolution = BeatResolutionService.getChallengeBeatResolution(
-        currentBeat,
-        threadLastStepResolution
+      console.log(
+        "[GameQueueProcessor] Updating exploration beat resolution for ",
+        playerSlot,
+        "to",
+        beatResolution
       );
+
+      return story.updateBeatResolution(playerSlot, beatResolution);
     }
 
+    // Process challenge beat resolution
+    // Get the thread's last step resolution for this player
+    const threadLastStepResolution =
+      story.getCurrentThreadLastStepResolution(playerSlot);
+
+    // Get both resolution and details from BeatResolutionService
+    const result = BeatResolutionService.getChallengeBeatResolution(
+      currentBeat,
+      threadLastStepResolution
+    );
+
+    beatResolution = result.resolution;
+
     console.log(
-      "[GameQueueProcessor] Updating beat resolution for ",
+      "[GameQueueProcessor] Updating challenge beat resolution for ",
       playerSlot,
       "to",
       beatResolution
     );
-    return story.updateBeatResolution(playerSlot, beatResolution);
+
+    // First add resolution details
+    updatedStory = story.updateBeatResolutionDetails(
+      playerSlot,
+      result.details
+    );
+
+    // Then update the actual resolution
+    return updatedStory.updateBeatResolution(playerSlot, beatResolution);
   }
 
   private async handleRecordCharacterSelection(

@@ -3,12 +3,18 @@ import {
   type ChallengeOption,
   type ProbabilityDistribution,
   type OptionRiskType,
+  type ResolutionDetails,
 } from "shared/types/beat.js";
 import {
   ResolutionChallenge,
   Resolution,
   ResolutionExploration,
 } from "shared/types/thread.js";
+
+export interface ChallengeResolutionResult {
+  resolution: ResolutionChallenge;
+  details: ResolutionDetails;
+}
 
 export class BeatResolutionService {
   static getExplorationBeatResolution(beat: Beat): ResolutionExploration {
@@ -40,10 +46,16 @@ export class BeatResolutionService {
     unfavorable: 40,
   };
 
+  /**
+   * Determine the challenge beat resolution and details for visualization
+   * @param beat The beat to process
+   * @param previousResolution The previous thread resolution, if any
+   * @returns The resolution result including outcome and visualization details
+   */
   static getChallengeBeatResolution(
     beat: Beat,
     previousResolution: Resolution | null
-  ): ResolutionChallenge {
+  ): ChallengeResolutionResult {
     console.log(
       `[BeatResolutionService] Processing outcome for beat: ${beat.title}`
     );
@@ -85,11 +97,34 @@ export class BeatResolutionService {
     // Calculate the probability distribution
     const distribution = this.calculateDistribution(points, optionType);
 
-    // Determine the outcome
-    const resolution = this.determineBeatResolution(distribution);
+    // Generate a random roll between 0 and 100
+    const roll = Math.random() * 100;
+    console.log(`[BeatResolutionService] Random roll: ${roll.toFixed(2)}`);
 
-    console.log(`[BeatResolutionService] Final resolution:`, resolution);
-    return resolution;
+    // Determine the outcome based on the roll
+    let outcome: ResolutionChallenge;
+    if (roll < distribution.favorable) {
+      outcome = "favorable";
+    } else if (roll < distribution.favorable + distribution.mixed) {
+      outcome = "mixed";
+    } else {
+      outcome = "unfavorable";
+    }
+
+    console.log(`[BeatResolutionService] Final resolution:`, outcome);
+
+    // Create resolution details for visualization
+    const resolutionDetails: ResolutionDetails = {
+      distribution,
+      roll,
+      points,
+    };
+
+    // Return both the resolution and details
+    return {
+      resolution: outcome,
+      details: resolutionDetails,
+    };
   }
 
   /**
@@ -185,7 +220,7 @@ export class BeatResolutionService {
    * Calculate probability distribution directly from points and risk type
    * This is a more elegant approach that replaces the complex point application logic
    */
-  private static calculateDistribution(
+  static calculateDistribution(
     points: number,
     optionRiskType: OptionRiskType
   ): ProbabilityDistribution {
@@ -409,27 +444,6 @@ export class BeatResolutionService {
 
     console.log(`[BeatResolutionService] Total points: ${totalPoints}`);
     return totalPoints;
-  }
-
-  /**
-   * Determine the beat resolution based on the probability distribution
-   */
-  static determineBeatResolution(
-    distribution: ProbabilityDistribution
-  ): ResolutionChallenge {
-    const roll = Math.random() * 100;
-    console.log(`[BeatResolutionService] Random roll: ${roll.toFixed(2)}`);
-
-    let outcome: ResolutionChallenge;
-    if (roll < distribution.favorable) {
-      outcome = "favorable";
-    } else if (roll < distribution.favorable + distribution.mixed) {
-      outcome = "mixed";
-    } else {
-      outcome = "unfavorable";
-    }
-
-    return outcome;
   }
 
   /**

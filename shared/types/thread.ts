@@ -14,6 +14,7 @@ export const getThreadType = (thread: Thread): ThreadType => {
   }
 };
 
+// Resolution types for challenges and exploration
 export const RESOLUTION_CHALLENGE = [
   "favorable",
   "mixed",
@@ -31,12 +32,11 @@ export const RESOLUTION_EXPLORATION = [
 ] as const;
 export type ResolutionExploration = (typeof RESOLUTION_EXPLORATION)[number];
 
-export const RESOLUTION = [
-  ...RESOLUTION_CHALLENGE,
-  ...RESOLUTION_CONTEST,
-  ...RESOLUTION_EXPLORATION,
-] as const;
-export type Resolution = (typeof RESOLUTION)[number];
+// Combined resolution type for all types of threads
+export type Resolution =
+  | ResolutionChallenge
+  | ResolutionContest
+  | ResolutionExploration;
 
 // For standard (non-contested) threads
 const challengeMilestonesSchema = z

@@ -4,14 +4,7 @@ Smaller and more commits!
 
 Next
 
-- Ensure variety of scene types
-- Resolution feedback (first for beats)
-  - When "generating next beat" spinner comes up
-  - show probability distribution as a stacked horizontal bar with colors for favorable/mixed/unfavorable
-  - an arrow moves over the bar and lands on the random number chosen by the backend.
-  - Relevant section of the bar and label ("mixed") gets highlighted
-  - expandable to show risk type, resource type, and modifiers
-  - when the beat arrives, show this element under the title of the beat / before the text
+- CoT schema attribute to list "show don't tell" elements for the beat.
 
 New features
 
