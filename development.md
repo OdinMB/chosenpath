@@ -2,6 +2,17 @@ Smaller and more commits!
 
 # Feature backlog
 
+Next
+
+- Ensure variety of scene types
+- Resolution feedback (first for beats)
+  - When "generating next beat" spinner comes up
+  - show probability distribution as a stacked horizontal bar with colors for favorable/mixed/unfavorable
+  - an arrow moves over the bar and lands on the random number chosen by the backend.
+  - Relevant section of the bar and label ("mixed") gets highlighted
+  - expandable to show risk type, resource type, and modifiers
+  - when the beat arrives, show this element under the title of the beat / before the text
+
 New features
 
 - Library of stories with pre-configured setups
@@ -40,7 +51,6 @@ Improve stat setups and option definitions
 
 Other improvements
 
-- Client: When new beat arrives on small devices, scroll up automatically
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Attach facts to players
 - adjust scope of story setup based on the number of beats

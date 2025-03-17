@@ -169,7 +169,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }
 
     return (
-      <div className="story-display h-full flex items-center justify-center font-lora">
+      <div className="story-display h-full min-h-[50vh] md:min-h-[70vh] flex items-center justify-center font-lora">
         <div className="text-center">
           <LoadingSpinner
             size="large"

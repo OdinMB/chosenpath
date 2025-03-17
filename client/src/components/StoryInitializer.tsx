@@ -191,12 +191,12 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
             </h2>
 
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+              <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
                 {playerCount === 1 ? "Single-player" : `${playerCount} players`}
               </span>
 
               {playerCount > 1 && (
-                <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+                <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
                   {gameMode === GameModes.Cooperative
                     ? "Cooperative"
                     : gameMode === GameModes.Competitive
@@ -205,12 +205,12 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 </span>
               )}
 
-              <span className="inline-block px-3 py-1 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+              <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
                 {generateImages ? "Images" : "No images"}
               </span>
             </div>
 
-            <div className="mb-6 p-4 bg-primary-50 rounded-md text-primary">
+            <div className="mb-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md text-primary">
               {prompt}
             </div>
 
