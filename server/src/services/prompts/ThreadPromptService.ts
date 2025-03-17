@@ -134,6 +134,7 @@ ${story.isMultiplayer() ? "3" : "2"}. Exploration Threads
 - Resolutions are "Resolution 1"/"Resolution 2"/"Resolution 3" representing different choices or directions
 - Example milestones (one will be added to the outcome at the end of the thread): "[insert player name] takes over the family hotel", "[insert player name] helps at the family hotel while doing occassional photography jobs", "[insert player name] is no longer engaged in the family business"
 - Use for character development, or when multiple valid paths exist without clear "better" or "worse" options
+- Often works well with 2-beat threads
 - Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
 
 Create a list of threads, each with:
@@ -143,6 +144,7 @@ Create a list of threads, each with:
    - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
    - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
 4. A progression of 2-4 beats (matching the duration) that:
+   - Adds to the variety of threads in the story. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)
    - Builds dramatic tension toward the thread's climax on the last beat
    - For Challenge ${
      story.isMultiplayer() ? " and Contest" : ""

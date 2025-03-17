@@ -155,7 +155,7 @@ export const threadSchema = z.object({
   progression: z
     .array(threadStepSchema)
     .describe(
-      "Progression of steps that structure this thread. Must have exactly as many steps as the duration of the thread. (If the thread has a duration of 3 beats, this field must have 3 steps.)"
+      "Progression of steps that structure this thread. Must have exactly as many steps as the duration of the thread. (If the thread has a duration of 3 beats, this field must have 3 steps.) Should be a different kind of thread than the previous three threads. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)"
     ),
   title: z
     .string()

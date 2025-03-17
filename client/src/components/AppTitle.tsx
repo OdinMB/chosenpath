@@ -86,7 +86,7 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
         <p
           className={`${taglineSizeClasses[size]} text-primary font-henny-penny mt-4`}
         >
-          Any story. Anytime.
+          Any story. Any time.
         </p>
 
         {/* Tooltip - positioned below without diamond */}
@@ -95,7 +95,7 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
             <div className="text-left">
               Step into an <strong>interactive story</strong> where your choices
               shape the journey. <strong>Play solo or with friends</strong> and
-              create unforgettable adventures, anytime.
+              create unforgettable adventures, any time.
             </div>
           </div>
         )}
