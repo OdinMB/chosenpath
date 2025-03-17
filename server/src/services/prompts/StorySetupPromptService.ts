@@ -65,14 +65,16 @@ export class StorySetupPromptService {
 --- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
 --- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
 - 3-4 visible shared stats for things that are not directly linked to one player
---- Things that are shared between players (e.g. group/organization, a spaceship, a flat)
---- Stats about the world (e.g. tension between factions, environment conditions, etc.)
-- Any invisible shared stats that you think are important
-- Stats for scoring, pacing, and story flags if you think they are needed (if any)
+--- Things that are shared between players (e.g. variables about a group/organization that several players belong to, a spaceship that players use together, a flat that players share, etc.)
+--- Stats about the world (e.g. tension between factions, environment conditions, etc.)${
+      isMultiplayer
+        ? "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)"
+        : ""
+    }- Any invisible shared stats that you think are important
 For each player
 - (3 - number of shared outcomes) individual outcomes, with a total of (6 - milestones toward shared outcomes) milestones between them
 --- Examples: If there are 2 shared outcomes with a total of 4 milestones, there should be 1 individual outcome with 2 milestones. If there are 3 shared outcomes with a total of 6 milestones, there should be 0 individual outcomes.
-- 3-4 visible stats that are linked directly to that player (traits, skills, dispositions, health, personal relationships, personal resources, etc.)
+- 3-4 visible stats that are directly linked to the player (traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc.)
 - Any invisible stats that are linked to that player that you think are important
 
 Outcomes
@@ -132,7 +134,11 @@ Stat guidelines
 - Stat names must be specific and mustn't include any placeholders.
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
---- No direct outcome progress trackers of any kind!! Outcomes are tracked separately. Example: If an outcome is "Does [insert player name] find the murderer of [NPC]?" or "Does [insert player name] unravel the mystery about [something]", don't add stats like (percentage) "Investigation progress", (string[]) "Clues", or worst of all (number) "Case Progress".
+--- Don't track progress toward outcomes (tracked separately via milestones)${
+      isMultiplayer
+        ? " -- except for contested outcomes in multiplayer games"
+        : ""
+    }.
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately)
 ${
@@ -158,7 +164,7 @@ Type of stats and what they are good for:
 --- Role that can be filled with the names of several NPCs (e.g. Friends, Love Interests)
 --- Issues (e.g. ["Poisoned", "Bleeding"] if avoiding and dealing with specific ailments is central to the story; otherwise, use a percentage for health)
 --- Contacts (e.g., ["Dealers", "Local Newspaper"] if using and building these contacts is central to the story; otherwise, use a string to represent the bredth of contacts)
---- NOT good for tracking progress towards outcomes, as with a list of clues in a mystery story. Don't use a stat for this at all.
+--- NOT good for tracking progress towards outcomes. Don't use stats for this at all.
 
 - percentage: 0-100. Qualitative aspects that will be changed often and granularly over the course of the story.
 --- Resources with a capacity limit (e.g. mana, chi, stamina, fuel, energy, oxygen supply)

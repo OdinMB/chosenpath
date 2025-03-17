@@ -120,7 +120,7 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
       sharedStats: z
         .array(statSchema)
         .describe(
-          "Stats that are shared among players. For multiplayer games with a competitive element, consider adding an opposite stat to track who is in the lead (for 2 players) or a string to track which player currently has the most momentum (for 3+ players)."
+          "Stats that are not tied specifically to individual players, including multiplayer elements (a shared spaceship, aspects of a shared group, etc.), aspects of the environment or world in general, etc. Generate 3-4 shared stats. For multiplayer games with a competitive element, consider adding an opposite stat to track who is in the lead (for 2 players) or a string to track which player currently has the most momentum (for 3+ players)."
         ),
       initialSharedStatValues: z
         .array(statValueEntrySchema)
@@ -129,7 +129,9 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
         ),
       playerStats: z
         .array(statSchema)
-        .describe("Stats that each player has individually"),
+        .describe(
+          "Stats that are tied specifically to individual players, including traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc. In multiplayer games, each player has different values for these stats. Generate 3-4 player stats."
+        ),
       characterSelectionPlan: characterSelectionPlanSchema,
       ...playerSchemas,
       title: z.string().describe("Title of the story"),

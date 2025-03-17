@@ -124,7 +124,7 @@ export const statSchema = z
     "A variable that is tracked in the game state.\n" +
       "Stats directly influence beat resolution through modifiers (typically +/-10 for minor influences, +/-30 for major influences).\n" +
       "Stats can be used as resources, define narrative thresholds, and change based on thread resolutions.\n" +
-      "Don't use stats to directly track progress toward outcomes. No (percentage) 'progress' stats, no (string[]) 'clues' in mystery stories, etc."
+      "Don't use stats to directly track progress toward outcomes. (This is done separately.) Exception: Contested outcomes in multiplayer games."
   );
 
 export const statsSchema = z.array(statSchema);
