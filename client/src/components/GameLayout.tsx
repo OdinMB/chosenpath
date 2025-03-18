@@ -163,13 +163,12 @@ export function GameLayout({
         <button
           onClick={onExitGame}
           className="w-full p-3 text-left rounded-lg transition-all duration-300
-            bg-white text-primary cursor-pointer font-lora
-            border-l-8 border border-accent shadow-md
-            hover:border-l-8 hover:border-secondary hover:shadow-lg
-            hover:translate-x-1 hover:bg-primary-50
-            focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
-            flex items-center justify-between"
-          title="Exit story"
+              bg-white text-primary cursor-pointer font-lora
+              border-l-8 border border-accent shadow-md
+              hover:border-l-8 hover:border-secondary hover:shadow-lg
+              hover:translate-x-1 hover:bg-primary-50
+              focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
+              flex items-center justify-between"
         >
           <span className="font-semibold text-sm mr-4">Leave story</span>
           <svg

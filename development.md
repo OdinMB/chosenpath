@@ -4,7 +4,6 @@ Smaller and more commits!
 
 Next
 
-- https://atomiks.github.io/tippyjs/v6/themes/: create theme, make all tooltips consistent across the app
 - list of modifiers
 - animation to "determine" resolution
 

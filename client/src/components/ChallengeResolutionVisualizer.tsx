@@ -135,7 +135,7 @@ export const ChallengeResolutionVisualizer: React.FC<
           content={`${emojiIcon} ${tooltipText}`}
           position="top"
           delay={400}
-          contentClassName="bg-secondary text-white border-secondary"
+          contentClassName="bg-secondary border-secondary"
           className="block w-full h-full"
         >
           <div
