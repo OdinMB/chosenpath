@@ -7,6 +7,7 @@ import {
 } from "../../../shared/types/beat";
 import { Resolution } from "../../../shared/types/thread";
 import { ChallengeOption } from "../../../shared/types/beat";
+import { Tooltip } from "./ui/Tooltip";
 
 interface ChallengeResolutionVisualizerProps {
   resolutionDetails: ResolutionDetails;
@@ -58,21 +59,21 @@ export const ChallengeResolutionVisualizer: React.FC<
     switch (resolution) {
       case "favorable":
         return (
-          <div title={tooltip} className="text-2xl">
-            😀
-          </div>
+          <Tooltip content={tooltip} position="right">
+            <div className="text-2xl">😀</div>
+          </Tooltip>
         );
       case "mixed":
         return (
-          <div title={tooltip} className="text-2xl">
-            😐
-          </div>
+          <Tooltip content={tooltip} position="right">
+            <div className="text-2xl">😐</div>
+          </Tooltip>
         );
       case "unfavorable":
         return (
-          <div title={tooltip} className="text-2xl">
-            🙁
-          </div>
+          <Tooltip content={tooltip} position="right">
+            <div className="text-2xl">🙁</div>
+          </Tooltip>
         );
       default:
         return null;
@@ -105,28 +106,29 @@ export const ChallengeResolutionVisualizer: React.FC<
     }
   };
 
-  // Info icon component
+  // Info icon component with tooltip
   const InfoIcon = ({ tooltipText }: { tooltipText: string }) => (
-    <div
-      className="inline-block ml-1 align-top"
-      style={{ position: "relative", top: "-2px" }}
-      title={tooltipText}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-4 w-4 text-primary-400 inline-block"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
+    <Tooltip content={tooltipText} position="top">
+      <div
+        className="inline-block ml-1 align-top"
+        style={{ position: "relative", top: "-2px" }}
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-4 w-4 text-primary-400 inline-block"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+    </Tooltip>
   );
 
   // Bar segment with tooltip
@@ -144,19 +146,35 @@ export const ChallengeResolutionVisualizer: React.FC<
     isLast: boolean;
     tooltipText: string;
     emojiIcon: string;
-  }) => (
-    <div
-      className={`h-full ${color} ${
-        isHighlighted
-          ? "ring-1 ring-white border-r border-white"
-          : isLast
-          ? ""
-          : "border-r border-white border-opacity-50"
-      }`}
-      style={{ width: `${width}%` }}
-      title={`${emojiIcon} ${tooltipText}`}
-    />
-  );
+  }) => {
+    // Prevent zero width segments from causing layout issues
+    const safeWidth = Math.max(width, 0.1);
+
+    return (
+      <div
+        className="h-full"
+        style={{ width: `${safeWidth}%`, minWidth: width > 0 ? "4px" : "0" }}
+      >
+        <Tooltip
+          content={`${emojiIcon} ${tooltipText}`}
+          position="top"
+          delay={400}
+          contentClassName="bg-accent text-white"
+          className="block w-full h-full"
+        >
+          <div
+            className={`w-full h-full ${color} ${
+              isHighlighted
+                ? "ring-1 ring-white border-r border-white"
+                : isLast
+                ? ""
+                : "border-r border-white border-opacity-50"
+            } cursor-pointer`}
+          />
+        </Tooltip>
+      </div>
+    );
+  };
 
   // Determine risk type (default to "unknown" if not specified)
   const riskType = option?.riskType || "unknown";
@@ -184,7 +202,7 @@ export const ChallengeResolutionVisualizer: React.FC<
           <div className="flex-shrink-0">{getThumbsIcon()}</div>
 
           {/* Distribution bar - using distinct blocks */}
-          <div className="relative flex-grow h-6 max-w-xs rounded-lg overflow-hidden shadow-inner flex">
+          <div className="relative flex-grow h-6 max-w-xs rounded-lg overflow-hidden shadow-inner flex z-0 w-full">
             {/* Favorable segment */}
             {distribution.favorable > 0 && (
               <BarSegment
@@ -233,7 +251,8 @@ export const ChallengeResolutionVisualizer: React.FC<
                 width: "1.5px",
                 backgroundColor: "black",
                 transform: "translateX(-0.75px)",
-                zIndex: 10,
+                zIndex: 5,
+                pointerEvents: "none", // Ensure tooltips work through the marker
               }}
             >
               {/* Top horizontal line of cursor */}
@@ -243,6 +262,7 @@ export const ChallengeResolutionVisualizer: React.FC<
                   width: "3px",
                   height: "1.5px",
                   left: "-0.75px",
+                  pointerEvents: "none",
                 }}
               ></div>
 
@@ -253,6 +273,7 @@ export const ChallengeResolutionVisualizer: React.FC<
                   width: "3px",
                   height: "1.5px",
                   left: "-0.75px",
+                  pointerEvents: "none",
                 }}
               ></div>
             </div>

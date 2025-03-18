@@ -1,0 +1,63 @@
+.tooltip-arrow-top::before,
+.tooltip-arrow-right::before,
+.tooltip-arrow-bottom::before,
+.tooltip-arrow-left::before {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+.tooltip-arrow-top::before {
+  border-top-color: #1b1f3a;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip-arrow-right::before {
+  border-right-color: #1b1f3a;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.tooltip-arrow-bottom::before {
+  border-bottom-color: #1b1f3a;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip-arrow-left::before {
+  border-left-color: #1b1f3a;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Accent-colored tooltips */
+.bg-accent .tooltip-arrow-top::before {
+  border-top-color: #00b4d8;
+}
+
+.bg-accent .tooltip-arrow-right::before {
+  border-right-color: #00b4d8;
+}
+
+.bg-accent .tooltip-arrow-bottom::before {
+  border-bottom-color: #00b4d8;
+}
+
+.bg-accent .tooltip-arrow-left::before {
+  border-left-color: #00b4d8;
+}
+
+/* Fix for tooltip arrows inside tooltips */
+.tooltip-arrow-top::before,
+.tooltip-arrow-right::before,
+.tooltip-arrow-bottom::before,
+.tooltip-arrow-left::before {
+  pointer-events: none;
+}
