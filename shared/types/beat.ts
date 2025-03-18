@@ -268,6 +268,35 @@ export interface ProbabilityDistribution {
   unfavorable: number;
 }
 
+/**
+ * Default probability distribution (33/34/33)
+ */
+export const DEFAULT_DISTRIBUTION: ProbabilityDistribution = {
+  favorable: 33,
+  mixed: 34,
+  unfavorable: 33,
+};
+
+/**
+ * Safe probability distribution (25/50/25)
+ * Skewed toward mixed results
+ */
+export const SAFE_DISTRIBUTION: ProbabilityDistribution = {
+  favorable: 25,
+  mixed: 50,
+  unfavorable: 25,
+};
+
+/**
+ * Risky probability distribution (40/20/40)
+ * Skewed toward extreme results
+ */
+export const RISKY_DISTRIBUTION: ProbabilityDistribution = {
+  favorable: 40,
+  mixed: 20,
+  unfavorable: 40,
+};
+
 export interface ResolutionDetails {
   distribution: ProbabilityDistribution;
   roll?: number;

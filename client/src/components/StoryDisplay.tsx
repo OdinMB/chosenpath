@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
+import type { ChallengeOption } from "../../../shared/types/beat";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -197,7 +198,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   // Render function for the current beat content or loading state
   const renderBeatContent = () => {
-    // If we're waiting for the next beat and the current beat has resolution details,
+    // If we're waiting for the next beat and the current beat has challenge resolution details,
     // show them along with a loading spinner
     if (
       isWaitingForNextBeat &&
@@ -206,16 +207,85 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     ) {
       return (
         <>
-          <h2 className="text-xl md:text-2xl font-bold text-center text-primary mb-6">
-            Resolving Action...
-          </h2>
-
           {/* Show resolution visualizer for the current beat */}
           <div className="my-4 max-w-2xl mx-auto">
             <ChallengeResolutionVisualizer
               resolutionDetails={currentBeat.resolutionDetails!}
               resolution={currentBeat.resolution!}
+              option={
+                currentBeat.options[currentBeat.choice].optionType ===
+                "challenge"
+                  ? (currentBeat.options[currentBeat.choice] as ChallengeOption)
+                  : undefined
+              }
             />
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
+            <LoadingSpinner
+              size="small"
+              message="Generating next story beat..."
+            />
+          </div>
+        </>
+      );
+    }
+
+    // If we're waiting for the next beat for an exploration beat,
+    // just show the loading spinner without resolution details
+    if (
+      isWaitingForNextBeat &&
+      currentBeat &&
+      !hasCurrentBeatResolutionDetails
+    ) {
+      return (
+        <>
+          <h2 className="text-xl md:text-2xl font-bold text-center text-primary mb-6">
+            {currentBeat.title}
+          </h2>
+
+          <div className="narrative-container relative">
+            {storyState?.generateImages && currentBeat.imageId && (
+              <div className="w-full sm:w-64 sm:float-right sm:ml-6 mb-4 aspect-square sm:h-64 max-w-[256px] mx-auto">
+                <img
+                  src={
+                    storyState.images.find(
+                      (img) => img.id === currentBeat.imageId
+                    )?.url
+                  }
+                  alt={
+                    storyState.images.find(
+                      (img) => img.id === currentBeat.imageId
+                    )?.description ?? ""
+                  }
+                  className="w-full h-full object-cover rounded-lg shadow-md border-l-4 border border-accent"
+                />
+              </div>
+            )}
+
+            <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
+              {React.createElement(
+                ReactMarkdown as ComponentType<{
+                  children: string;
+                  breaks?: boolean;
+                }>,
+                { breaks: true, children: currentBeat.text }
+              )}
+            </div>
+          </div>
+
+          {/* Display the selected choice */}
+          <div className="space-y-4">
+            <div className="mt-6 max-w-2xl mx-auto">
+              <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-primary">Choice: </span>
+                  <span className="text-primary">
+                    {currentBeat.options[currentBeat.choice].text}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
@@ -249,6 +319,15 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                   beatHistory[displayedBeatIndex - 1].resolutionDetails!
                 }
                 resolution={beatHistory[displayedBeatIndex - 1].resolution!}
+                option={
+                  beatHistory[displayedBeatIndex - 1].options[
+                    beatHistory[displayedBeatIndex - 1].choice
+                  ].optionType === "challenge"
+                    ? (beatHistory[displayedBeatIndex - 1].options[
+                        beatHistory[displayedBeatIndex - 1].choice
+                      ] as ChallengeOption)
+                    : undefined
+                }
               />
             </div>
           )}

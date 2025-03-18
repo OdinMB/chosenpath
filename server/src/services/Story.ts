@@ -231,11 +231,11 @@ export class Story {
           filteredBeat.options = filteredBeat.options.map((option) => {
             const filteredOption = { ...option };
 
-            // Remove statConsequences from all option types
-            delete filteredOption.statConsequences;
-
-            // Remove properties specific to challenge options
-            if (filteredOption.optionType === "challenge") {
+            // Remove properties specific to challenge options that haven't been decided yet
+            if (
+              filteredOption.optionType === "challenge" &&
+              filteredOption.decision === -1
+            ) {
               delete filteredOption.basePoints;
               delete filteredOption.modifiersToSuccessRate;
               delete filteredOption.riskType;

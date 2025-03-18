@@ -4,6 +4,9 @@ import {
   type ProbabilityDistribution,
   type OptionRiskType,
   type ResolutionDetails,
+  DEFAULT_DISTRIBUTION,
+  SAFE_DISTRIBUTION,
+  RISKY_DISTRIBUTION,
 } from "shared/types/beat.js";
 import {
   ResolutionChallenge,
@@ -26,25 +29,6 @@ export class BeatResolutionService {
     );
     return resolution;
   }
-
-  /**
-   * Default probability distribution (33/34/33)
-   */
-  private static DEFAULT_DISTRIBUTION: ProbabilityDistribution = {
-    favorable: 33,
-    mixed: 34,
-    unfavorable: 33,
-  };
-  private static SAFE_DISTRIBUTION: ProbabilityDistribution = {
-    favorable: 25,
-    mixed: 50,
-    unfavorable: 25,
-  };
-  private static RISKY_DISTRIBUTION: ProbabilityDistribution = {
-    favorable: 40,
-    mixed: 20,
-    unfavorable: 40,
-  };
 
   /**
    * Determine the challenge beat resolution and details for visualization
@@ -138,13 +122,13 @@ export class BeatResolutionService {
   ): ProbabilityDistribution {
     switch (optionRiskType) {
       case "normal":
-        return { ...this.DEFAULT_DISTRIBUTION };
+        return { ...DEFAULT_DISTRIBUTION };
       case "safe":
-        return { ...this.SAFE_DISTRIBUTION };
+        return { ...SAFE_DISTRIBUTION };
       case "risky":
-        return { ...this.RISKY_DISTRIBUTION };
+        return { ...RISKY_DISTRIBUTION };
       default:
-        return { ...this.DEFAULT_DISTRIBUTION };
+        return { ...DEFAULT_DISTRIBUTION };
     }
   }
 
