@@ -59,19 +59,19 @@ export const ChallengeResolutionVisualizer: React.FC<
       case "favorable":
         return (
           <div title={tooltip} className="text-2xl">
-            👍
+            😀
           </div>
         );
       case "mixed":
         return (
           <div title={tooltip} className="text-2xl">
-            👉
+            😐
           </div>
         );
       case "unfavorable":
         return (
           <div title={tooltip} className="text-2xl">
-            👎
+            🙁
           </div>
         );
       default:
@@ -83,11 +83,11 @@ export const ChallengeResolutionVisualizer: React.FC<
   const formatRiskDistribution = (riskType?: string): string => {
     switch (riskType) {
       case "normal":
-        return `👍 ${DEFAULT_DISTRIBUTION.favorable}% | 👉 ${DEFAULT_DISTRIBUTION.mixed}% | 👎 ${DEFAULT_DISTRIBUTION.unfavorable}%`;
+        return `😀 ${DEFAULT_DISTRIBUTION.favorable}% | 😐 ${DEFAULT_DISTRIBUTION.mixed}% | 🙁 ${DEFAULT_DISTRIBUTION.unfavorable}%`;
       case "safe":
-        return `👍 ${SAFE_DISTRIBUTION.favorable}% | 👉 ${SAFE_DISTRIBUTION.mixed}% | 👎 ${SAFE_DISTRIBUTION.unfavorable}%`;
+        return `😀 ${SAFE_DISTRIBUTION.favorable}% | 😐 ${SAFE_DISTRIBUTION.mixed}% | 🙁 ${SAFE_DISTRIBUTION.unfavorable}%`;
       case "risky":
-        return `👍 ${RISKY_DISTRIBUTION.favorable}% | 👉 ${RISKY_DISTRIBUTION.mixed}% | 👎 ${RISKY_DISTRIBUTION.unfavorable}%`;
+        return `😀 ${RISKY_DISTRIBUTION.favorable}% | 😐 ${RISKY_DISTRIBUTION.mixed}% | 🙁 ${RISKY_DISTRIBUTION.unfavorable}%`;
       default:
         return "Unknown risk type";
     }
@@ -136,12 +136,14 @@ export const ChallengeResolutionVisualizer: React.FC<
     isHighlighted,
     isLast,
     tooltipText,
+    emojiIcon,
   }: {
     width: number;
     color: string;
     isHighlighted: boolean;
     isLast: boolean;
     tooltipText: string;
+    emojiIcon: string;
   }) => (
     <div
       className={`h-full ${color} ${
@@ -152,7 +154,7 @@ export const ChallengeResolutionVisualizer: React.FC<
           : "border-r border-white border-opacity-50"
       }`}
       style={{ width: `${width}%` }}
-      title={tooltipText}
+      title={`${emojiIcon} ${tooltipText}`}
     />
   );
 
@@ -192,7 +194,8 @@ export const ChallengeResolutionVisualizer: React.FC<
                 isLast={
                   distribution.mixed === 0 && distribution.unfavorable === 0
                 }
-                tooltipText={`👍 ${distribution.favorable}%`}
+                tooltipText={`${distribution.favorable}%`}
+                emojiIcon="😀"
               />
             )}
 
@@ -203,7 +206,8 @@ export const ChallengeResolutionVisualizer: React.FC<
                 color={getColor("mixed")}
                 isHighlighted={resolution === "mixed"}
                 isLast={distribution.unfavorable === 0}
-                tooltipText={`👉 ${distribution.mixed}%`}
+                tooltipText={`${distribution.mixed}%`}
+                emojiIcon="😐"
               />
             )}
 
@@ -214,7 +218,8 @@ export const ChallengeResolutionVisualizer: React.FC<
                 color={getColor("unfavorable")}
                 isHighlighted={resolution === "unfavorable"}
                 isLast={true}
-                tooltipText={`👎 ${distribution.unfavorable}%`}
+                tooltipText={`${distribution.unfavorable}%`}
+                emojiIcon="🙁"
               />
             )}
 
