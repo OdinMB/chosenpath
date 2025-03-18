@@ -111,8 +111,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
         break;
     }
 
-    console.log("Initial position:", { top, left, position });
-
     // Check if tooltip is going outside viewport and adjust if needed
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -236,7 +234,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] px-2 py-1 text-sm bg-primary text-white rounded shadow-md ${getArrowClass()} ${contentClassName} animate-fadeIn`}
+          className={`fixed z-[9999] px-3 py-2 text-sm bg-white text-primary rounded-lg border border-primary-100 shadow-md ${getArrowClass()} ${contentClassName} animate-fadeIn`}
           style={{
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,

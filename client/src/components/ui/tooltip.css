@@ -7,34 +7,39 @@
   width: 0;
   height: 0;
   border: 6px solid transparent;
+  pointer-events: none;
 }
 
 .tooltip-arrow-top::before {
-  border-top-color: #1b1f3a;
+  border-top-color: #fff;
   bottom: -12px;
   left: 50%;
   transform: translateX(-50%);
+  filter: drop-shadow(0 1px 1px rgba(27, 31, 58, 0.1));
 }
 
 .tooltip-arrow-right::before {
-  border-right-color: #1b1f3a;
+  border-right-color: #fff;
   left: -12px;
   top: 50%;
   transform: translateY(-50%);
+  filter: drop-shadow(-1px 0 1px rgba(27, 31, 58, 0.1));
 }
 
 .tooltip-arrow-bottom::before {
-  border-bottom-color: #1b1f3a;
+  border-bottom-color: #fff;
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
+  filter: drop-shadow(0 -1px 1px rgba(27, 31, 58, 0.1));
 }
 
 .tooltip-arrow-left::before {
-  border-left-color: #1b1f3a;
+  border-left-color: #fff;
   right: -12px;
   top: 50%;
   transform: translateY(-50%);
+  filter: drop-shadow(1px 0 1px rgba(27, 31, 58, 0.1));
 }
 
 /* Accent-colored tooltips */
@@ -54,10 +59,19 @@
   border-left-color: #00b4d8;
 }
 
-/* Fix for tooltip arrows inside tooltips */
-.tooltip-arrow-top::before,
-.tooltip-arrow-right::before,
-.tooltip-arrow-bottom::before,
-.tooltip-arrow-left::before {
-  pointer-events: none;
+/* Secondary-colored tooltips */
+.bg-secondary .tooltip-arrow-top::before {
+  border-top-color: #f4a261;
+}
+
+.bg-secondary .tooltip-arrow-right::before {
+  border-right-color: #f4a261;
+}
+
+.bg-secondary .tooltip-arrow-bottom::before {
+  border-bottom-color: #f4a261;
+}
+
+.bg-secondary .tooltip-arrow-left::before {
+  border-left-color: #f4a261;
 }

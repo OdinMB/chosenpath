@@ -8,6 +8,7 @@ import {
 import { Resolution } from "../../../shared/types/thread";
 import { ChallengeOption } from "../../../shared/types/beat";
 import { Tooltip } from "./ui/Tooltip";
+import { InfoIcon } from "./InfoIcon";
 
 interface ChallengeResolutionVisualizerProps {
   resolutionDetails: ResolutionDetails;
@@ -106,31 +107,6 @@ export const ChallengeResolutionVisualizer: React.FC<
     }
   };
 
-  // Info icon component with tooltip
-  const InfoIcon = ({ tooltipText }: { tooltipText: string }) => (
-    <Tooltip content={tooltipText} position="top">
-      <div
-        className="inline-block ml-1 align-top"
-        style={{ position: "relative", top: "-2px" }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4 text-primary-400 inline-block"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      </div>
-    </Tooltip>
-  );
-
   // Bar segment with tooltip
   const BarSegment = ({
     width,
@@ -159,7 +135,7 @@ export const ChallengeResolutionVisualizer: React.FC<
           content={`${emojiIcon} ${tooltipText}`}
           position="top"
           delay={400}
-          contentClassName="bg-accent text-white"
+          contentClassName="bg-secondary text-white border-secondary"
           className="block w-full h-full"
         >
           <div
