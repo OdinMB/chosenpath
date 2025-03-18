@@ -10,7 +10,7 @@ export function BeatHistory({
   onBeatChange,
 }: BeatHistoryProps) {
   return (
-    <div className="py-2 border-b border-accent-100">
+    <div className="py-2">
       <div className="flex items-center justify-center space-x-4">
         <button
           onClick={() => onBeatChange(currentBeatIndex - 1)}

@@ -438,7 +438,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
   return (
     <div className="story-display relative flex flex-col h-full font-lora">
-      <div className="sticky top-0 bg-white z-10 border-b border-primary-100">
+      <div className="sticky top-0 bg-white z-10">
         {beatHistory.length > 0 && (
           <BeatHistory
             currentBeatIndex={displayedBeatIndex || 0}

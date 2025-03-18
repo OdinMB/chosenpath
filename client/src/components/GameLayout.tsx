@@ -376,10 +376,7 @@ export function GameLayout({
         {renderSidebar()}
 
         {/* Main Content Area */}
-        <main
-          className="flex-1 border-l border-t border-primary-100 md:border-t-0"
-          onClick={handleMainContentClick}
-        >
+        <main className="flex-1" onClick={handleMainContentClick}>
           {isCharacterSelectionMode && onCharacterSelected ? (
             <CharacterSelection onCharacterSelected={onCharacterSelected} />
           ) : !storyState.characterSelectionCompleted ? (
