@@ -95,6 +95,14 @@ export class Story {
     return null;
   }
 
+  getStatById(statId: string): Stat | null {
+    return (
+      this.state.playerStats.find((stat) => stat.id === statId) ||
+      this.state.sharedStats.find((stat) => stat.id === statId) ||
+      null
+    );
+  }
+
   getSharedStats(): Stat[] {
     return this.state.sharedStats;
   }

@@ -13,16 +13,26 @@ import {
   Resolution,
   ResolutionExploration,
 } from "shared/types/thread.js";
+import {
+  POINTS_FOR_FAVORABLE_RESOLUTION,
+  POINTS_FOR_MIXED_RESOLUTION,
+  POINTS_FOR_UNFAVORABLE_RESOLUTION,
+} from "shared/config.js";
 
 export interface ChallengeResolutionResult {
   resolution: ResolutionChallenge;
   details: ResolutionDetails;
 }
-
 export class BeatResolutionService {
   static getExplorationBeatResolution(beat: Beat): ResolutionExploration {
     // For exploration beats, the resolution is based on the option index
-    const resolutionIndex = (beat.choice % 3) + 1;
+    // Get the total number of available options
+    const numOptions = beat.options.length;
+
+    // Calculate the resolution index (1-based) based on the chosen option
+    // This ensures we map correctly regardless of how many options there are
+    const resolutionIndex = (beat.choice % numOptions) + 1;
+
     const resolution = `resolution${resolutionIndex}` as ResolutionExploration;
     console.log(
       `[BeatResolutionService] Exploration resolution: ${resolution}`
@@ -438,11 +448,11 @@ export class BeatResolutionService {
   ): number {
     switch (previousResolution) {
       case "favorable":
-        return 50; // Significant advantage
+        return POINTS_FOR_FAVORABLE_RESOLUTION; // Significant advantage
       case "mixed":
-        return 0; // No advantage or disadvantage
+        return POINTS_FOR_MIXED_RESOLUTION; // No advantage or disadvantage
       case "unfavorable":
-        return -50; // Significant disadvantage
+        return POINTS_FOR_UNFAVORABLE_RESOLUTION; // Significant disadvantage
       // Contest resolutions are already mapped to favorable/mixed/unfavorable
       // in the Story.getThreadLastStepResolution method
       case "sideAWins":

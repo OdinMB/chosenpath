@@ -20,7 +20,31 @@ export const ChallengeResolutionVisualizer: React.FC<
   ChallengeResolutionVisualizerProps
 > = ({ resolutionDetails, resolution, option }) => {
   const [expanded, setExpanded] = useState(false);
-  const { distribution, roll, points } = resolutionDetails;
+  const { distribution, roll, points, readablePointModifiers } =
+    resolutionDetails;
+
+  // First, add a helper function to create a formatted point breakdown component
+  const formatPointBreakdown = (): React.ReactNode => {
+    if (!readablePointModifiers || readablePointModifiers.length === 0)
+      return null;
+
+    return (
+      <div className="text-left w-full">
+        <div className="space-y-2">
+          {readablePointModifiers.map(([name, value], index) => (
+            <div key={index} className="flex justify-between text-sm">
+              <span className="mr-3">{name}</span>
+              <span
+                className={value >= 0 ? "text-emerald-600" : "text-red-600"}
+              >
+                {value > 0 ? `+${value}` : value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   // Calculate the position for the marker
   const markerPosition = roll != null ? roll : 50;
@@ -99,9 +123,9 @@ export const ChallengeResolutionVisualizer: React.FC<
   const getResourceTypeInfo = (resourceType?: string): string => {
     switch (resourceType) {
       case "sacrifice":
-        return "You made things easier for yourself but had to pay for it.";
+        return "You paid a price to gain an edge.";
       case "reward":
-        return "You made things harder for yourself and got rewarded.";
+        return "You chased a reward, which made things harder.";
       default:
         return "Standard option with no special effects.";
     }
@@ -295,12 +319,19 @@ export const ChallengeResolutionVisualizer: React.FC<
           <div className="mt-2 text-sm">
             {option && (
               <div className="mb-2">
-                <span className="font-semibold text-primary mr-1">Choice:</span>
+                <span className="font-semibold text-primary mr-1">
+                  {option.resourceType === "sacrifice"
+                    ? "Sacrifice"
+                    : option.resourceType === "reward"
+                    ? "Reward"
+                    : "Choice"}
+                  :
+                </span>
                 <span className="text-primary">{option.text}</span>
               </div>
             )}
 
-            <div className="flex flex-wrap mb-2">
+            <div className="flex flex-wrap mb-1">
               <div className="flex items-baseline mr-10">
                 <span className="font-semibold text-primary mr-1">Risk:</span>
                 <span className="text-primary flex items-center">
@@ -310,18 +341,27 @@ export const ChallengeResolutionVisualizer: React.FC<
               </div>
 
               {resourceType && resourceType !== "normal" && (
-                <div className="flex items-baseline">
+                <div className="flex items-baseline mr-10">
                   <span className="font-semibold text-primary capitalize">
                     {resourceType}
                   </span>
                   <InfoIcon tooltipText={getResourceTypeInfo(resourceType)} />
                 </div>
               )}
-            </div>
 
-            <div className="flex items-baseline">
-              <span className="font-semibold text-primary mr-1">Points:</span>
-              <span className="text-primary">{points}</span>
+              <div className="flex items-baseline">
+                <span className="font-semibold text-primary mr-1">
+                  {points >= 0 ? "Bonus" : "Malus"}:
+                </span>
+                <span className="text-primary mr-1">{points}</span>
+                {readablePointModifiers &&
+                  readablePointModifiers.length > 0 && (
+                    <InfoIcon
+                      tooltipText={formatPointBreakdown()}
+                      contentClassName="max-w-[400px]"
+                    />
+                  )}
+              </div>
             </div>
           </div>
         )}

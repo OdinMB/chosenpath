@@ -1,18 +1,24 @@
-import React from "react";
+import React, { ReactNode } from "react";
 import { Tooltip } from "./ui/Tooltip";
 
 interface InfoIconProps {
-  tooltipText: string;
+  tooltipText: ReactNode;
   position?: "top" | "right" | "bottom" | "left";
   className?: string;
+  contentClassName?: string;
 }
 
 export const InfoIcon: React.FC<InfoIconProps> = ({
   tooltipText,
   position = "top",
   className = "",
+  contentClassName = "",
 }) => (
-  <Tooltip content={tooltipText} position={position}>
+  <Tooltip
+    content={tooltipText}
+    position={position}
+    contentClassName={contentClassName}
+  >
     <div
       className={`inline-block ml-1 align-top ${className}`}
       style={{ position: "relative", top: "-2px" }}

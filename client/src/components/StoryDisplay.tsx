@@ -1,4 +1,3 @@
-// import React from "react";
 import React from "react";
 import { useSession } from "../hooks/useSession";
 import { BeatHistory } from "./BeatHistory";
@@ -6,7 +5,15 @@ import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
-import type { ChallengeOption } from "../../../shared/types/beat";
+import type {
+  ChallengeOption,
+  ResolutionDetails,
+} from "../../../shared/types/beat";
+import {
+  POINTS_FOR_FAVORABLE_RESOLUTION,
+  POINTS_FOR_MIXED_RESOLUTION,
+  POINTS_FOR_UNFAVORABLE_RESOLUTION,
+} from "../../../shared/config";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -39,6 +46,100 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     () => playerState?.beatHistory || [],
     [playerState?.beatHistory]
   );
+
+  // Helper function to get stat name by ID
+  const getStatNameById = (statId: string): string => {
+    if (!storyState) return statId;
+
+    // Check player stats
+    for (const stat of storyState.playerStats) {
+      if (stat.id === statId) {
+        return stat.name;
+      }
+    }
+
+    // Check shared stats
+    if (storyState.sharedStats) {
+      for (const stat of storyState.sharedStats) {
+        if (stat.id === statId) {
+          return stat.name;
+        }
+      }
+    }
+
+    // If we don't find the stat, return a formatted version of the ID
+    return statId
+      .split("_")
+      .slice(1)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
+
+  // Helper function to enhance ResolutionDetails with pointModifiers
+  const enhanceResolutionDetails = (
+    details: ResolutionDetails,
+    option: ChallengeOption,
+    beatIndex: number
+  ): ResolutionDetails => {
+    // If pointModifiers already exist, return as is
+    if (details.readablePointModifiers) return details;
+
+    const modifiers: Array<[string, number]> = [];
+
+    // Add base points from the option with appropriate label based on resourceType
+    let basePointLabel = "Choice";
+    if (option.resourceType === "sacrifice") {
+      basePointLabel = "Sacrifice";
+    } else if (option.resourceType === "reward") {
+      basePointLabel = "Reward";
+    }
+    modifiers.push([basePointLabel, option.basePoints]);
+
+    // Add stat modifiers with readable names
+    if (option.modifiersToSuccessRate) {
+      option.modifiersToSuccessRate.forEach((mod) => {
+        // Get the stat name using our helper function
+        const statName = getStatNameById(mod.statId);
+
+        if (mod.effect !== 0) {
+          modifiers.push([`${statName}`, mod.effect]);
+        }
+      });
+    }
+
+    // Add resolution effect from previous beat (if there was one)
+    // Beats create momentum - favorable outcomes make it easier to succeed in following beats
+    if (beatIndex > 1) {
+      const previousBeat = beatHistory[beatIndex - 2];
+
+      // Only add momentum if the previous beat had a resolution
+      if (previousBeat && previousBeat.resolution) {
+        let resolutionEffect = 0;
+
+        switch (previousBeat.resolution) {
+          case "favorable":
+            resolutionEffect = POINTS_FOR_FAVORABLE_RESOLUTION;
+            break;
+          case "mixed":
+            resolutionEffect = POINTS_FOR_MIXED_RESOLUTION;
+            break;
+          case "unfavorable":
+            resolutionEffect = POINTS_FOR_UNFAVORABLE_RESOLUTION;
+            break;
+        }
+
+        if (resolutionEffect !== 0) {
+          modifiers.push([`Previous beat`, resolutionEffect]);
+        }
+      }
+    }
+
+    // Return enhanced details with modifiers
+    return {
+      ...details,
+      readablePointModifiers: modifiers,
+    };
+  };
 
   // Initialize localSelectedChoice from server state when component mounts or state updates
   React.useEffect(() => {
@@ -205,19 +306,24 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       hasCurrentBeatResolutionDetails &&
       currentBeat
     ) {
+      // Get the chosen option and enhance resolution details with point modifiers
+      const chosenOption = currentBeat.options[
+        currentBeat.choice
+      ] as ChallengeOption;
+      const enhancedDetails = enhanceResolutionDetails(
+        currentBeat.resolutionDetails!,
+        chosenOption,
+        displayedBeatIndex || 0
+      );
+
       return (
         <>
           {/* Show resolution visualizer for the current beat */}
           <div className="my-4 max-w-2xl mx-auto">
             <ChallengeResolutionVisualizer
-              resolutionDetails={currentBeat.resolutionDetails!}
+              resolutionDetails={enhancedDetails}
               resolution={currentBeat.resolution!}
-              option={
-                currentBeat.options[currentBeat.choice].optionType ===
-                "challenge"
-                  ? (currentBeat.options[currentBeat.choice] as ChallengeOption)
-                  : undefined
-              }
+              option={chosenOption}
             />
           </div>
 
@@ -314,21 +420,25 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           {/* Show resolution from previous beat if applicable */}
           {shouldShowPreviousBeatResolution() && displayedBeatIndex && (
             <div className="my-4 max-w-2xl mx-auto">
-              <ChallengeResolutionVisualizer
-                resolutionDetails={
-                  beatHistory[displayedBeatIndex - 1].resolutionDetails!
-                }
-                resolution={beatHistory[displayedBeatIndex - 1].resolution!}
-                option={
-                  beatHistory[displayedBeatIndex - 1].options[
-                    beatHistory[displayedBeatIndex - 1].choice
-                  ].optionType === "challenge"
-                    ? (beatHistory[displayedBeatIndex - 1].options[
-                        beatHistory[displayedBeatIndex - 1].choice
-                      ] as ChallengeOption)
-                    : undefined
-                }
-              />
+              {(() => {
+                const prevBeat = beatHistory[displayedBeatIndex - 1];
+                const prevOption = prevBeat.options[
+                  prevBeat.choice
+                ] as ChallengeOption;
+                const enhancedDetails = enhanceResolutionDetails(
+                  prevBeat.resolutionDetails!,
+                  prevOption,
+                  displayedBeatIndex
+                );
+
+                return (
+                  <ChallengeResolutionVisualizer
+                    resolutionDetails={enhancedDetails}
+                    resolution={prevBeat.resolution!}
+                    option={prevOption}
+                  />
+                );
+              })()}
             </div>
           )}
 

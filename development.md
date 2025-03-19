@@ -50,6 +50,7 @@ Other improvements
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Attach facts to players
 - adjust scope of story setup based on the number of beats
+- Have the equivalent of Story on the client side
 - Track story elements that a player has NOT been introduced to yet
 
 - Move newMilestone changes to switch generation (away from beat generation)?

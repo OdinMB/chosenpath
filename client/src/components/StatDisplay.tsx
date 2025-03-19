@@ -31,6 +31,7 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
                 disabled={!tooltip}
                 position="top"
                 className="inline text-white font-medium"
+                contentClassName="max-w-[250px]"
               >
                 {name}
               </Tooltip>
@@ -58,6 +59,7 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
                 disabled={!tooltip}
                 position="top"
                 className="inline text-white font-medium"
+                contentClassName="max-w-[250px]"
               >
                 {stat1}
               </Tooltip>
@@ -67,6 +69,7 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
                 disabled={!tooltip}
                 position="top"
                 className="inline text-white font-medium"
+                contentClassName="max-w-[250px]"
               >
                 {stat2}
               </Tooltip>
@@ -78,7 +81,12 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
     case "boolean":
       return (
         <div className="flex items-center justify-between mb-2">
-          <Tooltip content={tooltip} disabled={!tooltip} position="top">
+          <Tooltip
+            content={tooltip}
+            disabled={!tooltip}
+            position="top"
+            contentClassName="max-w-[250px]"
+          >
             <span className="text-primary">{name}</span>
           </Tooltip>
           <span className="bg-white text-primary px-3 py-1 rounded border border-primary-100 shadow-sm">
@@ -90,7 +98,12 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
     case "string[]":
       return (
         <div className="mb-2">
-          <Tooltip content={tooltip} disabled={!tooltip} position="top">
+          <Tooltip
+            content={tooltip}
+            disabled={!tooltip}
+            position="top"
+            contentClassName="max-w-[250px]"
+          >
             <div className="mb-1 text-primary">{name}:</div>
           </Tooltip>
           {(value as string[]).length === 0 ? (
@@ -113,7 +126,12 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
     default:
       return (
         <div className="flex items-center justify-between mb-2">
-          <Tooltip content={tooltip} disabled={!tooltip} position="top">
+          <Tooltip
+            content={tooltip}
+            disabled={!tooltip}
+            position="top"
+            contentClassName="max-w-[250px]"
+          >
             <span className="text-primary">{name}</span>
           </Tooltip>
           <span className="bg-white text-primary px-3 py-1 rounded border border-primary-100 shadow-sm">

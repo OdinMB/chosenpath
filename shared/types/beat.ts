@@ -301,6 +301,7 @@ export interface ResolutionDetails {
   distribution: ProbabilityDistribution;
   roll?: number;
   points: number;
+  readablePointModifiers?: Array<[string, number]>;
 }
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {
