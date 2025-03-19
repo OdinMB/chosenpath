@@ -5,21 +5,27 @@ Smaller and more commits!
 Next
 
 For switch generation:
-
-    previousTypesOfThreadsNotToBeRepeated: z
-      .array(
-        z
-          .string()
-          .describe(
-            "Type of thread in one word. Examples: chase, eavesdropping, negotiation, fight, romantic date, performance, etc."
-          )
-      )
-      .describe(
-        "List of types of threads that have already been used in the previous 10 beats and should not be repeated with new threads."
-      ),
+previousTypesOfThreadsNotToBeRepeated: z
+.array(
+z
+.string()
+.describe(
+"Type of thread in one word. Examples: chase, eavesdropping, negotiation, fight, romantic date, performance, etc."
+)
+)
+.describe(
+"List of types of threads that have already been used in the previous 10 beats and should not be repeated with new threads."
+),
 
 - CoT schema attribute to list "show don't tell" elements for the beat.
 - Consideration to make 2-beat threads more likely
+
+Resolution element improvements
+
+- line animation: calculate speed to land on the right spot, then move (with some deceleration toward the end)
+- display resolution animation in the previously selected option element (both in the generating beat view and the beginning of the next beat)
+- what about overall result in multiplayer beats?
+- thread resolutions?
 
 New features
 

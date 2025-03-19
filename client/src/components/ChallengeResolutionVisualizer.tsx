@@ -372,7 +372,7 @@ export const ChallengeResolutionVisualizer: React.FC<
       case "risky":
         return "High";
       case "normal":
-        return "Medium";
+        return "Balanced";
       case "safe":
         return "Low";
       default:
