@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ResolutionDetails,
   DEFAULT_DISTRIBUTION,
@@ -14,14 +14,28 @@ interface ChallengeResolutionVisualizerProps {
   resolutionDetails: ResolutionDetails;
   resolution: Resolution;
   option?: ChallengeOption;
+  animateRoll?: boolean;
 }
 
 export const ChallengeResolutionVisualizer: React.FC<
   ChallengeResolutionVisualizerProps
-> = ({ resolutionDetails, resolution, option }) => {
+> = ({ resolutionDetails, resolution, option, animateRoll = false }) => {
   const [expanded, setExpanded] = useState(false);
   const { distribution, roll, points, readablePointModifiers } =
     resolutionDetails;
+
+  // Animation states
+  const [animatingMarker, setAnimatingMarker] = useState(animateRoll);
+  const [showResults, setShowResults] = useState(!animateRoll);
+  const [currentMarkerPosition, setCurrentMarkerPosition] = useState(50);
+  const [emojiAnimationStage, setEmojiAnimationStage] = useState<
+    "hidden" | "rotating" | "final"
+  >("hidden");
+  const animationRef = useRef<number | null>(null);
+  const animationStartTime = useRef<number | null>(null);
+  const animationDuration = 6000; // 6 seconds total
+  const animationCompletedRef = useRef(false);
+  const emojiAnimationStartedRef = useRef(false);
 
   // First, add a helper function to create a formatted point breakdown component
   const formatPointBreakdown = (): React.ReactNode => {
@@ -46,8 +60,143 @@ export const ChallengeResolutionVisualizer: React.FC<
     );
   };
 
-  // Calculate the position for the marker
-  const markerPosition = roll != null ? roll : 50;
+  // Function to stop animation and show results
+  const completeAnimation = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    setCurrentMarkerPosition(roll != null ? roll : 50);
+    setAnimatingMarker(false);
+    setShowResults(true);
+    setEmojiAnimationStage("final");
+    animationCompletedRef.current = true;
+  }, [roll]);
+
+  // Animation function for the marker
+  const animateMarker = useCallback(
+    (timestamp: number) => {
+      // Don't continue if animation was marked as completed
+      if (animationCompletedRef.current) {
+        return;
+      }
+
+      if (!animationStartTime.current) {
+        animationStartTime.current = timestamp;
+      }
+
+      const elapsed = timestamp - animationStartTime.current;
+      const progress = Math.min(elapsed / animationDuration, 1);
+
+      // Handle normal animation progress
+      if (progress < 0.95) {
+        // Phase 1 (0-50%): Go back and forth between ends twice
+        if (progress < 0.5) {
+          // Creates 4 full sweeps (2 complete cycles) in the first 50% of animation time
+          const fullSweepPosition =
+            50 + 50 * Math.sin((4 * Math.PI * progress) / 0.5);
+          setCurrentMarkerPosition(fullSweepPosition);
+        }
+        // Phase 2 (50-80%): Oscillate around the final position with gradually decreasing amplitude
+        else if (progress < 0.8) {
+          const phaseProgress = (progress - 0.5) / 0.3; // Normalized progress for this phase
+          const targetPosition = roll != null ? roll : 50;
+
+          // Start with large oscillations that gradually decrease
+          // Use more oscillations (higher frequency) as we progress
+          const frequency = 6 + 3 * phaseProgress; // Gentler frequency increase
+          const amplitude = 40 * (1 - phaseProgress); // Decrease amplitude over time
+
+          const oscillation =
+            amplitude * Math.sin(frequency * Math.PI * phaseProgress);
+          const convergence =
+            50 + (targetPosition - 50) * (0.4 + 0.6 * phaseProgress);
+
+          setCurrentMarkerPosition(convergence + oscillation);
+        }
+        // Phase 3 (80-95%): Settle gently on final position with smoother, slower oscillations
+        else if (progress < 0.95) {
+          const phaseProgress = (progress - 0.8) / 0.15;
+          const targetPosition = roll != null ? roll : 50;
+
+          // Gentler final oscillations with lower frequency
+          const smallAmplitude = 5 * (1 - phaseProgress);
+          const gentleOscillation =
+            smallAmplitude * Math.sin(3 * Math.PI * phaseProgress);
+
+          setCurrentMarkerPosition(targetPosition + gentleOscillation);
+        }
+
+        // Request next animation frame
+        animationRef.current = requestAnimationFrame(animateMarker);
+      }
+      // Final phase - start emoji animation and finalize
+      else {
+        // Set marker to final position
+        setCurrentMarkerPosition(roll != null ? roll : 50);
+
+        // Start emoji animation sequence only once
+        if (!emojiAnimationStartedRef.current) {
+          emojiAnimationStartedRef.current = true;
+
+          // Start rotation animation
+          setEmojiAnimationStage("rotating");
+
+          // After rotation completes, set to final state
+          setTimeout(() => {
+            setEmojiAnimationStage("final");
+            completeAnimation();
+          }, 1200); // 1.2 seconds for the rotation
+
+          // Stop requesting animation frames here
+          if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+          }
+        }
+      }
+    },
+    [roll, completeAnimation]
+  );
+
+  // Start or stop animation based on prop
+  useEffect(() => {
+    // Reset animation state when animateRoll changes
+    if (animateRoll) {
+      // Clear any existing animation
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+
+      // Reset state
+      setAnimatingMarker(true);
+      setShowResults(false);
+      setEmojiAnimationStage("hidden");
+      animationStartTime.current = null;
+      animationCompletedRef.current = false;
+      emojiAnimationStartedRef.current = false;
+
+      // Start new animation
+      animationRef.current = requestAnimationFrame(animateMarker);
+    }
+
+    // Cleanup function
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, [animateRoll, animateMarker]);
+
+  // Calculate the position for the marker - use roll directly for static display
+  const markerPosition = animatingMarker
+    ? currentMarkerPosition
+    : roll != null
+    ? roll
+    : 50;
 
   // Get color for an outcome type
   const getColor = (outcome: string): string => {
@@ -77,32 +226,69 @@ export const ChallengeResolutionVisualizer: React.FC<
     }
   };
 
-  // Get thumbs icon based on outcome
+  // Get thumbs icon based on outcome with rotation animation
   const getThumbsIcon = () => {
     const tooltip = getOutcomeDescription(resolution);
 
-    switch (resolution) {
-      case "favorable":
-        return (
-          <Tooltip content={tooltip} position="right">
-            <div className="text-2xl">😀</div>
-          </Tooltip>
-        );
-      case "mixed":
-        return (
-          <Tooltip content={tooltip} position="right">
-            <div className="text-2xl">😐</div>
-          </Tooltip>
-        );
-      case "unfavorable":
-        return (
-          <Tooltip content={tooltip} position="right">
-            <div className="text-2xl">🙁</div>
-          </Tooltip>
-        );
-      default:
-        return null;
+    // If no animation is happening (non-animated mode), show emoji immediately
+    if (!animateRoll) {
+      return (
+        <Tooltip content={tooltip} position="right">
+          <div className="text-2xl opacity-100">
+            {resolution === "favorable"
+              ? "😀"
+              : resolution === "mixed"
+              ? "😐"
+              : "🙁"}
+          </div>
+        </Tooltip>
+      );
     }
+
+    // Get emoji based on resolution
+    const emoji =
+      resolution === "favorable" ? "😀" : resolution === "mixed" ? "😐" : "🙁";
+
+    // Determine animation class based on stage
+    let animationClass = "opacity-0";
+    let rotationStyle = {};
+
+    switch (emojiAnimationStage) {
+      case "rotating":
+        animationClass = "opacity-100";
+        rotationStyle = {
+          animation: "rotate720 1.2s ease-in-out forwards",
+          transformOrigin: "center center",
+        };
+        break;
+      case "final":
+        animationClass = "opacity-100";
+        break;
+      default:
+        // Hidden state
+        animationClass = "opacity-0";
+        break;
+    }
+
+    // Render emoji with rotation animation
+    return (
+      <Tooltip content={tooltip} position="right">
+        <div
+          className={`text-2xl ${animationClass} inline-block`}
+          style={{
+            ...rotationStyle,
+          }}
+        >
+          {emoji}
+          <style>{`
+            @keyframes rotate720 {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(720deg); }
+            }
+          `}</style>
+        </div>
+      </Tooltip>
+    );
   };
 
   // Format risk distribution for tooltip text
@@ -164,7 +350,7 @@ export const ChallengeResolutionVisualizer: React.FC<
         >
           <div
             className={`w-full h-full ${color} ${
-              isHighlighted
+              isHighlighted && showResults
                 ? "ring-1 ring-white border-r border-white"
                 : isLast
                 ? ""
@@ -253,6 +439,7 @@ export const ChallengeResolutionVisualizer: React.FC<
                 transform: "translateX(-0.75px)",
                 zIndex: 5,
                 pointerEvents: "none", // Ensure tooltips work through the marker
+                transition: animatingMarker ? "none" : "left 0.3s ease-out",
               }}
             >
               {/* Top horizontal line of cursor */}
@@ -281,8 +468,11 @@ export const ChallengeResolutionVisualizer: React.FC<
 
           {/* Expand/collapse button */}
           <button
-            className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none"
+            className={`flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ${
+              showResults ? "opacity-100" : "opacity-0"
+            } transition-opacity duration-300`}
             onClick={() => setExpanded(!expanded)}
+            disabled={!showResults}
           >
             {expanded ? (
               <svg
@@ -315,7 +505,7 @@ export const ChallengeResolutionVisualizer: React.FC<
         </div>
 
         {/* Extended information */}
-        {expanded && (
+        {expanded && showResults && (
           <div className="mt-2 text-sm">
             {option && (
               <div className="mb-2">

@@ -324,6 +324,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               resolutionDetails={enhancedDetails}
               resolution={currentBeat.resolution!}
               option={chosenOption}
+              animateRoll={true}
             />
           </div>
 

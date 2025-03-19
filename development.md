@@ -4,10 +4,22 @@ Smaller and more commits!
 
 Next
 
-- list of modifiers
-- animation to "determine" resolution
+For switch generation:
+
+    previousTypesOfThreadsNotToBeRepeated: z
+      .array(
+        z
+          .string()
+          .describe(
+            "Type of thread in one word. Examples: chase, eavesdropping, negotiation, fight, romantic date, performance, etc."
+          )
+      )
+      .describe(
+        "List of types of threads that have already been used in the previous 10 beats and should not be repeated with new threads."
+      ),
 
 - CoT schema attribute to list "show don't tell" elements for the beat.
+- Consideration to make 2-beat threads more likely
 
 New features
 

@@ -247,7 +247,6 @@ export const createSetOfBeatGenerationSchema = (
       : {
           multiplayerCoordination: z.literal(""),
         }),
-
     ...beatSchemas,
   };
 
