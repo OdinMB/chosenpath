@@ -21,10 +21,6 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
         <AppTitle size="large" className="mb-10" />
 
         <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-6">
-          <h2 className="text-xl font-semibold text-primary mb-4">
-            Your Story is Ready!
-          </h2>
-
           {!isSinglePlayer && (
             <div className="bg-primary-50 border-l-4 border-primary-200 p-4 mb-6 rounded-md">
               <div className="flex">
@@ -62,17 +58,17 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
+              <div className="flex flex-row gap-3 pt-2">
                 <button
                   onClick={onBack}
-                  className="w-full sm:w-1/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
+                  className="flex-shrink-0 py-2.5 px-4 rounded-lg text-sm font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
                 >
                   Back
                 </button>
 
                 <button
                   onClick={() => onCodeSubmit(singlePlayerCode!)}
-                  className="w-full sm:w-2/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-300"
+                  className="flex-grow py-2.5 px-4 rounded-lg text-sm font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-300"
                 >
                   Join the Story
                 </button>

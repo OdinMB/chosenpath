@@ -522,7 +522,7 @@ export const ChallengeResolutionVisualizer: React.FC<
             )}
 
             <div className="flex flex-wrap mb-1">
-              <div className="flex items-baseline mr-10">
+              <div className="flex items-baseline mr-8">
                 <span className="font-semibold text-primary mr-1">Risk:</span>
                 <span className="text-primary flex items-center">
                   <span>{getRiskDisplayText(riskType)}</span>
@@ -531,7 +531,7 @@ export const ChallengeResolutionVisualizer: React.FC<
               </div>
 
               {resourceType && resourceType !== "normal" && (
-                <div className="flex items-baseline mr-10">
+                <div className="flex items-baseline mr-8">
                   <span className="font-semibold text-primary capitalize">
                     {resourceType}
                   </span>

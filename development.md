@@ -4,6 +4,8 @@ Smaller and more commits!
 
 Next
 
+Add feedback collection mechanism.
+
 For switch generation:
 previousTypesOfThreadsNotToBeRepeated: z
 .array(

@@ -186,10 +186,6 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
           </div>
         ) : isLoading ? (
           <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
-            <h2 className="text-xl font-semibold text-primary mb-4">
-              Creating Your Story
-            </h2>
-
             <div className="flex flex-wrap gap-2 mb-4">
               <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
                 {playerCount === 1 ? "Single-player" : `${playerCount} players`}
@@ -286,7 +282,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 <button
                   type="button"
                   onClick={handleSuggestion}
-                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-accent hover:text-secondary hover:bg-primary-50 rounded-md transition-colors duration-200"
+                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-accent rounded-md transition-colors duration-200"
                   disabled={isLoading}
                 >
                   Get suggestion
@@ -341,11 +337,11 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               </label>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
+            <div className="flex flex-row gap-3 sm:gap-4 pt-2">
               <button
                 type="button"
                 onClick={onBack}
-                className="w-full sm:w-1/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
+                className="shrink-0 px-4 py-2.5 md:py-3 rounded-lg text-sm md:text-base font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
               >
                 Back
               </button>
@@ -353,7 +349,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               <button
                 type="submit"
                 disabled={isLoading || !prompt.trim() || isConnecting}
-                className="w-full sm:w-2/3 py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                className="w-full py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
               >
                 {isLoading ? "Creating Story..." : "Create Story"}
               </button>
