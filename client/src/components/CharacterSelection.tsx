@@ -8,6 +8,7 @@ import { PlayerOptionsGeneration } from "../../../shared/types/story";
 import { StatDisplay } from "./StatDisplay";
 import { replacePronounPlaceholders } from "../../../shared/utils/playerUtils.js";
 import { CharacterCard } from "./CharacterCard";
+import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -163,20 +164,15 @@ export function CharacterSelection({
       </div>
 
       <div className="flex flex-col items-center mt-8">
-        <button
+        <PrimaryButton
           onClick={handleConfirmSelection}
           disabled={selectedIdentity === null || selectedBackground === null}
-          className={`
-            w-full max-w-md py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold transition-all duration-300
-            ${
-              selectedIdentity !== null && selectedBackground !== null
-                ? "text-primary bg-white border-l-8 border border-accent shadow-md hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
-                : "text-primary-400 bg-white border border-primary-100 cursor-not-allowed opacity-50"
-            }
-          `}
+          fullWidth
+          className="max-w-md"
+          size="lg"
         >
           Confirm Selection
-        </button>
+        </PrimaryButton>
       </div>
     </div>
   );

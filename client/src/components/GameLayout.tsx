@@ -2,8 +2,8 @@ import { useSession } from "../hooks/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
-import { SidebarFeedbackButton } from "./SidebarFeedbackButton";
-import { FeedbackModal } from "./FeedbackModal";
+import { SidebarFeedbackButton } from "./feedback/SidebarFeedbackButton";
+import { FeedbackModal } from "./feedback/FeedbackModal";
 import {
   ClientStat,
   StatValue,
@@ -11,7 +11,7 @@ import {
 } from "../../../shared/types/stat";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 
 interface Props {
   onExitGame: () => void;

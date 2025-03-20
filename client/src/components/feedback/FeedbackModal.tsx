@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useSession } from "../hooks/useSession";
+import { useSession } from "../../hooks/useSession.js";
+import { PrimaryButton } from "../ui/PrimaryButton.js";
 
 // Types for feedback
 type FeedbackType = "story" | "general" | "issue" | "idea";
@@ -166,18 +167,20 @@ export function FeedbackModal({
   // If feedback is submitted, show a thank you message
   if (isSubmitted) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-md w-full shadow-xl">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-lora">
+        <div className="bg-white rounded-lg p-8 max-w-md w-full shadow-xl border border-primary-100">
           <h2 className="text-2xl font-bold mb-4 text-primary">Thank You!</h2>
-          <p className="mb-4">Your feedback has been submitted successfully.</p>
+          <p className="mb-4 text-primary-800">
+            Your feedback has been submitted successfully.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-lora">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl border border-primary-100">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-primary">
             {mode === "story-beat" ? "Story Beat Feedback" : "Share Feedback"}
@@ -212,24 +215,23 @@ export function FeedbackModal({
           {/* Feedback Type Selection (only in general mode) */}
           {mode === "general" && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Feedback Type
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "general", label: "General Feedback" },
-                  { id: "issue", label: "Report an Issue" },
+                  { id: "general", label: "Feedback" },
+                  { id: "issue", label: "Issue" },
                   { id: "idea", label: "Suggestion" },
                 ].map((option) => (
                   <button
                     key={option.id}
                     type="button"
-                    className={`py-2 px-3 rounded-md border text-sm transition-colors 
+                    className={`
+                      border-l-4 border rounded-lg p-2 cursor-pointer transition-all duration-200 text-sm bg-white
                       ${
                         type === option.id
-                          ? "bg-primary text-white border-primary"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
+                          ? "border-secondary shadow-md text-primary"
+                          : "border-primary-100 shadow-sm hover:border-secondary hover:shadow-md text-primary"
+                      }
+                    `}
                     onClick={() => setType(option.id as FeedbackType)}
                   >
                     {option.label}
@@ -242,7 +244,7 @@ export function FeedbackModal({
           {/* Thumbs up/down in story-beat mode */}
           {mode === "story-beat" && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-primary">
                 How do you feel about this story beat?
               </label>
               <div className="flex gap-4 justify-center">
@@ -251,8 +253,8 @@ export function FeedbackModal({
                   className={`p-3 rounded-full transition-colors
                     ${
                       rating === "positive"
-                        ? "bg-green-100 text-green-600"
-                        : "text-gray-400 hover:text-green-600"
+                        ? "bg-secondary/20 text-secondary"
+                        : "text-gray-400 hover:text-secondary"
                     }`}
                   onClick={() => setRating("positive")}
                 >
@@ -288,48 +290,43 @@ export function FeedbackModal({
 
           {/* Comment field */}
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
+            <label className="block font-medium mb-2 text-primary">
               {mode === "story-beat"
                 ? "Additional comments (optional)"
                 : "Your feedback"}
             </label>
             <textarea
-              className="w-full border rounded-md p-2 h-24"
+              className="w-full border rounded-lg p-2 h-24 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Share your thoughts here..."
+              placeholder="The good and the bad"
             ></textarea>
           </div>
 
           {/* Contact info (only in general mode) */}
           {mode === "general" && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Contact info (optional)
+              <label className="block font-medium mb-2 text-primary">
+                Contact (optional)
               </label>
               <input
                 type="text"
-                className="w-full border rounded-md p-2"
+                className="w-full border rounded-lg p-2 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
                 value={contactInfo}
                 onChange={(e) => setContactInfo(e.target.value)}
-                placeholder="Email or other contact method"
               />
             </div>
           )}
 
           {/* Submit button */}
-          <button
+          <PrimaryButton
             type="submit"
             disabled={isSubmitting || (mode === "story-beat" && !rating)}
-            className={`w-full py-2 px-4 rounded-md font-medium 
-              ${
-                isSubmitting || (mode === "story-beat" && !rating)
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-primary text-white hover:bg-primary-700"
-              }`}
+            isLoading={isSubmitting}
+            fullWidth
           >
             {isSubmitting ? "Submitting..." : "Submit Feedback"}
-          </button>
+          </PrimaryButton>
         </form>
       </div>
     </div>

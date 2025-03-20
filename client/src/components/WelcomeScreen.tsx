@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AppTitle } from "./AppTitle";
 import { Tooltip } from "./ui/Tooltip";
+import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
@@ -56,16 +57,16 @@ export function WelcomeScreen({
                   {existingPlayerCode}
                 </div>
                 <div className="flex gap-3">
-                  <button
-                    onClick={handleResume}
-                    className="h-10 py-2 px-4 border-l-8 border border-accent rounded-lg shadow-md text-sm font-semibold text-primary bg-white hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 transition-all duration-300 whitespace-nowrap flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
-                  >
+                  <PrimaryButton onClick={handleResume} size="sm">
                     Resume
-                  </button>
+                  </PrimaryButton>
                   <Tooltip content="Delete code" position="bottom">
-                    <button
+                    <PrimaryButton
                       onClick={handleDeleteClick}
-                      className="h-10 py-2 px-4 rounded-lg text-sm font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm flex items-center gap-2"
+                      variant="outline"
+                      size="sm"
+                      leftBorder={false}
+                      className="flex items-center gap-2"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -81,7 +82,7 @@ export function WelcomeScreen({
                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                         />
                       </svg>
-                    </button>
+                    </PrimaryButton>
                   </Tooltip>
                 </div>
               </div>
@@ -109,13 +110,9 @@ export function WelcomeScreen({
               placeholder="Story code"
             />
 
-            <button
-              type="submit"
-              disabled={!code.trim()}
-              className="flex-shrink-0 h-10 py-2 px-4 border-l-8 border border-accent rounded-lg shadow-md text-sm font-semibold text-primary bg-white hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 whitespace-nowrap"
-            >
+            <PrimaryButton type="submit" disabled={!code.trim()} size="sm">
               Join Game
-            </button>
+            </PrimaryButton>
           </div>
         </form>
 
@@ -128,12 +125,9 @@ export function WelcomeScreen({
           </div>
         </div>
 
-        <button
-          onClick={onNewStory}
-          className="w-full py-3 px-4 border-l-8 border border-accent rounded-lg shadow-md text-base font-semibold text-primary bg-white hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-300"
-        >
+        <PrimaryButton onClick={onNewStory} fullWidth size="lg">
           Start A New Story
-        </button>
+        </PrimaryButton>
       </div>
 
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">

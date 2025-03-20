@@ -8,7 +8,7 @@ import {
 import { Resolution } from "../../../shared/types/thread";
 import { ChallengeOption } from "../../../shared/types/beat";
 import { Tooltip } from "./ui/Tooltip";
-import { InfoIcon } from "./InfoIcon";
+import { InfoIcon } from "./ui/InfoIcon";
 
 interface ChallengeResolutionVisualizerProps {
   resolutionDetails: ResolutionDetails;

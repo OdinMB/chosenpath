@@ -3,9 +3,9 @@ import { useSession } from "../hooks/useSession";
 import { BeatHistory } from "./BeatHistory";
 import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
-import { BeatFeedback } from "./BeatFeedback";
+import { BeatFeedback } from "./feedback/BeatFeedback";
 import type {
   ChallengeOption,
   ResolutionDetails,

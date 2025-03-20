@@ -9,7 +9,8 @@ import {
 } from "shared/config.js";
 import { GameMode, GameModes } from "shared/types/story.js";
 import { AppTitle } from "./AppTitle";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { LoadingSpinner } from "./ui/LoadingSpinner.js";
+import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface StoryInitializerProps {
   onSetup: (options: {
@@ -279,14 +280,17 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 >
                   What kind of story would you like to experience?
                 </label>
-                <button
+                <PrimaryButton
                   type="button"
                   onClick={handleSuggestion}
-                  className="self-end sm:self-auto px-3 py-1.5 text-sm font-semibold text-accent rounded-md transition-colors duration-200"
+                  variant="outline"
+                  size="sm"
+                  leftBorder={false}
                   disabled={isLoading}
+                  className="self-end sm:self-auto"
                 >
                   Get suggestion
-                </button>
+                </PrimaryButton>
               </div>
               <textarea
                 id="prompt"
@@ -338,21 +342,23 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
             </div>
 
             <div className="flex flex-row gap-3 sm:gap-4 pt-2">
-              <button
+              <PrimaryButton
                 type="button"
                 onClick={onBack}
-                className="shrink-0 px-4 py-2.5 md:py-3 rounded-lg text-sm md:text-base font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
+                variant="outline"
+                leftBorder={false}
               >
                 Back
-              </button>
+              </PrimaryButton>
 
-              <button
+              <PrimaryButton
                 type="submit"
                 disabled={isLoading || !prompt.trim() || isConnecting}
-                className="w-full py-2.5 md:py-3 px-4 rounded-lg text-sm md:text-base font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:enabled:border-l-8 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                isLoading={isLoading}
+                fullWidth
               >
                 {isLoading ? "Creating Story..." : "Create Story"}
-              </button>
+              </PrimaryButton>
             </div>
           </form>
         )}
