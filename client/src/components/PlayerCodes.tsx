@@ -1,4 +1,5 @@
 import { AppTitle } from "./AppTitle";
+import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;
@@ -53,25 +54,28 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                 <div className="mb-2 text-primary-700 text-sm">
                   Your Access Code:
                 </div>
-                <div className="h-12 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono flex items-center justify-center text-lg">
+                <div className="h-12 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm flex items-center justify-center text-lg">
                   {singlePlayerCode}
                 </div>
               </div>
 
               <div className="flex flex-row gap-3 pt-2">
-                <button
+                <PrimaryButton
                   onClick={onBack}
-                  className="flex-shrink-0 py-2.5 px-4 rounded-lg text-sm font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-colors duration-200 shadow-sm"
+                  variant="outline"
+                  leftBorder={false}
+                  size="lg"
                 >
                   Back
-                </button>
+                </PrimaryButton>
 
-                <button
+                <PrimaryButton
                   onClick={() => onCodeSubmit(singlePlayerCode!)}
-                  className="flex-grow py-2.5 px-4 rounded-lg text-sm font-semibold text-primary bg-white border-l-8 border border-accent shadow-md hover:border-l-8 hover:border-secondary hover:shadow-lg hover:translate-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-300"
+                  fullWidth
+                  size="lg"
                 >
                   Join the Story
-                </button>
+                </PrimaryButton>
               </div>
             </>
           ) : (
@@ -86,27 +90,28 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                       {formatPlayerName(slot)}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <div className="h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono flex items-center">
+                      <div className="h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm flex items-center">
                         {code}
                       </div>
-                      <button
+                      <PrimaryButton
                         onClick={() => onCodeSubmit(code)}
-                        className="ml-4 px-4 py-2 text-sm font-medium text-primary bg-white border-l-4 border border-accent shadow-sm hover:border-l-4 hover:border-secondary hover:shadow-md hover:translate-x-1 rounded-md transition-all duration-300"
+                        className="ml-4"
                       >
                         Join the Story
-                      </button>
+                      </PrimaryButton>
                     </div>
                   </div>
                 ))}
               </div>
 
               <div className="flex justify-center">
-                <button
+                <PrimaryButton
                   onClick={onBack}
-                  className="px-4 py-2 text-sm font-medium text-primary bg-white border border-primary-100 hover:bg-primary-50 rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                  variant="outline"
+                  leftBorder={false}
                 >
                   Back
-                </button>
+                </PrimaryButton>
               </div>
             </>
           )}

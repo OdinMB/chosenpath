@@ -344,6 +344,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
             <div className="flex flex-row gap-3 sm:gap-4 pt-2">
               <PrimaryButton
                 type="button"
+                size="lg"
                 onClick={onBack}
                 variant="outline"
                 leftBorder={false}
@@ -353,6 +354,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
               <PrimaryButton
                 type="submit"
+                size="lg"
                 disabled={isLoading || !prompt.trim() || isConnecting}
                 isLoading={isLoading}
                 fullWidth

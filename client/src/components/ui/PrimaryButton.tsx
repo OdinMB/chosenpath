@@ -35,21 +35,24 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   };
 
   const getVariantClasses = (): string => {
-    if (disabled || isLoading) {
-      return "bg-gray-300 text-gray-500 cursor-not-allowed";
-    }
+    const disabledClasses =
+      disabled || isLoading
+        ? "text-gray-400 border-gray-300 cursor-not-allowed"
+        : "";
+
+    const baseClasses = "bg-white shadow-md transition-all duration-300";
 
     switch (variant) {
       case "secondary":
-        return `bg-white border border-secondary ${
+        return `${baseClasses} border border-secondary ${
           leftBorder ? "border-l-8" : ""
-        } shadow-md text-primary hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1 transition-all duration-300`;
+        } text-primary hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1 ${disabledClasses}`;
       case "outline":
-        return "bg-white border border-primary-100 text-primary hover:enabled:bg-primary-50 transition-colors duration-200 shadow-sm";
+        return `${baseClasses} border border-primary-100 text-primary hover:enabled:bg-primary-50 transition-colors duration-200 shadow-sm ${disabledClasses}`;
       default:
-        return `bg-white border border-accent ${
+        return `${baseClasses} border border-accent ${
           leftBorder ? "border-l-8" : ""
-        } shadow-md text-primary hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 transition-all duration-300`;
+        } text-primary hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 ${disabledClasses}`;
     }
   };
 

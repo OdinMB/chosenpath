@@ -53,24 +53,19 @@ export function WelcomeScreen({
           <>
             <div className="flex flex-col gap-3">
               <div className="w-full flex items-center justify-between gap-3">
-                <div className="flex-1 h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono flex items-center opacity-75">
+                <div className="flex-1 h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm flex items-center opacity-75">
                   {existingPlayerCode}
                 </div>
-                <div className="flex gap-3">
-                  <PrimaryButton onClick={handleResume} size="sm">
-                    Resume
-                  </PrimaryButton>
+                <div className="flex gap-3 items-center">
+                  <PrimaryButton onClick={handleResume}>Resume</PrimaryButton>
                   <Tooltip content="Delete code" position="bottom">
-                    <PrimaryButton
+                    <button
                       onClick={handleDeleteClick}
-                      variant="outline"
-                      size="sm"
-                      leftBorder={false}
-                      className="flex items-center gap-2"
+                      className="text-red-600 hover:text-red-700 focus:outline-none flex items-center"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 text-red-600"
+                        className="h-5 w-5"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -82,7 +77,7 @@ export function WelcomeScreen({
                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                         />
                       </svg>
-                    </PrimaryButton>
+                    </button>
                   </Tooltip>
                 </div>
               </div>
@@ -106,11 +101,15 @@ export function WelcomeScreen({
               type="text"
               value={code}
               onChange={handleInputChange}
-              className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm font-mono placeholder-primary-400"
+              className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm placeholder-primary-400"
               placeholder="Story code"
             />
 
-            <PrimaryButton type="submit" disabled={!code.trim()} size="sm">
+            <PrimaryButton
+              type="submit"
+              disabled={!code.trim()}
+              className="whitespace-nowrap min-w-[90px]"
+            >
               Join Game
             </PrimaryButton>
           </div>
