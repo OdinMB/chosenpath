@@ -216,11 +216,11 @@ export const ChallengeResolutionVisualizer: React.FC<
   const getOutcomeDescription = (outcome: Resolution): string => {
     switch (outcome) {
       case "favorable":
-        return "Things went well";
+        return "Things go well";
       case "mixed":
-        return "Results were mixed";
+        return "Results are mixed";
       case "unfavorable":
-        return "Things didn't go as planned";
+        return "Things don't go as planned";
       default:
         return "";
     }

@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
+import { BeatFeedback } from "./BeatFeedback";
 import type {
   ChallengeOption,
   ResolutionDetails,
@@ -492,6 +493,23 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               )}
             </div>
           </div>
+
+          {/* Add BeatFeedback component after the beat text but before options */}
+          <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-4">
+            <div className="prose max-w-none">
+              {React.createElement(
+                ReactMarkdown as ComponentType<{
+                  children: string;
+                  breaks?: boolean;
+                }>,
+                { breaks: true, children: currentBeat.text }
+              )}
+            </div>
+
+            {/* Only show feedback after the player has made a choice for this beat */}
+            {currentBeat.choice !== -1 && <BeatFeedback />}
+          </div>
+
           {renderOptions()}
           {!isWaitingForNextBeat &&
             currentBeat.choice !== -1 &&

@@ -2,6 +2,7 @@ import { useSession } from "../hooks/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
+import { SidebarFeedbackButton } from "./SidebarFeedbackButton";
 import {
   ClientStat,
   StatValue,
@@ -160,6 +161,8 @@ export function GameLayout({
     // Common footer with title and exit button
     const renderFooter = () => (
       <div className="mt-4">
+        <SidebarFeedbackButton />
+
         <button
           onClick={onExitGame}
           className="w-full p-3 text-left rounded-lg transition-all duration-300
