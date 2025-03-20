@@ -250,6 +250,19 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     return false;
   };
 
+  // Check if feedback should be shown for the current beat
+  const shouldShowFeedback = () => {
+    if (!currentBeat) return false;
+
+    // Don't show feedback during waiting/loading states
+    if (isWaitingForNextBeat) return false;
+
+    // Don't show feedback for historical beats
+    if (!isViewingLatestBeat) return false;
+
+    return true;
+  };
+
   const renderOptions = () => {
     if (!currentBeat || storyState?.gameOver || isWaitingForNextBeat)
       return null;
@@ -382,26 +395,24 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             </div>
           </div>
 
-          {/* Display the selected choice */}
-          <div className="space-y-4">
-            <div className="mt-6 max-w-2xl mx-auto">
-              <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-primary">Choice: </span>
-                  <span className="text-primary">
-                    {currentBeat.options[currentBeat.choice].text}
-                  </span>
-                </div>
-              </div>
-            </div>
+          {/* Add feedback closer to options */}
+          <div className="mt-2 mb-4">
+            {shouldShowFeedback() && (
+              <BeatFeedback storyText={currentBeat.text} />
+            )}
           </div>
 
-          <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
-            <LoadingSpinner
-              size="small"
-              message="Generating next story beat..."
-            />
-          </div>
+          {renderOptions()}
+          {!isWaitingForNextBeat &&
+            currentBeat.choice !== -1 &&
+            storyState?.pendingPlayers?.length === 0 && (
+              <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
+                <LoadingSpinner
+                  size="small"
+                  message="Generating next story beat..."
+                />
+              </div>
+            )}
         </>
       );
     }
@@ -494,20 +505,11 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             </div>
           </div>
 
-          {/* Add BeatFeedback component after the beat text but before options */}
-          <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-4">
-            <div className="prose max-w-none">
-              {React.createElement(
-                ReactMarkdown as ComponentType<{
-                  children: string;
-                  breaks?: boolean;
-                }>,
-                { breaks: true, children: currentBeat.text }
-              )}
-            </div>
-
-            {/* Only show feedback after the player has made a choice for this beat */}
-            {currentBeat.choice !== -1 && <BeatFeedback />}
+          {/* Add feedback closer to options */}
+          <div className="mt-0">
+            {shouldShowFeedback() && (
+              <BeatFeedback storyText={currentBeat.text} />
+            )}
           </div>
 
           {renderOptions()}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSession } from "../../hooks/useSession.js";
 import { PrimaryButton } from "../ui/PrimaryButton.js";
 
@@ -11,8 +11,8 @@ interface FeedbackData {
   rating: FeedbackRating;
   comment: string;
   storyId?: string;
-  beatIndex?: number;
   contactInfo?: string;
+  storyText?: string;
 }
 
 interface FeedbackModalProps {
@@ -20,53 +20,7 @@ interface FeedbackModalProps {
   onClose: () => void;
   mode: "story-beat" | "general";
   initialRating?: FeedbackRating;
-}
-
-// Helper function to submit form in a CORS-compatible way
-function submitFormToGoogleScript(
-  url: string,
-  params: URLSearchParams
-): Promise<void> {
-  return new Promise<void>((resolve) => {
-    // Create a hidden iframe to avoid page redirect
-    const iframe = document.createElement("iframe");
-    iframe.name = "hidden_iframe";
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-
-    // Create a form element
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = url;
-    form.target = "hidden_iframe";
-
-    // Add form fields from URLSearchParams
-    for (const [key, value] of params.entries()) {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = key;
-      input.value = value.toString();
-      form.appendChild(input);
-    }
-
-    // Setup the iframe onload to resolve the promise
-    iframe.onload = () => {
-      // Clean up after a short delay to ensure the form submission completes
-      setTimeout(() => {
-        try {
-          document.body.removeChild(form);
-          document.body.removeChild(iframe);
-        } catch (e) {
-          console.warn("Failed to remove form elements:", e);
-        }
-        resolve();
-      }, 500);
-    };
-
-    // Add the form to the document and submit it
-    document.body.appendChild(form);
-    form.submit();
-  });
+  storyText?: string;
 }
 
 export function FeedbackModal({
@@ -74,6 +28,7 @@ export function FeedbackModal({
   onClose,
   mode,
   initialRating = null,
+  storyText,
 }: FeedbackModalProps) {
   const { storyState } = useSession();
 
@@ -88,15 +43,12 @@ export function FeedbackModal({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Compute current beat index
-  const playerSlotId = storyState?.players
-    ? Object.keys(storyState.players)[0]
-    : undefined;
-  const playerState = playerSlotId
-    ? storyState?.players[playerSlotId]
-    : undefined;
-  const beatHistory = playerState?.beatHistory || [];
-  const currentBeatIndex = beatHistory.length - 1;
+  // Update rating when initialRating changes
+  useEffect(() => {
+    if (initialRating) {
+      setRating(initialRating);
+    }
+  }, [initialRating]);
 
   // Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,9 +64,26 @@ export function FeedbackModal({
     };
 
     // Add story-specific data if in story beat mode
-    if (mode === "story-beat" && storyState) {
-      feedbackData.storyId = storyState.title;
-      feedbackData.beatIndex = currentBeatIndex;
+    if (mode === "story-beat") {
+      if (storyState) {
+        feedbackData.storyId = storyState.title;
+      }
+      if (storyText) {
+        // Truncate very long story text to avoid URL length issues
+        // For Google Apps Script, we need to keep this shorter than for regular APIs
+        // We need to make sure this text is properly formatted for transmission
+        const truncatedText = storyText.substring(0, 200); // Shorter is more reliable
+        feedbackData.storyText = truncatedText
+          .replace(/\r?\n/g, " ") // Replace newlines with spaces
+          .replace(/"/g, "'") // Replace double quotes with single quotes to avoid JSON issues
+          .trim();
+        console.log(
+          "Story text to be submitted (truncated):",
+          feedbackData.storyText
+        );
+      } else {
+        console.log("No story text available to submit");
+      }
     }
 
     try {
@@ -122,32 +91,60 @@ export function FeedbackModal({
       const scriptUrl =
         "https://script.google.com/macros/s/AKfycbzFmU6A6xWduf3jyzTwMwN3x1mvE5T5YABKJVMOG9p60KJs-zCOE7NKz1m6NJaV1oyK/exec";
 
-      // Create URLSearchParams for the request
+      // Instead of relying on the helper function, let's directly create a URLSearchParams object
+      // and make a direct GET request which tends to be more reliable with Google Apps Script
       const params = new URLSearchParams();
       params.append("feedbackType", feedbackData.type);
       if (feedbackData.rating) {
         params.append("rating", feedbackData.rating);
       }
       params.append("comments", feedbackData.comment);
-
       if (feedbackData.storyId) {
         params.append("storyId", feedbackData.storyId);
       }
-
-      if (feedbackData.beatIndex !== undefined) {
-        params.append("beatIndex", feedbackData.beatIndex.toString());
+      if (feedbackData.storyText) {
+        // Add the storyText as a URL parameter
+        params.append("storyText", feedbackData.storyText);
       }
-
       if (feedbackData.contactInfo) {
         params.append("contactInfo", feedbackData.contactInfo);
       }
 
-      // Use the form submission approach directly since it works reliably
-      await submitFormToGoogleScript(scriptUrl, params);
+      // Create a direct GET request with parameters in the URL
+      const getUrl = `${scriptUrl}?${params.toString()}`;
+      console.log(`Submitting GET request with length: ${getUrl.length}`);
+
+      // Use an image to make the request - this is a common way to make GET requests
+      // without triggering CORS issues
+      const img = new Image();
+      img.style.display = "none";
+      img.onload = () => console.log("Request succeeded");
+      img.onerror = () =>
+        console.log("Request completed with expected error (normal)");
+      document.body.appendChild(img);
+      img.src = getUrl;
+
       console.log("Feedback submitted successfully");
+
+      // Log the data being submitted
+      console.log("All submitted data:", {
+        feedbackType: feedbackData.type,
+        rating: feedbackData.rating,
+        comments: feedbackData.comment,
+        storyId: feedbackData.storyId,
+        storyText: feedbackData.storyText
+          ? feedbackData.storyText.substring(0, 50) + "..."
+          : undefined,
+        contactInfo: feedbackData.contactInfo,
+      });
 
       setIsSubmitted(true);
       setTimeout(() => {
+        // Clean up the image element
+        if (document.body.contains(img)) {
+          document.body.removeChild(img);
+        }
+
         onClose();
         setIsSubmitted(false);
         setRating(initialRating);
@@ -244,22 +241,19 @@ export function FeedbackModal({
           {/* Thumbs up/down in story-beat mode */}
           {mode === "story-beat" && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2 text-primary">
-                How do you feel about this story beat?
-              </label>
               <div className="flex gap-4 justify-center">
                 <button
                   type="button"
-                  className={`p-3 rounded-full transition-colors
+                  className={`w-12 h-12 flex items-center justify-center rounded-md shadow-sm border transition-all
                     ${
                       rating === "positive"
-                        ? "bg-secondary/20 text-secondary"
-                        : "text-gray-400 hover:text-secondary"
+                        ? "bg-white border-green-400 text-green-600 shadow"
+                        : "bg-white border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:shadow"
                     }`}
                   onClick={() => setRating("positive")}
                 >
                   <svg
-                    className="w-8 h-8"
+                    className="w-7 h-7"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -268,16 +262,16 @@ export function FeedbackModal({
                 </button>
                 <button
                   type="button"
-                  className={`p-3 rounded-full transition-colors
+                  className={`w-12 h-12 flex items-center justify-center rounded-md shadow-sm border transition-all
                     ${
                       rating === "negative"
-                        ? "bg-red-100 text-red-600"
-                        : "text-gray-400 hover:text-red-600"
+                        ? "bg-white border-red-400 text-red-600 shadow"
+                        : "bg-white border-gray-200 text-gray-400 hover:border-red-400 hover:text-red-600 hover:shadow"
                     }`}
                   onClick={() => setRating("negative")}
                 >
                   <svg
-                    className="w-8 h-8"
+                    className="w-7 h-7"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -291,9 +285,7 @@ export function FeedbackModal({
           {/* Comment field */}
           <div className="mb-4">
             <label className="block font-medium mb-2 text-primary">
-              {mode === "story-beat"
-                ? "Additional comments (optional)"
-                : "Your feedback"}
+              {mode === "story-beat" ? "Comments (optional)" : "Your feedback"}
             </label>
             <textarea
               className="w-full border rounded-lg p-2 h-24 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
@@ -301,6 +293,12 @@ export function FeedbackModal({
               onChange={(e) => setComment(e.target.value)}
               placeholder="The good and the bad"
             ></textarea>
+            {/* Leave comment section. We'll figure it out at some point.
+            {mode === "story-beat" && (
+              <p className="text-xs text-gray-500 mt-1">
+                The beat text will be included with your feedback
+              </p>
+            )} */}
           </div>
 
           {/* Contact info (only in general mode) */}
