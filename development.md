@@ -4,8 +4,6 @@ Smaller and more commits!
 
 Next
 
-Add feedback collection mechanism.
-
 For switch generation:
 previousTypesOfThreadsNotToBeRepeated: z
 .array(
@@ -24,6 +22,7 @@ z
 
 Resolution element improvements
 
+- rotating through smiley options, and bar only in expanded view?
 - line animation: calculate speed to land on the right spot, then move (with some deceleration toward the end)
 - display resolution animation in the previously selected option element (both in the generating beat view and the beginning of the next beat)
 - what about overall result in multiplayer beats?

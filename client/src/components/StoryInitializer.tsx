@@ -1,15 +1,15 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { useSession } from "../hooks/useSession.js";
+import { useSession } from "../hooks/useSession";
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   MIN_TURNS,
   MAX_TURNS,
   DEFAULT_TURNS,
-} from "shared/config.js";
-import { GameMode, GameModes } from "shared/types/story.js";
+} from "shared/config";
+import { GameMode, GameModes } from "shared/types/story";
 import { AppTitle } from "./AppTitle";
-import { LoadingSpinner } from "./ui/LoadingSpinner.js";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface StoryInitializerProps {
@@ -331,13 +331,13 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 checked={generateImages}
                 onChange={(e) => setGenerateImages(e.target.checked)}
                 className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-                disabled={isLoading}
+                disabled={true} // {isLoading}
               />
               <label
                 htmlFor="generate-images"
-                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
+                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary-400"
               >
-                Generate images for the story
+                With images (temporarily disabled)
               </label>
             </div>
 
