@@ -3,6 +3,7 @@ import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
 import { SidebarFeedbackButton } from "./SidebarFeedbackButton";
+import { FeedbackModal } from "./FeedbackModal";
 import {
   ClientStat,
   StatValue,
@@ -126,6 +127,7 @@ export function GameLayout({
   const { storyState } = useSession();
   const [showStats, setShowStats] = useState(false);
   const [showFluff, setShowFluff] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   if (!storyState) return null;
 
@@ -161,7 +163,10 @@ export function GameLayout({
     // Common footer with title and exit button
     const renderFooter = () => (
       <div className="mt-4">
-        <SidebarFeedbackButton />
+        <SidebarFeedbackButton
+          closeSidebarOnMobile={() => setShowStats(false)}
+          onOpenFeedbackModal={() => setIsFeedbackModalOpen(true)}
+        />
 
         <button
           onClick={onExitGame}
@@ -406,6 +411,13 @@ export function GameLayout({
           )}
         </main>
       </div>
+
+      {/* Feedback Modal at root level */}
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        mode="general"
+      />
     </div>
   );
 }
