@@ -100,10 +100,16 @@ Player agency in the form of a topic switch is valuable and should not be squand
 
 c) Decision. Justify your choice of using a flavor switch or a topic switch.
 
-Consider both player outcomes and shared outcomes throughout this process.`;
+Consider both player outcomes and shared outcomes throughout this process.
+
+2. Determine which types of threads have been used in the previous (up to) 10 beats
+
+This helps to avoid repeating similar types of threads, which would be boring.
+Do not create switch configurations that feature the same types of threads that have been used recently.
+`;
 
     if (story.isMultiplayer()) {
-      instructions += `\n\n2. Determine switch coordination between players
+      instructions += `\n3. Determine switch coordination between players
 
 a) Consider the game mode's implications
 ${

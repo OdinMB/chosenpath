@@ -92,6 +92,17 @@ export const createSwitchAnalysisSchema = (playerCount: PlayerCount) => {
   return z
     .object({
       ...switchPlayerAnalysisSchemas,
+      previousTypesOfThreadsNotToBeRepeated: z
+        .array(
+          z
+            .string()
+            .describe(
+              "Type of thread in one term. Examples: chase, eavesdropping, negotiation, fight, conversation, performance, romantic date, etc."
+            )
+        )
+        .describe(
+          "List of types of threads that have already been used in the previous (up to) 10 beats and should not be suggested as new threads in this switch configuration."
+        ),
       coordinationPatternAnalysis: z
         .string()
         .describe(
@@ -105,7 +116,7 @@ export const createSwitchAnalysisSchema = (playerCount: PlayerCount) => {
       switches: z
         .array(switchSchema)
         .describe(
-          "Overview of all switches and how players will be allocated to them."
+          "Overview of all switches and how players will be allocated to them. Don't repeat the same types of threads that have been used in recent beats."
         ),
     })
     .strict()

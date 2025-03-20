@@ -4,26 +4,12 @@ Smaller and more commits!
 
 Next
 
-For switch generation:
-previousTypesOfThreadsNotToBeRepeated: z
-.array(
-z
-.string()
-.describe(
-"Type of thread in one word. Examples: chase, eavesdropping, negotiation, fight, romantic date, performance, etc."
-)
-)
-.describe(
-"List of types of threads that have already been used in the previous 10 beats and should not be repeated with new threads."
-),
-
 - CoT schema attribute to list "show don't tell" elements for the beat.
 - Consideration to make 2-beat threads more likely
 
 Resolution element improvements
 
 - rotating through smiley options, and bar only in expanded view?
-- line animation: calculate speed to land on the right spot, then move (with some deceleration toward the end)
 - display resolution animation in the previously selected option element (both in the generating beat view and the beginning of the next beat)
 - what about overall result in multiplayer beats?
 - thread resolutions?
@@ -31,16 +17,18 @@ Resolution element improvements
 New features
 
 - Library of stories with pre-configured setups
-- Images: generate one for each player and story element and only use iamges from that list?
-- Difficulty level (affecting base points)
-- Allow users to see some option stats like risky/safe or even modifiers / final probability distribution. Costs more for later beats in a thread.
-- Prettier welcome/setup views with shifting images?
 - User accounts
   - Manage games
   - Invite specific account to a player slot
   - Game history
 - Credits system for generating stories
-- Stripe integration
+
+  - Stripe integration
+
+- Images: generate one for each player and story element and only use iamges from that list?
+- Difficulty level (affecting base points)
+- Allow users to see some option stats like risky/safe or even modifiers / final probability distribution. Costs more for later beats in a thread.
+- Prettier welcome/setup views with shifting images?
 - Dynamically add new outcomes, e.g. based on exploration threads.
 - Multiplaer mode: shared perspective
   - majority vote
@@ -49,7 +37,7 @@ New features
 - New switch type using this voting mechanism to decide which direction to take among several players (plus instructions for how to resolve draws)
 - Select language
   - different ones for different players
-- Include generic story music (identify right track for each story)
+- Include music (OpenAI's new API)
 - System to view/navigate save files
 
 Error resilience
