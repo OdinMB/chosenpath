@@ -291,7 +291,7 @@ export function FeedbackModal({
               className="w-full border rounded-lg p-2 h-24 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="The good and the bad"
+              placeholder="The good, the bad, ..."
             ></textarea>
             {/* Leave comment section. We'll figure it out at some point.
             {mode === "story-beat" && (

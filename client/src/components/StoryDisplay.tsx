@@ -349,10 +349,14 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     if (!prevBeat || prevBeat.choice === -1) return null;
 
+    // Check if this was a challenge beat that should animate
+    const selectedOption = prevBeat.options[prevBeat.choice];
+    const isChallengeBeat = selectedOption?.optionType === "challenge";
+
     return (
       <>
-        {/* Show the previous beat's choice with resolution if applicable */}
-        {renderPreviousChoice(prevBeatIndex, true)}
+        {/* Show the previous beat's choice with animation if it was a challenge */}
+        {renderPreviousChoice(prevBeatIndex, isChallengeBeat)}
 
         {/* Then show the skeleton for the next beat */}
         <div className="mt-6">
