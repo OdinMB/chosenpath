@@ -435,7 +435,7 @@ export const PreviousChoiceVisualizer: React.FC<
       <div
         className={`
           relative bg-white rounded-lg border-l-8 border border-secondary shadow-md
-          ${expanded ? "p-4 text-lg" : "p-2"} 
+          ${expanded ? "p-4 text-lg" : "p-2 px-3"} 
           ${!expanded && "cursor-pointer hover:shadow-lg transition-shadow"}
           ${expanded ? "w-full" : "inline-flex items-center justify-between"}
         `}
@@ -444,7 +444,7 @@ export const PreviousChoiceVisualizer: React.FC<
         {expanded ? (
           // Expanded layout
           <>
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 {/* Icon on the left - either path icon or emoji */}
                 <div className="flex-shrink-0">{getIconContent()}</div>
@@ -453,9 +453,9 @@ export const PreviousChoiceVisualizer: React.FC<
                 <span className="text-primary">{choice.text}</span>
               </div>
 
-              {/* Expand/collapse button */}
+              {/* Expand/collapse button - vertically centered */}
               <button
-                className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2"
+                className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2 self-center"
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpanded(false);
@@ -650,7 +650,7 @@ export const PreviousChoiceVisualizer: React.FC<
 
             {/* Always show expand button in collapsed view */}
             <button
-              className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2"
+              className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2 flex items-center"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(true);
