@@ -4,15 +4,8 @@ Smaller and more commits!
 
 Next
 
+- Make sure that story save files are persisted between deployments
 - CoT schema attribute to list "show don't tell" elements for the beat.
-- Consideration to make 2-beat threads more likely
-
-Resolution element improvements
-
-- rotating through smiley options, and bar only in expanded view?
-- display resolution animation in the previously selected option element (both in the generating beat view and the beginning of the next beat)
-- what about overall result in multiplayer beats?
-- thread resolutions?
 
 New features
 
@@ -26,6 +19,9 @@ New features
   - Stripe integration
 
 - Images: generate one for each player and story element and only use iamges from that list?
+- Resolution element improvements
+  - what about overall result in multiplayer beats?
+  - thread resolutions?
 - Difficulty level (affecting base points)
 - Allow users to see some option stats like risky/safe or even modifiers / final probability distribution. Costs more for later beats in a thread.
 - Prettier welcome/setup views with shifting images?
@@ -55,6 +51,7 @@ Improve stat setups and option definitions
 Other improvements
 
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
+- Consideration to make 2-beat threads more likely
 - Attach facts to players
 - adjust scope of story setup based on the number of beats
 - Have the equivalent of Story on the client side

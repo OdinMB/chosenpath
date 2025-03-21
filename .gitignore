@@ -32,9 +32,11 @@ boiler
 .vite
 .vite/**
 
-# Keep story_states folder but ignore contents
-data
-working files
+# Server data directories
+# Exclude story checkpoints (local development only)
+server/data/story_checkpoints/**
+# Exclude story JSON files but keep directory structure
+server/data/stories/*.json
 
 research.txt
 notes.txt
