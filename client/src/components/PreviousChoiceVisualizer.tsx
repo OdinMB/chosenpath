@@ -152,14 +152,37 @@ export const PreviousChoiceVisualizer: React.FC<
       const emojis = ["😀", "😐", "🙁"];
       let emojiIndex = 0;
 
+      // Get the final emoji once to ensure consistent value
+      const finalEmoji = getFinalEmoji();
+
       // Simple cycling with faster speed at start, slower at end
       const initialSpeed = 60; // Very fast cycling (reduced from 100)
       const endSpeed = 800; // Slow at the end
       const speedIncrement = 30; // Smaller increment for smoother transition
       let currentSpeed = initialSpeed;
+      const animationEndTime = Date.now() + 6000; // Total animation time (6s)
 
       // Function to update emoji
       const updateEmoji = () => {
+        const timeRemaining = animationEndTime - Date.now();
+
+        // If we're getting close to the end (remaining time < 2000ms, about 3 emoji cycles)
+        // and we're currently showing the final emoji, stop and keep this emoji
+        if (timeRemaining < 2000 && emojis[emojiIndex] === finalEmoji) {
+          setCurrentEmoji(finalEmoji);
+          return; // Exit early to stop the cycle and keep the final emoji
+        }
+
+        // If we're very close to the end (remaining time < 800ms, about 1 cycle)
+        // ensure we show the final emoji next
+        if (timeRemaining < 800) {
+          // Find index of final emoji
+          const finalIndex = emojis.indexOf(finalEmoji);
+          if (finalIndex !== -1) {
+            emojiIndex = finalIndex;
+          }
+        }
+
         // Update the emoji
         setCurrentEmoji(emojis[emojiIndex]);
 
@@ -186,7 +209,7 @@ export const PreviousChoiceVisualizer: React.FC<
 
         setIsAnimating(false);
         setShowEmoji(true);
-        setCurrentEmoji(getFinalEmoji());
+        setCurrentEmoji(finalEmoji);
 
         // Make sure marker animation is complete
         if (resolutionDetails?.roll !== undefined) {
