@@ -26,7 +26,7 @@ New features
 - Allow users to see some option stats like risky/safe or even modifiers / final probability distribution. Costs more for later beats in a thread.
 - Prettier welcome/setup views with shifting images?
 - Dynamically add new outcomes, e.g. based on exploration threads.
-- Multiplaer mode: shared perspective
+- Multiplayer mode: shared perspective
   - majority vote
   - lottery
   - setting for % players who must have voted to continue)

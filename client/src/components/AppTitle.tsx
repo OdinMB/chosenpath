@@ -94,8 +94,9 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-10 px-6 py-4 bg-white text-primary text-sm rounded-md shadow-lg z-10 animate-fadeIn border border-primary-100 w-72 md:w-96">
             <div className="text-left">
               Step into an <strong>interactive story</strong> where your choices
-              shape the journey. <strong>Play solo or with friends</strong> and
-              create unforgettable adventures, any time.
+              shape the journey. <strong>Play solo or with friends</strong>.
+              Create the stories you want, from space westerns to time travel
+              romances.
             </div>
           </div>
         )}
