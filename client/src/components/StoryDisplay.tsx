@@ -4,7 +4,7 @@ import { BeatHistory } from "./BeatHistory";
 import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
 import { LoadingSpinner } from "./ui/LoadingSpinner";
-import { ChallengeResolutionVisualizer } from "./ChallengeResolutionVisualizer";
+import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { BeatFeedback } from "./feedback/BeatFeedback";
 import { SkeletonBeat } from "./ui/SkeletonBeat";
 import type {
@@ -278,33 +278,57 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     );
   };
 
-  // Helper function to render a locked-in choice
+  // Helper function to render a previous beat's choice using the PreviousChoiceVisualizer
+  const renderPreviousChoice = (
+    prevBeatIndex: number,
+    animateRoll: boolean = false
+  ) => {
+    if (prevBeatIndex < 0 || prevBeatIndex >= beatHistory.length) return null;
+
+    const prevBeat = beatHistory[prevBeatIndex];
+    if (!prevBeat || prevBeat.choice === -1) return null;
+
+    const selectedOption = prevBeat.options[prevBeat.choice];
+
+    // Check if there's resolution details for challenge beats
+    let resolutionDetails;
+    if (
+      selectedOption.optionType === "challenge" &&
+      prevBeat.resolution &&
+      prevBeat.resolutionDetails
+    ) {
+      resolutionDetails = enhanceResolutionDetails(
+        prevBeat.resolutionDetails,
+        selectedOption as ChallengeOption,
+        prevBeatIndex + 1 // Add 1 because beat index is 0-based but display is 1-based
+      );
+    }
+
+    return (
+      <PreviousChoiceVisualizer
+        choice={selectedOption}
+        resolution={prevBeat.resolution || undefined}
+        resolutionDetails={resolutionDetails}
+        animateRoll={animateRoll}
+      />
+    );
+  };
+
+  // Helper function to render a locked-in choice (only for current beat)
   const renderLockedInChoice = (
     beat: {
       options: Array<{ text: string }>;
       choice: number;
     },
-    choiceIndex: number,
-    isPreviousBeat: boolean = false
+    choiceIndex: number
   ) => {
     if (choiceIndex === -1 || !beat || !beat.options) return null;
 
     return (
       <div className="space-y-4">
-        <div
-          className={`${
-            isPreviousBeat ? "mt-1 mb-3" : "mt-6"
-          } max-w-2xl mx-auto`}
-        >
-          <div
-            className={`bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md ${
-              isPreviousBeat ? "text-sm" : "text-lg"
-            }`}
-          >
-            <div className="flex items-start gap-2">
-              {isPreviousBeat && (
-                <span className="font-bold text-primary">↑ </span>
-              )}
+        <div className="mt-6 max-w-2xl mx-auto">
+          <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
+            <div className="flex items-start">
               <span className="text-primary">
                 {beat.options[choiceIndex].text}
               </span>
@@ -313,45 +337,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         </div>
       </div>
     );
-  };
-
-  // Helper to render a resolution from a previous beat
-  const renderPreviousBeatResolution = (
-    prevBeatIndex: number,
-    animateRoll: boolean = false
-  ) => {
-    if (prevBeatIndex < 0 || prevBeatIndex >= beatHistory.length) return null;
-
-    const prevBeat = beatHistory[prevBeatIndex];
-
-    // Check if previous beat had a challenge resolution
-    if (
-      prevBeat &&
-      prevBeat.resolution &&
-      prevBeat.resolutionDetails &&
-      prevBeat.choice !== -1 &&
-      prevBeat.options[prevBeat.choice].optionType === "challenge"
-    ) {
-      const prevOption = prevBeat.options[prevBeat.choice] as ChallengeOption;
-      const enhancedDetails = enhanceResolutionDetails(
-        prevBeat.resolutionDetails,
-        prevOption,
-        prevBeatIndex + 1 // Add 1 because beat index is 0-based but display is 1-based
-      );
-
-      return (
-        <div className="my-4 max-w-2xl mx-auto">
-          <ChallengeResolutionVisualizer
-            resolutionDetails={enhancedDetails}
-            resolution={prevBeat.resolution}
-            option={prevOption}
-            animateRoll={animateRoll}
-          />
-        </div>
-      );
-    }
-
-    return null;
   };
 
   // Render a placeholder for the next beat
@@ -366,22 +351,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     return (
       <>
-        {/* First show the choice from the previous beat */}
-        {renderLockedInChoice(prevBeat, prevBeat.choice, true)}
-
-        {/* Then show the resolution if it was a challenge beat */}
-        {prevBeat.resolution &&
-          prevBeat.resolutionDetails &&
-          prevBeat.options[prevBeat.choice].optionType === "challenge" &&
-          renderPreviousBeatResolution(prevBeatIndex, true)}
-
-        {/* Show loading spinner above the skeleton */}
-        <div className="flex items-center justify-center gap-2 mt-6 mb-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
-          <LoadingSpinner
-            size="small"
-            message="Generating next story beat..."
-          />
-        </div>
+        {/* Show the previous beat's choice with resolution if applicable */}
+        {renderPreviousChoice(prevBeatIndex, true)}
 
         {/* Then show the skeleton for the next beat */}
         <div className="mt-6">
@@ -404,25 +375,14 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         ? beatHistory[displayedBeatIndex]
         : null;
 
-    // Get the previous beat to show its choice at the top
-    const prevBeat =
-      displayedBeatIndex !== null && displayedBeatIndex > 0
-        ? beatHistory[displayedBeatIndex - 1]
-        : null;
-
     // Normal beat display
     if (currentBeat && storyState) {
       return (
         <>
           {/* Show previous beat's choice at the top if it exists */}
-          {prevBeat &&
-            prevBeat.choice !== -1 &&
-            renderLockedInChoice(prevBeat, prevBeat.choice, true)}
-
-          {/* Show resolution from previous beat if applicable */}
           {displayedBeatIndex !== null &&
             displayedBeatIndex > 0 &&
-            renderPreviousBeatResolution(displayedBeatIndex - 1)}
+            renderPreviousChoice(displayedBeatIndex - 1)}
 
           {displayedBeatIndex === 0 && (
             <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 text-primary">
