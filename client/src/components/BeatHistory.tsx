@@ -1,14 +1,19 @@
 interface BeatHistoryProps {
   currentBeatIndex: number;
   totalBeats: number;
+  pendingBeat: boolean;
   onBeatChange: (index: number) => void;
 }
 
 export function BeatHistory({
   currentBeatIndex,
   totalBeats,
+  pendingBeat,
   onBeatChange,
 }: BeatHistoryProps) {
+  // Total count including pending beat
+  const displayTotalBeats = pendingBeat ? totalBeats + 1 : totalBeats;
+
   return (
     <div className="py-2">
       <div className="flex items-center justify-center space-x-4">
@@ -34,12 +39,12 @@ export function BeatHistory({
         </button>
 
         <span className="text-sm text-primary-600">
-          Beat {currentBeatIndex + 1} of {totalBeats}
+          Beat {currentBeatIndex + 1} of {displayTotalBeats}
         </span>
 
         <button
           onClick={() => onBeatChange(currentBeatIndex + 1)}
-          disabled={currentBeatIndex === totalBeats - 1}
+          disabled={currentBeatIndex >= displayTotalBeats - 1}
           className="p-2 rounded-lg disabled:opacity-50 hover:bg-primary-50 text-primary"
           aria-label="Next beat"
         >

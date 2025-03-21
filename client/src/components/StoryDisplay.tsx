@@ -161,6 +161,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     if (currentBeatCount !== previousBeatCount) {
       setLocalSelectedChoice(undefined);
       setPreviousBeatCount(currentBeatCount);
+
       // If we were showing a placeholder, keep displaying the latest beat
       if (showNextBeatPlaceholder) {
         setDisplayedBeatIndex(currentBeatCount - 1);
@@ -517,6 +518,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           <BeatHistory
             currentBeatIndex={displayedBeatIndex || 0}
             totalBeats={beatHistory.length}
+            pendingBeat={showNextBeatPlaceholder}
             onBeatChange={setDisplayedBeatIndex}
           />
         )}
