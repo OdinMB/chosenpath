@@ -431,25 +431,37 @@ export const PreviousChoiceVisualizer: React.FC<
   };
 
   return (
-    <div className="max-w-2xl mx-auto mb-4">
-      <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
-        <div className="flex justify-between">
-          <div className="flex items-center gap-3">
-            {/* Icon on the left - either path icon or emoji */}
-            <div className="flex-shrink-0">{getIconContent()}</div>
+    <div className="max-w-2xl mx-auto mb-4 flex justify-center">
+      <div
+        className={`
+          relative bg-white rounded-lg border-l-8 border border-secondary shadow-md
+          ${expanded ? "p-4 text-lg" : "p-2"} 
+          ${!expanded && "cursor-pointer hover:shadow-lg transition-shadow"}
+          ${expanded ? "w-full" : "inline-flex items-center justify-between"}
+        `}
+        onClick={!expanded ? () => setExpanded(true) : undefined}
+      >
+        {expanded ? (
+          // Expanded layout
+          <>
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                {/* Icon on the left - either path icon or emoji */}
+                <div className="flex-shrink-0">{getIconContent()}</div>
 
-            {/* Choice text */}
-            <span className="text-primary">{choice.text}</span>
-          </div>
+                {/* Choice text */}
+                <span className="text-primary">{choice.text}</span>
+              </div>
 
-          {/* Expand/collapse button for challenge choices */}
-          {isChallenge && resolutionDetails && resolution && (
-            <button
-              className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2"
-              onClick={() => setExpanded(!expanded)}
-              aria-label={expanded ? "Collapse details" : "Expand details"}
-            >
-              {expanded ? (
+              {/* Expand/collapse button */}
+              <button
+                className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded(false);
+                }}
+                aria-label="Collapse details"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-5 w-5"
@@ -462,180 +474,203 @@ export const PreviousChoiceVisualizer: React.FC<
                     clipRule="evenodd"
                   />
                 </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Expanded view for challenge resolution */}
-        {expanded && isChallenge && resolutionDetails && resolution && (
-          <div className="mt-3">
-            <div className="max-w-md mx-auto">
-              {/* Distribution bar */}
-              <div className="relative h-5 rounded-lg overflow-hidden shadow-inner flex z-0 w-full mb-2">
-                {/* Favorable segment */}
-                {resolutionDetails.distribution.favorable > 0 && (
-                  <BarSegment
-                    width={resolutionDetails.distribution.favorable}
-                    color={getColor("favorable")}
-                    isHighlighted={resolution === "favorable"}
-                    isLast={
-                      resolutionDetails.distribution.mixed === 0 &&
-                      resolutionDetails.distribution.unfavorable === 0
-                    }
-                    tooltipText={`${resolutionDetails.distribution.favorable}%`}
-                    emojiIcon="😀"
-                  />
-                )}
-
-                {/* Mixed segment */}
-                {resolutionDetails.distribution.mixed > 0 && (
-                  <BarSegment
-                    width={resolutionDetails.distribution.mixed}
-                    color={getColor("mixed")}
-                    isHighlighted={resolution === "mixed"}
-                    isLast={resolutionDetails.distribution.unfavorable === 0}
-                    tooltipText={`${resolutionDetails.distribution.mixed}%`}
-                    emojiIcon="😐"
-                  />
-                )}
-
-                {/* Unfavorable segment */}
-                {resolutionDetails.distribution.unfavorable > 0 && (
-                  <BarSegment
-                    width={resolutionDetails.distribution.unfavorable}
-                    color={getColor("unfavorable")}
-                    isHighlighted={resolution === "unfavorable"}
-                    isLast={true}
-                    tooltipText={`${resolutionDetails.distribution.unfavorable}%`}
-                    emojiIcon="🙁"
-                  />
-                )}
-
-                {/* Cursor for roll position */}
-                {resolutionDetails.roll !== undefined && (
-                  <div
-                    className="absolute"
-                    style={{
-                      left: `${
-                        animatingMarker
-                          ? currentMarkerPosition
-                          : resolutionDetails.roll
-                      }%`,
-                      height: "calc(100% + 8px)",
-                      top: "-4px", // Extend 4px above
-                      width: "1.5px",
-                      backgroundColor: "black",
-                      transform: "translateX(-0.75px)",
-                      zIndex: 5,
-                      pointerEvents: "none",
-                      transition: animatingMarker
-                        ? "none"
-                        : "left 0.3s ease-out",
-                    }}
-                  >
-                    {/* Top horizontal line of cursor */}
-                    <div
-                      className="absolute top-0 bg-black"
-                      style={{
-                        width: "3px",
-                        height: "1.5px",
-                        left: "-0.75px",
-                        pointerEvents: "none",
-                      }}
-                    ></div>
-
-                    {/* Bottom horizontal line of cursor */}
-                    <div
-                      className="absolute bottom-0 bg-black"
-                      style={{
-                        width: "3px",
-                        height: "1.5px",
-                        left: "-0.75px",
-                        pointerEvents: "none",
-                      }}
-                    ></div>
-                  </div>
-                )}
-              </div>
-
-              {/* Info row with Risk, Resource Type, and Points */}
-              <div className="flex flex-wrap justify-between text-sm gap-4">
-                <div className="flex items-baseline">
-                  <span className="font-semibold text-primary mr-1">Risk:</span>
-                  <span className="text-primary flex items-center">
-                    <span>{getRiskDisplayText(choice.riskType)}</span>
-                    <InfoIcon
-                      tooltipText={formatRiskDistribution(choice.riskType)}
-                    />
-                  </span>
-                </div>
-
-                {choice.resourceType && choice.resourceType !== "normal" ? (
-                  <div className="flex items-baseline">
-                    <span className="font-semibold text-primary mr-1 capitalize">
-                      {choice.resourceType}:
-                    </span>
-                    <InfoIcon
-                      tooltipText={getResourceTypeInfo(choice.resourceType)}
-                    />
-                  </div>
-                ) : (
-                  resolutionDetails?.points !== undefined && (
-                    <div className="flex items-baseline">
-                      <span className="font-semibold text-primary mr-1">
-                        {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
-                      </span>
-                      <span className="text-primary mr-1">
-                        {resolutionDetails.points}
-                      </span>
-                      {resolutionDetails.readablePointModifiers &&
-                        resolutionDetails.readablePointModifiers.length > 0 && (
-                          <InfoIcon
-                            tooltipText={formatPointBreakdown()}
-                            contentClassName="max-w-[400px]"
-                          />
-                        )}
-                    </div>
-                  )
-                )}
-
-                {/* Only show points in third column if resource type exists */}
-                {choice.resourceType &&
-                  choice.resourceType !== "normal" &&
-                  resolutionDetails?.points !== undefined && (
-                    <div className="flex items-baseline">
-                      <span className="font-semibold text-primary mr-1">
-                        {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
-                      </span>
-                      <span className="text-primary mr-1">
-                        {resolutionDetails.points}
-                      </span>
-                      {resolutionDetails.readablePointModifiers &&
-                        resolutionDetails.readablePointModifiers.length > 0 && (
-                          <InfoIcon
-                            tooltipText={formatPointBreakdown()}
-                            contentClassName="max-w-[400px]"
-                          />
-                        )}
-                    </div>
-                  )}
-              </div>
+              </button>
             </div>
-          </div>
+
+            {/* Expanded view for challenge resolution */}
+            {isChallenge && resolutionDetails && resolution && (
+              <div className="mt-3">
+                <div className="max-w-md mx-auto">
+                  {/* Distribution bar */}
+                  <div className="relative h-5 rounded-lg overflow-hidden shadow-inner flex z-0 w-full mb-2">
+                    {/* Favorable segment */}
+                    {resolutionDetails.distribution.favorable > 0 && (
+                      <BarSegment
+                        width={resolutionDetails.distribution.favorable}
+                        color={getColor("favorable")}
+                        isHighlighted={resolution === "favorable"}
+                        isLast={
+                          resolutionDetails.distribution.mixed === 0 &&
+                          resolutionDetails.distribution.unfavorable === 0
+                        }
+                        tooltipText={`${resolutionDetails.distribution.favorable}%`}
+                        emojiIcon="😀"
+                      />
+                    )}
+
+                    {/* Mixed segment */}
+                    {resolutionDetails.distribution.mixed > 0 && (
+                      <BarSegment
+                        width={resolutionDetails.distribution.mixed}
+                        color={getColor("mixed")}
+                        isHighlighted={resolution === "mixed"}
+                        isLast={
+                          resolutionDetails.distribution.unfavorable === 0
+                        }
+                        tooltipText={`${resolutionDetails.distribution.mixed}%`}
+                        emojiIcon="😐"
+                      />
+                    )}
+
+                    {/* Unfavorable segment */}
+                    {resolutionDetails.distribution.unfavorable > 0 && (
+                      <BarSegment
+                        width={resolutionDetails.distribution.unfavorable}
+                        color={getColor("unfavorable")}
+                        isHighlighted={resolution === "unfavorable"}
+                        isLast={true}
+                        tooltipText={`${resolutionDetails.distribution.unfavorable}%`}
+                        emojiIcon="🙁"
+                      />
+                    )}
+
+                    {/* Cursor for roll position */}
+                    {resolutionDetails.roll !== undefined && (
+                      <div
+                        className="absolute"
+                        style={{
+                          left: `${
+                            animatingMarker
+                              ? currentMarkerPosition
+                              : resolutionDetails.roll
+                          }%`,
+                          height: "calc(100% + 8px)",
+                          top: "-4px", // Extend 4px above
+                          width: "1.5px",
+                          backgroundColor: "black",
+                          transform: "translateX(-0.75px)",
+                          zIndex: 5,
+                          pointerEvents: "none",
+                          transition: animatingMarker
+                            ? "none"
+                            : "left 0.3s ease-out",
+                        }}
+                      >
+                        {/* Top horizontal line of cursor */}
+                        <div
+                          className="absolute top-0 bg-black"
+                          style={{
+                            width: "3px",
+                            height: "1.5px",
+                            left: "-0.75px",
+                            pointerEvents: "none",
+                          }}
+                        ></div>
+
+                        {/* Bottom horizontal line of cursor */}
+                        <div
+                          className="absolute bottom-0 bg-black"
+                          style={{
+                            width: "3px",
+                            height: "1.5px",
+                            left: "-0.75px",
+                            pointerEvents: "none",
+                          }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info row with Risk, Resource Type, and Points */}
+                  <div className="flex flex-wrap justify-between text-sm gap-4">
+                    <div className="flex items-baseline">
+                      <span className="font-semibold text-primary mr-1">
+                        Risk:
+                      </span>
+                      <span className="text-primary flex items-center">
+                        <span>{getRiskDisplayText(choice.riskType)}</span>
+                        <InfoIcon
+                          tooltipText={formatRiskDistribution(choice.riskType)}
+                        />
+                      </span>
+                    </div>
+
+                    {choice.resourceType && choice.resourceType !== "normal" ? (
+                      <div className="flex items-baseline">
+                        <span className="font-semibold text-primary mr-1 capitalize">
+                          {choice.resourceType}:
+                        </span>
+                        <InfoIcon
+                          tooltipText={getResourceTypeInfo(choice.resourceType)}
+                        />
+                      </div>
+                    ) : (
+                      resolutionDetails?.points !== undefined && (
+                        <div className="flex items-baseline">
+                          <span className="font-semibold text-primary mr-1">
+                            {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
+                          </span>
+                          <span className="text-primary mr-1">
+                            {resolutionDetails.points}
+                          </span>
+                          {resolutionDetails.readablePointModifiers &&
+                            resolutionDetails.readablePointModifiers.length >
+                              0 && (
+                              <InfoIcon
+                                tooltipText={formatPointBreakdown()}
+                                contentClassName="max-w-[400px]"
+                              />
+                            )}
+                        </div>
+                      )
+                    )}
+
+                    {/* Only show points in third column if resource type exists */}
+                    {choice.resourceType &&
+                      choice.resourceType !== "normal" &&
+                      resolutionDetails?.points !== undefined && (
+                        <div className="flex items-baseline">
+                          <span className="font-semibold text-primary mr-1">
+                            {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
+                          </span>
+                          <span className="text-primary mr-1">
+                            {resolutionDetails.points}
+                          </span>
+                          {resolutionDetails.readablePointModifiers &&
+                            resolutionDetails.readablePointModifiers.length >
+                              0 && (
+                              <InfoIcon
+                                tooltipText={formatPointBreakdown()}
+                                contentClassName="max-w-[400px]"
+                              />
+                            )}
+                        </div>
+                      )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          // Collapsed view with icon and expand button
+          <>
+            <div className="flex-shrink-0 flex items-center justify-center w-12 h-12">
+              {getIconContent()}
+            </div>
+
+            {/* Always show expand button in collapsed view */}
+            <button
+              className="flex-shrink-0 text-primary-500 hover:text-primary focus:outline-none ml-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(true);
+              }}
+              aria-label="Expand details"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </>
         )}
       </div>
     </div>
