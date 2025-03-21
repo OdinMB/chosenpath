@@ -13,7 +13,17 @@ export class GameWebSocketServer {
   constructor(server: http.Server) {
     this.io = new Server(server, {
       cors: {
-        origin: config.corsOrigin,
+        origin: (origin, callback) => {
+          // Allow requests with no origin
+          if (!origin) return callback(null, true);
+
+          // Check if the origin is in the allowed list
+          if (config.corsOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+          }
+
+          callback(new Error("Not allowed by CORS"));
+        },
         methods: ["GET", "POST"],
       },
       path: "/socket.io",
