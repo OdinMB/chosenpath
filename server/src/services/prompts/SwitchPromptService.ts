@@ -39,7 +39,7 @@ export class SwitchPromptService {
         story,
         this.SECTIONS_PREVIOUS_THREAD
       );
-    console.log("\x1b[36m%s\x1b[0m", prompt);
+    // console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 

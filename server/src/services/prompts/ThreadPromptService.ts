@@ -36,7 +36,7 @@ export class ThreadPromptService {
         story,
         this.SECTIONS_SWITCH
       );
-    console.log("\x1b[36m%s\x1b[0m", prompt);
+    // console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 

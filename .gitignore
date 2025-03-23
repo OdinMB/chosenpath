@@ -35,6 +35,8 @@ boiler
 # Server data directories
 # Exclude story checkpoints (local development only)
 server/data/story_checkpoints/**
+# Exclude story mocks (local development only)
+server/data/mocks/**
 # Exclude story JSON files but keep directory structure
 server/data/stories/*.json
 

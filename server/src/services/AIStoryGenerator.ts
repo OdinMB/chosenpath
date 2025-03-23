@@ -32,10 +32,17 @@ import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { PLAYER_SLOTS } from "shared/types/player.js";
 import { Story } from "./Story.js";
 import { PlayerState } from "shared/types/story.js";
+import {
+  MOCK_STORIES_IN_DEVELOPMENT,
+  MOCK_STORIES_DELAY_MS,
+} from "shared/config.js";
+import fs from "fs";
+import path from "path";
 dotenv.config();
 
 export class AIStoryGenerator {
   private model: ChatOpenAI;
+  private mockStoriesDir: string;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
@@ -48,6 +55,8 @@ export class AIStoryGenerator {
       modelName: "gpt-4o",
       temperature: 0.4,
     });
+
+    this.mockStoriesDir = path.join(process.cwd(), "data", "mocks");
   }
 
   private getDefaultStatValue(statType: string): number | string | string[] {
@@ -153,6 +162,40 @@ export class AIStoryGenerator {
     gameMode: GameMode,
     maxTurns: number
   ): Promise<StorySetup<typeof playerCount>> {
+    // Create a filename based on the parameters
+    const mockStoriesEnabled =
+      process.env.NODE_ENV === "development" && MOCK_STORIES_IN_DEVELOPMENT;
+    const mockFilename = `story_setup_${playerCount}_${gameMode}.json`;
+    const mockFilePath = path.join(this.mockStoriesDir, mockFilename);
+
+    // If mock stories are enabled, try to read from file
+    if (mockStoriesEnabled) {
+      console.log(
+        `Using mock story setup with playerCount: ${playerCount}, gameMode: ${gameMode}`
+      );
+
+      // Simulate API delay
+      await new Promise((resolve) =>
+        setTimeout(resolve, MOCK_STORIES_DELAY_MS)
+      );
+
+      try {
+        // Check if mock file exists
+        if (fs.existsSync(mockFilePath)) {
+          console.log(`Reading mock story from ${mockFilePath}`);
+          const mockData = JSON.parse(fs.readFileSync(mockFilePath, "utf8"));
+          return mockData as StorySetup<typeof playerCount>;
+        } else {
+          console.log(
+            `Mock file ${mockFilePath} not found. Generating new story.`
+          );
+        }
+      } catch (error) {
+        console.error(`Error reading mock file: ${error}`);
+      }
+    }
+
+    // Generate a new story setup using the LLM
     const schema = createStorySetupSchema(playerCount);
     const structuredModel = this.model.withStructuredOutput(schema);
 
@@ -168,6 +211,17 @@ export class AIStoryGenerator {
 
       const result = await structuredModel.invoke(setupPrompt);
       console.log("Raw response:", JSON.stringify(result, null, 2));
+
+      // If mock stories are enabled, save the result to a file for later use
+      if (mockStoriesEnabled) {
+        try {
+          fs.writeFileSync(mockFilePath, JSON.stringify(result, null, 2));
+          console.log(`Saved mock story to ${mockFilePath}`);
+        } catch (error) {
+          console.error(`Error saving mock file: ${error}`);
+        }
+      }
+
       return result as StorySetup<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
