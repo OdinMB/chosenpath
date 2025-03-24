@@ -36,13 +36,12 @@ import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
 } from "shared/config.js";
-import fs from "fs";
-import path from "path";
+import { readStorageFile, writeStorageFile } from "../utils/storageUtils.js";
+
 dotenv.config();
 
 export class AIStoryGenerator {
   private model: ChatOpenAI;
-  private mockStoriesDir: string;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
@@ -55,8 +54,6 @@ export class AIStoryGenerator {
       modelName: "gpt-4o",
       temperature: 0.4,
     });
-
-    this.mockStoriesDir = path.join(process.cwd(), "data", "mocks");
   }
 
   private getDefaultStatValue(statType: string): number | string | string[] {
@@ -166,7 +163,6 @@ export class AIStoryGenerator {
     const mockStoriesEnabled =
       process.env.NODE_ENV === "development" && MOCK_STORIES_IN_DEVELOPMENT;
     const mockFilename = `story_setup_${playerCount}_${gameMode}.json`;
-    const mockFilePath = path.join(this.mockStoriesDir, mockFilename);
 
     // If mock stories are enabled, try to read from file
     if (mockStoriesEnabled) {
@@ -180,18 +176,18 @@ export class AIStoryGenerator {
       );
 
       try {
-        // Check if mock file exists
-        if (fs.existsSync(mockFilePath)) {
-          console.log(`Reading mock story from ${mockFilePath}`);
-          const mockData = JSON.parse(fs.readFileSync(mockFilePath, "utf8"));
-          return mockData as StorySetup<typeof playerCount>;
-        } else {
-          console.log(
-            `Mock file ${mockFilePath} not found. Generating new story.`
-          );
-        }
+        // Try to read the mock file
+        const mockData = await readStorageFile("mocks", mockFilename);
+        console.log(`Reading mock story from ${mockFilename}`);
+        return JSON.parse(mockData) as StorySetup<typeof playerCount>;
       } catch (error) {
-        console.error(`Error reading mock file: ${error}`);
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          console.log(
+            `Mock file ${mockFilename} not found. Generating new story.`
+          );
+        } else {
+          console.error(`Error reading mock file: ${error}`);
+        }
       }
     }
 
@@ -215,8 +211,12 @@ export class AIStoryGenerator {
       // If mock stories are enabled, save the result to a file for later use
       if (mockStoriesEnabled) {
         try {
-          fs.writeFileSync(mockFilePath, JSON.stringify(result, null, 2));
-          console.log(`Saved mock story to ${mockFilePath}`);
+          await writeStorageFile(
+            "mocks",
+            mockFilename,
+            JSON.stringify(result, null, 2)
+          );
+          console.log(`Saved mock story to ${mockFilename}`);
         } catch (error) {
           console.error(`Error saving mock file: ${error}`);
         }

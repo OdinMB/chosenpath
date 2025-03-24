@@ -1,41 +1,28 @@
-import { promises as fs } from "fs";
 import path from "path";
 import { connectionManager } from "./ConnectionManager.js";
 import type { StoryState } from "shared/types/story.js";
 import { Story } from "./Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import { Logger } from "../utils/logger.js";
+import {
+  readStorageFile,
+  writeStorageFile,
+  listStorageFiles,
+  deleteStorageFile,
+  getStorageFileStats,
+} from "../utils/storageUtils.js";
 
 export class StoryRepository {
   private static instance: StoryRepository;
   private storyStates: Map<string, Story> = new Map();
-  private storageDir: string;
 
-  private constructor() {
-    this.storageDir = path.join(process.cwd(), "data", "stories");
-    this.ensureStorageDir();
-  }
+  private constructor() {}
 
   public static getInstance(): StoryRepository {
     if (!StoryRepository.instance) {
       StoryRepository.instance = new StoryRepository();
     }
     return StoryRepository.instance;
-  }
-
-  private async ensureStorageDir() {
-    try {
-      await fs.mkdir(this.storageDir, { recursive: true });
-    } catch (error) {
-      Logger.StoryRepository.error(
-        "Failed to create storage directory:",
-        error
-      );
-    }
-  }
-
-  private getFilePath(storyId: string): string {
-    return path.join(this.storageDir, `${storyId}.json`);
   }
 
   async getStory(storyId: string): Promise<Story | null> {
@@ -53,10 +40,7 @@ export class StoryRepository {
 
     // If not in memory, try loading from file
     try {
-      const filePath = this.getFilePath(storyId);
-      Logger.StoryRepository.log("Reading from:", filePath);
-
-      const data = await fs.readFile(filePath, "utf-8");
+      const data = await readStorageFile("stories", `${storyId}.json`);
       const state = JSON.parse(data) as StoryState;
 
       Logger.StoryRepository.log("Successfully loaded state from file");
@@ -117,9 +101,12 @@ export class StoryRepository {
     // Update memory cache
     this.storyStates.set(storyId, storyCopy);
 
-    // Write to file
-    const filePath = this.getFilePath(storyId);
-    await fs.writeFile(filePath, JSON.stringify(state, null, 2));
+    // Write to file using the utility function
+    await writeStorageFile(
+      "stories",
+      `${storyId}.json`,
+      JSON.stringify(state, null, 2)
+    );
   }
 
   async deleteStory(storyId: string): Promise<void> {
@@ -127,9 +114,8 @@ export class StoryRepository {
       // Remove from memory cache
       this.storyStates.delete(storyId);
 
-      // Remove file
-      const filePath = this.getFilePath(storyId);
-      await fs.unlink(filePath);
+      // Remove file using the utility function
+      await deleteStorageFile("stories", `${storyId}.json`);
 
       Logger.StoryRepository.log("Successfully deleted state:", storyId);
     } catch (error) {
@@ -141,20 +127,22 @@ export class StoryRepository {
   // Helper method to clean up completed or abandoned stories
   async cleanupStories(): Promise<void> {
     try {
-      const files = await fs.readdir(this.storageDir);
+      const files = await listStorageFiles("stories");
 
       for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+
         const storyId = path.parse(file).name;
         const activePlayers = connectionManager.getActivePlayersInGame(storyId);
 
         // If no active players and story is old, delete it
         if (activePlayers.length === 0) {
-          const filePath = this.getFilePath(storyId);
-          const stats = await fs.stat(filePath);
-          const ageInHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
+          const stats = await getStorageFileStats("stories", file);
+          const ageInHours =
+            (Date.now() - Number(stats.mtimeMs)) / (1000 * 60 * 60);
 
-          if (ageInHours > 24) {
-            // Delete stories older than 24 hours
+          if (ageInHours > 72) {
+            // Delete stories older than 72 hours
             await this.deleteStory(storyId);
           }
         }
@@ -186,7 +174,7 @@ export class StoryRepository {
   // Add this method to load all existing stories on startup
   async loadExistingStories(): Promise<void> {
     try {
-      const files = await fs.readdir(this.storageDir);
+      const files = await listStorageFiles("stories");
       Logger.StoryRepository.log("Loading existing stories...");
 
       for (const file of files) {
@@ -194,10 +182,7 @@ export class StoryRepository {
 
         const storyId = path.parse(file).name;
         try {
-          const data = await fs.readFile(
-            path.join(this.storageDir, file),
-            "utf-8"
-          );
+          const data = await readStorageFile("stories", file);
           const state = JSON.parse(data) as StoryState;
           const story = new Story(state);
           this.storyStates.set(storyId, story);
@@ -230,7 +215,7 @@ export class StoryRepository {
     Logger.StoryRepository.log("Searching for state with code:", code);
 
     try {
-      const files = await fs.readdir(this.storageDir);
+      const files = await listStorageFiles("stories");
       Logger.StoryRepository.log(
         "Searching through ",
         files.length,
@@ -241,24 +226,30 @@ export class StoryRepository {
         if (!file.endsWith(".json")) continue;
 
         const storyId = path.parse(file).name;
-        const filePath = path.join(this.storageDir, file);
-        const data = await fs.readFile(filePath, "utf-8");
-        const state = JSON.parse(data) as StoryState;
-        const story = new Story(state);
+        try {
+          const data = await readStorageFile("stories", file);
+          const state = JSON.parse(data) as StoryState;
+          const story = new Story(state);
 
-        // Check if this state contains the code
-        const stateData = story.getState();
-        if (
-          stateData.playerCodes &&
-          Object.values(stateData.playerCodes).some((c) => c === code)
-        ) {
-          Logger.StoryRepository.log("Found code in story:", storyId);
+          // Check if this state contains the code
+          const stateData = story.getState();
+          if (
+            stateData.playerCodes &&
+            Object.values(stateData.playerCodes).some((c) => c === code)
+          ) {
+            Logger.StoryRepository.log("Found code in story:", storyId);
 
-          // Cache the found state
-          this.storyStates.set(storyId, story);
-          Logger.StoryRepository.log("Cached found state in memory");
+            // Cache the found state
+            this.storyStates.set(storyId, story);
+            Logger.StoryRepository.log("Cached found state in memory");
 
-          return { storyId, story };
+            return { storyId, story };
+          }
+        } catch (error) {
+          Logger.StoryRepository.error(
+            `Error checking story ${storyId}:`,
+            error
+          );
         }
       }
 

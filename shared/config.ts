@@ -54,3 +54,15 @@ export const RATE_LIMITS: Record<
     maxRequests: 15,
   },
 };
+
+// Storage paths configuration
+export const STORAGE_PATHS = {
+  development: {
+    stories: "data/stories",
+    mocks: "data/mocks",
+  },
+  production: {
+    stories: "/data/stories",
+    mocks: "/data/mocks",
+  },
+};
