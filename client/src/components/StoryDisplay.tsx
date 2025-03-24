@@ -6,7 +6,7 @@ import type { ComponentType } from "react";
 import { LoadingSpinner } from "./ui/LoadingSpinner";
 import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { BeatFeedback } from "./feedback/BeatFeedback";
-import { SkeletonBeat } from "./ui/SkeletonBeat";
+import { PendingPlayers } from "./PendingPlayers";
 import type {
   ChallengeOption,
   ResolutionDetails,
@@ -22,7 +22,7 @@ interface StoryDisplayProps {
 }
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
-  const { storyState, isLoading } = useSession();
+  const { storyState, isLoading, isRequestPending } = useSession();
   const [localSelectedChoice, setLocalSelectedChoice] = React.useState<
     number | undefined
   >(undefined);
@@ -50,6 +50,122 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     () => playerState?.beatHistory || [],
     [playerState?.beatHistory]
   );
+
+  // Reset the selected choice and displayed beat index when a new beat arrives
+  React.useEffect(() => {
+    const currentBeatCount = beatHistory.length;
+    if (currentBeatCount !== previousBeatCount) {
+      setLocalSelectedChoice(undefined);
+      setPreviousBeatCount(currentBeatCount);
+
+      // Always navigate to the latest beat when a new one arrives
+      setDisplayedBeatIndex(currentBeatCount - 1);
+      setShowNextBeatPlaceholder(false);
+
+      // Ensure we scroll to the top
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    }
+  }, [beatHistory.length, previousBeatCount]);
+
+  // Scroll to top when displayed beat changes
+  React.useEffect(() => {
+    if (displayedBeatIndex !== null) {
+      // Try multiple scroll approaches to ensure it works across browsers
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
+
+      // Also try scrolling the window as a fallback
+      window.scrollTo(0, 0);
+
+      // And try with a timeout as a last resort
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+      }, 100);
+    }
+  }, [displayedBeatIndex]);
+
+  // Initialize displayedBeatIndex if null
+  React.useEffect(() => {
+    if (displayedBeatIndex === null && beatHistory.length > 0) {
+      setDisplayedBeatIndex(beatHistory.length - 1);
+    }
+  }, [beatHistory.length, displayedBeatIndex]);
+
+  // Check both local and server state for choice status
+  const currentBeat =
+    displayedBeatIndex !== null ? beatHistory[displayedBeatIndex] : null;
+  // Use server state choice if available, otherwise use local state
+  const selectedChoice =
+    currentBeat && currentBeat.choice !== -1
+      ? currentBeat.choice
+      : localSelectedChoice;
+  const choiceMade = selectedChoice !== undefined;
+  const isViewingLatestBeat = displayedBeatIndex === beatHistory.length - 1;
+  const latestBeat =
+    beatHistory.length > 0 ? beatHistory[beatHistory.length - 1] : null;
+
+  // Track when a choice is successfully processed by the server
+  React.useEffect(() => {
+    // If the server confirmed our choice (it's in the story state)
+    // and we're viewing the latest beat, show the next beat placeholder
+    if (
+      localSelectedChoice !== undefined &&
+      !showNextBeatPlaceholder &&
+      isViewingLatestBeat
+    ) {
+      const latestBeat = beatHistory[beatHistory.length - 1];
+      // Check if the server has confirmed our choice (choice is set in the beat)
+      if (latestBeat && latestBeat.choice !== -1) {
+        console.log(
+          "[StoryDisplay] Choice confirmed by server, showing next beat placeholder"
+        );
+        setShowNextBeatPlaceholder(true);
+        setDisplayedBeatIndex(beatHistory.length);
+      }
+    }
+  }, [
+    localSelectedChoice,
+    showNextBeatPlaceholder,
+    beatHistory,
+    isViewingLatestBeat,
+  ]);
+
+  // Reset local choice when a rate limit occurs or an error happens
+  React.useEffect(() => {
+    // If we have a local choice but the server isn't processing it anymore
+    // (either rejected or rate-limited), and we're still waiting at the placeholder
+    const isPendingRequest = isRequestPending("make_choice");
+
+    if (!isPendingRequest && localSelectedChoice !== undefined) {
+      // Check if the server actually confirmed our choice (it would be in the beat history)
+      const latestBeat = beatHistory[beatHistory.length - 1];
+      const serverConfirmedChoice = latestBeat && latestBeat.choice !== -1;
+
+      if (!serverConfirmedChoice) {
+        console.log(
+          "[StoryDisplay] Resetting local choice due to request failure or rate limit"
+        );
+        setLocalSelectedChoice(undefined);
+        setShowNextBeatPlaceholder(false);
+
+        // Go back to the current beat
+        setDisplayedBeatIndex(beatHistory.length - 1);
+      }
+    }
+  }, [
+    isRequestPending,
+    localSelectedChoice,
+    displayedBeatIndex,
+    beatHistory,
+    showNextBeatPlaceholder,
+  ]);
 
   // Helper function to get stat name by ID
   const getStatNameById = (statId: string): string => {
@@ -155,88 +271,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }
   }, [beatHistory]);
 
-  // Reset the selected choice and displayed beat index when a new beat arrives
-  React.useEffect(() => {
-    const currentBeatCount = beatHistory.length;
-    if (currentBeatCount !== previousBeatCount) {
-      setLocalSelectedChoice(undefined);
-      setPreviousBeatCount(currentBeatCount);
-
-      // If we were showing a placeholder, keep displaying the latest beat
-      if (showNextBeatPlaceholder) {
-        setDisplayedBeatIndex(currentBeatCount - 1);
-        setShowNextBeatPlaceholder(false);
-      } else if (displayedBeatIndex === null) {
-        // Initial load - display the latest beat
-        setDisplayedBeatIndex(currentBeatCount - 1);
-      }
-    }
-  }, [
-    beatHistory.length,
-    previousBeatCount,
-    displayedBeatIndex,
-    showNextBeatPlaceholder,
-  ]);
-
-  // Scroll to top when displayed beat changes
-  React.useEffect(() => {
-    if (displayedBeatIndex !== null) {
-      // Try multiple scroll approaches to ensure it works across browsers
-      if (contentRef.current) {
-        contentRef.current.scrollTop = 0;
-      }
-
-      // Also try scrolling the window as a fallback
-      window.scrollTo(0, 0);
-
-      // And try with a timeout as a last resort
-      setTimeout(() => {
-        if (contentRef.current) {
-          contentRef.current.scrollTop = 0;
-        }
-        window.scrollTo(0, 0);
-      }, 100);
-    }
-  }, [displayedBeatIndex]);
-
-  // Initialize displayedBeatIndex if null
-  React.useEffect(() => {
-    if (displayedBeatIndex === null && beatHistory.length > 0) {
-      setDisplayedBeatIndex(beatHistory.length - 1);
-    }
-  }, [beatHistory.length, displayedBeatIndex]);
-
-  const handleChoiceClick = (index: number) => {
-    const currentBeat = beatHistory[beatHistory.length - 1];
-    // Don't allow choice if already made (either locally or in server state)
-    if (
-      localSelectedChoice !== undefined ||
-      currentBeat?.choice !== -1 ||
-      displayedBeatIndex !== beatHistory.length - 1
-    )
-      return;
-
-    // Set the local choice and notify the parent
-    setLocalSelectedChoice(index);
-    onChoiceSelected(index);
-
-    // Always move to the next beat view with placeholder when a choice is made
-    // This will happen regardless of other pending players
-    setShowNextBeatPlaceholder(true);
-    setDisplayedBeatIndex(beatHistory.length);
-  };
-
-  // Check both local and server state for choice status
-  const currentBeat =
-    displayedBeatIndex !== null ? beatHistory[displayedBeatIndex] : null;
-  // Use server state choice if available, otherwise use local state
-  const selectedChoice =
-    currentBeat && currentBeat.choice !== -1
-      ? currentBeat.choice
-      : localSelectedChoice;
-  const choiceMade = selectedChoice !== undefined;
-  const isViewingLatestBeat = displayedBeatIndex === beatHistory.length - 1;
-
   // Check if feedback should be shown for the current beat
   const shouldShowFeedback = () => {
     // Don't show feedback if there's no current beat
@@ -249,12 +283,31 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     return true;
   };
 
+  const handleChoiceClick = (index: number) => {
+    // Only allow a choice on the latest beat if it doesn't have a choice yet
+    if (
+      !isViewingLatestBeat ||
+      (latestBeat && latestBeat.choice !== -1) ||
+      localSelectedChoice !== undefined ||
+      isRequestPending("make_choice")
+    )
+      return;
+
+    // Set the local choice and notify the parent
+    setLocalSelectedChoice(index);
+    onChoiceSelected(index);
+
+    console.log(
+      "[StoryDisplay] Choice selected, waiting for server confirmation"
+    );
+  };
+
   const renderOptions = () => {
     if (!currentBeat || storyState?.gameOver) {
       return null;
     }
 
-    // Only show option buttons (not locked-in choices)
+    // Show options if no choice has been confirmed by the server
     return (
       <div className="space-y-4">
         <div className="mt-6 space-y-3 max-w-2xl mx-auto">
@@ -264,16 +317,35 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               onClick={() => handleChoiceClick(index)}
               className={`
                 w-full p-4 text-lg text-left rounded-lg transition-all duration-300
-                bg-white text-primary cursor-pointer font-lora
+                ${
+                  localSelectedChoice === index
+                    ? "opacity-70 bg-primary-50"
+                    : "bg-white"
+                }
+                text-primary cursor-pointer font-lora
                 border-l-8 border border-accent shadow-md
                 hover:border-l-8 hover:border-secondary hover:shadow-lg
                 hover:translate-x-1
                 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
               `}
+              disabled={
+                isRequestPending("make_choice") ||
+                localSelectedChoice !== undefined
+              }
             >
               {option.text}
             </button>
           ))}
+          {localSelectedChoice !== undefined && (
+            <div className="text-center text-primary-600 mt-4">
+              {isRequestPending("make_choice")
+                ? "Processing your choice..."
+                : storyState?.pendingPlayers &&
+                  Object.keys(storyState.pendingPlayers).length > 0
+                ? "Waiting for other players..."
+                : "Waiting for server response..."}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -354,14 +426,40 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     const selectedOption = prevBeat.options[prevBeat.choice];
     const isChallengeBeat = selectedOption?.optionType === "challenge";
 
+    // Get player slot to show pending players
+    const playerSlot = Object.keys(storyState.players)[0];
+
+    // Check if there are any pending players
+    const hasPendingPlayers =
+      storyState.pendingPlayers &&
+      Object.keys(storyState.pendingPlayers).length > 0;
+
     return (
       <>
         {/* Show the previous beat's choice with animation if it was a challenge */}
         {renderPreviousChoice(prevBeatIndex, isChallengeBeat)}
 
-        {/* Then show the skeleton for the next beat */}
-        <div className="mt-6">
-          <SkeletonBeat showImage={storyState.generateImages} />
+        {/* New cleaner loading view instead of skeleton */}
+        <div className="flex flex-col items-center justify-center h-full min-h-[40vh] mt-8">
+          {/* Show "Writing the story..." only when there are no pending players */}
+          {!hasPendingPlayers && (
+            <h1 className="text-2xl font-bold mb-6 text-primary">
+              Writing the story...
+            </h1>
+          )}
+
+          <LoadingSpinner size="large" message="" />
+
+          {/* Only show pending players list when there are actually pending players */}
+          {hasPendingPlayers && (
+            <div className="mt-8 w-full max-w-md">
+              <PendingPlayers
+                pendingPlayers={storyState.pendingPlayers}
+                numberOfPlayers={storyState.numberOfPlayers}
+                currentPlayer={playerSlot}
+              />
+            </div>
+          )}
         </div>
       </>
     );

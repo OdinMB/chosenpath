@@ -41,7 +41,7 @@ export const RATE_LIMITS: Record<
   // Game choices rate limiting
   make_choice: {
     windowMs: 30 * 1000, // 30 seconds
-    maxRequests: 100,
+    maxRequests: 6,
   },
   // Limit game join attempts
   join_game: {

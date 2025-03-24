@@ -49,16 +49,10 @@ export function WelcomeScreen({
       <AppTitle size="large" className="mb-6" />
 
       <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 mb-8 text-sm text-primary-800">
-        <h2 className="font-semibold mb-2">
-          Welcome to the ChosenPath Alpha Experience!
-        </h2>
+        <h2 className="font-semibold mb-2">Welcome to the Alpha Experience!</h2>
         <p className="mb-2">
-          Excited to have you join our early testing community! Everything is
-          free during this phase.
-        </p>
-        <p>
-          Your feedback is invaluable - share your thoughts directly from within
-          the stories you explore.
+          Everything is free during this phase. Jump into a story and share your
+          feedback!
         </p>
       </div>
 
@@ -144,7 +138,6 @@ export function WelcomeScreen({
       </div>
 
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
-        <p className="mb-2">Early prototype.</p>
         <p className="mb-2">
           Looking for collaborators. Are you a writer, storyteller, designer, or
           world simulation architect? Reach out!

@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ClientStoryState } from "../../../shared/types/story";
-import type { WSServerMessage } from "../../../shared/types/websocket";
+import type {
+  WSServerMessage,
+  RateLimitInfo,
+} from "../../../shared/types/websocket";
 import { wsService } from "../services/WebSocketService.js";
 import { SessionContext } from "../contexts/SessionContext.js";
 
@@ -13,29 +16,60 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
+
+  // Use a ref to track the loading state without causing effect reruns
+  const isLoadingRef = useRef(isLoading);
+
+  // Keep the ref updated with the latest value
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   useEffect(() => {
     wsService.clearMessageHandlers();
 
-    wsService.onMessage("session_created", (data: WSServerMessage) => {
-      if (data.type === "session_created" && data.sessionId) {
-        console.log("[SessionProvider] Session created:", data.sessionId);
-        setSessionId(data.sessionId);
-        localStorage.setItem("sessionId", data.sessionId);
-        wsService.setSessionId(data.sessionId);
+    wsService.onMessage("create_session_response", (data: WSServerMessage) => {
+      if (
+        data.type === "create_session_response" &&
+        "data" in data &&
+        data.data.sessionId
+      ) {
+        console.log("[SessionProvider] Session created:", data.data.sessionId);
+        setSessionId(data.data.sessionId);
+        localStorage.setItem("sessionId", data.data.sessionId);
+        wsService.setSessionId(data.data.sessionId);
+
+        // Ensure we mark connection as complete
         setIsConnecting(false);
+        console.log(
+          "[SessionProvider] Connection complete, isConnecting set to false"
+        );
       }
     });
 
-    wsService.onMessage("state_update", (data: WSServerMessage) => {
-      if (data.type === "state_update" && data.state) {
-        console.log("[SessionProvider] Received state update:", {
-          state: data.state,
-        });
-        setStoryState(data.state);
-        setIsLoading(false);
+    wsService.onMessage(
+      "state_update_notification",
+      (data: WSServerMessage) => {
+        if (data.type === "state_update_notification" && "state" in data) {
+          console.log("[SessionProvider] Received state update:", {
+            state: data.state,
+            trigger: data.trigger,
+          });
+          setStoryState(data.state);
+          setIsLoading(false);
+        }
       }
-    });
+    );
+
+    wsService.onMessage(
+      "initialize_story_response",
+      (data: WSServerMessage) => {
+        if (data.type === "initialize_story_response") {
+          console.log("[SessionProvider] Story initialization acknowledged");
+        }
+      }
+    );
 
     wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
       if (data.type === "exit_story_response") {
@@ -47,17 +81,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    wsService.onMessage("rate_limited", (data: WSServerMessage) => {
+      if ("rateLimit" in data) {
+        console.log("[SessionProvider] Rate limited:", data.rateLimit);
+        setRateLimit(data.rateLimit);
+        setIsLoading(false);
+      }
+    });
+
     wsService.onMessage("error", (data: WSServerMessage) => {
       if (data.type === "error") {
-        // Handle simple string errors
-        if (typeof data.error === "string") {
+        if ("error" in data && typeof data.error === "string") {
           if (data.error === "Session not found") {
             console.warn("[SessionProvider] Session not found - reconnecting");
             return;
           }
           console.error(
             `[SessionProvider] WebSocket error${
-              data.operationType ? ` (${data.operationType})` : ""
+              "operationType" in data && data.operationType
+                ? ` (${data.operationType})`
+                : ""
             }:`,
             data.error
           );
@@ -68,9 +111,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    wsService.onMessage("story_codes", (data: WSServerMessage) => {
-      if (data.type === "story_codes") {
-        console.log("[SessionProvider] Received player codes:", data.codes);
+    wsService.onMessage("story_codes_notification", (data: WSServerMessage) => {
+      if (data.type === "story_codes_notification" && "codes" in data) {
+        console.log(
+          "[SessionProvider] Received player codes notification:",
+          data.codes
+        );
         setStoryCodes(data.codes);
         setIsLoading(false);
       }
@@ -79,25 +125,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     wsService.onMessage("verify_code_response", (data: WSServerMessage) => {
       if (data.type === "verify_code_response") {
         console.log("[SessionProvider] Code verification response:", data);
-        if (data.state) {
-          setStoryState(data.state);
+        if ("data" in data && data.data.state) {
+          setStoryState(data.data.state);
           setIsLoading(false);
           setIsConnecting(false);
-        } else if (data.error) {
+        } else if ("errorMessage" in data) {
           console.log(
             "[SessionProvider] Code verification failed:",
-            data.error
+            data.errorMessage
           );
-          setError(data.error);
+          setError(data.errorMessage);
           setIsLoading(false);
 
-          // Clear the story state since the code is invalid
           setStoryState(null);
         }
       }
     });
 
-    // Connect to WebSocket
     const savedSessionId = localStorage.getItem("sessionId");
     wsService.connect(savedSessionId || undefined);
 
@@ -105,7 +149,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       wsService.disconnect();
       wsService.clearMessageHandlers();
     };
-  }, []); // Only run once on mount
+  }, []); // intentionally empty to run only on mount
+
+  useEffect(() => {
+    if (rateLimit && rateLimit.timeRemaining > 0) {
+      const timer = setTimeout(() => {
+        setRateLimit(null);
+      }, rateLimit.timeRemaining);
+
+      return () => clearTimeout(timer);
+    }
+  }, [rateLimit]);
 
   const value = {
     storyState,
@@ -119,6 +173,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setStoryCodes,
     error,
     setError,
+    rateLimit,
+    setRateLimit,
+    isRequestPending: (type: string) => wsService.isRequestPending(type),
+    isOperationRunning: (type: string) => wsService.isOperationRunning(type),
   };
 
   return (

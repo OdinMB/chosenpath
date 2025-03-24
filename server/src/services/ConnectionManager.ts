@@ -5,6 +5,7 @@ import { storyRepository } from "./StoryRepository.js";
 import { Story } from "./Story.js";
 import { Server } from "socket.io";
 import { Logger } from "../utils/logger.js";
+import type { StateUpdateNotification } from "shared/types/websocket.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -361,7 +362,11 @@ export class ConnectionManager {
 
       sockets.forEach((socketId) => {
         Logger.ConnectionManager.log("Sending update to socket:", socketId);
-        this.io!.to(socketId).emit("state_update", { state: filteredState });
+        this.io!.to(socketId).emit("state_update_notification", {
+          type: "state_update_notification",
+          state: filteredState,
+          trigger: "story_update", // Default trigger
+        } as StateUpdateNotification);
       });
     });
   }

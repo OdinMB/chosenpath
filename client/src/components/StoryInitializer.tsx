@@ -32,7 +32,8 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
-  const { isLoading, isConnecting } = useSession();
+  const { isLoading, isConnecting, isRequestPending, isOperationRunning } =
+    useSession();
 
   // Completely separate the game mode state for single player and multiplayer
   const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
@@ -47,7 +48,12 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   // Update gameMode when playerCount changes
   useEffect(() => {
     setGameMode(effectiveGameMode);
-  }, [effectiveGameMode]);
+
+    // Reset multiplayerMode to Cooperative when switching to single player
+    if (playerCount === 1) {
+      setMultiplayerMode(GameModes.Cooperative);
+    }
+  }, [effectiveGameMode, playerCount]);
 
   // Handle game mode slider changes
   const handleGameModeChange = (value: number) => {
@@ -164,6 +170,12 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     setPrompt(newPrompt);
   };
 
+  // Determine if we're in the loading state for story creation
+  const isCreatingStory =
+    isLoading ||
+    isRequestPending("initialize_story") ||
+    isOperationRunning("initialize_story");
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSetup({
@@ -185,7 +197,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-100 border-t-accent border-r-secondary mx-auto"></div>
             <p className="mt-2 text-primary-600">Connecting to server...</p>
           </div>
-        ) : isLoading ? (
+        ) : isCreatingStory ? (
           <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
             <div className="flex flex-wrap gap-2 mb-4">
               <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
@@ -241,7 +253,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
 
               <div
                 className={`space-y-2 transition-opacity duration-200 ${
-                  playerCount === 1 ? "opacity-50" : ""
+                  playerCount === 1 ? "hidden" : ""
                 }`}
               >
                 <label className="text-sm md:text-base font-medium text-primary">
@@ -324,7 +336,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               </div>
             </div>
 
-            <div className="flex items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+            <div className="items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md hidden">
               <input
                 id="generate-images"
                 type="checkbox"
@@ -355,11 +367,18 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
               <PrimaryButton
                 type="submit"
                 size="lg"
-                disabled={isLoading || !prompt.trim() || isConnecting}
-                isLoading={isLoading}
+                disabled={
+                  isLoading ||
+                  !prompt.trim() ||
+                  isConnecting ||
+                  isRequestPending("initialize_story")
+                }
+                isLoading={isLoading || isRequestPending("initialize_story")}
                 fullWidth
               >
-                {isLoading ? "Creating Story..." : "Create Story"}
+                {isLoading || isRequestPending("initialize_story")
+                  ? "Creating Story..."
+                  : "Create Story"}
               </PrimaryButton>
             </div>
           </form>

@@ -10,6 +10,12 @@ import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
 import { gameQueueProcessor } from "../services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
 import type { OperationErrorEvent } from "../types/queue.js";
+import type {
+  StoryCodesNotification,
+  SelectCharacterResponse,
+  MakeChoiceResponse,
+  InitializeStoryResponse,
+} from "shared/types/websocket.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
@@ -28,7 +34,12 @@ export class GameHandler {
     gameQueueProcessor.events.on("storyInitialized", ({ gameId, story }) => {
       if (this.pendingInitializations.has(gameId)) {
         const { resolve, codes } = this.pendingInitializations.get(gameId)!;
-        this.socket.emit("story_codes", { codes });
+        console.log("[GameHandler] Emitting story codes:", codes);
+        this.socket.emit("story_codes_notification", {
+          type: "story_codes_notification",
+          gameId,
+          codes,
+        } as StoryCodesNotification);
         resolve();
         this.pendingInitializations.delete(gameId);
       }
@@ -145,30 +156,42 @@ export class GameHandler {
       });
 
       // Create a promise that will resolve when initialization is complete
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>(async (resolve, reject) => {
         this.pendingInitializations.set(gameId, {
           resolve,
           codes: playerCodes,
         });
 
         // Queue the story initialization
-        gameQueueProcessor
-          .addOperation({
-            gameId,
-            type: "initializeStory",
-            input: {
-              prompt,
-              generateImages,
-              playerCount,
-              maxTurns,
-              gameMode,
-              playerCodes,
-            },
-          })
-          .then((operationId) => {
-            // Store the operation ID for error handling
-            this.pendingOperations.set(operationId, { resolve, reject });
-          });
+        const operationId = await gameQueueProcessor.addOperation({
+          gameId,
+          type: "initializeStory",
+          input: {
+            prompt,
+            generateImages,
+            playerCount,
+            maxTurns,
+            gameMode,
+            playerCodes,
+          },
+        });
+
+        // Store the operation ID for error handling
+        this.pendingOperations.set(operationId, { resolve, reject });
+
+        // Send response once we have the actual operationId string
+        const requestResponse = {
+          type: "initialize_story_response",
+          status: "success",
+          requestId: operationId,
+          timestamp: Date.now(),
+          data: {},
+        } as InitializeStoryResponse;
+        this.socket.emit("response", requestResponse);
+        console.log(
+          "[GameHandler] Emitted initialize_story_response to client: ",
+          requestResponse
+        );
       });
     } catch (error) {
       console.error("[GameHandler] Failed to initialize story:", error);
@@ -212,6 +235,22 @@ export class GameHandler {
           story,
         },
       });
+
+      // Send a response to the client about the queued operation
+      const requestResponse = {
+        type: "make_choice_response",
+        status: "success",
+        requestId: operationId,
+        timestamp: Date.now(),
+        data: {
+          optionIndex,
+        },
+      } as MakeChoiceResponse;
+      this.socket.emit("response", requestResponse);
+      console.log(
+        "[GameHandler] Emitted request response to client:",
+        requestResponse
+      );
 
       // Create a promise that will resolve when the operation is complete
       await new Promise<void>((resolve, reject) => {
@@ -263,6 +302,23 @@ export class GameHandler {
           story,
         },
       });
+
+      // Send a response to the client about the queued operation
+      const requestResponse = {
+        type: "select_character_response",
+        status: "success",
+        requestId: operationId,
+        timestamp: Date.now(),
+        data: {
+          identityIndex,
+          backgroundIndex,
+        },
+      } as SelectCharacterResponse;
+      this.socket.emit("response", requestResponse);
+      console.log(
+        "[GameHandler] Emitted select_character_response to client:",
+        requestResponse
+      );
 
       // Create a promise that will resolve when the operation is complete
       await new Promise<void>((resolve, reject) => {

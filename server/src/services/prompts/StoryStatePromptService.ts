@@ -470,9 +470,13 @@ ${modeDescriptions[story.getGameMode()]}
     }
 
     if (!threadAnalysis) {
-      console.log(
-        "[StoryStatePromptService] ERROR: No " + type + " thread analysis found"
-      );
+      if (story.getCurrentTurn() === 0) {
+        console.log(
+          "[StoryStatePromptService] ERROR: No " +
+            type +
+            " thread analysis found"
+        );
+      }
       return "";
     }
 

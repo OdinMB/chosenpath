@@ -17,11 +17,16 @@ interface CharacterSelectionProps {
 export function CharacterSelection({
   onCharacterSelected,
 }: CharacterSelectionProps) {
-  const { storyState } = useSession();
+  const { storyState, isRequestPending, isOperationRunning } = useSession();
   const [selectedIdentity, setSelectedIdentity] = useState<number | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<number | null>(
     null
   );
+
+  // Check if we're waiting for character selection to process
+  const isSelectionPending =
+    isRequestPending("select_character") ||
+    isOperationRunning("select_character");
 
   // Select the first identity by default
   useEffect(() => {
@@ -166,12 +171,18 @@ export function CharacterSelection({
       <div className="flex flex-col items-center mt-8">
         <PrimaryButton
           onClick={handleConfirmSelection}
-          disabled={selectedIdentity === null || selectedBackground === null}
+          disabled={
+            selectedIdentity === null ||
+            selectedBackground === null ||
+            isSelectionPending
+          }
           fullWidth
           className="max-w-md"
           size="lg"
         >
-          Confirm Selection
+          {isSelectionPending
+            ? "Processing Character Selection..."
+            : "Confirm Selection"}
         </PrimaryButton>
       </div>
     </div>

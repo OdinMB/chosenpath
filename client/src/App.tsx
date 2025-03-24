@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { PlayerCodes } from "./components/PlayerCodes";
 import { GameMode } from "../../shared/types/story.js";
+import { RateLimitNotification } from "./components/ui/RateLimitNotification";
 
 // Add this type at the top with the imports
 type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";
@@ -22,6 +23,11 @@ function App() {
     setStoryCodes,
     error,
     setError,
+    rateLimit,
+    setRateLimit,
+    isRequestPending,
+    isOperationRunning,
+    isConnecting,
   } = useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [viewState, setViewState] = useState<ViewState>("CONNECTING");
@@ -55,22 +61,47 @@ function App() {
 
   // Replace all setViewState calls with loggedSetViewState
   useEffect(() => {
+    // If we're connecting, stay in connecting state
+    if (isConnecting) {
+      if (viewState !== "CONNECTING") {
+        loggedSetViewState("CONNECTING");
+      }
+      return;
+    }
+
     // If we have a session or player code, we're in a valid state
     if (sessionId || playerCode) {
       if (viewState === "CONNECTING") {
         loggedSetViewState("WELCOME");
       } else if (viewState === "SETUP") {
-        // Stay in setup
+        // If we're initializing a story, keep in setup state
+        if (
+          isRequestPending("initialize_story") ||
+          isOperationRunning("initialize_story")
+        ) {
+          // Stay in setup
+        } else if (storyCodes) {
+          // If we have story codes, go to player codes view
+          loggedSetViewState("PLAYER_CODES");
+        }
       } else if (viewState === "PLAYER_CODES") {
         if (storyState) {
           loggedSetViewState("GAME");
+        }
+      } else if (viewState === "GAME") {
+        // If in game view, stay there even during character selection
+        if (
+          isRequestPending("select_character") ||
+          isOperationRunning("select_character")
+        ) {
+          // Stay in game view while character selection is processing
         }
       } else if (storyState) {
         loggedSetViewState("GAME");
       } else if (viewState !== "WELCOME") {
         loggedSetViewState("WELCOME");
       }
-    } else if (wsService.isConnected()) {
+    } else if (wsService.isConnected() && !isConnecting) {
       // If we're connected but have no session or player code, go to welcome
       if (viewState === "CONNECTING") {
         loggedSetViewState("WELCOME");
@@ -83,7 +114,11 @@ function App() {
     }
 
     // Handle transitions based on story codes
-    if (storyCodes && viewState === "SETUP") {
+    if (
+      storyCodes &&
+      viewState === "SETUP" &&
+      !isOperationRunning("initialize_story")
+    ) {
       loggedSetViewState("PLAYER_CODES");
     }
   }, [
@@ -93,9 +128,12 @@ function App() {
     storyCodes,
     viewState,
     loggedSetViewState,
+    isRequestPending,
+    isOperationRunning,
+    isConnecting,
   ]);
 
-  // Monitor WebSocket connection status and reconnect if needed
+  // Monitor WebSocket connection status
   useEffect(() => {
     const checkConnection = () => {
       if (!wsService.isConnected()) {
@@ -110,10 +148,15 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Monitor WebSocket connection status
+  // Monitor session status and request if needed
   useEffect(() => {
     const checkSession = () => {
-      if (wsService.isConnected() && !sessionId && !isCreatingSession) {
+      if (
+        wsService.isConnected() &&
+        !sessionId &&
+        !isCreatingSession &&
+        !isRequestPending("create_session")
+      ) {
         console.log("[App] Connected but no session, requesting new session");
         setIsCreatingSession(true);
         wsService.sendMessage({ type: "create_session" });
@@ -127,12 +170,22 @@ function App() {
     const interval = setInterval(checkSession, 1000);
 
     return () => clearInterval(interval);
-  }, [sessionId, isCreatingSession]);
+  }, [sessionId, isCreatingSession, isRequestPending]);
 
   useEffect(() => {
     if (sessionId) {
       setIsCreatingSession(false);
     }
+  }, [sessionId]);
+
+  // Add logging for isConnecting changes
+  useEffect(() => {
+    console.log("[App] isConnecting state changed:", isConnecting);
+  }, [isConnecting]);
+
+  // Debug sessionId changes
+  useEffect(() => {
+    console.log("[App] sessionId changed:", sessionId);
   }, [sessionId]);
 
   const handleStorySetup = (options: {
@@ -172,7 +225,6 @@ function App() {
   const handleNewStory = () => {
     setStoryState(null);
     setStoryCodes(null);
-
     loggedSetViewState("SETUP");
   };
 
@@ -231,26 +283,45 @@ function App() {
     console.log("[App] Player code deleted");
   }, [playerCode, playerCodeKey, loggedSetViewState, setSessionId]);
 
-  // Add error display component
-  const ErrorMessage = () =>
-    error ? (
-      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-primary border border-accent text-white px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
-        <div className="mr-2 whitespace-pre-wrap">{error}</div>
-        <button
-          onClick={() => setError(null)}
-          className="text-accent hover:text-tertiary ml-auto"
-          aria-label="Close"
-        >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </div>
-    ) : null;
+  // Add error and rate limit display
+  const Notifications = () => (
+    <>
+      {error ? (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-primary border border-accent text-white px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
+          <div className="mr-2 whitespace-pre-wrap">{error}</div>
+          <button
+            onClick={() => setError(null)}
+            className="text-accent hover:text-tertiary ml-auto"
+            aria-label="Close"
+          >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : null}
+
+      {/* Show all rate limit notifications centrally */}
+      {rateLimit && (
+        <>
+          {/* Full screen overlay with solid backdrop */}
+          <div className="fixed inset-0 bg-black bg-opacity-75 z-[999] flex items-center justify-center">
+            <div className="max-w-md w-full mx-4">
+              <RateLimitNotification
+                rateLimit={rateLimit}
+                onTimeout={() => setRateLimit(null)}
+                className="border-2 bg-white"
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
 
   // Get the current view content
   const getCurrentView = () => {
@@ -316,7 +387,7 @@ function App() {
   // Render
   return (
     <>
-      <ErrorMessage />
+      <Notifications />
       {getCurrentView()}
     </>
   );
