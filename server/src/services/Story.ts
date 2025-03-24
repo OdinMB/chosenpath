@@ -5,16 +5,22 @@ import {
   Guidelines,
   StoryPhase,
   PlayerState,
-} from "shared/types/story.js";
-import { PlayerCount, PlayerSlot } from "shared/types/player.js";
-import { StoryElement } from "shared/types/storyElement.js";
-import { Outcome } from "shared/types/outcome.js";
-import { Stat, ClientStat } from "shared/types/stat.js";
-import { Beat, BeatType, ResolutionDetails } from "shared/types/beat.js";
-import { SwitchAnalysis } from "shared/types/switch.js";
-import { ThreadAnalysis, Thread, Resolution } from "shared/types/thread.js";
-import { Image } from "shared/types/image.js";
-import { Change } from "shared/types/change.js";
+  PlayerCount,
+  PlayerSlot,
+  StoryElement,
+  Outcome,
+  Stat,
+  ClientStat,
+  Beat,
+  BeatType,
+  ResolutionDetails,
+  SwitchAnalysis,
+  ThreadAnalysis,
+  Thread,
+  Resolution,
+  Image,
+  Change,
+} from "shared/types/index.js";
 import { ChangeService } from "./ChangeService.js";
 import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
 

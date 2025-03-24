@@ -1,9 +1,7 @@
-import { GameModes, PlayerState } from "shared/types/story.js";
+import type { Stat, StatValueEntry, Thread, Beat } from "shared/types/index.js";
+import { GameModes } from "shared/types/story.js";
 import { Story } from "../Story.js";
-import { Thread } from "shared/types/thread.js";
 import { getThreadType } from "shared/types/thread.js";
-import { Stat, StatValueEntry } from "shared/types/stat.js";
-import { Beat } from "shared/types/beat.js";
 
 export interface SectionConfig {
   gameMode?: boolean;

@@ -1,20 +1,19 @@
 import { Server, Socket } from "socket.io";
 import http from "http";
 import { GameHandler } from "../handlers/GameHandler.js";
-import { PlayerCount } from "shared/types/player.js";
+import {
+  GameMode,
+  PlayerCount,
+  ResponseStatus,
+  StateUpdateNotification,
+} from "shared/types/index.js";
 import { config } from "../config/env.js";
 import { connectionManager } from "../services/ConnectionManager.js";
-import { GameMode } from "shared/types/story.js";
+import { RateLimitedAction } from "shared/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,
 } from "../middleware/rateLimiter.js";
-import {
-  ResponseStatus,
-  StateUpdateNotification,
-} from "shared/types/websocket.js";
-import { RateLimitedAction } from "shared/config.js";
-import { StoryRepository } from "../services/StoryRepository.js";
 
 export class GameWebSocketServer {
   private io: Server;

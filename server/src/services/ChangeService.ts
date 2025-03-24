@@ -1,8 +1,11 @@
-import type { Change } from "shared/types/change.js";
+import type {
+  Change,
+  PlayerSlot,
+  Stat,
+  StatValueEntry,
+  StoryState,
+} from "shared/types/index.js";
 import { Story } from "./Story.js";
-import type { PlayerSlot } from "shared/types/player.js";
-import type { Stat, StatValue, StatValueEntry } from "shared/types/stat.js";
-import type { StoryState } from "shared/types/story.js";
 
 export class ChangeService {
   applyChanges(story: Story, changes: Change[]): Story {

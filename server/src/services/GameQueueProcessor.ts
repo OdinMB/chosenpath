@@ -1,16 +1,16 @@
-import { BaseQueueProcessor } from "./QueueProcessor.js";
 import type {
   GameOperation,
   StoryUpdateEvent,
   OperationErrorEvent,
 } from "../types/queue.js";
-import type { PlayerSlot } from "shared/types/player.js";
+import type { PlayerSlot } from "shared/types/index.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
+import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "./Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
-import { Resolution } from "shared/types/thread.js";
+import { Resolution } from "shared/types/index.js";
 import { storyRepository } from "./StoryRepository.js";
 import { connectionManager } from "./ConnectionManager.js";
 

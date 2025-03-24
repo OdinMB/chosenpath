@@ -1,11 +1,14 @@
 import type { Socket } from "socket.io";
-import type { PlayerSlot } from "shared/types/player.js";
-import type { ClientStoryState, StoryState } from "shared/types/story.js";
+import type {
+  PlayerSlot,
+  ClientStoryState,
+  StoryState,
+  StateUpdateNotification,
+} from "shared/types/index.js";
 import { storyRepository } from "./StoryRepository.js";
 import { Story } from "./Story.js";
 import { Server } from "socket.io";
 import { Logger } from "../utils/logger.js";
-import type { StateUpdateNotification } from "shared/types/websocket.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;

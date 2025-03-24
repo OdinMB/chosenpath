@@ -1,5 +1,5 @@
 import { getThreadType } from "shared/types/thread.js";
-import type { Resolution, Thread } from "shared/types/thread.js";
+import type { Resolution, Thread } from "shared/types/index.js";
 import type { Story } from "./Story.js";
 
 /**

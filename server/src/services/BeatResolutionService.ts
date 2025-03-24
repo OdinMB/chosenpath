@@ -1,18 +1,16 @@
 import {
-  type Beat,
-  type ChallengeOption,
-  type ProbabilityDistribution,
-  type OptionRiskType,
-  type ResolutionDetails,
+  Beat,
+  ChallengeOption,
+  ProbabilityDistribution,
+  OptionRiskType,
+  ResolutionDetails,
   DEFAULT_DISTRIBUTION,
   SAFE_DISTRIBUTION,
   RISKY_DISTRIBUTION,
-} from "shared/types/beat.js";
-import {
   ResolutionChallenge,
   Resolution,
   ResolutionExploration,
-} from "shared/types/thread.js";
+} from "shared/types/index.js";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
   POINTS_FOR_MIXED_RESOLUTION,

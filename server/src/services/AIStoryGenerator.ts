@@ -1,37 +1,33 @@
+import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 import type {
   StoryState,
   StorySetup,
   PlayerOptionsGeneration,
-} from "shared/types/story.js";
-import type { Change } from "shared/types/change.js";
-import type {
+  Change,
   Beat,
   BeatGeneration,
   SetOfBeatGenerationSchema,
-} from "shared/types/beat.js";
-import dotenv from "dotenv";
-import { createStorySetupSchema } from "shared/types/story.js";
+  SwitchAnalysis,
+  ThreadAnalysis,
+  PlayerCount,
+  BeatsNeedingImages,
+  GameMode,
+} from "shared/types/index.js";
 import {
+  createStorySetupSchema,
   createSwitchAnalysisSchema,
-  type SwitchAnalysis,
-} from "shared/types/switch.js";
-import {
-  type ThreadAnalysis,
   threadAnalysisSchema,
-} from "shared/types/thread.js";
-import type { PlayerCount } from "shared/types/player.js";
+  PLAYER_SLOTS,
+  PlayerState,
+} from "shared/types/index.js";
 import { getPlayerSlots } from "shared/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "shared/types/beat.js";
-import type { BeatsNeedingImages } from "shared/types/image.js";
-import { type GameMode } from "shared/types/story.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
-import { PLAYER_SLOTS } from "shared/types/player.js";
 import { Story } from "./Story.js";
-import { PlayerState } from "shared/types/story.js";
 import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,

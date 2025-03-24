@@ -1,10 +1,13 @@
 import OpenAI from "openai";
-import type { Image, ImageGeneration } from "shared/types/image.js";
-import type { Beat } from "shared/types/beat.js";
+import type {
+  Image,
+  ImageGeneration,
+  BeatsNeedingImages,
+  Beat,
+} from "shared/types/index.js";
+import { imageGenerationSchema } from "shared/types/index.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
-import { imageGenerationSchema } from "shared/types/image.js";
-import type { BeatsNeedingImages } from "shared/types/image.js";
 import { Story } from "./Story.js";
 
 dotenv.config();
