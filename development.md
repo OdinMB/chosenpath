@@ -11,6 +11,7 @@ Only data written to /data, is located on the Persistent Disk and retained betwe
 Your data is being written to data/, which is a relative path, and expands to /opt/render/project/src/server/data. You need to ensure data is written to the absolute path /data.
 
 - CoT schema attribute to list "show don't tell" elements for the beat.
+- way too many
 
 New features
 

@@ -11,10 +11,8 @@ import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "./Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 import { Resolution } from "shared/types/thread.js";
-import {
-  ResolutionDetails,
-  ProbabilityDistribution,
-} from "shared/types/beat.js";
+import { storyRepository } from "./StoryRepository.js";
+import { connectionManager } from "./ConnectionManager.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -58,6 +56,20 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     }
   }
 
+  /**
+   * Helper method to update and broadcast story state
+   */
+  private async updateAndBroadcastStory(
+    gameId: string,
+    story: Story
+  ): Promise<void> {
+    // First store the updated story in the repository
+    await storyRepository.storeStory(gameId, story);
+
+    // Then broadcast the update to all connected clients
+    connectionManager.broadcastStoryUpdate(gameId, story);
+  }
+
   private async handleInitializeStory(
     operation: GameOperation & { type: "initializeStory" }
   ): Promise<void> {
@@ -87,21 +99,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       playerCodes,
     });
 
+    // Emit the initialization event
     this.events.emit("storyInitialized", {
       gameId: operation.gameId,
       story: storyWithCodes,
     });
-    this.events.emit("storyUpdated", {
-      gameId: operation.gameId,
-      story: storyWithCodes,
-    });
 
-    // Character selection => No more queueing the first moveStoryForward operation
-    // await this.addOperation({
-    //   type: "moveStoryForward",
-    //   gameId: operation.gameId,
-    //   input: { story: storyWithCodes },
-    // });
+    // Store and broadcast the story update
+    await this.updateAndBroadcastStory(gameId, storyWithCodes);
   }
 
   private async handleMoveStoryForward(
@@ -167,32 +172,25 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
       // Apply changes
       console.log("[GameQueueProcessor] Applying changes to state");
-      const storyWithChanges = nextStory.applyStoryChanges(changes);
+      let finalStory = nextStory.applyStoryChanges(changes);
 
-      // Save and broadcast state update
-      this.events.emit("storyUpdated", {
-        gameId: operation.gameId,
-        story: storyWithChanges,
-      });
+      // Store and broadcast the first update
+      await this.updateAndBroadcastStory(gameId, finalStory);
 
       // Generate images if needed
-      let finalStory = storyWithChanges;
       if (
-        storyWithChanges.includesImages() &&
+        finalStory.includesImages() &&
         Object.keys(beatsNeedingImages).length > 0
       ) {
         console.log("[GameQueueProcessor] Generating images for beats");
         finalStory = await this.aiImageGenerator.generateImagesForBeats(
-          storyWithChanges,
+          finalStory,
           beatsNeedingImages
         );
-      }
 
-      // Save and broadcast state update for images
-      this.events.emit("storyUpdated", {
-        gameId: operation.gameId,
-        story: finalStory,
-      });
+        // Store and broadcast the updated state with images
+        await this.updateAndBroadcastStory(gameId, finalStory);
+      }
     } catch (error) {
       console.error(
         "[GameQueueProcessor] Failed to move story forward:",
@@ -217,11 +215,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       optionIndex
     );
 
-    // Emit state update to update pending players lists
-    this.events.emit("storyUpdated", {
-      gameId,
-      story: storyWithBeatResolution,
-    });
+    // Store and broadcast the story update
+    await this.updateAndBroadcastStory(gameId, storyWithBeatResolution);
 
     // Queue next operation if all choices are in
     if (storyWithBeatResolution.areAllChoicesSubmitted()) {
@@ -329,11 +324,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       selectedBackground
     );
 
-    // Emit state update to update pending players lists
-    this.events.emit("storyUpdated", {
-      gameId,
-      story: updatedStory,
-    });
+    // Store and broadcast the updated state
+    await this.updateAndBroadcastStory(gameId, updatedStory);
 
     // Check if all players have completed character selection
     if (updatedStory.areAllCharactersSelected()) {
@@ -344,11 +336,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       // Mark character selection as completed
       updatedStory = updatedStory.completeCharacterSelection();
 
-      // Emit state update with completed character selection
-      this.events.emit("storyUpdated", {
-        gameId,
-        story: updatedStory,
-      });
+      // Store and broadcast the updated state with completed character selection
+      await this.updateAndBroadcastStory(gameId, updatedStory);
 
       // Queue the moveStoryForward operation to start the game
       await this.addOperation({

@@ -24,14 +24,16 @@ export class GameHandler {
     string,
     { resolve: () => void; reject: (error: Error) => void }
   > = new Map();
+  private storyInitializedHandler: (event: any) => void;
+  private operationErrorHandler: (event: any) => void;
 
   constructor(socket: Socket) {
     this.socket = socket;
     this.storyRepository = StoryRepository.getInstance();
     console.log("[GameHandler] Created new handler for socket:", socket.id);
 
-    // Add event listeners for queue processor events
-    gameQueueProcessor.events.on("storyInitialized", ({ gameId, story }) => {
+    // Create bound handlers that we can remove later
+    this.storyInitializedHandler = ({ gameId, story }) => {
       if (this.pendingInitializations.has(gameId)) {
         const { resolve, codes } = this.pendingInitializations.get(gameId)!;
         console.log("[GameHandler] Emitting story codes:", codes);
@@ -43,19 +45,35 @@ export class GameHandler {
         resolve();
         this.pendingInitializations.delete(gameId);
       }
-    });
+    };
 
-    gameQueueProcessor.events.on("storyUpdated", ({ gameId, story }) => {
-      console.log("[GameHandler] Received story update for game:", gameId);
-      this.storyRepository.storeStory(gameId, story);
-      connectionManager.broadcastStoryUpdate(gameId, story);
-    });
+    this.operationErrorHandler = this.handleOperationError.bind(this);
 
-    // Add centralized error handler
+    // Add event listeners for queue processor events
     gameQueueProcessor.events.on(
-      "operationError",
-      this.handleOperationError.bind(this)
+      "storyInitialized",
+      this.storyInitializedHandler
     );
+    gameQueueProcessor.events.on("operationError", this.operationErrorHandler);
+
+    // Clean up event listeners when socket disconnects
+    this.socket.on("disconnect", () => {
+      console.log(
+        "[GameHandler] Socket disconnected, removing event listeners"
+      );
+      this.removeEventListeners();
+    });
+  }
+
+  /**
+   * Remove all event listeners to prevent memory leaks and duplicate handling
+   */
+  private removeEventListeners(): void {
+    gameQueueProcessor.events.off(
+      "storyInitialized",
+      this.storyInitializedHandler
+    );
+    gameQueueProcessor.events.off("operationError", this.operationErrorHandler);
   }
 
   /**
@@ -426,5 +444,10 @@ export class GameHandler {
     if (currentBeat.choice !== -1) {
       throw new Error("Choice already made for this turn");
     }
+  }
+
+  // Make sure to clean up when handler is no longer needed
+  public dispose(): void {
+    this.removeEventListeners();
   }
 }
