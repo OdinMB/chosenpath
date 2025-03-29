@@ -2,6 +2,10 @@ Smaller and more commits!
 
 # Feature backlog
 
+Next
+
+- Fix rate limits not working online
+- Use React routing thingy for frontend
 - CoT schema attribute to list "show don't tell" elements for the beat.
 
 New features

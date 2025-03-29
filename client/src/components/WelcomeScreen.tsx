@@ -46,13 +46,18 @@ export function WelcomeScreen({
 
   return (
     <div className="max-w-md mx-auto p-6 font-lora">
-      <AppTitle size="large" className="mb-6" />
+      <AppTitle size="large" className="mb-4" />
 
       <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 mb-8 text-sm text-primary-800">
-        <h2 className="font-semibold mb-2">Welcome to the Alpha Experience!</h2>
         <p className="mb-2">
-          Everything is free during this phase. Jump into a story and share your
-          feedback!
+          Step into an <strong>interactive story</strong> where your choices
+          shape the journey. <strong>Create the stories you want</strong>, from
+          space westerns to time travel romances.{" "}
+          <strong>Play solo or with friends</strong>.
+        </p>
+        <p>
+          Everything is free during the alpha phase. Jump into a story and share
+          your feedback!
         </p>
       </div>
 
