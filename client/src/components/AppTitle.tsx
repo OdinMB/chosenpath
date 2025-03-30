@@ -1,9 +1,14 @@
 interface AppTitleProps {
   className?: string;
   size?: "small" | "medium" | "large";
+  onClick?: () => void;
 }
 
-export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
+export function AppTitle({
+  className = "",
+  size = "medium",
+  onClick,
+}: AppTitleProps) {
   // Base size in pixels for each size option
   const baseSizes = {
     small: 128,
@@ -12,7 +17,10 @@ export function AppTitle({ className = "", size = "medium" }: AppTitleProps) {
   };
 
   return (
-    <div className={`text-center ${className}`}>
+    <div
+      className={`text-center ${className} ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+    >
       <div className="inline-block">
         <img
           src="/ChosenPath-512.png"

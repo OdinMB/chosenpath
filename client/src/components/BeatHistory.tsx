@@ -1,3 +1,5 @@
+import { Icons } from "./ui/Icons";
+
 interface BeatHistoryProps {
   currentBeatIndex: number;
   totalBeats: number;
@@ -24,22 +26,10 @@ export function BeatHistory({
         {showPreviousButton ? (
           <button
             onClick={() => onBeatChange(currentBeatIndex - 1)}
-            className="p-2 rounded-lg hover:bg-primary-50 text-primary"
+            className={`p-2 rounded-lg transition-colors ${"text-primary-600 hover:bg-primary-50"}`}
             aria-label="Previous beat"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <Icons.ArrowLeft className="w-5 h-5" />
           </button>
         ) : (
           // Empty div to maintain spacing when button is hidden
@@ -53,22 +43,10 @@ export function BeatHistory({
         {showNextButton ? (
           <button
             onClick={() => onBeatChange(currentBeatIndex + 1)}
-            className="p-2 rounded-lg hover:bg-primary-50 text-primary"
+            className={`p-2 rounded-lg transition-colors ${"text-primary-600 hover:bg-primary-50"}`}
             aria-label="Next beat"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <Icons.ArrowRight className="w-5 h-5" />
           </button>
         ) : (
           // Empty div to maintain spacing when button is hidden

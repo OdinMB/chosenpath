@@ -190,7 +190,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   return (
     <div className="min-h-screen p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        <AppTitle size="large" className="mb-10" />
+        <AppTitle size="large" className="mb-4" onClick={onBack} />
 
         {isConnecting ? (
           <div className="text-center py-4">
@@ -242,7 +242,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                   max={MAX_PLAYERS}
                   value={playerCount}
                   onChange={(e) => setPlayerCount(Number(e.target.value))}
-                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
                   disabled={isLoading}
                 />
                 <div className="flex justify-between text-xs md:text-sm text-primary-600">
@@ -273,7 +273,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                       : 2
                   }
                   onChange={(e) => handleGameModeChange(Number(e.target.value))}
-                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x"
+                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
                   disabled={isLoading || playerCount === 1}
                 />
                 <div className="flex justify-between text-xs md:text-sm text-primary-600">
@@ -375,6 +375,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
                 }
                 isLoading={isLoading || isRequestPending("initialize_story")}
                 fullWidth
+                className="font-semibold text-lg"
               >
                 {isLoading || isRequestPending("initialize_story")
                   ? "Creating Story..."

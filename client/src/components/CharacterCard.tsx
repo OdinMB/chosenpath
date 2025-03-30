@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { ColoredBox } from "./ui/ColoredBox";
 
 interface CharacterCardProps {
   isSelected: boolean;
@@ -12,18 +13,15 @@ export function CharacterCard({
   children,
 }: CharacterCardProps) {
   return (
-    <div
+    <ColoredBox
+      colorType={isSelected ? "tertiary" : "secondary"}
       className={`
-        border-l-4 border rounded-lg p-4 cursor-pointer transition-all duration-200 flex flex-col h-full bg-white
-        ${
-          isSelected
-            ? "border-secondary shadow-md"
-            : "border-primary-100 shadow-sm hover:border-secondary hover:shadow-md"
-        }
+        p-4 cursor-pointer flex flex-col h-full
+        ${!isSelected && "border-secondary-800 hover:border-secondary"}
       `}
       onClick={onClick}
     >
       {children}
-    </div>
+    </ColoredBox>
   );
 }

@@ -12,6 +12,8 @@ import {
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers";
 import { LoadingSpinner } from "./ui/LoadingSpinner";
+import { PrimaryButton } from "./ui/PrimaryButton";
+import { Icons } from "./ui/Icons";
 
 interface Props {
   onExitGame: () => void;
@@ -40,21 +42,11 @@ function StatGroup({
         className="w-full flex items-center justify-center gap-2 hover:text-primary"
       >
         <h4 className="text-primary-700 text-center font-bold">{title}</h4>
-        <svg
+        <Icons.ChevronDown
           className={`w-4 h-4 transition-transform ${
             isExpanded ? "rotate-180" : ""
           }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        />
       </button>
       {isExpanded && (
         <div className="mt-2 grid gap-0">
@@ -168,32 +160,13 @@ export function GameLayout({
           onOpenFeedbackModal={() => setIsFeedbackModalOpen(true)}
         />
 
-        <button
+        <PrimaryButton
           onClick={onExitGame}
-          className="w-full p-3 text-left rounded-lg transition-all duration-300
-              bg-white text-primary cursor-pointer font-lora
-              border-l-8 border border-accent shadow-md
-              hover:border-l-8 hover:border-secondary hover:shadow-lg
-              hover:translate-x-1 hover:bg-primary-50
-              focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
-              flex items-center justify-between"
+          className="w-full"
+          rightIcon={<Icons.LogOut />}
         >
-          <span className="font-semibold text-sm mr-4">Leave story</span>
-          <svg
-            className="w-6 h-6 text-primary-700 flex-shrink-0 ml-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-            />
-          </svg>
-        </button>
+          <span className="font-semibold text-sm mr-4">Leave Story</span>
+        </PrimaryButton>
       </div>
     );
 
@@ -285,21 +258,11 @@ export function GameLayout({
                   : "Show character description"
               }
             >
-              <svg
-                className={`w-5 h-5 transform transition-transform ${
+              <Icons.ChevronDown
+                className={`w-4 h-4 transform transition-transform ${
                   showFluff ? "rotate-180" : ""
                 }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+              />
             </button>
           </div>
           <p className="text-primary-600 text-center">
@@ -342,35 +305,7 @@ export function GameLayout({
         className="fixed top-4 right-4 md:hidden z-30 bg-white p-2 rounded-lg shadow-sm"
         aria-label="Toggle Stats Panel"
       >
-        {showStats ? (
-          <svg
-            className="w-6 h-6 text-primary"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        ) : (
-          <svg
-            className="w-6 h-6 text-primary"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16m-7 6h7"
-            />
-          </svg>
-        )}
+        {showStats ? <Icons.Close /> : <Icons.Menu />}
       </button>
     );
   };

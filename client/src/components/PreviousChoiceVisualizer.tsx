@@ -8,6 +8,8 @@ import {
 import { Resolution } from "../../../shared/types/thread";
 import { Tooltip } from "./ui/Tooltip";
 import { InfoIcon } from "./ui/InfoIcon";
+import { ColoredBox } from "./ui/ColoredBox";
+import { Icons } from "./ui/Icons";
 
 interface PreviousChoiceVisualizerProps {
   choice: {
@@ -251,45 +253,7 @@ export const PreviousChoiceVisualizer: React.FC<
       return (
         <Tooltip content="You chose a path" position="right">
           <div className="text-lg text-primary">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 32 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-10 h-10"
-            >
-              {/* Road starts at bottom center and forks to top left and right */}
-              <path
-                d="M16 29C16 29 16 22 16 19C16 16 18 15 19 14C20 13 22 11 23 9C24 7 24 4 24 4"
-                stroke="#1B1F3A"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-              <path
-                d="M16 19C16 19 14 16 13 15C12 14 10 12 9 10C8 8 8 4 8 4"
-                stroke="#1B1F3A"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-              <circle cx="8" cy="4" r="2.5" fill="#1B1F3A" />
-              <circle cx="24" cy="4" r="2.5" fill="#1B1F3A" />
-              <circle cx="16" cy="29" r="2.5" fill="#1B1F3A" />
-
-              {/* Add small arrows to indicate direction */}
-              <path
-                d="M11 6L8 4L5 6"
-                stroke="#1B1F3A"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M27 6L24 4L21 6"
-                stroke="#1B1F3A"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Icons.Fork className="w-10 h-10" />
           </div>
         </Tooltip>
       );
@@ -355,11 +319,11 @@ export const PreviousChoiceVisualizer: React.FC<
   const getColor = (outcome: string): string => {
     switch (outcome) {
       case "favorable":
-        return "bg-secondary";
+        return "bg-tertiary-800";
       case "mixed":
-        return "bg-secondary bg-opacity-60";
+        return "bg-tertiary-600";
       case "unfavorable":
-        return "bg-secondary bg-opacity-30";
+        return "bg-tertiary-400";
       default:
         return "bg-primary-200";
     }
@@ -455,12 +419,16 @@ export const PreviousChoiceVisualizer: React.FC<
 
   return (
     <div className="max-w-2xl mx-auto mb-4 flex justify-center">
-      <div
+      <ColoredBox
+        colorType="tertiary"
         className={`
-          relative bg-white rounded-lg border-l-8 border border-secondary shadow-md
-          ${expanded ? "p-4 text-lg" : "p-2 px-3"} 
-          ${!expanded && "cursor-pointer hover:shadow-lg transition-shadow"}
-          ${expanded ? "w-full" : "inline-flex items-center justify-between"}
+          relative
+          ${
+            expanded
+              ? "p-4 w-full"
+              : "p-2 px-3 inline-flex items-center justify-between min-w-[100px]"
+          }
+          ${!expanded && "cursor-pointer hover:shadow-lg"}
         `}
         onClick={!expanded ? () => setExpanded(true) : undefined}
       >
@@ -485,18 +453,7 @@ export const PreviousChoiceVisualizer: React.FC<
                 }}
                 aria-label="Collapse details"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <Icons.ChevronUp className="w-5 h-5" />
               </button>
             </div>
 
@@ -595,44 +552,50 @@ export const PreviousChoiceVisualizer: React.FC<
                   </div>
 
                   {/* Info row with Risk, Resource Type, and Points */}
-                  <div className="flex flex-wrap justify-between text-sm gap-4">
-                    <div className="flex items-baseline">
-                      <span className="font-semibold text-primary mr-1">
-                        Risk:
+                  <div className="flex items-center gap-4 flex-wrap text-sm">
+                    <div className="inline-flex items-center">
+                      <span className="font-semibold text-primary">Risk:</span>
+                      <span className="text-primary ml-1">
+                        {getRiskDisplayText(choice.riskType)}
                       </span>
-                      <span className="text-primary flex items-center">
-                        <span>{getRiskDisplayText(choice.riskType)}</span>
+                      <div className="ml-0.5 mt-[7px]">
                         <InfoIcon
                           tooltipText={formatRiskDistribution(choice.riskType)}
                         />
-                      </span>
+                      </div>
                     </div>
 
                     {choice.resourceType && choice.resourceType !== "normal" ? (
-                      <div className="flex items-baseline">
-                        <span className="font-semibold text-primary mr-1 capitalize">
+                      <div className="inline-flex items-center">
+                        <span className="font-semibold text-primary capitalize">
                           {choice.resourceType}:
                         </span>
-                        <InfoIcon
-                          tooltipText={getResourceTypeInfo(choice.resourceType)}
-                        />
+                        <div className="ml-0.5 mt-[7px]">
+                          <InfoIcon
+                            tooltipText={getResourceTypeInfo(
+                              choice.resourceType
+                            )}
+                          />
+                        </div>
                       </div>
                     ) : (
                       resolutionDetails?.points !== undefined && (
-                        <div className="flex items-baseline">
-                          <span className="font-semibold text-primary mr-1">
+                        <div className="inline-flex items-center">
+                          <span className="font-semibold text-primary">
                             {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
                           </span>
-                          <span className="text-primary mr-1">
+                          <span className="text-primary ml-1">
                             {resolutionDetails.points}
                           </span>
                           {resolutionDetails.readablePointModifiers &&
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
-                              <InfoIcon
-                                tooltipText={formatPointBreakdown()}
-                                contentClassName="max-w-[400px]"
-                              />
+                              <div className="ml-0.5 mt-[7px]">
+                                <InfoIcon
+                                  tooltipText={formatPointBreakdown()}
+                                  contentClassName="max-w-[400px]"
+                                />
+                              </div>
                             )}
                         </div>
                       )
@@ -642,20 +605,22 @@ export const PreviousChoiceVisualizer: React.FC<
                     {choice.resourceType &&
                       choice.resourceType !== "normal" &&
                       resolutionDetails?.points !== undefined && (
-                        <div className="flex items-baseline">
-                          <span className="font-semibold text-primary mr-1">
+                        <div className="inline-flex items-center">
+                          <span className="font-semibold text-primary">
                             {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
                           </span>
-                          <span className="text-primary mr-1">
+                          <span className="text-primary ml-1">
                             {resolutionDetails.points}
                           </span>
                           {resolutionDetails.readablePointModifiers &&
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
-                              <InfoIcon
-                                tooltipText={formatPointBreakdown()}
-                                contentClassName="max-w-[400px]"
-                              />
+                              <div className="ml-0.5 mt-[7px]">
+                                <InfoIcon
+                                  tooltipText={formatPointBreakdown()}
+                                  contentClassName="max-w-[400px]"
+                                />
+                              </div>
                             )}
                         </div>
                       )}
@@ -680,22 +645,11 @@ export const PreviousChoiceVisualizer: React.FC<
               }}
               aria-label="Expand details"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <Icons.ChevronDown className="w-5 h-5" />
             </button>
           </>
         )}
-      </div>
+      </ColoredBox>
     </div>
   );
 };

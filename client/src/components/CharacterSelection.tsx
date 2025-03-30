@@ -75,11 +75,13 @@ export function CharacterSelection({
       isSelected={selectedIdentity === index}
       onClick={() => setSelectedIdentity(index)}
     >
-      <h3 className="font-bold text-lg text-primary">{identity.name}</h3>
-      <p className="text-primary-700 mb-2">
+      <h3 className="font-bold text-lg md:text-xl text-primary">
+        {identity.name}
+      </h3>
+      <p className="text-primary-700 mb-3">
         {identity.pronouns.personal}/{identity.pronouns.object}
       </p>
-      <p className="text-primary-600 text-sm">{identity.appearance}</p>
+      <p className="text-primary-600 text-base">{identity.appearance}</p>
     </CharacterCard>
   );
 
@@ -99,10 +101,10 @@ export function CharacterSelection({
         onClick={() => setSelectedBackground(index)}
       >
         <div>
-          <h3 className="font-bold text-lg mb-2 text-primary">
+          <h3 className="font-bold text-lg md:text-xl mb-3 text-primary">
             {background.title}
           </h3>
-          <div className="text-primary-600 text-sm mb-4 min-h-[80px]">
+          <div className="text-primary-600 text-base mb-6 min-h-[80px]">
             {replacePronounPlaceholders(
               background.fluffTemplate,
               selectedIdentityData
@@ -112,7 +114,7 @@ export function CharacterSelection({
 
         {/* Display stats */}
         <div className="mt-auto">
-          <div className="space-y-1">
+          <div className="space-y-2">
             {background.initialPlayerStatValues.map((statValueEntry) => {
               // Find the stat definition in playerStats
               const statDef = storyState.playerStats.find(
@@ -142,33 +144,37 @@ export function CharacterSelection({
 
   return (
     <div className="p-6 max-w-4xl mx-auto font-lora">
-      <h1 className="text-2xl font-bold text-center mb-2 text-primary">
+      <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-primary">
         {storyState.characterSelectionIntroduction?.title || "Who are you?"}
       </h1>
 
       {storyState.characterSelectionIntroduction?.text ? (
-        <p className="mb-8 text-primary-700">
+        <p className="mb-10 text-lg text-primary-700">
           {storyState.characterSelectionIntroduction.text}
         </p>
       ) : (
         <div></div>
       )}
 
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-primary">Identity</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mb-10">
+        <h2 className="text-xl md:text-2xl font-semibold mb-6 text-primary">
+          Identity
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {options.possibleCharacterIdentities.map(renderIdentityCard)}
         </div>
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-primary">Background</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mb-10">
+        <h2 className="text-xl md:text-2xl font-semibold mb-6 text-primary">
+          Background
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {options.possibleCharacterBackgrounds.map(renderBackgroundCard)}
         </div>
       </div>
 
-      <div className="flex flex-col items-center mt-8">
+      <div className="flex flex-col items-center mt-10">
         <PrimaryButton
           onClick={handleConfirmSelection}
           disabled={
@@ -177,7 +183,7 @@ export function CharacterSelection({
             isSelectionPending
           }
           fullWidth
-          className="max-w-md"
+          className="max-w-md text-lg p-6"
           size="lg"
         >
           {isSelectionPending

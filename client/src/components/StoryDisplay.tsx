@@ -16,6 +16,8 @@ import {
   POINTS_FOR_MIXED_RESOLUTION,
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
 } from "../../../shared/config";
+import { PrimaryButton } from "./ui/PrimaryButton";
+import { ColoredBox } from "./ui/ColoredBox";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -312,29 +314,20 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       <div className="space-y-4">
         <div className="mt-6 space-y-3 max-w-2xl mx-auto">
           {currentBeat.options.map((option, index) => (
-            <button
+            <PrimaryButton
               key={index}
               onClick={() => handleChoiceClick(index)}
-              className={`
-                w-full p-4 text-lg text-left rounded-lg transition-all duration-300
-                ${
-                  localSelectedChoice === index
-                    ? "opacity-70 bg-primary-50"
-                    : "bg-white"
-                }
-                text-primary cursor-pointer font-lora
-                border-l-8 border border-accent shadow-md
-                hover:border-l-8 hover:border-secondary hover:shadow-lg
-                hover:translate-x-1
-                focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
-              `}
+              size="lg"
+              className={`w-full text-lg md:text-xl text-left p-6 ${
+                localSelectedChoice === index ? "opacity-70 bg-primary-50" : ""
+              }`}
               disabled={
                 isRequestPending("make_choice") ||
                 localSelectedChoice !== undefined
               }
             >
               {option.text}
-            </button>
+            </PrimaryButton>
           ))}
           {localSelectedChoice !== undefined && (
             <div className="text-center text-primary-600 mt-4">
@@ -400,13 +393,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     return (
       <div className="space-y-4">
         <div className="mt-6 max-w-2xl mx-auto">
-          <div className="bg-white p-4 rounded-lg border-l-8 border border-secondary shadow-md text-lg">
+          <ColoredBox colorType="tertiary" className="p-4 text-lg">
             <div className="flex items-start">
               <span className="text-primary">
                 {beat.options[choiceIndex].text}
               </span>
             </div>
-          </div>
+          </ColoredBox>
         </div>
       </div>
     );

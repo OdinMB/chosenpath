@@ -1,4 +1,5 @@
 import React from "react";
+import { ColoredBox } from "./ColoredBox";
 
 type ButtonVariant = "primary" | "secondary" | "outline";
 type ButtonSize = "sm" | "md" | "lg";
@@ -10,6 +11,8 @@ interface PrimaryButtonProps
   isLoading?: boolean;
   fullWidth?: boolean;
   leftBorder?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
@@ -19,6 +22,8 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   isLoading = false,
   fullWidth = false,
   leftBorder = true,
+  leftIcon,
+  rightIcon,
   className = "",
   disabled,
   ...props
@@ -35,33 +40,28 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   };
 
   const getVariantClasses = (): string => {
-    const disabledClasses =
-      disabled || isLoading
-        ? "text-gray-400 border-gray-300 cursor-not-allowed"
-        : "";
-
-    const baseClasses = "bg-white shadow-md transition-all duration-300";
-
     switch (variant) {
-      case "secondary":
-        return `${baseClasses} border border-secondary ${
-          leftBorder ? "border-l-8" : ""
-        } text-primary hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1 ${disabledClasses}`;
       case "outline":
-        return `${baseClasses} border border-primary-100 text-primary hover:enabled:bg-primary-50 transition-colors duration-200 shadow-sm ${disabledClasses}`;
+        return "text-primary hover:enabled:bg-primary-50 transition-colors duration-200 shadow-sm";
       default:
-        return `${baseClasses} border border-accent ${
-          leftBorder ? "border-l-8" : ""
-        } text-primary hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 ${disabledClasses}`;
+        return "text-primary";
     }
   };
 
   return (
-    <button
-      className={`font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 ${getSizeClasses()} ${getVariantClasses()} ${
-        fullWidth ? "w-full" : ""
-      } ${className}`}
+    <ColoredBox
+      as="button"
+      isActive={variant !== "outline"}
+      leftBorder={leftBorder}
+      colorType={variant === "outline" ? "primary" : "secondary"}
       disabled={disabled || isLoading}
+      className={`
+        font-medium focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
+        ${getSizeClasses()}
+        ${getVariantClasses()}
+        ${fullWidth ? "w-full" : ""}
+        ${className}
+      `}
       {...props}
     >
       {isLoading ? (
@@ -70,8 +70,18 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
           <span>Loading...</span>
         </div>
       ) : (
-        children
+        <div
+          className={`flex items-center ${
+            rightIcon ? "justify-between" : "justify-center"
+          } gap-2`}
+        >
+          <div className="flex items-center gap-2">
+            {leftIcon}
+            {children}
+          </div>
+          {rightIcon}
+        </div>
       )}
-    </button>
+    </ColoredBox>
   );
 };
