@@ -6,7 +6,7 @@ type ColoredBoxBaseProps = {
   children: React.ReactNode;
   isActive?: boolean;
   leftBorder?: boolean;
-  colorType?: "primary" | "secondary" | "tertiary";
+  colorType?: "primary" | "secondary" | "tertiary" | "accent";
   className?: string;
   disabled?: boolean;
 };
@@ -36,12 +36,34 @@ export function ColoredBox<T extends ElementType = "div">({
 
   const getBorderClasses = () => {
     const borderBase = leftBorder ? "border-l-8" : "";
+    const borderClass = "border " + borderBase;
 
+    // Static classes for color types instead of template literals
     if (isActive) {
-      return `border ${borderBase} border-${colorType}-800 hover:enabled:border-${colorType} hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      if (colorType === "primary") {
+        return `${borderClass} border-primary-800 hover:enabled:border-primary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      } else if (colorType === "secondary") {
+        return `${borderClass} border-secondary-800 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      } else if (colorType === "tertiary") {
+        return `${borderClass} border-tertiary-800 hover:enabled:border-tertiary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      } else if (colorType === "accent") {
+        return `${borderClass} border-accent-800 hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      }
     }
 
-    return `border ${borderBase} border-${colorType}`;
+    // Non-active state
+    if (colorType === "primary") {
+      return `${borderClass} border-primary`;
+    } else if (colorType === "secondary") {
+      return `${borderClass} border-secondary`;
+    } else if (colorType === "tertiary") {
+      return `${borderClass} border-tertiary`;
+    } else if (colorType === "accent") {
+      return `${borderClass} border-accent`;
+    }
+
+    // Fallback to secondary
+    return `${borderClass} border-secondary`;
   };
 
   const Element = (as || "div") as "div" | "button";

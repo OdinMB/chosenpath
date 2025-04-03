@@ -9,11 +9,11 @@ export function AppTitle({
   size = "medium",
   onClick,
 }: AppTitleProps) {
-  // Base size in pixels for each size option
-  const baseSizes = {
-    small: 128,
-    medium: 192,
-    large: 256,
+  // Size mappings for different screen sizes
+  const sizeMappings = {
+    small: "w-24 sm:w-32", // 96px, 128px
+    medium: "w-36 sm:w-48", // 144px, 192px
+    large: "w-48 sm:w-64", // 192px, 256px
   };
 
   return (
@@ -25,10 +25,7 @@ export function AppTitle({
         <img
           src="/ChosenPath-512.png"
           alt="ChosenPath.ai"
-          className="w-full object-contain -my-6"
-          style={{
-            width: baseSizes[size],
-          }}
+          className={`${sizeMappings[size]} object-contain -my-4 sm:-my-6`}
         />
       </div>
     </div>
