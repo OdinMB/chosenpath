@@ -9,7 +9,7 @@ import {
 } from "shared/types/index.js";
 import { config } from "../config/env.js";
 import { connectionManager } from "../services/ConnectionManager.js";
-import { RateLimitedAction } from "shared/config.js";
+import { RateLimitedAction, SOCKET_CONFIG } from "shared/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,
@@ -36,6 +36,9 @@ export class GameWebSocketServer {
         methods: ["GET", "POST"],
       },
       path: "/socket.io",
+      // Add Socket.IO keep-alive configurations
+      pingInterval: SOCKET_CONFIG.SERVER.pingInterval,
+      pingTimeout: SOCKET_CONFIG.SERVER.pingTimeout,
     });
 
     // Set io instance in ConnectionManager
@@ -124,6 +127,19 @@ export class GameWebSocketServer {
             `[WebSocket] Error handling disconnect for ${socket.id}:`,
             error
           );
+        }
+      });
+
+      // Handle heartbeat messages
+      socket.on("heartbeat", (data) => {
+        console.log(`[WebSocket] Heartbeat from client: ${socket.id}`);
+
+        // Echo back a heartbeat response to confirm the connection is alive
+        socket.emit("heartbeat", { timestamp: Date.now() });
+
+        // If this socket is associated with a session, update its last active timestamp
+        if (data && data.sessionId) {
+          connectionManager.updateLastActive(data.sessionId, socket.id);
         }
       });
 

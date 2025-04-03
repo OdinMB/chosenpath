@@ -55,6 +55,27 @@ export const RATE_LIMITS: Record<
   },
 };
 
+// WebSocket keep-alive configuration
+export const SOCKET_CONFIG = {
+  // Client-side configuration
+  CLIENT: {
+    timeout: 180000, // 3 minutes in ms
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    heartbeatInterval: 30000, // Send heartbeat every 30 seconds
+  },
+
+  // Server-side configuration
+  SERVER: {
+    pingInterval: 25000, // Default ping interval (25 seconds)
+    pingTimeout: 180000, // 3 minutes ping timeout
+  },
+
+  // When to show the reload message after tab becomes visible again
+  STALE_CONNECTION_THRESHOLD_MS: 180000, // 3 minutes
+};
+
 // Storage paths configuration
 export const STORAGE_PATHS = {
   development: {

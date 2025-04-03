@@ -17,6 +17,9 @@ export type SessionContextType = {
   // Rate limiting
   rateLimit: RateLimitInfo | null;
   setRateLimit: (rateLimit: RateLimitInfo | null) => void;
+  // Connection status
+  connectionStale: string | null;
+  setConnectionStale: (message: string | null) => void;
   // Request status utilities
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
@@ -36,6 +39,8 @@ export const SessionContext = createContext<SessionContextType>({
   setError: () => {},
   rateLimit: null,
   setRateLimit: () => {},
+  connectionStale: null,
+  setConnectionStale: () => {},
   isRequestPending: () => false,
   isOperationRunning: () => false,
 });

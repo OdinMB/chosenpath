@@ -17,6 +17,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
+  const [connectionStale, setConnectionStale] = useState<string | null>(null);
 
   // Use a ref to track the loading state without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -142,6 +143,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    wsService.onMessage("connection_stale", (data: WSServerMessage) => {
+      if (data.type === "connection_stale" && "message" in data) {
+        console.log("[SessionProvider] Connection stale:", data.message);
+        setConnectionStale(data.message as string);
+        setIsLoading(false);
+      }
+    });
+
     const savedSessionId = localStorage.getItem("sessionId");
     wsService.connect(savedSessionId || undefined);
 
@@ -161,6 +170,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [rateLimit]);
 
+  useEffect(() => {
+    if (connectionStale) {
+      // Show a notification to the user that they need to refresh
+      // This could trigger a UI overlay or other notification
+      // You could also add logic here to auto-refresh if desired
+      // window.location.reload();
+    }
+  }, [connectionStale]);
+
   const value = {
     storyState,
     setStoryState,
@@ -175,6 +193,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setError,
     rateLimit,
     setRateLimit,
+    connectionStale,
+    setConnectionStale,
     isRequestPending: (type: string) => wsService.isRequestPending(type),
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
   };
