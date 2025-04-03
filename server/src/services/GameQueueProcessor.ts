@@ -99,14 +99,23 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       playerCodes,
     });
 
-    // Emit the initialization event
+    // Store and broadcast the story update
+    await this.updateAndBroadcastStory(gameId, storyWithCodes);
+
+    // Emit the initialization event after storing and broadcasting
     this.events.emit("storyInitialized", {
       gameId: operation.gameId,
       story: storyWithCodes,
     });
 
-    // Store and broadcast the story update
-    await this.updateAndBroadcastStory(gameId, storyWithCodes);
+    // Send story_ready_notification to all clients to indicate the story is ready to join
+    const io = connectionManager.getIo();
+    if (io) {
+      io.to(gameId).emit("story_ready_notification", {
+        type: "story_ready_notification",
+        gameId,
+      });
+    }
   }
 
   private async handleMoveStoryForward(

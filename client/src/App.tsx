@@ -21,6 +21,8 @@ function App() {
     setSessionId,
     storyCodes,
     setStoryCodes,
+    storyReady,
+    setStoryReady,
     error,
     setError,
     rateLimit,
@@ -199,6 +201,7 @@ function App() {
   }) => {
     setIsLoading(true);
     setPlayerCode(null);
+    setStoryReady(false); // Reset story ready state when starting a new story
     localStorage.removeItem(playerCodeKey);
     gameService.initializeStory(
       options.prompt,
@@ -395,6 +398,7 @@ function App() {
             codes={storyCodes}
             onBack={() => setViewState("WELCOME")}
             onCodeSubmit={handleCodeSubmit}
+            storyReady={storyReady}
           />
         ) : (
           <StoryInitializer

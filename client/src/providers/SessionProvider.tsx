@@ -18,6 +18,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
+  const [storyReady, setStoryReady] = useState(false);
 
   // Use a ref to track the loading state without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -119,6 +120,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           data.codes
         );
         setStoryCodes(data.codes);
+        setStoryReady(false);
+        setIsLoading(false);
+      }
+    });
+
+    wsService.onMessage("story_ready_notification", (data: WSServerMessage) => {
+      if (data.type === "story_ready_notification") {
+        console.log(
+          "[SessionProvider] Story generation completed and ready to join"
+        );
+        setStoryReady(true);
         setIsLoading(false);
       }
     });
@@ -154,7 +166,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const savedSessionId = localStorage.getItem("sessionId");
     wsService.connect(savedSessionId || undefined);
 
+    // Auto-reconnect when becoming visible if connection is lost
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !wsService.isConnected()) {
+        console.log(
+          "[SessionProvider] Tab became visible, reconnecting if needed"
+        );
+        wsService.connect();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       wsService.disconnect();
       wsService.clearMessageHandlers();
     };
@@ -189,6 +214,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     isConnecting,
     storyCodes,
     setStoryCodes,
+    storyReady,
+    setStoryReady,
     error,
     setError,
     rateLimit,

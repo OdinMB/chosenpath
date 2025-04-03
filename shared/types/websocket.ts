@@ -205,6 +205,11 @@ export interface StoryCodesNotification extends BaseServerNotification {
   codes: Record<string, string>;
 }
 
+export interface StoryReadyNotification extends BaseServerNotification {
+  type: "story_ready_notification";
+  gameId: string;
+}
+
 export interface ActivePlayersNotification extends BaseServerNotification {
   type: "active_players_notification";
   gameId: string;
@@ -231,6 +236,7 @@ export interface GameErrorNotification extends BaseServerNotification {
 export type WSServerNotification =
   | StateUpdateNotification
   | StoryCodesNotification
+  | StoryReadyNotification
   | ActivePlayersNotification
   | GameErrorNotification;
 

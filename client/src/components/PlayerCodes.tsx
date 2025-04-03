@@ -1,13 +1,20 @@
 import { AppTitle } from "./AppTitle";
 import { PrimaryButton } from "./ui/PrimaryButton";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;
   onBack: () => void;
   onCodeSubmit: (code: string) => void;
+  storyReady: boolean;
 }
 
-export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
+export function PlayerCodes({
+  codes,
+  onBack,
+  onCodeSubmit,
+  storyReady,
+}: PlayerCodesProps) {
   const formatPlayerName = (slot: string) => {
     // Convert "player1" to "Player 1"
     return slot.replace(/player(\d+)/, (_, num) => `Player ${num}`);
@@ -22,6 +29,33 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
         <AppTitle size="large" className="mb-10" />
 
         <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-6">
+          {!storyReady && (
+            <div className="bg-primary-50 border-l-4 border-primary-200 p-4 mb-6 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-primary-600"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-primary-700">
+                    {!storyReady
+                      ? "Your story is being created. Please wait a moment before joining."
+                      : "Save these codes! Each player will need their code to access their character."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!isSinglePlayer && (
             <div className="bg-primary-50 border-l-4 border-primary-200 p-4 mb-6 rounded-md">
               <div className="flex">
@@ -59,6 +93,12 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                 </div>
               </div>
 
+              {!storyReady && (
+                <div className="mb-4 text-center">
+                  <LoadingSpinner message="Creating your story. This should take less than a minute..." />
+                </div>
+              )}
+
               <div className="flex flex-row gap-3 pt-2">
                 <PrimaryButton
                   onClick={onBack}
@@ -73,8 +113,12 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                   onClick={() => onCodeSubmit(singlePlayerCode!)}
                   fullWidth
                   size="lg"
+                  disabled={!storyReady}
+                  title={
+                    !storyReady ? "Please wait for your story to be ready" : ""
+                  }
                 >
-                  Join the Story
+                  {storyReady ? "Join the Story" : "Waiting for Story..."}
                 </PrimaryButton>
               </div>
             </>
@@ -96,13 +140,25 @@ export function PlayerCodes({ codes, onBack, onCodeSubmit }: PlayerCodesProps) {
                       <PrimaryButton
                         onClick={() => onCodeSubmit(code)}
                         className="ml-4"
+                        disabled={!storyReady}
+                        title={
+                          !storyReady
+                            ? "Please wait for your story to be ready"
+                            : ""
+                        }
                       >
-                        Join the Story
+                        {storyReady ? "Join the Story" : "Waiting..."}
                       </PrimaryButton>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {!storyReady && (
+                <div className="mb-4 text-center">
+                  <LoadingSpinner message="Creating your story. This should take less than a minute..." />
+                </div>
+              )}
 
               <div className="flex justify-center">
                 <PrimaryButton

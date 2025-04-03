@@ -12,6 +12,7 @@ import { randomUUID } from "crypto";
 import type { OperationErrorEvent } from "../types/queue.js";
 import type {
   StoryCodesNotification,
+  StoryReadyNotification,
   SelectCharacterResponse,
   MakeChoiceResponse,
   InitializeStoryResponse,
@@ -34,16 +35,19 @@ export class GameHandler {
 
     // Create bound handlers that we can remove later
     this.storyInitializedHandler = ({ gameId, story }) => {
-      if (this.pendingInitializations.has(gameId)) {
-        const { resolve, codes } = this.pendingInitializations.get(gameId)!;
-        console.log("[GameHandler] Emitting story codes:", codes);
-        this.socket.emit("story_codes_notification", {
-          type: "story_codes_notification",
-          gameId,
-          codes,
-        } as StoryCodesNotification);
+      console.log("[GameHandler] Story initialized for game:", gameId);
+
+      // Since codes have been sent immediately, we now just need to notify
+      // that the story is ready to be joined
+      this.socket.emit("story_ready_notification", {
+        type: "story_ready_notification",
+        gameId,
+      } as StoryReadyNotification);
+
+      if (this.pendingOperations.has(gameId)) {
+        const { resolve } = this.pendingOperations.get(gameId)!;
         resolve();
-        this.pendingInitializations.delete(gameId);
+        this.pendingOperations.delete(gameId);
       }
     };
 
@@ -173,12 +177,21 @@ export class GameHandler {
         connectionManager.registerCode(gameId, slot as PlayerSlot, code);
       });
 
+      // Send the codes immediately so the client has them
+      console.log(
+        "[GameHandler] Immediately emitting story codes:",
+        playerCodes
+      );
+      this.socket.emit("story_codes_notification", {
+        type: "story_codes_notification",
+        gameId,
+        codes: playerCodes,
+      } as StoryCodesNotification);
+
       // Create a promise that will resolve when initialization is complete
       await new Promise<void>(async (resolve, reject) => {
-        this.pendingInitializations.set(gameId, {
-          resolve,
-          codes: playerCodes,
-        });
+        // Store the resolve/reject handlers for later use
+        this.pendingOperations.set(gameId, { resolve, reject });
 
         // Queue the story initialization
         const operationId = await gameQueueProcessor.addOperation({
@@ -193,9 +206,6 @@ export class GameHandler {
             playerCodes,
           },
         });
-
-        // Store the operation ID for error handling
-        this.pendingOperations.set(operationId, { resolve, reject });
 
         // Send response once we have the actual operationId string
         const requestResponse = {

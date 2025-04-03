@@ -12,6 +12,8 @@ export type SessionContextType = {
   isConnecting: boolean;
   storyCodes: Record<string, string> | null;
   setStoryCodes: (codes: Record<string, string> | null) => void;
+  storyReady: boolean;
+  setStoryReady: (ready: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
   // Rate limiting
@@ -35,6 +37,8 @@ export const SessionContext = createContext<SessionContextType>({
   isConnecting: true,
   storyCodes: null,
   setStoryCodes: () => {},
+  storyReady: false,
+  setStoryReady: () => {},
   error: null,
   setError: () => {},
   rateLimit: null,

@@ -6,9 +6,10 @@ import {
   StoryCodesNotification,
   GameErrorNotification,
   RateLimitInfo,
-} from "../../../shared/types/websocket";
+  StoryReadyNotification,
+} from "../../../shared/types/websocket.js";
 import { RateLimitedAction, SOCKET_CONFIG } from "../../../shared/config.js";
-import type { ClientStoryState } from "../../../shared/types/story";
+import type { ClientStoryState } from "../../../shared/types/story.js";
 import { config } from "../config";
 
 type MessageHandler = (data: WSServerMessage) => void;
@@ -457,19 +458,6 @@ export class WebSocketService {
           "[WebSocketService] Player codes notification received:",
           data
         );
-
-        // Always clear the background operation when codes are received
-        if (this.isOperationRunning("initialize_story")) {
-          console.log(
-            "[WebSocketService] Clearing initialize_story background operation after receiving codes notification"
-          );
-          this.removeBackgroundOperation("initialize_story");
-        } else {
-          console.log(
-            "[WebSocketService] Note: initialize_story operation was not running when codes notification received"
-          );
-        }
-
         const handler = this.messageHandlers.get("story_codes_notification");
         if (handler) {
           handler(data);
@@ -620,6 +608,34 @@ export class WebSocketService {
             );
             handler(errorInfo);
           }
+        }
+      }
+    );
+
+    // Handle story_ready_notification events
+    this.socket.on(
+      "story_ready_notification",
+      (data: StoryReadyNotification) => {
+        console.log(
+          "[WebSocketService] Story ready notification received:",
+          data
+        );
+
+        // Clear any pending background initialize_story operation
+        if (this.isOperationRunning("initialize_story")) {
+          console.log(
+            "[WebSocketService] Clearing initialize_story background operation after story ready"
+          );
+          this.removeBackgroundOperation("initialize_story");
+        }
+
+        const handler = this.messageHandlers.get("story_ready_notification");
+        if (handler) {
+          handler(data);
+        } else {
+          console.warn(
+            "[WebSocketService] No handler for story_ready_notification"
+          );
         }
       }
     );

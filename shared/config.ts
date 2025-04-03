@@ -35,8 +35,8 @@ export const RATE_LIMITS: Record<
 > = {
   // Allow 1 request per 15 minutes for createStory
   initialize_story: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 1,
+    windowMs: 30 * 60 * 1000, // 30 minutes
+    maxRequests: 2,
   },
   // Game choices rate limiting
   make_choice: {

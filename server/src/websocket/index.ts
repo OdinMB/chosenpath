@@ -449,6 +449,14 @@ export class GameWebSocketServer {
     });
   }
 
+  // Send story ready notification to clients
+  public sendStoryReady(storyId: string): void {
+    this.io.to(storyId).emit("story_ready_notification", {
+      type: "story_ready_notification",
+      gameId: storyId,
+    });
+  }
+
   private broadcastActivePlayersUpdate(storyId: string): void {
     const activePlayers = connectionManager.getActivePlayersInGame(storyId);
     this.io.to(storyId).emit("active_players_notification", {

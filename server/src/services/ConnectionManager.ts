@@ -41,6 +41,10 @@ export class ConnectionManager {
     this.io = io;
   }
 
+  getIo(): Server | undefined {
+    return this.io;
+  }
+
   createGameSession(storyId: string, userId?: string): void {
     Logger.ConnectionManager.log("Creating game session:", {
       storyId,
@@ -409,6 +413,15 @@ export class ConnectionManager {
         `Received heartbeat from unmapped socket ${socketId} for session ${sessionId}`
       );
     }
+  }
+
+  // Get player codes for a story - now gets directly from Story Repository
+  async getPlayerCodes(
+    storyId: string
+  ): Promise<Record<string, string> | undefined> {
+    // Get the story from repository instead of from session
+    const story = await storyRepository.getStory(storyId);
+    return story?.getPlayerCodes();
   }
 }
 
