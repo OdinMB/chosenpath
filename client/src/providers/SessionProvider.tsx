@@ -5,7 +5,66 @@ import type {
   RateLimitInfo,
 } from "../../../shared/types/websocket";
 import { wsService } from "../services/WebSocketService.js";
-import { SessionContext } from "../contexts/SessionContext.js";
+import { SessionContext, StoredCodeSet } from "../contexts/SessionContext.js";
+
+// Function to store codes in localStorage
+function storeCodeSet(codes: Record<string, string>, title?: string): void {
+  const codeSet: StoredCodeSet = {
+    codes,
+    timestamp: Date.now(),
+    title,
+  };
+
+  // Get existing code sets
+  const existingSetsJSON = localStorage.getItem("storyCodes");
+  const existingSets: StoredCodeSet[] = existingSetsJSON
+    ? JSON.parse(existingSetsJSON)
+    : [];
+
+  // Add new code set
+  existingSets.push(codeSet);
+
+  // Save back to localStorage
+  localStorage.setItem("storyCodes", JSON.stringify(existingSets));
+}
+
+// Function to get all stored code sets
+function getStoredCodeSets(): StoredCodeSet[] {
+  const setsJSON = localStorage.getItem("storyCodes");
+  return setsJSON ? JSON.parse(setsJSON) : [];
+}
+
+// Function to update a stored set with a new code
+function updateStoredSetWithCode(
+  code: string,
+  playerRole: string,
+  title?: string
+): void {
+  const sets = getStoredCodeSets();
+
+  // Find if any set contains this code
+  for (const set of sets) {
+    if (Object.values(set.codes).includes(code)) {
+      // Update the set with the new player role and code
+      set.codes[playerRole] = code;
+      // Update title if provided and not already set
+      if (title && !set.title) {
+        set.title = title;
+      }
+      localStorage.setItem("storyCodes", JSON.stringify(sets));
+      return;
+    }
+  }
+
+  // If no set contains this code, create a new one
+  const newSet: StoredCodeSet = {
+    codes: { [playerRole]: code },
+    timestamp: Date.now(),
+    title,
+  };
+  sets.push(newSet);
+  localStorage.setItem("storyCodes", JSON.stringify(sets));
+}
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyState, setStoryState] = useState<ClientStoryState | null>(null);
@@ -19,6 +78,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
   const [storyReady, setStoryReady] = useState(false);
+  const [storedCodeSets, setStoredCodeSets] = useState<StoredCodeSet[]>(
+    getStoredCodeSets()
+  );
+
+  // Function to delete a code set by timestamp
+  function handleDeleteCodeSet(timestamp: number): void {
+    const sets = getStoredCodeSets();
+    const filteredSets = sets.filter((set) => set.timestamp !== timestamp);
+    localStorage.setItem("storyCodes", JSON.stringify(filteredSets));
+    setStoredCodeSets(filteredSets);
+  }
 
   // Use a ref to track the loading state without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -121,7 +191,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         );
         setStoryCodes(data.codes);
         setStoryReady(false);
-        setIsLoading(false);
+
+        // Store codes in localStorage
+        storeCodeSet(data.codes);
+        setStoredCodeSets(getStoredCodeSets());
       }
     });
 
@@ -142,6 +215,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           setStoryState(data.data.state);
           setIsLoading(false);
           setIsConnecting(false);
+
+          // Try to find the player role from the data directly or compute it
+          let playerRole = "player1"; // Default fallback
+          if (data.data.state.players) {
+            // Find the first and only player in ClientStoryState
+            const playerKeys = Object.keys(data.data.state.players);
+            if (playerKeys.length > 0) {
+              playerRole = playerKeys[0];
+            }
+          }
+
+          const title = data.data.state.title;
+
+          // Store or update the code
+          updateStoredSetWithCode(data.data.code, playerRole, title);
+          setStoredCodeSets(getStoredCodeSets());
         } else if ("errorMessage" in data) {
           console.log(
             "[SessionProvider] Code verification failed:",
@@ -224,6 +313,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setConnectionStale,
     isRequestPending: (type: string) => wsService.isRequestPending(type),
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
+    storedCodeSets,
+    getStoredCodeSets,
+    deleteCodeSet: handleDeleteCodeSet,
   };
 
   return (

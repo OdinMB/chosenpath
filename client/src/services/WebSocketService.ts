@@ -130,8 +130,6 @@ export class WebSocketService {
   private isConnecting = false;
   private readonly MAX_RECONNECT_ATTEMPTS =
     SOCKET_CONFIG.CLIENT.reconnectionAttempts;
-  private heartbeatInterval: number | null = null;
-  private tabInactiveStartTime: number | null = null;
   // Track pending requests by their type
   private pendingRequests = new Set<string>();
   // Track background operations
@@ -147,97 +145,11 @@ export class WebSocketService {
     this.playerCode = localStorage.getItem(playerCodeKey);
     this.sessionId = localStorage.getItem("sessionId");
 
-    // Set up visibility change handler to detect tab switching
-    this.setupVisibilityChangeHandler();
-
     console.log("[WebSocketService] Initialized with:", {
       tabId: this.tabId,
       playerCode: this.playerCode,
       sessionId: this.sessionId,
     });
-  }
-
-  // Set up handler for document visibility changes
-  private setupVisibilityChangeHandler() {
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        // Tab is now inactive - record the time
-        this.tabInactiveStartTime = Date.now();
-        console.log(
-          "[WebSocketService] Tab inactive, timestamp:",
-          this.tabInactiveStartTime
-        );
-      } else if (document.visibilityState === "visible") {
-        // Tab is now active again
-        if (this.tabInactiveStartTime) {
-          const inactiveDuration = Date.now() - this.tabInactiveStartTime;
-          console.log(
-            "[WebSocketService] Tab active again after",
-            inactiveDuration,
-            "ms"
-          );
-
-          // If inactive for longer than our threshold, check connection
-          if (inactiveDuration > SOCKET_CONFIG.STALE_CONNECTION_THRESHOLD_MS) {
-            if (!this.socket?.connected) {
-              console.log(
-                "[WebSocketService] Connection stale after inactive period, showing reconnect message"
-              );
-
-              // Notify about stale connection
-              const handler = this.messageHandlers.get("connection_stale");
-              if (handler) {
-                handler({
-                  type: "connection_stale",
-                  message:
-                    "Connection lost while tab was inactive. Please refresh the page.",
-                } as unknown as WSServerMessage);
-              }
-            } else {
-              console.log(
-                "[WebSocketService] Connection survived inactive period"
-              );
-            }
-          }
-
-          // Always check if we have pending operations
-          const hasPendingOperations =
-            this.pendingRequests.size > 0 || this.backgroundOperations.size > 0;
-
-          if (hasPendingOperations && !this.socket?.connected) {
-            console.log(
-              "[WebSocketService] Reconnecting due to pending operations after visibility change"
-            );
-            this.connect();
-          }
-
-          this.tabInactiveStartTime = null;
-        }
-      }
-    });
-  }
-
-  // Start heartbeat to keep connection alive
-  private setupHeartbeat() {
-    // Clear any existing heartbeat
-    if (this.heartbeatInterval !== null) {
-      clearInterval(this.heartbeatInterval);
-    }
-
-    // Setup new heartbeat
-    this.heartbeatInterval = window.setInterval(() => {
-      if (this.socket?.connected) {
-        console.log("[WebSocketService] Sending heartbeat");
-        this.socket.emit("heartbeat", { sessionId: this.sessionId });
-      }
-    }, SOCKET_CONFIG.CLIENT.heartbeatInterval);
-  }
-
-  private clearHeartbeat() {
-    if (this.heartbeatInterval !== null) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
   }
 
   // Track a request that's waiting for a response
@@ -331,12 +243,11 @@ export class WebSocketService {
       reconnectionAttempts: this.MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: SOCKET_CONFIG.CLIENT.reconnectionDelay,
       reconnectionDelayMax: SOCKET_CONFIG.CLIENT.reconnectionDelayMax,
-      timeout: SOCKET_CONFIG.CLIENT.timeout, // Use the 3-minute timeout
+      timeout: SOCKET_CONFIG.CLIENT.timeout,
       forceNew: false,
     });
 
     this.setupSocketHandlers();
-    this.setupHeartbeat();
   }
 
   private setupSocketHandlers() {
@@ -661,11 +572,6 @@ export class WebSocketService {
         }
       }
     );
-
-    // Add heartbeat response handler
-    this.socket?.on("heartbeat", () => {
-      console.log("[WebSocketService] Received heartbeat response");
-    });
   }
 
   onMessage(type: string, handler: MessageHandler) {
@@ -715,8 +621,6 @@ export class WebSocketService {
   }
 
   disconnect(clearCode = false) {
-    this.clearHeartbeat();
-
     if (this.socket) {
       console.log("[WebSocketService] Manually disconnecting socket:", {
         socketId: this.socket.id,

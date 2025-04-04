@@ -2,6 +2,13 @@ import { createContext } from "react";
 import type { ClientStoryState } from "../../../shared/types/story";
 import type { RateLimitInfo } from "../../../shared/types/websocket";
 
+// Interface for story code sets stored in localStorage
+export interface StoredCodeSet {
+  codes: Record<string, string>;
+  timestamp: number;
+  title?: string;
+}
+
 export type SessionContextType = {
   storyState: ClientStoryState | null;
   setStoryState: (state: ClientStoryState | null) => void;
@@ -25,6 +32,10 @@ export type SessionContextType = {
   // Request status utilities
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
+  // Stored code sets
+  storedCodeSets: StoredCodeSet[];
+  getStoredCodeSets: () => StoredCodeSet[];
+  deleteCodeSet: (timestamp: number) => void;
 };
 
 export const SessionContext = createContext<SessionContextType>({
@@ -47,4 +58,7 @@ export const SessionContext = createContext<SessionContextType>({
   setConnectionStale: () => {},
   isRequestPending: () => false,
   isOperationRunning: () => false,
+  storedCodeSets: [],
+  getStoredCodeSets: () => [],
+  deleteCodeSet: () => {},
 });

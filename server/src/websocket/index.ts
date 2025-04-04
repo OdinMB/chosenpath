@@ -6,6 +6,8 @@ import {
   PlayerCount,
   ResponseStatus,
   StateUpdateNotification,
+  VerifyCodeResponse,
+  ErrorResponse,
 } from "shared/types/index.js";
 import { config } from "../config/env.js";
 import { connectionManager } from "../services/ConnectionManager.js";
@@ -127,19 +129,6 @@ export class GameWebSocketServer {
             `[WebSocket] Error handling disconnect for ${socket.id}:`,
             error
           );
-        }
-      });
-
-      // Handle heartbeat messages
-      socket.on("heartbeat", (data) => {
-        console.log(`[WebSocket] Heartbeat from client: ${socket.id}`);
-
-        // Echo back a heartbeat response to confirm the connection is alive
-        socket.emit("heartbeat", { timestamp: Date.now() });
-
-        // If this socket is associated with a session, update its last active timestamp
-        if (data && data.sessionId) {
-          connectionManager.updateLastActive(data.sessionId, socket.id);
         }
       });
 
@@ -380,8 +369,8 @@ export class GameWebSocketServer {
                 status: ResponseStatus.SUCCESS,
                 requestId: data.requestId || crypto.randomUUID(),
                 timestamp: Date.now(),
-                data: { state: result.state },
-              });
+                data: { code: data.code, state: result.state },
+              } as VerifyCodeResponse);
             } else {
               // Send error response
               socket.emit("response", {
@@ -390,7 +379,7 @@ export class GameWebSocketServer {
                 requestId: data.requestId || crypto.randomUUID(),
                 timestamp: Date.now(),
                 errorMessage: "Invalid code",
-              });
+              } as ErrorResponse);
             }
           } catch (error) {
             console.error("[WebSocket] Error verifying code:", error);
@@ -403,7 +392,7 @@ export class GameWebSocketServer {
                 error instanceof Error
                   ? error.message
                   : "Failed to verify code",
-            });
+            } as ErrorResponse);
           }
         }
       );

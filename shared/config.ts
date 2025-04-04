@@ -1,6 +1,6 @@
 // Only enable mocks in development environment
 export const MOCK_STORIES_IN_DEVELOPMENT = true;
-export const MOCK_STORIES_DELAY_MS = 3000;
+export const MOCK_STORIES_DELAY_MS = 30 * 1000;
 
 // Story settings
 export const MIN_PLAYERS = 1;
@@ -63,7 +63,6 @@ export const SOCKET_CONFIG = {
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    heartbeatInterval: 30000, // Send heartbeat every 30 seconds
   },
 
   // Server-side configuration

@@ -378,43 +378,6 @@ export class ConnectionManager {
     });
   }
 
-  /**
-   * Updates the last active timestamp for a socket and its associated player
-   * @param sessionId The session ID from the heartbeat
-   * @param socketId The socket ID sending the heartbeat
-   */
-  updateLastActive(sessionId: string, socketId: string): void {
-    // Check if socket is mapped to a player
-    const playerInfo = this.socketMap.get(socketId);
-
-    if (playerInfo) {
-      const { storyId, playerSlot } = playerInfo;
-
-      // Get the game session
-      const session = this.gameSessions.get(storyId);
-      if (!session) return;
-
-      // Get the player connection
-      const player = session.players.get(playerSlot);
-      if (!player) return;
-
-      // Update the last active timestamp
-      player.lastActive = new Date();
-      Logger.ConnectionManager.log(
-        `Updated last active time for socket ${socketId} in story ${storyId}`
-      );
-    } else if (sessionId) {
-      // If socket isn't mapped but we have a sessionId, try to find the session
-      const session = this.gameSessions.get(sessionId);
-      if (!session) return;
-
-      // Just log that we received a heartbeat but couldn't map it to a player
-      Logger.ConnectionManager.log(
-        `Received heartbeat from unmapped socket ${socketId} for session ${sessionId}`
-      );
-    }
-  }
-
   // Get player codes for a story - now gets directly from Story Repository
   async getPlayerCodes(
     storyId: string

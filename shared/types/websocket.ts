@@ -159,6 +159,7 @@ export interface SelectCharacterResponse extends SuccessResponse {
 export interface VerifyCodeResponse extends SuccessResponse {
   type: "verify_code_response";
   data: {
+    code: string;
     state: ClientStoryState;
   };
 }

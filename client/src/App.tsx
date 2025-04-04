@@ -263,31 +263,6 @@ function App() {
     gameService.selectCharacter(identityIndex, backgroundIndex);
   };
 
-  const handleDeleteCode = useCallback(() => {
-    console.log("[App] Deleting player code:", playerCode);
-
-    // Clear player code from local storage and state
-    localStorage.removeItem(playerCodeKey);
-    setPlayerCode(null);
-
-    // Reset session state
-    setSessionId(null);
-    localStorage.removeItem("sessionId");
-
-    // Force reconnection to ensure we have a valid connection
-    // Pass true to clear the player code in WebSocketService
-    wsService.disconnect(true);
-    wsService.connect();
-
-    // Reset creating session flag to trigger a new session request
-    setIsCreatingSession(false);
-
-    // Set view state to WELCOME
-    loggedSetViewState("WELCOME");
-
-    console.log("[App] Player code deleted");
-  }, [playerCode, playerCodeKey, loggedSetViewState, setSessionId]);
-
   // Add error and rate limit display
   const Notifications = () => (
     <>
@@ -380,7 +355,6 @@ function App() {
             onCodeSubmit={handleCodeSubmit}
             onNewStory={handleNewStory}
             existingPlayerCode={playerCode}
-            onDeleteCode={handleDeleteCode}
           />
         );
 
