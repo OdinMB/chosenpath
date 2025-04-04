@@ -224,6 +224,8 @@ function App() {
     setStoryState(null);
     setStoryCodes(null);
     setSessionId(null);
+    setPlayerCode(null);
+    localStorage.removeItem(playerCodeKey);
     loggedSetViewState("WELCOME");
   };
 
@@ -354,7 +356,6 @@ function App() {
           <WelcomeScreen
             onCodeSubmit={handleCodeSubmit}
             onNewStory={handleNewStory}
-            existingPlayerCode={playerCode}
           />
         );
 
@@ -373,6 +374,7 @@ function App() {
             onBack={() => setViewState("WELCOME")}
             onCodeSubmit={handleCodeSubmit}
             storyReady={storyReady}
+            onGoToWelcome={() => setViewState("WELCOME")}
           />
         ) : (
           <StoryInitializer

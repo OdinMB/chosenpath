@@ -10,7 +10,6 @@ import { StoredCodeSet } from "../contexts/SessionContext";
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
-  existingPlayerCode: string | null;
 }
 
 // Helper function to format timestamp
@@ -45,7 +44,6 @@ function formatPlayerLabel(player: string, isFirstPlayer: boolean): string {
 export function WelcomeScreen({
   onCodeSubmit,
   onNewStory,
-  existingPlayerCode,
 }: WelcomeScreenProps) {
   const [code, setCode] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -54,24 +52,13 @@ export function WelcomeScreen({
 
   const { storedCodeSets, deleteCodeSet } = useSession();
 
-  // Find the code set that contains the existing player code
-  const resumeCodeSetIndex = existingPlayerCode
-    ? storedCodeSets.findIndex((codeSet) =>
-        Object.values(codeSet.codes).includes(existingPlayerCode)
-      )
-    : -1;
-
-  // Sort code sets to put the resume code set at the top
+  // Sort code sets to put the lastActive code set at the top
   const sortedCodeSets = [...storedCodeSets].sort((a, b) => {
-    const aHasResumeCode =
-      resumeCodeSetIndex >= 0 && a === storedCodeSets[resumeCodeSetIndex];
-    const bHasResumeCode =
-      resumeCodeSetIndex >= 0 && b === storedCodeSets[resumeCodeSetIndex];
+    // First priority: lastActive flag
+    if (a.lastActive && !b.lastActive) return -1;
+    if (!a.lastActive && b.lastActive) return 1;
 
-    if (aHasResumeCode && !bHasResumeCode) return -1;
-    if (!aHasResumeCode && bHasResumeCode) return 1;
-
-    // Sort by timestamp (newest first) if neither has the resume code
+    // Second priority: timestamp (newest first)
     return b.timestamp - a.timestamp;
   });
 
@@ -152,10 +139,6 @@ export function WelcomeScreen({
           <>
             <div className="flex flex-col gap-3">
               {sortedCodeSets.map((codeSet) => {
-                const isResumeCodeSet =
-                  resumeCodeSetIndex >= 0 &&
-                  codeSet === storedCodeSets[resumeCodeSetIndex];
-
                 return (
                   <div
                     key={codeSet.timestamp}
@@ -210,7 +193,7 @@ export function WelcomeScreen({
                         size="sm"
                         onClick={() => handleJoinWithCodeSet(codeSet)}
                       >
-                        {isResumeCodeSet ? "Resume" : "Play"}
+                        {codeSet.lastActive ? "Resume" : "Play"}
                       </PrimaryButton>
                       <Tooltip content="Delete codes" position="bottom">
                         <button

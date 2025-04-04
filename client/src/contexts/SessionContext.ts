@@ -7,6 +7,7 @@ export interface StoredCodeSet {
   codes: Record<string, string>;
   timestamp: number;
   title?: string;
+  lastActive: boolean;
 }
 
 export type SessionContextType = {

@@ -8,11 +8,16 @@ import { wsService } from "../services/WebSocketService.js";
 import { SessionContext, StoredCodeSet } from "../contexts/SessionContext.js";
 
 // Function to store codes in localStorage
-function storeCodeSet(codes: Record<string, string>, title?: string): void {
+function storeCodeSet(
+  codes: Record<string, string>,
+  title?: string,
+  lastActive?: boolean
+): void {
   const codeSet: StoredCodeSet = {
     codes,
     timestamp: Date.now(),
     title,
+    lastActive: lastActive || false,
   };
 
   // Get existing code sets
@@ -38,7 +43,8 @@ function getStoredCodeSets(): StoredCodeSet[] {
 function updateStoredSetWithCode(
   code: string,
   playerRole: string,
-  title?: string
+  title?: string,
+  lastActive?: boolean
 ): void {
   const sets = getStoredCodeSets();
 
@@ -51,6 +57,17 @@ function updateStoredSetWithCode(
       if (title && !set.title) {
         set.title = title;
       }
+      if (lastActive !== undefined) {
+        set.lastActive = lastActive;
+        // If the set is now active, set all other sets to inactive
+        if (lastActive) {
+          for (const otherSet of sets) {
+            if (otherSet !== set) {
+              otherSet.lastActive = false;
+            }
+          }
+        }
+      }
       localStorage.setItem("storyCodes", JSON.stringify(sets));
       return;
     }
@@ -61,6 +78,7 @@ function updateStoredSetWithCode(
     codes: { [playerRole]: code },
     timestamp: Date.now(),
     title,
+    lastActive: lastActive || false,
   };
   sets.push(newSet);
   localStorage.setItem("storyCodes", JSON.stringify(sets));
@@ -229,7 +247,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           const title = data.data.state.title;
 
           // Store or update the code
-          updateStoredSetWithCode(data.data.code, playerRole, title);
+          updateStoredSetWithCode(data.data.code, playerRole, title, true);
           setStoredCodeSets(getStoredCodeSets());
         } else if ("errorMessage" in data) {
           console.log(
