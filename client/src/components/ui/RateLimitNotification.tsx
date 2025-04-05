@@ -92,8 +92,8 @@ export const RateLimitNotification = memo(function RateLimitNotification({
           <>
             <p>
               To keep our servers running smoothly during this free alpha, we
-              limit new story creation to {maxRequests} per {windowMinutes}{" "}
-              {windowMinutes === 1 ? "minute" : "minutes"}.
+              ask players to only create {maxRequests} new stories per{" "}
+              {windowMinutes} {windowMinutes === 1 ? "minute" : "minutes"}.
             </p>
             <p className="mt-2">
               You can create a new story in{" "}

@@ -19,16 +19,14 @@ function App() {
     storyState,
     sessionId,
     setSessionId,
-    storyCodes,
-    setStoryCodes,
+    transientStoryCodes,
+    setTransientStoryCodes,
     storyReady,
     setStoryReady,
     error,
     setError,
     rateLimit,
     setRateLimit,
-    connectionStale,
-    setConnectionStale,
     isRequestPending,
     isOperationRunning,
     isConnecting,
@@ -63,30 +61,38 @@ function App() {
     [viewState]
   );
 
-  // Replace all setViewState calls with loggedSetViewState
   useEffect(() => {
     // If we're connecting, stay in connecting state
-    if (isConnecting) {
-      if (viewState !== "CONNECTING") {
-        loggedSetViewState("CONNECTING");
+    if (isConnecting && viewState !== "CONNECTING") {
+      loggedSetViewState("CONNECTING");
+      return;
+    }
+
+    // If we're connected but have no session or player code, go to welcome
+    if (!sessionId && !playerCode && wsService.isConnected()) {
+      if (viewState === "CONNECTING") {
+        loggedSetViewState("WELCOME");
       }
       return;
     }
 
     // If we have a session or player code, we're in a valid state
     if (sessionId || playerCode) {
-      if (viewState === "CONNECTING") {
-        loggedSetViewState("WELCOME");
-      } else if (viewState === "SETUP") {
-        // If we're initializing a story, keep in setup state
-        if (
-          isRequestPending("initialize_story") ||
-          isOperationRunning("initialize_story")
-        ) {
-          // Stay in setup
-        } else if (storyCodes) {
-          // If we have story codes, go to player codes view
+      if (viewState === "SETUP") {
+        // If we have story codes, go to codes view
+        console.log(
+          "[App - viewState determination] in viewState SETUP, transientStoryCodes:",
+          transientStoryCodes
+        );
+        if (transientStoryCodes) {
+          console.log(
+            "[App - viewState determination] in viewState SETUP, transientStoryCodes are truthy -> going to PLAYER_CODES"
+          );
           loggedSetViewState("PLAYER_CODES");
+        } else {
+          console.log(
+            "[App - viewState determination] in viewState SETUP, transientStoryCodes are falsy -> staying in SETUP"
+          );
         }
       } else if (viewState === "PLAYER_CODES") {
         if (storyState) {
@@ -100,36 +106,19 @@ function App() {
         ) {
           // Stay in game view while character selection is processing
         }
-      } else if (storyState) {
-        loggedSetViewState("GAME");
-      } else if (viewState !== "WELCOME") {
+      } else if (viewState === "WELCOME") {
+        if (storyState) {
+          loggedSetViewState("GAME");
+        }
+      } else {
         loggedSetViewState("WELCOME");
       }
-    } else if (wsService.isConnected() && !isConnecting) {
-      // If we're connected but have no session or player code, go to welcome
-      if (viewState === "CONNECTING") {
-        loggedSetViewState("WELCOME");
-      }
-    }
-
-    // Handle transitions based on story state
-    if (viewState === "WELCOME" && storyState) {
-      loggedSetViewState("GAME");
-    }
-
-    // Handle transitions based on story codes
-    if (
-      storyCodes &&
-      viewState === "SETUP" &&
-      !isOperationRunning("initialize_story")
-    ) {
-      loggedSetViewState("PLAYER_CODES");
     }
   }, [
     sessionId,
     storyState,
     playerCode,
-    storyCodes,
+    transientStoryCodes,
     viewState,
     loggedSetViewState,
     isRequestPending,
@@ -199,10 +188,15 @@ function App() {
     maxTurns: number;
     gameMode: GameMode;
   }) => {
+    console.log("[App] handleStorySetup called, initializing a new story");
     setIsLoading(true);
     setPlayerCode(null);
     setStoryReady(false); // Reset story ready state when starting a new story
     localStorage.removeItem(playerCodeKey);
+
+    // Make sure transientStoryCodes is null before starting a new story
+    setTransientStoryCodes(null);
+
     gameService.initializeStory(
       options.prompt,
       options.generateImages,
@@ -222,7 +216,7 @@ function App() {
   const handleExitGame = () => {
     gameService.exitStory();
     setStoryState(null);
-    setStoryCodes(null);
+    setTransientStoryCodes(null);
     setSessionId(null);
     setPlayerCode(null);
     localStorage.removeItem(playerCodeKey);
@@ -230,8 +224,9 @@ function App() {
   };
 
   const handleNewStory = () => {
+    console.log("[App] handleNewStory called, clearing story state and codes");
     setStoryState(null);
-    setStoryCodes(null);
+    setTransientStoryCodes(null);
     loggedSetViewState("SETUP");
   };
 
@@ -287,39 +282,6 @@ function App() {
         </div>
       ) : null}
 
-      {/* Stale connection notification */}
-      {connectionStale ? (
-        <div className="fixed inset-0 bg-black bg-opacity-75 z-[999] flex items-center justify-center">
-          <div className="max-w-md w-full mx-4 bg-white rounded-lg p-6 text-center shadow-lg">
-            <svg
-              className="w-12 h-12 mx-auto text-warning mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <h3 className="text-lg font-bold mb-2">Connection Lost</h3>
-            <p className="mb-4">{connectionStale}</p>
-            <button
-              onClick={() => {
-                setConnectionStale(null);
-                window.location.reload();
-              }}
-              className="bg-accent hover:bg-accent-dark text-white font-bold py-2 px-4 rounded-full"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {/* Show all rate limit notifications centrally */}
       {rateLimit && (
         <>
@@ -340,6 +302,7 @@ function App() {
 
   // Get the current view content
   const getCurrentView = () => {
+    console.log("[App] getCurrentView called with viewState:", viewState);
     switch (viewState) {
       case "CONNECTING":
         return (
@@ -360,26 +323,43 @@ function App() {
         );
 
       case "SETUP":
+        console.log(
+          "[App - getCurrentView] in viewState SETUP, entering case 'SETUP' -> rendering StoryInitializer"
+        );
         return (
           <StoryInitializer
             onSetup={handleStorySetup}
-            onBack={() => setViewState("WELCOME")}
+            onBack={() => {
+              setTransientStoryCodes(null);
+              loggedSetViewState("WELCOME");
+            }}
           />
         );
 
       case "PLAYER_CODES":
-        return storyCodes ? (
+        // If we're in PLAYER_CODES state but don't have transientStoryCodes,
+        // redirect to SETUP state instead of conditionally rendering StoryInitializer
+        if (!transientStoryCodes) {
+          console.log(
+            "[App] In PLAYER_CODES but no transientStoryCodes, redirecting to SETUP"
+          );
+          loggedSetViewState("SETUP");
+          return null; // Return null while redirecting to avoid flash of UI
+        }
+
+        return (
           <PlayerCodes
-            codes={storyCodes}
-            onBack={() => setViewState("WELCOME")}
+            codes={transientStoryCodes}
+            onBack={() => {
+              setTransientStoryCodes(null);
+              loggedSetViewState("WELCOME");
+            }}
             onCodeSubmit={handleCodeSubmit}
             storyReady={storyReady}
-            onGoToWelcome={() => setViewState("WELCOME")}
-          />
-        ) : (
-          <StoryInitializer
-            onSetup={handleStorySetup}
-            onBack={() => setViewState("WELCOME")}
+            onGoToWelcome={() => {
+              setTransientStoryCodes(null);
+              loggedSetViewState("WELCOME");
+            }}
           />
         );
 

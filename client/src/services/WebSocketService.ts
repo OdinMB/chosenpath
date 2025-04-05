@@ -606,7 +606,6 @@ export class WebSocketService {
 
   clearSession() {
     console.log("[WebSocketService] Clearing session:", {
-      oldPlayerCode: this.playerCode,
       oldSessionId: this.sessionId,
     });
 

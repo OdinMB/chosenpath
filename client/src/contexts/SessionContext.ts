@@ -20,6 +20,8 @@ export type SessionContextType = {
   isConnecting: boolean;
   storyCodes: Record<string, string> | null;
   setStoryCodes: (codes: Record<string, string> | null) => void;
+  transientStoryCodes: Record<string, string> | null;
+  setTransientStoryCodes: (codes: Record<string, string> | null) => void;
   storyReady: boolean;
   setStoryReady: (ready: boolean) => void;
   error: string | null;
@@ -27,9 +29,6 @@ export type SessionContextType = {
   // Rate limiting
   rateLimit: RateLimitInfo | null;
   setRateLimit: (rateLimit: RateLimitInfo | null) => void;
-  // Connection status
-  connectionStale: string | null;
-  setConnectionStale: (message: string | null) => void;
   // Request status utilities
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
@@ -49,14 +48,14 @@ export const SessionContext = createContext<SessionContextType>({
   isConnecting: true,
   storyCodes: null,
   setStoryCodes: () => {},
+  transientStoryCodes: null,
+  setTransientStoryCodes: () => {},
   storyReady: false,
   setStoryReady: () => {},
   error: null,
   setError: () => {},
   rateLimit: null,
   setRateLimit: () => {},
-  connectionStale: null,
-  setConnectionStale: () => {},
   isRequestPending: () => false,
   isOperationRunning: () => false,
   storedCodeSets: [],

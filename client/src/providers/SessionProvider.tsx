@@ -89,6 +89,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(
     null
   );
+  const [transientStoryCodes, setTransientStoryCodes] = useState<Record<
+    string,
+    string
+  > | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
@@ -167,6 +171,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setStoryState(null);
         setSessionId(null);
         setStoryCodes(null);
+        setTransientStoryCodes(null);
         localStorage.removeItem("sessionId");
       }
     });
@@ -208,6 +213,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           data.codes
         );
         setStoryCodes(data.codes);
+        setTransientStoryCodes(data.codes);
+        console.log(
+          "[SessionProvider] Updated transientStoryCodes with new codes"
+        );
         setStoryReady(false);
 
         // Store codes in localStorage
@@ -321,6 +330,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     isConnecting,
     storyCodes,
     setStoryCodes,
+    transientStoryCodes,
+    setTransientStoryCodes,
     storyReady,
     setStoryReady,
     error,

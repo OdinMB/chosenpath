@@ -9,7 +9,6 @@ import {
 } from "shared/config";
 import { GameMode, GameModes } from "shared/types/story";
 import { AppTitle } from "./AppTitle";
-import { LoadingSpinner } from "./ui/LoadingSpinner";
 import { PrimaryButton } from "./ui/PrimaryButton";
 
 interface StoryInitializerProps {
@@ -32,8 +31,7 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
-  const { isLoading, isConnecting, isRequestPending, isOperationRunning } =
-    useSession();
+  const { isRequestPending } = useSession();
 
   // Completely separate the game mode state for single player and multiplayer
   const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
@@ -170,12 +168,6 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     setPrompt(newPrompt);
   };
 
-  // Determine if we're in the loading state for story creation
-  const isCreatingStory =
-    isLoading ||
-    isRequestPending("initialize_story") ||
-    isOperationRunning("initialize_story");
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSetup({
@@ -192,198 +184,155 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
       <div className="max-w-2xl mx-auto">
         <AppTitle size="large" className="mb-4" onClick={onBack} />
 
-        {isConnecting ? (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary-100 border-t-accent border-r-secondary mx-auto"></div>
-            <p className="mt-2 text-primary-600">Connecting to server...</p>
-          </div>
-        ) : isCreatingStory ? (
-          <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md max-w-2xl mx-auto">
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
-                {playerCount === 1 ? "Single-player" : `${playerCount} players`}
-              </span>
-
-              {playerCount > 1 && (
-                <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
-                  {gameMode === GameModes.Cooperative
-                    ? "Cooperative"
-                    : gameMode === GameModes.Competitive
-                    ? "Competitive"
-                    : "Mixed"}
-                </span>
-              )}
-
-              <span className="inline-block px-3 py-1 bg-white text-primary rounded-md text-sm font-medium border border-primary-100 shadow-sm">
-                {generateImages ? "Images" : "No images"}
-              </span>
-            </div>
-
-            <div className="mb-6 p-4 bg-white rounded-lg border border-primary-100 shadow-md text-primary">
-              {prompt}
-            </div>
-
-            <LoadingSpinner message="Creating your story..." />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-              <div className="space-y-2">
-                <label
-                  htmlFor="player-count"
-                  className="text-sm md:text-base font-medium text-primary"
-                >
-                  Number of Players: {playerCount}
-                </label>
-                <input
-                  id="player-count"
-                  type="range"
-                  min={MIN_PLAYERS}
-                  max={MAX_PLAYERS}
-                  value={playerCount}
-                  onChange={(e) => setPlayerCount(Number(e.target.value))}
-                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                  disabled={isLoading}
-                />
-                <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                  <span>1 Player</span>
-                  <span>{MAX_PLAYERS} Players</span>
-                </div>
-              </div>
-
-              <div
-                className={`space-y-2 transition-opacity duration-200 ${
-                  playerCount === 1 ? "hidden" : ""
-                }`}
-              >
-                <label className="text-sm md:text-base font-medium text-primary">
-                  Multiplayer Mode
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={2}
-                  value={
-                    playerCount === 1
-                      ? 0
-                      : multiplayerMode === GameModes.Cooperative
-                      ? 0
-                      : multiplayerMode === GameModes.CooperativeCompetitive
-                      ? 1
-                      : 2
-                  }
-                  onChange={(e) => handleGameModeChange(Number(e.target.value))}
-                  className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                  disabled={isLoading || playerCount === 1}
-                />
-                <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                  <span>Shared Goals</span>
-                  <span>Mixed Goals</span>
-                  <span>Competing Goals</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
-                <label
-                  htmlFor="prompt"
-                  className="text-sm md:text-base font-medium text-primary"
-                >
-                  What kind of story would you like to experience?
-                </label>
-                <PrimaryButton
-                  type="button"
-                  onClick={handleSuggestion}
-                  variant="outline"
-                  size="sm"
-                  leftBorder={false}
-                  disabled={isLoading}
-                  className="self-end sm:self-auto"
-                >
-                  Get suggestion
-                </PrimaryButton>
-              </div>
-              <textarea
-                id="prompt"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                placeholder={getPlaceholderText()}
-                disabled={isLoading}
-              />
-            </div>
-
-            {/* Story Length section - temporarily hidden but preserved for future use */}
-            <div className="hidden">
-              <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-2">
-                <label className="text-sm md:text-base font-medium text-primary">
-                  Story Length: {maxTurns} decisions
-                </label>
-                <input
-                  type="range"
-                  min={MIN_TURNS}
-                  max={MAX_TURNS}
-                  step={5}
-                  value={maxTurns}
-                  className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
-                  disabled={true}
-                />
-                <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                  <span>{MIN_TURNS} decisions</span>
-                  <span>{MAX_TURNS} decisions</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md hidden">
-              <input
-                id="generate-images"
-                type="checkbox"
-                checked={generateImages}
-                onChange={(e) => setGenerateImages(e.target.checked)}
-                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-                disabled={true} // {isLoading}
-              />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+            <div className="space-y-2">
               <label
-                htmlFor="generate-images"
-                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary-400"
+                htmlFor="player-count"
+                className="text-sm md:text-base font-medium text-primary"
               >
-                With images (temporarily disabled)
+                Number of Players: {playerCount}
               </label>
+              <input
+                id="player-count"
+                type="range"
+                min={MIN_PLAYERS}
+                max={MAX_PLAYERS}
+                value={playerCount}
+                onChange={(e) => setPlayerCount(Number(e.target.value))}
+                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+              />
+              <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                <span>1 Player</span>
+                <span>{MAX_PLAYERS} Players</span>
+              </div>
             </div>
 
-            <div className="flex flex-row gap-3 sm:gap-4 pt-2">
+            <div
+              className={`space-y-2 transition-opacity duration-200 ${
+                playerCount === 1 ? "hidden" : ""
+              }`}
+            >
+              <label className="text-sm md:text-base font-medium text-primary">
+                Multiplayer Mode
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                value={
+                  playerCount === 1
+                    ? 0
+                    : multiplayerMode === GameModes.Cooperative
+                    ? 0
+                    : multiplayerMode === GameModes.CooperativeCompetitive
+                    ? 1
+                    : 2
+                }
+                onChange={(e) => handleGameModeChange(Number(e.target.value))}
+                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                disabled={playerCount === 1}
+              />
+              <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                <span>Shared Goals</span>
+                <span>Mixed Goals</span>
+                <span>Competing Goals</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
+              <label
+                htmlFor="prompt"
+                className="text-sm md:text-base font-medium text-primary"
+              >
+                What kind of story would you like to experience?
+              </label>
               <PrimaryButton
                 type="button"
-                size="lg"
-                onClick={onBack}
+                onClick={handleSuggestion}
                 variant="outline"
+                size="sm"
                 leftBorder={false}
+                className="self-end sm:self-auto"
               >
-                Back
-              </PrimaryButton>
-
-              <PrimaryButton
-                type="submit"
-                size="lg"
-                disabled={
-                  isLoading ||
-                  !prompt.trim() ||
-                  isConnecting ||
-                  isRequestPending("initialize_story")
-                }
-                isLoading={isLoading || isRequestPending("initialize_story")}
-                fullWidth
-                className="font-semibold text-lg"
-              >
-                {isLoading || isRequestPending("initialize_story")
-                  ? "Creating Story..."
-                  : "Create Story"}
+                Get suggestion
               </PrimaryButton>
             </div>
-          </form>
-        )}
+            <textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+              placeholder={getPlaceholderText()}
+            />
+          </div>
+
+          {/* Story Length section - temporarily hidden but preserved for future use */}
+          <div className="hidden">
+            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-2">
+              <label className="text-sm md:text-base font-medium text-primary">
+                Story Length: {maxTurns} decisions
+              </label>
+              <input
+                type="range"
+                min={MIN_TURNS}
+                max={MAX_TURNS}
+                step={5}
+                value={maxTurns}
+                className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
+                disabled={true}
+              />
+              <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                <span>{MIN_TURNS} decisions</span>
+                <span>{MAX_TURNS} decisions</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md hidden">
+            <input
+              id="generate-images"
+              type="checkbox"
+              checked={generateImages}
+              onChange={(e) => setGenerateImages(e.target.checked)}
+              className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+              disabled={true} // {isLoading}
+            />
+            <label
+              htmlFor="generate-images"
+              className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary-400"
+            >
+              With images (temporarily disabled)
+            </label>
+          </div>
+
+          <div className="flex flex-row gap-3 sm:gap-4 pt-2">
+            <PrimaryButton
+              type="button"
+              size="lg"
+              onClick={onBack}
+              variant="outline"
+              leftBorder={false}
+            >
+              Back
+            </PrimaryButton>
+
+            <PrimaryButton
+              type="submit"
+              size="lg"
+              disabled={!prompt.trim() || isRequestPending("initialize_story")}
+              isLoading={isRequestPending("initialize_story")}
+              fullWidth
+              className="font-semibold text-lg"
+            >
+              {isRequestPending("initialize_story")
+                ? "Creating Story..."
+                : "Create Story"}
+            </PrimaryButton>
+          </div>
+        </form>
       </div>
     </div>
   );
