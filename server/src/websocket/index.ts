@@ -64,14 +64,30 @@ export class GameWebSocketServer {
   ): boolean {
     // Get client IP address using the helper function
     const ip = getClientIP(socket);
-    // Add this to WebSocketServer class constructor or at the start of checkAndHandleRateLimit
-    console.log("[WebSocket] Client connection headers:", {
-      address: socket.handshake.address,
-      xForwardedFor: socket.handshake.headers["x-forwarded-for"],
-      xRealIp: socket.handshake.headers["x-real-ip"],
+
+    // Enhanced debugging for rate limit tracking
+    console.log(`[WebSocket] Rate limit check for ${action}:`, {
+      clientIP: ip,
+      socketId: socket.id,
+      action,
     });
+
+    // console.log("[WebSocket] Client connection headers:", {
+    //   address: socket.handshake.address,
+    //   xForwardedFor: socket.handshake.headers["x-forwarded-for"],
+    //   xRealIp: socket.handshake.headers["x-real-ip"],
+    // });
+
     // Check if rate limited
     const limitStatus = checkRateLimit(ip, action);
+
+    // Log rate limit status for debugging
+    console.log(`[WebSocket] Rate limit status for ${ip} [${action}]:`, {
+      isLimited: limitStatus.isLimited,
+      requestsRemaining: limitStatus.requestsRemaining,
+      timeRemaining: `${Math.round(limitStatus.timeRemaining / 1000)}s`,
+      maxRequests: limitStatus.maxRequests,
+    });
 
     if (limitStatus.isLimited) {
       console.log(`[WebSocket] Rate limited for ${action}:`, {

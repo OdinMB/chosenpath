@@ -178,19 +178,34 @@ export function getClientIP(socket: Socket): string {
   // Try to get IP from standard proxy headers first
   const forwardedFor = socket.handshake.headers["x-forwarded-for"];
   if (forwardedFor) {
-    // x-forwarded-for can contain multiple IPs - the leftmost is the original client
-    const ips = Array.isArray(forwardedFor)
-      ? forwardedFor[0]
-      : forwardedFor.split(",")[0].trim();
-    return normalizeIP(ips);
+    // Parse the x-forwarded-for header which can be either an array or string
+    let clientIP: string;
+
+    if (Array.isArray(forwardedFor)) {
+      // If it's an array, take the first entry
+      clientIP = forwardedFor[0];
+    } else {
+      // If it's a string, split by comma and take the leftmost IP (client's original IP)
+      const ips = forwardedFor.split(",");
+      clientIP = ips[0].trim();
+    }
+
+    console.log(
+      `[RateLimiter] Extracted client IP: ${clientIP} from x-forwarded-for: ${forwardedFor}`
+    );
+    return normalizeIP(clientIP);
   }
 
   // Try other common proxy headers
   const realIP = socket.handshake.headers["x-real-ip"];
   if (realIP) {
-    return normalizeIP(Array.isArray(realIP) ? realIP[0] : realIP);
+    const clientIP = Array.isArray(realIP) ? realIP[0] : realIP;
+    console.log(`[RateLimiter] Using x-real-ip: ${clientIP}`);
+    return normalizeIP(clientIP);
   }
 
   // Fall back to direct socket address if no proxy headers exist
-  return normalizeIP(socket.handshake.address || "unknown");
+  const directIP = socket.handshake.address || "unknown";
+  console.log(`[RateLimiter] Using direct IP: ${directIP}`);
+  return normalizeIP(directIP);
 }
