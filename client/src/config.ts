@@ -6,4 +6,10 @@ export const config = {
     window.location.hostname === "127.0.0.1"
       ? "http://localhost:3000"
       : "https://api.chosenpath.ai"),
+  apiUrl:
+    import.meta.env.VITE_API_URL ||
+    (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://localhost:3000"
+      : "https://api.chosenpath.ai"),
 } as const;

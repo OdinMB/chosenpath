@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PrimaryButton } from "../components/ui/PrimaryButton";
 import { Icons } from "../components/ui/Icons";
+import { config } from "../config";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;
@@ -17,7 +18,7 @@ export const AdminLogin = ({ onLogin }: AdminLoginProps) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/admin/auth", {
+      const response = await fetch(`${config.apiUrl}/admin/auth`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${password}`,
