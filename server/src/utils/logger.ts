@@ -6,6 +6,7 @@ const COLORS = {
   QUEUE: "\x1b[36m", // Cyan (existing)
   STORY: "\x1b[35m", // Magenta
   CONNECTION: "\x1b[35m", // Magenta (same as Story)
+  ADMIN: "\x1b[33m", // Yellow for admin-related logs
   DEFAULT: "\x1b[32m", // Green
 };
 
@@ -54,6 +55,8 @@ export const Logger = {
   Queue: createLogger("Queue", COLORS.QUEUE),
   StoryRepository: createLogger("StoryRepository", COLORS.STORY),
   ConnectionManager: createLogger("ConnectionManager", COLORS.CONNECTION),
+  Admin: createLogger("Admin", COLORS.ADMIN),
+  AdminService: createLogger("AdminService", COLORS.ADMIN),
 
   // Factory method for other services
   forService(serviceName: string) {

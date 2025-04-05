@@ -4,6 +4,7 @@ import {
   listStorageFiles,
   getStorageFileStats,
 } from "../utils/storageUtils.js";
+import { Logger } from "../utils/logger.js";
 import path from "path";
 
 export type StoryInfo = {
@@ -25,14 +26,18 @@ export class AdminStoryService {
    */
   async getStoriesList(): Promise<StoryInfo[]> {
     try {
+      Logger.AdminService.log("Loading list of stories");
       const files = await listStorageFiles("stories");
       const storyFiles = files.filter((file) => file.endsWith(".json"));
+      Logger.AdminService.log(`Found ${storyFiles.length} story files`);
 
       // Get basic info for each story
       const storiesInfo = await Promise.all(
         storyFiles.map(async (file) => {
           try {
             const storyId = path.parse(file).name;
+            Logger.AdminService.log(`Loading metadata for story: ${storyId}`);
+
             const data = await readStorageFile("stories", file);
             const storyData = JSON.parse(data);
 
@@ -53,6 +58,10 @@ export class AdminStoryService {
               fileSize: data.length,
             };
           } catch (error) {
+            Logger.AdminService.error(
+              `Error loading story file: ${file}`,
+              error
+            );
             return {
               id: path.parse(file).name,
               title: "Error loading story",
@@ -62,9 +71,12 @@ export class AdminStoryService {
         })
       );
 
+      Logger.AdminService.log(
+        `Successfully loaded metadata for ${storiesInfo.length} stories`
+      );
       return storiesInfo;
     } catch (error) {
-      console.error("Failed to load stories:", error);
+      Logger.AdminService.error("Failed to load stories", error);
       throw new Error("Failed to load stories");
     }
   }
@@ -73,12 +85,15 @@ export class AdminStoryService {
    * Get details of a specific story
    */
   async getStory(storyId: string) {
+    Logger.AdminService.log(`Loading full details for story: ${storyId}`);
     const story = await storyRepository.getStory(storyId);
 
     if (!story) {
+      Logger.AdminService.error(`Story not found: ${storyId}`);
       throw new Error("Story not found");
     }
 
+    Logger.AdminService.log(`Successfully loaded story details: ${storyId}`);
     return story.getState();
   }
 
@@ -86,7 +101,14 @@ export class AdminStoryService {
    * Delete a story
    */
   async deleteStory(storyId: string): Promise<void> {
-    await storyRepository.deleteStory(storyId);
+    Logger.AdminService.log(`Deleting story: ${storyId}`);
+    try {
+      await storyRepository.deleteStory(storyId);
+      Logger.AdminService.log(`Successfully deleted story: ${storyId}`);
+    } catch (error) {
+      Logger.AdminService.error(`Failed to delete story: ${storyId}`, error);
+      throw error;
+    }
   }
 }
 

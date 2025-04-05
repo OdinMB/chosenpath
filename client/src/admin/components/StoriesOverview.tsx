@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton } from "../../components/ui/PrimaryButton.js";
 import { Icons } from "../../components/ui/Icons.js";
 import { config } from "../../config.js";
+import { Logger } from "../../utils/logger.js";
 
 type Story = {
   id: string;
@@ -27,6 +28,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   const loadStories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    Logger.Admin.log("Loading stories list");
 
     try {
       const response = await fetch(`${config.apiUrl}/admin/stories`, {
@@ -36,12 +38,18 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
       });
 
       if (!response.ok) {
+        Logger.Admin.error("Server returned an error response", {
+          status: response.status,
+          statusText: response.statusText,
+        });
         throw new Error("Failed to load stories");
       }
 
       const data = await response.json();
+      Logger.Admin.log(`Successfully loaded ${data.stories.length} stories`);
       setStories(data.stories);
-    } catch {
+    } catch (error) {
+      Logger.Admin.error("Failed to load stories", error);
       setError("Failed to load stories. Please try again.");
     } finally {
       setIsLoading(false);
@@ -69,9 +77,11 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
         "Are you sure you want to delete this story? This action cannot be undone."
       )
     ) {
+      Logger.Admin.log(`Delete operation canceled for story: ${storyId}`);
       return;
     }
 
+    Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
       const response = await fetch(
         `${config.apiUrl}/admin/stories/${storyId}`,
@@ -84,12 +94,18 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
       );
 
       if (!response.ok) {
+        Logger.Admin.error(`Failed to delete story: ${storyId}`, {
+          status: response.status,
+          statusText: response.statusText,
+        });
         throw new Error("Failed to delete story");
       }
 
+      Logger.Admin.log(`Successfully deleted story: ${storyId}`);
       // Refresh the list
       loadStories();
-    } catch {
+    } catch (error) {
+      Logger.Admin.error(`Error deleting story: ${storyId}`, error);
       setError("Failed to delete story. Please try again.");
     }
   };
