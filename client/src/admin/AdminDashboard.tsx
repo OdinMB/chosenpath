@@ -1,44 +1,68 @@
+import { PrimaryButton } from "../components/ui/PrimaryButton";
+import { Icons } from "../components/ui/Icons";
+
 type AdminDashboardProps = {
   onLogout: () => void;
 };
 
 export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   return (
-    <div className="container mx-auto p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-primary">Admin Dashboard</h1>
-        <button
-          onClick={onLogout}
-          className="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
-        >
-          Logout
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-secondary">Admin Dashboard</h1>
+          <PrimaryButton
+            onClick={onLogout}
+            variant="outline"
+            size="sm"
+            leftIcon={<Icons.LogOut className="h-4 w-4" />}
+          >
+            Logout
+          </PrimaryButton>
+        </div>
       </header>
 
-      <div className="rounded-lg bg-white p-6 shadow-md">
-        <div className="mb-4 flex items-center text-green-600">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="mr-2 h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="font-medium">
-            You're successfully logged in as admin
-          </span>
+      <div className="container mx-auto p-6">
+        <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+          <div className="mb-4 flex items-center text-accent">
+            <Icons.Success className="mr-2 h-5 w-5" />
+            <span className="font-medium">
+              You're successfully logged in as admin
+            </span>
+          </div>
+
+          <hr className="my-4 border-t border-gray-200" />
+
+          <div className="rounded-lg bg-gray-50 p-4">
+            <h2 className="mb-2 text-lg font-medium text-secondary">
+              Story Management
+            </h2>
+            <p className="text-primary-700">
+              Story management features will be implemented here.
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-lg bg-gray-50 p-4">
-          <h2 className="mb-2 text-lg font-medium">Story Management</h2>
-          <p className="text-gray-600">
-            Story management features will be implemented here.
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-lg bg-white p-6 shadow-md">
+            <h3 className="mb-3 flex items-center text-lg font-medium text-secondary">
+              <Icons.Globe className="mr-2 h-5 w-5" />
+              Active Stories
+            </h3>
+            <p className="text-primary-700">
+              View and manage currently active stories.
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-white p-6 shadow-md">
+            <h3 className="mb-3 flex items-center text-lg font-medium text-secondary">
+              <Icons.Clipboard className="mr-2 h-5 w-5" />
+              Story Archives
+            </h3>
+            <p className="text-primary-700">
+              Access archived stories and game history.
+            </p>
+          </div>
         </div>
       </div>
     </div>

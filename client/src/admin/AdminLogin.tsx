@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { PrimaryButton } from "../components/ui/PrimaryButton";
+import { Icons } from "../components/ui/Icons";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;
@@ -36,23 +38,24 @@ export const AdminLogin = ({ onLogin }: AdminLoginProps) => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md space-y-6 rounded-lg bg-white p-8 shadow-md">
         <div>
-          <h2 className="text-center text-3xl font-bold text-primary">
+          <h2 className="text-center text-3xl font-bold text-secondary">
             Admin Login
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-100 p-4 text-sm text-red-700">
-              {error}
+            <div className="flex items-center rounded-md bg-tertiary-100 p-4 text-sm text-tertiary">
+              <Icons.Error className="mr-2 h-5 w-5" />
+              <span>{error}</span>
             </div>
           )}
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-primary-800"
             >
               Password
             </label>
@@ -62,19 +65,21 @@ export const AdminLogin = ({ onLogin }: AdminLoginProps) => {
               type="password"
               autoComplete="current-password"
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-primary"
+              className="mt-1 block w-full rounded-md border border-primary-300 px-3 py-2 shadow-sm focus:border-secondary focus:outline-none focus:ring-secondary"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
           <div>
-            <button
+            <PrimaryButton
               type="submit"
               disabled={isLoading}
-              className="flex w-full justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              isLoading={isLoading}
+              fullWidth
+              rightIcon={<Icons.ArrowRight />}
             >
-              {isLoading ? "Logging in..." : "Login"}
-            </button>
+              Login
+            </PrimaryButton>
           </div>
         </form>
       </div>
