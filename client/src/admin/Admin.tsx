@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { AdminLogin } from "./AdminLogin";
-import { AdminDashboard } from "./AdminDashboard";
+import { AdminLogin } from "./components/AdminLogin";
+import { AdminDashboard } from "./components/AdminDashboard";
 import { config } from "../config";
 
 export const Admin = () => {

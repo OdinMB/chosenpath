@@ -9,7 +9,7 @@ import {
   VerifyCodeResponse,
   ErrorResponse,
 } from "shared/types/index.js";
-import { config } from "../config/env.js";
+import { config } from "../config.js";
 import { connectionManager } from "../services/ConnectionManager.js";
 import { RateLimitedAction, SOCKET_CONFIG } from "shared/config.js";
 import {

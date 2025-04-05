@@ -1,6 +1,6 @@
-import { PrimaryButton } from "../components/ui/PrimaryButton";
-import { Icons } from "../components/ui/Icons";
-import { StoriesOverview } from "./StoriesOverview";
+import { PrimaryButton } from "../../components/ui/PrimaryButton.js";
+import { Icons } from "../../components/ui/Icons.js";
+import { StoriesOverview } from "./StoriesOverview.js";
 
 type AdminDashboardProps = {
   onLogout: () => void;

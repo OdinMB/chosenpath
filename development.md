@@ -7,6 +7,32 @@ Next
 - CoT schema attribute to list "show don't tell" elements for the beat.
 - Use React routing thingy for frontend
 
+Project structure
+
+- /client
+
+  - /src
+    - /shared
+      - /components # Shared components
+        - /ui # UI primitives (buttons, modals, etc.)
+      - hooks, utilities, etc.
+    - /website # Website-specific code
+      - /components # Website-specific components
+      - /pages # Website pages
+    - /game # Game-specific code
+      - /components # Game-specific components
+      - /services # Game services
+    - /admin # Admin-specific code
+      - /components # Admin-specific components
+      - /services # Admin services
+    - /user # User account-specific code
+      - /components # User account components
+      - /services # User account services
+
+- Setting up path aliases in your tsconfig.json to make imports cleaner
+- Using barrel files (index.ts) at key points to simplify imports
+- Documenting the chosen structure to help onboard new team members
+
 New features
 
 - Library of stories with pre-configured setups
@@ -20,7 +46,7 @@ New features
   - Stripe integration
 
 - Images: generate one for each player and story element and only use iamges from that list?
-- Resolution element improvements
+- Resolution elements
   - what about overall result in multiplayer beats?
   - thread resolutions?
 - Difficulty level (affecting base points)

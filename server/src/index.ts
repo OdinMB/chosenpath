@@ -1,9 +1,9 @@
 import http from "http";
 import express from "express";
 import cors from "cors";
-import { GameWebSocketServer } from "./websocket/index.js";
-import { config } from "./config/env.js";
+import { config } from "./config.js";
 import { adminRouter } from "./admin/routes.js";
+import { GameWebSocketServer } from "./websocket/index.js";
 
 async function startServer() {
   const app = express();
