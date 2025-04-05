@@ -14,4 +14,5 @@ export const config = {
     ? parseCorsOrigins(process.env.CORS_ORIGIN)
     : ["http://localhost:5173"],
   productionDomain: process.env.PRODUCTION_DOMAIN || "chosenpath.ai",
+  adminPassword: process.env.ADMIN_PASSWORD || "admin-dev-password",
 } as const;

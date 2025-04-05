@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { GameWebSocketServer } from "./websocket/index.js";
 import { config } from "./config/env.js";
+import { adminRouter } from "./admin/routes.js";
 
 async function startServer() {
   const app = express();
@@ -31,6 +32,9 @@ async function startServer() {
   app.get("/health", (_, res) => {
     res.json({ status: "ok" });
   });
+
+  // Admin routes
+  app.use("/admin", adminRouter);
 
   app.set("trust proxy", true);
 
