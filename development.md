@@ -5,8 +5,8 @@ Smaller and more commits!
 Next
 
 - Fix rate limits not working online
-- Use React routing thingy for frontend
 - CoT schema attribute to list "show don't tell" elements for the beat.
+- Use React routing thingy for frontend
 
 New features
 
@@ -16,6 +16,7 @@ New features
   - Invite specific account to a player slot
   - Game history
 - Credits system for generating stories
+- See pending players, current beat, etc. of games of stored codes
 
   - Stripe integration
 

@@ -32,6 +32,8 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  app.set("trust proxy", true);
+
   const server = http.createServer(app);
 
   // Initialize WebSocket server

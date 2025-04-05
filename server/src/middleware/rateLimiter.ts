@@ -1,5 +1,6 @@
 // Rate limiter implementation for limiting access to API endpoints
 import { RateLimitedAction, RATE_LIMITS } from "shared/config.js";
+import { Socket } from "socket.io";
 
 // RateLimitRecord tracks requests for a specific IP and action
 interface RateLimitRecord {
@@ -166,4 +167,30 @@ export function getRateLimitInfo(ip: string): Record<
  */
 export function getRateLimitConfig() {
   return { ...RATE_LIMITS };
+}
+
+/**
+ * Gets the real client IP address accounting for proxies and load balancers
+ * @param socket The client socket
+ * @returns The normalized client IP address
+ */
+export function getClientIP(socket: Socket): string {
+  // Try to get IP from standard proxy headers first
+  const forwardedFor = socket.handshake.headers["x-forwarded-for"];
+  if (forwardedFor) {
+    // x-forwarded-for can contain multiple IPs - the leftmost is the original client
+    const ips = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor.split(",")[0].trim();
+    return normalizeIP(ips);
+  }
+
+  // Try other common proxy headers
+  const realIP = socket.handshake.headers["x-real-ip"];
+  if (realIP) {
+    return normalizeIP(Array.isArray(realIP) ? realIP[0] : realIP);
+  }
+
+  // Fall back to direct socket address if no proxy headers exist
+  return normalizeIP(socket.handshake.address || "unknown");
 }

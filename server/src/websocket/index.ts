@@ -15,6 +15,7 @@ import { RateLimitedAction, SOCKET_CONFIG } from "shared/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,
+  getClientIP,
 } from "../middleware/rateLimiter.js";
 
 export class GameWebSocketServer {
@@ -61,13 +62,14 @@ export class GameWebSocketServer {
     action: RateLimitedAction,
     requestId?: string
   ): boolean {
-    // Get client IP address
-    let ip = socket.handshake.address;
-    if (!ip) {
-      console.warn("[WebSocket] Missing IP address for connection");
-      ip = "unknown";
-    }
-
+    // Get client IP address using the helper function
+    const ip = getClientIP(socket);
+    // Add this to WebSocketServer class constructor or at the start of checkAndHandleRateLimit
+    console.log("[WebSocket] Client connection headers:", {
+      address: socket.handshake.address,
+      xForwardedFor: socket.handshake.headers["x-forwarded-for"],
+      xRealIp: socket.handshake.headers["x-real-ip"],
+    });
     // Check if rate limited
     const limitStatus = checkRateLimit(ip, action);
 
