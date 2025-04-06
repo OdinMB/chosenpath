@@ -4,37 +4,47 @@ import {
   GameMode,
   Guidelines,
   StoryPhase,
-  PlayerState,
   PlayerCount,
   PlayerSlot,
   StoryElement,
   Outcome,
   Stat,
-  ClientStat,
   Beat,
   BeatType,
-  ResolutionDetails,
   SwitchAnalysis,
   ThreadAnalysis,
   Thread,
   Resolution,
-  Image,
 } from "shared/types/index.js";
-import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
+import { PlayerManager } from "./PlayerManager.js";
+import { ThreadManager } from "./ThreadManager.js";
+import { ImageManager } from "./ImageManager.js";
+import { ClientStateManager } from "./ClientStateManager.js";
 
 /**
  * Comprehensive manager for story state
  * Encapsulates all story state management logic and provides a clean interface
+ * using a domain-driven design approach with specialized managers
  */
 export class Story {
   private state: StoryState;
+  private playerManager: PlayerManager;
+  private threadManager: ThreadManager;
+  private imageManager: ImageManager;
+  private clientStateManager: ClientStateManager;
 
   constructor(state: StoryState) {
     this.state = state;
+    this.playerManager = new PlayerManager(state);
+    this.threadManager = new ThreadManager(state);
+    this.imageManager = new ImageManager(state);
+    this.clientStateManager = new ClientStateManager();
   }
+
   static create(state: StoryState): Story {
     return new Story(state);
   }
+
   clone(updatedState: Partial<StoryState> = {}): Story {
     return new Story({
       ...this.state,
@@ -42,24 +52,31 @@ export class Story {
     });
   }
 
-  getTitle(): string {
-    return this.state.title;
-  }
+  // Story metadata getters
   getState(): StoryState {
     return this.state;
   }
+
+  getTitle(): string {
+    return this.state.title;
+  }
+
   getGameMode(): GameMode {
     return this.state.gameMode;
   }
+
   getGuidelines(): Guidelines {
     return this.state.guidelines;
   }
+
   getStoryElements(): StoryElement[] {
     return this.state.storyElements;
   }
+
   getWorldFacts(): string[] {
     return this.state.worldFacts;
   }
+
   getSharedOutcomes(): Outcome[] {
     return this.state.sharedOutcomes;
   }
@@ -105,56 +122,15 @@ export class Story {
   getSharedStats(): Stat[] {
     return this.state.sharedStats;
   }
-  getImages(): Image[] {
-    return this.state.images;
-  }
-  getPlayerCodes(): Record<PlayerSlot, string> {
-    return this.state.playerCodes;
-  }
-  getPlayerSlots(): PlayerSlot[] {
-    return Object.keys(this.state.players) as PlayerSlot[];
-  }
-  getNumberOfPlayers(): PlayerCount {
-    return Object.keys(this.state.players).length as PlayerCount;
-  }
-  getPlayers(): Record<PlayerSlot, PlayerState> {
-    return this.state.players;
-  }
-  getPlayer(playerSlot: PlayerSlot): PlayerState | null {
-    return this.state.players[playerSlot] || null;
-  }
-
-  getCurrentBeat(playerSlot: PlayerSlot): Beat | null {
-    const player = this.getPlayer(playerSlot);
-    if (!player) return null;
-    return player.beatHistory[this.getCurrentTurn() - 1] || null;
-  }
-  getPreviousBeat(playerSlot: PlayerSlot): Beat | null {
-    const player = this.getPlayer(playerSlot);
-    if (!player) return null;
-    return player.beatHistory[player.beatHistory.length - 2] || null;
-  }
 
   includesImages(): boolean {
     return this.state.generateImages;
   }
 
-  getCurrentTurn(): number {
-    // If no players, return 0
-    if (Object.keys(this.state.players).length === 0) {
-      return 0;
-    }
-
-    // Get the first player's beat history length
-    const firstPlayerSlot = Object.keys(this.state.players)[0] as PlayerSlot;
-    return this.state.players[firstPlayerSlot].beatHistory.length;
-  }
-  getMaxTurns(): number {
-    return this.state.maxTurns;
-  }
   isFirstBeat(): boolean {
     return this.getCurrentTurn() === 0;
   }
+
   isStoryComplete(): boolean {
     return this.getCurrentTurn() > this.state.maxTurns;
   }
@@ -163,230 +139,41 @@ export class Story {
     return this.getNumberOfPlayers() > 1;
   }
 
-  getPendingPlayers(): PlayerSlot[] {
-    const currentTurn = this.getCurrentTurn();
-    return Object.entries(this.state.players)
-      .filter(([_, player]) => {
-        const currentBeat = player.beatHistory[currentTurn - 1];
-        return currentBeat?.choice === -1;
-      })
-      .map(([slot]) => slot as PlayerSlot);
-  }
-
-  getPendingCharacterSelections(): PlayerSlot[] {
-    // If character selection is completed, return empty array
-    if (this.state.characterSelectionCompleted) {
-      return [];
-    }
-
-    // Return players who haven't selected a character yet
-    return Object.entries(this.state.players)
-      .filter(([_, player]) => !player.characterSelected)
-      .map(([slot]) => slot as PlayerSlot);
-  }
-
-  areAllChoicesSubmitted(): boolean {
-    return this.getPendingPlayers().length === 0;
-  }
-
-  getPlayerSlotByCode(code: string): PlayerSlot | null {
-    const entry = Object.entries(this.state.playerCodes).find(
-      ([_, playerCode]) => playerCode === code
-    );
-    return entry ? (entry[0] as PlayerSlot) : null;
-  }
-
-  /**
-   * Convert a Stat to a ClientStat by removing sensitive fields
-   */
-  private convertToClientStat(stat: Stat): ClientStat {
-    const {
-      adjustmentsAfterThreads,
-      canBeChangedInBeatResolutions,
-      effectOnPoints,
-      narrativeImplications,
-      optionsToSacrifice,
-      optionsToGainAsReward,
-      possibleValues,
-      ...clientStat
-    } = stat;
-
-    return clientStat as ClientStat;
-  }
-
-  filterStateForPlayer(playerSlot: PlayerSlot): ClientStoryState {
-    // Create a deep copy to avoid mutating the original state
-    let filteredState = JSON.parse(JSON.stringify(this.state));
-
-    // Only include the specific player's data
-    let playerData = filteredState.players[playerSlot];
-    // Filter out outcomes if they exist
-    if (playerData.outcomes) {
-      delete playerData.outcomes;
-    }
-    // Filter out sensitive data from beat history
-    if (playerData.beatHistory && playerData.beatHistory.length > 0) {
-      playerData.beatHistory = playerData.beatHistory.map((beat: Beat) => {
-        // Create a new filtered beat without sensitive properties
-        const { plan, summary, ...filteredBeat } = beat;
-
-        // Filter option details for undecided challenge beats
-        if (
-          filteredBeat.choice &&
-          filteredBeat.choice === -1 &&
-          filteredBeat.options &&
-          filteredBeat.options.length > 0
-        ) {
-          filteredBeat.options = filteredBeat.options.map((option) => {
-            const optionCopy = { ...option };
-            if (optionCopy.optionType === "challenge") {
-              // Safe to delete these properties as we're working with a copy
-              delete (optionCopy as any).basePoints;
-              delete (optionCopy as any).modifiersToSuccessRate;
-              delete (optionCopy as any).riskType;
-            }
-            return optionCopy;
-          });
-        }
-
-        return filteredBeat;
-      });
-    }
-    filteredState.players = { [playerSlot]: playerData };
-
-    // Filter out hidden player stats and certain stat attributes
-    filteredState.playerStats = filteredState.playerStats
-      .filter((stat: Stat) => stat.isVisible !== false)
-      .map((stat: Stat) => this.convertToClientStat(stat));
-
-    // Filter out hidden shared stats and certain stat attributes
-    filteredState.sharedStats = filteredState.sharedStats
-      .filter((stat: Stat) => stat.isVisible !== false)
-      .map((stat: Stat) => this.convertToClientStat(stat));
-
-    // Filter characterSelectionOptions to only include data for this player
-    if (filteredState.characterSelectionOptions) {
-      filteredState.characterSelectionOptions = {
-        [playerSlot]: filteredState.characterSelectionOptions[playerSlot],
-      };
-    }
-
-    // Get pending players
-    const pendingPlayers = this.getPendingPlayers();
-
-    // Get pending character selections if in character selection mode
-    const pendingCharacterSelections =
-      !filteredState.characterSelectionCompleted
-        ? this.getPendingCharacterSelections()
-        : [];
-
-    // Remove other players' codes
-    filteredState.playerCodes = {
-      [playerSlot]: filteredState.playerCodes[playerSlot],
-    };
-
-    // Return only the properties needed for the client
-    return {
-      title: filteredState.title,
-      numberOfPlayers: Object.keys(this.state.players).length,
-      gameMode: filteredState.gameMode,
-      sharedStats: filteredState.sharedStats,
-      sharedStatValues: filteredState.sharedStatValues,
-      playerStats: filteredState.playerStats,
-      players: filteredState.players,
-      maxTurns: filteredState.maxTurns,
-      characterSelectionCompleted: filteredState.characterSelectionCompleted,
-      characterSelectionOptions: filteredState.characterSelectionOptions,
-      characterSelectionIntroduction:
-        filteredState.characterSelectionIntroduction,
-      generateImages: filteredState.generateImages,
-      images: filteredState.images,
-      pendingPlayers: filteredState.characterSelectionCompleted
-        ? pendingPlayers
-        : pendingCharacterSelections,
-      gameOver: this.getCurrentBeatType() === "ending",
-    } as ClientStoryState;
-  }
-
+  // Story phases
   getCurrentPhase(): StoryPhase | null {
     if (this.state.storyPhases.length === 0) {
       return null;
     }
     return this.state.storyPhases[this.state.storyPhases.length - 1];
   }
+
   getPreviousPhase(): StoryPhase | null {
     if (this.state.storyPhases.length < 2) {
       return null;
     }
     return this.state.storyPhases[this.state.storyPhases.length - 2];
   }
-  getCurrentBeatType(): BeatType | null {
-    // If there are no phases, return intro
-    if (this.state.storyPhases.length === 0) {
-      return "intro";
-    }
 
-    const currentPhase = this.getCurrentPhase();
-
-    // If the current phase is a SwitchAnalysis, return switch
-    if (this.isSwitchAnalysis(currentPhase)) {
-      return "switch";
-    }
-
-    // If the current phase is a ThreadAnalysis, return thread
-    if (this.isThreadAnalysis(currentPhase)) {
-      // If we've reached the max turns, return ending
-      if (
-        this.getCurrentTurn() >= this.state.maxTurns &&
-        this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
-      ) {
-        return "ending";
-      }
-      return "thread";
-    }
-
-    // Default to intro
-    return "intro";
-  }
-  determineNextBeatType(): BeatType {
-    const lastBeatType = this.getCurrentBeatType();
-
-    let nextBeatType: BeatType = "intro";
-
-    if (lastBeatType === "intro") {
-      nextBeatType = "switch";
-    } else if (lastBeatType === "switch") {
-      nextBeatType = "thread";
-    } else if (lastBeatType === "thread" && this.isCurrentThreadResolved()) {
-      // Check if we should end the story
-      if (this.getCurrentTurn() >= this.state.maxTurns) {
-        nextBeatType = "ending";
-      } else {
-        nextBeatType = "switch";
-      }
-    } else if (lastBeatType === "thread") {
-      nextBeatType = "thread";
-    }
-
-    console.log("[Story] Next beat type:", nextBeatType);
-    return nextBeatType;
-  }
-  private isSwitchAnalysis(phase: StoryPhase | null): phase is SwitchAnalysis {
+  isSwitchAnalysis(phase: StoryPhase | null): phase is SwitchAnalysis {
     if (!phase) return false;
     return "switches" in phase;
   }
-  private isThreadAnalysis(phase: StoryPhase | null): phase is ThreadAnalysis {
+
+  isThreadAnalysis(phase: StoryPhase | null): phase is ThreadAnalysis {
     if (!phase) return false;
     return "threads" in phase;
   }
+
   getCurrentSwitchAnalysis(): SwitchAnalysis | null {
     const currentPhase = this.getCurrentPhase();
     return this.isSwitchAnalysis(currentPhase) ? currentPhase : null;
   }
+
   getCurrentThreadAnalysis(): ThreadAnalysis | null {
     const currentPhase = this.getCurrentPhase();
     return this.isThreadAnalysis(currentPhase) ? currentPhase : null;
   }
+
   getPreviousThreadAnalysis(): ThreadAnalysis | null {
     // Look through phases in reverse order to find the most recent ThreadAnalysis
     // that isn't the current phase
@@ -402,100 +189,24 @@ export class Story {
     return null;
   }
 
-  getCurrentThreadDuration(): number {
-    const threadAnalysis = this.getCurrentThreadAnalysis();
-    return threadAnalysis ? threadAnalysis.duration : 0;
-  }
-  getCurrentThreadBeatsCompleted(): number {
-    const threadAnalysis = this.getCurrentThreadAnalysis();
-    if (!threadAnalysis || threadAnalysis.threads.length === 0) {
-      return 0;
-    }
-
-    // All threads in the same ThreadAnalysis have the same number of completed steps
-    // So we can just look at the first thread
-    const firstThread = threadAnalysis.threads[0];
-    return firstThread.progression.filter((step) => step.resolution !== null)
-      .length;
-  }
-  getCurrentThreadLastStepResolution(
-    playerSlot: PlayerSlot
-  ): Resolution | null {
-    const threadAnalysis = this.getCurrentThreadAnalysis();
-    if (!threadAnalysis || threadAnalysis.threads.length === 0) {
-      return null;
-    }
-
-    // Find the current thread
-    const currentThread = threadAnalysis.threads.find((thread) => {
-      // For challenge threads, check if player is in playersSideA
-      if (thread.playersSideA.includes(playerSlot)) {
-        return true;
-      }
-      // For contest threads, check if player is in either side
-      if (thread.playersSideB.includes(playerSlot)) {
-        return true;
-      }
-
-      return false;
-    });
-
-    if (!currentThread) {
-      return null;
-    }
-
-    // Get the last completed step
-    const completedSteps = currentThread.progression.filter(
-      (step) => step.resolution !== null
-    );
-
-    if (completedSteps.length === 0) {
-      return null;
-    }
-
-    const lastStep = completedSteps[completedSteps.length - 1];
-
-    // For contest threads, map the resolution based on which side the player is on
-    if (currentThread.playersSideB.length > 0) {
-      // This is a contest thread
-      if (currentThread.playersSideA.includes(playerSlot)) {
-        // Player is on side A
-        switch (lastStep.resolution) {
-          case "sideAWins":
-            return "favorable";
-          case "mixed":
-            return "mixed";
-          case "sideBWins":
-            return "unfavorable";
-          default:
-            return null;
-        }
-      } else if (currentThread.playersSideB.includes(playerSlot)) {
-        // Player is on side B
-        switch (lastStep.resolution) {
-          case "sideAWins":
-            return "unfavorable";
-          case "mixed":
-            return "mixed";
-          case "sideBWins":
-            return "favorable";
-          default:
-            return null;
-        }
-      }
-    } else {
-      // This is a challenge thread, return the resolution directly
-      return lastStep.resolution;
-    }
-
-    return null;
-  }
-  isCurrentThreadResolved(): boolean {
-    return (
-      this.getCurrentThreadBeatsCompleted() >= this.getCurrentThreadDuration()
-    );
+  // Beat types and turn management
+  getCurrentBeatType(): BeatType {
+    return this.threadManager.getCurrentBeatType(this.state);
   }
 
+  determineNextBeatType(): BeatType {
+    return this.threadManager.determineNextBeatType(this.state);
+  }
+
+  getCurrentTurn(): number {
+    return this.playerManager.getCurrentTurn(this.state);
+  }
+
+  getMaxTurns(): number {
+    return this.state.maxTurns;
+  }
+
+  // State update methods
   addPhase(phase: StoryPhase): Story {
     const updatedState = {
       ...this.state,
@@ -504,122 +215,22 @@ export class Story {
     return new Story(updatedState);
   }
 
-  /**
-   * Updates the current thread analysis with resolved threads
-   * @param thread The thread to update
-   * @param resolution The resolution of the thread
-   * @returns Updated Story instance
-   */
   updateThreadResolution(thread: Thread, resolution: Resolution): Story {
-    const threadAnalysis = this.getCurrentThreadAnalysis();
-    if (!threadAnalysis) {
-      console.log("[Story] No thread analysis found to update resolutions");
-      return this;
-    }
-
-    // Get the current step index that needs to be updated
-    const currentStepIndex = this.getCurrentThreadBeatsCompleted();
-
-    console.log(
-      `[Story] Updating thread ${thread.id} resolution at step ${
-        currentStepIndex + 1
-      } to ${resolution}`
-    );
-
-    // Update the thread with the resolution
-    const updatedThread = this.updateThreadWithResolution(
+    const updatedState = this.threadManager.updateThreadResolution(
+      this.state,
       thread,
-      resolution,
-      currentStepIndex
+      resolution
     );
-
-    // Update the thread analysis and story state
-    return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
-  }
-
-  updateThreadMilestone(thread: Thread, milestone: string): Story {
-    const threadAnalysis = this.getCurrentThreadAnalysis();
-    if (!threadAnalysis) {
-      console.log("[Story] No thread analysis found to update milestone");
-      return this;
-    }
-
-    // Update the thread with the milestone
-    const updatedThread: Thread = {
-      ...thread,
-      milestone,
-    };
-
-    // Update the thread analysis and story state
-    return this.updateThreadInAnalysis(updatedThread, threadAnalysis);
-  }
-
-  private updateThreadWithResolution(
-    thread: Thread,
-    resolution: Resolution,
-    stepIndex: number
-  ): Thread {
-    // Create a new progression array with the updated step
-    const updatedProgression = [...thread.progression];
-    if (stepIndex >= 0 && stepIndex < updatedProgression.length) {
-      updatedProgression[stepIndex] = {
-        ...updatedProgression[stepIndex],
-        resolution,
-      };
-    }
-
-    // Create updated thread with the new progression
-    return {
-      ...thread,
-      progression: updatedProgression,
-      // If this is the last step, also update the thread's overall resolution
-      resolution:
-        stepIndex === thread.progression.length - 1
-          ? resolution
-          : thread.resolution,
-    };
-  }
-
-  /**
-   * Helper method to update a thread in the current thread analysis
-   * @param thread The updated thread
-   * @param threadAnalysis The current thread analysis
-   * @returns Updated Story instance
-   */
-  private updateThreadInAnalysis(
-    thread: Thread,
-    threadAnalysis: ThreadAnalysis
-  ): Story {
-    // Create updated thread analysis with the updated thread
-    const updatedThreadAnalysis: ThreadAnalysis = {
-      ...threadAnalysis,
-      threads: threadAnalysis.threads.map((t) =>
-        t.id === thread.id ? thread : t
-      ),
-    };
-
-    // Replace the current thread analysis in the story phases
-    const updatedStoryPhases = [...this.state.storyPhases];
-    const currentPhaseIndex = updatedStoryPhases.length - 1;
-
-    if (currentPhaseIndex >= 0) {
-      updatedStoryPhases[currentPhaseIndex] = updatedThreadAnalysis;
-    }
-
-    // Update the state with the new story phases
-    const updatedState = {
-      ...this.state,
-      storyPhases: updatedStoryPhases,
-    };
-
     return new Story(updatedState);
   }
 
-  updatePlayers(players: Record<PlayerSlot, any>): Story {
-    return new Story({
-      ...this.state,
-      players,
-    });
+  updateThreadMilestone(thread: Thread, milestone: string): Story {
+    const updatedState = this.threadManager.updateThreadMilestone(
+      this.state,
+      thread,
+      milestone
+    );
+    return new Story(updatedState);
   }
 
   applyChanges(updatedState: Partial<StoryState>): Story {
@@ -629,268 +240,183 @@ export class Story {
     });
   }
 
-  addBeatToPlayer(playerSlot: PlayerSlot, beat: Beat): Story {
-    const player = this.state.players[playerSlot];
+  updatePlayers(players: Record<PlayerSlot, any>): Story {
     return new Story({
       ...this.state,
-      players: {
-        ...this.state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: [...player.beatHistory, beat],
-        } as PlayerState,
-      },
+      players,
     });
   }
 
-  updateChoice(playerSlot: PlayerSlot, optionIndex: number): Story {
-    const player = this.getPlayer(playerSlot);
-    if (!player) {
-      console.log(
-        "[Story] Error: No player found to update choice for " + playerSlot
-      );
-      return this;
-    }
-
-    return new Story({
-      ...this.state,
-      players: {
-        ...this.state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: player.beatHistory.map((beat, index) =>
-            index === player.beatHistory.length - 1
-              ? { ...beat, choice: optionIndex }
-              : beat
-          ),
-        } as PlayerState,
-      },
-    });
+  // Player delegation
+  getNumberOfPlayers(): PlayerCount {
+    return this.playerManager.getNumberOfPlayers(this.state);
   }
 
-  updateBeatResolution(playerSlot: PlayerSlot, resolution: Resolution): Story {
-    const player = this.getPlayer(playerSlot);
-    if (!player) {
-      console.error(`Player ${playerSlot} not found`);
-      return this;
-    }
-
-    if (!player.beatHistory || player.beatHistory.length === 0) {
-      console.error(`No beat history for player ${playerSlot}`);
-      return this;
-    }
-
-    // Get the current beat (last in history)
-    const currentBeatIndex = player.beatHistory.length - 1;
-    const updatedBeatHistory = [...player.beatHistory];
-    updatedBeatHistory[currentBeatIndex] = {
-      ...updatedBeatHistory[currentBeatIndex],
-      resolution,
-    };
-
-    // Update the player with the new beat history
-    const updatedPlayers = {
-      ...this.state.players,
-      [playerSlot]: {
-        ...player,
-        beatHistory: updatedBeatHistory,
-      },
-    };
-
-    return this.clone({
-      players: updatedPlayers,
-    });
+  getPlayerSlots(): PlayerSlot[] {
+    return this.playerManager.getPlayerSlots(this.state);
   }
 
-  /**
-   * Update the current beat with resolution details for visualization
-   * @param playerSlot The player slot
-   * @param resolutionDetails Details about the resolution including distribution and roll
-   * @returns Updated Story instance
-   */
-  updateBeatResolutionDetails(
-    playerSlot: PlayerSlot,
-    resolutionDetails: ResolutionDetails
-  ): Story {
-    const player = this.getPlayer(playerSlot);
-    if (!player) {
-      console.error(`Player ${playerSlot} not found`);
-      return this;
-    }
-
-    if (!player.beatHistory || player.beatHistory.length === 0) {
-      console.error(`No beat history for player ${playerSlot}`);
-      return this;
-    }
-
-    // Get the current beat (last in history)
-    const currentBeatIndex = player.beatHistory.length - 1;
-    const updatedBeatHistory = [...player.beatHistory];
-    updatedBeatHistory[currentBeatIndex] = {
-      ...updatedBeatHistory[currentBeatIndex],
-      resolutionDetails,
-    };
-
-    // Update the player with the new beat history
-    const updatedPlayers = {
-      ...this.state.players,
-      [playerSlot]: {
-        ...player,
-        beatHistory: updatedBeatHistory,
-      },
-    };
-
-    return this.clone({
-      players: updatedPlayers,
-    });
+  getPlayerCodes(): Record<PlayerSlot, string> {
+    return this.state.playerCodes;
   }
 
-  /**
-   * Add a new image to the story's image library
-   * @param image The image to add
-   * @returns Updated Story instance
-   */
-  addImage(image: Image): Story {
-    return new Story({
-      ...this.state,
-      images: [...this.state.images, image],
-    });
+  getPlayerSlotByCode(code: string): PlayerSlot | null {
+    return this.playerManager.getPlayerSlotByCode(this.state, code);
   }
 
-  /**
-   * Update an existing image in the story's image library
-   * @param imageId ID of the image to update
-   * @param updates Partial image object with fields to update
-   * @returns Updated Story instance
-   */
-  updateImage(imageId: string, updates: Partial<Image>): Story {
-    return new Story({
-      ...this.state,
-      images: this.state.images.map((image) =>
-        image.id === imageId
-          ? {
-              ...image,
-              ...updates,
-              status: updates.url ? "ready" : image.status,
-            }
-          : image
-      ),
-    });
+  getPendingPlayers(): PlayerSlot[] {
+    return this.playerManager.getPendingPlayers(this.state);
   }
 
-  /**
-   * Set the image for a player's current beat
-   * @param playerSlot The player slot
-   * @param imageId ID of the image to associate with the beat
-   * @returns Updated Story instance
-   */
-  setCurrentBeatImage(playerSlot: PlayerSlot, imageId: string): Story {
-    const player = this.getPlayer(playerSlot);
-    if (!player) return this;
-
-    const currentTurn = this.getCurrentTurn();
-    if (currentTurn <= 0) return this;
-
-    return new Story({
-      ...this.state,
-      players: {
-        ...this.state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: player.beatHistory.map((beat, index) =>
-            index === player.beatHistory.length - 1
-              ? { ...beat, imageId }
-              : beat
-          ),
-        },
-      },
-    });
+  getPendingCharacterSelections(): PlayerSlot[] {
+    return this.playerManager.getPendingCharacterSelections(this.state);
   }
 
-  /**
-   * Gets the beat texts for a specific thread
-   * @param thread The thread to get beat texts for
-   * @returns A record mapping player slots to their beat history for this thread
-   */
-  getThreadBeatTexts(thread: Thread): Record<string, Beat[]> {
-    const result: Record<string, Beat[]> = {};
-
-    // Collect beat texts for all players in the thread
-    [...thread.playersSideA, ...thread.playersSideB].forEach((playerSlot) => {
-      const playerState = this.getPlayer(playerSlot);
-      if (!playerState) return;
-
-      // Get the beat history for this player
-      const beatHistory = playerState.beatHistory || [];
-
-      // Find the beats that belong to this thread
-      // This is a simplification - in a real implementation, you would need to
-      // match beats to thread steps more precisely
-      result[playerSlot] = beatHistory.slice(-thread.duration);
-    });
-
-    return result;
-  }
-
-  /**
-   * Gets the last beat text for each player in a thread
-   * @param thread The thread to get the last beat text for
-   * @returns A record mapping player slots to their last beat in this thread
-   */
-  getThreadLastBeatTexts(thread: Thread): Record<string, Beat | null> {
-    const result: Record<string, Beat | null> = {};
-    const threadBeatTexts = this.getThreadBeatTexts(thread);
-
-    Object.entries(threadBeatTexts).forEach(([playerSlot, beats]) => {
-      result[playerSlot] = beats.length > 0 ? beats[beats.length - 1] : null;
-    });
-
-    return result;
-  }
-
-  updatePlayerCharacter(
-    playerSlot: PlayerSlot,
-    identity: any,
-    background: any
-  ): Story {
-    const player = this.getPlayer(playerSlot);
-    if (!player) {
-      console.error(`Player ${playerSlot} not found`);
-      return this;
-    }
-
-    // Update player with selected character information
-    const updatedPlayer = {
-      ...player,
-      name: identity.name,
-      pronouns: identity.pronouns,
-      appearance: identity.appearance,
-      fluff: replacePronounPlaceholders(background.fluffTemplate, identity),
-      statValues: background.initialPlayerStatValues,
-      characterSelected: true,
-    };
-
-    // Update the players object with the updated player
-    const updatedPlayers = {
-      ...this.state.players,
-      [playerSlot]: updatedPlayer,
-    };
-
-    return this.clone({
-      players: updatedPlayers,
-    });
+  areAllChoicesSubmitted(): boolean {
+    return this.getPendingPlayers().length === 0;
   }
 
   areAllCharactersSelected(): boolean {
-    const playerSlots = this.getPlayerSlots();
-    return playerSlots.every(
-      (slot) => this.getPlayer(slot)?.characterSelected === true
-    );
+    return this.playerManager.areAllCharactersSelected(this.state);
   }
 
   completeCharacterSelection(): Story {
     return this.clone({
       characterSelectionCompleted: true,
     });
+  }
+
+  // Player forwarding methods
+  getPlayers() {
+    return this.playerManager.getPlayers(this.state);
+  }
+
+  getPlayer(playerSlot: PlayerSlot) {
+    return this.playerManager.getPlayer(this.state, playerSlot);
+  }
+
+  getCurrentBeat(playerSlot: PlayerSlot) {
+    return this.playerManager.getCurrentBeat(this.state, playerSlot);
+  }
+
+  getPreviousBeat(playerSlot: PlayerSlot) {
+    return this.playerManager.getPreviousBeat(this.state, playerSlot);
+  }
+
+  addBeatToPlayer(playerSlot: PlayerSlot, beat: any) {
+    const updatedState = this.playerManager.addBeatToPlayer(
+      this.state,
+      playerSlot,
+      beat
+    );
+    return new Story(updatedState);
+  }
+
+  updateChoice(playerSlot: PlayerSlot, optionIndex: number) {
+    const updatedState = this.playerManager.updateChoice(
+      this.state,
+      playerSlot,
+      optionIndex
+    );
+    return new Story(updatedState);
+  }
+
+  updateBeatResolution(playerSlot: PlayerSlot, resolution: Resolution) {
+    const updatedState = this.playerManager.updateBeatResolution(
+      this.state,
+      playerSlot,
+      resolution
+    );
+    return new Story(updatedState);
+  }
+
+  updateBeatResolutionDetails(playerSlot: PlayerSlot, resolutionDetails: any) {
+    const updatedState = this.playerManager.updateBeatResolutionDetails(
+      this.state,
+      playerSlot,
+      resolutionDetails
+    );
+    return new Story(updatedState);
+  }
+
+  updatePlayerCharacter(
+    playerSlot: PlayerSlot,
+    identity: any,
+    background: any
+  ) {
+    const updatedState = this.playerManager.updatePlayerCharacter(
+      this.state,
+      playerSlot,
+      identity,
+      background
+    );
+    return new Story(updatedState);
+  }
+
+  // Thread forwarding methods
+  getCurrentThreadDuration() {
+    return this.threadManager.getCurrentThreadDuration(this.state);
+  }
+
+  getCurrentThreadBeatsCompleted() {
+    return this.threadManager.getCurrentThreadBeatsCompleted(this.state);
+  }
+
+  getCurrentThreadLastStepResolution(playerSlot: PlayerSlot) {
+    return this.threadManager.getCurrentThreadLastStepResolution(
+      this.state,
+      playerSlot
+    );
+  }
+
+  isCurrentThreadResolved() {
+    return this.threadManager.isCurrentThreadResolved(this.state);
+  }
+
+  getThreadBeatTexts(thread: Thread) {
+    return this.threadManager.getThreadBeatTexts(this.state, thread);
+  }
+
+  getThreadLastBeatTexts(thread: Thread) {
+    return this.threadManager.getThreadLastBeatTexts(this.state, thread);
+  }
+
+  // Image forwarding methods
+  getImages() {
+    return this.imageManager.getImages(this.state);
+  }
+
+  addImage(image: any) {
+    const updatedState = this.imageManager.addImage(this.state, image);
+    return new Story(updatedState);
+  }
+
+  updateImage(imageId: string, updates: any) {
+    const updatedState = this.imageManager.updateImage(
+      this.state,
+      imageId,
+      updates
+    );
+    return new Story(updatedState);
+  }
+
+  setCurrentBeatImage(playerSlot: PlayerSlot, imageId: string) {
+    const updatedState = this.imageManager.setCurrentBeatImage(
+      this.state,
+      playerSlot,
+      imageId
+    );
+    return new Story(updatedState);
+  }
+
+  // Client state forwarding
+  filterStateForPlayer(playerSlot: PlayerSlot): ClientStoryState {
+    return this.clientStateManager.filterStateForPlayer(
+      this.state,
+      playerSlot,
+      this.getCurrentBeatType(),
+      this.getPendingPlayers(),
+      this.getPendingCharacterSelections()
+    );
   }
 }
