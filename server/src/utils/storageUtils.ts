@@ -154,3 +154,44 @@ export async function getStorageFileStats(
 
   return await fs.stat(filePath);
 }
+
+/**
+ * Gets files in a storage subdirectory
+ * @param pathType - The type of storage path ('stories', 'library', or 'mocks')
+ * @param subDir - The subdirectory within the storage path (or empty string for base directory)
+ * @returns Array of file names in the subdirectory
+ */
+export async function getStorageFiles(
+  pathType: keyof typeof STORAGE_PATHS.development,
+  subDir: string
+): Promise<string[]> {
+  const basePath = getStoragePath(pathType);
+  const dirPath = subDir ? path.join(basePath, subDir) : basePath;
+
+  try {
+    return await fs.readdir(dirPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // Directory doesn't exist, create it
+      await ensureDirExists(dirPath);
+      // Return empty array as the directory was just created
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Ensures a storage directory exists before performing file operations
+ * @param pathType - The type of storage path ('stories', 'library', or 'mocks')
+ * @returns The full path to the created directory
+ */
+export async function ensureStorageDirectory(dirPath: string): Promise<string> {
+  try {
+    await ensureDirExists(dirPath);
+    return dirPath;
+  } catch (error) {
+    console.error(`Failed to ensure directory exists ${dirPath}:`, error);
+    throw error;
+  }
+}

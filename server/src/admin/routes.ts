@@ -2,9 +2,10 @@ import express from "express";
 import { config } from "../config.js";
 import { adminStoryService } from "./storyService.js";
 import { Logger } from "../utils/logger.js";
+import { LibraryService } from "../services/LibraryService.js";
 
 // Simple authentication middleware
-const authenticate = (
+export const verifyAdmin = (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
@@ -31,15 +32,16 @@ const authenticate = (
 };
 
 const router = express.Router();
+const libraryService = new LibraryService();
 
 // Auth check route
-router.get("/auth", authenticate, (req, res) => {
+router.get("/auth", verifyAdmin, (req, res) => {
   Logger.Admin.log("Auth check successful");
   res.json({ authenticated: true });
 });
 
 // Get list of stories
-router.get("/stories", authenticate, async (req, res) => {
+router.get("/stories", verifyAdmin, async (req, res) => {
   try {
     Logger.Admin.log("Fetching list of stories");
     const stories = await adminStoryService.getStoriesList();
@@ -52,7 +54,7 @@ router.get("/stories", authenticate, async (req, res) => {
 });
 
 // Get story details
-router.get("/stories/:id", authenticate, async (req, res) => {
+router.get("/stories/:id", verifyAdmin, async (req, res) => {
   try {
     const storyId = req.params.id;
     Logger.Admin.log(`Fetching story details: ${storyId}`);
@@ -70,7 +72,7 @@ router.get("/stories/:id", authenticate, async (req, res) => {
 });
 
 // Delete story
-router.delete("/stories/:id", authenticate, async (req, res) => {
+router.delete("/stories/:id", verifyAdmin, async (req, res) => {
   try {
     const storyId = req.params.id;
     Logger.Admin.log(`Deleting story: ${storyId}`);
@@ -80,6 +82,122 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
   } catch (error) {
     Logger.Admin.error(`Failed to delete story: ${req.params.id}`, error);
     res.status(500).json({ error: "Failed to delete story" });
+  }
+});
+
+// LIBRARY ROUTES
+
+// Get all templates
+router.get("/library/templates", verifyAdmin, async (req, res) => {
+  try {
+    const templates = await libraryService.getAllTemplates();
+    Logger.Admin.log(`Retrieved ${templates.length} templates`);
+    res.json({ templates });
+  } catch (error) {
+    Logger.Admin.error("Error retrieving templates", error);
+    res.status(500).json({ error: "Failed to retrieve templates" });
+  }
+});
+
+// Get template by ID
+router.get("/library/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const template = await libraryService.getTemplateById(id);
+
+    if (!template) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    Logger.Admin.log(`Retrieved template ${id}`);
+    res.json({ template });
+  } catch (error) {
+    Logger.Admin.error(`Error retrieving template ${id}`, error);
+    res.status(500).json({ error: "Failed to retrieve template" });
+  }
+});
+
+// Create a new template
+router.post("/library/templates", verifyAdmin, async (req, res) => {
+  const { title, playerCount, gameMode, setup } = req.body;
+
+  if (!title || !playerCount || !gameMode || !setup) {
+    return res.status(400).json({
+      error: "Missing required fields: title, playerCount, gameMode, setup",
+    });
+  }
+
+  try {
+    const template = await libraryService.createTemplate(
+      title,
+      playerCount,
+      gameMode,
+      setup
+    );
+
+    Logger.Admin.log(`Created template ${template.id}: ${title}`);
+    res.status(201).json({ template });
+  } catch (error) {
+    Logger.Admin.error("Error creating template", error);
+    res.status(500).json({ error: "Failed to create template" });
+  }
+});
+
+// Update a template
+router.put("/library/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { title, playerCount, gameMode, setup } = req.body;
+
+  if (!title || !playerCount || !gameMode || !setup) {
+    return res.status(400).json({
+      error: "Missing required fields: title, playerCount, gameMode, setup",
+    });
+  }
+
+  try {
+    const template = await libraryService.updateTemplate(
+      id,
+      title,
+      playerCount,
+      gameMode,
+      setup
+    );
+
+    Logger.Admin.log(`Updated template ${id}: ${title}`);
+    res.json({ template });
+  } catch (error) {
+    // Check if it's a not found error
+    if ((error as Error).message.includes("not found")) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    Logger.Admin.error(`Error updating template ${id}`, error);
+    res.status(500).json({ error: "Failed to update template" });
+  }
+});
+
+// Delete a template
+router.delete("/library/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await libraryService.deleteTemplate(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    Logger.Admin.log(`Deleted template ${id}`);
+    res.json({ success: true });
+  } catch (error) {
+    // Check if it's a not found error
+    if ((error as Error).message.includes("not found")) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    Logger.Admin.error(`Error deleting template ${id}`, error);
+    res.status(500).json({ error: "Failed to delete template" });
   }
 });
 

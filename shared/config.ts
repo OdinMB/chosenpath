@@ -87,10 +87,12 @@ export const SOCKET_CONFIG = {
 export const STORAGE_PATHS = {
   development: {
     stories: "data/stories",
+    library: "data/templates",
     mocks: "data/mocks",
   },
   production: {
     stories: "/data/stories",
+    library: "/data/templates",
     mocks: "/data/mocks",
   },
 };

@@ -1,0 +1,54 @@
+{
+  "id": "07b189da-e9f1-46dc-b5f3-d082527e7b93",
+  "title": "Test the test",
+  "gameMode": "cooperative",
+  "playerCount": 2,
+  "createdAt": "2025-04-06T22:45:29.760Z",
+  "updatedAt": "2025-04-06T22:59:03.354Z",
+  "setup": {
+    "title": "Test the test",
+    "guidelines": {
+      "world": "Essence statement ddddd",
+      "rules": [
+        "asdfsadf",
+        "asdsdfgsdfgsfdg",
+        "asdfsdf"
+      ],
+      "tone": [],
+      "conflicts": [
+        "aaaaa"
+      ],
+      "decisions": []
+    },
+    "storyElements": [],
+    "sharedOutcomes": [],
+    "statGroups": [
+      "Character",
+      "Resources",
+      "World"
+    ],
+    "sharedStats": [],
+    "initialSharedStatValues": [],
+    "playerStats": [],
+    "characterSelectionPlan": {
+      "multiplayerCoordination": [],
+      "playerStatConversionRates": [],
+      "backgroundArchetypes": []
+    },
+    "characterSelectionIntroduction": {
+      "title": "",
+      "text": ""
+    },
+    "maxTurns": 10,
+    "player1": {
+      "outcomes": [],
+      "possibleCharacterIdentities": [],
+      "possibleCharacterBackgrounds": []
+    },
+    "player2": {
+      "outcomes": [],
+      "possibleCharacterIdentities": [],
+      "possibleCharacterBackgrounds": []
+    }
+  }
+}
