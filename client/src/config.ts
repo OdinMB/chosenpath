@@ -1,15 +1,15 @@
+import { API_CONFIG, isDevelopment } from "shared/config";
+
 export const config = {
-  wsPort: import.meta.env.VITE_WS_PORT || "3000",
+  wsPort: import.meta.env.VITE_WS_PORT || API_CONFIG.DEFAULT_PORT.toString(),
   wsServerUrl:
     import.meta.env.VITE_WS_SERVER_URL ||
-    (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1"
-      ? "http://localhost:3000"
-      : "https://api.chosenpath.ai"),
+    (isDevelopment
+      ? `http://localhost:${API_CONFIG.DEFAULT_PORT}`
+      : `https://api.${API_CONFIG.DEFAULT_DOMAIN}`),
   apiUrl:
     import.meta.env.VITE_API_URL ||
-    (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1"
-      ? "http://localhost:3000"
-      : "https://api.chosenpath.ai"),
+    (isDevelopment
+      ? `http://localhost:${API_CONFIG.DEFAULT_PORT}`
+      : `https://api.${API_CONFIG.DEFAULT_DOMAIN}`),
 } as const;

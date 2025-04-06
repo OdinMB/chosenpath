@@ -26,6 +26,7 @@ const config = {
   },
   build: {
     outDir: "dist",
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -33,6 +34,14 @@ const config = {
           router: ["react-router-dom"],
         },
       },
+    },
+  },
+  preview: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+    headers: {
+      "Cache-Control": "no-store",
     },
   },
 };

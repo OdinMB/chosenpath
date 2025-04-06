@@ -1,4 +1,8 @@
 import dotenv from "dotenv";
+import {
+  API_CONFIG,
+  STORAGE_PATHS as SHARED_STORAGE_PATHS,
+} from "../../shared/config.js";
 
 // Load environment variables
 dotenv.config();
@@ -10,27 +14,18 @@ const parseCorsOrigins = (origins: string): string[] => {
 
 export const config = {
   // Server settings
-  port: process.env.PORT || 3000,
+  port: process.env.PORT || API_CONFIG.DEFAULT_PORT,
   nodeEnv: process.env.NODE_ENV || "development",
 
   // CORS and domain settings
   corsOrigins: process.env.CORS_ORIGIN
     ? parseCorsOrigins(process.env.CORS_ORIGIN)
-    : ["http://localhost:5173"],
-  productionDomain: process.env.PRODUCTION_DOMAIN || "chosenpath.ai",
+    : API_CONFIG.DEFAULT_CORS_ORIGINS,
+  productionDomain: process.env.PRODUCTION_DOMAIN || API_CONFIG.DEFAULT_DOMAIN,
 
   // Authentication
   adminPassword: process.env.ADMIN_PASSWORD || "admin-dev-password",
 } as const;
 
-// Storage paths configuration
-export const STORAGE_PATHS = {
-  development: {
-    stories: "data/stories",
-    mocks: "data/mocks",
-  },
-  production: {
-    stories: "/data/stories",
-    mocks: "/data/mocks",
-  },
-};
+// Use storage paths from shared config
+export const STORAGE_PATHS = SHARED_STORAGE_PATHS;

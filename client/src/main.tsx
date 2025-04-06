@@ -1,12 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
 import App from "./App";
 import { SessionProvider } from "./providers/SessionProvider";
 import { Admin } from "./admin/Admin";
 import "./index.css";
 
-const router = createBrowserRouter([
+// Use hash router for all routes to avoid 404s on direct URL access in production
+const router = createHashRouter([
   {
     path: "/admin/*",
     element: <Admin />,

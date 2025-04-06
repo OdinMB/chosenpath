@@ -1,3 +1,11 @@
+// Environment detection
+export const isDevelopment =
+  typeof process !== "undefined"
+    ? process.env.NODE_ENV === "development"
+    : typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
+
 // Only enable mocks in development environment
 export const MOCK_STORIES_IN_DEVELOPMENT = true;
 export const MOCK_STORIES_DELAY_MS = 4 * 1000;
@@ -85,4 +93,23 @@ export const STORAGE_PATHS = {
     stories: "/data/stories",
     mocks: "/data/mocks",
   },
+};
+
+// API and server configuration
+export const API_CONFIG = {
+  // Default ports
+  DEFAULT_PORT: 3000,
+
+  // Default URLs
+  DEFAULT_API_URL: isDevelopment
+    ? "http://localhost:3000"
+    : "https://api.chosenpath.ai",
+
+  // Default CORS origins
+  DEFAULT_CORS_ORIGINS: isDevelopment
+    ? ["http://localhost:5173"]
+    : ["https://chosenpath.ai"],
+
+  // Default domain
+  DEFAULT_DOMAIN: "chosenpath.ai",
 };

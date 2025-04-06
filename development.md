@@ -4,8 +4,10 @@ Smaller and more commits!
 
 Next
 
+- Always introduce other players in beat 1
+- First thread always together
+- List of types of scenes that the story should include (generation, switch/thread generation)
 - CoT schema attribute to list "show don't tell" elements for the beat.
-- Use React routing thingy for frontend
 
 Project structure
 
@@ -42,11 +44,11 @@ New features
   - Invite specific account to a player slot
   - Game history
 - Credits system for generating stories
+- Stripe integration
 - See pending players, current beat, etc. of games of stored codes
 
-  - Stripe integration
-
 - Images: generate one for each player and story element and only use iamges from that list?
+- Use React routing thingy for frontend
 - Resolution elements
   - what about overall result in multiplayer beats?
   - thread resolutions?
