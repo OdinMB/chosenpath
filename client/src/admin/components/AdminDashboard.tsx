@@ -4,7 +4,7 @@ import { Icons } from "../../components/ui/Icons.js";
 import { StoriesOverview } from "./StoriesOverview.js";
 import { StoryLibrary } from "./StoryLibrary.js";
 import { StoryTemplateForm } from "./StoryTemplateForm.js";
-import { StoryTemplate } from "shared/types/library";
+import { StoryTemplate } from "shared/types/storyTemplate";
 
 type AdminDashboardProps = {
   onLogout: () => void;

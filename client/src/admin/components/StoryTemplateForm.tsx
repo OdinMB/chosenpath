@@ -24,7 +24,7 @@ import {
   MAX_TURNS,
   DEFAULT_TURNS,
 } from "shared/config";
-import { StoryTemplate } from "shared/types/library";
+import { StoryTemplate } from "shared/types/storyTemplate";
 
 // Custom type for the setup with maxTurns
 interface SetupWithMaxTurns extends StorySetup<PlayerCount> {

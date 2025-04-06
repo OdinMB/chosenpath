@@ -3,7 +3,7 @@ import { PrimaryButton } from "../../components/ui/PrimaryButton";
 import { Icons } from "../../components/ui/Icons";
 import { config } from "../../config";
 import { Logger } from "../../utils/logger";
-import { StoryTemplate } from "shared/types/library";
+import { StoryTemplate } from "shared/types/storyTemplate";
 import { GameMode } from "shared/types/story";
 
 type StoryLibraryProps = {

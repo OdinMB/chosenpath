@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { StoryTemplate, TemplateListItem } from "shared/types/library";
+import { StoryTemplate, TemplateListItem } from "shared/types/storyTemplate";
 import { PrimaryButton } from "./ui/PrimaryButton";
 import { Icons } from "./ui/Icons";
 import { config } from "../config";
