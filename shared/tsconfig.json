@@ -12,12 +12,6 @@
     "composite": true,
     "rootDir": "."
   },
-  "include": [
-    "types/**/*",
-    "utils/**/*",
-    "models/**/*",
-    "config.ts",
-    "../backup/Story.orig.ts"
-  ],
+  "include": ["types/**/*", "utils/**/*", "models/**/*", "config.ts"],
   "exclude": ["node_modules", "dist"]
 }
