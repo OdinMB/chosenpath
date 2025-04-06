@@ -36,7 +36,7 @@ export class GameWebSocketServer {
 
           callback(new Error("Not allowed by CORS"));
         },
-        methods: ["GET", "POST"],
+        methods: ["GET", "POST", "DELETE"],
       },
       path: "/socket.io",
       // Add Socket.IO keep-alive configurations
