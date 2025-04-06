@@ -12,14 +12,6 @@ export interface StoryTemplate {
   setup: StorySetup<PlayerCount>;
 }
 
-// Template form data for creating/updating
-export interface TemplateFormData {
-  title: string;
-  gameMode: GameMode;
-  playerCount: PlayerCount;
-  setup: Partial<StorySetup<PlayerCount>>;
-}
-
 // Template list item for displaying in the library
 export interface TemplateListItem {
   id: string;

@@ -14,7 +14,6 @@ import { Outcome } from "shared/types/outcome";
 import {
   PlayerCount,
   PLAYER_SLOTS,
-  CharacterSelectionPlan,
   CharacterSelectionIntroduction,
 } from "shared/types/player";
 import { StatValueEntry, Stat } from "shared/types/stat";
@@ -117,15 +116,6 @@ export const StoryTemplateForm = ({
   // Shared outcomes
   const [sharedOutcomes] = useState<Outcome[]>(
     existingTemplate?.setup?.sharedOutcomes || []
-  );
-
-  // Character Selection
-  const [characterSelectionPlan] = useState<CharacterSelectionPlan>(
-    existingTemplate?.setup?.characterSelectionPlan || {
-      multiplayerCoordination: [],
-      playerStatConversionRates: [],
-      backgroundArchetypes: [],
-    }
   );
 
   const [characterSelectionIntroduction] =
@@ -279,7 +269,6 @@ export const StoryTemplateForm = ({
         sharedStats,
         initialSharedStatValues,
         playerStats,
-        characterSelectionPlan,
         characterSelectionIntroduction,
         maxTurns,
         ...playerData,

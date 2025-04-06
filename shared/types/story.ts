@@ -20,7 +20,6 @@ import {
   characterSelectionIntroductionSchema,
   CharacterSelectionIntroduction,
   characterSelectionPlanSchema,
-  CharacterSelectionPlan,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -150,7 +149,6 @@ export type StorySetup<N extends PlayerCount> = {
   playerStats: z.infer<typeof statSchema>[];
   sharedStats: z.infer<typeof statSchema>[];
   initialSharedStatValues: StatValueEntry[];
-  characterSelectionPlan: CharacterSelectionPlan;
   characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
 
@@ -187,7 +185,6 @@ export type StoryState = {
   storyPhases: StoryPhase[];
   maxTurns: number;
   characterSelectionCompleted: boolean;
-  characterSelectionPlan: CharacterSelectionPlan;
   characterSelectionOptions: Record<
     (typeof PLAYER_SLOTS)[number],
     PlayerOptionsGeneration

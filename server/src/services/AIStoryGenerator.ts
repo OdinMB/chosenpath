@@ -97,7 +97,6 @@ export class AIStoryGenerator {
       storyPhases: [],
       maxTurns,
       characterSelectionCompleted: false,
-      characterSelectionPlan: setup.characterSelectionPlan,
       characterSelectionOptions: Object.fromEntries(
         getPlayerSlots(playerCount).map((slot) => {
           const playerKey = slot as keyof StorySetup<typeof playerCount>;
@@ -218,7 +217,10 @@ export class AIStoryGenerator {
         }
       }
 
-      return result as StorySetup<typeof playerCount>;
+      // Create a new object without the characterSelectionPlan property
+      const { characterSelectionPlan, ...storySetupData } = result;
+
+      return storySetupData as StorySetup<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
