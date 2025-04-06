@@ -34,11 +34,14 @@ export class SwitchPromptService {
       ) +
       "\n\n" +
       this.createInstructionsSection(story) +
-      "\n\n" +
-      StoryStatePromptService.createStoryStatePrompt(
-        story,
-        this.SECTIONS_PREVIOUS_THREAD
-      );
+      // Only show the previous thread if this is not the opening switch
+      (story.getCurrentTurn() > 1
+        ? "\n\n" +
+          StoryStatePromptService.createStoryStatePrompt(
+            story,
+            this.SECTIONS_PREVIOUS_THREAD
+          )
+        : "");
     // console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }

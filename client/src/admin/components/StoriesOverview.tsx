@@ -8,12 +8,14 @@ type Story = {
   id: string;
   title: string;
   updatedAt: string;
+  createdAt?: string; // Optional as it may not be available in existing data
   gameMode: string;
   playerCount: number;
   characterSelectionCompleted: boolean;
   maxTurns: number;
   fileSize: number;
   error?: string;
+  currentBeat?: number; // Optional as it may not be available in existing data
 };
 
 type StoriesOverviewProps = {
@@ -62,13 +64,21 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Unknown";
-    return new Date(dateString).toLocaleString();
-  };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
+    const date = new Date(dateString);
+
+    // Format: "2025-04-07, 9:34pm"
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    let hours = date.getHours();
+    const ampm = hours >= 12 ? "pm" : "am";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // Convert 0 to 12
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}, ${hours}:${minutes}${ampm}`;
   };
 
   const handleDeleteStory = async (storyId: string) => {
@@ -118,7 +128,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
           onClick={loadStories}
           size="sm"
           disabled={isLoading}
-          leftIcon={<Icons.ArrowRight className="h-4 w-4 rotate-90" />}
+          leftIcon={<Icons.Refresh className="h-4 w-4" />}
         >
           Refresh
         </PrimaryButton>
@@ -145,10 +155,11 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
             <thead className="bg-gray-100 text-primary-800">
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
-                <th className="py-3 px-4 text-left">Game Mode</th>
                 <th className="py-3 px-4 text-left">Players</th>
+                <th className="py-3 px-4 text-left">Game Mode</th>
+                <th className="py-3 px-4 text-left">Beat</th>
+                <th className="py-3 px-4 text-left">Created</th>
                 <th className="py-3 px-4 text-left">Last Updated</th>
-                <th className="py-3 px-4 text-left">Size</th>
                 <th className="py-3 px-4 text-left">Actions</th>
               </tr>
             </thead>
@@ -161,26 +172,23 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
                     ) : (
                       <div>
                         <span className="font-medium">{story.title}</span>
-                        {story.characterSelectionCompleted ? (
-                          <span className="ml-2 bg-accent-100 text-accent text-xs px-2 py-1 rounded">
-                            In Progress
-                          </span>
-                        ) : (
-                          <span className="ml-2 bg-primary-100 text-primary-700 text-xs px-2 py-1 rounded">
-                            Setup
-                          </span>
-                        )}
                       </div>
                     )}
                   </td>
+                  <td className="py-3 px-4">{story.playerCount}</td>
                   <td className="py-3 px-4 capitalize">
                     {story.gameMode.replace("-", " ")}
                   </td>
-                  <td className="py-3 px-4">{story.playerCount}</td>
-                  <td className="py-3 px-4">{formatDate(story.updatedAt)}</td>
                   <td className="py-3 px-4">
-                    {formatFileSize(story.fileSize)}
+                    {story.characterSelectionCompleted
+                      ? story.currentBeat || 1
+                      : 0}{" "}
+                    / {story.maxTurns}
                   </td>
+                  <td className="py-3 px-4">
+                    {formatDate(story.createdAt || story.updatedAt)}
+                  </td>
+                  <td className="py-3 px-4">{formatDate(story.updatedAt)}</td>
                   <td className="py-3 px-4">
                     <div className="flex space-x-2">
                       <button

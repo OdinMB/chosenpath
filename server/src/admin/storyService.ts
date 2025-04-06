@@ -17,6 +17,7 @@ export type StoryInfo = {
   characterSelectionCompleted: boolean;
   maxTurns: number;
   fileSize: number;
+  currentBeat: number;
   error?: string;
 };
 
@@ -44,6 +45,21 @@ export class AdminStoryService {
             // Get file stats for last modified time
             const fileStats = await getStorageFileStats("stories", file);
 
+            // Calculate current beat from beatHistory if available
+            let currentBeat = 0;
+            if (storyData.characterSelectionCompleted) {
+              // Look for beatHistory in each player
+              const playerBeats = Object.values(storyData.players || {}).map(
+                (player: any) => {
+                  return player.beatHistory?.length || 0;
+                }
+              );
+
+              // Use the maximum number of beats across all players
+              currentBeat =
+                playerBeats.length > 0 ? Math.max(...playerBeats) : 1;
+            }
+
             // Extract relevant information
             return {
               id: storyId,
@@ -56,6 +72,7 @@ export class AdminStoryService {
                 storyData.characterSelectionCompleted || false,
               maxTurns: storyData.maxTurns || 0,
               fileSize: data.length,
+              currentBeat,
             };
           } catch (error) {
             Logger.AdminService.error(
@@ -66,6 +83,7 @@ export class AdminStoryService {
               id: path.parse(file).name,
               title: "Error loading story",
               error: (error as Error).message,
+              currentBeat: 0,
             } as StoryInfo;
           }
         })

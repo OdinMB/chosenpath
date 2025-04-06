@@ -32,6 +32,7 @@ Project structure
 - Setting up path aliases in your tsconfig.json to make imports cleaner
 - Using barrel files (index.ts) at key points to simplify imports
 - Documenting the chosen structure to help onboard new team members
+- Update client logging to use the new logger util
 
 New features
 
