@@ -1,4 +1,4 @@
-import type { Story } from "../services/Story.js";
+import type { Story } from "shared/models/Story.js";
 import type { PlayerSlot } from "shared/types/player.js";
 import type { Beat } from "shared/types/beat.js";
 import type { GameMode, StoryState } from "shared/types/story.js";

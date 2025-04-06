@@ -5,6 +5,7 @@ import {
   getStorageFileStats,
 } from "../utils/storageUtils.js";
 import { Logger } from "../utils/logger.js";
+import { Story } from "shared/models/Story.js";
 import path from "path";
 
 export type StoryInfo = {
@@ -16,7 +17,6 @@ export type StoryInfo = {
   playerCount: number;
   characterSelectionCompleted: boolean;
   maxTurns: number;
-  fileSize: number;
   currentBeat: number;
   error?: string;
 };
@@ -42,37 +42,26 @@ export class AdminStoryService {
             const data = await readStorageFile("stories", file);
             const storyData = JSON.parse(data);
 
+            // Create a Story instance to leverage its methods
+            const story = Story.create(storyData);
+
             // Get file stats for last modified time
             const fileStats = await getStorageFileStats("stories", file);
 
-            // Calculate current beat from beatHistory if available
-            let currentBeat = 0;
-            if (storyData.characterSelectionCompleted) {
-              // Look for beatHistory in each player
-              const playerBeats = Object.values(storyData.players || {}).map(
-                (player: any) => {
-                  return player.beatHistory?.length || 0;
-                }
-              );
-
-              // Use the maximum number of beats across all players
-              currentBeat =
-                playerBeats.length > 0 ? Math.max(...playerBeats) : 1;
-            }
-
-            // Extract relevant information
+            // Return story info with ID directly using Story methods
             return {
               id: storyId,
-              title: storyData.title || "Untitled",
-              createdAt: storyData.createdAt || null,
+              title: story.getTitle(),
+              createdAt: (storyData as any).createdAt || null,
               updatedAt: new Date(fileStats.mtime).toISOString(),
-              gameMode: storyData.gameMode || "unknown",
-              playerCount: Object.keys(storyData.players || {}).length,
+              gameMode: story.getGameMode(),
+              playerCount: story.getNumberOfPlayers(),
               characterSelectionCompleted:
-                storyData.characterSelectionCompleted || false,
-              maxTurns: storyData.maxTurns || 0,
-              fileSize: data.length,
-              currentBeat,
+                story.getState().characterSelectionCompleted,
+              maxTurns: story.getMaxTurns(),
+              currentBeat: story.getState().characterSelectionCompleted
+                ? story.getCurrentTurn()
+                : 0,
             };
           } catch (error) {
             Logger.AdminService.error(

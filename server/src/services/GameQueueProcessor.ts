@@ -8,11 +8,12 @@ import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
 import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
-import { Story } from "./Story.js";
+import { Story } from "shared/models/Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 import { Resolution } from "shared/types/index.js";
 import { storyRepository } from "./StoryRepository.js";
 import { connectionManager } from "./ConnectionManager.js";
+import { ChangeService } from "./ChangeService.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -26,11 +27,13 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 > {
   private aiStoryGenerator: AIStoryGenerator;
   private aiImageGenerator: AIImageGenerator;
+  private changeService: ChangeService;
 
   constructor() {
     super();
     this.aiStoryGenerator = new AIStoryGenerator();
     this.aiImageGenerator = new AIImageGenerator();
+    this.changeService = new ChangeService();
   }
 
   protected getQueueId(operation: GameOperation): string {
@@ -179,9 +182,9 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       const [nextStory, changes, beatsNeedingImages] =
         await this.aiStoryGenerator.generateBeats(updatedStory);
 
-      // Apply changes
+      // Apply changes using ChangeService directly
       console.log("[GameQueueProcessor] Applying changes to state");
-      let finalStory = nextStory.applyStoryChanges(changes);
+      let finalStory = this.changeService.applyChanges(nextStory, changes);
 
       // Store and broadcast the first update
       await this.updateAndBroadcastStory(gameId, finalStory);

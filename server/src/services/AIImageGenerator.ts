@@ -8,7 +8,7 @@ import type {
 import { imageGenerationSchema } from "shared/types/index.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
-import { Story } from "./Story.js";
+import { Story } from "shared/models/Story.js";
 
 dotenv.config();
 

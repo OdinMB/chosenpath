@@ -1,4 +1,4 @@
-import { Story } from "../Story.js";
+import { Story } from "shared/models/Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,

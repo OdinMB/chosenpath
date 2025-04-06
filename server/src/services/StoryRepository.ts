@@ -1,7 +1,7 @@
 import path from "path";
 import { connectionManager } from "./ConnectionManager.js";
 import type { StoryState, PlayerSlot } from "shared/types/index.js";
-import { Story } from "./Story.js";
+import { Story } from "shared/models/Story.js";
 import { Logger } from "../utils/logger.js";
 import {
   readStorageFile,

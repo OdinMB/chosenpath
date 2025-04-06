@@ -5,7 +5,7 @@ import type {
   StatValueEntry,
   StoryState,
 } from "shared/types/index.js";
-import { Story } from "./Story.js";
+import { Story } from "shared/models/Story.js";
 
 export class ChangeService {
   applyChanges(story: Story, changes: Change[]): Story {
@@ -92,7 +92,7 @@ export class ChangeService {
       },
     };
 
-    return story.applyChanges(updatedState);
+    return story.clone(updatedState);
   }
 
   private applyNewMilestone(
@@ -115,7 +115,7 @@ export class ChangeService {
         };
       });
 
-      return story.applyChanges({
+      return story.clone({
         sharedOutcomes: updatedOutcomes,
       });
     }
@@ -136,7 +136,7 @@ export class ChangeService {
       };
     });
 
-    return story.applyChanges({
+    return story.clone({
       players: {
         ...state.players,
         [change.outcomeGroup]: {
@@ -236,7 +236,7 @@ export class ChangeService {
     const updatedStatValues = [...statValues];
     updatedStatValues[statValueIndex] = updatedStatValue;
 
-    return story.applyChanges(updateState(updatedStatValues));
+    return story.clone(updateState(updatedStatValues));
   }
 
   private updateStatValue(
@@ -331,7 +331,7 @@ export class ChangeService {
         return story;
       }
 
-      return story.applyChanges({
+      return story.clone({
         worldFacts: [...state.worldFacts, change.fact],
       });
     }
@@ -354,7 +354,7 @@ export class ChangeService {
       return element;
     });
 
-    return story.applyChanges({
+    return story.clone({
       storyElements: updatedElements,
     });
   }
@@ -375,7 +375,7 @@ export class ChangeService {
       return story;
     }
 
-    return story.applyChanges({
+    return story.clone({
       storyElements: [...state.storyElements, change.element],
     });
   }

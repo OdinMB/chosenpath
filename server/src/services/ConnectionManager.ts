@@ -6,7 +6,7 @@ import type {
   StateUpdateNotification,
 } from "shared/types/index.js";
 import { storyRepository } from "./StoryRepository.js";
-import { Story } from "./Story.js";
+import { Story } from "shared/models/Story.js";
 import { Server } from "socket.io";
 import { Logger } from "../utils/logger.js";
 

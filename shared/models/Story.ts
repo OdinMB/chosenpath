@@ -19,9 +19,7 @@ import {
   Thread,
   Resolution,
   Image,
-  Change,
 } from "shared/types/index.js";
-import { ChangeService } from "./ChangeService.js";
 import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
 
 /**
@@ -30,7 +28,6 @@ import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
  */
 export class Story {
   private state: StoryState;
-  private static changeService = new ChangeService();
 
   constructor(state: StoryState) {
     this.state = state;
@@ -43,10 +40,6 @@ export class Story {
       ...this.state,
       ...updatedState,
     });
-  }
-
-  applyStoryChanges(changes: Change[]): Story {
-    return Story.changeService.applyChanges(this, changes);
   }
 
   getTitle(): string {
@@ -233,29 +226,26 @@ export class Story {
     }
     // Filter out sensitive data from beat history
     if (playerData.beatHistory && playerData.beatHistory.length > 0) {
-      playerData.beatHistory = playerData.beatHistory.map((beat) => {
-        const filteredBeat = { ...beat };
+      playerData.beatHistory = playerData.beatHistory.map((beat: Beat) => {
+        // Create a new filtered beat without sensitive properties
+        const { plan, summary, ...filteredBeat } = beat;
 
-        // Remove plan and summary from beats
-        delete filteredBeat.plan;
-        delete filteredBeat.summary;
-
-        // Filter options if they exist
-        if (filteredBeat.options && filteredBeat.options.length > 0) {
+        // Filter option details for undecided challenge beats
+        if (
+          filteredBeat.choice &&
+          filteredBeat.choice === -1 &&
+          filteredBeat.options &&
+          filteredBeat.options.length > 0
+        ) {
           filteredBeat.options = filteredBeat.options.map((option) => {
-            const filteredOption = { ...option };
-
-            // Remove properties specific to challenge options that haven't been decided yet
-            if (
-              filteredOption.optionType === "challenge" &&
-              filteredOption.decision === -1
-            ) {
-              delete filteredOption.basePoints;
-              delete filteredOption.modifiersToSuccessRate;
-              delete filteredOption.riskType;
+            const optionCopy = { ...option };
+            if (optionCopy.optionType === "challenge") {
+              // Safe to delete these properties as we're working with a copy
+              delete (optionCopy as any).basePoints;
+              delete (optionCopy as any).modifiersToSuccessRate;
+              delete (optionCopy as any).riskType;
             }
-
-            return filteredOption;
+            return optionCopy;
           });
         }
 

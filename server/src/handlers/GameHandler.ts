@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import type { Story } from "../services/Story.js";
+import type { Story } from "shared/models/Story.js";
 import { isValidPlayerCount } from "shared/utils/playerUtils.js";
 import type { PlayerCount, PlayerSlot } from "shared/types/player.js";
 import { getPlayerSlots } from "shared/utils/playerUtils.js";

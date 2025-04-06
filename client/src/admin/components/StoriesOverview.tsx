@@ -4,18 +4,17 @@ import { Icons } from "../../components/ui/Icons.js";
 import { config } from "../../config.js";
 import { Logger } from "../../utils/logger.js";
 
-type Story = {
+type StoryListItem = {
   id: string;
   title: string;
   updatedAt: string;
-  createdAt?: string; // Optional as it may not be available in existing data
+  createdAt?: string;
   gameMode: string;
   playerCount: number;
   characterSelectionCompleted: boolean;
   maxTurns: number;
-  fileSize: number;
   error?: string;
-  currentBeat?: number; // Optional as it may not be available in existing data
+  currentBeat?: number;
 };
 
 type StoriesOverviewProps = {
@@ -23,7 +22,7 @@ type StoriesOverviewProps = {
 };
 
 export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
-  const [stories, setStories] = useState<Story[]>([]);
+  const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

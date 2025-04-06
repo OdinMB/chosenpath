@@ -17,6 +17,6 @@
     "alwaysStrict": false
   },
   "references": [{ "path": "../shared" }],
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/models/Story.ts"],
   "exclude": ["node_modules", "dist"]
 }
