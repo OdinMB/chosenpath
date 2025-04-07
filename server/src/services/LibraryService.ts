@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { isDevelopment, STORAGE_PATHS } from "shared/config.js";
 import { GameMode, StorySetup } from "shared/types/story.js";
 import { PlayerCount } from "shared/types/player.js";
+import { StoryTemplate } from "shared/types/storyTemplate.js";
 import {
   readStorageFile,
   writeStorageFile,
@@ -11,17 +12,6 @@ import {
   ensureStorageDirectory,
 } from "../utils/storageUtils.js";
 import { Logger } from "../utils/logger.js";
-
-// Define the template structure
-export interface StoryTemplate {
-  id: string;
-  title: string;
-  gameMode: GameMode;
-  playerCount: PlayerCount;
-  createdAt: string;
-  updatedAt: string;
-  setup: StorySetup<PlayerCount>;
-}
 
 export class LibraryService {
   private storagePath: string;
@@ -105,10 +95,11 @@ export class LibraryService {
    * Create a new template
    */
   async createTemplate(
-    title: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
-    setup: Partial<StorySetup<PlayerCount>>
+    setup: Partial<StorySetup<PlayerCount>>,
+    tags: string[] = [],
+    maxTurns?: number
   ): Promise<StoryTemplate> {
     try {
       const id = uuidv4();
@@ -116,9 +107,10 @@ export class LibraryService {
 
       const template: StoryTemplate = {
         id,
-        title,
         gameMode,
         playerCount,
+        tags,
+        ...(maxTurns !== undefined ? { maxTurns } : {}),
         createdAt: now,
         updatedAt: now,
         setup: setup as StorySetup<PlayerCount>,
@@ -130,7 +122,7 @@ export class LibraryService {
         JSON.stringify(template, null, 2)
       );
 
-      this.logger.log(`Created template ${id}: ${title}`);
+      this.logger.log(`Created template ${id}: ${setup.title}`);
       return template;
     } catch (error) {
       this.logger.error("Failed to create template", error);
@@ -143,10 +135,11 @@ export class LibraryService {
    */
   async updateTemplate(
     id: string,
-    title: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
-    setup: Partial<StorySetup<PlayerCount>>
+    setup: Partial<StorySetup<PlayerCount>>,
+    tags: string[] = [],
+    maxTurns?: number
   ): Promise<StoryTemplate> {
     try {
       // Check if template exists
@@ -160,9 +153,10 @@ export class LibraryService {
 
       const updatedTemplate: StoryTemplate = {
         ...existingTemplate,
-        title,
         gameMode,
         playerCount,
+        tags,
+        ...(maxTurns !== undefined ? { maxTurns } : {}),
         updatedAt: now,
         setup: setup as StorySetup<PlayerCount>,
       };
@@ -173,7 +167,7 @@ export class LibraryService {
         JSON.stringify(updatedTemplate, null, 2)
       );
 
-      this.logger.log(`Updated template ${id}: ${title}`);
+      this.logger.log(`Updated template ${id}: ${setup.title}`);
       return updatedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template ${id}`, error);

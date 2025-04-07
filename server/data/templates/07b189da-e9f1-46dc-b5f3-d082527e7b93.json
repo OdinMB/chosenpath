@@ -4,21 +4,21 @@
   "gameMode": "cooperative",
   "playerCount": 2,
   "createdAt": "2025-04-06T22:45:29.760Z",
-  "updatedAt": "2025-04-06T22:59:03.354Z",
+  "updatedAt": "2025-04-07T00:40:47.420Z",
   "setup": {
-    "title": "Test the test",
+    "title": "Test",
     "guidelines": {
-      "world": "Essence statement ddddd",
+      "world": "EssEssEss",
       "rules": [
-        "asdfsadf",
-        "asdsdfgsdfgsfdg",
-        "asdfsdf"
+        "asdfsadf"
       ],
-      "tone": [],
-      "conflicts": [
-        "aaaaa"
+      "tone": [
+        "guideline"
       ],
-      "decisions": []
+      "conflicts": [],
+      "decisions": [
+        "manage resources"
+      ]
     },
     "storyElements": [],
     "sharedOutcomes": [],
@@ -50,5 +50,9 @@
       "possibleCharacterIdentities": [],
       "possibleCharacterBackgrounds": []
     }
-  }
+  },
+  "tags": [
+    "Cooperative"
+  ],
+  "maxTurns": 15
 }

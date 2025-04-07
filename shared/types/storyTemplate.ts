@@ -4,9 +4,10 @@ import { PlayerCount } from "./player.js";
 // Define the template structure
 export interface StoryTemplate {
   id: string;
-  title: string;
   gameMode: GameMode;
   playerCount: PlayerCount;
+  maxTurns?: number;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
   setup: StorySetup<PlayerCount>;
@@ -18,6 +19,7 @@ export interface TemplateListItem {
   title: string;
   gameMode: GameMode;
   playerCount: PlayerCount;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }

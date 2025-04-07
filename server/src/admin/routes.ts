@@ -120,23 +120,30 @@ router.get("/library/templates/:id", verifyAdmin, async (req, res) => {
 
 // Create a new template
 router.post("/library/templates", verifyAdmin, async (req, res) => {
-  const { title, playerCount, gameMode, setup } = req.body;
+  const { playerCount, gameMode, setup, tags, maxTurns } = req.body;
 
-  if (!title || !playerCount || !gameMode || !setup) {
+  if (!playerCount || !gameMode || !setup) {
     return res.status(400).json({
-      error: "Missing required fields: title, playerCount, gameMode, setup",
+      error: "Missing required fields: playerCount, gameMode, setup",
+    });
+  }
+
+  if (!setup.title) {
+    return res.status(400).json({
+      error: "Missing required field: setup.title",
     });
   }
 
   try {
     const template = await libraryService.createTemplate(
-      title,
       playerCount,
       gameMode,
-      setup
+      setup,
+      tags || [],
+      maxTurns
     );
 
-    Logger.Admin.log(`Created template ${template.id}: ${title}`);
+    Logger.Admin.log(`Created template ${template.id}: ${setup.title}`);
     res.status(201).json({ template });
   } catch (error) {
     Logger.Admin.error("Error creating template", error);
@@ -147,24 +154,31 @@ router.post("/library/templates", verifyAdmin, async (req, res) => {
 // Update a template
 router.put("/library/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const { title, playerCount, gameMode, setup } = req.body;
+  const { playerCount, gameMode, setup, tags, maxTurns } = req.body;
 
-  if (!title || !playerCount || !gameMode || !setup) {
+  if (!playerCount || !gameMode || !setup) {
     return res.status(400).json({
-      error: "Missing required fields: title, playerCount, gameMode, setup",
+      error: "Missing required fields: playerCount, gameMode, setup",
+    });
+  }
+
+  if (!setup.title) {
+    return res.status(400).json({
+      error: "Missing required field: setup.title",
     });
   }
 
   try {
     const template = await libraryService.updateTemplate(
       id,
-      title,
       playerCount,
       gameMode,
-      setup
+      setup,
+      tags || [],
+      maxTurns
     );
 
-    Logger.Admin.log(`Updated template ${id}: ${title}`);
+    Logger.Admin.log(`Updated template ${id}: ${setup.title}`);
     res.json({ template });
   } catch (error) {
     // Check if it's a not found error

@@ -4,7 +4,6 @@ import { Icons } from "../../components/ui/Icons";
 import { config } from "../../config";
 import { Logger } from "../../utils/logger";
 import { StoryTemplate } from "shared/types/storyTemplate";
-import { GameMode } from "shared/types/story";
 
 type StoryLibraryProps = {
   token: string;
@@ -63,18 +62,12 @@ export const StoryLibrary = ({
 
     const date = new Date(dateString);
 
-    // Format: "2025-04-07, 9:34pm"
+    // Format: "2025-04-07"
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
 
-    let hours = date.getHours();
-    const ampm = hours >= 12 ? "pm" : "am";
-    hours = hours % 12;
-    hours = hours ? hours : 12; // Convert 0 to 12
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-
-    return `${year}-${month}-${day}, ${hours}:${minutes}${ampm}`;
+    return `${year}-${month}-${day}`;
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
@@ -114,12 +107,6 @@ export const StoryLibrary = ({
       Logger.Admin.error(`Error deleting template: ${templateId}`, error);
       setError("Failed to delete template. Please try again.");
     }
-  };
-
-  const formatGameMode = (mode: GameMode) => {
-    return mode
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (c: string) => c.toUpperCase());
   };
 
   return (
@@ -176,10 +163,10 @@ export const StoryLibrary = ({
             <thead className="bg-gray-100 text-primary-800">
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
+                <th className="py-3 px-4 text-left">Tags</th>
                 <th className="py-3 px-4 text-left">Players</th>
-                <th className="py-3 px-4 text-left">Game Mode</th>
                 <th className="py-3 px-4 text-left">Created</th>
-                <th className="py-3 px-4 text-left">Last Updated</th>
+                <th className="py-3 px-4 text-left">Updated</th>
                 <th className="py-3 px-4 text-left">Actions</th>
               </tr>
             </thead>
@@ -188,13 +175,28 @@ export const StoryLibrary = ({
                 <tr key={template.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <div>
-                      <span className="font-medium">{template.title}</span>
+                      <span className="font-medium">
+                        {template.setup.title}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex flex-wrap gap-1">
+                      {template.tags && template.tags.length > 0 ? (
+                        template.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-md"
+                          >
+                            {tag}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-sm">No tags</span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-4">{template.playerCount}</td>
-                  <td className="py-3 px-4 capitalize">
-                    {formatGameMode(template.gameMode)}
-                  </td>
                   <td className="py-3 px-4">
                     {formatDate(template.createdAt)}
                   </td>
