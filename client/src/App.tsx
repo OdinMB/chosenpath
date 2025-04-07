@@ -1,13 +1,13 @@
-import { useSession } from "./hooks/useSession.js";
-import { StoryInitializer } from "./components/StoryInitializer.js";
-import { GameLayout } from "./components/GameLayout.js";
-import { wsService } from "./services/WebSocketService.js";
-import { gameService } from "./services/GameService.js";
+import { useSession } from "./shared/useSession.js";
+import { StoryInitializer } from "./page/StoryInitializer.js";
+import { GameLayout } from "./game/components/GameLayout.js";
+import { wsService } from "./shared/WebSocketService.js";
+import { gameService } from "./game/GameService.js";
 import { useEffect, useState, useCallback } from "react";
-import { WelcomeScreen } from "./components/WelcomeScreen";
-import { PlayerCodes } from "./components/PlayerCodes";
+import { WelcomeScreen } from "./page/WelcomeScreen.js";
+import { PlayerCodes } from "./page/PlayerCodes.js";
 import { GameMode } from "../../shared/types/story.js";
-import { RateLimitNotification } from "./components/ui/RateLimitNotification";
+import { RateLimitNotification } from "./shared/components/ui/RateLimitNotification.js";
 
 // Add this type at the top with the imports
 type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";

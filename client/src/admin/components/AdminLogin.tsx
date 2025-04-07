@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { PrimaryButton } from "../../components/ui/PrimaryButton.js";
-import { Icons } from "../../components/ui/Icons.js";
+import { PrimaryButton } from "../../shared/components/ui/PrimaryButton.js";
+import { Icons } from "../../shared/components/ui/Icons.js";
 import { config } from "../../config.js";
 
 type AdminLoginProps = {

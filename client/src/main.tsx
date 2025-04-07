@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App";
-import { SessionProvider } from "./providers/SessionProvider";
+import { SessionProvider } from "./shared/SessionProvider";
 import { Admin } from "./admin/Admin";
 import "./index.css";
 

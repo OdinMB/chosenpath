@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AdminLogin } from "./components/AdminLogin";
-import { PrimaryButton } from "../components/ui/PrimaryButton.js";
-import { Icons } from "../components/ui/Icons.js";
+import { PrimaryButton } from "../shared/components/ui/PrimaryButton.js";
+import { Icons } from "../shared/components/ui/Icons.js";
 import { StoriesOverview } from "./components/StoriesOverview.js";
 import { StoryLibrary } from "./components/StoryLibrary.js";
 import { TemplateForm } from "./components/template/index.js";

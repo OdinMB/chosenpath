@@ -4,8 +4,8 @@ import { GuidelinesTab } from "./GuidelinesTab";
 import { PlaceholderTab } from "./PlaceholderTab";
 import { StoryTemplate } from "shared/types/storyTemplate";
 import { GameMode, GameModes } from "shared/types/story";
-import { PrimaryButton } from "../../../components/ui/PrimaryButton";
-import { Logger } from "../../../utils/logger";
+import { PrimaryButton } from "../../../shared/components/ui/PrimaryButton";
+import { Logger } from "../../../shared/logger";
 import { config } from "../../../config";
 
 interface TemplateFormProps {

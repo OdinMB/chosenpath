@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import { adminRouter } from "./admin/routes.js";
-import { GameWebSocketServer } from "./websocket/index.js";
+import { GameWebSocketServer } from "./shared/websocket.js";
 
 async function startServer() {
   const app = express();

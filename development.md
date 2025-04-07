@@ -2,6 +2,12 @@ Smaller and more commits!
 
 # Feature backlog
 
+Library of stories with pre-configured setups
+
+- add remaining sections
+- allow users to select stories from library
+- make some settings flexible (2-3 players, 20-25 beats, etc.)
+
 Next
 
 - Always introduce other players in beat 1
@@ -9,36 +15,8 @@ Next
 - List of types of scenes that the story should include (generation, switch/thread generation)
 - CoT schema attribute to list "show don't tell" elements for the beat.
 
-Project structure
-
-- /client
-
-  - /src
-    - /shared
-      - /components # Shared components
-        - /ui # UI primitives (buttons, modals, etc.)
-      - hooks, utilities, etc.
-    - /website # Website-specific code
-      - /components # Website-specific components
-      - /pages # Website pages
-    - /game # Game-specific code
-      - /components # Game-specific components
-      - /services # Game services
-    - /admin # Admin-specific code
-      - /components # Admin-specific components
-      - /services # Admin services
-    - /user # User account-specific code
-      - /components # User account components
-      - /services # User account services
-
-- Setting up path aliases in your tsconfig.json to make imports cleaner
-- Using barrel files (index.ts) at key points to simplify imports
-- Documenting the chosen structure to help onboard new team members
-- Update client logging to use the new logger util
-
 New features
 
-- Library of stories with pre-configured setups
 - User accounts
   - Manage games
   - Invite specific account to a player slot
@@ -68,6 +46,7 @@ New features
 
 Error resilience
 
+- Update client logging to use the new logger util
 - Retry mechanism for queue actions
 - Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values. (See getDefaultStatValue for "fix me" indicators.)
 - Make sure that there are only 3 backgrounds per player, turn backgrounds into background1-3, or just delete duplicate backgrounds.

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton } from "../../components/ui/PrimaryButton.js";
-import { Icons } from "../../components/ui/Icons.js";
+import { PrimaryButton } from "../../shared/components/ui/PrimaryButton.js";
+import { Icons } from "../../shared/components/ui/Icons.js";
 import { config } from "../../config.js";
-import { Logger } from "../../utils/logger.js";
+import { Logger } from "../../shared/logger.js";
 
 type StoryListItem = {
   id: string;

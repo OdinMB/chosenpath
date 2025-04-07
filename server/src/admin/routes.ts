@@ -1,8 +1,8 @@
 import express from "express";
 import { config } from "../config.js";
-import { adminStoryService } from "./storyService.js";
-import { Logger } from "../utils/logger.js";
-import { LibraryService } from "../services/LibraryService.js";
+import { adminStoryService } from "./AdminStoryService.js";
+import { Logger } from "../shared/logger.js";
+import { AdminLibraryService } from "./AdminLibraryService.js";
 
 // Simple authentication middleware
 export const verifyAdmin = (
@@ -32,7 +32,7 @@ export const verifyAdmin = (
 };
 
 const router = express.Router();
-const libraryService = new LibraryService();
+const libraryService = new AdminLibraryService();
 
 // Auth check route
 router.get("/auth", verifyAdmin, (req, res) => {

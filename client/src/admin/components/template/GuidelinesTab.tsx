@@ -1,5 +1,5 @@
 import React from "react";
-import { Icons } from "../../../components/ui/Icons";
+import { Icons } from "../../../shared/components/ui/Icons";
 
 interface GuidelinesTabProps {
   world: string;
