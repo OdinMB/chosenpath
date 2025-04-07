@@ -3,6 +3,8 @@ import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
 import { GameModes, GameMode } from "@core/types/story";
 import { PlayerCount } from "@core/types/player";
 import { Icons } from "@components/ui/Icons";
+import { Input } from "@components/ui/Input";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
 
 interface BasicInfoTabProps {
   title: string;
@@ -36,23 +38,59 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-primary mb-1">
-          Title
-        </label>
-        <input
-          type="text"
+        <h3 className="font-semibold mb-1">Title</h3>
+        <Input
+          id="story-title"
+          name="story-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
           placeholder="Story Title"
         />
       </div>
 
+      {/* Tags section */}
       <div>
-        <label className="block text-sm font-medium text-primary mb-1">
-          Number of Players: {playerCount}
-        </label>
+        <div className="flex justify-between items-center mb-1">
+          <h3 className="font-semibold">Tags</h3>
+          <PrimaryButton
+            variant="outline"
+            size="sm"
+            onClick={handleAddTag}
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
+          >
+            Add
+          </PrimaryButton>
+        </div>
+        {tags.map((tag, index) => (
+          <div key={index} className="flex gap-2 mb-2">
+            <Input
+              id={`tag-${index}`}
+              name={`tag-${index}`}
+              value={tag}
+              onChange={(e) => {
+                const updatedTags = [...tags];
+                updatedTags[index] = e.target.value;
+                handleTagsChange(updatedTags);
+              }}
+              placeholder="Add a tag"
+            />
+            <button
+              type="button"
+              onClick={() => handleRemoveTag(index)}
+              className="text-tertiary hover:text-tertiary-700"
+              aria-label={`Remove tag ${tag || index + 1}`}
+            >
+              <Icons.Trash className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-1">Number of Players: {playerCount}</h3>
         <input
+          id="player-count"
+          name="player-count"
           type="range"
           min={MIN_PLAYERS}
           max={MAX_PLAYERS}
@@ -69,10 +107,10 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div className={`${playerCount === 1 ? "opacity-50" : ""}`}>
-        <label className="block text-sm font-medium text-primary mb-1">
-          Game Mode
-        </label>
+        <h3 className="font-semibold mb-1">Game Mode</h3>
         <input
+          id="game-mode"
+          name="game-mode"
           type="range"
           min={0}
           max={2}
@@ -97,10 +135,12 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-primary mb-1">
+        <h3 className="font-semibold mb-1">
           Story Length: {maxTurns} decisions
-        </label>
+        </h3>
         <input
+          id="story-length"
+          name="story-length"
           type="range"
           min={MIN_TURNS}
           max={MAX_TURNS}
@@ -113,41 +153,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           <span>{MIN_TURNS} decisions</span>
           <span>{MAX_TURNS} decisions</span>
         </div>
-      </div>
-
-      <div>
-        <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium text-primary">Tags</label>
-          <button
-            type="button"
-            onClick={handleAddTag}
-            className="text-secondary hover:text-secondary-700"
-          >
-            <Icons.Plus className="h-4 w-4" />
-          </button>
-        </div>
-        {tags.map((tag, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <input
-              type="text"
-              className="flex-grow p-2 border border-gray-300 rounded-md"
-              value={tag}
-              onChange={(e) => {
-                const updatedTags = [...tags];
-                updatedTags[index] = e.target.value;
-                handleTagsChange(updatedTags);
-              }}
-              placeholder="Add a tag"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveTag(index)}
-              className="text-tertiary hover:text-tertiary-700"
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
       </div>
     </div>
   );

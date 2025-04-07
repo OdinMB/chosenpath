@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { BasicInfoTab } from "./BasicInfoTab";
 import { GuidelinesTab } from "./GuidelinesTab";
+import { StatsTab } from "./StatsTab";
 import { PlaceholderTab } from "./PlaceholderTab";
 import { StoryTemplate } from "@core/types/storyTemplate";
 import { GameMode, GameModes } from "@core/types/story";
+import { Stat, StatValueEntry } from "@core/types/stat";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -16,7 +18,7 @@ interface TemplateFormProps {
   setIsLoading: (isLoading: boolean) => void;
 }
 
-type TabType = "basic" | "guidelines" | "characters" | "advanced";
+type TabType = "basic" | "guidelines" | "stats" | "characters" | "advanced";
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   template,
@@ -210,6 +212,26 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleChange("maxTurns", value);
   };
 
+  // Handle stats changes
+  const handleStatsChange = (updates: {
+    statGroups?: string[];
+    sharedStats?: Stat[];
+    playerStats?: Stat[];
+    initialSharedStatValues?: StatValueEntry[];
+  }) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      setup: {
+        ...prev.setup,
+        statGroups: updates.statGroups ?? prev.setup.statGroups,
+        sharedStats: updates.sharedStats ?? prev.setup.sharedStats,
+        playerStats: updates.playerStats ?? prev.setup.playerStats,
+        initialSharedStatValues:
+          updates.initialSharedStatValues ?? prev.setup.initialSharedStatValues,
+      },
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="border-b border-gray-200">
@@ -217,6 +239,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           {[
             { id: "basic", label: "Basic Info" },
             { id: "guidelines", label: "Guidelines" },
+            { id: "stats", label: "Stats" },
             { id: "characters", label: "Characters" },
             { id: "advanced", label: "Advanced" },
           ].map((tab) => (
@@ -272,6 +295,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           />
         )}
 
+        {activeTab === "stats" && (
+          <StatsTab
+            statGroups={formData.setup?.statGroups || []}
+            sharedStats={formData.setup?.sharedStats || []}
+            playerStats={formData.setup?.playerStats || []}
+            initialSharedStatValues={
+              formData.setup?.initialSharedStatValues || []
+            }
+            onChange={handleStatsChange}
+          />
+        )}
+
         {activeTab === "characters" && (
           <PlaceholderTab message="Character configuration will be implemented soon." />
         )}
@@ -282,7 +317,12 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       </div>
 
       <div className="flex justify-end">
-        <PrimaryButton type="submit" disabled={isLoading} isLoading={isLoading}>
+        <PrimaryButton
+          type="submit"
+          disabled={isLoading}
+          isLoading={isLoading}
+          size="lg"
+        >
           Save Template
         </PrimaryButton>
       </div>

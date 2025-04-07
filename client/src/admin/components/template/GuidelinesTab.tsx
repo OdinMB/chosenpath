@@ -1,5 +1,7 @@
 import React from "react";
 import { Icons } from "@components/ui/Icons";
+import { Input } from "@components/ui/Input";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
 
 interface GuidelinesTabProps {
   world: string;
@@ -43,16 +45,13 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-600 mb-4">
-        Define the world, rules, tone, conflicts, and decisions that will shape
-        the story.
-      </p>
-
       <div>
-        <label className="block text-sm font-medium text-primary mb-1">
+        <h3 className="font-semibold mb-1">
           World (three sentences about the essence of the world)
-        </label>
+        </h3>
         <textarea
+          id="world-description"
+          name="world-description"
           value={world}
           onChange={(e) => setWorld(e.target.value)}
           className="w-full p-2 border border-gray-300 rounded-md"
@@ -64,141 +63,189 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
       {/* Rules section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium text-primary">
+          <h3 className="font-semibold">
             Rules (fundamental rules governing the story world)
-          </label>
-          <button
-            type="button"
+          </h3>
+          <PrimaryButton
+            variant="outline"
+            size="sm"
             onClick={() => handleAddArrayItem(setRules)}
-            className="text-secondary hover:text-secondary-700"
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
           >
-            <Icons.Plus className="h-4 w-4" />
-          </button>
+            Add
+          </PrimaryButton>
         </div>
-        {rules.map((rule, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <input
-              value={rule}
-              onChange={(e) =>
-                handleArrayFieldChange(setRules, index, e.target.value)
-              }
-              className="flex-grow p-2 border border-gray-300 rounded-md"
-              placeholder="Add a rule"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveArrayItem(setRules, index)}
-              className="text-tertiary hover:text-tertiary-700"
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        {rules.length === 0 ? (
+          <Input
+            id="new-rule"
+            name="new-rule"
+            placeholder="Click + to add rules"
+            disabled
+          />
+        ) : (
+          rules.map((rule, index) => (
+            <div key={index} className="flex gap-2 mb-2">
+              <Input
+                id={`rule-${index}`}
+                name={`rule-${index}`}
+                value={rule}
+                onChange={(e) =>
+                  handleArrayFieldChange(setRules, index, e.target.value)
+                }
+                placeholder="Add a rule"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveArrayItem(setRules, index)}
+                className="text-tertiary hover:text-tertiary-700"
+                aria-label={`Remove rule ${index + 1}`}
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Tone section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium text-primary">
+          <h3 className="font-semibold">
             Tone (emotional and narrative tone guidelines)
-          </label>
-          <button
-            type="button"
+          </h3>
+          <PrimaryButton
+            variant="outline"
+            size="sm"
             onClick={() => handleAddArrayItem(setTone)}
-            className="text-secondary hover:text-secondary-700"
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
           >
-            <Icons.Plus className="h-4 w-4" />
-          </button>
+            Add
+          </PrimaryButton>
         </div>
-        {tone.map((toneItem, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <input
-              value={toneItem}
-              onChange={(e) =>
-                handleArrayFieldChange(setTone, index, e.target.value)
-              }
-              className="flex-grow p-2 border border-gray-300 rounded-md"
-              placeholder="Add a tone guideline"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveArrayItem(setTone, index)}
-              className="text-tertiary hover:text-tertiary-700"
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        {tone.length === 0 ? (
+          <Input
+            id="new-tone"
+            name="new-tone"
+            placeholder="Click + to add tone guidelines"
+            disabled
+          />
+        ) : (
+          tone.map((toneItem, index) => (
+            <div key={index} className="flex gap-2 mb-2">
+              <Input
+                id={`tone-${index}`}
+                name={`tone-${index}`}
+                value={toneItem}
+                onChange={(e) =>
+                  handleArrayFieldChange(setTone, index, e.target.value)
+                }
+                placeholder="Add a tone guideline"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveArrayItem(setTone, index)}
+                className="text-tertiary hover:text-tertiary-700"
+                aria-label={`Remove tone guideline ${index + 1}`}
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Conflicts section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium text-primary">
+          <h3 className="font-semibold">
             Conflicts (major conflicts driving the narrative)
-          </label>
-          <button
-            type="button"
+          </h3>
+          <PrimaryButton
+            variant="outline"
+            size="sm"
             onClick={() => handleAddArrayItem(setConflicts)}
-            className="text-secondary hover:text-secondary-700"
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
           >
-            <Icons.Plus className="h-4 w-4" />
-          </button>
+            Add
+          </PrimaryButton>
         </div>
-        {conflicts.map((conflict, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <input
-              value={conflict}
-              onChange={(e) =>
-                handleArrayFieldChange(setConflicts, index, e.target.value)
-              }
-              className="flex-grow p-2 border border-gray-300 rounded-md"
-              placeholder="Add a conflict"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveArrayItem(setConflicts, index)}
-              className="text-tertiary hover:text-tertiary-700"
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        {conflicts.length === 0 ? (
+          <Input
+            id="new-conflict"
+            name="new-conflict"
+            placeholder="Click + to add conflicts"
+            disabled
+          />
+        ) : (
+          conflicts.map((conflict, index) => (
+            <div key={index} className="flex gap-2 mb-2">
+              <Input
+                id={`conflict-${index}`}
+                name={`conflict-${index}`}
+                value={conflict}
+                onChange={(e) =>
+                  handleArrayFieldChange(setConflicts, index, e.target.value)
+                }
+                placeholder="Add a conflict"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveArrayItem(setConflicts, index)}
+                className="text-tertiary hover:text-tertiary-700"
+                aria-label={`Remove conflict ${index + 1}`}
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Decisions section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <label className="block text-sm font-medium text-primary">
-            Decisions (types of decisions players will make)
-          </label>
-          <button
-            type="button"
+          <h3 className="font-semibold">
+            Decisions (major decisions in the narrative)
+          </h3>
+          <PrimaryButton
+            variant="outline"
+            size="sm"
             onClick={() => handleAddArrayItem(setDecisions)}
-            className="text-secondary hover:text-secondary-700"
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
           >
-            <Icons.Plus className="h-4 w-4" />
-          </button>
+            Add
+          </PrimaryButton>
         </div>
-        {decisions.map((decision, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <input
-              value={decision}
-              onChange={(e) =>
-                handleArrayFieldChange(setDecisions, index, e.target.value)
-              }
-              className="flex-grow p-2 border border-gray-300 rounded-md"
-              placeholder="Add a decision type"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveArrayItem(setDecisions, index)}
-              className="text-tertiary hover:text-tertiary-700"
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        {decisions.length === 0 ? (
+          <Input
+            id="new-decision"
+            name="new-decision"
+            placeholder="Click + to add decisions"
+            disabled
+          />
+        ) : (
+          decisions.map((decision, index) => (
+            <div key={index} className="flex gap-2 mb-2">
+              <Input
+                id={`decision-${index}`}
+                name={`decision-${index}`}
+                value={decision}
+                onChange={(e) =>
+                  handleArrayFieldChange(setDecisions, index, e.target.value)
+                }
+                placeholder="Add a decision"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveArrayItem(setDecisions, index)}
+                className="text-tertiary hover:text-tertiary-700"
+                aria-label={`Remove decision ${index + 1}`}
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
