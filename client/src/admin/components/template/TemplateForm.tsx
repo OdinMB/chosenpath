@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { BasicInfoTab } from "./BasicInfoTab";
 import { GuidelinesTab } from "./GuidelinesTab";
 import { StatsTab } from "./StatsTab";
+import { StoryElementsTab } from "./StoryElementsTab";
 import { PlaceholderTab } from "./PlaceholderTab";
 import { StoryTemplate } from "@core/types/storyTemplate";
 import { GameMode, GameModes } from "@core/types/story";
 import { Stat, StatValueEntry } from "@core/types/stat";
+import { StoryElement } from "@core/types/storyElement";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -18,7 +20,7 @@ interface TemplateFormProps {
   setIsLoading: (isLoading: boolean) => void;
 }
 
-type TabType = "basic" | "guidelines" | "stats" | "characters" | "advanced";
+type TabType = "basic" | "guidelines" | "elements" | "stats" | "players";
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   template,
@@ -232,6 +234,17 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }));
   };
 
+  // Add handleStoryElementsChange function
+  const handleStoryElementsChange = (elements: StoryElement[]) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      setup: {
+        ...prev.setup,
+        storyElements: elements,
+      },
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="border-b border-gray-200">
@@ -239,9 +252,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           {[
             { id: "basic", label: "Basic Info" },
             { id: "guidelines", label: "Guidelines" },
+            { id: "elements", label: "Story Elements" },
             { id: "stats", label: "Stats" },
-            { id: "characters", label: "Characters" },
-            { id: "advanced", label: "Advanced" },
+            { id: "players", label: "Players" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -295,6 +308,13 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           />
         )}
 
+        {activeTab === "elements" && (
+          <StoryElementsTab
+            elements={formData.setup?.storyElements || []}
+            onChange={handleStoryElementsChange}
+          />
+        )}
+
         {activeTab === "stats" && (
           <StatsTab
             statGroups={formData.setup?.statGroups || []}
@@ -307,12 +327,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           />
         )}
 
-        {activeTab === "characters" && (
-          <PlaceholderTab message="Character configuration will be implemented soon." />
-        )}
-
-        {activeTab === "advanced" && (
-          <PlaceholderTab message="Advanced settings will be implemented soon." />
+        {activeTab === "players" && (
+          <PlaceholderTab message="Player configuration will be implemented soon." />
         )}
       </div>
 

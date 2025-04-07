@@ -1,6 +1,7 @@
 import { StoryTemplate } from "@core/types/storyTemplate";
 import { GameModes } from "@core/types/story";
 import { PlayerCount } from "@core/types/player";
+import { StoryElement } from "@core/types/storyElement";
 
 /**
  * Creates a default empty template for a single player game
@@ -23,7 +24,7 @@ export function createDefaultTemplate(): StoryTemplate {
         conflicts: [],
         decisions: [],
       },
-      storyElements: [],
+      storyElements: [] as StoryElement[],
       sharedOutcomes: [],
       statGroups: [],
       sharedStats: [],

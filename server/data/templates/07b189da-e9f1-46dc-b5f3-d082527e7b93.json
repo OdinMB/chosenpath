@@ -4,7 +4,7 @@
   "gameMode": "cooperative-competitive",
   "playerCount": 2,
   "createdAt": "2025-04-06T22:45:29.760Z",
-  "updatedAt": "2025-04-07T21:43:55.216Z",
+  "updatedAt": "2025-04-07T22:27:34.500Z",
   "setup": {
     "title": "Test",
     "guidelines": {
@@ -14,7 +14,17 @@
       "conflicts": [],
       "decisions": []
     },
-    "storyElements": [],
+    "storyElements": [
+      {
+        "id": "mr_x",
+        "name": "Mr. X",
+        "role": "role",
+        "instructions": "instructions",
+        "facts": [
+          "fact"
+        ]
+      }
+    ],
     "sharedOutcomes": [],
     "statGroups": [
       "Character",
