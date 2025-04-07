@@ -1,8 +1,10 @@
-import type { Story } from "shared/models/Story.js";
-import type { PlayerSlot } from "shared/types/player.js";
-import type { Beat } from "shared/types/beat.js";
-import type { GameMode, StoryState } from "shared/types/story.js";
-import type { PlayerCount } from "shared/types/player.js";
+import type { Story } from "@core/models/Story.js";
+import type {
+  Beat,
+  GameMode,
+  PlayerCount,
+  PlayerSlot,
+} from "@core/types/index.js";
 
 // Base operation type for any queueable operation
 export interface QueueableOperation {

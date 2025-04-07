@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { StoryTemplate, TemplateListItem } from "shared/types/storyTemplate";
-import { PrimaryButton } from "../shared/components/ui/PrimaryButton.js";
-import { Icons } from "../shared/components/ui/Icons.js";
-import { config } from "../config.js";
-import { Logger } from "../shared/logger.js";
+import { StoryTemplate, TemplateListItem } from "@core/types/storyTemplate";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
+import { config } from "@/config";
+import { Logger } from "@common/logger";
 
 interface TemplateSelectorProps {
   onSelect: (template: StoryTemplate) => void;

@@ -5,7 +5,7 @@ import type {
   OperationErrorEvent,
 } from "../queue.js";
 import EventEmitter from "events";
-import { Logger } from "../../shared/logger.js";
+import { Logger } from "@common/logger.js";
 
 export abstract class BaseQueueProcessor<
   TOperation extends QueueableOperation,

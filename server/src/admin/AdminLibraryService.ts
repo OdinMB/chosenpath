@@ -1,17 +1,17 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { isDevelopment, STORAGE_PATHS } from "shared/config.js";
-import { GameMode, StorySetup } from "shared/types/story.js";
-import { PlayerCount } from "shared/types/player.js";
-import { StoryTemplate } from "shared/types/storyTemplate.js";
+import { isDevelopment, STORAGE_PATHS } from "@core/config.js";
+import { GameMode, StorySetup } from "@core/types/story.js";
+import { PlayerCount } from "@core/types/player.js";
+import { StoryTemplate } from "@core/types/storyTemplate.js";
 import {
   readStorageFile,
   writeStorageFile,
   getStorageFiles,
   deleteStorageFile,
   ensureStorageDirectory,
-} from "../shared/storageUtils.js";
-import { Logger } from "../shared/logger.js";
+} from "@common/storageUtils.js";
+import { Logger } from "@common/logger.js";
 
 export class AdminLibraryService {
   private storagePath: string;

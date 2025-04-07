@@ -2,10 +2,21 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "src",
-    "baseUrl": "src",
+    "rootDir": "..",
+    "baseUrl": "..",
+    "composite": true,
+    "declaration": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "paths": {
-      "shared/*": ["../shared/*"]
+      "@/*": ["server/src/*"],
+      "@core/*": ["shared/*"],
+      "@common/*": ["server/src/shared/*"],
+      "@admin/*": ["server/src/admin/*"],
+      "@game/*": ["server/src/game/*"],
+      "@page/*": ["server/src/page/*"],
+      "@user/*": ["server/src/user/*"],
+      "shared/*": ["shared/*"]
     },
     "strict": true,
     "strictNullChecks": true,
@@ -16,7 +27,10 @@
     "noImplicitThis": false,
     "alwaysStrict": false
   },
-  "references": [{ "path": "../shared" }],
-  "include": ["src/**/*", "../shared/models/Story.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ]
 }

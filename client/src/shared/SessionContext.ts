@@ -1,6 +1,6 @@
 import { createContext } from "react";
-import type { ClientStoryState } from "../../../shared/types/story";
-import type { RateLimitInfo } from "../../../shared/types/websocket";
+import type { ClientStoryState } from "@core/types/story";
+import type { RateLimitInfo } from "@core/types/websocket";
 
 // Interface for story code sets stored in localStorage
 export interface StoredCodeSet {

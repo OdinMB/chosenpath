@@ -1,6 +1,6 @@
-import { getThreadType } from "shared/types/thread.js";
-import type { Resolution, Thread } from "shared/types/index.js";
-import type { Story } from "shared/models/Story.js";
+import { getThreadType } from "@core/types/thread.js";
+import type { Resolution, Thread } from "@core/types/index.js";
+import type { Story } from "@core/models/Story.js";
 
 /**
  * Service for determining thread resolutions based on step outcomes

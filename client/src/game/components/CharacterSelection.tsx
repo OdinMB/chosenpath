@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useSession } from "../../shared/useSession.js";
-import { CharacterIdentity, CharacterBackground } from "shared/types/player";
-import { PlayerOptionsGeneration } from "shared/types/story";
-import { StatDisplay } from "./StatDisplay.js";
-import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
-import { CharacterCard } from "./CharacterCard.js";
-import { PrimaryButton } from "../../shared/components/ui/PrimaryButton.js";
+import { useSession } from "@common/useSession";
+import { CharacterIdentity, CharacterBackground } from "@core/types/player";
+import { PlayerOptionsGeneration } from "@core/types/story";
+import { StatDisplay } from "./StatDisplay";
+import { replacePronounPlaceholders } from "@core/utils/playerUtils";
+import { CharacterCard } from "./CharacterCard";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;

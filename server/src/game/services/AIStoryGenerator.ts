@@ -13,29 +13,26 @@ import type {
   PlayerCount,
   BeatsNeedingImages,
   GameMode,
-} from "shared/types/index.js";
+} from "@core/types/index.js";
 import {
   createStorySetupSchema,
   createSwitchAnalysisSchema,
   threadAnalysisSchema,
   PLAYER_SLOTS,
   PlayerState,
-} from "shared/types/index.js";
-import { getPlayerSlots } from "shared/utils/playerUtils.js";
-import { createSetOfBeatGenerationSchema } from "shared/types/beat.js";
+} from "@core/types/index.js";
+import { getPlayerSlots } from "@core/utils/playerUtils.js";
+import { createSetOfBeatGenerationSchema } from "@core/types/beat.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
-import { Story } from "shared/models/Story.js";
+import { Story } from "@core/models/Story.js";
 import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
-} from "shared/config.js";
-import {
-  readStorageFile,
-  writeStorageFile,
-} from "../../shared/storageUtils.js";
+} from "@core/config.js";
+import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
 
 dotenv.config();
 

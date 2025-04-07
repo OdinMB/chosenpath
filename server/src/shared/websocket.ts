@@ -10,7 +10,7 @@ import {
   ErrorResponse,
 } from "shared/types/index.js";
 import { config } from "../config.js";
-import { connectionManager } from "../game/services/ConnectionManager.js";
+import { connectionManager } from "./ConnectionManager.js";
 import { RateLimitedAction, SOCKET_CONFIG } from "shared/config.js";
 import {
   checkRateLimit,

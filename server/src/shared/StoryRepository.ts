@@ -1,15 +1,15 @@
 import path from "path";
-import { connectionManager } from "./ConnectionManager.js";
-import type { StoryState, PlayerSlot } from "shared/types/index.js";
-import { Story } from "shared/models/Story.js";
-import { Logger } from "../../shared/logger.js";
+import { connectionManager } from "@common/ConnectionManager.js";
+import type { StoryState, PlayerSlot } from "@core/types/index.js";
+import { Story } from "@core/models/Story.js";
+import { Logger } from "@common/logger.js";
 import {
   readStorageFile,
   writeStorageFile,
   listStorageFiles,
   deleteStorageFile,
   getStorageFileStats,
-} from "../../shared/storageUtils.js";
+} from "./storageUtils.js";
 
 export class StoryRepository {
   private static instance: StoryRepository;

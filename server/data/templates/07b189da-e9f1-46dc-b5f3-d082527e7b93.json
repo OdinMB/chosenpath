@@ -1,14 +1,14 @@
 {
   "id": "07b189da-e9f1-46dc-b5f3-d082527e7b93",
   "title": "Test the test",
-  "gameMode": "cooperative",
+  "gameMode": "cooperative-competitive",
   "playerCount": 2,
   "createdAt": "2025-04-06T22:45:29.760Z",
-  "updatedAt": "2025-04-07T00:40:47.420Z",
+  "updatedAt": "2025-04-07T18:11:25.002Z",
   "setup": {
     "title": "Test",
     "guidelines": {
-      "world": "EssEssEss",
+      "world": "EssE",
       "rules": [
         "asdfsadf"
       ],

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { useSession } from "../shared/useSession.js";
+import { useSession } from "@common/useSession";
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -7,9 +7,9 @@ import {
   MAX_TURNS,
   DEFAULT_TURNS,
 } from "shared/config";
-import { GameMode, GameModes } from "shared/types/story";
-import { AppTitle } from "../shared/components/AppTitle.js";
-import { PrimaryButton } from "../shared/components/ui/PrimaryButton.js";
+import { GameMode, GameModes } from "@core/types/story";
+import { AppTitle } from "@components/AppTitle";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
 
 interface StoryInitializerProps {
   onSetup: (options: {

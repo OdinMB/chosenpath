@@ -1,6 +1,6 @@
-import { wsService } from "../shared/WebSocketService.js";
-import { isValidPlayerCount } from "shared/utils/playerUtils.js";
-import { GameMode } from "shared/types/story.js";
+import { wsService } from "@common/WebSocketService";
+import { isValidPlayerCount } from "@core/utils/playerUtils";
+import { GameMode } from "@core/types/story";
 
 class GameService {
   initializeStory(

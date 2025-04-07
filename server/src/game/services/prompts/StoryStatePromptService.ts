@@ -1,7 +1,7 @@
-import type { Stat, StatValueEntry, Thread, Beat } from "shared/types/index.js";
-import { GameModes } from "shared/types/story.js";
-import { Story } from "shared/models/Story.js";
-import { getThreadType } from "shared/types/thread.js";
+import { GameModes } from "@core/types/story.js";
+import { getThreadType } from "@core/types/thread.js";
+import type { Stat, StatValueEntry, Thread, Beat } from "@core/types/index.js";
+import { Story } from "@core/models/Story.js";
 
 export interface SectionConfig {
   gameMode?: boolean;

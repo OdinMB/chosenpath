@@ -4,8 +4,8 @@ import type {
   Stat,
   StatValueEntry,
   StoryState,
-} from "shared/types/index.js";
-import { Story } from "shared/models/Story.js";
+} from "@core/types/index.js";
+import { Story } from "@core/models/Story.js";
 
 export class ChangeService {
   applyChanges(story: Story, changes: Change[]): Story {

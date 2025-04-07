@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { PrimaryButton } from "../../shared/components/ui/PrimaryButton.js";
-import { Icons } from "../../shared/components/ui/Icons.js";
-import { config } from "../../config.js";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
+import { config } from "@/config";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;

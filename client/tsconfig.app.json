@@ -20,7 +20,20 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@core/*": ["../shared/*"],
+      "@common/*": ["src/shared/*"],
+      "@components/*": ["src/shared/components/*"],
+      "@admin/*": ["src/admin/*"],
+      "@game/*": ["src/game/*"],
+      "@page/*": ["src/page/*"],
+      "@user/*": ["src/user/*"]
+    }
   },
   "include": [
     "src",

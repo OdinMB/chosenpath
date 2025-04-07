@@ -1,8 +1,8 @@
 import React from "react";
-import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "shared/config";
-import { GameModes, GameMode } from "shared/types/story";
-import { PlayerCount } from "shared/types/player";
-import { Icons } from "../../../shared/components/ui/Icons";
+import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
+import { GameModes, GameMode } from "@core/types/story";
+import { PlayerCount } from "@core/types/player";
+import { Icons } from "@components/ui/Icons";
 
 interface BasicInfoTabProps {
   title: string;

@@ -1,12 +1,10 @@
 import type { Socket } from "socket.io";
-import type { Story } from "shared/models/Story.js";
-import { isValidPlayerCount } from "shared/utils/playerUtils.js";
-import type { PlayerCount, PlayerSlot } from "shared/types/player.js";
-import { getPlayerSlots } from "shared/utils/playerUtils.js";
-import { StoryRepository } from "./services/StoryRepository.js";
-import { connectionManager } from "./services/ConnectionManager.js";
-import type { GameMode } from "shared/types/story.js";
-import { MAX_TURNS, MIN_TURNS } from "shared/config.js";
+import type { Story } from "@core/models/Story.js";
+import { isValidPlayerCount, getPlayerSlots } from "@core/utils/playerUtils.js";
+import type { PlayerCount, PlayerSlot, GameMode } from "@core/types/index.js";
+import { StoryRepository } from "@common/StoryRepository.js";
+import { connectionManager } from "@common/ConnectionManager.js";
+import { MAX_TURNS, MIN_TURNS } from "@core/config.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
 import type { OperationErrorEvent } from "./queue.js";
@@ -16,7 +14,7 @@ import type {
   SelectCharacterResponse,
   MakeChoiceResponse,
   InitializeStoryResponse,
-} from "shared/types/websocket.js";
+} from "@core/types/websocket.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;

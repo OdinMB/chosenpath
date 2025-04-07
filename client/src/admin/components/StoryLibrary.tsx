@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton } from "../../shared/components/ui/PrimaryButton";
-import { Icons } from "../../shared/components/ui/Icons";
-import { config } from "../../config";
-import { Logger } from "../../shared/logger";
-import { StoryTemplate } from "shared/types/storyTemplate";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
+import { config } from "@/config";
+import { Logger } from "@common/logger";
+import { StoryTemplate } from "@core/types/storyTemplate";
 
 type StoryLibraryProps = {
   token: string;

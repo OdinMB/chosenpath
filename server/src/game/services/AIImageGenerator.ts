@@ -4,11 +4,11 @@ import type {
   ImageGeneration,
   BeatsNeedingImages,
   Beat,
-} from "shared/types/index.js";
-import { imageGenerationSchema } from "shared/types/index.js";
+} from "@core/types/index.js";
+import { imageGenerationSchema } from "@core/types/index.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
-import { Story } from "shared/models/Story.js";
+import { Story } from "@core/models/Story.js";
 
 dotenv.config();
 

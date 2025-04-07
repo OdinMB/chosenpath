@@ -1,4 +1,4 @@
-import { Tooltip } from "../../shared/components/ui/Tooltip.js";
+import { Tooltip } from "@components/ui/Tooltip";
 
 interface StatDisplayProps {
   name: string;

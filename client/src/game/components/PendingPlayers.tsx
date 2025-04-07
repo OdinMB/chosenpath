@@ -1,5 +1,5 @@
-import type { PlayerSlot } from "shared/types/player.js";
-import { useSession } from "../../shared/useSession.js";
+import type { PlayerSlot } from "@core/types/player";
+import { useSession } from "@common/useSession";
 
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];

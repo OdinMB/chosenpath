@@ -1,6 +1,6 @@
-import { AppTitle } from "../shared/components/AppTitle";
-import { PrimaryButton } from "../shared/components/ui/PrimaryButton";
-import { LoadingSpinner } from "../shared/components/ui/LoadingSpinner";
+import { AppTitle } from "@components/AppTitle";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { LoadingSpinner } from "@components/ui/LoadingSpinner";
 import { useState, useEffect } from "react";
 
 interface PlayerCodesProps {

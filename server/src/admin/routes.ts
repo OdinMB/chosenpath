@@ -1,7 +1,7 @@
 import express from "express";
-import { config } from "../config.js";
+import { config } from "@/config.js";
 import { adminStoryService } from "./AdminStoryService.js";
-import { Logger } from "../shared/logger.js";
+import { Logger } from "@common/logger.js";
 import { AdminLibraryService } from "./AdminLibraryService.js";
 
 // Simple authentication middleware

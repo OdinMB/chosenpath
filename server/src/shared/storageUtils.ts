@@ -1,5 +1,5 @@
 import path from "path";
-import { STORAGE_PATHS } from "shared/config.js";
+import { STORAGE_PATHS } from "@core/config.js";
 import fs from "fs/promises";
 
 /**

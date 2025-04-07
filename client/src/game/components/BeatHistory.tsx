@@ -1,4 +1,4 @@
-import { Icons } from "../../shared/components/ui/Icons.js";
+import { Icons } from "@components/ui/Icons";
 
 interface BeatHistoryProps {
   currentBeatIndex: number;

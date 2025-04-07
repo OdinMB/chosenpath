@@ -7,6 +7,12 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["shared/*"],
+      "@server/*": ["server/src/*"],
+      "@client/*": ["client/src/*"]
+    }
   }
 }

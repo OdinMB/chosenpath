@@ -15,7 +15,7 @@ import {
   ThreadAnalysis,
   Thread,
   Resolution,
-} from "shared/types/index.js";
+} from "../types/index.js";
 import { PlayerManager } from "./PlayerManager.js";
 import { ThreadManager } from "./ThreadManager.js";
 import { ImageManager } from "./ImageManager.js";

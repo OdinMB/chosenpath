@@ -1,5 +1,5 @@
-import { type GameMode, GameModes } from "shared/types/story.js";
-import type { PlayerCount } from "shared/types/player.js";
+import { type GameMode, GameModes } from "@core/types/story.js";
+import type { PlayerCount } from "@core/types/player.js";
 
 const GAME_MODE_DESCRIPTIONS: Record<
   Exclude<GameModes, GameModes.SinglePlayer>,

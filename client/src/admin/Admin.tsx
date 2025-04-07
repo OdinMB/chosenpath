@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { AdminLogin } from "./components/AdminLogin";
-import { PrimaryButton } from "../shared/components/ui/PrimaryButton.js";
-import { Icons } from "../shared/components/ui/Icons.js";
-import { StoriesOverview } from "./components/StoriesOverview.js";
-import { StoryLibrary } from "./components/StoryLibrary.js";
-import { TemplateForm } from "./components/template/index.js";
-import { StoryTemplate } from "shared/types/storyTemplate";
-import { createDefaultTemplate } from "./components/template/templateFactory.js";
-import { config } from "../config";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
+import { StoriesOverview } from "./components/StoriesOverview";
+import { StoryLibrary } from "./components/StoryLibrary";
+import { TemplateForm } from "./components/template/index";
+import { StoryTemplate } from "@core/types/storyTemplate";
+import { createDefaultTemplate } from "./components/template/templateFactory";
+import { config } from "@/config";
 
 type AdminTab = "stories" | "library" | "template-form";
 

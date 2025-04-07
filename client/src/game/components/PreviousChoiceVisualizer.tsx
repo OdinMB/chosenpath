@@ -4,12 +4,12 @@ import {
   DEFAULT_DISTRIBUTION,
   SAFE_DISTRIBUTION,
   RISKY_DISTRIBUTION,
-} from "shared/types/beat";
-import { Resolution } from "shared/types/thread";
-import { Tooltip } from "../../shared/components/ui/Tooltip";
-import { InfoIcon } from "../../shared/components/ui/InfoIcon";
-import { ColoredBox } from "../../shared/components/ui/ColoredBox";
-import { Icons } from "../../shared/components/ui/Icons";
+} from "@core/types/beat";
+import { Resolution } from "@core/types/thread";
+import { Tooltip } from "@components/ui/Tooltip";
+import { InfoIcon } from "@components/ui/InfoIcon";
+import { ColoredBox } from "@components/ui/ColoredBox";
+import { Icons } from "@components/ui/Icons";
 
 interface PreviousChoiceVisualizerProps {
   choice: {

@@ -1,6 +1,6 @@
-import { StoryTemplate } from "shared/types/storyTemplate";
-import { GameModes } from "shared/types/story";
-import { PlayerCount } from "shared/types/player";
+import { StoryTemplate } from "@core/types/storyTemplate";
+import { GameModes } from "@core/types/story";
+import { PlayerCount } from "@core/types/player";
 
 /**
  * Creates a default empty template for a single player game

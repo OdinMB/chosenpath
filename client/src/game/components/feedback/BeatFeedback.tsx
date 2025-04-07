@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { FeedbackModal } from "./FeedbackModal.js";
-import { Icons } from "../../../shared/components/ui/Icons.js";
+import { FeedbackModal } from "./FeedbackModal";
+import { Icons } from "@components/ui/Icons";
 
 interface BeatFeedbackProps {
   storyText?: string;

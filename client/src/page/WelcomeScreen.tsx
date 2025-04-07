@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { AppTitle } from "../shared/components/AppTitle.js";
-import { Tooltip } from "../shared/components/ui/Tooltip.js";
-import { PrimaryButton } from "../shared/components/ui/PrimaryButton.js";
-import { Icons } from "../shared/components/ui/Icons.js";
-import { ConfirmDialog } from "../shared/components/ui/ConfirmDialog.js";
-import { useSession } from "../shared/useSession.js";
-import { StoredCodeSet } from "../shared/SessionContext.js";
+import { AppTitle } from "@components/AppTitle";
+import { Tooltip } from "@components/ui/Tooltip";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
+import { ConfirmDialog } from "@components/ui/ConfirmDialog";
+import { useSession } from "@common/useSession";
+import { StoredCodeSet } from "@common/SessionContext";
 
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
