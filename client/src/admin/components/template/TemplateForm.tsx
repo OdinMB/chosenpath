@@ -4,10 +4,12 @@ import { GuidelinesTab } from "./GuidelinesTab";
 import { StatsTab } from "./StatsTab";
 import { StoryElementsTab } from "./StoryElementsTab";
 import { PlaceholderTab } from "./PlaceholderTab";
+import { OutcomesTab } from "./OutcomesTab";
 import { StoryTemplate } from "@core/types/storyTemplate";
 import { GameMode, GameModes } from "@core/types/story";
 import { Stat, StatValueEntry } from "@core/types/stat";
 import { StoryElement } from "@core/types/storyElement";
+import { Outcome } from "@core/types/outcome";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -20,7 +22,13 @@ interface TemplateFormProps {
   setIsLoading: (isLoading: boolean) => void;
 }
 
-type TabType = "basic" | "guidelines" | "elements" | "stats" | "players";
+type TabType =
+  | "basic"
+  | "guidelines"
+  | "elements"
+  | "outcomes"
+  | "stats"
+  | "players";
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   template,
@@ -245,6 +253,17 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }));
   };
 
+  // Add handleOutcomesChange function
+  const handleOutcomesChange = (outcomes: Outcome[]) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      setup: {
+        ...prev.setup,
+        sharedOutcomes: outcomes,
+      },
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="border-b border-gray-200">
@@ -252,7 +271,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           {[
             { id: "basic", label: "Basic Info" },
             { id: "guidelines", label: "Guidelines" },
-            { id: "elements", label: "Story Elements" },
+            { id: "elements", label: "Elements" },
+            { id: "outcomes", label: "Outcomes" },
             { id: "stats", label: "Stats" },
             { id: "players", label: "Players" },
           ].map((tab) => (
@@ -312,6 +332,13 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           <StoryElementsTab
             elements={formData.setup?.storyElements || []}
             onChange={handleStoryElementsChange}
+          />
+        )}
+
+        {activeTab === "outcomes" && (
+          <OutcomesTab
+            outcomes={formData.setup?.sharedOutcomes || []}
+            onChange={handleOutcomesChange}
           />
         )}
 

@@ -4,7 +4,7 @@
   "gameMode": "cooperative-competitive",
   "playerCount": 2,
   "createdAt": "2025-04-06T22:45:29.760Z",
-  "updatedAt": "2025-04-07T22:27:34.500Z",
+  "updatedAt": "2025-04-07T22:48:36.066Z",
   "setup": {
     "title": "Test",
     "guidelines": {
@@ -25,7 +25,20 @@
         ]
       }
     ],
-    "sharedOutcomes": [],
+    "sharedOutcomes": [
+      {
+        "id": "shared_outcome_1744066093940",
+        "question": "asdf",
+        "possibleResolutions": {
+          "favorable": "",
+          "unfavorable": "",
+          "mixed": ""
+        },
+        "resonance": "",
+        "intendedNumberOfMilestones": 2,
+        "milestones": []
+      }
+    ],
     "statGroups": [
       "Character",
       "World"
