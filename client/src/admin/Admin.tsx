@@ -88,7 +88,7 @@ export const Admin = () => {
         <header className="bg-white border-b border-gray-200 shadow-sm">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-secondary">
-              Story Management
+              Admin Dashboard
             </h1>
             <PrimaryButton
               onClick={handleLogout}

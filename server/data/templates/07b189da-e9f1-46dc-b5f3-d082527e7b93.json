@@ -4,7 +4,7 @@
   "gameMode": "cooperative-competitive",
   "playerCount": 2,
   "createdAt": "2025-04-06T22:45:29.760Z",
-  "updatedAt": "2025-04-07T22:48:36.066Z",
+  "updatedAt": "2025-04-08T23:38:44.530Z",
   "setup": {
     "title": "Test",
     "guidelines": {
@@ -43,37 +43,25 @@
       "Character",
       "World"
     ],
-    "sharedStats": [
+    "sharedStats": [],
+    "initialSharedStatValues": [],
+    "playerStats": [
       {
-        "id": "shared_powers",
+        "id": "player_powers",
         "name": "Powers",
         "type": "string[]",
         "group": "Character",
-        "possibleValues": "only mundane shit",
-        "effectOnPoints": [
-          "+5 for every \"Power\" that is useful for carrying out the actions in the selected option"
-        ],
-        "optionsToSacrifice": "Powers can never be sacrificed to gain an advantage in a beat",
-        "optionsToGainAsReward": "Powers can never be gained as a reward in a beat",
+        "possibleValues": "",
+        "effectOnPoints": [],
+        "optionsToSacrifice": "",
+        "optionsToGainAsReward": "",
         "narrativeImplications": [],
-        "adjustmentsAfterThreads": [
-          "New \"Powers\" can be awarded at the end of a thread. Only if the character learned something that can be translated into a new \"Power\"."
-        ],
-        "canBeChangedInBeatResolutions": false,
+        "adjustmentsAfterThreads": [],
+        "canBeChangedInBeatResolutions": true,
         "isVisible": true,
-        "tooltip": "tooltip?"
+        "tooltip": ""
       }
     ],
-    "initialSharedStatValues": [
-      {
-        "statId": "57d29e1e-1ee8-4626-aab1-346feddddbc6",
-        "value": [
-          "Eating",
-          "Drinking"
-        ]
-      }
-    ],
-    "playerStats": [],
     "characterSelectionPlan": {
       "multiplayerCoordination": [],
       "playerStatConversionRates": [],
@@ -86,10 +74,81 @@
     "maxTurns": 10,
     "player1": {
       "outcomes": [],
+      "possibleCharacterIdentities": [
+        {
+          "name": "",
+          "appearance": "",
+          "pronouns": {
+            "personal": "",
+            "object": "",
+            "possessive": "",
+            "reflexive": ""
+          }
+        },
+        {
+          "name": "",
+          "appearance": "",
+          "pronouns": {
+            "personal": "",
+            "object": "",
+            "possessive": "",
+            "reflexive": ""
+          }
+        },
+        {
+          "name": "",
+          "appearance": "",
+          "pronouns": {
+            "personal": "",
+            "object": "",
+            "possessive": "",
+            "reflexive": ""
+          }
+        }
+      ],
+      "possibleCharacterBackgrounds": [
+        {
+          "title": "",
+          "fluffTemplate": "",
+          "initialPlayerStatValues": [
+            {
+              "statId": "player_powers",
+              "value": [
+                "Eating",
+                "Drinking",
+                "SomethingNew"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "",
+          "fluffTemplate": "",
+          "initialPlayerStatValues": [
+            {
+              "statId": "player_powers",
+              "value": []
+            }
+          ]
+        },
+        {
+          "title": "",
+          "fluffTemplate": "",
+          "initialPlayerStatValues": [
+            {
+              "statId": "player_powers",
+              "value": []
+            }
+          ]
+        }
+      ]
+    },
+    "player2": {
+      "outcomes": [],
       "possibleCharacterIdentities": [],
       "possibleCharacterBackgrounds": []
     },
-    "player2": {
+    "player3": {
       "outcomes": [],
       "possibleCharacterIdentities": [],
       "possibleCharacterBackgrounds": []

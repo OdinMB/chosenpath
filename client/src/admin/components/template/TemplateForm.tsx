@@ -3,13 +3,19 @@ import { BasicInfoTab } from "./BasicInfoTab";
 import { GuidelinesTab } from "./GuidelinesTab";
 import { StatsTab } from "./StatsTab";
 import { StoryElementsTab } from "./StoryElementsTab";
-import { PlaceholderTab } from "./PlaceholderTab";
 import { OutcomesTab } from "./OutcomesTab";
+import { PlayersTab } from "./PlayersTab";
 import { StoryTemplate } from "@core/types/storyTemplate";
-import { GameMode, GameModes } from "@core/types/story";
-import { Stat, StatValueEntry } from "@core/types/stat";
-import { StoryElement } from "@core/types/storyElement";
-import { Outcome } from "@core/types/outcome";
+import {
+  GameMode,
+  GameModes,
+  Stat,
+  StatValueEntry,
+  StoryElement,
+  Outcome,
+  PlayerOptionsGeneration,
+} from "@core/types/index";
+import { MAX_PLAYERS } from "@core/config";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -264,6 +270,19 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }));
   };
 
+  // Add handlePlayerOptionsChange function
+  const handlePlayerOptionsChange = (
+    updates: Record<string, PlayerOptionsGeneration>
+  ) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      setup: {
+        ...prev.setup,
+        ...updates,
+      },
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="border-b border-gray-200">
@@ -355,7 +374,23 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         )}
 
         {activeTab === "players" && (
-          <PlaceholderTab message="Player configuration will be implemented soon." />
+          <PlayersTab
+            playerCount={formData.playerCount}
+            playerOptions={Object.fromEntries(
+              Array.from({ length: MAX_PLAYERS }, (_, i) => [
+                `player${i + 1}`,
+                (formData.setup?.[
+                  `player${i + 1}` as keyof typeof formData.setup
+                ] as PlayerOptionsGeneration) || {
+                  outcomes: [],
+                  possibleCharacterIdentities: [],
+                  possibleCharacterBackgrounds: [],
+                },
+              ])
+            )}
+            onChange={handlePlayerOptionsChange}
+            playerStats={formData.setup?.playerStats || []}
+          />
         )}
       </div>
 
