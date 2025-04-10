@@ -1,7 +1,7 @@
 import React from "react";
 import { ExpandableItem } from "./ExpandableItem";
 import { Input } from "@components/ui/Input";
-import { Select } from "../../../shared/components/ui/Select";
+import { Select } from "@components/ui/Select";
 import { CharacterIdentity } from "@core/types/player";
 
 interface PlayerIdentityProps {

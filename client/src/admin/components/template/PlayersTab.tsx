@@ -9,6 +9,7 @@ import { Stat } from "@core/types/stat";
 import { ExpandableOutcome } from "./ExpandableOutcome";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { PlayerBackground } from "./PlayerBackground";
+import { Select } from "@components/ui/Select";
 
 interface PlayerOutcome {
   id: string;
@@ -393,8 +394,9 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Individual Outcomes</h3>
               <div className="flex gap-2">
-                <select
-                  className="px-2 py-1 border rounded text-sm"
+                <Select
+                  className="text-sm w-44"
+                  size="sm"
                   onChange={(e) => {
                     const [sourcePlayer, outcomeIndex] =
                       e.target.value.split(":");
@@ -419,7 +421,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                         </option>
                       ))
                   )}
-                </select>
+                </Select>
                 <PrimaryButton
                   onClick={() => handleAddPlayerOutcome(playerSlot)}
                   variant="outline"

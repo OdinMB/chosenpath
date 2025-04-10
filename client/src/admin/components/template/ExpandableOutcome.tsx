@@ -2,6 +2,7 @@ import React from "react";
 import { ExpandableItem } from "./ExpandableItem";
 import { Input } from "@components/ui/Input";
 import { Outcome } from "@core/types/outcome";
+import { Select } from "@components/ui/Select";
 
 // Define PlayerOutcome here since it's not exported from a module
 interface PlayerOutcome {
@@ -111,8 +112,9 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center">
             <h4 className="text-sm font-medium">Possible Resolutions</h4>
-            <select
-              className="p-1 border rounded text-sm"
+            <Select
+              className="text-sm"
+              size="sm"
               value={isExploration(resolutions) ? "exploration" : "challenge"}
               onChange={(e) => {
                 const type = e.target.value;
@@ -158,7 +160,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
             >
               <option value="challenge">Challenge</option>
               <option value="exploration">Exploration</option>
-            </select>
+            </Select>
           </div>
 
           {isChallenge(resolutions) ? (

@@ -1,16 +1,18 @@
-import React from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Icons } from "@components/ui/Icons";
 
 interface SelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> {
   size?: "sm" | "md" | "lg";
   variant?: "default" | "outline";
+  placeholder?: string;
 }
 
 export const Select: React.FC<SelectProps> = ({
   className = "",
   size = "md",
   variant = "default",
+  placeholder = "Select...",
   ...props
 }) => {
   const sizeClasses = {
@@ -25,14 +27,48 @@ export const Select: React.FC<SelectProps> = ({
       "border-2 border-secondary text-secondary bg-white hover:bg-secondary/5",
   };
 
+  // Track the selected text value
+  const [selectedText, setSelectedText] = useState<string>(placeholder);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  // Update the displayed text whenever the select value changes
+  useEffect(() => {
+    if (selectRef.current) {
+      const selectedOption =
+        selectRef.current.options[selectRef.current.selectedIndex];
+      setSelectedText(selectedOption?.textContent || placeholder);
+    }
+  }, [props.value, props.defaultValue, placeholder]);
+
   return (
     <div className="relative inline-block">
+      {/* The actual select element with native browser behavior */}
       <select
-        className={`appearance-none rounded transition-colors [-webkit-appearance:none] [-moz-appearance:none] ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
+        ref={selectRef}
+        className={`w-full h-full absolute inset-0 opacity-0 cursor-pointer z-10`}
+        onChange={(e) => {
+          if (props.onChange) {
+            props.onChange(e);
+          }
+          // Update the displayed text when selection changes
+          setSelectedText(
+            e.target.options[e.target.selectedIndex]?.textContent || placeholder
+          );
+        }}
         {...props}
       />
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-current">
-        <Icons.ChevronDown className="h-4 w-4" />
+
+      {/* Custom styled display that looks like a select */}
+      <div
+        className={`rounded transition-colors ${sizeClasses[size]} ${variantClasses[variant]} ${className} relative`}
+      >
+        {/* Text display */}
+        <span className="block truncate pr-8">{selectedText}</span>
+
+        {/* Custom arrow icon with consistent positioning */}
+        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+          <Icons.ChevronDown className="h-4 w-4" />
+        </span>
       </div>
     </div>
   );
