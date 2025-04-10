@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
-import { Input } from "@components/ui/Input";
-import { Select } from "../../../shared/components/ui/Select";
 import { PlayerOptionsGeneration } from "@core/types/story";
 import { CharacterIdentity, CharacterBackground } from "@core/types/player";
 import { MAX_PLAYERS } from "@core/config";
 import { PlayerSlot } from "@core/types/player";
-import { StatValueInput } from "./StatValueInput";
 import { Stat } from "@core/types/stat";
+import { ExpandableOutcome } from "./ExpandableOutcome";
+import { PlayerIdentity } from "./PlayerIdentity";
+import { PlayerBackground } from "./PlayerBackground";
 
 interface PlayerOutcome {
   id: string;
@@ -74,6 +74,18 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 }) => {
   // Track which players are being edited
   const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
+  // Track which identities are being edited
+  const [editingIdentities, setEditingIdentities] = useState<Set<string>>(
+    new Set()
+  );
+  // Track which backgrounds are being edited
+  const [editingBackgrounds, setEditingBackgrounds] = useState<Set<string>>(
+    new Set()
+  );
+  // Track which outcomes are being edited
+  const [editingOutcomes, setEditingOutcomes] = useState<Set<string>>(
+    new Set()
+  );
 
   const handleUpdatePlayer = (
     playerSlot: PlayerSlot,
@@ -131,18 +143,23 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   };
 
   const handleAddPlayerOutcome = (playerSlot: PlayerSlot) => {
+    const outcomeId = crypto.randomUUID();
     const newOutcome: PlayerOutcome = {
-      id: crypto.randomUUID(),
+      id: outcomeId,
       question: "",
       resonance: "",
       possibleResolutions: {
+        favorable: "",
+        unfavorable: "",
         mixed: "",
-        sideAWins: "",
-        sideBWins: "",
       },
       intendedNumberOfMilestones: 3,
       milestones: [],
     };
+
+    // Start in edit mode for the new outcome
+    const outcomeStateKey = `${playerSlot}_outcome_${outcomeId}`;
+    setEditingOutcomes((prev) => new Set(prev).add(outcomeStateKey));
 
     handleUpdatePlayer(playerSlot, {
       outcomes: [...(playerOptions[playerSlot].outcomes || []), newOutcome],
@@ -187,6 +204,89 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
           outcomes: [...prev.outcomes, copiedOutcome],
         }));
       }
+    };
+
+    const handleUpdateIdentity = (
+      index: number,
+      updatedIdentity: CharacterIdentity
+    ) => {
+      const updated = [...localOptions.possibleCharacterIdentities];
+      updated[index] = updatedIdentity;
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterIdentities: updated,
+      }));
+    };
+
+    const handleDeleteIdentity = (index: number) => {
+      const updated = [...localOptions.possibleCharacterIdentities];
+      updated.splice(index, 1);
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterIdentities: updated,
+      }));
+    };
+
+    const handleAddIdentity = () => {
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterIdentities: [
+          ...prev.possibleCharacterIdentities,
+          createEmptyIdentity(),
+        ],
+      }));
+    };
+
+    const handleUpdateBackground = (
+      index: number,
+      updatedBackground: CharacterBackground
+    ) => {
+      const updated = [...localOptions.possibleCharacterBackgrounds];
+      updated[index] = updatedBackground;
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterBackgrounds: updated,
+      }));
+    };
+
+    const handleDeleteBackground = (index: number) => {
+      const updated = [...localOptions.possibleCharacterBackgrounds];
+      updated.splice(index, 1);
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterBackgrounds: updated,
+      }));
+    };
+
+    const handleAddBackground = () => {
+      setLocalOptions((prev) => ({
+        ...prev,
+        possibleCharacterBackgrounds: [
+          ...prev.possibleCharacterBackgrounds,
+          createEmptyBackground(),
+        ],
+      }));
+    };
+
+    const handleUpdateOutcome = (
+      index: number,
+      updatedOutcome: PlayerOutcome
+    ) => {
+      const updated = [...localOptions.outcomes];
+      updated[index] = updatedOutcome;
+      setLocalOptions((prev) => ({
+        ...prev,
+        outcomes: updated,
+      }));
+    };
+
+    const handleDeleteOutcome = (index: number) => {
+      const updated = [...localOptions.outcomes];
+      updated.splice(index, 1);
+      setLocalOptions((prev) => ({
+        ...prev,
+        outcomes: updated,
+      }));
     };
 
     if (!isEditing) {
@@ -236,83 +336,27 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
           <div className="space-y-4">
             <h3 className="font-semibold mb-1">Character Identities</h3>
             {localOptions.possibleCharacterIdentities.map((identity, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-sm font-medium">Identity {index + 1}</h4>
-                  <div className="flex gap-2">
-                    <Input
-                      value={identity.name}
-                      onChange={(e) => {
-                        const updated = [
-                          ...localOptions.possibleCharacterIdentities,
-                        ];
-                        updated[index] = {
-                          ...updated[index],
-                          name: e.target.value,
-                        };
-                        setLocalOptions((prev) => ({
-                          ...prev,
-                          possibleCharacterIdentities: updated,
-                        }));
-                      }}
-                      placeholder="Character name"
-                      className="flex-1"
-                    />
-                    <Select
-                      size="sm"
-                      className="w-36"
-                      value={PRONOUN_SETS.findIndex(
-                        (set) =>
-                          set.pronouns.personal ===
-                            identity.pronouns.personal &&
-                          set.pronouns.object === identity.pronouns.object &&
-                          set.pronouns.possessive ===
-                            identity.pronouns.possessive &&
-                          set.pronouns.reflexive === identity.pronouns.reflexive
-                      )}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        const updated = [
-                          ...localOptions.possibleCharacterIdentities,
-                        ];
-                        updated[index] = {
-                          ...updated[index],
-                          pronouns:
-                            PRONOUN_SETS[Number(e.target.value)].pronouns,
-                        };
-                        setLocalOptions((prev) => ({
-                          ...prev,
-                          possibleCharacterIdentities: updated,
-                        }));
-                      }}
-                    >
-                      <option value={-1}>Select pronouns...</option>
-                      {PRONOUN_SETS.map((set, i) => (
-                        <option key={i} value={i}>
-                          {set.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <Input
-                    value={identity.appearance}
-                    onChange={(e) => {
-                      const updated = [
-                        ...localOptions.possibleCharacterIdentities,
-                      ];
-                      updated[index] = {
-                        ...updated[index],
-                        appearance: e.target.value,
-                      };
-                      setLocalOptions((prev) => ({
-                        ...prev,
-                        possibleCharacterIdentities: updated,
-                      }));
-                    }}
-                    placeholder="Character appearance"
-                  />
-                </div>
-              </div>
+              <PlayerIdentity
+                key={`${playerSlot}_identity_${index}`}
+                identity={identity}
+                index={index}
+                editingIdentities={editingIdentities}
+                setEditingIdentities={setEditingIdentities}
+                onDelete={handleDeleteIdentity}
+                onUpdate={handleUpdateIdentity}
+                pronounSets={PRONOUN_SETS}
+              />
             ))}
+            <div className="flex justify-end">
+              <PrimaryButton
+                variant="outline"
+                size="sm"
+                onClick={handleAddIdentity}
+                leftIcon={<Icons.Plus className="h-4 w-4" />}
+              >
+                Add Identity
+              </PrimaryButton>
+            </div>
           </div>
 
           {/* Character Backgrounds */}
@@ -320,102 +364,28 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             <h3 className="font-semibold mb-1">Character Backgrounds</h3>
             {localOptions.possibleCharacterBackgrounds.map(
               (background, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex flex-col gap-2">
-                    <h4 className="text-sm font-medium">
-                      Background {index + 1}
-                    </h4>
-                    <Input
-                      value={background.title}
-                      onChange={(e) => {
-                        const updated = [
-                          ...localOptions.possibleCharacterBackgrounds,
-                        ];
-                        updated[index] = {
-                          ...updated[index],
-                          title: e.target.value,
-                        };
-                        setLocalOptions((prev) => ({
-                          ...prev,
-                          possibleCharacterBackgrounds: updated,
-                        }));
-                      }}
-                      placeholder="Background title"
-                    />
-                    <textarea
-                      className="w-full p-2 border rounded"
-                      rows={3}
-                      value={background.fluffTemplate}
-                      onChange={(e) => {
-                        const updated = [
-                          ...localOptions.possibleCharacterBackgrounds,
-                        ];
-                        updated[index] = {
-                          ...updated[index],
-                          fluffTemplate: e.target.value,
-                        };
-                        setLocalOptions((prev) => ({
-                          ...prev,
-                          possibleCharacterBackgrounds: updated,
-                        }));
-                      }}
-                      placeholder="Background description with placeholders: {name}, {personal}, {object}, {possessive}, {reflexive}"
-                    />
-                    <div className="space-y-2">
-                      <h5 className="text-sm font-medium">
-                        Initial Stat Values
-                      </h5>
-                      {background.initialPlayerStatValues.map(
-                        (statValue, statIndex) => {
-                          const stat = playerStats.find(
-                            (s) => s.id === statValue.statId
-                          );
-                          if (!stat) return null;
-                          return (
-                            <div
-                              key={statValue.statId}
-                              className="flex gap-2 items-center"
-                            >
-                              <span className="text-sm w-32 font-medium">
-                                {stat.name}
-                              </span>
-                              <StatValueInput
-                                value={statValue.value}
-                                onChange={(newValue) => {
-                                  const updated = [
-                                    ...localOptions.possibleCharacterBackgrounds,
-                                  ];
-                                  updated[index] = {
-                                    ...updated[index],
-                                    initialPlayerStatValues: updated[
-                                      index
-                                    ].initialPlayerStatValues.map((v, i) =>
-                                      i === statIndex
-                                        ? {
-                                            ...v,
-                                            value: newValue,
-                                          }
-                                        : v
-                                    ),
-                                  };
-                                  setLocalOptions((prev) => ({
-                                    ...prev,
-                                    possibleCharacterBackgrounds: updated,
-                                  }));
-                                }}
-                                statType={stat.type}
-                                placeholder={`Initial ${stat.name}`}
-                                className="flex-1"
-                              />
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <PlayerBackground
+                  key={`${playerSlot}_background_${index}`}
+                  background={background}
+                  index={index}
+                  editingBackgrounds={editingBackgrounds}
+                  setEditingBackgrounds={setEditingBackgrounds}
+                  onDelete={handleDeleteBackground}
+                  onUpdate={handleUpdateBackground}
+                  playerStats={playerStats}
+                />
               )
             )}
+            <div className="flex justify-end">
+              <PrimaryButton
+                variant="outline"
+                size="sm"
+                onClick={handleAddBackground}
+                leftIcon={<Icons.Plus className="h-4 w-4" />}
+              >
+                Add Background
+              </PrimaryButton>
+            </div>
           </div>
 
           {/* Individual Outcomes */}
@@ -423,11 +393,9 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Individual Outcomes</h3>
               <div className="flex gap-2">
-                <Select
-                  size="sm"
-                  variant="outline"
-                  className="w-48"
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                <select
+                  className="px-2 py-1 border rounded text-sm"
+                  onChange={(e) => {
                     const [sourcePlayer, outcomeIndex] =
                       e.target.value.split(":");
                     handleCopyOutcome(
@@ -451,65 +419,28 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                         </option>
                       ))
                   )}
-                </Select>
+                </select>
                 <PrimaryButton
                   onClick={() => handleAddPlayerOutcome(playerSlot)}
                   variant="outline"
                   size="sm"
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
                 >
                   Add Outcome
                 </PrimaryButton>
               </div>
             </div>
+
             {localOptions.outcomes.map((outcome, index) => (
-              <div key={outcome.id} className="space-y-2">
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-sm font-medium">Outcome {index + 1}</h4>
-                  <Input
-                    value={outcome.question}
-                    onChange={(e) => {
-                      const updated = [...localOptions.outcomes];
-                      updated[index] = {
-                        ...updated[index],
-                        question: e.target.value,
-                      };
-                      setLocalOptions((prev) => ({
-                        ...prev,
-                        outcomes: updated,
-                      }));
-                    }}
-                    placeholder="Question that defines the outcome"
-                  />
-                  <textarea
-                    className="w-full p-2 border rounded"
-                    rows={2}
-                    value={outcome.resonance}
-                    onChange={(e) => {
-                      const updated = [...localOptions.outcomes];
-                      updated[index] = {
-                        ...updated[index],
-                        resonance: e.target.value,
-                      };
-                      setLocalOptions((prev) => ({
-                        ...prev,
-                        outcomes: updated,
-                      }));
-                    }}
-                    placeholder="Why does this matter to the character?"
-                  />
-                  <button
-                    onClick={() => {
-                      setLocalOptions((prev) => ({
-                        ...prev,
-                        outcomes: prev.outcomes.filter((_, i) => i !== index),
-                      }));
-                    }}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Remove Outcome
-                  </button>
-                </div>
-              </div>
+              <ExpandableOutcome
+                key={outcome.id}
+                outcome={outcome}
+                index={index}
+                editingOutcomes={editingOutcomes}
+                setEditingOutcomes={setEditingOutcomes}
+                onDelete={handleDeleteOutcome}
+                onUpdate={handleUpdateOutcome}
+              />
             ))}
           </div>
         </div>
