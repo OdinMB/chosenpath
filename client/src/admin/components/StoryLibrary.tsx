@@ -3,7 +3,7 @@ import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
-import { StoryTemplate } from "@core/types/storyTemplate";
+import { StoryTemplate } from "@core/types/story";
 
 type StoryLibraryProps = {
   token: string;
@@ -165,6 +165,7 @@ export const StoryLibrary = ({
                 <th className="py-3 px-4 text-left">Title</th>
                 <th className="py-3 px-4 text-left">Tags</th>
                 <th className="py-3 px-4 text-left">Players</th>
+                <th className="py-3 px-4 text-left">Story Length</th>
                 <th className="py-3 px-4 text-left">Created</th>
                 <th className="py-3 px-4 text-left">Updated</th>
                 <th className="py-3 px-4 text-left">Actions</th>
@@ -175,9 +176,7 @@ export const StoryLibrary = ({
                 <tr key={template.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <div>
-                      <span className="font-medium">
-                        {template.setup.title}
-                      </span>
+                      <span className="font-medium">{template.title}</span>
                     </div>
                   </td>
                   <td className="py-3 px-4">
@@ -196,7 +195,16 @@ export const StoryLibrary = ({
                       )}
                     </div>
                   </td>
-                  <td className="py-3 px-4">{template.playerCount}</td>
+                  <td className="py-3 px-4">
+                    {template.playerCountMin === template.playerCountMax
+                      ? template.playerCountMin
+                      : `${template.playerCountMin} - ${template.playerCountMax}`}
+                  </td>
+                  <td className="py-3 px-4">
+                    {template.maxTurnsMin === template.maxTurnsMax
+                      ? `${template.maxTurnsMin} turns`
+                      : `${template.maxTurnsMin} - ${template.maxTurnsMax} turns`}
+                  </td>
                   <td className="py-3 px-4">
                     {formatDate(template.createdAt)}
                   </td>

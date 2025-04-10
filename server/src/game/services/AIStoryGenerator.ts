@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 import type {
   StoryState,
-  StorySetup,
+  StorySetupGeneration,
   PlayerOptionsGeneration,
   Change,
   Beat,
@@ -99,7 +99,9 @@ export class AIStoryGenerator {
       characterSelectionCompleted: false,
       characterSelectionOptions: Object.fromEntries(
         getPlayerSlots(playerCount).map((slot) => {
-          const playerKey = slot as keyof StorySetup<typeof playerCount>;
+          const playerKey = slot as keyof StorySetupGeneration<
+            typeof playerCount
+          >;
           return [slot, setup[playerKey] as PlayerOptionsGeneration];
         })
       ),
@@ -115,12 +117,14 @@ export class AIStoryGenerator {
   }
 
   private createPlayersFromSetup(
-    setup: StorySetup<PlayerCount>,
+    setup: StorySetupGeneration<PlayerCount>,
     playerCount: PlayerCount
   ): Record<string, PlayerState> {
     return Object.fromEntries(
       getPlayerSlots(playerCount).map((slot) => {
-        const playerKey = slot as keyof StorySetup<typeof playerCount>;
+        const playerKey = slot as keyof StorySetupGeneration<
+          typeof playerCount
+        >;
         const playerData = setup[playerKey] as PlayerOptionsGeneration;
 
         // Create minimal PlayerState with only outcomes defined
@@ -153,7 +157,7 @@ export class AIStoryGenerator {
     playerCount: PlayerCount,
     gameMode: GameMode,
     maxTurns: number
-  ): Promise<StorySetup<typeof playerCount>> {
+  ): Promise<StorySetupGeneration<typeof playerCount>> {
     // Create a filename based on the parameters
     const mockStoriesEnabled =
       process.env.NODE_ENV === "development" && MOCK_STORIES_IN_DEVELOPMENT;
@@ -174,7 +178,7 @@ export class AIStoryGenerator {
         // Try to read the mock file
         const mockData = await readStorageFile("mocks", mockFilename);
         console.log(`Reading mock story from ${mockFilename}`);
-        return JSON.parse(mockData) as StorySetup<typeof playerCount>;
+        return JSON.parse(mockData) as StorySetupGeneration<typeof playerCount>;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
           console.log(
@@ -220,7 +224,7 @@ export class AIStoryGenerator {
       // Create a new object without the characterSelectionPlan property
       const { characterSelectionPlan, ...storySetupData } = result;
 
-      return storySetupData as StorySetup<typeof playerCount>;
+      return storySetupData as StorySetupGeneration<typeof playerCount>;
     } catch (error) {
       console.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");

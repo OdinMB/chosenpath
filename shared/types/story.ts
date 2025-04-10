@@ -24,6 +24,7 @@ import {
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
 import { ThreadAnalysis } from "./thread.js";
+import { MAX_PLAYERS } from "../config.js";
 
 // GENERATION WITH LLM
 
@@ -139,8 +140,8 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
     .describe("Initial setup for the story");
 };
 
-// Helper type for the response - simplified by using ExactPlayerMap
-export type StorySetup<N extends PlayerCount> = {
+// Helper type - simplified by using ExactPlayerMap
+export type StorySetupBase<N extends PlayerCount> = {
   title: string;
   guidelines: z.infer<typeof guidelinesSchema>;
   storyElements: z.infer<typeof StoryElementsSchema>;
@@ -151,6 +152,21 @@ export type StorySetup<N extends PlayerCount> = {
   initialSharedStatValues: StatValueEntry[];
   characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
+
+export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N>;
+
+export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  gameMode: GameMode;
+  playerCountMin: PlayerCount;
+  playerCountMax: PlayerCount;
+  maxTurnsMin: number;
+  maxTurnsMax: number;
+  teaser: string;
+  tags: string[];
+};
 
 // TYPES USED BY APP (not LLM)
 

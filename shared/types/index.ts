@@ -6,7 +6,6 @@ export * from "./player.js";
 export * from "./stat.js";
 export * from "./story.js";
 export * from "./storyElement.js";
-export * from "./storyTemplate.js";
 export * from "./switch.js";
 export * from "./thread.js";
 export * from "./websocket.js";

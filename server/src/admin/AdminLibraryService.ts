@@ -1,9 +1,12 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { isDevelopment, STORAGE_PATHS } from "@core/config.js";
-import { GameMode, StorySetup } from "@core/types/story.js";
-import { PlayerCount } from "@core/types/player.js";
-import { StoryTemplate } from "@core/types/storyTemplate.js";
+import { isDevelopment, STORAGE_PATHS, MAX_PLAYERS } from "@core/config.js";
+import {
+  GameMode,
+  StoryTemplate,
+  PlayerOptionsGeneration,
+} from "@core/types/story.js";
+import { PlayerCount, PLAYER_SLOTS } from "@core/types/player.js";
 import {
   readStorageFile,
   writeStorageFile,
@@ -12,6 +15,23 @@ import {
   ensureStorageDirectory,
 } from "@common/storageUtils.js";
 import { Logger } from "@common/logger.js";
+
+// Create a type that has all StoryTemplate properties except metadata fields
+type TemplateDataInput = Omit<
+  StoryTemplate,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "gameMode"
+  | "playerCountMin"
+  | "playerCountMax"
+  | "maxTurnsMin"
+  | "maxTurnsMax"
+  | "tags"
+>;
+
+// Create a type that makes all fields optional for updates
+type TemplateDataUpdate = Partial<TemplateDataInput>;
 
 export class AdminLibraryService {
   private storagePath: string;
@@ -35,6 +55,34 @@ export class AdminLibraryService {
       this.logger.error("Failed to initialize storage", error);
       throw new Error("Failed to initialize library storage");
     }
+  }
+
+  /**
+   * Ensure template data has all the required player options
+   */
+  private ensurePlayerOptions(
+    data: Partial<StoryTemplate>
+  ): Partial<StoryTemplate> {
+    const result = { ...data };
+
+    // Get only player slots up to MAX_PLAYERS
+    const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
+
+    // Create default player options for any missing player slots
+    for (const playerSlot of relevantPlayerSlots) {
+      if (!result[playerSlot as keyof StoryTemplate]) {
+        this.logger.log(`Adding default options for ${playerSlot}`);
+        // Cast to any first to avoid the type error, as TypeScript doesn't understand
+        // we're dynamically adding properties that match the StoryTemplate structure
+        (result as any)[playerSlot] = {
+          outcomes: [],
+          possibleCharacterIdentities: [],
+          possibleCharacterBackgrounds: [],
+        };
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -95,26 +143,65 @@ export class AdminLibraryService {
    * Create a new template
    */
   async createTemplate(
-    playerCount: PlayerCount,
+    playerCountMin: PlayerCount,
+    playerCountMax: PlayerCount,
     gameMode: GameMode,
-    setup: Partial<StorySetup<PlayerCount>>,
+    templateData: TemplateDataInput,
     tags: string[] = [],
-    maxTurns?: number
+    maxTurnsMin: number = 10,
+    maxTurnsMax: number = 15
   ): Promise<StoryTemplate> {
     try {
       const id = uuidv4();
       const now = new Date().toISOString();
 
-      const template: StoryTemplate = {
+      // Ensure all required player options exist
+      const dataWithPlayerOptions = this.ensurePlayerOptions(
+        templateData
+      ) as TemplateDataInput;
+
+      // First create a base template without player properties
+      const baseTemplate = {
         id,
         gameMode,
-        playerCount,
+        playerCountMin,
+        playerCountMax,
+        maxTurnsMin,
+        maxTurnsMax,
         tags,
-        ...(maxTurns !== undefined ? { maxTurns } : {}),
         createdAt: now,
         updatedAt: now,
-        setup: setup as StorySetup<PlayerCount>,
+        title: dataWithPlayerOptions.title,
+        teaser: dataWithPlayerOptions.teaser,
+        guidelines: dataWithPlayerOptions.guidelines,
+        storyElements: dataWithPlayerOptions.storyElements,
+        sharedOutcomes: dataWithPlayerOptions.sharedOutcomes,
+        statGroups: dataWithPlayerOptions.statGroups,
+        sharedStats: dataWithPlayerOptions.sharedStats,
+        initialSharedStatValues: dataWithPlayerOptions.initialSharedStatValues,
+        playerStats: dataWithPlayerOptions.playerStats,
+        characterSelectionIntroduction:
+          dataWithPlayerOptions.characterSelectionIntroduction,
       };
+
+      // Then add player-specific properties
+      // Use Record type to create a map of player slots to player options
+      const playerProperties: Record<string, PlayerOptionsGeneration> = {};
+      PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
+        playerProperties[slot] = (dataWithPlayerOptions[
+          slot as keyof StoryTemplate
+        ] as unknown as PlayerOptionsGeneration) || {
+          outcomes: [],
+          possibleCharacterIdentities: [],
+          possibleCharacterBackgrounds: [],
+        };
+      });
+
+      // Combine the base template with player properties to create a valid StoryTemplate
+      const template = {
+        ...baseTemplate,
+        ...playerProperties,
+      } as StoryTemplate;
 
       await writeStorageFile(
         "library",
@@ -122,7 +209,7 @@ export class AdminLibraryService {
         JSON.stringify(template, null, 2)
       );
 
-      this.logger.log(`Created template ${id}: ${setup.title}`);
+      this.logger.log(`Created template ${id}: ${templateData.title}`);
       return template;
     } catch (error) {
       this.logger.error("Failed to create template", error);
@@ -135,11 +222,13 @@ export class AdminLibraryService {
    */
   async updateTemplate(
     id: string,
-    playerCount: PlayerCount,
+    playerCountMin: PlayerCount,
+    playerCountMax: PlayerCount,
     gameMode: GameMode,
-    setup: Partial<StorySetup<PlayerCount>>,
+    templateData: TemplateDataUpdate,
     tags: string[] = [],
-    maxTurns?: number
+    maxTurnsMin?: number,
+    maxTurnsMax?: number
   ): Promise<StoryTemplate> {
     try {
       // Check if template exists
@@ -151,15 +240,67 @@ export class AdminLibraryService {
 
       const now = new Date().toISOString();
 
-      const updatedTemplate: StoryTemplate = {
-        ...existingTemplate,
+      // Merge existing data with the updates
+      const mergedData = { ...existingTemplate, ...templateData };
+
+      // Ensure all required player options exist
+      const dataWithPlayerOptions = this.ensurePlayerOptions(mergedData);
+
+      // First create a base template without player properties
+      const baseTemplate = {
+        id,
         gameMode,
-        playerCount,
+        playerCountMin,
+        playerCountMax,
         tags,
-        ...(maxTurns !== undefined ? { maxTurns } : {}),
+        createdAt: existingTemplate.createdAt,
         updatedAt: now,
-        setup: setup as StorySetup<PlayerCount>,
+        maxTurnsMin:
+          maxTurnsMin !== undefined
+            ? maxTurnsMin
+            : existingTemplate.maxTurnsMin,
+        maxTurnsMax:
+          maxTurnsMax !== undefined
+            ? maxTurnsMax
+            : existingTemplate.maxTurnsMax,
+        title: dataWithPlayerOptions.title as string,
+        teaser: dataWithPlayerOptions.teaser as string,
+        guidelines:
+          dataWithPlayerOptions.guidelines as StoryTemplate["guidelines"],
+        storyElements:
+          dataWithPlayerOptions.storyElements as StoryTemplate["storyElements"],
+        sharedOutcomes:
+          dataWithPlayerOptions.sharedOutcomes as StoryTemplate["sharedOutcomes"],
+        statGroups:
+          dataWithPlayerOptions.statGroups as StoryTemplate["statGroups"],
+        sharedStats:
+          dataWithPlayerOptions.sharedStats as StoryTemplate["sharedStats"],
+        initialSharedStatValues:
+          dataWithPlayerOptions.initialSharedStatValues as StoryTemplate["initialSharedStatValues"],
+        playerStats:
+          dataWithPlayerOptions.playerStats as StoryTemplate["playerStats"],
+        characterSelectionIntroduction:
+          dataWithPlayerOptions.characterSelectionIntroduction as StoryTemplate["characterSelectionIntroduction"],
       };
+
+      // Then add player-specific properties
+      // Use Record type to create a map of player slots to player options
+      const playerProperties: Record<string, PlayerOptionsGeneration> = {};
+      PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
+        playerProperties[slot] = (dataWithPlayerOptions[
+          slot as keyof StoryTemplate
+        ] as unknown as PlayerOptionsGeneration) || {
+          outcomes: [],
+          possibleCharacterIdentities: [],
+          possibleCharacterBackgrounds: [],
+        };
+      });
+
+      // Combine the base template with player properties to create a valid StoryTemplate
+      const updatedTemplate = {
+        ...baseTemplate,
+        ...playerProperties,
+      } as StoryTemplate;
 
       await writeStorageFile(
         "library",
@@ -167,7 +308,11 @@ export class AdminLibraryService {
         JSON.stringify(updatedTemplate, null, 2)
       );
 
-      this.logger.log(`Updated template ${id}: ${setup.title}`);
+      this.logger.log(
+        `Updated template ${id}: ${
+          templateData.title || existingTemplate.title
+        }`
+      );
       return updatedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template ${id}`, error);

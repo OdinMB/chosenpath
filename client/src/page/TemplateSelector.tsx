@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { StoryTemplate, TemplateListItem } from "@core/types/storyTemplate";
+import { PlayerCount, GameMode } from "@core/types/index";
+import type { StoryTemplate } from "@core/types/index";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
+
+interface TemplateListItem {
+  id: string;
+  title: string;
+  gameMode: GameMode;
+  playerCount: PlayerCount;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface TemplateSelectorProps {
   onSelect: (template: StoryTemplate) => void;

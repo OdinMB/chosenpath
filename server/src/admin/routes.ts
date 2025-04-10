@@ -120,30 +120,43 @@ router.get("/library/templates/:id", verifyAdmin, async (req, res) => {
 
 // Create a new template
 router.post("/library/templates", verifyAdmin, async (req, res) => {
-  const { playerCount, gameMode, setup, tags, maxTurns } = req.body;
+  const {
+    playerCountMin,
+    playerCountMax,
+    gameMode,
+    maxTurnsMin,
+    maxTurnsMax,
+    teaser,
+    title,
+    ...templateData
+  } = req.body;
 
-  if (!playerCount || !gameMode || !setup) {
+  if (!playerCountMin || !playerCountMax || !gameMode || !title) {
     return res.status(400).json({
-      error: "Missing required fields: playerCount, gameMode, setup",
-    });
-  }
-
-  if (!setup.title) {
-    return res.status(400).json({
-      error: "Missing required field: setup.title",
+      error:
+        "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
     });
   }
 
   try {
+    // Prepare template data with the title field
+    const fullTemplateData = {
+      ...templateData,
+      title,
+      teaser: teaser || "",
+    };
+
     const template = await libraryService.createTemplate(
-      playerCount,
+      playerCountMin,
+      playerCountMax,
       gameMode,
-      setup,
-      tags || [],
-      maxTurns
+      fullTemplateData,
+      templateData.tags || [],
+      maxTurnsMin || 10,
+      maxTurnsMax || 15
     );
 
-    Logger.Admin.log(`Created template ${template.id}: ${setup.title}`);
+    Logger.Admin.log(`Created template ${template.id}: ${title}`);
     res.status(201).json({ template });
   } catch (error) {
     Logger.Admin.error("Error creating template", error);
@@ -154,31 +167,44 @@ router.post("/library/templates", verifyAdmin, async (req, res) => {
 // Update a template
 router.put("/library/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const { playerCount, gameMode, setup, tags, maxTurns } = req.body;
+  const {
+    playerCountMin,
+    playerCountMax,
+    gameMode,
+    maxTurnsMin,
+    maxTurnsMax,
+    teaser,
+    title,
+    ...templateData
+  } = req.body;
 
-  if (!playerCount || !gameMode || !setup) {
+  if (!playerCountMin || !playerCountMax || !gameMode || !title) {
     return res.status(400).json({
-      error: "Missing required fields: playerCount, gameMode, setup",
-    });
-  }
-
-  if (!setup.title) {
-    return res.status(400).json({
-      error: "Missing required field: setup.title",
+      error:
+        "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
     });
   }
 
   try {
+    // Prepare template data with the title field
+    const fullTemplateData = {
+      ...templateData,
+      title,
+      teaser: teaser || "",
+    };
+
     const template = await libraryService.updateTemplate(
       id,
-      playerCount,
+      playerCountMin,
+      playerCountMax,
       gameMode,
-      setup,
-      tags || [],
-      maxTurns
+      fullTemplateData,
+      templateData.tags || [],
+      maxTurnsMin,
+      maxTurnsMax
     );
 
-    Logger.Admin.log(`Updated template ${id}: ${setup.title}`);
+    Logger.Admin.log(`Updated template ${id}: ${title}`);
     res.json({ template });
   } catch (error) {
     // Check if it's a not found error

@@ -5,20 +5,20 @@ import { StatsTab } from "./StatsTab";
 import { StoryElementsTab } from "./StoryElementsTab";
 import { OutcomesTab } from "./OutcomesTab";
 import { PlayersTab } from "./PlayersTab";
-import { StoryTemplate } from "@core/types/storyTemplate";
 import {
+  StoryTemplate,
   GameMode,
   GameModes,
-  Stat,
-  StatValueEntry,
-  StoryElement,
-  Outcome,
   PlayerOptionsGeneration,
-} from "@core/types/index";
-import { MAX_PLAYERS } from "@core/config";
+} from "@core/types/story";
+import { Stat, StatValueEntry } from "@core/types/stat";
+import { StoryElement } from "@core/types/storyElement";
+import { Outcome } from "@core/types/outcome";
+import { PlayerCount, PLAYER_SLOTS } from "@core/types/player";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
+import { MAX_PLAYERS } from "@core/config";
 
 interface TemplateFormProps {
   template: StoryTemplate;
@@ -50,29 +50,25 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   useEffect(() => {
     Logger.UI.log("Template form received updated template data:", template.id);
     setFormData(template);
-    setWorld(template.setup?.guidelines?.world || "");
-    setRules(template.setup?.guidelines?.rules || []);
-    setTone(template.setup?.guidelines?.tone || []);
-    setConflicts(template.setup?.guidelines?.conflicts || []);
-    setDecisions(template.setup?.guidelines?.decisions || []);
+    setWorld(template.guidelines?.world || "");
+    setRules(template.guidelines?.rules || []);
+    setTone(template.guidelines?.tone || []);
+    setConflicts(template.guidelines?.conflicts || []);
+    setDecisions(template.guidelines?.decisions || []);
     setTags(template.tags || []);
   }, [template]);
 
   // Define state for array fields that GuidelinesTab needs
-  const [world, setWorld] = useState<string>(
-    template.setup?.guidelines?.world || ""
-  );
+  const [world, setWorld] = useState<string>(template.guidelines?.world || "");
   const [rules, setRules] = useState<string[]>(
-    template.setup?.guidelines?.rules || []
+    template.guidelines?.rules || []
   );
-  const [tone, setTone] = useState<string[]>(
-    template.setup?.guidelines?.tone || []
-  );
+  const [tone, setTone] = useState<string[]>(template.guidelines?.tone || []);
   const [conflicts, setConflicts] = useState<string[]>(
-    template.setup?.guidelines?.conflicts || []
+    template.guidelines?.conflicts || []
   );
   const [decisions, setDecisions] = useState<string[]>(
-    template.setup?.guidelines?.decisions || []
+    template.guidelines?.decisions || []
   );
 
   // State for tags
@@ -107,7 +103,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Convert numeric game mode value to actual GameMode enum
   const handleGameModeChange = (value: number) => {
     let newGameMode: GameMode;
-    if (formData.playerCount === 1) {
+    if (formData.playerCountMax === 1) {
       newGameMode = GameModes.SinglePlayer;
     } else {
       switch (value) {
@@ -133,19 +129,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
     // Construct the final template, merging all state
     const updatedTemplate: StoryTemplate = {
-      ...formData, // Include all formData which includes id, gameMode, playerCount, etc.
-      tags, // Include tags array
-      setup: {
-        ...formData.setup,
-        title: formData.setup.title,
-        guidelines: {
-          ...formData.setup.guidelines,
-          world,
-          rules,
-          tone,
-          conflicts,
-          decisions,
-        },
+      ...formData,
+      tags,
+      guidelines: {
+        ...formData.guidelines,
+        world,
+        rules,
+        tone,
+        conflicts,
+        decisions,
       },
     };
 
@@ -163,12 +155,43 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
       Logger.Admin.log(`Making ${method} request to ${url}`);
 
-      const requestBody = {
-        playerCount: updatedTemplate.playerCount,
+      // Create a base request body with common fields
+      const baseRequestBody = {
+        playerCountMin: updatedTemplate.playerCountMin,
+        playerCountMax: updatedTemplate.playerCountMax,
         gameMode: updatedTemplate.gameMode,
-        maxTurns: updatedTemplate.maxTurns,
-        setup: updatedTemplate.setup,
+        maxTurnsMin: updatedTemplate.maxTurnsMin,
+        maxTurnsMax: updatedTemplate.maxTurnsMax,
+        teaser: updatedTemplate.teaser,
         tags: updatedTemplate.tags,
+        title: updatedTemplate.title,
+        guidelines: updatedTemplate.guidelines,
+        storyElements: updatedTemplate.storyElements,
+        sharedOutcomes: updatedTemplate.sharedOutcomes,
+        statGroups: updatedTemplate.statGroups,
+        sharedStats: updatedTemplate.sharedStats,
+        initialSharedStatValues: updatedTemplate.initialSharedStatValues,
+        playerStats: updatedTemplate.playerStats,
+        characterSelectionIntroduction:
+          updatedTemplate.characterSelectionIntroduction,
+      };
+
+      // Add player options dynamically using PLAYER_SLOTS
+      const playerOptions: Record<string, unknown> = {};
+      // Only include player slots up to MAX_PLAYERS
+      const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
+
+      for (const playerSlot of relevantPlayerSlots) {
+        if (playerSlot in updatedTemplate) {
+          playerOptions[playerSlot] =
+            updatedTemplate[playerSlot as keyof StoryTemplate];
+        }
+      }
+
+      // Combine base request body with player options
+      const requestBody = {
+        ...baseRequestBody,
+        ...playerOptions,
       };
 
       Logger.Admin.log("Request payload:", requestBody);
@@ -206,26 +229,43 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     key: K,
     value: StoryTemplate[K]
   ) => {
-    Logger.UI.log(`Updating ${String(key)}:`, value);
     setFormData((prev: StoryTemplate) => ({ ...prev, [key]: value }));
   };
 
-  // Set title in setup object
+  // Set title
   const handleTitleChange = (title: string) => {
-    Logger.UI.log("Updating title:", title);
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      setup: {
-        ...prev.setup,
-        title,
-      },
+      title,
     }));
   };
 
-  // Update when maxTurns changes
-  const handleMaxTurnsChange = (value: number) => {
-    Logger.UI.log("Updating maxTurns:", value);
-    handleChange("maxTurns", value);
+  // Set teaser
+  const handleTeaserChange = (teaser: string) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      teaser,
+    }));
+  };
+
+  // Update when playerCountMin changes
+  const handlePlayerCountMinChange = (value: PlayerCount) => {
+    handleChange("playerCountMin", value);
+  };
+
+  // Update when playerCountMax changes
+  const handlePlayerCountMaxChange = (value: PlayerCount) => {
+    handleChange("playerCountMax", value);
+  };
+
+  // Update when maxTurnsMin changes
+  const handleMaxTurnsMinChange = (value: number) => {
+    handleChange("maxTurnsMin", value);
+  };
+
+  // Update when maxTurnsMax changes
+  const handleMaxTurnsMaxChange = (value: number) => {
+    handleChange("maxTurnsMax", value);
   };
 
   // Handle stats changes
@@ -237,14 +277,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   }) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      setup: {
-        ...prev.setup,
-        statGroups: updates.statGroups ?? prev.setup.statGroups,
-        sharedStats: updates.sharedStats ?? prev.setup.sharedStats,
-        playerStats: updates.playerStats ?? prev.setup.playerStats,
-        initialSharedStatValues:
-          updates.initialSharedStatValues ?? prev.setup.initialSharedStatValues,
-      },
+      statGroups: updates.statGroups ?? prev.statGroups,
+      sharedStats: updates.sharedStats ?? prev.sharedStats,
+      playerStats: updates.playerStats ?? prev.playerStats,
+      initialSharedStatValues:
+        updates.initialSharedStatValues ?? prev.initialSharedStatValues,
     }));
   };
 
@@ -252,10 +289,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   const handleStoryElementsChange = (elements: StoryElement[]) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      setup: {
-        ...prev.setup,
-        storyElements: elements,
-      },
+      storyElements: elements,
     }));
   };
 
@@ -263,10 +297,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   const handleOutcomesChange = (outcomes: Outcome[]) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      setup: {
-        ...prev.setup,
-        sharedOutcomes: outcomes,
-      },
+      sharedOutcomes: outcomes,
     }));
   };
 
@@ -276,11 +307,31 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   ) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      setup: {
-        ...prev.setup,
-        ...updates,
-      },
+      ...updates,
     }));
+  };
+
+  // Create player options dynamically using PLAYER_SLOTS
+  const getPlayerOptions = () => {
+    const playerOptions: Record<string, PlayerOptionsGeneration> = {};
+    // Only include player slots up to MAX_PLAYERS
+    const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
+
+    for (const playerSlot of relevantPlayerSlots) {
+      const defaultOptions = {
+        outcomes: [],
+        possibleCharacterIdentities: [],
+        possibleCharacterBackgrounds: [],
+      };
+
+      // Use type assertion to access the player properties
+      const playerOption = formData[playerSlot as keyof StoryTemplate] as
+        | PlayerOptionsGeneration
+        | undefined;
+      playerOptions[playerSlot] = playerOption || defaultOptions;
+    }
+
+    return playerOptions;
   };
 
   return (
@@ -314,14 +365,20 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       <div className="mt-6">
         {activeTab === "basic" && (
           <BasicInfoTab
-            title={formData.setup?.title || ""}
+            title={formData.title || ""}
             setTitle={handleTitleChange}
-            playerCount={formData.playerCount}
-            setPlayerCount={(value) => handleChange("playerCount", value)}
+            teaser={formData.teaser || ""}
+            setTeaser={handleTeaserChange}
+            playerCountMin={formData.playerCountMin}
+            playerCountMax={formData.playerCountMax}
+            setPlayerCountMin={handlePlayerCountMinChange}
+            setPlayerCountMax={handlePlayerCountMaxChange}
             gameMode={formData.gameMode}
             handleGameModeChange={handleGameModeChange}
-            maxTurns={formData.maxTurns || 10}
-            setMaxTurns={handleMaxTurnsChange}
+            maxTurnsMin={formData.maxTurnsMin || 10}
+            maxTurnsMax={formData.maxTurnsMax || 15}
+            setMaxTurnsMin={handleMaxTurnsMinChange}
+            setMaxTurnsMax={handleMaxTurnsMaxChange}
             tags={tags}
             handleTagsChange={setTags}
             handleAddTag={() => handleAddArrayItem(setTags)}
@@ -349,47 +406,33 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         {activeTab === "elements" && (
           <StoryElementsTab
-            elements={formData.setup?.storyElements || []}
+            elements={formData.storyElements || []}
             onChange={handleStoryElementsChange}
           />
         )}
 
         {activeTab === "outcomes" && (
           <OutcomesTab
-            outcomes={formData.setup?.sharedOutcomes || []}
+            outcomes={formData.sharedOutcomes || []}
             onChange={handleOutcomesChange}
           />
         )}
 
         {activeTab === "stats" && (
           <StatsTab
-            statGroups={formData.setup?.statGroups || []}
-            sharedStats={formData.setup?.sharedStats || []}
-            playerStats={formData.setup?.playerStats || []}
-            initialSharedStatValues={
-              formData.setup?.initialSharedStatValues || []
-            }
+            statGroups={formData.statGroups || []}
+            sharedStats={formData.sharedStats || []}
+            playerStats={formData.playerStats || []}
+            initialSharedStatValues={formData.initialSharedStatValues || []}
             onChange={handleStatsChange}
           />
         )}
 
         {activeTab === "players" && (
           <PlayersTab
-            playerCount={formData.playerCount}
-            playerOptions={Object.fromEntries(
-              Array.from({ length: MAX_PLAYERS }, (_, i) => [
-                `player${i + 1}`,
-                (formData.setup?.[
-                  `player${i + 1}` as keyof typeof formData.setup
-                ] as PlayerOptionsGeneration) || {
-                  outcomes: [],
-                  possibleCharacterIdentities: [],
-                  possibleCharacterBackgrounds: [],
-                },
-              ])
-            )}
+            playerOptions={getPlayerOptions()}
             onChange={handlePlayerOptionsChange}
-            playerStats={formData.setup?.playerStats || []}
+            playerStats={formData.playerStats || []}
           />
         )}
       </div>

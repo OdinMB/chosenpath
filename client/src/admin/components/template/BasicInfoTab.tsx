@@ -9,12 +9,18 @@ import { PrimaryButton } from "@components/ui/PrimaryButton";
 interface BasicInfoTabProps {
   title: string;
   setTitle: (value: string) => void;
-  playerCount: PlayerCount;
-  setPlayerCount: (value: PlayerCount) => void;
+  teaser: string;
+  setTeaser: (value: string) => void;
+  playerCountMin: PlayerCount;
+  playerCountMax: PlayerCount;
+  setPlayerCountMin: (value: PlayerCount) => void;
+  setPlayerCountMax: (value: PlayerCount) => void;
   gameMode: GameMode;
   handleGameModeChange: (value: number) => void;
-  maxTurns: number;
-  setMaxTurns: (value: number) => void;
+  maxTurnsMin: number;
+  maxTurnsMax: number;
+  setMaxTurnsMin: (value: number) => void;
+  setMaxTurnsMax: (value: number) => void;
   tags: string[];
   handleTagsChange: (updatedTags: string[]) => void;
   handleAddTag: () => void;
@@ -24,12 +30,18 @@ interface BasicInfoTabProps {
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   title,
   setTitle,
-  playerCount,
-  setPlayerCount,
+  teaser,
+  setTeaser,
+  playerCountMin,
+  playerCountMax,
+  setPlayerCountMin,
+  setPlayerCountMax,
   gameMode,
   handleGameModeChange,
-  maxTurns,
-  setMaxTurns,
+  maxTurnsMin,
+  maxTurnsMax,
+  setMaxTurnsMin,
+  setMaxTurnsMax,
   tags,
   handleTagsChange,
   handleAddTag,
@@ -45,6 +57,19 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Story Title"
+        />
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-1">Teaser</h3>
+        <textarea
+          id="story-teaser"
+          name="story-teaser"
+          value={teaser}
+          onChange={(e) => setTeaser(e.target.value)}
+          placeholder="A short teaser to attract players to your story"
+          rows={3}
+          className="w-full px-3 py-2 placeholder-gray-400 text-primary-900 bg-white rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
         />
       </div>
 
@@ -87,26 +112,46 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div>
-        <h3 className="font-semibold mb-1">Number of Players: {playerCount}</h3>
-        <input
-          id="player-count"
-          name="player-count"
-          type="range"
-          min={MIN_PLAYERS}
-          max={MAX_PLAYERS}
-          value={playerCount}
-          onChange={(e) =>
-            setPlayerCount(Number(e.target.value) as PlayerCount)
-          }
-          className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-        />
-        <div className="flex justify-between text-xs text-primary-600">
-          <span>{MIN_PLAYERS} Player</span>
-          <span>{MAX_PLAYERS} Players</span>
+        <h3 className="font-semibold mb-2">Player Count Range</h3>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1 mr-6">
+            <label className="text-sm text-gray-600 block mb-1">
+              Minimum Players: {playerCountMin}
+            </label>
+            <input
+              id="player-count-min"
+              name="player-count-min"
+              type="range"
+              min={MIN_PLAYERS}
+              max={playerCountMax}
+              value={playerCountMin}
+              onChange={(e) =>
+                setPlayerCountMin(Number(e.target.value) as PlayerCount)
+              }
+              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm text-gray-600 block mb-1">
+              Maximum Players: {playerCountMax}
+            </label>
+            <input
+              id="player-count-max"
+              name="player-count-max"
+              type="range"
+              min={playerCountMin}
+              max={MAX_PLAYERS}
+              value={playerCountMax}
+              onChange={(e) =>
+                setPlayerCountMax(Number(e.target.value) as PlayerCount)
+              }
+              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            />
+          </div>
         </div>
       </div>
 
-      <div className={`${playerCount === 1 ? "opacity-50" : ""}`}>
+      <div className={`${playerCountMax === 1 ? "opacity-50" : ""}`}>
         <h3 className="font-semibold mb-1">Game Mode</h3>
         <input
           id="game-mode"
@@ -115,7 +160,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           min={0}
           max={2}
           value={
-            playerCount === 1
+            playerCountMax === 1
               ? 0
               : gameMode === GameModes.Cooperative
               ? 0
@@ -125,7 +170,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           }
           onChange={(e) => handleGameModeChange(Number(e.target.value))}
           className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-          disabled={playerCount === 1}
+          disabled={playerCountMax === 1}
         />
         <div className="flex justify-between text-xs text-primary-600">
           <span>Shared Goals</span>
@@ -135,23 +180,42 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div>
-        <h3 className="font-semibold mb-1">
-          Story Length: {maxTurns} decisions
+        <h3 className="font-semibold mb-2">
+          Story Length (number of decisions)
         </h3>
-        <input
-          id="story-length"
-          name="story-length"
-          type="range"
-          min={MIN_TURNS}
-          max={MAX_TURNS}
-          step={5}
-          value={maxTurns}
-          onChange={(e) => setMaxTurns(Number(e.target.value))}
-          className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-        />
-        <div className="flex justify-between text-xs text-primary-600">
-          <span>{MIN_TURNS} decisions</span>
-          <span>{MAX_TURNS} decisions</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1 mr-6">
+            <label className="text-sm text-gray-600 block mb-1">
+              Minimum: {maxTurnsMin}
+            </label>
+            <input
+              id="story-length-min"
+              name="story-length-min"
+              type="range"
+              min={MIN_TURNS}
+              max={maxTurnsMax}
+              step={5}
+              value={maxTurnsMin}
+              onChange={(e) => setMaxTurnsMin(Number(e.target.value))}
+              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm text-gray-600 block mb-1">
+              Maximum: {maxTurnsMax}
+            </label>
+            <input
+              id="story-length-max"
+              name="story-length-max"
+              type="range"
+              min={maxTurnsMin}
+              max={MAX_TURNS}
+              step={5}
+              value={maxTurnsMax}
+              onChange={(e) => setMaxTurnsMax(Number(e.target.value))}
+              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            />
+          </div>
         </div>
       </div>
     </div>

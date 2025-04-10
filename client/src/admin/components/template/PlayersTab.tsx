@@ -23,7 +23,6 @@ interface PlayerOutcome {
 }
 
 interface PlayersTabProps {
-  playerCount: number;
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   onChange: (updates: Record<PlayerSlot, PlayerOptionsGeneration>) => void;
   playerStats: Stat[];

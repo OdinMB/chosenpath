@@ -5,7 +5,7 @@ import { Icons } from "@components/ui/Icons";
 import { StoriesOverview } from "./components/StoriesOverview";
 import { StoryLibrary } from "./components/StoryLibrary";
 import { TemplateForm } from "./components/template/index";
-import { StoryTemplate } from "@core/types/storyTemplate";
+import { StoryTemplate } from "@core/types/story";
 import { createDefaultTemplate } from "./components/template/templateFactory";
 import { config } from "@/config";
 
@@ -141,8 +141,8 @@ export const Admin = () => {
             <div>
               <div className="flex items-center pb-2">
                 <h2 className="text-xl font-semibold text-gray-800 truncate">
-                  {selectedTemplate?.setup?.title
-                    ? `${selectedTemplate.setup.title}`
+                  {selectedTemplate?.title
+                    ? `${selectedTemplate.title}`
                     : "New Template"}
                 </h2>
               </div>
