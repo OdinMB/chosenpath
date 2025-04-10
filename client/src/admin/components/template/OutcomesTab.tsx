@@ -49,9 +49,11 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Shared Outcomes</h3>
+        <div className="flex items-center">
+          <h3 className="text-lg font-semibold">Shared Outcomes</h3>
+        </div>
         <PrimaryButton
           variant="outline"
           size="sm"

@@ -3,6 +3,7 @@ import { ExpandableItem } from "./ExpandableItem";
 import { Input } from "@components/ui/Input";
 import { Outcome } from "@core/types/outcome";
 import { Select } from "@components/ui/Select";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 // Define PlayerOutcome here since it's not exported from a module
 interface PlayerOutcome {
@@ -65,36 +66,38 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
 
     return (
       <div className="flex-1 space-y-4">
-        <div className="flex justify-between items-center">
-          <h4 className="font-medium">Outcome {index + 1}</h4>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h4 className="text-sm font-medium">Question</h4>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold w-36">Question</span>
           <Input
+            className="flex-1"
             value={data.question}
             onChange={(e) => onChange({ ...data, question: e.target.value })}
             placeholder="Question that defines the outcome"
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <h4 className="text-sm font-medium">Resonance</h4>
-          <textarea
-            className="w-full p-2 border rounded"
-            rows={2}
+        <div className="flex items-center gap-2">
+          <span className="font-semibold w-36">Resonance</span>
+          <Input
+            className="flex-1"
             value={data.resonance}
             onChange={(e) => onChange({ ...data, resonance: e.target.value })}
             placeholder="Why does this matter to the character or group?"
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <h4 className="text-sm font-medium">Number of Milestones</h4>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold w-30">Milestones</span>
+          <InfoIcon
+            tooltipText="1 for side-outcomes, 2 as default, 3 for particularly important outcomes"
+            position="right"
+            className="ml-2 mt-1"
+          />
           <Input
             type="number"
             min={1}
             max={3}
+            className="max-w-16"
             value={data.intendedNumberOfMilestones}
             onChange={(e) =>
               onChange({
@@ -103,15 +106,18 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
               })
             }
           />
-          <span className="text-sm text-gray-500">
-            1 for side-outcomes, 2 as default, 3 for particularly important
-            outcomes
-          </span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <h4 className="text-sm font-medium">Possible Resolutions</h4>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center">
+              <h4 className="font-semibold">Possible Resolutions</h4>
+              <InfoIcon
+                tooltipText="Different ways this outcome could be resolved"
+                position="right"
+                className="ml-2 mt-1"
+              />
+            </div>
             <Select
               className="text-sm"
               size="sm"
@@ -165,12 +171,11 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
 
           {isChallenge(resolutions) ? (
             // Challenge resolutions
-            <>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Favorable</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Favorable</span>
+                <Input
+                  className="flex-1"
                   value={resolutions.favorable}
                   onChange={(e) => {
                     const updated = {
@@ -185,11 +190,10 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="Resolution that is favorable to the player(s)"
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Unfavorable</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Unfavorable</span>
+                <Input
+                  className="flex-1"
                   value={resolutions.unfavorable}
                   onChange={(e) => {
                     const updated = {
@@ -204,11 +208,10 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="Resolution that is unfavorable for the player(s)"
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Mixed</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Mixed</span>
+                <Input
+                  className="flex-1"
                   value={resolutions.mixed}
                   onChange={(e) => {
                     const updated = {
@@ -223,15 +226,14 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="Resolution for a mixed outcome"
                 />
               </div>
-            </>
+            </div>
           ) : (
             // Exploration resolutions
-            <>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Resolution 1</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Resolution 1</span>
+                <Input
+                  className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution1}
                   onChange={(e) => {
                     const updated = {
@@ -246,11 +248,10 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="First possible resolution"
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Resolution 2</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Resolution 2</span>
+                <Input
+                  className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution2}
                   onChange={(e) => {
                     const updated = {
@@ -265,11 +266,10 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="Second possible resolution"
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <h5 className="text-sm font-medium">Resolution 3</h5>
-                <textarea
-                  className="w-full p-2 border rounded"
-                  rows={2}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-36">Resolution 3</span>
+                <Input
+                  className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution3}
                   onChange={(e) => {
                     const updated = {
@@ -284,7 +284,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   placeholder="Third possible resolution"
                 />
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

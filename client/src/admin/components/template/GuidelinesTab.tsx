@@ -1,7 +1,9 @@
 import React from "react";
 import { Icons } from "@components/ui/Icons";
 import { Input } from "@components/ui/Input";
+import { TextArea } from "@components/ui/TextArea";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 interface GuidelinesTabProps {
   world: string;
@@ -46,26 +48,36 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-semibold mb-1">
-          World (three sentences about the essence of the world)
-        </h3>
-        <textarea
-          id="world-description"
-          name="world-description"
-          value={world}
-          onChange={(e) => setWorld(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
-          rows={3}
-          placeholder="Describe the essence of the story world in three sentences"
-        />
+        <div className="flex items-start gap-2">
+          <span className="font-semibold pt-2">World</span>
+          <InfoIcon
+            tooltipText="Three sentences about the essence of the world"
+            position="right"
+            className="mt-3"
+          />
+          <TextArea
+            id="world-description"
+            name="world-description"
+            value={world}
+            onChange={(e) => setWorld(e.target.value)}
+            className="flex-1"
+            rows={3}
+            placeholder="Describe the essence of the story world in three sentences"
+          />
+        </div>
       </div>
 
       {/* Rules section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <h3 className="font-semibold">
-            Rules (fundamental rules governing the story world)
-          </h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Rules</h3>
+            <InfoIcon
+              tooltipText="Fundamental rules governing the story world"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -110,9 +122,14 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
       {/* Tone section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <h3 className="font-semibold">
-            Tone (emotional and narrative tone guidelines)
-          </h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Tone</h3>
+            <InfoIcon
+              tooltipText="Emotional and narrative tone guidelines"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -157,9 +174,14 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
       {/* Conflicts section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <h3 className="font-semibold">
-            Conflicts (major conflicts driving the narrative)
-          </h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Conflicts</h3>
+            <InfoIcon
+              tooltipText="Major conflicts driving the narrative"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -204,9 +226,14 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
       {/* Decisions section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <h3 className="font-semibold">
-            Decisions (major decisions in the narrative)
-          </h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Decisions</h3>
+            <InfoIcon
+              tooltipText="Major decisions in the narrative"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"

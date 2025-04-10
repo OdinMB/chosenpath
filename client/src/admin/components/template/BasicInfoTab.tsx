@@ -4,7 +4,9 @@ import { GameModes, GameMode } from "@core/types/story";
 import { PlayerCount } from "@core/types/player";
 import { Icons } from "@components/ui/Icons";
 import { Input } from "@components/ui/Input";
+import { TextArea } from "@components/ui/TextArea";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 interface BasicInfoTabProps {
   title: string;
@@ -49,34 +51,42 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="font-semibold mb-1">Title</h3>
+      <div className="flex items-center gap-2">
+        <span className="font-semibold w-24">Title</span>
         <Input
           id="story-title"
           name="story-title"
+          className="flex-1"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Story Title"
         />
       </div>
 
-      <div>
-        <h3 className="font-semibold mb-1">Teaser</h3>
-        <textarea
+      <div className="flex items-start gap-2">
+        <span className="font-semibold w-24 pt-2">Teaser</span>
+        <TextArea
           id="story-teaser"
           name="story-teaser"
+          className="flex-1"
           value={teaser}
           onChange={(e) => setTeaser(e.target.value)}
           placeholder="A short teaser to attract players to your story"
           rows={3}
-          className="w-full px-3 py-2 placeholder-gray-400 text-primary-900 bg-white rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
         />
       </div>
 
       {/* Tags section */}
       <div>
         <div className="flex justify-between items-center mb-1">
-          <h3 className="font-semibold">Tags</h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Tags</h3>
+            <InfoIcon
+              tooltipText="Categories to help players find your story"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -112,11 +122,18 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div>
-        <h3 className="font-semibold mb-2">Player Count Range</h3>
+        <div className="flex items-center mb-2">
+          <h3 className="font-semibold">Players</h3>
+          <InfoIcon
+            tooltipText="Minimum and maximum number of players allowed"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1 mr-6">
             <label className="text-sm text-gray-600 block mb-1">
-              Minimum Players: {playerCountMin}
+              Minimum: {playerCountMin}
             </label>
             <input
               id="player-count-min"
@@ -133,7 +150,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           </div>
           <div className="flex-1">
             <label className="text-sm text-gray-600 block mb-1">
-              Maximum Players: {playerCountMax}
+              Maximum: {playerCountMax}
             </label>
             <input
               id="player-count-max"
@@ -152,7 +169,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div className={`${playerCountMax === 1 ? "opacity-50" : ""}`}>
-        <h3 className="font-semibold mb-1">Game Mode</h3>
+        <div className="flex items-center mb-1">
+          <h3 className="font-semibold">Game Mode</h3>
+          <InfoIcon
+            tooltipText="How players interact with each other during gameplay"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </div>
         <input
           id="game-mode"
           name="game-mode"
@@ -180,9 +204,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       <div>
-        <h3 className="font-semibold mb-2">
-          Story Length (number of decisions)
-        </h3>
+        <div className="flex items-center mb-2">
+          <h3 className="font-semibold">Story Length</h3>
+          <InfoIcon
+            tooltipText="Number of decisions players will make in the game"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1 mr-6">
             <label className="text-sm text-gray-600 block mb-1">

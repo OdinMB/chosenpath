@@ -11,8 +11,8 @@ interface InfoIconProps {
 
 export const InfoIcon: React.FC<InfoIconProps> = ({
   tooltipText,
-  position = "top",
-  className = "",
+  position = "right",
+  className = "ml-2 mt-1",
   contentClassName = "",
 }) => (
   <Tooltip
@@ -21,7 +21,7 @@ export const InfoIcon: React.FC<InfoIconProps> = ({
     contentClassName={contentClassName}
   >
     <div
-      className={`inline-block ml-1 align-top text-primary-400 ${className}`}
+      className={`inline-block align-top text-primary-400 ${className}`}
       style={{ position: "relative", top: "-2px" }}
     >
       <Icons.Info />

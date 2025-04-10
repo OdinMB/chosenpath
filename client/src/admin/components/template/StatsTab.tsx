@@ -3,6 +3,7 @@ import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
 import { Input } from "@components/ui/Input";
 import { Stat, StatValueEntry } from "@core/types/stat";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 type StatsTabProps = {
   statGroups: string[];
@@ -217,11 +218,12 @@ export const StatsTab = ({
       <div className="bg-white p-4 rounded-lg shadow mb-4">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1 space-y-4 mr-4">
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Name</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Name</span>
               <Input
                 id={`stat-name-${stat.id}`}
                 name={`stat-name-${stat.id}`}
+                className="flex-1"
                 value={localStat.name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setLocalStat((prev) => ({ ...prev, name: e.target.value }))
@@ -229,9 +231,9 @@ export const StatsTab = ({
                 placeholder="Enter stat name"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">ID</h3>
-              <div className="flex">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">ID</span>
+              <div className="flex flex-1">
                 <span className="inline-flex items-center px-3 rounded-l border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
                   {type === "shared" ? "shared_" : "player_"}
                 </span>
@@ -265,11 +267,12 @@ export const StatsTab = ({
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Description</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Description</span>
               <Input
                 id={`stat-description-${stat.id}`}
                 name={`stat-description-${stat.id}`}
+                className="flex-1"
                 value={localStat.tooltip}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setLocalStat((prev) => ({ ...prev, tooltip: e.target.value }))
@@ -277,12 +280,30 @@ export const StatsTab = ({
                 placeholder="Enter stat description"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Type</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Group</span>
+              <select
+                id={`stat-group-${stat.id}`}
+                name={`stat-group-${stat.id}`}
+                className="flex-1 p-2 border rounded"
+                value={localStat.group}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setLocalStat((prev) => ({ ...prev, group: e.target.value }))
+                }
+              >
+                {statGroups.map((group, i) => (
+                  <option key={i} value={group}>
+                    {group}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Type</span>
               <select
                 id={`stat-type-${stat.id}`}
                 name={`stat-type-${stat.id}`}
-                className="w-full p-2 border rounded"
+                className="flex-1 p-2 border rounded"
                 value={localStat.type}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const newType = e.target.value as Stat["type"];
@@ -309,31 +330,15 @@ export const StatsTab = ({
                 <option value="opposites">Opposites</option>
               </select>
             </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Group</h3>
-              <select
-                id={`stat-group-${stat.id}`}
-                name={`stat-group-${stat.id}`}
-                className="w-full p-2 border rounded"
-                value={localStat.group}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setLocalStat((prev) => ({ ...prev, group: e.target.value }))
-                }
-              >
-                {statGroups.map((group, i) => (
-                  <option key={i} value={group}>
-                    {group}
-                  </option>
-                ))}
-              </select>
-            </div>
+
             {type === "shared" && (
-              <div className="flex flex-col gap-2">
-                <h3 className="font-semibold mb-1">Initial Value</h3>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-24">Initial Value</span>
                 {localStat.type === "string" ? (
                   <Input
                     id={`stat-initial-value-${stat.id}`}
                     name={`stat-initial-value-${stat.id}`}
+                    className="flex-1"
                     value={localInitialValue as string}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setLocalInitialValue(e.target.value)
@@ -344,6 +349,7 @@ export const StatsTab = ({
                   <Input
                     id={`stat-initial-value-${stat.id}`}
                     name={`stat-initial-value-${stat.id}`}
+                    className="flex-1"
                     value={
                       Array.isArray(localInitialValue)
                         ? localInitialValue.join(", ")
@@ -363,6 +369,7 @@ export const StatsTab = ({
                   <Input
                     id={`stat-initial-value-${stat.id}`}
                     name={`stat-initial-value-${stat.id}`}
+                    className="flex-1"
                     type="number"
                     value={localInitialValue as number}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -372,14 +379,14 @@ export const StatsTab = ({
                 )}
               </div>
             )}
-
             {/* Additional stat fields */}
             {(localStat.type === "string" || localStat.type === "string[]") && (
-              <div className="flex flex-col gap-2">
-                <h3 className="font-semibold mb-1">Possible Values</h3>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold w-24">Possible Values</span>
                 <Input
                   id={`stat-possible-values-${stat.id}`}
                   name={`stat-possible-values-${stat.id}`}
+                  className="flex-1"
                   value={localStat.possibleValues}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setLocalStat((prev) => ({
@@ -395,7 +402,6 @@ export const StatsTab = ({
                 />
               </div>
             )}
-
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-2">
                 <input
@@ -417,37 +423,120 @@ export const StatsTab = ({
                   Visible to players
                 </label>
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id={`stat-beat-changes-${stat.id}`}
-                  name={`stat-beat-changes-${stat.id}`}
-                  checked={localStat.canBeChangedInBeatResolutions}
-                  onChange={(e) =>
-                    setLocalStat((prev) => ({
-                      ...prev,
-                      canBeChangedInBeatResolutions: e.target.checked,
-                    }))
-                  }
-                />
-                <label
-                  htmlFor={`stat-beat-changes-${stat.id}`}
-                  className="font-semibold"
-                >
-                  Can be changed in beat resolutions
-                </label>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center">
+                    <h3 className="font-semibold">Narrative Implications</h3>
+                    <InfoIcon
+                      tooltipText="How this stat affects the story narrative"
+                      position="right"
+                      className="ml-2 mt-1"
+                    />
+                  </div>
+                  <PrimaryButton
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLocalStat((prev) => ({
+                        ...prev,
+                        narrativeImplications: [
+                          ...prev.narrativeImplications,
+                          "",
+                        ],
+                      }));
+                    }}
+                    leftIcon={<Icons.Plus className="h-4 w-4" />}
+                  >
+                    Add
+                  </PrimaryButton>
+                </div>
+                {localStat.narrativeImplications.length === 0 ? (
+                  <Input
+                    id={`new-implication-${stat.id}`}
+                    name={`new-implication-${stat.id}`}
+                    placeholder="Click + to add narrative implications"
+                    disabled
+                  />
+                ) : (
+                  localStat.narrativeImplications.map((implication, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <Input
+                        id={`stat-implication-${stat.id}-${idx}`}
+                        name={`stat-implication-${stat.id}-${idx}`}
+                        className="flex-1"
+                        value={implication}
+                        onChange={(e) => {
+                          const newImplications = [
+                            ...localStat.narrativeImplications,
+                          ];
+                          newImplications[idx] = e.target.value;
+                          setLocalStat((prev) => ({
+                            ...prev,
+                            narrativeImplications: newImplications,
+                          }));
+                        }}
+                        placeholder="e.g., Below 30% causes visible weakness"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newImplications =
+                            localStat.narrativeImplications.filter(
+                              (_, i) => i !== idx
+                            );
+                          setLocalStat((prev) => ({
+                            ...prev,
+                            narrativeImplications: newImplications,
+                          }));
+                        }}
+                        className="text-tertiary hover:text-tertiary-700"
+                        aria-label={`Remove implication ${idx + 1}`}
+                      >
+                        <Icons.Trash className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Effect on Points</h3>
-              <div className="space-y-2">
-                {localStat.effectOnPoints.map((effect, idx) => (
-                  <div key={idx} className="flex gap-2">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center">
+                  <h3 className="font-semibold">Effect on Points</h3>
+                  <InfoIcon
+                    tooltipText="How this stat affects point calculations"
+                    position="right"
+                    className="ml-2 mt-1"
+                  />
+                </div>
+                <PrimaryButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLocalStat((prev) => ({
+                      ...prev,
+                      effectOnPoints: [...prev.effectOnPoints, ""],
+                    }));
+                  }}
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
+                >
+                  Add
+                </PrimaryButton>
+              </div>
+              {localStat.effectOnPoints.length === 0 ? (
+                <Input
+                  id={`new-effect-${stat.id}`}
+                  name={`new-effect-${stat.id}`}
+                  placeholder="Click + to add effects"
+                  disabled
+                />
+              ) : (
+                localStat.effectOnPoints.map((effect, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
                     <Input
                       id={`stat-effect-${stat.id}-${idx}`}
                       name={`stat-effect-${stat.id}-${idx}`}
+                      className="flex-1"
                       value={effect}
                       onChange={(e) => {
                         const newEffects = [...localStat.effectOnPoints];
@@ -476,28 +565,15 @@ export const StatsTab = ({
                       <Icons.Trash className="h-4 w-4" />
                     </button>
                   </div>
-                ))}
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setLocalStat((prev) => ({
-                      ...prev,
-                      effectOnPoints: [...prev.effectOnPoints, ""],
-                    }));
-                  }}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add Effect
-                </PrimaryButton>
-              </div>
+                ))
+              )}
             </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Options to Sacrifice</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Sacrifice Options</span>
               <Input
                 id={`stat-sacrifice-options-${stat.id}`}
                 name={`stat-sacrifice-options-${stat.id}`}
+                className="flex-1"
                 value={localStat.optionsToSacrifice}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setLocalStat((prev) => ({
@@ -508,12 +584,12 @@ export const StatsTab = ({
                 placeholder="How can this stat be sacrificed for bonuses?"
               />
             </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Options to Gain as Reward</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Reward Options</span>
               <Input
                 id={`stat-reward-options-${stat.id}`}
                 name={`stat-reward-options-${stat.id}`}
+                className="flex-1"
                 value={localStat.optionsToGainAsReward}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setLocalStat((prev) => ({
@@ -524,74 +600,67 @@ export const StatsTab = ({
                 placeholder="How can this stat be gained as a reward?"
               />
             </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Narrative Implications</h3>
-              <div className="space-y-2">
-                {localStat.narrativeImplications.map((implication, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <Input
-                      id={`stat-implication-${stat.id}-${idx}`}
-                      name={`stat-implication-${stat.id}-${idx}`}
-                      value={implication}
-                      onChange={(e) => {
-                        const newImplications = [
-                          ...localStat.narrativeImplications,
-                        ];
-                        newImplications[idx] = e.target.value;
-                        setLocalStat((prev) => ({
-                          ...prev,
-                          narrativeImplications: newImplications,
-                        }));
-                      }}
-                      placeholder="e.g., Below 30% causes visible weakness"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newImplications =
-                          localStat.narrativeImplications.filter(
-                            (_, i) => i !== idx
-                          );
-                        setLocalStat((prev) => ({
-                          ...prev,
-                          narrativeImplications: newImplications,
-                        }));
-                      }}
-                      className="text-tertiary hover:text-tertiary-700"
-                      aria-label={`Remove implication ${idx + 1}`}
-                    >
-                      <Icons.Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={`stat-beat-changes-${stat.id}`}
+                name={`stat-beat-changes-${stat.id}`}
+                checked={localStat.canBeChangedInBeatResolutions}
+                onChange={(e) =>
+                  setLocalStat((prev) => ({
+                    ...prev,
+                    canBeChangedInBeatResolutions: e.target.checked,
+                  }))
+                }
+              />
+              <label
+                htmlFor={`stat-beat-changes-${stat.id}`}
+                className="font-semibold"
+              >
+                Can be changed in beat resolutions
+              </label>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center">
+                  <h3 className="font-semibold">Adjustments After Threads</h3>
+                  <InfoIcon
+                    tooltipText="How this stat changes after completing story threads"
+                    position="right"
+                    className="ml-2 mt-1"
+                  />
+                </div>
                 <PrimaryButton
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     setLocalStat((prev) => ({
                       ...prev,
-                      narrativeImplications: [
-                        ...prev.narrativeImplications,
+                      adjustmentsAfterThreads: [
+                        ...prev.adjustmentsAfterThreads,
                         "",
                       ],
                     }));
                   }}
                   leftIcon={<Icons.Plus className="h-4 w-4" />}
                 >
-                  Add Implication
+                  Add
                 </PrimaryButton>
               </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Adjustments After Threads</h3>
-              <div className="space-y-2">
-                {localStat.adjustmentsAfterThreads.map((adjustment, idx) => (
-                  <div key={idx} className="flex gap-2">
+              {localStat.adjustmentsAfterThreads.length === 0 ? (
+                <Input
+                  id={`new-adjustment-${stat.id}`}
+                  name={`new-adjustment-${stat.id}`}
+                  placeholder="Click + to add thread adjustments"
+                  disabled
+                />
+              ) : (
+                localStat.adjustmentsAfterThreads.map((adjustment, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
                     <Input
                       id={`stat-adjustment-${stat.id}-${idx}`}
                       name={`stat-adjustment-${stat.id}-${idx}`}
+                      className="flex-1"
                       value={adjustment}
                       onChange={(e) => {
                         const newAdjustments = [
@@ -623,24 +692,8 @@ export const StatsTab = ({
                       <Icons.Trash className="h-4 w-4" />
                     </button>
                   </div>
-                ))}
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setLocalStat((prev) => ({
-                      ...prev,
-                      adjustmentsAfterThreads: [
-                        ...prev.adjustmentsAfterThreads,
-                        "",
-                      ],
-                    }));
-                  }}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add Adjustment
-                </PrimaryButton>
-              </div>
+                ))
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -671,7 +724,14 @@ export const StatsTab = ({
       {/* Stat Groups */}
       <section>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-semibold">Stat Groups</h3>
+          <div className="flex items-center">
+            <h3 className="font-semibold">Stat Groups</h3>
+            <InfoIcon
+              tooltipText="Categories to organize stats"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -717,7 +777,14 @@ export const StatsTab = ({
       {/* Shared Stats */}
       <section>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Shared Stats</h3>
+          <div className="flex items-center">
+            <h3 className="text-lg font-semibold">Shared Stats</h3>
+            <InfoIcon
+              tooltipText="Stats shared by all players in the game"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"
@@ -740,7 +807,14 @@ export const StatsTab = ({
       {/* Player Stats */}
       <section>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Player Stats</h3>
+          <div className="flex items-center">
+            <h3 className="text-lg font-semibold">Player Stats</h3>
+            <InfoIcon
+              tooltipText="Stats that are unique to each player"
+              position="right"
+              className="ml-2 mt-1"
+            />
+          </div>
           <PrimaryButton
             variant="outline"
             size="sm"

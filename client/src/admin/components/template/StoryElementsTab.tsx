@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
 import { Input } from "@components/ui/Input";
+import { TextArea } from "@components/ui/TextArea";
 import { StoryElement } from "@core/types/storyElement";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];
@@ -99,11 +101,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
       <div className="bg-white p-4 rounded-lg shadow mb-4">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1 space-y-4 mr-4">
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Name</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">Name</span>
               <Input
                 id={`element-name-${element.id}`}
                 name={`element-name-${element.id}`}
+                className="flex-1"
                 value={localElement.name}
                 onChange={(e) =>
                   setLocalElement((prev) => ({ ...prev, name: e.target.value }))
@@ -112,11 +115,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">ID</h3>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">ID</span>
               <Input
                 id={`element-id-${element.id}`}
                 name={`element-id-${element.id}`}
+                className="flex-1"
                 value={localElement.id}
                 onChange={(e) =>
                   setLocalElement((prev) => ({ ...prev, id: e.target.value }))
@@ -125,12 +129,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Role</h3>
-              <textarea
+            <div className="flex items-start gap-2">
+              <span className="font-semibold w-24 pt-2">Role</span>
+              <TextArea
                 id={`element-role-${element.id}`}
                 name={`element-role-${element.id}`}
-                className="w-full p-2 border rounded"
+                className="flex-1"
                 rows={3}
                 value={localElement.role}
                 onChange={(e) =>
@@ -140,12 +144,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Instructions</h3>
-              <textarea
+            <div className="flex items-start gap-2">
+              <span className="font-semibold w-36 pt-2">Instructions</span>
+              <TextArea
                 id={`element-instructions-${element.id}`}
                 name={`element-instructions-${element.id}`}
-                className="w-full p-2 border rounded"
+                className="flex-1"
                 rows={3}
                 value={localElement.instructions}
                 onChange={(e) =>
@@ -158,14 +162,44 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <h3 className="font-semibold mb-1">Facts</h3>
-              <div className="space-y-2">
-                {localElement.facts.map((fact, factIndex) => (
-                  <div key={factIndex} className="flex gap-2">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <div className="flex items-center">
+                  <h3 className="font-semibold">Facts</h3>
+                  <InfoIcon
+                    tooltipText="Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
+                    position="right"
+                    className="ml-2 mt-1"
+                  />
+                </div>
+                <PrimaryButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLocalElement((prev) => ({
+                      ...prev,
+                      facts: [...prev.facts, ""],
+                    }));
+                  }}
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
+                >
+                  Add
+                </PrimaryButton>
+              </div>
+              {localElement.facts.length === 0 ? (
+                <Input
+                  id={`new-fact-${element.id}`}
+                  name={`new-fact-${element.id}`}
+                  placeholder="Click + to add facts"
+                  disabled
+                />
+              ) : (
+                localElement.facts.map((fact, factIndex) => (
+                  <div key={factIndex} className="flex gap-2 mb-2">
                     <Input
                       id={`element-fact-${element.id}-${factIndex}`}
                       name={`element-fact-${element.id}-${factIndex}`}
+                      className="flex-1"
                       value={fact}
                       onChange={(e) => {
                         const newFacts = [...localElement.facts];
@@ -194,21 +228,8 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
                       <Icons.Trash className="h-4 w-4" />
                     </button>
                   </div>
-                ))}
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setLocalElement((prev) => ({
-                      ...prev,
-                      facts: [...prev.facts, ""],
-                    }));
-                  }}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add Fact
-                </PrimaryButton>
-              </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -236,9 +257,16 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Story Elements</h3>
+        <div className="flex items-center">
+          <h3 className="text-lg font-semibold">Story Elements</h3>
+          <InfoIcon
+            tooltipText="Objects, characters, or concepts that players can interact with"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </div>
         <PrimaryButton
           variant="outline"
           size="sm"
