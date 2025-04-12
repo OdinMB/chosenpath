@@ -1,4 +1,4 @@
-import { StoryState, Image, PlayerSlot } from "shared/types/index.js";
+import { Beat, StoryState, Image, PlayerSlot } from "@core/types/index.js";
 
 /**
  * Manages all image-related operations for Story class
@@ -35,7 +35,7 @@ export class ImageManager {
   ): StoryState {
     return {
       ...state,
-      images: state.images.map((image) =>
+      images: state.images.map((image: Image) =>
         image.id === imageId
           ? {
               ...image,
@@ -67,7 +67,7 @@ export class ImageManager {
         ...state.players,
         [playerSlot]: {
           ...player,
-          beatHistory: player.beatHistory.map((beat, index) =>
+          beatHistory: player.beatHistory.map((beat: Beat, index: number) =>
             index === player.beatHistory.length - 1
               ? { ...beat, imageId }
               : beat

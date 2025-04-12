@@ -10,7 +10,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "composite": true,
-    "rootDir": "."
+    "rootDir": "..",
+    "baseUrl": "..",
+    "paths": {
+      "@core/*": ["shared/*"]
+    }
   },
   "include": ["types/**/*", "utils/**/*", "models/**/*", "config.ts"],
   "exclude": ["node_modules", "dist"]

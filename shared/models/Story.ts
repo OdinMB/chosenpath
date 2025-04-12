@@ -9,13 +9,12 @@ import {
   StoryElement,
   Outcome,
   Stat,
-  Beat,
   BeatType,
   SwitchAnalysis,
   ThreadAnalysis,
   Thread,
   Resolution,
-} from "../types/index.js";
+} from "@core/types/index.js";
 import { PlayerManager } from "./PlayerManager.js";
 import { ThreadManager } from "./ThreadManager.js";
 import { ImageManager } from "./ImageManager.js";

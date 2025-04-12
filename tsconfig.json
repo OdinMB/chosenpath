@@ -10,9 +10,7 @@
     "composite": true,
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["shared/*"],
-      "@server/*": ["server/src/*"],
-      "@client/*": ["client/src/*"]
+      "@core/*": ["shared/*"]
     }
   }
 }

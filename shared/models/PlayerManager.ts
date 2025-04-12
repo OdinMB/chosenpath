@@ -6,8 +6,8 @@ import {
   Beat,
   Resolution,
   ResolutionDetails,
-} from "shared/types/index.js";
-import { replacePronounPlaceholders } from "shared/utils/playerUtils.js";
+} from "@core/types/index.js";
+import { replacePronounPlaceholders } from "@core/utils/playerUtils.js";
 
 /**
  * Manages all player-related operations for Story class

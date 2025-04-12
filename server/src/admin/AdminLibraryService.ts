@@ -5,8 +5,9 @@ import {
   GameMode,
   StoryTemplate,
   PlayerOptionsGeneration,
-} from "@core/types/story.js";
-import { PlayerCount, PLAYER_SLOTS } from "@core/types/player.js";
+  PlayerCount,
+  PLAYER_SLOTS,
+} from "@core/types/index.js";
 import {
   readStorageFile,
   writeStorageFile,

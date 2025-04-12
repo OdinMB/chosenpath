@@ -6,7 +6,7 @@ import {
   Beat,
   BeatType,
   PlayerSlot,
-} from "shared/types/index.js";
+} from "@core/types/index.js";
 
 /**
  * Manages all thread-related operations for Story class
