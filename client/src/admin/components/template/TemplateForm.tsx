@@ -20,6 +20,7 @@ import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
 import { MAX_PLAYERS } from "@core/config";
+import { Icons } from "@components/ui/Icons";
 
 interface TemplateFormProps {
   template: StoryTemplate;
@@ -58,6 +59,75 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     setConflicts(template.guidelines?.conflicts || []);
     setDecisions(template.guidelines?.decisions || []);
     setTags(template.tags || []);
+
+    // Also update player backgrounds to ensure each has initial stat values for the current playerStats
+    // This fixes the issue where player stats don't have assigned initial values
+    const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
+    const updatedPlayerOptions: Record<string, PlayerOptionsGeneration> = {};
+    let needsUpdate = false;
+
+    relevantPlayerSlots.forEach((slot) => {
+      const playerOption = template[
+        slot as keyof StoryTemplate
+      ] as PlayerOptionsGeneration;
+
+      if (playerOption && playerOption.possibleCharacterBackgrounds) {
+        const updatedBackgrounds =
+          playerOption.possibleCharacterBackgrounds.map((background) => {
+            // Check if background has all the current playerStats
+            const existingStatIds = background.initialPlayerStatValues.map(
+              (sv) => sv.statId
+            );
+            const missingStats = template.playerStats.filter(
+              (stat) => !existingStatIds.includes(stat.id)
+            );
+
+            if (missingStats.length > 0) {
+              needsUpdate = true;
+              // Add missing stats with default values
+              const newStatValues = [...background.initialPlayerStatValues];
+
+              missingStats.forEach((stat) => {
+                let defaultValue: number | string | string[];
+                if (stat.type === "string") {
+                  defaultValue = "";
+                } else if (stat.type === "string[]") {
+                  defaultValue = [];
+                } else {
+                  defaultValue = 50; // Default for number/percentage/opposites
+                }
+
+                newStatValues.push({
+                  statId: stat.id,
+                  value: defaultValue,
+                });
+              });
+
+              return {
+                ...background,
+                initialPlayerStatValues: newStatValues,
+              };
+            }
+
+            return background;
+          });
+
+        if (needsUpdate) {
+          updatedPlayerOptions[slot] = {
+            ...playerOption,
+            possibleCharacterBackgrounds: updatedBackgrounds,
+          };
+        }
+      }
+    });
+
+    // If any player options needed updates, apply them to the form data
+    if (Object.keys(updatedPlayerOptions).length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        ...updatedPlayerOptions,
+      }));
+    }
   }, [template]);
 
   // Define state for array fields that GuidelinesTab needs
@@ -378,12 +448,29 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       })
       .then((data) => {
         // Update form data with generated template
-        setFormData((prev) => ({
-          ...prev,
-          ...data.template,
-        }));
+        setFormData((prev) => {
+          const updatedData = {
+            ...prev,
+            ...data.template,
+          };
 
-        // Set active tab to basic info to review generated content
+          // Also update the state of the array fields that GuidelinesTab needs
+          setWorld(data.template.guidelines?.world || "");
+          setRules(data.template.guidelines?.rules || []);
+          setTone(data.template.guidelines?.tone || []);
+          setConflicts(data.template.guidelines?.conflicts || []);
+          setDecisions(data.template.guidelines?.decisions || []);
+          setTags(data.template.tags || []);
+
+          // Automatically save the generated template
+          setTimeout(() => {
+            onSubmit(updatedData);
+          }, 500);
+
+          return updatedData;
+        });
+
+        // Set active tab to basic to review generated content
         setActiveTab("basic");
       })
       .catch((error) => {
@@ -515,13 +602,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         {activeTab === "ai-draft" && (
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">
-              Generate Template Draft
-            </h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Generate a complete template draft using AI. This will create a
-              starting point that you can further refine in the other tabs.
-            </p>
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-2">
+              <div className="flex items-start">
+                <Icons.Warning className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
+                <div>
+                  <p className="text-sm text-yellow-700 font-medium">Warning</p>
+                  <p className="text-sm text-yellow-600">
+                    Generating a new template will override any existing
+                    information in this form. Unsaved changes will be lost.
+                  </p>
+                </div>
+              </div>
+            </div>
             <StoryInitializer
               onSetup={handleAIDraftSetup}
               onBack={() => setActiveTab("basic")}

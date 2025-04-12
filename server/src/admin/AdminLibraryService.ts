@@ -363,8 +363,17 @@ export class AdminLibraryService {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
 
-      // Use AIStoryGenerator to create initial state
-      const initialState = await this.aiStoryGenerator.createInitialState(
+      // First, generate the StorySetup which includes statGroups
+      const setupGenerator = new AIStoryGenerator();
+      const setup = await setupGenerator.generateStorySetup(
+        prompt,
+        playerCount,
+        gameMode,
+        maxTurns
+      );
+
+      // Then create the initial state (which doesn't include statGroups directly)
+      const initialState = await setupGenerator.createInitialState(
         prompt,
         generateImages,
         playerCount,
@@ -407,7 +416,8 @@ export class AdminLibraryService {
         tags: [],
         createdAt: now,
         updatedAt: now,
-        statGroups: [],
+        // Use statGroups from setup rather than initialState
+        statGroups: setup.statGroups || ["General"],
         ...playerOptions,
       };
 
