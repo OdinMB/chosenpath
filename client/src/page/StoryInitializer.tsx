@@ -6,7 +6,7 @@ import {
   MIN_TURNS,
   MAX_TURNS,
   DEFAULT_TURNS,
-} from "shared/config";
+} from "@core/config";
 import { GameMode, GameModes } from "@core/types/story";
 import { AppTitle } from "@components/AppTitle";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
