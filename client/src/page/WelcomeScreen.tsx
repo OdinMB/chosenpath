@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AppTitle } from "@components/AppTitle";
 import { Tooltip } from "@components/ui/Tooltip";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Icons } from "@components/ui/Icons";
@@ -118,8 +117,6 @@ export function WelcomeScreen({
         confirmText="Delete"
         cancelText="Cancel"
       />
-
-      <AppTitle size="large" className="mb-2" />
 
       <div className="mb-8 text-primary-800">
         <p className="mb-2">

@@ -1,4 +1,3 @@
-import { AppTitle } from "@components/AppTitle";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { LoadingSpinner } from "@components/ui/LoadingSpinner";
 import { useState, useEffect } from "react";
@@ -44,8 +43,6 @@ export function PlayerCodes({
   return (
     <div className="min-h-screen p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        <AppTitle size="large" className="mb-10" />
-
         <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-6">
           {isLikelyReady && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-md">

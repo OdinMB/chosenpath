@@ -8,7 +8,6 @@ import {
   DEFAULT_TURNS,
 } from "@core/config";
 import { GameMode, GameModes } from "@core/types/story";
-import { AppTitle } from "@components/AppTitle";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 
 interface StoryInitializerProps {
@@ -180,10 +179,8 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6 font-lora">
+    <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        <AppTitle size="large" className="mb-4" onClick={onBack} />
-
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
             <div className="space-y-2">

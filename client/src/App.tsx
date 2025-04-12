@@ -8,6 +8,7 @@ import { WelcomeScreen } from "@page/WelcomeScreen";
 import { PlayerCodes } from "@page/PlayerCodes";
 import { GameMode } from "@core/types/story";
 import { RateLimitNotification } from "@components/RateLimitNotification";
+import { AppTitle } from "@components/AppTitle";
 
 // Add this type at the top with the imports
 type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";
@@ -316,10 +317,15 @@ function App() {
 
       case "WELCOME":
         return (
-          <WelcomeScreen
-            onCodeSubmit={handleCodeSubmit}
-            onNewStory={handleNewStory}
-          />
+          <>
+            <div className="max-w-md mx-auto pt-4">
+              <AppTitle size="large" />
+            </div>
+            <WelcomeScreen
+              onCodeSubmit={handleCodeSubmit}
+              onNewStory={handleNewStory}
+            />
+          </>
         );
 
       case "SETUP":
@@ -327,13 +333,24 @@ function App() {
           "[App - getCurrentView] in viewState SETUP, entering case 'SETUP' -> rendering StoryInitializer"
         );
         return (
-          <StoryInitializer
-            onSetup={handleStorySetup}
-            onBack={() => {
-              setTransientStoryCodes(null);
-              loggedSetViewState("WELCOME");
-            }}
-          />
+          <>
+            <div className="max-w-2xl mx-auto pt-4">
+              <AppTitle
+                size="large"
+                onClick={() => {
+                  setTransientStoryCodes(null);
+                  loggedSetViewState("WELCOME");
+                }}
+              />
+            </div>
+            <StoryInitializer
+              onSetup={handleStorySetup}
+              onBack={() => {
+                setTransientStoryCodes(null);
+                loggedSetViewState("WELCOME");
+              }}
+            />
+          </>
         );
 
       case "PLAYER_CODES":
@@ -348,19 +365,24 @@ function App() {
         }
 
         return (
-          <PlayerCodes
-            codes={transientStoryCodes}
-            onBack={() => {
-              setTransientStoryCodes(null);
-              loggedSetViewState("WELCOME");
-            }}
-            onCodeSubmit={handleCodeSubmit}
-            storyReady={storyReady}
-            onGoToWelcome={() => {
-              setTransientStoryCodes(null);
-              loggedSetViewState("WELCOME");
-            }}
-          />
+          <>
+            <div className="max-w-2xl mx-auto p-4 md:p-6">
+              <AppTitle size="large" />
+            </div>
+            <PlayerCodes
+              codes={transientStoryCodes}
+              onBack={() => {
+                setTransientStoryCodes(null);
+                loggedSetViewState("WELCOME");
+              }}
+              onCodeSubmit={handleCodeSubmit}
+              storyReady={storyReady}
+              onGoToWelcome={() => {
+                setTransientStoryCodes(null);
+                loggedSetViewState("WELCOME");
+              }}
+            />
+          </>
         );
 
       case "GAME":
