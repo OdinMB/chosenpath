@@ -243,7 +243,7 @@ router.delete("/library/templates/:id", verifyAdmin, async (req, res) => {
 
 // Generate a template using AI
 router.post("/library/templates/generate", verifyAdmin, async (req, res) => {
-  const { prompt, generateImages, playerCount, maxTurns, gameMode } = req.body;
+  const { prompt, playerCount, maxTurns, gameMode } = req.body;
 
   if (!prompt || !playerCount || !maxTurns || !gameMode) {
     return res.status(400).json({
@@ -256,7 +256,7 @@ router.post("/library/templates/generate", verifyAdmin, async (req, res) => {
 
     const template = await libraryService.generateTemplate(
       prompt,
-      generateImages || false,
+      false,
       playerCount,
       maxTurns,
       gameMode

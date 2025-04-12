@@ -8,6 +8,7 @@ import { TemplateForm } from "./components/template/index";
 import { StoryTemplate } from "@core/types/story";
 import { createDefaultTemplate } from "./components/template/templateFactory";
 import { config } from "@/config";
+import { Logger } from "@common/logger";
 
 type AdminTab = "stories" | "library" | "template-form";
 
@@ -60,9 +61,51 @@ export const Admin = () => {
     setIsAuthenticated(true);
   };
 
-  const handleCreateTemplate = () => {
-    setSelectedTemplate(null);
-    setActiveTab("template-form");
+  const handleCreateTemplate = async () => {
+    if (!authToken) return;
+
+    Logger.Admin.log("Creating new template");
+    setIsFormLoading(true);
+
+    try {
+      // Create a default template
+      const defaultTemplate = createDefaultTemplate();
+
+      // Create a new template record on the server first to get an ID
+      const response = await fetch(`${config.apiUrl}/admin/library/templates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          playerCountMin: defaultTemplate.playerCountMin,
+          playerCountMax: defaultTemplate.playerCountMax,
+          gameMode: defaultTemplate.gameMode,
+          maxTurnsMin: defaultTemplate.maxTurnsMin,
+          maxTurnsMax: defaultTemplate.maxTurnsMax,
+          teaser: defaultTemplate.teaser,
+          tags: defaultTemplate.tags,
+          title: defaultTemplate.title || "New Template",
+          guidelines: defaultTemplate.guidelines,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create new template");
+      }
+
+      const data = await response.json();
+      Logger.Admin.log("New template created with ID:", data.template.id);
+
+      // Set the new template with its ID as the selected template
+      setSelectedTemplate(data.template);
+      setActiveTab("template-form");
+    } catch (error) {
+      Logger.Admin.error("Error creating new template:", error);
+    } finally {
+      setIsFormLoading(false);
+    }
   };
 
   const handleEditTemplate = (template: StoryTemplate) => {
@@ -71,13 +114,8 @@ export const Admin = () => {
   };
 
   const handleTemplateFormSaved = (updatedTemplate: StoryTemplate) => {
-    if (updatedTemplate.id) {
-      // Update the selected template with the latest data and stay in edit view
-      setSelectedTemplate(updatedTemplate);
-    } else {
-      // New template was created, go back to library
-      setActiveTab("library");
-    }
+    // Update the selected template with the latest data and stay in edit view
+    setSelectedTemplate(updatedTemplate);
   };
 
   const renderAdminDashboard = () => {

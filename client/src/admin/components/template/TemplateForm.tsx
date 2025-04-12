@@ -219,11 +219,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       setIsLoading(true);
       Logger.Admin.log("Saving template", updatedTemplate);
 
-      const url = updatedTemplate.id
-        ? `${config.apiUrl}/admin/library/templates/${updatedTemplate.id}`
-        : `${config.apiUrl}/admin/library/templates`;
+      if (!updatedTemplate.id) {
+        Logger.Admin.error("Cannot update template without an ID");
+        throw new Error("Template has no ID");
+      }
 
-      const method = updatedTemplate.id ? "PUT" : "POST";
+      // Always use PUT since we now create the template beforehand
+      const url = `${config.apiUrl}/admin/library/templates/${updatedTemplate.id}`;
+      const method = "PUT";
 
       Logger.Admin.log(`Making ${method} request to ${url}`);
 
@@ -280,9 +283,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       if (!response.ok) {
         const errorText = await response.text();
         Logger.Admin.error(`API error (${response.status}): ${errorText}`);
-        throw new Error(
-          `Failed to ${updatedTemplate.id ? "update" : "create"} template`
-        );
+        throw new Error("Failed to update template");
       }
 
       const data = await response.json();
@@ -409,7 +410,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Add handleAIDraftSetup function
   const handleAIDraftSetup = (options: {
     prompt: string;
-    generateImages: boolean;
     playerCount: number;
     maxTurns: number;
     gameMode: GameMode;
@@ -425,7 +425,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       formData.maxTurnsMin > 0 ? formData.maxTurnsMin : options.maxTurns;
     const effectiveGameMode = formData.gameMode || options.gameMode;
 
-    // Call API to generate template
+    // First, call API to generate template content
     fetch(`${config.apiUrl}/admin/library/templates/generate`, {
       method: "POST",
       headers: {
@@ -434,7 +434,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       },
       body: JSON.stringify({
         prompt: options.prompt,
-        generateImages: options.generateImages,
         playerCount: effectivePlayerCount,
         maxTurns: effectiveMaxTurns,
         gameMode: effectiveGameMode,
@@ -446,35 +445,95 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         }
         return response.json();
       })
-      .then((data) => {
-        // Update form data with generated template
-        setFormData((prev) => {
-          const updatedData = {
-            ...prev,
-            ...data.template,
-          };
+      .then(async (data) => {
+        // Get generated content
+        const generatedTemplate = data.template;
 
-          // Also update the state of the array fields that GuidelinesTab needs
-          setWorld(data.template.guidelines?.world || "");
-          setRules(data.template.guidelines?.rules || []);
-          setTone(data.template.guidelines?.tone || []);
-          setConflicts(data.template.guidelines?.conflicts || []);
-          setDecisions(data.template.guidelines?.decisions || []);
-          setTags(data.template.tags || []);
+        if (!formData.id) {
+          Logger.Admin.error("Cannot update template without an ID");
+          throw new Error("Template has no ID");
+        }
 
-          // Automatically save the generated template
-          setTimeout(() => {
-            onSubmit(updatedData);
-          }, 500);
+        // Create update object by merging generated content with the current formData ID
+        const updateData = {
+          ...generatedTemplate,
+          id: formData.id,
+        };
 
-          return updatedData;
+        // Update the state of the array fields that GuidelinesTab needs
+        setWorld(generatedTemplate.guidelines?.world || "");
+        setRules(generatedTemplate.guidelines?.rules || []);
+        setTone(generatedTemplate.guidelines?.tone || []);
+        setConflicts(generatedTemplate.guidelines?.conflicts || []);
+        setDecisions(generatedTemplate.guidelines?.decisions || []);
+        setTags(generatedTemplate.tags || []);
+
+        // Update form data
+        setFormData(updateData);
+
+        // Now update the template on the server
+        const updateUrl = `${config.apiUrl}/admin/library/templates/${formData.id}`;
+        Logger.Admin.log(
+          `Updating template ${formData.id} with generated content`
+        );
+
+        const response = await fetch(updateUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            playerCountMin: updateData.playerCountMin,
+            playerCountMax: updateData.playerCountMax,
+            gameMode: updateData.gameMode,
+            maxTurnsMin: updateData.maxTurnsMin,
+            maxTurnsMax: updateData.maxTurnsMax,
+            teaser: updateData.teaser,
+            tags: updateData.tags,
+            title: updateData.title,
+            guidelines: updateData.guidelines,
+            storyElements: updateData.storyElements,
+            sharedOutcomes: updateData.sharedOutcomes,
+            statGroups: updateData.statGroups,
+            sharedStats: updateData.sharedStats,
+            initialSharedStatValues: updateData.initialSharedStatValues,
+            playerStats: updateData.playerStats,
+            characterSelectionIntroduction:
+              updateData.characterSelectionIntroduction,
+            // Add player options
+            ...Object.fromEntries(
+              PLAYER_SLOTS.slice(0, MAX_PLAYERS).map((slot) => [
+                slot,
+                updateData[slot as keyof StoryTemplate] || {
+                  outcomes: [],
+                  possibleCharacterIdentities: [],
+                  possibleCharacterBackgrounds: [],
+                },
+              ])
+            ),
+          }),
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          Logger.Admin.error(`API error (${response.status}): ${errorText}`);
+          throw new Error("Failed to update template with generated content");
+        }
+
+        const updatedData = await response.json();
+        Logger.Admin.log(
+          "Template updated successfully with generated content"
+        );
+
+        // Pass the updated template back to the parent component
+        onSubmit(updatedData.template);
 
         // Set active tab to basic to review generated content
         setActiveTab("basic");
       })
       .catch((error) => {
-        console.error("Error generating template:", error);
+        Logger.Admin.error("Error generating or updating template:", error);
       })
       .finally(() => {
         setIsLoading(false);
