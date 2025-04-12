@@ -333,7 +333,7 @@ export const StatsTab = ({
 
             {type === "shared" && (
               <div className="flex items-center gap-2">
-                <span className="font-semibold w-24">Initial Value</span>
+                <span className="font-semibold w-40">Initial Value</span>
                 {localStat.type === "string" ? (
                   <Input
                     id={`stat-initial-value-${stat.id}`}
@@ -382,7 +382,7 @@ export const StatsTab = ({
             {/* Additional stat fields */}
             {(localStat.type === "string" || localStat.type === "string[]") && (
               <div className="flex items-center gap-2">
-                <span className="font-semibold w-24">Possible Values</span>
+                <span className="font-semibold w-40">Possible Values</span>
                 <Input
                   id={`stat-possible-values-${stat.id}`}
                   name={`stat-possible-values-${stat.id}`}
@@ -569,7 +569,7 @@ export const StatsTab = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold w-24">Sacrifice Options</span>
+              <span className="font-semibold w-48">Sacrifice Options</span>
               <Input
                 id={`stat-sacrifice-options-${stat.id}`}
                 name={`stat-sacrifice-options-${stat.id}`}
@@ -585,7 +585,7 @@ export const StatsTab = ({
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold w-24">Reward Options</span>
+              <span className="font-semibold w-48">Reward Options</span>
               <Input
                 id={`stat-reward-options-${stat.id}`}
                 name={`stat-reward-options-${stat.id}`}

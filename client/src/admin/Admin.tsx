@@ -139,13 +139,6 @@ export const Admin = () => {
 
           {activeTab === "template-form" && (
             <div>
-              <div className="flex items-center pb-2">
-                <h2 className="text-xl font-semibold text-gray-800 truncate">
-                  {selectedTemplate?.title
-                    ? `${selectedTemplate.title}`
-                    : "New Template"}
-                </h2>
-              </div>
               <TemplateForm
                 template={selectedTemplate || createDefaultTemplate()}
                 onSubmit={handleTemplateFormSaved}

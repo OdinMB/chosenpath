@@ -4,6 +4,7 @@ import { Input } from "@components/ui/Input";
 import { Stat } from "@core/types/stat";
 import { CharacterBackground } from "@core/types/player";
 import { StatValueInput } from "./StatValueInput";
+import { InfoIcon } from "@components/ui/InfoIcon";
 
 interface PlayerBackgroundProps {
   background: CharacterBackground;
@@ -30,33 +31,45 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
   ) => {
     return (
       <div className="flex-1 space-y-4">
-        <div className="flex justify-between items-center">
-          <h4 className="font-medium">Background {index + 1}</h4>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold w-36">Title</span>
+          <Input
+            className="flex-1"
+            value={data.title}
+            onChange={(e) => onChange({ ...data, title: e.target.value })}
+            placeholder="Background title"
+          />
         </div>
 
-        <Input
-          value={data.title}
-          onChange={(e) => onChange({ ...data, title: e.target.value })}
-          placeholder="Background title"
-        />
+        <div className="flex items-start gap-2">
+          <span className="font-semibold w-36 pt-2">Description</span>
+          <textarea
+            className="w-full p-2 border rounded flex-1"
+            rows={3}
+            value={data.fluffTemplate}
+            onChange={(e) =>
+              onChange({ ...data, fluffTemplate: e.target.value })
+            }
+            placeholder="Background description with placeholders: {name}, {personal}, {object}, {possessive}, {reflexive}"
+          />
+        </div>
 
-        <textarea
-          className="w-full p-2 border rounded"
-          rows={3}
-          value={data.fluffTemplate}
-          onChange={(e) => onChange({ ...data, fluffTemplate: e.target.value })}
-          placeholder="Background description with placeholders: {name}, {personal}, {object}, {possessive}, {reflexive}"
-        />
-
-        <div className="space-y-2">
-          <h5 className="text-sm font-medium">Initial Stat Values</h5>
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center">
+            <h5 className="font-semibold">Initial Stat Values</h5>
+            <InfoIcon
+              tooltipText="Starting stat values for characters with this background"
+              position="right"
+              className="ml-2 mt-0"
+            />
+          </div>
           {data.initialPlayerStatValues.map((statValue, statIndex) => {
             const stat = playerStats.find((s) => s.id === statValue.statId);
             if (!stat) return null;
 
             return (
               <div key={statValue.statId} className="flex gap-2 items-center">
-                <span className="text-sm w-32 font-medium">{stat.name}</span>
+                <span className="text-sm w-48 font-semibold">{stat.name}</span>
                 <StatValueInput
                   value={statValue.value}
                   onChange={(newValue) => {

@@ -7,6 +7,7 @@ import { Input } from "@components/ui/Input";
 import { TextArea } from "@components/ui/TextArea";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { InfoIcon } from "@components/ui/InfoIcon";
+import { Select } from "@components/ui/Select";
 
 interface BasicInfoTabProps {
   title: string;
@@ -49,6 +50,31 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   handleAddTag,
   handleRemoveTag,
 }) => {
+  // For story length select options
+  const getStoryLengthOptions = (min: number, max: number, step: number) => {
+    const options = [];
+    for (let i = min; i <= max; i += step) {
+      options.push(i);
+    }
+    return options;
+  };
+
+  // For player count options
+  const getPlayerCountOptions = (min: number, max: number) => {
+    const options = [];
+    for (let i = min; i <= max; i++) {
+      options.push(i);
+    }
+    return options;
+  };
+
+  // Game mode options
+  const gameModeOptions = [
+    { value: 0, label: "Shared Goals" },
+    { value: 1, label: "Mixed Goals" },
+    { value: 2, label: "Competing Goals" },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -121,129 +147,135 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         ))}
       </div>
 
-      <div>
-        <div className="flex items-center mb-2">
-          <h3 className="font-semibold">Players</h3>
-          <InfoIcon
-            tooltipText="Minimum and maximum number of players allowed"
-            position="right"
-            className="ml-2 mt-1"
-          />
-        </div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex-1 mr-6">
-            <label className="text-sm text-gray-600 block mb-1">
-              Minimum: {playerCountMin}
+      {/* Players and Game Mode section */}
+      <div className="flex items-center gap-4 mb-2">
+        <h3 className="font-semibold whitespace-nowrap">Players</h3>
+        <InfoIcon
+          tooltipText="Minimum and maximum number of players allowed"
+          position="right"
+          className="mr-2 mt-1 -ml-1"
+        />
+        <div className="flex flex-1 flex-wrap gap-4">
+          <div className="flex items-center min-w-[150px]">
+            <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
+              Min:
             </label>
-            <input
+            <Select
               id="player-count-min"
               name="player-count-min"
-              type="range"
-              min={MIN_PLAYERS}
-              max={playerCountMax}
-              value={playerCountMin}
+              value={playerCountMin.toString()}
               onChange={(e) =>
                 setPlayerCountMin(Number(e.target.value) as PlayerCount)
               }
-              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-            />
+            >
+              {getPlayerCountOptions(MIN_PLAYERS, playerCountMax).map(
+                (count) => (
+                  <option key={count} value={count}>
+                    {count}
+                  </option>
+                )
+              )}
+            </Select>
           </div>
-          <div className="flex-1">
-            <label className="text-sm text-gray-600 block mb-1">
-              Maximum: {playerCountMax}
+
+          <div className="flex items-center min-w-[150px]">
+            <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
+              Max:
             </label>
-            <input
+            <Select
               id="player-count-max"
               name="player-count-max"
-              type="range"
-              min={playerCountMin}
-              max={MAX_PLAYERS}
-              value={playerCountMax}
+              value={playerCountMax.toString()}
               onChange={(e) =>
                 setPlayerCountMax(Number(e.target.value) as PlayerCount)
               }
-              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-            />
+            >
+              {getPlayerCountOptions(playerCountMin, MAX_PLAYERS).map(
+                (count) => (
+                  <option key={count} value={count}>
+                    {count}
+                  </option>
+                )
+              )}
+            </Select>
+          </div>
+
+          <div
+            className={`flex items-center min-w-[180px] ${
+              playerCountMax === 1 ? "opacity-50" : ""
+            }`}
+          >
+            <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
+              Mode:
+            </label>
+            <Select
+              id="game-mode"
+              name="game-mode"
+              value={
+                playerCountMax === 1
+                  ? "0"
+                  : gameMode === GameModes.Cooperative
+                  ? "0"
+                  : gameMode === GameModes.CooperativeCompetitive
+                  ? "1"
+                  : "2"
+              }
+              onChange={(e) => handleGameModeChange(Number(e.target.value))}
+              disabled={playerCountMax === 1}
+            >
+              {gameModeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
       </div>
 
-      <div className={`${playerCountMax === 1 ? "opacity-50" : ""}`}>
-        <div className="flex items-center mb-1">
-          <h3 className="font-semibold">Game Mode</h3>
-          <InfoIcon
-            tooltipText="How players interact with each other during gameplay"
-            position="right"
-            className="ml-2 mt-1"
-          />
-        </div>
-        <input
-          id="game-mode"
-          name="game-mode"
-          type="range"
-          min={0}
-          max={2}
-          value={
-            playerCountMax === 1
-              ? 0
-              : gameMode === GameModes.Cooperative
-              ? 0
-              : gameMode === GameModes.CooperativeCompetitive
-              ? 1
-              : 2
-          }
-          onChange={(e) => handleGameModeChange(Number(e.target.value))}
-          className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-          disabled={playerCountMax === 1}
+      {/* Story Length section */}
+      <div className="flex items-center gap-4 mb-2">
+        <h3 className="font-semibold whitespace-nowrap">Length</h3>
+        <InfoIcon
+          tooltipText="Number of decisions players will make in the game"
+          position="right"
+          className="mr-2 mt-1 -ml-1"
         />
-        <div className="flex justify-between text-xs text-primary-600">
-          <span>Shared Goals</span>
-          <span>Mixed Goals</span>
-          <span>Competing Goals</span>
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-center mb-2">
-          <h3 className="font-semibold">Story Length</h3>
-          <InfoIcon
-            tooltipText="Number of decisions players will make in the game"
-            position="right"
-            className="ml-2 mt-1"
-          />
-        </div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex-1 mr-6">
-            <label className="text-sm text-gray-600 block mb-1">
-              Minimum: {maxTurnsMin}
+        <div className="flex flex-1 flex-wrap gap-4">
+          <div className="flex items-center min-w-[150px]">
+            <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
+              Min:
             </label>
-            <input
+            <Select
               id="story-length-min"
               name="story-length-min"
-              type="range"
-              min={MIN_TURNS}
-              max={maxTurnsMax}
-              step={5}
-              value={maxTurnsMin}
+              value={maxTurnsMin.toString()}
               onChange={(e) => setMaxTurnsMin(Number(e.target.value))}
-              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-            />
+            >
+              {getStoryLengthOptions(MIN_TURNS, maxTurnsMax, 5).map((turns) => (
+                <option key={turns} value={turns}>
+                  {turns}
+                </option>
+              ))}
+            </Select>
           </div>
-          <div className="flex-1">
-            <label className="text-sm text-gray-600 block mb-1">
-              Maximum: {maxTurnsMax}
+
+          <div className="flex items-center min-w-[150px]">
+            <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
+              Max:
             </label>
-            <input
+            <Select
               id="story-length-max"
               name="story-length-max"
-              type="range"
-              min={maxTurnsMin}
-              max={MAX_TURNS}
-              step={5}
-              value={maxTurnsMax}
+              value={maxTurnsMax.toString()}
               onChange={(e) => setMaxTurnsMax(Number(e.target.value))}
-              className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-            />
+            >
+              {getStoryLengthOptions(maxTurnsMin, MAX_TURNS, 5).map((turns) => (
+                <option key={turns} value={turns}>
+                  {turns}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
       </div>
