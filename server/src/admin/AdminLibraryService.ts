@@ -16,6 +16,7 @@ import {
   ensureStorageDirectory,
 } from "@common/storageUtils.js";
 import { Logger } from "@common/logger.js";
+import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -37,6 +38,7 @@ type TemplateDataUpdate = Partial<TemplateDataInput>;
 export class AdminLibraryService {
   private storagePath: string;
   private logger = Logger.forService("LibraryService");
+  private aiStoryGenerator: AIStoryGenerator;
 
   constructor() {
     // Get the appropriate storage path based on environment
@@ -46,6 +48,7 @@ export class AdminLibraryService {
 
     this.storagePath = path.resolve(process.cwd(), basePath);
     this.initializeStorage();
+    this.aiStoryGenerator = new AIStoryGenerator();
   }
 
   private async initializeStorage() {
@@ -344,6 +347,80 @@ export class AdminLibraryService {
 
       this.logger.error(`Failed to delete template ${id}`, error);
       throw new Error(`Failed to delete story template ${id}`);
+    }
+  }
+
+  /**
+   * Generate a new template using AI
+   */
+  async generateTemplate(
+    prompt: string,
+    generateImages: boolean,
+    playerCount: PlayerCount,
+    maxTurns: number,
+    gameMode: GameMode
+  ): Promise<StoryTemplate> {
+    try {
+      this.logger.log(`Generating template with prompt: ${prompt}`);
+
+      // Use AIStoryGenerator to create initial state
+      const initialState = await this.aiStoryGenerator.createInitialState(
+        prompt,
+        generateImages,
+        playerCount,
+        maxTurns,
+        gameMode
+      );
+
+      // Convert story state to template
+      // Create an ID for the new template
+      const id = uuidv4();
+      const now = new Date().toISOString();
+
+      // Extract player options from the state
+      const playerOptions: Record<string, PlayerOptionsGeneration> = {};
+      Object.entries(initialState.characterSelectionOptions).forEach(
+        ([slot, options]) => {
+          playerOptions[slot] = options;
+        }
+      );
+
+      // Create the template data using the ensurePlayerOptions method
+      // which will make sure all required player slots are filled
+      const templateData = {
+        id,
+        title: initialState.title,
+        teaser: `Generated from prompt: ${prompt}`,
+        guidelines: initialState.guidelines,
+        storyElements: initialState.storyElements,
+        sharedOutcomes: initialState.sharedOutcomes,
+        sharedStats: initialState.sharedStats,
+        initialSharedStatValues: initialState.sharedStatValues,
+        playerStats: initialState.playerStats,
+        characterSelectionIntroduction:
+          initialState.characterSelectionIntroduction,
+        gameMode,
+        playerCountMin: playerCount,
+        playerCountMax: playerCount,
+        maxTurnsMin: maxTurns,
+        maxTurnsMax: maxTurns,
+        tags: [],
+        createdAt: now,
+        updatedAt: now,
+        statGroups: [],
+        ...playerOptions,
+      };
+
+      // Ensure all player slots are properly filled
+      const templateWithPlayerOptions = this.ensurePlayerOptions(templateData);
+
+      this.logger.log(
+        `Generated template with title: ${templateWithPlayerOptions.title}`
+      );
+      return templateWithPlayerOptions as StoryTemplate;
+    } catch (error) {
+      this.logger.error("Failed to generate template", error);
+      throw new Error("Failed to generate story template");
     }
   }
 }

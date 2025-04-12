@@ -19,14 +19,33 @@ interface StoryInitializerProps {
     gameMode: GameMode;
   }) => void;
   onBack: () => void;
+  initialPlayerCount?: number;
+  initialMaxTurns?: number;
+  initialGameMode?: GameMode;
+  showBackButton?: boolean;
+  isLoading?: boolean;
+  wrappingForm?: boolean;
+  templateMode?: boolean;
 }
 
-export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
+export function StoryInitializer({
+  onSetup,
+  onBack,
+  initialPlayerCount,
+  initialMaxTurns,
+  initialGameMode,
+  showBackButton = true,
+  isLoading = false,
+  wrappingForm = false,
+  templateMode = false,
+}: StoryInitializerProps) {
   const [prompt, setPrompt] = useState("");
   const [generateImages, setGenerateImages] = useState(false);
-  const [playerCount, setPlayerCount] = useState(1);
-  const [gameMode, setGameMode] = useState<GameMode>(GameModes.Cooperative);
-  const [maxTurns] = useState(DEFAULT_TURNS);
+  const [playerCount, setPlayerCount] = useState(initialPlayerCount || 1);
+  const [gameMode, setGameMode] = useState<GameMode>(
+    initialGameMode || GameModes.Cooperative
+  );
+  const [maxTurns] = useState(initialMaxTurns || DEFAULT_TURNS);
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
@@ -35,7 +54,9 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
   // Completely separate the game mode state for single player and multiplayer
   const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
   const [multiplayerMode, setMultiplayerMode] = useState<GameMode>(
-    GameModes.Cooperative
+    initialGameMode && initialPlayerCount && initialPlayerCount > 1
+      ? initialGameMode
+      : GameModes.Cooperative
   );
 
   // Compute the effective game mode based on player count
@@ -178,158 +199,177 @@ export function StoryInitializer({ onSetup, onBack }: StoryInitializerProps) {
     });
   };
 
+  const renderForm = () => (
+    <div className="space-y-6">
+      <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+        <div className="space-y-2">
+          <label
+            htmlFor="player-count"
+            className="text-sm md:text-base font-medium text-primary"
+          >
+            Number of Players: {playerCount}
+          </label>
+          <input
+            id="player-count"
+            type="range"
+            min={MIN_PLAYERS}
+            max={MAX_PLAYERS}
+            value={playerCount}
+            onChange={(e) => setPlayerCount(Number(e.target.value))}
+            className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+          />
+          <div className="flex justify-between text-xs md:text-sm text-primary-600">
+            <span>1 Player</span>
+            <span>{MAX_PLAYERS} Players</span>
+          </div>
+        </div>
+
+        <div
+          className={`space-y-2 transition-opacity duration-200 ${
+            playerCount === 1 ? "hidden" : ""
+          }`}
+        >
+          <label className="text-sm md:text-base font-medium text-primary">
+            Multiplayer Mode
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={2}
+            value={
+              playerCount === 1
+                ? 0
+                : multiplayerMode === GameModes.Cooperative
+                ? 0
+                : multiplayerMode === GameModes.CooperativeCompetitive
+                ? 1
+                : 2
+            }
+            onChange={(e) => handleGameModeChange(Number(e.target.value))}
+            className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            disabled={playerCount === 1}
+          />
+          <div className="flex justify-between text-xs md:text-sm text-primary-600">
+            <span>Shared Goals</span>
+            <span>Mixed Goals</span>
+            <span>Competing Goals</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
+          <label
+            htmlFor="prompt"
+            className="text-sm md:text-base font-medium text-primary"
+          >
+            What kind of story would you like to experience?
+          </label>
+          <PrimaryButton
+            type="button"
+            onClick={handleSuggestion}
+            variant="outline"
+            size="sm"
+            leftBorder={false}
+            className="self-end sm:self-auto"
+          >
+            Get suggestion
+          </PrimaryButton>
+        </div>
+        <textarea
+          id="prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+          placeholder={getPlaceholderText()}
+        />
+      </div>
+
+      {/* Story Length section - temporarily hidden but preserved for future use */}
+      <div className="hidden">
+        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-2">
+          <label className="text-sm md:text-base font-medium text-primary">
+            Story Length: {maxTurns} decisions
+          </label>
+          <input
+            type="range"
+            min={MIN_TURNS}
+            max={MAX_TURNS}
+            step={5}
+            value={maxTurns}
+            className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
+            disabled={true}
+          />
+          <div className="flex justify-between text-xs md:text-sm text-primary-600">
+            <span>{MIN_TURNS} decisions</span>
+            <span>{MAX_TURNS} decisions</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md hidden">
+        <input
+          id="generate-images"
+          type="checkbox"
+          checked={generateImages}
+          onChange={(e) => setGenerateImages(e.target.checked)}
+          className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+          disabled={true} // {isLoading}
+        />
+        <label
+          htmlFor="generate-images"
+          className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary-400"
+        >
+          With images (temporarily disabled)
+        </label>
+      </div>
+
+      <div className="flex flex-row gap-3 sm:gap-4 pt-2">
+        {showBackButton && (
+          <PrimaryButton
+            type="button"
+            size="lg"
+            onClick={onBack}
+            variant="outline"
+            leftBorder={false}
+          >
+            Back
+          </PrimaryButton>
+        )}
+
+        <PrimaryButton
+          type={wrappingForm ? "button" : "submit"}
+          onClick={wrappingForm ? handleSubmit : undefined}
+          size="lg"
+          disabled={
+            !prompt.trim() || isLoading || isRequestPending("initialize_story")
+          }
+          isLoading={isLoading || isRequestPending("initialize_story")}
+          fullWidth
+          className="font-semibold text-lg"
+        >
+          {isLoading || isRequestPending("initialize_story")
+            ? templateMode
+              ? "Creating Template..."
+              : "Creating Story..."
+            : templateMode
+            ? "Create Template"
+            : "Create Story"}
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-            <div className="space-y-2">
-              <label
-                htmlFor="player-count"
-                className="text-sm md:text-base font-medium text-primary"
-              >
-                Number of Players: {playerCount}
-              </label>
-              <input
-                id="player-count"
-                type="range"
-                min={MIN_PLAYERS}
-                max={MAX_PLAYERS}
-                value={playerCount}
-                onChange={(e) => setPlayerCount(Number(e.target.value))}
-                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-              />
-              <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                <span>1 Player</span>
-                <span>{MAX_PLAYERS} Players</span>
-              </div>
-            </div>
-
-            <div
-              className={`space-y-2 transition-opacity duration-200 ${
-                playerCount === 1 ? "hidden" : ""
-              }`}
-            >
-              <label className="text-sm md:text-base font-medium text-primary">
-                Multiplayer Mode
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={2}
-                value={
-                  playerCount === 1
-                    ? 0
-                    : multiplayerMode === GameModes.Cooperative
-                    ? 0
-                    : multiplayerMode === GameModes.CooperativeCompetitive
-                    ? 1
-                    : 2
-                }
-                onChange={(e) => handleGameModeChange(Number(e.target.value))}
-                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                disabled={playerCount === 1}
-              />
-              <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                <span>Shared Goals</span>
-                <span>Mixed Goals</span>
-                <span>Competing Goals</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between mb-2">
-              <label
-                htmlFor="prompt"
-                className="text-sm md:text-base font-medium text-primary"
-              >
-                What kind of story would you like to experience?
-              </label>
-              <PrimaryButton
-                type="button"
-                onClick={handleSuggestion}
-                variant="outline"
-                size="sm"
-                leftBorder={false}
-                className="self-end sm:self-auto"
-              >
-                Get suggestion
-              </PrimaryButton>
-            </div>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-              placeholder={getPlaceholderText()}
-            />
-          </div>
-
-          {/* Story Length section - temporarily hidden but preserved for future use */}
-          <div className="hidden">
-            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-2">
-              <label className="text-sm md:text-base font-medium text-primary">
-                Story Length: {maxTurns} decisions
-              </label>
-              <input
-                type="range"
-                min={MIN_TURNS}
-                max={MAX_TURNS}
-                step={5}
-                value={maxTurns}
-                className="w-full h-2 bg-primary-100 rounded-lg appearance-none cursor-pointer touch-pan-x opacity-50"
-                disabled={true}
-              />
-              <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                <span>{MIN_TURNS} decisions</span>
-                <span>{MAX_TURNS} decisions</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="items-center p-4 bg-white rounded-lg border border-primary-100 shadow-md hidden">
-            <input
-              id="generate-images"
-              type="checkbox"
-              checked={generateImages}
-              onChange={(e) => setGenerateImages(e.target.checked)}
-              className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-              disabled={true} // {isLoading}
-            />
-            <label
-              htmlFor="generate-images"
-              className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary-400"
-            >
-              With images (temporarily disabled)
-            </label>
-          </div>
-
-          <div className="flex flex-row gap-3 sm:gap-4 pt-2">
-            <PrimaryButton
-              type="button"
-              size="lg"
-              onClick={onBack}
-              variant="outline"
-              leftBorder={false}
-            >
-              Back
-            </PrimaryButton>
-
-            <PrimaryButton
-              type="submit"
-              size="lg"
-              disabled={!prompt.trim() || isRequestPending("initialize_story")}
-              isLoading={isRequestPending("initialize_story")}
-              fullWidth
-              className="font-semibold text-lg"
-            >
-              {isRequestPending("initialize_story")
-                ? "Creating Story..."
-                : "Create Story"}
-            </PrimaryButton>
-          </div>
-        </form>
+        {wrappingForm ? (
+          renderForm()
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {renderForm()}
+          </form>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { StatsTab } from "./StatsTab";
 import { StoryElementsTab } from "./StoryElementsTab";
 import { OutcomesTab } from "./OutcomesTab";
 import { PlayersTab } from "./PlayersTab";
+import { StoryInitializer } from "@page/StoryInitializer";
 import {
   StoryTemplate,
   GameMode,
@@ -34,7 +35,8 @@ type TabType =
   | "elements"
   | "outcomes"
   | "stats"
-  | "players";
+  | "players"
+  | "ai-draft";
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   template,
@@ -334,6 +336,64 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     return playerOptions;
   };
 
+  // Add handleAIDraftSetup function
+  const handleAIDraftSetup = (options: {
+    prompt: string;
+    generateImages: boolean;
+    playerCount: number;
+    maxTurns: number;
+    gameMode: GameMode;
+  }) => {
+    setIsLoading(true);
+
+    // Use form values if available
+    const effectivePlayerCount =
+      formData.playerCountMin > 0
+        ? formData.playerCountMin
+        : options.playerCount;
+    const effectiveMaxTurns =
+      formData.maxTurnsMin > 0 ? formData.maxTurnsMin : options.maxTurns;
+    const effectiveGameMode = formData.gameMode || options.gameMode;
+
+    // Call API to generate template
+    fetch(`${config.apiUrl}/admin/library/templates/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        prompt: options.prompt,
+        generateImages: options.generateImages,
+        playerCount: effectivePlayerCount,
+        maxTurns: effectiveMaxTurns,
+        gameMode: effectiveGameMode,
+      }),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to generate template");
+        }
+        return response.json();
+      })
+      .then((data) => {
+        // Update form data with generated template
+        setFormData((prev) => ({
+          ...prev,
+          ...data.template,
+        }));
+
+        // Set active tab to basic info to review generated content
+        setActiveTab("basic");
+      })
+      .catch((error) => {
+        console.error("Error generating template:", error);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-4">
@@ -360,6 +420,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               { id: "outcomes", label: "Outcomes" },
               { id: "stats", label: "Stats" },
               { id: "players", label: "Players" },
+              { id: "ai-draft", label: "AI Draft" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -450,6 +511,29 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             onChange={handlePlayerOptionsChange}
             playerStats={formData.playerStats || []}
           />
+        )}
+
+        {activeTab === "ai-draft" && (
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              Generate Template Draft
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Generate a complete template draft using AI. This will create a
+              starting point that you can further refine in the other tabs.
+            </p>
+            <StoryInitializer
+              onSetup={handleAIDraftSetup}
+              onBack={() => setActiveTab("basic")}
+              initialPlayerCount={formData.playerCountMin}
+              initialMaxTurns={formData.maxTurnsMin}
+              initialGameMode={formData.gameMode}
+              showBackButton={false}
+              isLoading={isLoading}
+              wrappingForm={true}
+              templateMode={true}
+            />
+          </div>
         )}
       </div>
     </form>

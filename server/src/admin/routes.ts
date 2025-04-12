@@ -241,4 +241,33 @@ router.delete("/library/templates/:id", verifyAdmin, async (req, res) => {
   }
 });
 
+// Generate a template using AI
+router.post("/library/templates/generate", verifyAdmin, async (req, res) => {
+  const { prompt, generateImages, playerCount, maxTurns, gameMode } = req.body;
+
+  if (!prompt || !playerCount || !maxTurns || !gameMode) {
+    return res.status(400).json({
+      error: "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+    });
+  }
+
+  try {
+    Logger.Admin.log(`Generating template with prompt: ${prompt}`);
+
+    const template = await libraryService.generateTemplate(
+      prompt,
+      generateImages || false,
+      playerCount,
+      maxTurns,
+      gameMode
+    );
+
+    Logger.Admin.log(`Generated template: ${template.title}`);
+    res.status(201).json({ template });
+  } catch (error) {
+    Logger.Admin.error("Error generating template", error);
+    res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
 export const adminRouter = router;
