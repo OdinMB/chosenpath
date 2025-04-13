@@ -1,14 +1,18 @@
 import React, { useState } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
-import { PlayerOptionsGeneration } from "@core/types/story";
-import { CharacterIdentity, CharacterBackground } from "@core/types/player";
+import {
+  CharacterIdentity,
+  CharacterBackground,
+  CharacterSelectionIntroduction,
+  PlayerOptionsGeneration,
+  PlayerSlot,
+  Stat,
+} from "@core/types/index";
 import { MAX_PLAYERS } from "@core/config";
-import { PlayerSlot } from "@core/types/player";
-import { Stat } from "@core/types/stat";
 import { ExpandableOutcome } from "./ExpandableOutcome";
 import { PlayerIdentity } from "./PlayerIdentity";
 import { PlayerBackground } from "./PlayerBackground";
+import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { Icons } from "@components/ui/Icons";
 import { Select } from "@components/ui/Select";
 
 interface PlayerOutcome {
@@ -27,7 +31,125 @@ interface PlayersTabProps {
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   onChange: (updates: Record<PlayerSlot, PlayerOptionsGeneration>) => void;
   playerStats: Stat[];
+  characterSelectionIntroduction: CharacterSelectionIntroduction;
+  onCharacterSelectionIntroductionChange: (
+    updatedIntro: CharacterSelectionIntroduction
+  ) => void;
 }
+
+interface CharacterSelectionIntroductionCardProps {
+  introduction: CharacterSelectionIntroduction;
+  onChange: (updatedIntro: CharacterSelectionIntroduction) => void;
+}
+
+const CharacterSelectionIntroductionCard: React.FC<
+  CharacterSelectionIntroductionCardProps
+> = ({ introduction, onChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localIntroduction, setLocalIntroduction] = useState(introduction);
+
+  const handleSave = () => {
+    onChange(localIntroduction);
+    setIsEditing(false);
+  };
+
+  const handleChange = (
+    field: keyof CharacterSelectionIntroduction,
+    value: string
+  ) => {
+    setLocalIntroduction((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  if (!isEditing) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-semibold">
+            Character Selection Introduction
+          </h3>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="text-secondary hover:text-secondary-700"
+            aria-label="Edit character selection introduction"
+          >
+            <Icons.Edit className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-2">
+          <div>
+            <span className="font-medium">Title:</span>{" "}
+            <span>{introduction.title || "No title set"}</span>
+          </div>
+          <div>
+            <span className="font-medium">Introduction Text:</span>
+            <p className="mt-1 text-sm text-gray-600">
+              {introduction.text || "No introduction text set"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">
+          Character Selection Introduction
+        </h3>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <label
+            htmlFor="intro-title"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Title
+          </label>
+          <input
+            id="intro-title"
+            type="text"
+            value={localIntroduction.title || ""}
+            onChange={(e) => handleChange("title", e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            placeholder="Enter a title for the character selection screen"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="intro-text"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Introduction Text
+          </label>
+          <textarea
+            id="intro-text"
+            value={localIntroduction.text || ""}
+            onChange={(e) => handleChange("text", e.target.value)}
+            rows={5}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            placeholder="Enter introduction text for the character selection screen"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Write a short introduction to the setting, followed by a question
+            about the player's identity and background.
+          </p>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 mt-4">
+        <PrimaryButton onClick={() => setIsEditing(false)} variant="secondary">
+          Cancel
+        </PrimaryButton>
+        <PrimaryButton onClick={handleSave} variant="outline">
+          Save
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+};
 
 const PRONOUN_SETS = [
   {
@@ -72,6 +194,8 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   playerOptions,
   onChange,
   playerStats,
+  characterSelectionIntroduction,
+  onCharacterSelectionIntroductionChange,
 }) => {
   // Track which players are being edited
   const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
@@ -457,6 +581,11 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 
   return (
     <div className="space-y-8">
+      <CharacterSelectionIntroductionCard
+        introduction={characterSelectionIntroduction}
+        onChange={onCharacterSelectionIntroductionChange}
+      />
+
       {Array.from({ length: MAX_PLAYERS }, (_, i) => {
         const playerSlot = `player${i + 1}` as PlayerSlot;
         return (

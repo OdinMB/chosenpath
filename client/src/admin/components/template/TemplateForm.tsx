@@ -15,7 +15,11 @@ import {
 import { Stat, StatValueEntry } from "@core/types/stat";
 import { StoryElement } from "@core/types/storyElement";
 import { Outcome } from "@core/types/outcome";
-import { PlayerCount, PLAYER_SLOTS } from "@core/types/player";
+import {
+  PlayerCount,
+  PLAYER_SLOTS,
+  CharacterSelectionIntroduction,
+} from "@core/types/player";
 import { PrimaryButton } from "@components/ui/PrimaryButton";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -540,6 +544,16 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       });
   };
 
+  // Add handleCharacterSelectionIntroductionChange function
+  const handleCharacterSelectionIntroductionChange = (
+    updatedIntro: CharacterSelectionIntroduction
+  ) => {
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      characterSelectionIntroduction: updatedIntro,
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-4">
@@ -656,6 +670,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             playerOptions={getPlayerOptions()}
             onChange={handlePlayerOptionsChange}
             playerStats={formData.playerStats || []}
+            characterSelectionIntroduction={
+              formData.characterSelectionIntroduction || {
+                title: "",
+                text: "",
+              }
+            }
+            onCharacterSelectionIntroductionChange={
+              handleCharacterSelectionIntroductionChange
+            }
           />
         )}
 
