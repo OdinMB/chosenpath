@@ -39,6 +39,7 @@ server/data/story_checkpoints/**
 server/data/mocks/**
 # Exclude story JSON files but keep directory structure
 server/data/stories/*.json
+server/data/templates/*.json
 
 backup/
 research.txt
