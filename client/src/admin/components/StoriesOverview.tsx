@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons } from "@components/ui";
+import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 
@@ -24,6 +24,13 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    storyId: string;
+  }>({
+    isOpen: false,
+    storyId: "",
+  });
 
   const loadStories = useCallback(async () => {
     setIsLoading(true);
@@ -80,15 +87,6 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   };
 
   const handleDeleteStory = async (storyId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this story? This action cannot be undone."
-      )
-    ) {
-      Logger.Admin.log(`Delete operation canceled for story: ${storyId}`);
-      return;
-    }
-
     Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
       const response = await fetch(
@@ -118,6 +116,20 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     }
   };
 
+  const openDeleteDialog = (storyId: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      storyId,
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      isOpen: false,
+      storyId: "",
+    });
+  };
+
   return (
     <div className="bg-gray-50 pt-4 rounded-lg">
       <div className="flex justify-between items-center mb-6">
@@ -137,6 +149,17 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={() => handleDeleteStory(deleteDialog.storyId)}
+        title="Delete Story"
+        message="Are you sure you want to delete this story? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -193,7 +216,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
                   <td className="py-3 px-4">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleDeleteStory(story.id)}
+                        onClick={() => openDeleteDialog(story.id)}
                         className="text-tertiary hover:text-tertiary-700 transition-colors"
                         title="Delete story"
                       >

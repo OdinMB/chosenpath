@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrimaryButton, Icons } from "@components/ui/index";
+import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui/index";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
@@ -19,6 +19,13 @@ export const StoryLibrary = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    templateId: string;
+  }>({
+    isOpen: false,
+    templateId: "",
+  });
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
@@ -71,15 +78,6 @@ export const StoryLibrary = ({
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this story template? This action cannot be undone."
-      )
-    ) {
-      Logger.Admin.log(`Delete operation canceled for template: ${templateId}`);
-      return;
-    }
-
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
       const response = await fetch(
@@ -107,6 +105,20 @@ export const StoryLibrary = ({
       Logger.Admin.error(`Error deleting template: ${templateId}`, error);
       setError("Failed to delete template. Please try again.");
     }
+  };
+
+  const openDeleteDialog = (templateId: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      templateId,
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      isOpen: false,
+      templateId: "",
+    });
   };
 
   const getStatusColor = (status: PublicationStatus) => {
@@ -279,6 +291,17 @@ export const StoryLibrary = ({
         </div>
       )}
 
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={() => handleDeleteTemplate(deleteDialog.templateId)}
+        title="Delete Template"
+        message="Are you sure you want to delete this story template? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-t-2 border-b-2 border-secondary rounded-full animate-spin"></div>
@@ -353,7 +376,7 @@ export const StoryLibrary = ({
                           </span>
                         ))
                       ) : (
-                        <span className="text-gray-400 text-sm">No tags</span>
+                        <span className="text-gray-400 text-sm">None</span>
                       )}
                     </div>
                   </td>
@@ -392,7 +415,7 @@ export const StoryLibrary = ({
                         <Icons.Export className="h-5 w-5" />
                       </button>
                       <button
-                        onClick={() => handleDeleteTemplate(template.id)}
+                        onClick={() => openDeleteDialog(template.id)}
                         className="text-tertiary hover:text-tertiary-700 transition-colors"
                         title="Delete template"
                       >
