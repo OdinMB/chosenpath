@@ -110,16 +110,7 @@ export function TemplateConfigurator({
                   </div>
                 </>
               ) : (
-                <div className="py-2 px-3 bg-gray-50 rounded border border-gray-100">
-                  <p className="text-primary-600">
-                    This story is designed for{" "}
-                    <span className="font-medium">
-                      {template.playerCountMin} player
-                      {template.playerCountMin > 1 ? "s" : ""}
-                    </span>
-                    .
-                  </p>
-                </div>
+                ""
               )}
             </div>
 
@@ -150,15 +141,7 @@ export function TemplateConfigurator({
                   </div>
                 </>
               ) : (
-                <div className="py-2 px-3 bg-gray-50 rounded border border-gray-100">
-                  <p className="text-primary-600">
-                    This story is designed to last{" "}
-                    <span className="font-medium">
-                      {template.maxTurnsMin} turns
-                    </span>
-                    .
-                  </p>
-                </div>
+                ""
               )}
             </div>
           </div>

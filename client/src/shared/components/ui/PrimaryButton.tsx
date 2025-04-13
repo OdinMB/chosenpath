@@ -72,13 +72,15 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       ) : (
         <div
           className={`flex items-center ${
-            rightIcon ? "justify-between" : "justify-center"
+            rightIcon && children ? "justify-between" : "justify-center"
           } gap-2`}
         >
-          <div className="flex items-center gap-2">
-            {leftIcon}
-            {children}
-          </div>
+          {(leftIcon || children) && (
+            <div className="flex items-center gap-2">
+              {leftIcon}
+              {children}
+            </div>
+          )}
           {rightIcon}
         </div>
       )}

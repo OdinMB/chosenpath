@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { StoryTemplate } from "@core/types";
 import { TemplateCard } from "./TemplateCard";
-import { Icons, PrimaryButton } from "@components/ui";
+import { Icons } from "@components/ui";
 
 type TemplateCarouselProps = {
   templates: StoryTemplate[];
@@ -74,7 +74,7 @@ export const TemplateCarousel = ({
           onTransitionEnd={handleTransitionEnd}
         >
           {templates.map((template) => (
-            <div key={template.id} className="w-full flex-shrink-0 px-2">
+            <div key={template.id} className="w-full flex-shrink-0">
               <TemplateCard template={template} onPlay={onPlay} />
             </div>
           ))}
@@ -83,14 +83,14 @@ export const TemplateCarousel = ({
 
       {templates.length > 1 && (
         <div className="flex justify-between mt-4">
-          <PrimaryButton
+          <button
             onClick={prevTemplate}
             disabled={isTransitioning || templates.length <= 1}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
-          />
+            className="p-2 rounded-full hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Previous template"
+          >
+            <Icons.ArrowLeft className="h-4 w-4" />
+          </button>
 
           <div className="flex items-center gap-2">
             {templates.map((_, index) => (
@@ -109,14 +109,14 @@ export const TemplateCarousel = ({
             ))}
           </div>
 
-          <PrimaryButton
+          <button
             onClick={nextTemplate}
             disabled={isTransitioning || templates.length <= 1}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            rightIcon={<Icons.ArrowRight className="h-4 w-4" />}
-          />
+            className="p-2 rounded-full hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Next template"
+          >
+            <Icons.ArrowRight className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>

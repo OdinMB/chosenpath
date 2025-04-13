@@ -8,11 +8,13 @@ type TemplateCardProps = {
 
 export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
   return (
-    <div>
-      <div className="flex-grow">
+    <div className="w-full p-4 bg-white rounded-lg border border-primary-100">
+      <div className="w-full">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-lg text-primary-800">{template.title}</h3>
-          <PrimaryButton onClick={() => onPlay(template)}>Play</PrimaryButton>
+          <PrimaryButton onClick={() => onPlay(template)} className="ml-4">
+            Play
+          </PrimaryButton>
         </div>
 
         {/* Info */}
