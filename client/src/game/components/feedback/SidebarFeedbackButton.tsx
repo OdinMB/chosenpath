@@ -1,5 +1,4 @@
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 
 interface SidebarFeedbackButtonProps {
   closeSidebarOnMobile?: () => void;

@@ -7,8 +7,8 @@ import {
   MAX_TURNS,
   DEFAULT_TURNS,
 } from "@core/config";
-import { GameMode, GameModes } from "@core/types/story";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
+import { GameMode, GameModes } from "@core/types";
+import { PrimaryButton } from "@components/ui";
 
 interface StoryInitializerProps {
   onSetup: (options: {

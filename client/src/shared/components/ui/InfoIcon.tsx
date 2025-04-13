@@ -1,6 +1,5 @@
 import React, { ReactNode } from "react";
-import { Tooltip } from "./Tooltip.js";
-import { Icons } from "./Icons.js";
+import { Tooltip, Icons } from "./";
 
 interface InfoIconProps {
   tooltipText: ReactNode;

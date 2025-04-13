@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, memo, useRef } from "react";
-import { RateLimitInfo } from "@core/types/websocket.js";
-import { Notification } from "./ui/Notification.js";
+import { RateLimitInfo } from "@core/types";
+import { Notification } from "./ui";
 
 interface RateLimitNotificationProps {
   rateLimit: RateLimitInfo;

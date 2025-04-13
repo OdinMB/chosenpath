@@ -1,20 +1,18 @@
 import React from "react";
-import { useSession } from "@common/useSession";
-import { BeatHistory } from "./BeatHistory";
 import ReactMarkdown from "react-markdown";
 import type { ComponentType } from "react";
-import { LoadingSpinner } from "@components/ui/LoadingSpinner";
+import { useSession } from "@common/useSession";
+import { BeatHistory } from "./BeatHistory";
 import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { BeatFeedback } from "./feedback/BeatFeedback";
 import { PendingPlayers } from "./PendingPlayers.js";
-import type { ChallengeOption, ResolutionDetails } from "@core/types/beat";
+import type { ChallengeOption, ResolutionDetails } from "@core/types";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
   POINTS_FOR_MIXED_RESOLUTION,
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
 } from "@core/config";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { ColoredBox } from "@components/ui/ColoredBox";
+import { LoadingSpinner, PrimaryButton, ColoredBox } from "@components/ui";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;

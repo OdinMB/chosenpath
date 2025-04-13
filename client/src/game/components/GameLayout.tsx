@@ -4,12 +4,10 @@ import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
 import { SidebarFeedbackButton } from "./feedback/SidebarFeedbackButton";
 import { FeedbackModal } from "./feedback/FeedbackModal";
-import { ClientStat, StatValue, StatValueEntry } from "@core/types/stat";
+import { ClientStat, StatValue, StatValueEntry } from "@core/types";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
-import { LoadingSpinner } from "@components/ui/LoadingSpinner";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { LoadingSpinner, PrimaryButton, Icons } from "@components/ui";
 
 interface Props {
   onExitGame: () => void;

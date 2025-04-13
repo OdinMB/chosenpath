@@ -7,9 +7,9 @@ import {
   GameErrorNotification,
   RateLimitInfo,
   StoryReadyNotification,
-} from "@core/types/websocket.js";
+} from "@core/types";
 import { RateLimitedAction, SOCKET_CONFIG } from "@core/config";
-import type { ClientStoryState } from "@core/types/story";
+import type { ClientStoryState } from "@core/types";
 import { config } from "@/config";
 
 type MessageHandler = (data: WSServerMessage) => void;

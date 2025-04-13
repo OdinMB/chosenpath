@@ -4,12 +4,9 @@ import {
   DEFAULT_DISTRIBUTION,
   SAFE_DISTRIBUTION,
   RISKY_DISTRIBUTION,
-} from "@core/types/beat";
-import { Resolution } from "@core/types/thread";
-import { Tooltip } from "@components/ui/Tooltip";
-import { InfoIcon } from "@components/ui/InfoIcon";
-import { ColoredBox } from "@components/ui/ColoredBox";
-import { Icons } from "@components/ui/Icons";
+  Resolution,
+} from "@core/types";
+import { Tooltip, InfoIcon, ColoredBox, Icons } from "@components/ui";
 
 interface PreviousChoiceVisualizerProps {
   choice: {

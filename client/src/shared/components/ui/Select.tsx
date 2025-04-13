@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Icons } from "@components/ui/Icons";
+import { Icons } from "./";
 
 interface SelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> {

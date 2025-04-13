@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { PlayerCount, GameMode } from "@core/types/index";
-import type { StoryTemplate } from "@core/types/index";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PlayerCount, GameMode } from "@core/types";
+import type { StoryTemplate } from "@core/types";
+import { Icons, PrimaryButton } from "@components/ui";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 

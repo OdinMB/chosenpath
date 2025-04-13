@@ -6,7 +6,7 @@ import { gameService } from "@game/GameService";
 import { useEffect, useState, useCallback } from "react";
 import { WelcomeScreen } from "@page/WelcomeScreen";
 import { PlayerCodes } from "@page/PlayerCodes";
-import { GameMode } from "@core/types/story";
+import { GameMode } from "@core/types";
 import { RateLimitNotification } from "@components/RateLimitNotification";
 import { AppTitle } from "@components/AppTitle";
 

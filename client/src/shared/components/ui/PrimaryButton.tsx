@@ -1,5 +1,5 @@
 import React from "react";
-import { ColoredBox } from "./ColoredBox.js";
+import { ColoredBox } from "./";
 
 type ButtonVariant = "primary" | "secondary" | "outline";
 type ButtonSize = "sm" | "md" | "lg";

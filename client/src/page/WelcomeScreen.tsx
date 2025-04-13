@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-import { Tooltip } from "@components/ui/Tooltip";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
-import { ConfirmDialog } from "@components/ui/ConfirmDialog";
+import { ConfirmDialog, Icons, PrimaryButton, Tooltip } from "@components/ui";
 import { useSession } from "@common/useSession";
 import { StoredCodeSet } from "@common/SessionContext";
 

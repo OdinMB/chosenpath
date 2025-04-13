@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import type { ClientStoryState } from "@core/types/story";
-import type { WSServerMessage, RateLimitInfo } from "@core/types/websocket";
+import type {
+  ClientStoryState,
+  WSServerMessage,
+  RateLimitInfo,
+} from "@core/types";
 import { wsService } from "./WebSocketService.js";
 import { SessionContext, StoredCodeSet } from "./SessionContext.js";
 

@@ -1,6 +1,5 @@
 import React from "react";
-import { Tooltip } from "./Tooltip.js";
-import { InfoIcon } from "./InfoIcon.js";
+import { Tooltip, InfoIcon } from "./";
 
 export const TooltipExample: React.FC = () => {
   return (

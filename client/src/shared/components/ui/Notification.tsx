@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { Icons } from "./Icons.js";
+import { Icons } from "./";
 
 type NotificationType = "info" | "warning" | "error" | "success";
 

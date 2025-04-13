@@ -1,4 +1,4 @@
-import type { PlayerSlot } from "@core/types/player";
+import type { PlayerSlot } from "@core/types";
 import { useSession } from "@common/useSession";
 
 interface PendingPlayersProps {

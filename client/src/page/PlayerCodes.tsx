@@ -1,6 +1,5 @@
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { LoadingSpinner } from "@components/ui/LoadingSpinner";
 import { useState, useEffect } from "react";
+import { LoadingSpinner, PrimaryButton } from "@components/ui";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;

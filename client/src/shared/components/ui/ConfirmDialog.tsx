@@ -1,4 +1,4 @@
-import { PrimaryButton } from "./PrimaryButton.js";
+import { PrimaryButton } from "./";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
