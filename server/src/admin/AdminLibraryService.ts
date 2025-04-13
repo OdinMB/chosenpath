@@ -8,6 +8,7 @@ import {
   PlayerCount,
   PLAYER_SLOTS,
   PublicationStatus,
+  Stat,
 } from "@core/types/index.js";
 import {
   readStorageFile,
@@ -370,16 +371,8 @@ export class AdminLibraryService {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
 
-      // First, generate the StorySetup which includes statGroups
+      // Generate the initial state which includes all necessary data
       const setupGenerator = new AIStoryGenerator();
-      const setup = await setupGenerator.generateStorySetup(
-        prompt,
-        playerCount,
-        gameMode,
-        maxTurns
-      );
-
-      // Then create the initial state (which doesn't include statGroups directly)
       const initialState = await setupGenerator.createInitialState(
         prompt,
         generateImages,
@@ -424,8 +417,11 @@ export class AdminLibraryService {
         publicationStatus: PublicationStatus.Draft,
         createdAt: now,
         updatedAt: now,
-        // Use statGroups from setup rather than initialState
-        statGroups: setup.statGroups || ["General"],
+        // Use statGroups from initialState
+        statGroups: this.extractStatGroups(
+          initialState.sharedStats,
+          initialState.playerStats
+        ),
         ...playerOptions,
       };
 
@@ -440,5 +436,28 @@ export class AdminLibraryService {
       this.logger.error("Failed to generate template", error);
       throw new Error("Failed to generate story template");
     }
+  }
+
+  private extractStatGroups(
+    sharedStats: Stat[],
+    playerStats: Stat[]
+  ): string[] {
+    // Use a Set to automatically handle duplicates
+    const groups = new Set<string>();
+
+    // Extract group from each stat and add to Set
+    [...sharedStats, ...playerStats].forEach((stat) => {
+      if (stat.group && stat.group.trim() !== "") {
+        groups.add(stat.group);
+      }
+    });
+
+    // Default to "General" if no groups found
+    if (groups.size === 0) {
+      return ["General"];
+    }
+
+    // Convert Set to array
+    return Array.from(groups);
   }
 }

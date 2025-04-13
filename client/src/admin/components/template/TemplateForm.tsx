@@ -727,7 +727,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                   <p className="text-sm text-yellow-700 font-medium">Warning</p>
                   <p className="text-sm text-yellow-600">
                     Generating a new template will override any existing
-                    information in this form. Unsaved changes will be lost.
+                    information in this form.
                   </p>
                 </div>
               </div>

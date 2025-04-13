@@ -42,7 +42,7 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
 
         {/* Tags */}
         {template.tags && template.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-1">
             {template.tags.map((tag, index) => (
               <span
                 key={index}

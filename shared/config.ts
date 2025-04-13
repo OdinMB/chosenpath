@@ -7,7 +7,7 @@ export const isDevelopment =
         window.location.hostname === "127.0.0.1");
 
 // Only enable mocks in development environment
-export const MOCK_STORIES_IN_DEVELOPMENT = true;
+export const MOCK_STORIES_IN_DEVELOPMENT = false;
 export const MOCK_STORIES_DELAY_MS = 4 * 1000;
 
 // Story settings

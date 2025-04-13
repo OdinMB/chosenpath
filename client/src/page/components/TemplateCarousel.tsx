@@ -58,7 +58,7 @@ export const TemplateCarousel = ({
 
   if (templates.length === 0) {
     return (
-      <div className="text-center py-8 text-primary-600">
+      <div className="text-center py-2 text-primary-600">
         <p>No story templates found.</p>
       </div>
     );
@@ -82,7 +82,7 @@ export const TemplateCarousel = ({
       </div>
 
       {templates.length > 1 && (
-        <div className="flex justify-between mt-4">
+        <div className="flex justify-between mt-2">
           <button
             onClick={prevTemplate}
             disabled={isTransitioning || templates.length <= 1}
