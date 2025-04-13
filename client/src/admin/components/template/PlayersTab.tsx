@@ -136,10 +136,14 @@ const CharacterSelectionIntroductionCard: React.FC<
         </div>
       </div>
       <div className="flex justify-end gap-2 mt-4">
-        <PrimaryButton onClick={() => setIsEditing(false)} variant="secondary">
+        <PrimaryButton
+          onClick={() => setIsEditing(false)}
+          variant="outline"
+          leftBorder={false}
+        >
           Cancel
         </PrimaryButton>
-        <PrimaryButton onClick={handleSave} variant="outline">
+        <PrimaryButton onClick={handleSave} variant="secondary">
           Save
         </PrimaryButton>
       </div>

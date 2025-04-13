@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PrimaryButton, Icons } from "@components/ui/index";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
-import { StoryTemplate, PublicationStatus } from "@core/types";
+import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
 
 type StoryLibraryProps = {
   token: string;
@@ -18,6 +18,7 @@ export const StoryLibrary = ({
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
@@ -121,6 +122,117 @@ export const StoryLibrary = ({
     }
   };
 
+  const handleExportTemplate = (template: StoryTemplate) => {
+    Logger.Admin.log(`Exporting template: ${template.id}`);
+
+    try {
+      // Create a blob with the JSON data
+      const json = JSON.stringify(template, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+
+      // Create an object URL for the blob
+      const url = URL.createObjectURL(blob);
+
+      // Create a download link and trigger it
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${template.title
+        .replace(/\s+/g, "-")
+        .toLowerCase()}-template.json`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      Logger.Admin.log(`Successfully exported template: ${template.id}`);
+    } catch (error) {
+      Logger.Admin.error(`Error exporting template: ${template.id}`, error);
+      setError("Failed to export template. Please try again.");
+    }
+  };
+
+  const handleImportTemplate = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Logger.Admin.log(`Importing template from file: ${file.name}`);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const templateData = JSON.parse(content);
+
+        // Create a new template with essential fields
+        const templateWithoutId: Partial<StoryTemplate> = {
+          title: templateData.title || "Imported Template",
+          publicationStatus: PublicationStatus.Draft,
+          playerCountMin: templateData.playerCountMin,
+          playerCountMax: templateData.playerCountMax,
+          maxTurnsMin: templateData.maxTurnsMin,
+          maxTurnsMax: templateData.maxTurnsMax,
+          gameMode: templateData.gameMode || GameModes.SinglePlayer,
+          tags: templateData.tags || [],
+          teaser: templateData.teaser || "",
+          guidelines: templateData.guidelines || {
+            world: "",
+            rules: [],
+            tone: [],
+            conflicts: [],
+            decisions: [],
+          },
+          storyElements: templateData.storyElements || [],
+          sharedOutcomes: templateData.sharedOutcomes || [],
+          statGroups: templateData.statGroups || [],
+          sharedStats: templateData.sharedStats || [],
+          initialSharedStatValues: templateData.initialSharedStatValues || [],
+          playerStats: templateData.playerStats || [],
+          characterSelectionIntroduction:
+            templateData.characterSelectionIntroduction || {
+              title: "",
+              text: "",
+            },
+        };
+
+        // Send to server
+        const response = await fetch(`${config.apiUrl}/admin/templates`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(templateWithoutId),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to import template");
+        }
+
+        Logger.Admin.log("Template imported successfully");
+
+        // Refresh templates list
+        loadTemplates();
+
+        // Clear file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      } catch (error) {
+        Logger.Admin.error("Failed to import template", error);
+        setError("Failed to import template. Please check the file format.");
+      }
+    };
+
+    reader.onerror = () => {
+      Logger.Admin.error("Error reading file");
+      setError("Failed to read the file. Please try again.");
+    };
+
+    reader.readAsText(file);
+  };
+
   return (
     <div className="bg-gray-50 pt-4 rounded-lg">
       <div className="flex justify-between items-center mb-6">
@@ -134,6 +246,22 @@ export const StoryLibrary = ({
             disabled={isLoading}
             leftIcon={<Icons.Refresh className="h-4 w-4" />}
           ></PrimaryButton>
+          <input
+            type="file"
+            accept="application/json"
+            ref={fileInputRef}
+            onChange={handleImportTemplate}
+            className="hidden"
+          />
+          <PrimaryButton
+            onClick={() => fileInputRef.current?.click()}
+            size="sm"
+            variant="outline"
+            leftBorder={false}
+            leftIcon={<Icons.Import className="h-4 w-4" />}
+          >
+            Import
+          </PrimaryButton>
           <PrimaryButton
             onClick={onCreateNew}
             size="sm"
@@ -243,7 +371,9 @@ export const StoryLibrary = ({
                     {formatDate(template.createdAt)}
                   </td> */}
                   <td className="hidden md:table-cell py-3 px-4">
-                    {formatDate(template.updatedAt)}
+                    <span className="whitespace-nowrap">
+                      {formatDate(template.updatedAt)}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex space-x-3">
@@ -253,6 +383,13 @@ export const StoryLibrary = ({
                         title="Edit template"
                       >
                         <Icons.Edit className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleExportTemplate(template)}
+                        className="text-secondary hover:text-secondary-700 transition-colors"
+                        title="Export template as JSON"
+                      >
+                        <Icons.Export className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template.id)}

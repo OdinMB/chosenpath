@@ -124,12 +124,11 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
         <h2 className="text-xl font-semibold text-secondary">Stored Stories</h2>
         <PrimaryButton
           onClick={loadStories}
-          size="sm"
+          variant="outline"
+          leftBorder={false}
           disabled={isLoading}
           leftIcon={<Icons.Refresh className="h-4 w-4" />}
-        >
-          Refresh
-        </PrimaryButton>
+        ></PrimaryButton>
       </div>
 
       {error && (

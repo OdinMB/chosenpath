@@ -601,7 +601,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             isLoading={isLoading}
             size="lg"
           >
-            Save Template
+            Save
           </PrimaryButton>
         </div>
       </div>
