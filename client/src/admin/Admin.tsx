@@ -124,68 +124,73 @@ export const Admin = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200 shadow-sm">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-secondary">
-              Admin Dashboard
-            </h1>
-            <PrimaryButton
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              leftIcon={<Icons.LogOut className="h-4 w-4" />}
-            >
-              Logout
-            </PrimaryButton>
+          <div className="container mx-auto px-6 py-4">
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <div className="w-24"></div> {/* Left spacer */}
+              <h1 className="text-2xl font-bold text-secondary">Admin</h1>
+              <div className="w-24 flex justify-end">
+                <PrimaryButton
+                  onClick={handleLogout}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icons.LogOut className="h-4 w-4" />}
+                >
+                  Logout
+                </PrimaryButton>
+              </div>
+            </div>
           </div>
         </header>
 
-        <div className="container mx-auto p-6">
-          {/* Tabs */}
-          <div className="flex border-b mb-6">
-            <button
-              className={`px-4 py-2 font-medium ${
-                activeTab === "stories"
-                  ? "text-secondary border-b-2 border-secondary"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("stories")}
-            >
-              Active Stories
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${
-                activeTab === "library" || activeTab === "template-form"
-                  ? "text-secondary border-b-2 border-secondary"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("library")}
-            >
-              Story Library
-            </button>
-          </div>
-
-          {/* Content based on active tab */}
-          {activeTab === "stories" && <StoriesOverview token={authToken} />}
-
-          {activeTab === "library" && (
-            <StoryLibrary
-              token={authToken}
-              onCreateNew={handleCreateTemplate}
-              onEdit={handleEditTemplate}
-            />
-          )}
-
-          {activeTab === "template-form" && (
-            <div>
-              <TemplateForm
-                template={selectedTemplate || createDefaultTemplate()}
-                onSubmit={handleTemplateFormSaved}
-                isLoading={isFormLoading}
-                token={authToken}
-                setIsLoading={setIsFormLoading}
-              />
+        <div className="container mx-auto px-6 py-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Tabs */}
+            <div className="flex border-b mb-6">
+              <button
+                className={`px-4 py-2 font-medium ${
+                  activeTab === "stories"
+                    ? "text-secondary border-b-2 border-secondary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("stories")}
+              >
+                Active Stories
+              </button>
+              <button
+                className={`px-4 py-2 font-medium ${
+                  activeTab === "library" || activeTab === "template-form"
+                    ? "text-secondary border-b-2 border-secondary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("library")}
+              >
+                Story Library
+              </button>
             </div>
-          )}
+
+            {/* Content based on active tab */}
+            {activeTab === "stories" && <StoriesOverview token={authToken} />}
+
+            {activeTab === "library" && (
+              <StoryLibrary
+                token={authToken}
+                onCreateNew={handleCreateTemplate}
+                onEdit={handleEditTemplate}
+              />
+            )}
+
+            {activeTab === "template-form" && (
+              <div>
+                <TemplateForm
+                  template={selectedTemplate || createDefaultTemplate()}
+                  onSubmit={handleTemplateFormSaved}
+                  isLoading={isFormLoading}
+                  token={authToken}
+                  setIsLoading={setIsFormLoading}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

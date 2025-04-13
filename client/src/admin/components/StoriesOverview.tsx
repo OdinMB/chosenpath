@@ -119,7 +119,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg">
+    <div className="bg-gray-50 pt-4 rounded-lg">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-secondary">Stored Stories</h2>
         <PrimaryButton
@@ -153,12 +153,17 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
             <thead className="bg-gray-100 text-primary-800">
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
-                <th className="py-3 px-4 text-left">Players</th>
-                <th className="py-3 px-4 text-left">Game Mode</th>
+                <th className="py-3 px-4 text-left hidden md:table-cell">
+                  Players
+                </th>
                 <th className="py-3 px-4 text-left">Beat</th>
-                <th className="py-3 px-4 text-left">Created</th>
-                <th className="py-3 px-4 text-left">Last Updated</th>
-                <th className="py-3 px-4 text-left">Actions</th>
+                <th className="py-3 px-4 text-left hidden md:table-cell">
+                  Created
+                </th>
+                <th className="py-3 px-4 text-left">Updated</th>
+                <th className="py-3 px-4 text-left">
+                  <span className="hidden md:inline">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -173,9 +178,8 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
                       </div>
                     )}
                   </td>
-                  <td className="py-3 px-4">{story.playerCount}</td>
-                  <td className="py-3 px-4 capitalize">
-                    {story.gameMode.replace("-", " ")}
+                  <td className="py-3 px-4 hidden md:table-cell">
+                    {story.playerCount}
                   </td>
                   <td className="py-3 px-4">
                     {story.characterSelectionCompleted
@@ -183,7 +187,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
                       : 0}{" "}
                     / {story.maxTurns}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 hidden md:table-cell">
                     {formatDate(story.createdAt || story.updatedAt)}
                   </td>
                   <td className="py-3 px-4">{formatDate(story.updatedAt)}</td>

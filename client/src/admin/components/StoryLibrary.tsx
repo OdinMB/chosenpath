@@ -122,21 +122,18 @@ export const StoryLibrary = ({
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg">
+    <div className="bg-gray-50 pt-4 rounded-lg">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-secondary">
-          Story Templates
-        </h2>
+        <h2 className="text-xl font-semibold text-secondary">Templates</h2>
         <div className="flex gap-2">
           <PrimaryButton
             onClick={loadTemplates}
             size="sm"
             variant="outline"
+            leftBorder={false}
             disabled={isLoading}
             leftIcon={<Icons.Refresh className="h-4 w-4" />}
-          >
-            Refresh
-          </PrimaryButton>
+          ></PrimaryButton>
           <PrimaryButton
             onClick={onCreateNew}
             size="sm"
@@ -176,11 +173,19 @@ export const StoryLibrary = ({
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
                 <th className="py-3 px-4 text-left">Status</th>
-                <th className="py-3 px-4 text-left">Tags</th>
-                <th className="py-3 px-4 text-left">Players</th>
-                <th className="py-3 px-4 text-left">Story Length</th>
-                <th className="py-3 px-4 text-left">Created</th>
-                <th className="py-3 px-4 text-left">Updated</th>
+                <th className="hidden lg:table-cell py-3 px-4 text-left">
+                  Tags
+                </th>
+                <th className="hidden md:table-cell py-3 px-4 text-left">
+                  Players
+                </th>
+                <th className="hidden lg:table-cell py-3 px-4 text-left">
+                  Length
+                </th>
+                {/* <th className="py-3 px-4 text-left">Created</th> */}
+                <th className="hidden md:table-cell py-3 px-4 text-left">
+                  Updated
+                </th>
                 <th className="py-3 px-4 text-left">Actions</th>
               </tr>
             </thead>
@@ -198,10 +203,17 @@ export const StoryLibrary = ({
                         template.publicationStatus || PublicationStatus.Draft
                       )}`}
                     >
-                      {template.publicationStatus || PublicationStatus.Draft}
+                      <span className="md:hidden">
+                        {(
+                          template.publicationStatus || PublicationStatus.Draft
+                        ).substring(0, 5)}
+                      </span>
+                      <span className="hidden md:inline">
+                        {template.publicationStatus || PublicationStatus.Draft}
+                      </span>
                     </span>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="hidden lg:table-cell py-3 px-4">
                     <div className="flex flex-wrap gap-1">
                       {template.tags && template.tags.length > 0 ? (
                         template.tags.map((tag, index) => (
@@ -217,20 +229,20 @@ export const StoryLibrary = ({
                       )}
                     </div>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="hidden md:table-cell py-3 px-4">
                     {template.playerCountMin === template.playerCountMax
                       ? template.playerCountMin
                       : `${template.playerCountMin} - ${template.playerCountMax}`}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="hidden lg:table-cell py-3 px-4">
                     {template.maxTurnsMin === template.maxTurnsMax
-                      ? `${template.maxTurnsMin} turns`
-                      : `${template.maxTurnsMin} - ${template.maxTurnsMax} turns`}
+                      ? `${template.maxTurnsMin}`
+                      : `${template.maxTurnsMin} - ${template.maxTurnsMax}`}
                   </td>
-                  <td className="py-3 px-4">
+                  {/* <td className="py-3 px-4">
                     {formatDate(template.createdAt)}
-                  </td>
-                  <td className="py-3 px-4">
+                  </td> */}
+                  <td className="hidden md:table-cell py-3 px-4">
                     {formatDate(template.updatedAt)}
                   </td>
                   <td className="py-3 px-4">
