@@ -58,9 +58,11 @@ export function TemplateConfigurator({
             <p className="text-primary-700 mb-4">{template.teaser}</p>
 
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs">
-                {formatGameMode(template.gameMode)}
-              </span>
+              {playerCount > 1 && (
+                <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs">
+                  {formatGameMode(template.gameMode)}
+                </span>
+              )}
               {template.tags.map((tag, index) => (
                 <span
                   key={index}
