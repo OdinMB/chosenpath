@@ -86,6 +86,16 @@ function App() {
         // Reset the flag once we're in the template config state
         templateConfigPending.current = false;
       }
+
+      // Add a check for transientStoryCodes to transition from TEMPLATE_CONFIG to PLAYER_CODES
+      if (viewState === "TEMPLATE_CONFIG" && transientStoryCodes) {
+        Logger.App.log(
+          "Transitioning from TEMPLATE_CONFIG to PLAYER_CODES due to codes received"
+        );
+        loggedSetViewState("PLAYER_CODES");
+        return;
+      }
+
       return;
     }
 
@@ -253,22 +263,24 @@ function App() {
   }) => {
     Logger.App.log("handleConfigureTemplate called with options:", options);
 
-    // Here we would normally call a service to initialize a story from the template
-    // But as per requirements, we're not triggering any backend actions yet
-
     setIsLoading(true);
     setPlayerCode(null);
     setStoryReady(false);
     localStorage.removeItem(playerCodeKey);
+
+    // Make sure to clear any existing story codes first
     setTransientStoryCodes(null);
 
-    // TODO: Add API call to initialize story from template when backend is ready
-    // For now, we'll just log the configuration
-    Logger.App.log("Template story configuration complete:", {
-      templateId: options.templateId,
-      playerCount: options.playerCount,
-      maxTurns: options.maxTurns,
-    });
+    // Initialize story from template
+    gameService.initializeFromTemplate(
+      options.templateId,
+      options.playerCount,
+      options.maxTurns
+    );
+
+    // Set the template pending flag to prevent premature state transitions
+    // until we receive the story codes
+    templateConfigPending.current = true;
   };
 
   const handleCodeSubmit = (code: string) => {
@@ -421,7 +433,7 @@ function App() {
           </>
         );
 
-      case "PLAYER_CODES":
+      case "PLAYER_CODES": {
         // If we're in PLAYER_CODES state but don't have transientStoryCodes,
         // redirect to SETUP state instead of conditionally rendering StoryInitializer
         if (!transientStoryCodes) {
@@ -430,6 +442,14 @@ function App() {
           );
           loggedSetViewState("SETUP");
           return null; // Return null while redirecting to avoid flash of UI
+        }
+
+        // Check if we're coming from template configuration
+        const isFromTemplate = templateConfigPending.current;
+
+        // Reset template pending flag since we're now showing codes
+        if (isFromTemplate) {
+          templateConfigPending.current = false;
         }
 
         return (
@@ -449,9 +469,11 @@ function App() {
                 setTransientStoryCodes(null);
                 loggedSetViewState("WELCOME");
               }}
+              isTemplateFlow={isFromTemplate}
             />
           </>
         );
+      }
 
       case "GAME":
         return (

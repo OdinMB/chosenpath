@@ -30,6 +30,13 @@ export interface InitializeStoryMessage extends BaseClientMessage {
   gameMode: GameMode;
 }
 
+export interface InitializeFromTemplateMessage extends BaseClientMessage {
+  type: "initialize_from_template";
+  templateId: string;
+  playerCount: number;
+  maxTurns: number;
+}
+
 export interface MakeChoiceMessage extends BaseClientMessage {
   type: "make_choice";
   optionIndex: number;
@@ -55,6 +62,7 @@ export type WSClientMessage =
   | CreateSessionMessage
   | JoinSessionMessage
   | InitializeStoryMessage
+  | InitializeFromTemplateMessage
   | MakeChoiceMessage
   | SelectCharacterMessage
   | VerifyCodeMessage

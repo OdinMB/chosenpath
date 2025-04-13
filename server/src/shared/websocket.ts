@@ -243,6 +243,63 @@ export class GameWebSocketServer {
       );
 
       socket.on(
+        "initialize_from_template",
+        async (data: {
+          sessionId: string;
+          templateId: string;
+          playerCount: number;
+          maxTurns: number;
+          requestId?: string;
+        }) => {
+          try {
+            console.log("[WebSocket] Initialize from template request:", data);
+
+            // Check rate limiting
+            if (
+              this.checkAndHandleRateLimit(
+                socket,
+                "initialize_story",
+                data.requestId
+              )
+            ) {
+              return;
+            }
+
+            // Process the request
+            await gameHandler.initializeFromTemplate(
+              data.templateId,
+              data.playerCount as PlayerCount,
+              data.maxTurns
+            );
+
+            // Send immediate success response that the request was accepted
+            socket.emit("response", {
+              type: "initialize_story_response",
+              status: ResponseStatus.SUCCESS,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              data: { message: "Template-based story initialization queued" },
+            });
+          } catch (error) {
+            console.error(
+              "[WebSocket] Error initializing from template:",
+              error
+            );
+            socket.emit("response", {
+              type: "initialize_story_response",
+              status: ResponseStatus.ERROR,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              errorMessage:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to initialize from template",
+            });
+          }
+        }
+      );
+
+      socket.on(
         "make_choice",
         async (data: { optionIndex: number; requestId?: string }) => {
           try {

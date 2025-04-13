@@ -33,6 +33,7 @@ import {
   MOCK_STORIES_DELAY_MS,
 } from "@core/config.js";
 import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
+import { createEmptyPlayerState } from "./StoryStateFactory.js";
 
 dotenv.config();
 
@@ -127,27 +128,8 @@ export class AIStoryGenerator {
         >;
         const playerData = setup[playerKey] as PlayerOptionsGeneration;
 
-        // Create minimal PlayerState with only outcomes defined
-        // name, pronouns, fluff, and stats will be added after character selection
-        return [
-          slot,
-          {
-            name: "", // Will be set during character selection
-            pronouns: {
-              personal: "",
-              object: "",
-              possessive: "",
-              reflexive: "",
-            }, // Will be set during character selection
-            appearance: "", // Will be set during character selection
-            fluff: "", // Will be set during character selection
-            outcomes: playerData.outcomes,
-            statValues: [], // Will be set during character selection
-            knownStoryElements: [],
-            beatHistory: [],
-            characterSelected: false,
-          },
-        ];
+        // Create minimal PlayerState with only outcomes defined using the reusable function
+        return [slot, createEmptyPlayerState(playerData.outcomes)];
       })
     );
   }

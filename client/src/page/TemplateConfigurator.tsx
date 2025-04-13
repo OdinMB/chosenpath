@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StoryTemplate, GameMode, PlayerCount } from "@core/types";
 import { PrimaryButton, Icons } from "@components/ui";
+import { useSession } from "@common/useSession";
 
 interface TemplateConfiguratorProps {
   template: StoryTemplate;
@@ -22,10 +23,28 @@ export function TemplateConfigurator({
   );
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [isLoading, setIsLoading] = useState(false);
+  const { isRequestPending, isOperationRunning } = useSession();
 
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
+
+  // Monitor if the story initialization operation is pending
+  useEffect(() => {
+    const isPending =
+      isRequestPending("initialize_from_template") ||
+      isOperationRunning("initialize_story");
+
+    if (isPending && !isLoading) {
+      setIsLoading(true);
+    } else if (!isPending && isLoading) {
+      // This should not happen during normal flow, but helps prevent
+      // the UI from getting stuck in a loading state
+      console.log(
+        "Template initialization no longer pending, but still in loading state"
+      );
+    }
+  }, [isRequestPending, isOperationRunning, isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

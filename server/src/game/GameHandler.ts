@@ -15,6 +15,8 @@ import type {
   MakeChoiceResponse,
   InitializeStoryResponse,
 } from "@core/types/websocket.js";
+import { nanoid } from "nanoid";
+import { AdminLibraryService } from "../admin/AdminLibraryService.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
@@ -225,6 +227,107 @@ export class GameHandler {
         error instanceof Error ? error.message : String(error);
       this.socket.emit("error", {
         error: "Failed to initialize story",
+        details: errorMessage,
+      });
+      throw error; // Re-throw to allow caller to handle
+    }
+  }
+
+  async initializeFromTemplate(
+    templateId: string,
+    playerCount: PlayerCount,
+    maxTurns: number
+  ): Promise<void> {
+    try {
+      console.log(
+        `\n====== [GameHandler] Initializing story from template: ${templateId} ======`
+      );
+      if (!isValidPlayerCount(playerCount)) {
+        throw new Error(`Invalid player count: ${playerCount}`);
+      }
+      if (maxTurns < MIN_TURNS || maxTurns > MAX_TURNS) {
+        throw new Error(`Invalid max turns: ${maxTurns}`);
+      }
+
+      // Fetch the template from the library
+      const libraryService = new AdminLibraryService();
+      const template = await libraryService.getTemplateById(templateId);
+
+      if (!template) {
+        throw new Error(`Template not found: ${templateId}`);
+      }
+
+      // Validate that requested player count is within template limits
+      if (
+        playerCount < template.playerCountMin ||
+        playerCount > template.playerCountMax
+      ) {
+        throw new Error(
+          `Player count ${playerCount} is outside template limits (${template.playerCountMin}-${template.playerCountMax})`
+        );
+      }
+
+      const gameId = randomUUID();
+      const playerCodes = this.generatePlayerCodes(playerCount);
+
+      // Register game session and codes
+      console.log("[GameHandler] Registering game session and codes");
+      connectionManager.createGameSession(gameId);
+      Object.entries(playerCodes).forEach(([slot, code]) => {
+        connectionManager.registerCode(gameId, slot as PlayerSlot, code);
+      });
+
+      // Send the codes immediately so the client has them
+      console.log(
+        "[GameHandler] Immediately emitting story codes:",
+        playerCodes
+      );
+      this.socket.emit("story_codes_notification", {
+        type: "story_codes_notification",
+        gameId,
+        codes: playerCodes,
+      } as StoryCodesNotification);
+
+      // Create a promise that will resolve when initialization is complete
+      await new Promise<void>(async (resolve, reject) => {
+        // Store the resolve/reject handlers for later use
+        this.pendingOperations.set(gameId, { resolve, reject });
+
+        // Queue the story initialization from template
+        const operationId = await gameQueueProcessor.addOperation({
+          gameId,
+          type: "initializeStoryFromTemplate",
+          input: {
+            template,
+            playerCount,
+            maxTurns,
+            playerCodes,
+          },
+        });
+
+        // Send response once we have the actual operationId string
+        const requestResponse = {
+          type: "initialize_story_response",
+          status: "success",
+          requestId: operationId,
+          timestamp: Date.now(),
+          data: {},
+        } as InitializeStoryResponse;
+        this.socket.emit("response", requestResponse);
+        console.log(
+          "[GameHandler] Emitted initialize_story_response to client: ",
+          requestResponse
+        );
+      });
+    } catch (error) {
+      console.error(
+        "[GameHandler] Failed to initialize story from template:",
+        error
+      );
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.socket.emit("error", {
+        error: "Failed to initialize story from template",
         details: errorMessage,
       });
       throw error; // Re-throw to allow caller to handle

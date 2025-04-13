@@ -4,6 +4,7 @@ import type {
   GameMode,
   PlayerCount,
   PlayerSlot,
+  StoryTemplate,
 } from "@core/types/index.js";
 
 // Base operation type for any queueable operation
@@ -25,6 +26,15 @@ export interface GameOperations {
       playerCount: PlayerCount;
       maxTurns: number;
       gameMode: GameMode;
+      playerCodes: Record<PlayerSlot, string>;
+    };
+    story: Story;
+  };
+  initializeStoryFromTemplate: {
+    input: {
+      template: StoryTemplate;
+      playerCount: PlayerCount;
+      maxTurns: number;
       playerCodes: Record<PlayerSlot, string>;
     };
     story: Story;

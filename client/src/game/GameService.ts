@@ -42,6 +42,39 @@ class GameService {
     });
   }
 
+  initializeFromTemplate(
+    templateId: string,
+    playerCount: number,
+    maxTurns: number
+  ) {
+    const sessionId = wsService.getSessionId();
+    if (!sessionId) {
+      console.warn("[GameService] Cannot initialize from template: no session");
+      return;
+    }
+
+    // Validate playerCount using utility function
+    if (!isValidPlayerCount(playerCount)) {
+      console.error("[GameService] Invalid player count:", playerCount);
+      return;
+    }
+
+    console.log("[GameService] Initializing from template:", {
+      sessionId,
+      templateId,
+      playerCount,
+      maxTurns,
+    });
+
+    wsService.sendMessage({
+      type: "initialize_from_template",
+      sessionId,
+      templateId,
+      playerCount,
+      maxTurns,
+    });
+  }
+
   makeChoice(optionIndex: number) {
     console.log("[GameService] Making choice:", { optionIndex });
     wsService.sendMessage({

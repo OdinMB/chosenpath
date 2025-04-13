@@ -7,6 +7,7 @@ interface PlayerCodesProps {
   onCodeSubmit: (code: string) => void;
   storyReady: boolean;
   onGoToWelcome?: () => void;
+  isTemplateFlow?: boolean;
 }
 
 export function PlayerCodes({
@@ -15,9 +16,18 @@ export function PlayerCodes({
   onCodeSubmit,
   storyReady,
   onGoToWelcome,
+  isTemplateFlow = false,
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
   const FALLBACK_READY_TIME = 60; // in seconds
+
+  // If the story isn't marked ready by the server after 60 seconds,
+  // assume it's probably ready but we missed the notification
+  const isLikelyReady = !storyReady && timeSinceLoad >= FALLBACK_READY_TIME;
+
+  // Template-based stories don't need to wait for AI generation
+  // so they can be joined immediately
+  const isReadyToJoin = storyReady || isLikelyReady || isTemplateFlow;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -26,10 +36,6 @@ export function PlayerCodes({
 
     return () => clearInterval(interval);
   }, []);
-
-  // If the story isn't marked ready by the server after 60 seconds,
-  // assume it's probably ready but we missed the notification
-  const isLikelyReady = !storyReady && timeSinceLoad >= FALLBACK_READY_TIME;
 
   const formatPlayerName = (slot: string) => {
     // Convert "player1" to "Player 1"
@@ -114,7 +120,7 @@ export function PlayerCodes({
                 </div>
               </div>
 
-              {!storyReady && !isLikelyReady && (
+              {!isReadyToJoin && (
                 <div className="mb-4 text-center">
                   <LoadingSpinner message="Creating your story. This should take less than a minute..." />
                 </div>
@@ -134,16 +140,14 @@ export function PlayerCodes({
                   onClick={() => onCodeSubmit(singlePlayerCode!)}
                   fullWidth
                   size="lg"
-                  disabled={!storyReady && !isLikelyReady}
+                  disabled={!isReadyToJoin}
                   title={
-                    !storyReady && !isLikelyReady
+                    !isReadyToJoin
                       ? "Please wait for your story to be ready"
                       : ""
                   }
                 >
-                  {storyReady || isLikelyReady
-                    ? "Join the Story"
-                    : "Waiting for Story..."}
+                  {isReadyToJoin ? "Join the Story" : "Waiting for Story..."}
                 </PrimaryButton>
               </div>
             </>
@@ -165,23 +169,21 @@ export function PlayerCodes({
                       <PrimaryButton
                         onClick={() => onCodeSubmit(code)}
                         className="ml-4"
-                        disabled={!storyReady && !isLikelyReady}
+                        disabled={!isReadyToJoin}
                         title={
-                          !storyReady && !isLikelyReady
+                          !isReadyToJoin
                             ? "Please wait for your story to be ready"
                             : ""
                         }
                       >
-                        {storyReady || isLikelyReady
-                          ? "Join the Story"
-                          : "Waiting..."}
+                        {isReadyToJoin ? "Join the Story" : "Waiting..."}
                       </PrimaryButton>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {!storyReady && !isLikelyReady && (
+              {!isReadyToJoin && (
                 <div className="mb-4 text-center">
                   <LoadingSpinner message="Creating your story. This should take less than a minute..." />
                 </div>
