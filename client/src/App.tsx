@@ -3,15 +3,23 @@ import { StoryInitializer } from "@page/StoryInitializer";
 import { GameLayout } from "@game/components/GameLayout";
 import { wsService } from "@common/WebSocketService";
 import { gameService } from "@game/GameService";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { WelcomeScreen } from "@page/WelcomeScreen";
 import { PlayerCodes } from "@page/PlayerCodes";
 import { GameMode, StoryTemplate } from "@core/types";
 import { RateLimitNotification } from "@components/RateLimitNotification";
 import { AppTitle } from "@components/AppTitle";
+import { TemplateConfigurator } from "@page/TemplateConfigurator";
+import { Logger } from "@common/logger";
 
 // Add this type at the top with the imports
-type ViewState = "CONNECTING" | "WELCOME" | "SETUP" | "PLAYER_CODES" | "GAME";
+type ViewState =
+  | "CONNECTING"
+  | "WELCOME"
+  | "SETUP"
+  | "PLAYER_CODES"
+  | "GAME"
+  | "TEMPLATE_CONFIG";
 
 function App() {
   const {
@@ -34,6 +42,9 @@ function App() {
   } = useSession();
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [viewState, setViewState] = useState<ViewState>("CONNECTING");
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<StoryTemplate | null>(null);
+  const templateConfigPending = useRef(false);
 
   // Generate a unique ID for this tab if it doesn't exist
   const [tabId] = useState(
@@ -56,7 +67,7 @@ function App() {
   // Wrap loggedSetViewState in useCallback
   const loggedSetViewState = useCallback(
     (newState: ViewState) => {
-      console.log(`[App] View state changing from ${viewState} to ${newState}`);
+      Logger.App.log(`View state changing from ${viewState} to ${newState}`);
       setViewState(newState);
     },
     [viewState]
@@ -66,6 +77,15 @@ function App() {
     // If we're connecting, stay in connecting state
     if (isConnecting && viewState !== "CONNECTING") {
       loggedSetViewState("CONNECTING");
+      return;
+    }
+
+    // If we're transitioning to TEMPLATE_CONFIG or already there, don't interfere
+    if (templateConfigPending.current || viewState === "TEMPLATE_CONFIG") {
+      if (templateConfigPending.current && viewState === "TEMPLATE_CONFIG") {
+        // Reset the flag once we're in the template config state
+        templateConfigPending.current = false;
+      }
       return;
     }
 
@@ -81,18 +101,18 @@ function App() {
     if (sessionId || playerCode) {
       if (viewState === "SETUP") {
         // If we have story codes, go to codes view
-        console.log(
-          "[App - viewState determination] in viewState SETUP, transientStoryCodes:",
+        Logger.App.log(
+          "in viewState SETUP, transientStoryCodes:",
           transientStoryCodes
         );
         if (transientStoryCodes) {
-          console.log(
-            "[App - viewState determination] in viewState SETUP, transientStoryCodes are truthy -> going to PLAYER_CODES"
+          Logger.App.log(
+            "in viewState SETUP, transientStoryCodes are truthy -> going to PLAYER_CODES"
           );
           loggedSetViewState("PLAYER_CODES");
         } else {
-          console.log(
-            "[App - viewState determination] in viewState SETUP, transientStoryCodes are falsy -> staying in SETUP"
+          Logger.App.log(
+            "in viewState SETUP, transientStoryCodes are falsy -> staying in SETUP"
           );
         }
       } else if (viewState === "PLAYER_CODES") {
@@ -131,7 +151,7 @@ function App() {
   useEffect(() => {
     const checkConnection = () => {
       if (!wsService.isConnected()) {
-        console.log("[App] WebSocket not connected, reconnecting");
+        Logger.App.log("WebSocket not connected, reconnecting");
         wsService.connect();
       }
     };
@@ -151,7 +171,7 @@ function App() {
         !isCreatingSession &&
         !isRequestPending("create_session")
       ) {
-        console.log("[App] Connected but no session, requesting new session");
+        Logger.App.log("Connected but no session, requesting new session");
         setIsCreatingSession(true);
         wsService.sendMessage({ type: "create_session" });
       }
@@ -174,12 +194,12 @@ function App() {
 
   // Add logging for isConnecting changes
   useEffect(() => {
-    console.log("[App] isConnecting state changed:", isConnecting);
+    Logger.App.log(`isConnecting state changed: ${isConnecting}`);
   }, [isConnecting]);
 
   // Debug sessionId changes
   useEffect(() => {
-    console.log("[App] sessionId changed:", sessionId);
+    Logger.App.log(`sessionId changed: ${sessionId}`);
   }, [sessionId]);
 
   const handleStorySetup = (options: {
@@ -189,7 +209,7 @@ function App() {
     maxTurns: number;
     gameMode: GameMode;
   }) => {
-    console.log("[App] handleStorySetup called, initializing a new story");
+    Logger.App.log("handleStorySetup called, initializing a new story");
     setIsLoading(true);
     setPlayerCode(null);
     setStoryReady(false); // Reset story ready state when starting a new story
@@ -208,15 +228,47 @@ function App() {
   };
 
   const handleSelectTemplate = (template: StoryTemplate) => {
-    console.log(
-      "[App] handleSelectTemplate called, starting game from template:",
-      template.id
-    );
+    Logger.App.log(`handleSelectTemplate called with template: ${template.id}`);
+
+    // Ensure we have a valid template object before changing state
+    if (!template || !template.id) {
+      Logger.App.error("Invalid template object:", template);
+      return;
+    }
+
+    // Set a flag to indicate we're about to show template config
+    templateConfigPending.current = true;
+
+    // Set the selected template first
+    setSelectedTemplate(template);
+
+    // Then change view state
+    loggedSetViewState("TEMPLATE_CONFIG");
+  };
+
+  const handleConfigureTemplate = (options: {
+    templateId: string;
+    playerCount: number;
+    maxTurns: number;
+  }) => {
+    Logger.App.log("handleConfigureTemplate called with options:", options);
+
+    // Here we would normally call a service to initialize a story from the template
+    // But as per requirements, we're not triggering any backend actions yet
+
     setIsLoading(true);
     setPlayerCode(null);
     setStoryReady(false);
     localStorage.removeItem(playerCodeKey);
     setTransientStoryCodes(null);
+
+    // TODO: Add API call to initialize story from template when backend is ready
+    // For now, we'll just log the configuration
+    Logger.App.log("Template story configuration complete:", {
+      templateId: options.templateId,
+      playerCount: options.playerCount,
+      maxTurns: options.maxTurns,
+    });
   };
 
   const handleCodeSubmit = (code: string) => {
@@ -237,7 +289,7 @@ function App() {
   };
 
   const handleNewStory = () => {
-    console.log("[App] handleNewStory called, clearing story state and codes");
+    Logger.App.log("handleNewStory called, clearing story state and codes");
     setStoryState(null);
     setTransientStoryCodes(null);
     loggedSetViewState("SETUP");
@@ -245,11 +297,11 @@ function App() {
 
   const handlePlayerChoice = (optionIndex: number) => {
     if (!storyState) {
-      console.warn("[App] Cannot make choice: missing storyState");
+      Logger.App.warn("Cannot make choice: missing storyState");
       return;
     }
 
-    console.log("[App] Processing player choice:", { optionIndex });
+    Logger.App.log("Processing player choice:", { optionIndex });
 
     setIsLoading(true);
     gameService.makeChoice(optionIndex);
@@ -260,11 +312,11 @@ function App() {
     backgroundIndex: number
   ) => {
     if (!storyState) {
-      console.warn("[App] Cannot select character: missing storyState");
+      Logger.App.warn("Cannot select character: missing storyState");
       return;
     }
 
-    console.log("[App] Processing character selection:", {
+    Logger.App.log("Processing character selection:", {
       identityIndex,
       backgroundIndex,
     });
@@ -273,49 +325,9 @@ function App() {
     gameService.selectCharacter(identityIndex, backgroundIndex);
   };
 
-  // Add error and rate limit display
-  const Notifications = () => (
-    <>
-      {error ? (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-primary border border-accent text-white px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
-          <div className="mr-2 whitespace-pre-wrap">{error}</div>
-          <button
-            onClick={() => setError(null)}
-            className="text-accent hover:text-tertiary ml-auto"
-            aria-label="Close"
-          >
-            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-        </div>
-      ) : null}
-
-      {/* Show all rate limit notifications centrally */}
-      {rateLimit && (
-        <>
-          {/* Full screen overlay with solid backdrop */}
-          <div className="fixed inset-0 bg-black bg-opacity-75 z-[999] flex items-center justify-center">
-            <div className="max-w-md w-full mx-4">
-              <RateLimitNotification
-                rateLimit={rateLimit}
-                onTimeout={() => setRateLimit(null)}
-                className="border-2 bg-white"
-              />
-            </div>
-          </div>
-        </>
-      )}
-    </>
-  );
-
   // Get the current view content
   const getCurrentView = () => {
-    console.log("[App] getCurrentView called with viewState:", viewState);
+    Logger.App.log(`getCurrentView called with viewState: ${viewState}`);
     switch (viewState) {
       case "CONNECTING":
         return (
@@ -342,9 +354,7 @@ function App() {
         );
 
       case "SETUP":
-        console.log(
-          "[App - getCurrentView] in viewState SETUP, entering case 'SETUP' -> rendering StoryInitializer"
-        );
+        Logger.App.log("in viewState SETUP, rendering StoryInitializer");
         return (
           <>
             <div className="max-w-2xl mx-auto pt-4">
@@ -366,12 +376,57 @@ function App() {
           </>
         );
 
+      case "TEMPLATE_CONFIG":
+        // Check if we have a template to configure
+        if (!selectedTemplate) {
+          Logger.App.log(
+            "In TEMPLATE_CONFIG but no selectedTemplate, redirecting to WELCOME"
+          );
+          // Schedule the redirect in the next tick to avoid state update during render
+          setTimeout(() => loggedSetViewState("WELCOME"), 0);
+          // Return a loading indicator while redirecting
+          return (
+            <div className="app flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-primary-600">Loading...</p>
+              </div>
+            </div>
+          );
+        }
+
+        Logger.App.log(
+          `Rendering TemplateConfigurator with template: ${selectedTemplate.id}`
+        );
+
+        return (
+          <>
+            <div className="max-w-2xl mx-auto pt-4">
+              <AppTitle
+                size="large"
+                onClick={() => {
+                  setSelectedTemplate(null);
+                  loggedSetViewState("WELCOME");
+                }}
+              />
+            </div>
+            <TemplateConfigurator
+              template={selectedTemplate}
+              onBack={() => {
+                setSelectedTemplate(null);
+                loggedSetViewState("WELCOME");
+              }}
+              onConfigure={handleConfigureTemplate}
+            />
+          </>
+        );
+
       case "PLAYER_CODES":
         // If we're in PLAYER_CODES state but don't have transientStoryCodes,
         // redirect to SETUP state instead of conditionally rendering StoryInitializer
         if (!transientStoryCodes) {
-          console.log(
-            "[App] In PLAYER_CODES but no transientStoryCodes, redirecting to SETUP"
+          Logger.App.log(
+            "In PLAYER_CODES but no transientStoryCodes, redirecting to SETUP"
           );
           loggedSetViewState("SETUP");
           return null; // Return null while redirecting to avoid flash of UI
@@ -413,6 +468,46 @@ function App() {
         return null;
     }
   };
+
+  // Add error and rate limit display
+  const Notifications = () => (
+    <>
+      {error ? (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-primary border border-accent text-white px-4 py-3 rounded z-50 flex items-center shadow-lg max-w-2xl">
+          <div className="mr-2 whitespace-pre-wrap">{error}</div>
+          <button
+            onClick={() => setError(null)}
+            className="text-accent hover:text-tertiary ml-auto"
+            aria-label="Close"
+          >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : null}
+
+      {/* Show all rate limit notifications centrally */}
+      {rateLimit && (
+        <>
+          {/* Full screen overlay with solid backdrop */}
+          <div className="fixed inset-0 bg-black bg-opacity-75 z-[999] flex items-center justify-center">
+            <div className="max-w-md w-full mx-4">
+              <RateLimitNotification
+                rateLimit={rateLimit}
+                onTimeout={() => setRateLimit(null)}
+                className="border-2 bg-white"
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
 
   // Render
   return (

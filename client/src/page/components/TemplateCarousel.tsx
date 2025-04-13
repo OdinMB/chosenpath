@@ -90,7 +90,7 @@ export const TemplateCarousel = ({
             variant="outline"
             leftBorder={false}
             leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
-          ></PrimaryButton>
+          />
 
           <div className="flex items-center gap-2">
             {templates.map((_, index) => (
@@ -116,7 +116,7 @@ export const TemplateCarousel = ({
             variant="outline"
             leftBorder={false}
             rightIcon={<Icons.ArrowRight className="h-4 w-4" />}
-          ></PrimaryButton>
+          />
         </div>
       )}
     </div>

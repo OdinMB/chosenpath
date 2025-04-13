@@ -11,33 +11,12 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
     <div>
       <div className="flex-grow">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="font-semibold text-lg text-primary-800">
-            {template.title}
-          </h3>
+          <h3 className="text-lg text-primary-800">{template.title}</h3>
           <PrimaryButton onClick={() => onPlay(template)}>Play</PrimaryButton>
         </div>
 
-        {/* Tags */}
-        {template.tags && template.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {template.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-block px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded-md"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Teaser */}
-        <p className="text-sm text-primary-600 mb-4 line-clamp-3">
-          {template.teaser}
-        </p>
-
         {/* Info */}
-        <div className="flex flex-col gap-1 text-xs text-primary-500 mb-2">
+        <div className="flex flex-col gap-1 text-xs text-primary-500 mb-4">
           <div className="flex items-center gap-8">
             <span className="font-semibold">
               {template.playerCountMin === template.playerCountMax
@@ -53,6 +32,25 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
             </span>
           </div>
         </div>
+
+        {/* Teaser */}
+        <p className="text-sm text-primary-600 mb-4 line-clamp-3">
+          {template.teaser}
+        </p>
+
+        {/* Tags */}
+        {template.tags && template.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {template.tags.map((tag, index) => (
+              <span
+                key={index}
+                className="inline-block px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded-md"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
