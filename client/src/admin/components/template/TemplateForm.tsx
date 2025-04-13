@@ -1,30 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { BasicInfoTab } from "./BasicInfoTab";
-import { GuidelinesTab } from "./GuidelinesTab";
-import { StatsTab } from "./StatsTab";
-import { StoryElementsTab } from "./StoryElementsTab";
-import { OutcomesTab } from "./OutcomesTab";
-import { PlayersTab } from "./PlayersTab";
+import {
+  BasicInfoTab,
+  GuidelinesTab,
+  StatsTab,
+  StoryElementsTab,
+  OutcomesTab,
+  PlayersTab,
+} from "./";
 import { StoryInitializer } from "@page/StoryInitializer";
 import {
   StoryTemplate,
   GameMode,
   GameModes,
-  PlayerOptionsGeneration,
-} from "@core/types/story";
-import { Stat, StatValueEntry } from "@core/types/stat";
-import { StoryElement } from "@core/types/storyElement";
-import { Outcome } from "@core/types/outcome";
-import {
+  Outcome,
   PlayerCount,
   PLAYER_SLOTS,
   CharacterSelectionIntroduction,
-} from "@core/types/player";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
+  PlayerOptionsGeneration,
+  PublicationStatus,
+  PublicationStatusType,
+  Stat,
+  StatValueEntry,
+  StoryElement,
+} from "@core/types/index";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
 import { MAX_PLAYERS } from "@core/config";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons, Select } from "@components/ui";
 
 interface TemplateFormProps {
   template: StoryTemplate;
@@ -218,6 +220,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     };
 
     Logger.UI.log("Submitting updated template:", updatedTemplate);
+    Logger.UI.log(
+      "Publication status:",
+      updatedTemplate.publicationStatus || "not set"
+    );
 
     try {
       setIsLoading(true);
@@ -244,6 +250,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         teaser: updatedTemplate.teaser,
         tags: updatedTemplate.tags,
         title: updatedTemplate.title,
+        publicationStatus:
+          updatedTemplate.publicationStatus || PublicationStatus.Draft,
         guidelines: updatedTemplate.guidelines,
         storyElements: updatedTemplate.storyElements,
         sharedOutcomes: updatedTemplate.sharedOutcomes,
@@ -292,6 +300,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
       const data = await response.json();
       Logger.Admin.log("Template saved successfully", data);
+      Logger.Admin.log(
+        "Response template data:",
+        JSON.stringify(data.template, null, 2)
+      );
 
       // Pass the updated template back to the parent component
       onSubmit(data.template);
@@ -496,6 +508,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             teaser: updateData.teaser,
             tags: updateData.tags,
             title: updateData.title,
+            publicationStatus:
+              updateData.publicationStatus || PublicationStatus.Draft,
             guidelines: updateData.guidelines,
             storyElements: updateData.storyElements,
             sharedOutcomes: updateData.sharedOutcomes,
@@ -529,6 +543,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         Logger.Admin.log(
           "Template updated successfully with generated content"
         );
+        Logger.Admin.log(
+          "Response template data:",
+          JSON.stringify(updatedData.template, null, 2)
+        );
 
         // Pass the updated template back to the parent component
         onSubmit(updatedData.template);
@@ -554,20 +572,46 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }));
   };
 
+  // Add handlePublicationStatusChange function
+  const handlePublicationStatusChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const value = e.target.value as PublicationStatusType;
+    setFormData((prev: StoryTemplate) => ({
+      ...prev,
+      publicationStatus: value,
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-gray-800 truncate">
           {formData.title ? formData.title : "New Template"}
         </h2>
-        <PrimaryButton
-          type="submit"
-          disabled={isLoading}
-          isLoading={isLoading}
-          size="lg"
-        >
-          Save Template
-        </PrimaryButton>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">
+            <Select
+              value={formData.publicationStatus || PublicationStatus.Draft}
+              onChange={handlePublicationStatusChange}
+              variant="large"
+              size="lg"
+              className="w-48"
+            >
+              <option value={PublicationStatus.Draft}>Draft</option>
+              <option value={PublicationStatus.Review}>Review</option>
+              <option value={PublicationStatus.Published}>Published</option>
+            </Select>
+          </div>
+          <PrimaryButton
+            type="submit"
+            disabled={isLoading}
+            isLoading={isLoading}
+            size="lg"
+          >
+            Save Template
+          </PrimaryButton>
+        </div>
       </div>
 
       <div className="border-b border-gray-200">

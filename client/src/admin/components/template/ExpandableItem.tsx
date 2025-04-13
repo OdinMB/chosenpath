@@ -1,6 +1,5 @@
 import React, { ReactNode, useState } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 
 interface ExpandableItemProps<T> {
   /** Unique identifier for this item */

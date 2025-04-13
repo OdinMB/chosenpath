@@ -6,14 +6,10 @@ import {
   PlayerOptionsGeneration,
   PlayerSlot,
   Stat,
-} from "@core/types/index";
+} from "@core/types";
 import { MAX_PLAYERS } from "@core/config";
-import { ExpandableOutcome } from "./ExpandableOutcome";
-import { PlayerIdentity } from "./PlayerIdentity";
-import { PlayerBackground } from "./PlayerBackground";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
-import { Select } from "@components/ui/Select";
+import { ExpandableOutcome, PlayerIdentity, PlayerBackground } from "./";
+import { PrimaryButton, Icons, Select } from "@components/ui";
 
 interface PlayerOutcome {
   id: string;

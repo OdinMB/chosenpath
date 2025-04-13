@@ -1,6 +1,6 @@
 import React from "react";
-import { Input } from "@components/ui/Input";
-import { Stat } from "@core/types/stat";
+import { Input } from "@components/ui";
+import { Stat } from "@core/types";
 
 interface StatValueInputProps {
   value: string | number | string[];

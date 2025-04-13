@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
-import { Input } from "@components/ui/Input";
-import { TextArea } from "@components/ui/TextArea";
-import { StoryElement } from "@core/types/storyElement";
-import { InfoIcon } from "@components/ui/InfoIcon";
+import { StoryElement } from "@core/types";
+import {
+  InfoIcon,
+  Input,
+  TextArea,
+  PrimaryButton,
+  Icons,
+} from "@components/ui";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];

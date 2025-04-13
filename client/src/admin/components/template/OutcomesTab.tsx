@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 import { Outcome } from "@core/types/outcome";
-import { ExpandableOutcome } from "./ExpandableOutcome";
+import { ExpandableOutcome } from "./";
 
 interface OutcomesTabProps {
   outcomes: Outcome[];

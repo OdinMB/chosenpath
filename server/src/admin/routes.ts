@@ -3,6 +3,7 @@ import { config } from "@/config.js";
 import { adminStoryService } from "./AdminStoryService.js";
 import { Logger } from "@common/logger.js";
 import { AdminLibraryService } from "./AdminLibraryService.js";
+import { PublicationStatus } from "@core/types/index.js";
 
 // Simple authentication middleware
 export const verifyAdmin = (
@@ -128,6 +129,7 @@ router.post("/library/templates", verifyAdmin, async (req, res) => {
     maxTurnsMax,
     teaser,
     title,
+    publicationStatus,
     ...templateData
   } = req.body;
 
@@ -144,6 +146,7 @@ router.post("/library/templates", verifyAdmin, async (req, res) => {
       ...templateData,
       title,
       teaser: teaser || "",
+      publicationStatus: publicationStatus || PublicationStatus.Draft,
     };
 
     const template = await libraryService.createTemplate(
@@ -175,6 +178,7 @@ router.put("/library/templates/:id", verifyAdmin, async (req, res) => {
     maxTurnsMax,
     teaser,
     title,
+    publicationStatus,
     ...templateData
   } = req.body;
 
@@ -191,6 +195,7 @@ router.put("/library/templates/:id", verifyAdmin, async (req, res) => {
       ...templateData,
       title,
       teaser: teaser || "",
+      publicationStatus: publicationStatus || PublicationStatus.Draft,
     };
 
     const template = await libraryService.updateTemplate(

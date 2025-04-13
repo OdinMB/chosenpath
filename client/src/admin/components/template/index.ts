@@ -1,4 +1,12 @@
 export { BasicInfoTab } from "./BasicInfoTab";
+export { ExpandableItem } from "./ExpandableItem";
+export { ExpandableOutcome } from "./ExpandableOutcome";
 export { GuidelinesTab } from "./GuidelinesTab";
-export { PlaceholderTab } from "./PlaceholderTab";
+export { OutcomesTab } from "./OutcomesTab";
+export { PlayerBackground } from "./PlayerBackground";
+export { PlayerIdentity } from "./PlayerIdentity";
+export { PlayersTab } from "./PlayersTab";
+export { StatsTab } from "./StatsTab";
+export { StatValueInput } from "./StatValueInput";
+export { StoryElementsTab } from "./StoryElementsTab";
 export { TemplateForm } from "./TemplateForm";

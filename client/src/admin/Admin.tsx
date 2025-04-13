@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { AdminLogin } from "./components/AdminLogin";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 import { StoriesOverview } from "./components/StoriesOverview";
+import { AdminLogin } from "./components/AdminLogin";
 import { StoryLibrary } from "./components/StoryLibrary";
-import { TemplateForm } from "./components/template/index";
-import { StoryTemplate } from "@core/types/story";
+import { TemplateForm } from "./components/template";
+import { StoryTemplate, PublicationStatus } from "@core/types";
 import { createDefaultTemplate } from "./components/template/templateFactory";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
@@ -87,6 +86,7 @@ export const Admin = () => {
           teaser: defaultTemplate.teaser,
           tags: defaultTemplate.tags,
           title: defaultTemplate.title || "New Template",
+          publicationStatus: PublicationStatus.Draft,
           guidelines: defaultTemplate.guidelines,
         }),
       });

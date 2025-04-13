@@ -43,6 +43,19 @@ export const gameModeSchema = z.enum([
 ]);
 export type GameMode = typeof gameModeSchema._type;
 
+export enum PublicationStatus {
+  Draft = "draft",
+  Review = "review",
+  Published = "published",
+}
+
+export const publicationStatusSchema = z.enum([
+  PublicationStatus.Draft,
+  PublicationStatus.Review,
+  PublicationStatus.Published,
+]);
+export type PublicationStatusType = typeof publicationStatusSchema._type;
+
 export const guidelinesSchema = z
   .object({
     world: z
@@ -166,6 +179,7 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   maxTurnsMax: number;
   teaser: string;
   tags: string[];
+  publicationStatus: PublicationStatusType;
 };
 
 // TYPES USED BY APP (not LLM)

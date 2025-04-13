@@ -1,8 +1,7 @@
 import React from "react";
-import { ExpandableItem } from "./ExpandableItem";
-import { Input } from "@components/ui/Input";
-import { Select } from "@components/ui/Select";
-import { CharacterIdentity } from "@core/types/player";
+import { ExpandableItem } from "./";
+import { Input, Select } from "@components/ui";
+import { CharacterIdentity } from "@core/types";
 
 interface PlayerIdentityProps {
   identity: CharacterIdentity;

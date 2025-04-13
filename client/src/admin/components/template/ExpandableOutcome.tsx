@@ -1,9 +1,7 @@
 import React from "react";
-import { ExpandableItem } from "./ExpandableItem";
-import { Input } from "@components/ui/Input";
-import { Outcome } from "@core/types/outcome";
-import { Select } from "@components/ui/Select";
-import { InfoIcon } from "@components/ui/InfoIcon";
+import { Outcome } from "@core/types";
+import { ExpandableItem } from "./";
+import { InfoIcon, Input, Select } from "@components/ui";
 
 // Define PlayerOutcome here since it's not exported from a module
 interface PlayerOutcome {

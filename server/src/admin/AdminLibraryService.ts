@@ -7,6 +7,7 @@ import {
   PlayerOptionsGeneration,
   PlayerCount,
   PLAYER_SLOTS,
+  PublicationStatus,
 } from "@core/types/index.js";
 import {
   readStorageFile,
@@ -177,6 +178,8 @@ export class AdminLibraryService {
         updatedAt: now,
         title: dataWithPlayerOptions.title,
         teaser: dataWithPlayerOptions.teaser,
+        publicationStatus:
+          dataWithPlayerOptions.publicationStatus || PublicationStatus.Draft,
         guidelines: dataWithPlayerOptions.guidelines,
         storyElements: dataWithPlayerOptions.storyElements,
         sharedOutcomes: dataWithPlayerOptions.sharedOutcomes,
@@ -269,6 +272,10 @@ export class AdminLibraryService {
             : existingTemplate.maxTurnsMax,
         title: dataWithPlayerOptions.title as string,
         teaser: dataWithPlayerOptions.teaser as string,
+        publicationStatus:
+          dataWithPlayerOptions.publicationStatus ||
+          existingTemplate.publicationStatus ||
+          PublicationStatus.Draft,
         guidelines:
           dataWithPlayerOptions.guidelines as StoryTemplate["guidelines"],
         storyElements:
@@ -414,6 +421,7 @@ export class AdminLibraryService {
         maxTurnsMin: maxTurns,
         maxTurnsMax: maxTurns,
         tags: [],
+        publicationStatus: PublicationStatus.Draft,
         createdAt: now,
         updatedAt: now,
         // Use statGroups from setup rather than initialState

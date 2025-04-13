@@ -1,13 +1,14 @@
 import React from "react";
 import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
-import { GameModes, GameMode } from "@core/types/story";
-import { PlayerCount } from "@core/types/player";
-import { Icons } from "@components/ui/Icons";
-import { Input } from "@components/ui/Input";
-import { TextArea } from "@components/ui/TextArea";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { InfoIcon } from "@components/ui/InfoIcon";
-import { Select } from "@components/ui/Select";
+import { GameModes, GameMode, PlayerCount } from "@core/types";
+import {
+  Icons,
+  Input,
+  TextArea,
+  PrimaryButton,
+  InfoIcon,
+  Select,
+} from "@components/ui/index";
 
 interface BasicInfoTabProps {
   title: string;

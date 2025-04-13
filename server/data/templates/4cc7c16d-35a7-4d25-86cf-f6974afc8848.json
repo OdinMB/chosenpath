@@ -5,11 +5,12 @@
   "playerCountMax": 1,
   "tags": [],
   "createdAt": "2025-04-10T17:40:04.428Z",
-  "updatedAt": "2025-04-12T13:50:04.345Z",
+  "updatedAt": "2025-04-13T13:00:50.141Z",
   "maxTurnsMin": 15,
   "maxTurnsMax": 25,
   "title": "Secrets of Eldridge Academy",
   "teaser": "Gonna be good",
+  "publicationStatus": "review",
   "guidelines": {
     "world": "Nestled in the misty hills of an ancient forest, the elite boarding school of Eldridge Academy stands as a beacon of knowledge and tradition. However, beneath its prestigious facade, the school is a labyrinth of hidden secrets and dangerous alliances. As a new teacher, you must navigate the treacherous waters of academia while uncovering the mysteries that threaten the very foundation of Eldridge.",
     "rules": [
@@ -443,7 +444,20 @@
       {
         "title": "",
         "fluffTemplate": "",
-        "initialPlayerStatValues": []
+        "initialPlayerStatValues": [
+          {
+            "statId": "player_teaching_skills",
+            "value": []
+          },
+          {
+            "statId": "player_trust_with_students",
+            "value": 50
+          },
+          {
+            "statId": "player_faculty_standing",
+            "value": ""
+          }
+        ]
       }
     ]
   },
@@ -465,7 +479,20 @@
       {
         "title": "",
         "fluffTemplate": "",
-        "initialPlayerStatValues": []
+        "initialPlayerStatValues": [
+          {
+            "statId": "player_teaching_skills",
+            "value": []
+          },
+          {
+            "statId": "player_trust_with_students",
+            "value": 50
+          },
+          {
+            "statId": "player_faculty_standing",
+            "value": ""
+          }
+        ]
       }
     ]
   }

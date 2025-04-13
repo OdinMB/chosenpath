@@ -1,10 +1,7 @@
 import React from "react";
-import { ExpandableItem } from "./ExpandableItem";
-import { Input } from "@components/ui/Input";
-import { Stat } from "@core/types/stat";
-import { CharacterBackground } from "@core/types/player";
-import { StatValueInput } from "./StatValueInput";
-import { InfoIcon } from "@components/ui/InfoIcon";
+import { ExpandableItem, StatValueInput } from "./";
+import { InfoIcon, Input } from "@components/ui";
+import { CharacterBackground, Stat } from "@core/types";
 
 interface PlayerBackgroundProps {
   background: CharacterBackground;

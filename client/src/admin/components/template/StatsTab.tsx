@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
-import { Input } from "@components/ui/Input";
-import { Stat, StatValueEntry } from "@core/types/stat";
-import { InfoIcon } from "@components/ui/InfoIcon";
+import { Stat, StatValueEntry } from "@core/types";
+import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
 
 type StatsTabProps = {
   statGroups: string[];

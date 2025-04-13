@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
-import { StoryTemplate } from "@core/types/story";
+import { StoryTemplate, PublicationStatus } from "@core/types";
 
 type StoryLibraryProps = {
   token: string;
@@ -109,6 +108,19 @@ export const StoryLibrary = ({
     }
   };
 
+  const getStatusColor = (status: PublicationStatus) => {
+    switch (status) {
+      case PublicationStatus.Draft:
+        return "bg-gray-100 text-gray-700";
+      case PublicationStatus.Review:
+        return "bg-amber-100 text-amber-700";
+      case PublicationStatus.Published:
+        return "bg-green-100 text-green-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
       <div className="flex justify-between items-center mb-6">
@@ -163,6 +175,7 @@ export const StoryLibrary = ({
             <thead className="bg-gray-100 text-primary-800">
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
+                <th className="py-3 px-4 text-left">Status</th>
                 <th className="py-3 px-4 text-left">Tags</th>
                 <th className="py-3 px-4 text-left">Players</th>
                 <th className="py-3 px-4 text-left">Story Length</th>
@@ -178,6 +191,15 @@ export const StoryLibrary = ({
                     <div>
                       <span className="font-medium">{template.title}</span>
                     </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+                        template.publicationStatus || PublicationStatus.Draft
+                      )}`}
+                    >
+                      {template.publicationStatus || PublicationStatus.Draft}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex flex-wrap gap-1">

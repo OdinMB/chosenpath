@@ -4,7 +4,7 @@ import { Icons } from "@components/ui/Icons";
 interface SelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> {
   size?: "sm" | "md" | "lg";
-  variant?: "default" | "outline";
+  variant?: "default" | "outline" | "large";
   placeholder?: string;
 }
 
@@ -25,6 +25,8 @@ export const Select: React.FC<SelectProps> = ({
     default: "border bg-white",
     outline:
       "border-2 border-secondary text-secondary bg-white hover:bg-secondary/5",
+    large:
+      "border-2 border-primary font-medium text-primary bg-white hover:bg-primary/5 shadow-sm",
   };
 
   // Track the selected text value
@@ -67,7 +69,9 @@ export const Select: React.FC<SelectProps> = ({
 
         {/* Custom arrow icon with consistent positioning */}
         <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-          <Icons.ChevronDown className="h-4 w-4" />
+          <Icons.ChevronDown
+            className={`${variant === "large" ? "h-5 w-5" : "h-4 w-4"}`}
+          />
         </span>
       </div>
     </div>

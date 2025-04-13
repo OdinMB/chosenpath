@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { Icons } from "@components/ui/Icons";
+import { PrimaryButton, Icons } from "@components/ui";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 

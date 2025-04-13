@@ -1,9 +1,11 @@
 import React from "react";
-import { Icons } from "@components/ui/Icons";
-import { Input } from "@components/ui/Input";
-import { TextArea } from "@components/ui/TextArea";
-import { PrimaryButton } from "@components/ui/PrimaryButton";
-import { InfoIcon } from "@components/ui/InfoIcon";
+import {
+  Icons,
+  Input,
+  TextArea,
+  PrimaryButton,
+  InfoIcon,
+} from "@components/ui";
 
 interface GuidelinesTabProps {
   world: string;

@@ -1,6 +1,11 @@
-import { StoryTemplate, GameModes } from "@core/types/story";
-import { PlayerCount, PLAYER_SLOTS } from "@core/types/player";
-import { StoryElement } from "@core/types/storyElement";
+import {
+  PlayerCount,
+  PLAYER_SLOTS,
+  StoryTemplate,
+  GameModes,
+  PublicationStatus,
+  StoryElement,
+} from "@core/types/index";
 import { MAX_PLAYERS } from "@core/config";
 
 /**
@@ -20,6 +25,7 @@ export function createDefaultTemplate(): StoryTemplate {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     title: "",
+    publicationStatus: PublicationStatus.Draft,
     guidelines: {
       world: "",
       rules: [],
