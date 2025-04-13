@@ -2,14 +2,14 @@
   "id": "765cd8cc-6854-40eb-81a9-e7a794e9dd7c",
   "gameMode": "cooperative",
   "playerCountMin": 2,
-  "playerCountMax": 2,
+  "playerCountMax": 3,
   "tags": [
     "asdf",
     "tasetas ddddd",
     ""
   ],
   "createdAt": "2025-04-13T14:00:20.631Z",
-  "updatedAt": "2025-04-13T15:36:50.796Z",
+  "updatedAt": "2025-04-13T17:52:41.609Z",
   "maxTurnsMin": 10,
   "maxTurnsMax": 10,
   "title": "Test 2",

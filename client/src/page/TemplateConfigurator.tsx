@@ -23,6 +23,10 @@ export function TemplateConfigurator({
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Determine if configuration is needed for each option
+  const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
+  const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -69,54 +73,93 @@ export function TemplateConfigurator({
           </div>
 
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+            <h3 className="text-lg font-medium text-primary">
+              Story Configuration
+            </h3>
+
+            {/* Player Count Section */}
             <div className="space-y-2">
               <label
                 htmlFor="player-count"
                 className="text-sm md:text-base font-medium text-primary"
               >
-                Number of Players: {playerCount}
+                Number of Players:{" "}
+                {needsPlayerConfig ? playerCount : template.playerCountMin}
               </label>
-              <input
-                id="player-count"
-                type="range"
-                min={template.playerCountMin}
-                max={template.playerCountMax}
-                value={playerCount}
-                onChange={handlePlayerCountChange}
-                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-              />
-              <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                <span>
-                  {template.playerCountMin} Player
-                  {template.playerCountMin > 1 ? "s" : ""}
-                </span>
-                <span>
-                  {template.playerCountMax} Player
-                  {template.playerCountMax > 1 ? "s" : ""}
-                </span>
-              </div>
+
+              {needsPlayerConfig ? (
+                <>
+                  <input
+                    id="player-count"
+                    type="range"
+                    min={template.playerCountMin}
+                    max={template.playerCountMax}
+                    value={playerCount}
+                    onChange={handlePlayerCountChange}
+                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                  />
+                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                    <span>
+                      {template.playerCountMin} Player
+                      {template.playerCountMin > 1 ? "s" : ""}
+                    </span>
+                    <span>
+                      {template.playerCountMax} Player
+                      {template.playerCountMax > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="py-2 px-3 bg-gray-50 rounded border border-gray-100">
+                  <p className="text-primary-600">
+                    This story is designed for{" "}
+                    <span className="font-medium">
+                      {template.playerCountMin} player
+                      {template.playerCountMin > 1 ? "s" : ""}
+                    </span>
+                    .
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* Story Length Section */}
             <div className="space-y-2">
               <label
                 htmlFor="max-turns"
                 className="text-sm md:text-base font-medium text-primary"
               >
-                Story Length: {maxTurns} turns
+                Story Length:{" "}
+                {needsTurnsConfig ? maxTurns : template.maxTurnsMin} turns
               </label>
-              <input
-                id="max-turns"
-                type="range"
-                min={template.maxTurnsMin}
-                max={template.maxTurnsMax}
-                value={maxTurns}
-                onChange={(e) => setMaxTurns(Number(e.target.value))}
-                className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-              />
-              <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                <span>{template.maxTurnsMin} turns</span>
-                <span>{template.maxTurnsMax} turns</span>
-              </div>
+
+              {needsTurnsConfig ? (
+                <>
+                  <input
+                    id="max-turns"
+                    type="range"
+                    min={template.maxTurnsMin}
+                    max={template.maxTurnsMax}
+                    value={maxTurns}
+                    onChange={(e) => setMaxTurns(Number(e.target.value))}
+                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                  />
+                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                    <span>{template.maxTurnsMin} turns</span>
+                    <span>{template.maxTurnsMax} turns</span>
+                  </div>
+                </>
+              ) : (
+                <div className="py-2 px-3 bg-gray-50 rounded border border-gray-100">
+                  <p className="text-primary-600">
+                    This story is designed to last{" "}
+                    <span className="font-medium">
+                      {template.maxTurnsMin} turns
+                    </span>
+                    .
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
