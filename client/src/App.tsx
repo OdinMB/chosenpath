@@ -21,6 +21,9 @@ type ViewState =
   | "GAME"
   | "TEMPLATE_CONFIG";
 
+// Define story creation types to unify handling
+type StoryCreationType = "PREMISE" | "TEMPLATE" | "NONE";
+
 function App() {
   const {
     setStoryState,
@@ -44,7 +47,9 @@ function App() {
   const [viewState, setViewState] = useState<ViewState>("CONNECTING");
   const [selectedTemplate, setSelectedTemplate] =
     useState<StoryTemplate | null>(null);
-  const templateConfigPending = useRef(false);
+
+  // Replace templateConfigPending with a more general story creation status
+  const storyCreationStatus = useRef<StoryCreationType>("NONE");
 
   // Generate a unique ID for this tab if it doesn't exist
   const [tabId] = useState(
@@ -74,75 +79,46 @@ function App() {
   );
 
   useEffect(() => {
-    // If we're connecting, stay in connecting state
-    if (isConnecting && viewState !== "CONNECTING") {
-      loggedSetViewState("CONNECTING");
-      return;
-    }
-
-    // If we're transitioning to TEMPLATE_CONFIG or already there, don't interfere
-    if (templateConfigPending.current || viewState === "TEMPLATE_CONFIG") {
-      if (templateConfigPending.current && viewState === "TEMPLATE_CONFIG") {
-        // Reset the flag once we're in the template config state
-        templateConfigPending.current = false;
-      }
-
-      // Add a check for transientStoryCodes to transition from TEMPLATE_CONFIG to PLAYER_CODES
-      if (viewState === "TEMPLATE_CONFIG" && transientStoryCodes) {
-        Logger.App.log(
-          "Transitioning from TEMPLATE_CONFIG to PLAYER_CODES due to codes received"
-        );
-        loggedSetViewState("PLAYER_CODES");
-        return;
-      }
-
-      return;
-    }
-
-    // If we're connected but have no session or player code, go to welcome
-    if (!sessionId && !playerCode && wsService.isConnected()) {
-      if (viewState === "CONNECTING") {
-        loggedSetViewState("WELCOME");
+    // If we need to show connecting screen
+    if (isConnecting) {
+      if (viewState !== "CONNECTING") {
+        loggedSetViewState("CONNECTING");
       }
       return;
     }
 
-    // If we have a session or player code, we're in a valid state
+    // Once we're done connecting, go to welcome if we don't have a state to restore
+    if (viewState === "CONNECTING" && !storyState) {
+      Logger.App.log("Connection complete, transitioning to WELCOME");
+      loggedSetViewState("WELCOME");
+      return;
+    }
+
+    // If we have a session or player code, handle view transitions
     if (sessionId || playerCode) {
-      if (viewState === "SETUP") {
-        // If we have story codes, go to codes view
+      // For both story creation flows: check if we have story codes and transition to PLAYER_CODES
+      if (
+        (viewState === "SETUP" || viewState === "TEMPLATE_CONFIG") &&
+        transientStoryCodes
+      ) {
         Logger.App.log(
-          "in viewState SETUP, transientStoryCodes:",
-          transientStoryCodes
+          `Transitioning from ${viewState} to PLAYER_CODES due to codes received`
         );
-        if (transientStoryCodes) {
-          Logger.App.log(
-            "in viewState SETUP, transientStoryCodes are truthy -> going to PLAYER_CODES"
-          );
-          loggedSetViewState("PLAYER_CODES");
-        } else {
-          Logger.App.log(
-            "in viewState SETUP, transientStoryCodes are falsy -> staying in SETUP"
-          );
+
+        // Reset creation status when transitioning to player codes
+        if (storyCreationStatus.current !== "NONE") {
+          storyCreationStatus.current = "NONE";
         }
-      } else if (viewState === "PLAYER_CODES") {
-        if (storyState) {
-          loggedSetViewState("GAME");
-        }
-      } else if (viewState === "GAME") {
-        // If in game view, stay there even during character selection
-        if (
-          isRequestPending("select_character") ||
-          isOperationRunning("select_character")
-        ) {
-          // Stay in game view while character selection is processing
-        }
-      } else if (viewState === "WELCOME") {
-        if (storyState) {
-          loggedSetViewState("GAME");
-        }
-      } else {
-        loggedSetViewState("WELCOME");
+
+        loggedSetViewState("PLAYER_CODES");
+      }
+      // If we're in player codes and have story state, transition to game
+      else if (viewState === "PLAYER_CODES" && storyState) {
+        loggedSetViewState("GAME");
+      }
+      // If we're at welcome and have a loaded story state, transition to game
+      else if (viewState === "WELCOME" && storyState) {
+        loggedSetViewState("GAME");
       }
     }
   }, [
@@ -152,8 +128,6 @@ function App() {
     transientStoryCodes,
     viewState,
     loggedSetViewState,
-    isRequestPending,
-    isOperationRunning,
     isConnecting,
   ]);
 
@@ -212,6 +186,13 @@ function App() {
     Logger.App.log(`sessionId changed: ${sessionId}`);
   }, [sessionId]);
 
+  // Helper function to reset all story creation state
+  const resetStoryCreationState = useCallback(() => {
+    setTransientStoryCodes(null);
+    setIsLoading(false);
+    storyCreationStatus.current = "NONE";
+  }, [setTransientStoryCodes, setIsLoading]);
+
   const handleStorySetup = (options: {
     prompt: string;
     generateImages: boolean;
@@ -227,6 +208,9 @@ function App() {
 
     // Make sure transientStoryCodes is null before starting a new story
     setTransientStoryCodes(null);
+
+    // Set story creation status to PREMISE
+    storyCreationStatus.current = "PREMISE";
 
     gameService.initializeStory(
       options.prompt,
@@ -246,8 +230,11 @@ function App() {
       return;
     }
 
+    // Reset loading state and story state
+    resetStoryCreationState();
+
     // Set a flag to indicate we're about to show template config
-    templateConfigPending.current = true;
+    storyCreationStatus.current = "TEMPLATE";
 
     // Set the selected template first
     setSelectedTemplate(template);
@@ -280,7 +267,7 @@ function App() {
 
     // Set the template pending flag to prevent premature state transitions
     // until we receive the story codes
-    templateConfigPending.current = true;
+    storyCreationStatus.current = "TEMPLATE";
   };
 
   const handleCodeSubmit = (code: string) => {
@@ -303,7 +290,7 @@ function App() {
   const handleNewStory = () => {
     Logger.App.log("handleNewStory called, clearing story state and codes");
     setStoryState(null);
-    setTransientStoryCodes(null);
+    resetStoryCreationState();
     loggedSetViewState("SETUP");
   };
 
@@ -381,7 +368,7 @@ function App() {
             <StoryInitializer
               onSetup={handleStorySetup}
               onBack={() => {
-                setTransientStoryCodes(null);
+                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
             />
@@ -418,6 +405,7 @@ function App() {
                 size="large"
                 onClick={() => {
                   setSelectedTemplate(null);
+                  resetStoryCreationState();
                   loggedSetViewState("WELCOME");
                 }}
               />
@@ -426,6 +414,7 @@ function App() {
               template={selectedTemplate}
               onBack={() => {
                 setSelectedTemplate(null);
+                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
               onConfigure={handleConfigureTemplate}
@@ -444,12 +433,18 @@ function App() {
           return null; // Return null while redirecting to avoid flash of UI
         }
 
-        // Check if we're coming from template configuration
-        const isFromTemplate = templateConfigPending.current;
+        // Check if we're coming from template configuration or if there are background operations
+        const hasBackgroundOperations = isOperationRunning("initialize_story");
+        const isFromTemplate = storyCreationStatus.current === "TEMPLATE";
+
+        // Log status for debugging purposes
+        if (hasBackgroundOperations) {
+          Logger.App.log("Story initialization still running in background");
+        }
 
         // Reset template pending flag since we're now showing codes
         if (isFromTemplate) {
-          templateConfigPending.current = false;
+          storyCreationStatus.current = "NONE";
         }
 
         return (
@@ -460,16 +455,15 @@ function App() {
             <PlayerCodes
               codes={transientStoryCodes}
               onBack={() => {
-                setTransientStoryCodes(null);
+                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
               onCodeSubmit={handleCodeSubmit}
               storyReady={storyReady}
               onGoToWelcome={() => {
-                setTransientStoryCodes(null);
+                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
-              isTemplateFlow={isFromTemplate}
             />
           </>
         );

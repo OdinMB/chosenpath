@@ -7,7 +7,6 @@ interface PlayerCodesProps {
   onCodeSubmit: (code: string) => void;
   storyReady: boolean;
   onGoToWelcome?: () => void;
-  isTemplateFlow?: boolean;
 }
 
 export function PlayerCodes({
@@ -16,7 +15,6 @@ export function PlayerCodes({
   onCodeSubmit,
   storyReady,
   onGoToWelcome,
-  isTemplateFlow = false,
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
   const FALLBACK_READY_TIME = 60; // in seconds
@@ -25,9 +23,8 @@ export function PlayerCodes({
   // assume it's probably ready but we missed the notification
   const isLikelyReady = !storyReady && timeSinceLoad >= FALLBACK_READY_TIME;
 
-  // Template-based stories don't need to wait for AI generation
-  // so they can be joined immediately
-  const isReadyToJoin = storyReady || isLikelyReady || isTemplateFlow;
+  // Story is ready to join only if explicitly marked ready or fallback timeout reached
+  const isReadyToJoin = storyReady || isLikelyReady;
 
   useEffect(() => {
     const interval = setInterval(() => {

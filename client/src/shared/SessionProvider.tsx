@@ -217,6 +217,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         console.log(
           "[SessionProvider] Updated transientStoryCodes with new codes"
         );
+
+        // Always mark the story as not ready initially
+        // The server will send a story_ready_notification when it's ready
+        console.log("[SessionProvider] Waiting for story ready notification");
         setStoryReady(false);
 
         // Store codes in localStorage

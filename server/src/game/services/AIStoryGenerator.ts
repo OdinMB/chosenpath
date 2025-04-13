@@ -53,21 +53,6 @@ export class AIStoryGenerator {
     });
   }
 
-  private getDefaultStatValue(statType: string): number | string | string[] {
-    switch (statType) {
-      case "number":
-      case "percentage":
-      case "opposites":
-        return -1;
-      case "string":
-        return "fix me";
-      case "string[]":
-        return ["fix me"];
-      default:
-        return -1;
-    }
-  }
-
   public async createInitialState(
     prompt: string,
     generateImages: boolean,
