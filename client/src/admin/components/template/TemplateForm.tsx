@@ -235,7 +235,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       }
 
       // Always use PUT since we now create the template beforehand
-      const url = `${config.apiUrl}/admin/library/templates/${updatedTemplate.id}`;
+      const url = `${config.apiUrl}/admin/templates/${updatedTemplate.id}`;
       const method = "PUT";
 
       Logger.Admin.log(`Making ${method} request to ${url}`);
@@ -300,10 +300,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
       const data = await response.json();
       Logger.Admin.log("Template saved successfully", data);
-      Logger.Admin.log(
-        "Response template data:",
-        JSON.stringify(data.template, null, 2)
-      );
 
       // Pass the updated template back to the parent component
       onSubmit(data.template);
@@ -442,7 +438,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     const effectiveGameMode = formData.gameMode || options.gameMode;
 
     // First, call API to generate template content
-    fetch(`${config.apiUrl}/admin/library/templates/generate`, {
+    fetch(`${config.apiUrl}/admin/templates/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -488,7 +484,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         setFormData(updateData);
 
         // Now update the template on the server
-        const updateUrl = `${config.apiUrl}/admin/library/templates/${formData.id}`;
+        const updateUrl = `${config.apiUrl}/admin/templates/${formData.id}`;
         Logger.Admin.log(
           `Updating template ${formData.id} with generated content`
         );
@@ -542,10 +538,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         const updatedData = await response.json();
         Logger.Admin.log(
           "Template updated successfully with generated content"
-        );
-        Logger.Admin.log(
-          "Response template data:",
-          JSON.stringify(updatedData.template, null, 2)
         );
 
         // Pass the updated template back to the parent component

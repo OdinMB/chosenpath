@@ -34,7 +34,7 @@ export function TemplateSelector({
     setError(null);
 
     try {
-      const response = await fetch(`${config.apiUrl}/library/templates`);
+      const response = await fetch(`${config.apiUrl}/templates`);
 
       if (!response.ok) {
         throw new Error("Failed to load story templates");
@@ -69,9 +69,7 @@ export function TemplateSelector({
 
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `${config.apiUrl}/library/templates/${selectedId}`
-      );
+      const response = await fetch(`${config.apiUrl}/templates/${selectedId}`);
 
       if (!response.ok) {
         throw new Error("Failed to load template details");

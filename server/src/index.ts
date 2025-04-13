@@ -2,7 +2,7 @@ import http from "http";
 import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
-import { adminRouter } from "./admin/routes.js";
+import { Router } from "./routes.js";
 import { GameWebSocketServer } from "@common/websocket.js";
 
 async function startServer() {
@@ -28,21 +28,18 @@ async function startServer() {
   );
   app.use(express.json());
 
+  // Routes
+  app.use("", Router);
   // Health check endpoint
   app.get("/health", (_, res) => {
     res.json({ status: "ok" });
   });
 
-  // Admin routes
-  app.use("/admin", adminRouter);
-
   app.set("trust proxy", true);
-
   const server = http.createServer(app);
 
   // Initialize WebSocket server
   const wsServer = new GameWebSocketServer(server);
-
   // Start HTTP server
   server.listen(config.port, () => {
     console.log(

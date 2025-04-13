@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons } from "@components/ui";
+import { PrimaryButton, Icons } from "@components/ui/index";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 import { StoryTemplate, PublicationStatus } from "@core/types";
@@ -25,7 +25,7 @@ export const StoryLibrary = ({
     Logger.Admin.log("Loading story templates");
 
     try {
-      const response = await fetch(`${config.apiUrl}/admin/library/templates`, {
+      const response = await fetch(`${config.apiUrl}/admin/templates`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -82,7 +82,7 @@ export const StoryLibrary = ({
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
       const response = await fetch(
-        `${config.apiUrl}/admin/library/templates/${templateId}`,
+        `${config.apiUrl}/admin/templates/${templateId}`,
         {
           method: "DELETE",
           headers: {

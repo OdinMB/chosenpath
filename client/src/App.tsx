@@ -6,7 +6,7 @@ import { gameService } from "@game/GameService";
 import { useEffect, useState, useCallback } from "react";
 import { WelcomeScreen } from "@page/WelcomeScreen";
 import { PlayerCodes } from "@page/PlayerCodes";
-import { GameMode } from "@core/types";
+import { GameMode, StoryTemplate } from "@core/types";
 import { RateLimitNotification } from "@components/RateLimitNotification";
 import { AppTitle } from "@components/AppTitle";
 
@@ -207,6 +207,18 @@ function App() {
     );
   };
 
+  const handleSelectTemplate = (template: StoryTemplate) => {
+    console.log(
+      "[App] handleSelectTemplate called, starting game from template:",
+      template.id
+    );
+    setIsLoading(true);
+    setPlayerCode(null);
+    setStoryReady(false);
+    localStorage.removeItem(playerCodeKey);
+    setTransientStoryCodes(null);
+  };
+
   const handleCodeSubmit = (code: string) => {
     setIsLoading(true);
     gameService.verifyCode(code);
@@ -324,6 +336,7 @@ function App() {
             <WelcomeScreen
               onCodeSubmit={handleCodeSubmit}
               onNewStory={handleNewStory}
+              onSelectTemplate={handleSelectTemplate}
             />
           </>
         );

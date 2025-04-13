@@ -71,7 +71,7 @@ export const Admin = () => {
       const defaultTemplate = createDefaultTemplate();
 
       // Create a new template record on the server first to get an ID
-      const response = await fetch(`${config.apiUrl}/admin/library/templates`, {
+      const response = await fetch(`${config.apiUrl}/admin/templates`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

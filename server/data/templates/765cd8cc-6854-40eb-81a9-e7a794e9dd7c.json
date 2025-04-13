@@ -1,15 +1,19 @@
 {
-  "id": "4cc7c16d-35a7-4d25-86cf-f6974afc8848",
-  "gameMode": "cooperative-competitive",
-  "playerCountMin": 1,
-  "playerCountMax": 1,
-  "tags": [],
-  "createdAt": "2025-04-10T17:40:04.428Z",
-  "updatedAt": "2025-04-13T15:39:40.358Z",
-  "maxTurnsMin": 15,
-  "maxTurnsMax": 25,
-  "title": "Secrets of Eldridge Academy - Really Long Title",
-  "teaser": "Gonna be good",
+  "id": "765cd8cc-6854-40eb-81a9-e7a794e9dd7c",
+  "gameMode": "cooperative",
+  "playerCountMin": 2,
+  "playerCountMax": 2,
+  "tags": [
+    "asdf",
+    "tasetas ddddd",
+    ""
+  ],
+  "createdAt": "2025-04-13T14:00:20.631Z",
+  "updatedAt": "2025-04-13T15:36:50.796Z",
+  "maxTurnsMin": 10,
+  "maxTurnsMax": 10,
+  "title": "Test 2",
+  "teaser": "Generated from prompt: We're new recruits in the city's fire department facing our first crises...",
   "publicationStatus": "published",
   "guidelines": {
     "world": "Nestled in the misty hills of an ancient forest, the elite boarding school of Eldridge Academy stands as a beacon of knowledge and tradition. However, beneath its prestigious facade, the school is a labyrinth of hidden secrets and dangerous alliances. As a new teacher, you must navigate the treacherous waters of academia while uncovering the mysteries that threaten the very foundation of Eldridge.",
@@ -130,7 +134,8 @@
   ],
   "statGroups": [
     "Character",
-    "School"
+    "School",
+    "Magic"
   ],
   "sharedStats": [
     {
@@ -181,7 +186,7 @@
       "canBeChangedInBeatResolutions": true,
       "isVisible": true,
       "tooltip": "The level of magical influence within the school.",
-      "group": "School"
+      "group": "Magic"
     },
     {
       "type": "number",
@@ -299,8 +304,8 @@
     }
   ],
   "characterSelectionIntroduction": {
-    "title": "",
-    "text": ""
+    "title": "Choose Your Path at Eldridge",
+    "text": "Welcome to Eldridge Academy, where knowledge and mystery intertwine. As a new teacher, you must navigate the treacherous waters of academia. Remind me, which educator are you again?"
   },
   "player1": {
     "outcomes": [
@@ -428,72 +433,12 @@
   },
   "player2": {
     "outcomes": [],
-    "possibleCharacterIdentities": [
-      {
-        "name": "",
-        "pronouns": {
-          "personal": "they",
-          "object": "them",
-          "possessive": "their",
-          "reflexive": "themselves"
-        },
-        "appearance": ""
-      }
-    ],
-    "possibleCharacterBackgrounds": [
-      {
-        "title": "",
-        "fluffTemplate": "",
-        "initialPlayerStatValues": [
-          {
-            "statId": "player_teaching_skills",
-            "value": []
-          },
-          {
-            "statId": "player_trust_with_students",
-            "value": 50
-          },
-          {
-            "statId": "player_faculty_standing",
-            "value": ""
-          }
-        ]
-      }
-    ]
+    "possibleCharacterIdentities": [],
+    "possibleCharacterBackgrounds": []
   },
   "player3": {
     "outcomes": [],
-    "possibleCharacterIdentities": [
-      {
-        "name": "",
-        "pronouns": {
-          "personal": "they",
-          "object": "them",
-          "possessive": "their",
-          "reflexive": "themselves"
-        },
-        "appearance": ""
-      }
-    ],
-    "possibleCharacterBackgrounds": [
-      {
-        "title": "",
-        "fluffTemplate": "",
-        "initialPlayerStatValues": [
-          {
-            "statId": "player_teaching_skills",
-            "value": []
-          },
-          {
-            "statId": "player_trust_with_students",
-            "value": 50
-          },
-          {
-            "statId": "player_faculty_standing",
-            "value": ""
-          }
-        ]
-      }
-    ]
+    "possibleCharacterIdentities": [],
+    "possibleCharacterBackgrounds": []
   }
 }

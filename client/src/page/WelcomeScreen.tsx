@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { ConfirmDialog, Icons, PrimaryButton, Tooltip } from "@components/ui";
 import { useSession } from "@common/useSession";
 import { StoredCodeSet } from "@common/SessionContext";
+import { StoryTemplate } from "@core/types";
+import { TemplateBrowser } from "./components/TemplateBrowser";
 
 interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
+  onSelectTemplate?: (template: StoryTemplate) => void;
 }
 
 // Helper function to format timestamp
@@ -40,6 +43,7 @@ function formatPlayerLabel(player: string, isFirstPlayer: boolean): string {
 export function WelcomeScreen({
   onCodeSubmit,
   onNewStory,
+  onSelectTemplate,
 }: WelcomeScreenProps) {
   const [code, setCode] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -101,6 +105,12 @@ export function WelcomeScreen({
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+  };
+
+  const handleSelectTemplate = (template: StoryTemplate) => {
+    if (onSelectTemplate) {
+      onSelectTemplate(template);
+    }
   };
 
   return (
@@ -220,8 +230,24 @@ export function WelcomeScreen({
           size="lg"
           className="font-semibold"
         >
-          Start A New Story
+          Create Your Own Story
         </PrimaryButton>
+
+        {/* Template Browser */}
+        {onSelectTemplate && (
+          <>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-primary-100"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-primary-600">or</span>
+              </div>
+            </div>
+
+            <TemplateBrowser onSelectTemplate={handleSelectTemplate} />
+          </>
+        )}
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">

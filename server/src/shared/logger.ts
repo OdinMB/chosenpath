@@ -7,6 +7,7 @@ const COLORS = {
   STORY: "\x1b[35m", // Magenta
   CONNECTION: "\x1b[35m", // Magenta (same as Story)
   ADMIN: "\x1b[33m", // Yellow for admin-related logs
+  ROUTE: "\x1b[34m", // Blue for route-related logs
   DEFAULT: "\x1b[32m", // Green
 };
 
@@ -52,6 +53,7 @@ function createLogger(serviceName: string, color: string) {
 
 // Create loggers for each service
 export const Logger = {
+  Route: createLogger("Route", COLORS.ROUTE),
   Queue: createLogger("Queue", COLORS.QUEUE),
   StoryRepository: createLogger("StoryRepository", COLORS.STORY),
   ConnectionManager: createLogger("ConnectionManager", COLORS.CONNECTION),
