@@ -94,9 +94,7 @@ export function TemplateConfigurator({
           </div>
 
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-            <h3 className="text-lg font-medium text-primary">
-              Story Configuration
-            </h3>
+            <h3 className="text-lg font-medium text-primary">Settings </h3>
 
             {/* Player Count Section */}
             <div className="space-y-2">

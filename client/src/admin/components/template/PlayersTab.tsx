@@ -216,13 +216,17 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     playerSlot: PlayerSlot,
     updates: Partial<PlayerOptionsGeneration>
   ) => {
-    onChange({
+    // Create the updated player options
+    const updatedPlayerOptions = {
       ...playerOptions,
       [playerSlot]: {
         ...playerOptions[playerSlot],
         ...updates,
       },
-    });
+    };
+
+    // Immediately propagate the change to parent component
+    onChange(updatedPlayerOptions);
   };
 
   const createEmptyIdentity = (): CharacterIdentity => ({
@@ -286,8 +290,13 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     const outcomeStateKey = `${playerSlot}_outcome_${outcomeId}`;
     setEditingOutcomes((prev) => new Set(prev).add(outcomeStateKey));
 
+    // Get current outcomes for this player
+    const currentOutcomes = playerOptions[playerSlot]?.outcomes || [];
+    const updatedOutcomes = [...currentOutcomes, newOutcome];
+
+    // Save changes immediately
     handleUpdatePlayer(playerSlot, {
-      outcomes: [...(playerOptions[playerSlot].outcomes || []), newOutcome],
+      outcomes: updatedOutcomes,
     });
   };
 
@@ -319,15 +328,24 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     ) => {
       const sourceOutcome =
         playerOptions[sourcePlayerSlot]?.outcomes[outcomeIndex];
+
       if (sourceOutcome) {
         const copiedOutcome: PlayerOutcome = {
           ...sourceOutcome,
           id: crypto.randomUUID(),
         };
+
+        // Update local state
+        const updatedOutcomes = [...localOptions.outcomes, copiedOutcome];
         setLocalOptions((prev) => ({
           ...prev,
-          outcomes: [...prev.outcomes, copiedOutcome],
+          outcomes: updatedOutcomes,
         }));
+
+        // Immediately save changes to the parent component
+        handleUpdatePlayer(playerSlot, {
+          outcomes: updatedOutcomes,
+        });
       }
     };
 
@@ -337,29 +355,51 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     ) => {
       const updated = [...localOptions.possibleCharacterIdentities];
       updated[index] = updatedIdentity;
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         possibleCharacterIdentities: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterIdentities: updated,
+      });
     };
 
     const handleDeleteIdentity = (index: number) => {
       const updated = [...localOptions.possibleCharacterIdentities];
       updated.splice(index, 1);
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         possibleCharacterIdentities: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterIdentities: updated,
+      });
     };
 
     const handleAddIdentity = () => {
+      const updated = [
+        ...localOptions.possibleCharacterIdentities,
+        createEmptyIdentity(),
+      ];
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
-        possibleCharacterIdentities: [
-          ...prev.possibleCharacterIdentities,
-          createEmptyIdentity(),
-        ],
+        possibleCharacterIdentities: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterIdentities: updated,
+      });
     };
 
     const handleUpdateBackground = (
@@ -368,29 +408,51 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     ) => {
       const updated = [...localOptions.possibleCharacterBackgrounds];
       updated[index] = updatedBackground;
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         possibleCharacterBackgrounds: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterBackgrounds: updated,
+      });
     };
 
     const handleDeleteBackground = (index: number) => {
       const updated = [...localOptions.possibleCharacterBackgrounds];
       updated.splice(index, 1);
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         possibleCharacterBackgrounds: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterBackgrounds: updated,
+      });
     };
 
     const handleAddBackground = () => {
+      const updated = [
+        ...localOptions.possibleCharacterBackgrounds,
+        createEmptyBackground(),
+      ];
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
-        possibleCharacterBackgrounds: [
-          ...prev.possibleCharacterBackgrounds,
-          createEmptyBackground(),
-        ],
+        possibleCharacterBackgrounds: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        possibleCharacterBackgrounds: updated,
+      });
     };
 
     const handleUpdateOutcome = (
@@ -399,19 +461,33 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     ) => {
       const updated = [...localOptions.outcomes];
       updated[index] = updatedOutcome;
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         outcomes: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        outcomes: updated,
+      });
     };
 
     const handleDeleteOutcome = (index: number) => {
       const updated = [...localOptions.outcomes];
       updated.splice(index, 1);
+
+      // Update local state
       setLocalOptions((prev) => ({
         ...prev,
         outcomes: updated,
       }));
+
+      // Immediately save changes to the parent component
+      handleUpdatePlayer(playerSlot, {
+        outcomes: updated,
+      });
     };
 
     if (!isEditing) {

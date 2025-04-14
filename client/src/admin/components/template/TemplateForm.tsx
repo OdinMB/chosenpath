@@ -15,6 +15,7 @@ import {
   Outcome,
   PlayerCount,
   PLAYER_SLOTS,
+  PlayerSlot,
   CharacterSelectionIntroduction,
   PlayerOptionsGeneration,
   PublicationStatus,
@@ -359,6 +360,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     sharedStats?: Stat[];
     playerStats?: Stat[];
     initialSharedStatValues?: StatValueEntry[];
+    playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
@@ -367,6 +369,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       playerStats: updates.playerStats ?? prev.playerStats,
       initialSharedStatValues:
         updates.initialSharedStatValues ?? prev.initialSharedStatValues,
+      // If playerOptions is provided, update the relevant player slots
+      ...(updates.playerOptions ? updates.playerOptions : {}),
     }));
   };
 
@@ -697,6 +701,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             sharedStats={formData.sharedStats || []}
             playerStats={formData.playerStats || []}
             initialSharedStatValues={formData.initialSharedStatValues || []}
+            playerOptions={getPlayerOptions()}
             onChange={handleStatsChange}
           />
         )}

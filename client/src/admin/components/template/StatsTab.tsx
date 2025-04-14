@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react";
-import { Stat, StatValueEntry } from "@core/types";
+import {
+  Stat,
+  StatValueEntry,
+  PlayerSlot,
+  PlayerOptionsGeneration,
+} from "@core/types";
 import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
+import { StatValueInput } from "./StatValueInput";
 
 type StatsTabProps = {
   statGroups: string[];
   sharedStats: Stat[];
   playerStats: Stat[];
   initialSharedStatValues: StatValueEntry[];
+  playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   onChange: (updates: {
     statGroups?: string[];
     sharedStats?: Stat[];
     playerStats?: Stat[];
     initialSharedStatValues?: StatValueEntry[];
+    playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => void;
 };
 
@@ -20,6 +28,7 @@ export const StatsTab = ({
   sharedStats,
   playerStats,
   initialSharedStatValues,
+  playerOptions,
   onChange,
 }: StatsTabProps) => {
   // Track which stats are being edited by their IDs
@@ -28,6 +37,35 @@ export const StatsTab = ({
   const handleRemoveGroup = (index: number) => {
     const updated = statGroups.filter((_, i) => i !== index);
     onChange({ statGroups: updated });
+  };
+
+  // Helper function to update player stat references when an ID changes
+  const updatePlayerStatReferences = (oldId: string, newId: string) => {
+    const updatedPlayerOptions = { ...playerOptions };
+    let hasChanges = false;
+
+    // Update all character backgrounds for all players
+    Object.keys(updatedPlayerOptions).forEach((playerSlot) => {
+      const player = updatedPlayerOptions[playerSlot as PlayerSlot];
+
+      player.possibleCharacterBackgrounds.forEach((background) => {
+        const statValueIndex = background.initialPlayerStatValues.findIndex(
+          (sv) => sv.statId === oldId
+        );
+
+        if (statValueIndex !== -1) {
+          background.initialPlayerStatValues[statValueIndex].statId = newId;
+          hasChanges = true;
+        }
+      });
+    });
+
+    // Only update if we actually made changes
+    if (hasChanges) {
+      return updatedPlayerOptions;
+    }
+
+    return null;
   };
 
   const handleAddStat = (type: "shared" | "player") => {
@@ -69,7 +107,30 @@ export const StatsTab = ({
         ],
       });
     } else {
-      onChange({ playerStats: [...playerStats, newStat] });
+      // For player stats, also add entries to each character background
+      const updatedPlayerOptions = { ...playerOptions };
+
+      // Add the new stat to each character background's initial values
+      Object.keys(updatedPlayerOptions).forEach((playerSlot) => {
+        const player = updatedPlayerOptions[playerSlot as PlayerSlot];
+
+        player.possibleCharacterBackgrounds.forEach((background) => {
+          background.initialPlayerStatValues.push({
+            statId: tempId,
+            value:
+              newStat.type === "string"
+                ? ""
+                : newStat.type === "string[]"
+                ? []
+                : 50,
+          });
+        });
+      });
+
+      onChange({
+        playerStats: [...playerStats, newStat],
+        playerOptions: updatedPlayerOptions,
+      });
     }
   };
 
@@ -78,16 +139,39 @@ export const StatsTab = ({
     index: number,
     updates: Partial<Stat>
   ) => {
+    const oldStat = type === "shared" ? sharedStats[index] : playerStats[index];
+    const oldId = oldStat?.id;
+    const newId = updates.id;
+
+    // Check if ID is changing
+    const isIdChanging = newId && oldId !== newId;
+
     if (type === "shared") {
       const updated = sharedStats.map((stat, i) =>
         i === index ? { ...stat, ...updates } : stat
       );
+
       onChange({ sharedStats: updated });
     } else {
       const updated = playerStats.map((stat, i) =>
         i === index ? { ...stat, ...updates } : stat
       );
-      onChange({ playerStats: updated });
+
+      // If player stat ID is changing, we need to update all references
+      if (isIdChanging) {
+        const updatedPlayerOptions = updatePlayerStatReferences(oldId, newId);
+
+        if (updatedPlayerOptions) {
+          onChange({
+            playerStats: updated,
+            playerOptions: updatedPlayerOptions,
+          });
+        } else {
+          onChange({ playerStats: updated });
+        }
+      } else {
+        onChange({ playerStats: updated });
+      }
     }
   };
 
@@ -102,8 +186,37 @@ export const StatsTab = ({
         initialSharedStatValues: updatedValues,
       });
     } else {
+      const statIdToRemove = playerStats[index].id;
       const updated = playerStats.filter((_, i) => i !== index);
-      onChange({ playerStats: updated });
+
+      // Also remove this stat from all character backgrounds
+      const updatedPlayerOptions = { ...playerOptions };
+      let hasChanges = false;
+
+      Object.keys(updatedPlayerOptions).forEach((playerSlot) => {
+        const player = updatedPlayerOptions[playerSlot as PlayerSlot];
+
+        player.possibleCharacterBackgrounds.forEach((background) => {
+          const originalLength = background.initialPlayerStatValues.length;
+          background.initialPlayerStatValues =
+            background.initialPlayerStatValues.filter(
+              (sv) => sv.statId !== statIdToRemove
+            );
+
+          if (originalLength !== background.initialPlayerStatValues.length) {
+            hasChanges = true;
+          }
+        });
+      });
+
+      if (hasChanges) {
+        onChange({
+          playerStats: updated,
+          playerOptions: updatedPlayerOptions,
+        });
+      } else {
+        onChange({ playerStats: updated });
+      }
     }
   };
 
@@ -128,6 +241,15 @@ export const StatsTab = ({
 
     if (!statToConvert) return;
 
+    // If the stat is currently being edited, remove it from editing mode first
+    if (editingStats.has(statToConvert.id)) {
+      setEditingStats((prev) => {
+        const next = new Set(prev);
+        next.delete(statToConvert.id);
+        return next;
+      });
+    }
+
     // Create a new ID with the appropriate prefix
     const targetType = sourceType === "shared" ? "player" : "shared";
     const newId = statToConvert.id.replace(
@@ -141,6 +263,15 @@ export const StatsTab = ({
       id: newId,
     };
 
+    // Handle updates to playerOptions if needed
+    let updatedPlayerOptions = null;
+    const oldId = statToConvert.id;
+
+    if (sourceType === "player") {
+      // Converting from player to shared - need to update references
+      updatedPlayerOptions = updatePlayerStatReferences(oldId, newId);
+    }
+
     if (sourceType === "shared") {
       // Converting from shared to player
       // 1. Remove from shared stats
@@ -152,10 +283,39 @@ export const StatsTab = ({
         (entry) => entry.statId !== statToConvert.id
       );
 
+      // 4. Add stat to all character backgrounds
+      const newPlayerOptions = { ...playerOptions };
+
+      // Initialize this stat for all character backgrounds
+      Object.keys(newPlayerOptions).forEach((playerSlot) => {
+        const player = newPlayerOptions[playerSlot as PlayerSlot];
+
+        player.possibleCharacterBackgrounds.forEach((background) => {
+          // Check if the stat is already there (should not be, but just to be safe)
+          if (
+            !background.initialPlayerStatValues.some(
+              (sv) => sv.statId === newId
+            )
+          ) {
+            // Add the stat with an initial value
+            background.initialPlayerStatValues.push({
+              statId: newId,
+              value:
+                convertedStat.type === "string"
+                  ? ""
+                  : convertedStat.type === "string[]"
+                  ? []
+                  : 50,
+            });
+          }
+        });
+      });
+
       onChange({
         sharedStats: updatedSharedStats,
         playerStats: updatedPlayerStats,
         initialSharedStatValues: updatedValues,
+        playerOptions: newPlayerOptions,
       });
     } else {
       // Converting from player to shared
@@ -180,6 +340,7 @@ export const StatsTab = ({
         playerStats: updatedPlayerStats,
         sharedStats: updatedSharedStats,
         initialSharedStatValues: updatedValues,
+        playerOptions: updatedPlayerOptions || undefined,
       });
     }
   };
@@ -232,7 +393,19 @@ export const StatsTab = ({
     if (!isEditing) {
       return (
         <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
-          <span className="font-medium">{stat.name}</span>
+          <div className="flex items-center">
+            <span
+              className={`w-2 h-2 rounded-full mr-2 ${
+                type === "shared" ? "bg-blue-500" : "bg-green-500"
+              }`}
+              title={
+                type === "shared"
+                  ? "Shared stat (applies to all players)"
+                  : "Player stat (unique to each player)"
+              }
+            ></span>
+            <span className="font-medium">{stat.name}</span>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() =>
@@ -272,16 +445,58 @@ export const StatsTab = ({
         localStat.name &&
         localStat.id.startsWith(type === "shared" ? "shared_" : "player_")
       ) {
+        // Check if ID has changed
+        const oldId = stat.id;
+        const isIdChanged = oldId !== localStat.id;
+
         // Update the stat
         handleUpdateStat(type, index, localStat);
+
         if (type === "shared") {
           // Update initial value with the correct ID
           const valueToStore =
             localStat.type === "string" || localStat.type === "string[]"
               ? localInitialValue
               : Number(localInitialValue);
-          handleUpdateInitialValue(localStat.id, valueToStore);
+
+          // If the ID has changed, update the initialSharedStatValues entries
+          if (isIdChanged) {
+            // Check if there's already an entry for this stat
+            const hasExistingEntry = initialSharedStatValues.some(
+              (entry) => entry.statId === oldId
+            );
+
+            if (hasExistingEntry) {
+              // Update the existing entry
+              const updatedValues = initialSharedStatValues.map((entry) =>
+                entry.statId === oldId
+                  ? { ...entry, statId: localStat.id, value: valueToStore }
+                  : entry
+              );
+              onChange({ initialSharedStatValues: updatedValues });
+            } else {
+              // Add a new entry (this is a newly created stat or one without an initial value)
+              const updatedValues = [
+                ...initialSharedStatValues,
+                { statId: localStat.id, value: valueToStore },
+              ];
+              onChange({ initialSharedStatValues: updatedValues });
+            }
+          } else {
+            // Otherwise just update the value
+            handleUpdateInitialValue(localStat.id, valueToStore);
+          }
+        } else if (isIdChanged) {
+          // For player stats, if ID changed, update references in playerOptions
+          const updatedPlayerOptions = updatePlayerStatReferences(
+            oldId,
+            localStat.id
+          );
+          if (updatedPlayerOptions) {
+            onChange({ playerOptions: updatedPlayerOptions });
+          }
         }
+
         setEditingStats((prev) => {
           const next = new Set(prev);
           next.delete(stat.id);
@@ -322,22 +537,13 @@ export const StatsTab = ({
                     const prefix = type === "shared" ? "shared_" : "player_";
                     const newId = prefix + e.target.value;
 
-                    // Update the stat's ID
+                    // Only update local state, don't update parent state yet
                     setLocalStat((prev) => ({
                       ...prev,
                       id: newId,
                     }));
 
-                    // If this is a shared stat, also update the initialSharedStatValues
-                    if (type === "shared") {
-                      const updatedValues = initialSharedStatValues.map(
-                        (entry) =>
-                          entry.statId === stat.id
-                            ? { ...entry, statId: newId }
-                            : entry
-                      );
-                      onChange({ initialSharedStatValues: updatedValues });
-                    }
+                    // We'll wait until save to update initialSharedStatValues
                   }}
                   placeholder="Enter stat ID"
                 />
@@ -409,50 +615,14 @@ export const StatsTab = ({
 
             {type === "shared" && (
               <div className="flex items-center gap-2">
-                <span className="font-semibold w-40">Initial Value</span>
-                {localStat.type === "string" ? (
-                  <Input
-                    id={`stat-initial-value-${stat.id}`}
-                    name={`stat-initial-value-${stat.id}`}
-                    className="flex-1"
-                    value={localInitialValue as string}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setLocalInitialValue(e.target.value)
-                    }
-                    placeholder="Enter initial value"
-                  />
-                ) : localStat.type === "string[]" ? (
-                  <Input
-                    id={`stat-initial-value-${stat.id}`}
-                    name={`stat-initial-value-${stat.id}`}
-                    className="flex-1"
-                    value={
-                      Array.isArray(localInitialValue)
-                        ? localInitialValue.join(", ")
-                        : ""
-                    }
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const inputValue = e.target.value;
-                      // Only split if there's actual content
-                      const values = inputValue
-                        ? inputValue.split(",").map((s) => s.trim())
-                        : [];
-                      setLocalInitialValue(values);
-                    }}
-                    placeholder="Enter comma-separated values"
-                  />
-                ) : (
-                  <Input
-                    id={`stat-initial-value-${stat.id}`}
-                    name={`stat-initial-value-${stat.id}`}
-                    className="flex-1"
-                    type="number"
-                    value={localInitialValue as number}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setLocalInitialValue(Number(e.target.value))
-                    }
-                  />
-                )}
+                <StatValueInput
+                  statType={localStat.type}
+                  value={localInitialValue}
+                  onChange={(value) => setLocalInitialValue(value)}
+                  placeholder="Enter initial value"
+                  className="flex-1"
+                  label="Initial Value"
+                />
               </div>
             )}
             {/* Additional stat fields */}
@@ -854,7 +1024,13 @@ export const StatsTab = ({
       <section>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
-            <h3 className="text-lg font-semibold">Shared Stats</h3>
+            <h3 className="text-lg font-semibold flex items-center">
+              <span
+                className="w-3 h-3 rounded-full bg-blue-500 mr-2"
+                title="Shared stats apply to all players"
+              ></span>
+              Shared Stats
+            </h3>
             <InfoIcon
               tooltipText="Stats shared by all players in the game"
               position="right"
@@ -884,7 +1060,13 @@ export const StatsTab = ({
       <section>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
-            <h3 className="text-lg font-semibold">Player Stats</h3>
+            <h3 className="text-lg font-semibold flex items-center">
+              <span
+                className="w-3 h-3 rounded-full bg-green-500 mr-2"
+                title="Player stats are unique to each player"
+              ></span>
+              Player Stats
+            </h3>
             <InfoIcon
               tooltipText="Stats that are unique to each player"
               position="right"

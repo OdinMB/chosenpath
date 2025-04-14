@@ -66,7 +66,6 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
 
             return (
               <div key={statValue.statId} className="flex gap-2 items-center">
-                <span className="text-sm w-48 font-semibold">{stat.name}</span>
                 <StatValueInput
                   value={statValue.value}
                   onChange={(newValue) => {
@@ -82,6 +81,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
                   statType={stat.type}
                   placeholder={`Initial ${stat.name}`}
                   className="flex-1"
+                  label={stat.name}
                 />
               </div>
             );
