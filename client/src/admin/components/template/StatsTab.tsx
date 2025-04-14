@@ -117,6 +117,73 @@ export const StatsTab = ({
     onChange({ initialSharedStatValues: updated });
   };
 
+  // Function to convert a stat between shared and player types
+  const handleConvertStat = (
+    sourceType: "shared" | "player",
+    index: number
+  ) => {
+    // Get the stat to convert
+    const statToConvert =
+      sourceType === "shared" ? sharedStats[index] : playerStats[index];
+
+    if (!statToConvert) return;
+
+    // Create a new ID with the appropriate prefix
+    const targetType = sourceType === "shared" ? "player" : "shared";
+    const newId = statToConvert.id.replace(
+      /^(shared_|player_)/,
+      targetType === "shared" ? "shared_" : "player_"
+    );
+
+    // Create a copy of the stat with the new ID
+    const convertedStat: Stat = {
+      ...statToConvert,
+      id: newId,
+    };
+
+    if (sourceType === "shared") {
+      // Converting from shared to player
+      // 1. Remove from shared stats
+      const updatedSharedStats = sharedStats.filter((_, i) => i !== index);
+      // 2. Add to player stats
+      const updatedPlayerStats = [...playerStats, convertedStat];
+      // 3. Remove from shared values
+      const updatedValues = initialSharedStatValues.filter(
+        (entry) => entry.statId !== statToConvert.id
+      );
+
+      onChange({
+        sharedStats: updatedSharedStats,
+        playerStats: updatedPlayerStats,
+        initialSharedStatValues: updatedValues,
+      });
+    } else {
+      // Converting from player to shared
+      // 1. Remove from player stats
+      const updatedPlayerStats = playerStats.filter((_, i) => i !== index);
+      // 2. Add to shared stats
+      const updatedSharedStats = [...sharedStats, convertedStat];
+      // 3. Add initial value for the new shared stat
+      const initialValue =
+        convertedStat.type === "string"
+          ? ""
+          : convertedStat.type === "string[]"
+          ? []
+          : 50;
+
+      const updatedValues = [
+        ...initialSharedStatValues,
+        { statId: newId, value: initialValue },
+      ];
+
+      onChange({
+        playerStats: updatedPlayerStats,
+        sharedStats: updatedSharedStats,
+        initialSharedStatValues: updatedValues,
+      });
+    }
+  };
+
   const StatEditor = ({
     stat,
     index,
@@ -175,6 +242,18 @@ export const StatsTab = ({
               aria-label={`Edit ${stat.name}`}
             >
               <Icons.Edit className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => handleConvertStat(type, index)}
+              className="text-blue-500 hover:text-blue-700"
+              aria-label={`Convert ${stat.name} to ${
+                type === "shared" ? "player" : "shared"
+              } stat`}
+              title={`Convert to ${
+                type === "shared" ? "player" : "shared"
+              } stat`}
+            >
+              <Icons.SwitchHorizontal className="h-5 w-5" />
             </button>
             <button
               onClick={() => handleRemoveStat(type, index)}
