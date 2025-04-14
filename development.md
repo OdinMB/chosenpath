@@ -2,18 +2,13 @@ Smaller and more commits!
 
 # Feature backlog
 
-Library of stories with pre-configured setups
-
-- add remaining sections
-- allow users to select stories from library
-- make some settings flexible (2-3 players, 20-25 beats, etc.)
-
 Next
 
-- Always introduce other players in beat 1
-- First thread always together
 - List of types of scenes that the story should include (generation, switch/thread generation)
 - CoT schema attribute to list "show don't tell" elements for the beat.
+- Not the same type of decision several times over the course of a thread
+- Always introduce other players in beat 1
+- First thread always together
 
 New features
 

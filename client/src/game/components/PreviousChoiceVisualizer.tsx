@@ -555,11 +555,9 @@ export const PreviousChoiceVisualizer: React.FC<
                       <span className="text-primary ml-1">
                         {getRiskDisplayText(choice.riskType)}
                       </span>
-                      <div className="ml-0.5 mt-[7px]">
-                        <InfoIcon
-                          tooltipText={formatRiskDistribution(choice.riskType)}
-                        />
-                      </div>
+                      <InfoIcon
+                        tooltipText={formatRiskDistribution(choice.riskType)}
+                      />
                     </div>
 
                     {choice.resourceType && choice.resourceType !== "normal" ? (
@@ -567,13 +565,9 @@ export const PreviousChoiceVisualizer: React.FC<
                         <span className="font-semibold text-primary capitalize">
                           {choice.resourceType}:
                         </span>
-                        <div className="ml-0.5 mt-[7px]">
-                          <InfoIcon
-                            tooltipText={getResourceTypeInfo(
-                              choice.resourceType
-                            )}
-                          />
-                        </div>
+                        <InfoIcon
+                          tooltipText={getResourceTypeInfo(choice.resourceType)}
+                        />
                       </div>
                     ) : (
                       resolutionDetails?.points !== undefined && (
@@ -587,12 +581,10 @@ export const PreviousChoiceVisualizer: React.FC<
                           {resolutionDetails.readablePointModifiers &&
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
-                              <div className="ml-0.5 mt-[7px]">
-                                <InfoIcon
-                                  tooltipText={formatPointBreakdown()}
-                                  contentClassName="max-w-[400px]"
-                                />
-                              </div>
+                              <InfoIcon
+                                tooltipText={formatPointBreakdown()}
+                                contentClassName="max-w-[400px]"
+                              />
                             )}
                         </div>
                       )
