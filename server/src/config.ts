@@ -29,3 +29,14 @@ export const config = {
 
 // Use storage paths from shared config
 export const STORAGE_PATHS = SHARED_STORAGE_PATHS;
+
+// OpenAI model settings
+export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1";
+export const TEXT_MODEL_REASONING_EFFORT =
+  process.env.TEXT_MODEL_REASONING_EFFORT || "medium";
+export const TEXT_MODEL_TEMPERATURE = process.env.TEXT_MODEL_TEMPERATURE || 0.3;
+
+export const IMAGE_QUERY_MODEL_NAME =
+  process.env.IMAGE_QUERY_MODEL_NAME || "gpt-4.1-mini";
+export const IMAGE_QUERY_MODEL_TEMPERATURE =
+  process.env.IMAGE_QUERY_MODEL_TEMPERATURE || 0.1;

@@ -9,6 +9,10 @@ import { imageGenerationSchema } from "@core/types/index.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 import { Story } from "@core/models/Story.js";
+import {
+  IMAGE_QUERY_MODEL_NAME,
+  IMAGE_QUERY_MODEL_TEMPERATURE,
+} from "@/config.js";
 
 dotenv.config();
 
@@ -21,11 +25,10 @@ export class AIImageGenerator {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
     this.openai = new OpenAI();
+
     this.model = new ChatOpenAI({
-      modelName: "o3-mini",
-      reasoningEffort: "low",
-      // modelName: "gpt-4o",
-      // temperature: 0.4,
+      modelName: IMAGE_QUERY_MODEL_NAME as string,
+      temperature: IMAGE_QUERY_MODEL_TEMPERATURE as number,
     });
   }
 

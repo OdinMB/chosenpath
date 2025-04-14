@@ -32,6 +32,7 @@ import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
 } from "@core/config.js";
+import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "@/config.js";
 import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 
@@ -46,10 +47,8 @@ export class AIStoryGenerator {
     }
 
     this.model = new ChatOpenAI({
-      // modelName: "o3-mini",
-      // reasoningEffort: "high", // low, medium, high
-      modelName: "gpt-4o",
-      temperature: 0.4,
+      modelName: TEXT_MODEL_NAME as string,
+      temperature: TEXT_MODEL_TEMPERATURE as number,
     });
   }
 
