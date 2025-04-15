@@ -1,13 +1,6 @@
 import React from "react";
 import { PlayerCount } from "@core/types";
-import {
-  Icons,
-  Input,
-  TextArea,
-  PrimaryButton,
-  InfoIcon,
-  Select,
-} from "@components/ui";
+import { ArrayField, Input, TextArea, InfoIcon, Select } from "@components/ui";
 
 interface BasicInfoTabProps {
   title: string;
@@ -52,8 +45,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   setMaxTurnsMax,
   tags,
   handleTagsChange,
-  handleAddTag,
-  handleRemoveTag,
   // Helper functions
   getMinPlayerOptions,
   getMaxPlayerOptions,
@@ -91,47 +82,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
       {/* Tags section */}
       <div>
-        <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center">
-            <h3 className="font-semibold">Tags</h3>
-            <InfoIcon
-              tooltipText="Categories to help players find your story"
-              position="right"
-              className="ml-2 mt-1"
-            />
-          </div>
-          <PrimaryButton
-            variant="outline"
-            size="sm"
-            onClick={handleAddTag}
-            leftIcon={<Icons.Plus className="h-4 w-4" />}
-          >
-            Add
-          </PrimaryButton>
-        </div>
-        {tags.map((tag, index) => (
-          <div key={index} className="flex gap-2 mb-2">
-            <Input
-              id={`tag-${index}`}
-              name={`tag-${index}`}
-              value={tag}
-              onChange={(e) => {
-                const updatedTags = [...tags];
-                updatedTags[index] = e.target.value;
-                handleTagsChange(updatedTags);
-              }}
-              placeholder="Add a tag"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveTag(index)}
-              className="text-tertiary hover:text-tertiary-700"
-              aria-label={`Remove tag ${tag || index + 1}`}
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        <ArrayField
+          title="Tags"
+          tooltipText="Categories to help players find your story"
+          items={tags}
+          onChange={handleTagsChange}
+          placeholder="Add a tag"
+          emptyPlaceholder="Click + to add tags"
+        />
       </div>
 
       {/* Players and Game Mode section */}

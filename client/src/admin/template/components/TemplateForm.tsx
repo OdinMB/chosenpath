@@ -40,15 +40,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     activeTab,
     setActiveTab,
     formData,
-    world,
-    rules,
-    tone,
-    conflicts,
-    decisions,
     tags,
-    handleArrayFieldChange,
-    handleAddArrayItem,
-    handleRemoveArrayItem,
     handleSubmit,
     getPlayerOptions,
     handleAIDraftSetup,
@@ -183,19 +175,19 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         {activeTab === "guidelines" && (
           <GuidelinesTab
-            world={world}
-            setWorld={setWorld}
-            rules={rules}
-            tone={tone}
-            conflicts={conflicts}
-            decisions={decisions}
-            handleArrayFieldChange={handleArrayFieldChange}
-            handleAddArrayItem={handleAddArrayItem}
-            handleRemoveArrayItem={handleRemoveArrayItem}
-            setRules={setRules}
-            setTone={setTone}
-            setConflicts={setConflicts}
-            setDecisions={setDecisions}
+            template={formData}
+            onChange={(updates) => {
+              // Delegate to useTemplateForm's update mechanisms
+              if (updates.guidelines) {
+                const { world, rules, tone, conflicts, decisions } =
+                  updates.guidelines;
+                if (world !== undefined) setWorld(world);
+                if (rules !== undefined) setRules(rules);
+                if (tone !== undefined) setTone(tone);
+                if (conflicts !== undefined) setConflicts(conflicts);
+                if (decisions !== undefined) setDecisions(decisions);
+              }
+            }}
           />
         )}
 

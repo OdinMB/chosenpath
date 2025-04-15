@@ -29,12 +29,11 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
         </div>
         <PrimaryButton
           variant="outline"
+          leftBorder={false}
           size="sm"
           onClick={handleAddOutcome}
           leftIcon={<Icons.Plus className="h-4 w-4" />}
-        >
-          Add
-        </PrimaryButton>
+        ></PrimaryButton>
       </div>
 
       {outcomes.map((outcome, index) => (

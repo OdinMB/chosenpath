@@ -28,14 +28,13 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
         </div>
         <PrimaryButton
           variant="outline"
+          leftBorder={false}
           size="sm"
           onClick={() => {
             onChange([...statGroups, ""]);
           }}
           leftIcon={<Icons.Plus className="h-4 w-4" />}
-        >
-          Add
-        </PrimaryButton>
+        ></PrimaryButton>
       </div>
       {statGroups.length === 0 ? (
         <p className="text-gray-500">Add at least one stat group</p>

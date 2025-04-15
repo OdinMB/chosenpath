@@ -258,7 +258,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4">
-        <div className="flex-1 space-y-6 mr-4">
+        <div className="flex-1 space-y-12 mr-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">
               Player {playerSlot.replace("player", "")}
@@ -267,7 +267,16 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 
           {/* Character Identities */}
           <div className="space-y-4">
-            <h3 className="font-semibold mb-1">Character Identities</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold mb-1">Character Identities</h3>
+              <PrimaryButton
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={handleAddIdentity}
+                leftIcon={<Icons.Plus className="h-4 w-4" />}
+              ></PrimaryButton>
+            </div>
             {localOptions.possibleCharacterIdentities.map((identity, index) => (
               <PlayerIdentity
                 key={`${playerSlot}_identity_${index}`}
@@ -280,21 +289,20 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                 pronounSets={PRONOUN_SETS}
               />
             ))}
-            <div className="flex justify-end">
-              <PrimaryButton
-                variant="outline"
-                size="sm"
-                onClick={handleAddIdentity}
-                leftIcon={<Icons.Plus className="h-4 w-4" />}
-              >
-                Add Identity
-              </PrimaryButton>
-            </div>
           </div>
 
           {/* Character Backgrounds */}
           <div className="space-y-4">
-            <h3 className="font-semibold mb-1">Character Backgrounds</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold mb-1">Character Backgrounds</h3>
+              <PrimaryButton
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={handleAddBackground}
+                leftIcon={<Icons.Plus className="h-4 w-4" />}
+              ></PrimaryButton>
+            </div>
             {localOptions.possibleCharacterBackgrounds.map(
               (background, index) => (
                 <PlayerBackground
@@ -309,16 +317,6 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                 />
               )
             )}
-            <div className="flex justify-end">
-              <PrimaryButton
-                variant="outline"
-                size="sm"
-                onClick={handleAddBackground}
-                leftIcon={<Icons.Plus className="h-4 w-4" />}
-              >
-                Add Background
-              </PrimaryButton>
-            </div>
           </div>
 
           {/* Individual Outcomes */}
@@ -326,6 +324,13 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Individual Outcomes</h3>
               <div className="flex gap-2">
+                <PrimaryButton
+                  onClick={() => handleAddPlayerOutcome(playerSlot)}
+                  variant="outline"
+                  leftBorder={false}
+                  size="sm"
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
+                ></PrimaryButton>{" "}
                 <Select
                   className="text-sm w-44"
                   size="sm"
@@ -354,14 +359,6 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                       ))
                   )}
                 </Select>
-                <PrimaryButton
-                  onClick={() => handleAddPlayerOutcome(playerSlot)}
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add Outcome
-                </PrimaryButton>
               </div>
             </div>
 

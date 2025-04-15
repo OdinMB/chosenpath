@@ -1,6 +1,7 @@
 import React from "react";
 import { StoryElement } from "@core/types";
 import {
+  ArrayField,
   InfoIcon,
   Input,
   TextArea,
@@ -48,79 +49,6 @@ const ElementItem: React.FC<{
     </div>
   </div>
 );
-
-const FactsList: React.FC<{
-  facts: string[];
-  elementId: string;
-  onChange: (facts: string[]) => void;
-}> = ({ facts, elementId, onChange }) => {
-  const handleAddFact = () => {
-    onChange([...facts, ""]);
-  };
-
-  const handleFactChange = (index: number, value: string) => {
-    const newFacts = [...facts];
-    newFacts[index] = value;
-    onChange(newFacts);
-  };
-
-  const handleRemoveFact = (index: number) => {
-    onChange(facts.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-1">
-        <div className="flex items-center">
-          <h3 className="font-semibold">Facts</h3>
-          <InfoIcon
-            tooltipText="Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
-            position="right"
-            className="ml-2 mt-1"
-          />
-        </div>
-        <PrimaryButton
-          variant="outline"
-          size="sm"
-          onClick={handleAddFact}
-          leftIcon={<Icons.Plus className="h-4 w-4" />}
-        >
-          Add
-        </PrimaryButton>
-      </div>
-
-      {facts.length === 0 ? (
-        <Input
-          id={`new-fact-${elementId}`}
-          name={`new-fact-${elementId}`}
-          placeholder="Click + to add facts"
-          disabled
-        />
-      ) : (
-        facts.map((fact, factIndex) => (
-          <div key={factIndex} className="flex gap-2 mb-2">
-            <Input
-              id={`element-fact-${elementId}-${factIndex}`}
-              name={`element-fact-${elementId}-${factIndex}`}
-              className="flex-1"
-              value={fact}
-              onChange={(e) => handleFactChange(factIndex, e.target.value)}
-              placeholder="Enter a fact about this element"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveFact(factIndex)}
-              className="text-tertiary hover:text-tertiary-700"
-              aria-label={`Remove fact ${factIndex + 1}`}
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
-          </div>
-        ))
-      )}
-    </div>
-  );
-};
 
 const ElementEditor: React.FC<ElementEditorProps> = ({
   element,
@@ -208,10 +136,15 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             />
           </div>
 
-          <FactsList
-            facts={localElement.facts}
-            elementId={element.id}
-            onChange={(facts) => setLocalElement({ ...localElement, facts })}
+          <ArrayField
+            title="Facts"
+            tooltipText="Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
+            items={localElement.facts}
+            onChange={(facts: string[]) =>
+              setLocalElement({ ...localElement, facts })
+            }
+            placeholder="Enter a fact about this element"
+            emptyPlaceholder="Click + to add facts"
           />
         </div>
 
@@ -264,12 +197,11 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
         </div>
         <PrimaryButton
           variant="outline"
+          leftBorder={false}
           size="sm"
           onClick={handleAddElement}
           leftIcon={<Icons.Plus className="h-4 w-4" />}
-        >
-          Add
-        </PrimaryButton>
+        ></PrimaryButton>
       </div>
 
       {elements.map((element, index) => (

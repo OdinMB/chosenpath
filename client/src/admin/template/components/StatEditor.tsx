@@ -1,5 +1,5 @@
 import React from "react";
-import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
+import { ArrayField, PrimaryButton, Icons, Input } from "@components/ui";
 import { Stat, StatValueEntry } from "@core/types";
 import { StatValueInput } from "./StatValueInput";
 import { useStatEditor } from "../hooks/useStatEditor";
@@ -40,9 +40,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
     setLocalInitialValue,
     handleSave,
     updateStatField,
-    updateArrayField,
-    removeArrayItem,
-    addArrayItem,
+    handleRemoveStat,
   } = useStatEditor({
     stat,
     index,
@@ -200,114 +198,29 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 Visible to players
               </label>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <div className="flex items-center">
-                  <h3 className="font-semibold">Narrative Implications</h3>
-                  <InfoIcon
-                    tooltipText="How this stat affects the story narrative"
-                    position="right"
-                    className="ml-2 mt-1"
-                  />
-                </div>
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addArrayItem("narrativeImplications")}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add
-                </PrimaryButton>
-              </div>
-              {localStat.narrativeImplications.length === 0 ? (
-                <Input
-                  id={`new-implication-${stat.id}`}
-                  name={`new-implication-${stat.id}`}
-                  placeholder="Click + to add narrative implications"
-                  disabled
-                />
-              ) : (
-                localStat.narrativeImplications.map((implication, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <Input
-                      id={`stat-implication-${stat.id}-${idx}`}
-                      name={`stat-implication-${stat.id}-${idx}`}
-                      className="flex-1"
-                      value={implication}
-                      onChange={(e) =>
-                        updateArrayField(
-                          "narrativeImplications",
-                          idx,
-                          e.target.value
-                        )
-                      }
-                      placeholder="e.g., Below 30% causes visible weakness"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeArrayItem("narrativeImplications", idx)
-                      }
-                      className="text-tertiary hover:text-tertiary-700"
-                      aria-label={`Remove implication ${idx + 1}`}
-                    >
-                      <Icons.Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <div className="flex items-center">
-                  <h3 className="font-semibold">Effect on Points</h3>
-                  <InfoIcon
-                    tooltipText="How this stat affects point calculations"
-                    position="right"
-                    className="ml-2 mt-1"
-                  />
-                </div>
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addArrayItem("effectOnPoints")}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add
-                </PrimaryButton>
-              </div>
-              {localStat.effectOnPoints.length === 0 ? (
-                <Input
-                  id={`new-effect-${stat.id}`}
-                  name={`new-effect-${stat.id}`}
-                  placeholder="Click + to add effects"
-                  disabled
-                />
-              ) : (
-                localStat.effectOnPoints.map((effect, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <Input
-                      id={`stat-effect-${stat.id}-${idx}`}
-                      name={`stat-effect-${stat.id}-${idx}`}
-                      className="flex-1"
-                      value={effect}
-                      onChange={(e) =>
-                        updateArrayField("effectOnPoints", idx, e.target.value)
-                      }
-                      placeholder="e.g., Above 70% provides +15 points to social challenges"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeArrayItem("effectOnPoints", idx)}
-                      className="text-tertiary hover:text-tertiary-700"
-                      aria-label={`Remove effect ${idx + 1}`}
-                    >
-                      <Icons.Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
+
+            <ArrayField
+              title="Narrative Implications"
+              tooltipText="How this stat affects the story narrative"
+              items={localStat.narrativeImplications}
+              onChange={(items: string[]) =>
+                updateStatField("narrativeImplications", items)
+              }
+              placeholder="e.g., Below 30% causes visible weakness"
+              emptyPlaceholder="Click + to add narrative implications"
+            />
+
+            <ArrayField
+              title="Effect on Points"
+              tooltipText="How this stat affects point calculations"
+              items={localStat.effectOnPoints}
+              onChange={(items: string[]) =>
+                updateStatField("effectOnPoints", items)
+              }
+              placeholder="e.g., Above 70% provides +15 points to social challenges"
+              emptyPlaceholder="Click + to add effects"
+            />
+
             <div className="flex items-center gap-2">
               <span className="font-semibold w-48">Sacrifice Options</span>
               <Input
@@ -354,68 +267,22 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 Can be changed in beat resolutions
               </label>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <div className="flex items-center">
-                  <h3 className="font-semibold">Adjustments After Threads</h3>
-                  <InfoIcon
-                    tooltipText="How this stat changes after completing story threads"
-                    position="right"
-                    className="ml-2 mt-1"
-                  />
-                </div>
-                <PrimaryButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addArrayItem("adjustmentsAfterThreads")}
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                >
-                  Add
-                </PrimaryButton>
-              </div>
-              {localStat.adjustmentsAfterThreads.length === 0 ? (
-                <Input
-                  id={`new-adjustment-${stat.id}`}
-                  name={`new-adjustment-${stat.id}`}
-                  placeholder="Click + to add thread adjustments"
-                  disabled
-                />
-              ) : (
-                localStat.adjustmentsAfterThreads.map((adjustment, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <Input
-                      id={`stat-adjustment-${stat.id}-${idx}`}
-                      name={`stat-adjustment-${stat.id}-${idx}`}
-                      className="flex-1"
-                      value={adjustment}
-                      onChange={(e) =>
-                        updateArrayField(
-                          "adjustmentsAfterThreads",
-                          idx,
-                          e.target.value
-                        )
-                      }
-                      placeholder="e.g., Mana regenerates by 10% after each thread"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeArrayItem("adjustmentsAfterThreads", idx)
-                      }
-                      className="text-tertiary hover:text-tertiary-700"
-                      aria-label={`Remove adjustment ${idx + 1}`}
-                    >
-                      <Icons.Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
+
+            <ArrayField
+              title="Adjustments After Threads"
+              tooltipText="How this stat changes after completing story threads"
+              items={localStat.adjustmentsAfterThreads}
+              onChange={(items: string[]) =>
+                updateStatField("adjustmentsAfterThreads", items)
+              }
+              placeholder="e.g., Mana regenerates by 10% after each thread"
+              emptyPlaceholder="Click + to add thread adjustments"
+            />
           </div>
         </div>
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => onRemoveStat(type, index)}
+            onClick={handleRemoveStat}
             className="text-tertiary hover:text-tertiary-700"
             aria-label="Remove stat"
           >

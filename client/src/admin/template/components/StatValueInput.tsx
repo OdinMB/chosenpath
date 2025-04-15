@@ -1,5 +1,5 @@
 import React from "react";
-import { Icons, Input, PrimaryButton } from "@components/ui";
+import { ArrayField, Input } from "@components/ui";
 import { Stat } from "@core/types";
 
 interface StatValueInputProps {
@@ -23,57 +23,16 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
   if (statType === "string[]") {
     const arrayValues = Array.isArray(value) ? value : [];
 
-    const handleAddItem = () => {
-      onChange([...arrayValues, ""]);
-    };
-
-    const handleUpdateItem = (index: number, newValue: string) => {
-      const updatedArray = [...arrayValues];
-      updatedArray[index] = newValue;
-      onChange(updatedArray);
-    };
-
-    const handleDeleteItem = (index: number) => {
-      const updatedArray = arrayValues.filter((_, i) => i !== index);
-      onChange(updatedArray);
-    };
-
     return (
-      <div className={className}>
-        <div className="flex justify-between items-center">
-          {label && <span className="font-semibold flex-grow">{label}</span>}
-          <PrimaryButton
-            variant="outline"
-            size="sm"
-            onClick={handleAddItem}
-            leftIcon={<Icons.Plus className="h-4 w-4" />}
-          >
-            Add
-          </PrimaryButton>
-        </div>
-        <div className="space-y-2 mt-2 ml-0">
-          {arrayValues.map((item, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Input
-                value={item}
-                onChange={(e) => handleUpdateItem(index, e.target.value)}
-                placeholder={placeholder || `Item ${index + 1}`}
-                className="flex-1"
-              />
-              <button
-                onClick={() => handleDeleteItem(index)}
-                className="text-tertiary hover:text-tertiary-700"
-                aria-label={`Delete item ${index + 1}`}
-              >
-                <Icons.Trash className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-          {arrayValues.length === 0 && (
-            <div className="text-gray-500 text-sm">No items added</div>
-          )}
-        </div>
-      </div>
+      <ArrayField
+        label={label}
+        items={arrayValues}
+        onChange={onChange}
+        placeholder={placeholder || "Enter a value"}
+        emptyPlaceholder="No items added"
+        className={className}
+        buttonText="Add Item"
+      />
     );
   }
 
