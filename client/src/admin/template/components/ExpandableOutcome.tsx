@@ -2,6 +2,7 @@ import React from "react";
 import { Outcome } from "@core/types";
 import { ExpandableItem } from "./";
 import { InfoIcon, Input, Select } from "@components/ui";
+import { useOutcomeForm } from "../hooks/useOutcomeForm";
 
 // Define PlayerOutcome here since it's not exported from a module
 interface PlayerOutcome {
@@ -49,12 +50,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
   onDelete,
   onUpdate,
 }) => {
-  // Helper functions to check resolution type
-  const isChallenge = (res: ResolutionType): res is ChallengeResolution =>
-    "favorable" in res;
-
-  const isExploration = (res: ResolutionType): res is ExplorationResolution =>
-    "resolution1" in res;
+  const {
+    isChallenge,
+    isExploration,
+    handleResolutionTypeChange,
+    handleResolutionFieldChange,
+  } = useOutcomeForm();
 
   const renderOutcomeForm = (
     data: OutcomeType,
@@ -121,45 +122,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
               size="sm"
               value={isExploration(resolutions) ? "exploration" : "challenge"}
               onChange={(e) => {
-                const type = e.target.value;
-
-                // Get existing values to preserve them
-                let favorable = "";
-                let unfavorable = "";
-                let mixed = "";
-                let resolution1 = "";
-                let resolution2 = "";
-                let resolution3 = "";
-
-                if (isChallenge(resolutions)) {
-                  favorable = resolutions.favorable;
-                  unfavorable = resolutions.unfavorable;
-                  mixed = resolutions.mixed;
-                } else if (isExploration(resolutions)) {
-                  resolution1 = resolutions.resolution1;
-                  resolution2 = resolutions.resolution2;
-                  resolution3 = resolutions.resolution3;
-                }
-
-                if (type === "challenge") {
-                  onChange({
-                    ...data,
-                    possibleResolutions: {
-                      favorable: favorable || resolution1 || "",
-                      unfavorable: unfavorable || resolution2 || "",
-                      mixed: mixed || resolution3 || "",
-                    },
-                  });
-                } else {
-                  onChange({
-                    ...data,
-                    possibleResolutions: {
-                      resolution1: resolution1 || favorable || "",
-                      resolution2: resolution2 || unfavorable || "",
-                      resolution3: resolution3 || mixed || "",
-                    },
-                  });
-                }
+                handleResolutionTypeChange(e.target.value, data, onChange);
               }}
             >
               <option value="challenge">Challenge</option>
@@ -176,14 +139,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={resolutions.favorable}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        favorable: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "favorable",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="Resolution that is favorable to the player(s)"
                 />
@@ -194,14 +155,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={resolutions.unfavorable}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        unfavorable: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "unfavorable",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="Resolution that is unfavorable for the player(s)"
                 />
@@ -212,14 +171,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={resolutions.mixed}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        mixed: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "mixed",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="Resolution for a mixed outcome"
                 />
@@ -234,14 +191,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution1}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        resolution1: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "resolution1",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="First possible resolution"
                 />
@@ -252,14 +207,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution2}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        resolution2: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "resolution2",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="Second possible resolution"
                 />
@@ -270,14 +223,12 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                   className="flex-1"
                   value={(resolutions as ExplorationResolution).resolution3}
                   onChange={(e) => {
-                    const updated = {
-                      ...data,
-                      possibleResolutions: {
-                        ...resolutions,
-                        resolution3: e.target.value,
-                      },
-                    };
-                    onChange(updated);
+                    handleResolutionFieldChange(
+                      data,
+                      "resolution3",
+                      e.target.value,
+                      onChange
+                    );
                   }}
                   placeholder="Third possible resolution"
                 />

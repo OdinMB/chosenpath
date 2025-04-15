@@ -1,6 +1,5 @@
 import React from "react";
-import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
-import { GameModes, GameMode, PlayerCount } from "@core/types";
+import { PlayerCount } from "@core/types";
 import {
   Icons,
   Input,
@@ -8,27 +7,33 @@ import {
   PrimaryButton,
   InfoIcon,
   Select,
-} from "@components/ui/index";
+} from "@components/ui";
 
 interface BasicInfoTabProps {
   title: string;
-  setTitle: (value: string) => void;
+  setTitle: (title: string) => void;
   teaser: string;
-  setTeaser: (value: string) => void;
+  setTeaser: (teaser: string) => void;
   playerCountMin: PlayerCount;
   playerCountMax: PlayerCount;
-  setPlayerCountMin: (value: PlayerCount) => void;
-  setPlayerCountMax: (value: PlayerCount) => void;
-  gameMode: GameMode;
+  setPlayerCountMin: (count: PlayerCount) => void;
+  setPlayerCountMax: (count: PlayerCount) => void;
   handleGameModeChange: (value: number) => void;
   maxTurnsMin: number;
   maxTurnsMax: number;
-  setMaxTurnsMin: (value: number) => void;
-  setMaxTurnsMax: (value: number) => void;
+  setMaxTurnsMin: (turns: number) => void;
+  setMaxTurnsMax: (turns: number) => void;
   tags: string[];
-  handleTagsChange: (updatedTags: string[]) => void;
+  handleTagsChange: (tags: string[]) => void;
   handleAddTag: () => void;
   handleRemoveTag: (index: number) => void;
+  // Helper functions
+  getMinPlayerOptions: () => number[];
+  getMaxPlayerOptions: () => number[];
+  getMinTurnsOptions: () => number[];
+  getMaxTurnsOptions: () => number[];
+  gameModeOptions: Array<{ value: number; label: string }>;
+  getGameModeValue: () => number;
 }
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
@@ -40,7 +45,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   playerCountMax,
   setPlayerCountMin,
   setPlayerCountMax,
-  gameMode,
   handleGameModeChange,
   maxTurnsMin,
   maxTurnsMax,
@@ -50,32 +54,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   handleTagsChange,
   handleAddTag,
   handleRemoveTag,
+  // Helper functions
+  getMinPlayerOptions,
+  getMaxPlayerOptions,
+  getMinTurnsOptions,
+  getMaxTurnsOptions,
+  gameModeOptions,
+  getGameModeValue,
 }) => {
-  // For story length select options
-  const getStoryLengthOptions = (min: number, max: number, step: number) => {
-    const options = [];
-    for (let i = min; i <= max; i += step) {
-      options.push(i);
-    }
-    return options;
-  };
-
-  // For player count options
-  const getPlayerCountOptions = (min: number, max: number) => {
-    const options = [];
-    for (let i = min; i <= max; i++) {
-      options.push(i);
-    }
-    return options;
-  };
-
-  // Game mode options
-  const gameModeOptions = [
-    { value: 0, label: "Shared Goals" },
-    { value: 1, label: "Mixed Goals" },
-    { value: 2, label: "Competing Goals" },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -169,13 +155,11 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                 setPlayerCountMin(Number(e.target.value) as PlayerCount)
               }
             >
-              {getPlayerCountOptions(MIN_PLAYERS, playerCountMax).map(
-                (count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                )
-              )}
+              {getMinPlayerOptions().map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
             </Select>
           </div>
 
@@ -191,13 +175,11 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                 setPlayerCountMax(Number(e.target.value) as PlayerCount)
               }
             >
-              {getPlayerCountOptions(playerCountMin, MAX_PLAYERS).map(
-                (count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                )
-              )}
+              {getMaxPlayerOptions().map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
             </Select>
           </div>
 
@@ -212,15 +194,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="game-mode"
               name="game-mode"
-              value={
-                playerCountMax === 1
-                  ? "0"
-                  : gameMode === GameModes.Cooperative
-                  ? "0"
-                  : gameMode === GameModes.CooperativeCompetitive
-                  ? "1"
-                  : "2"
-              }
+              value={getGameModeValue().toString()}
               onChange={(e) => handleGameModeChange(Number(e.target.value))}
               disabled={playerCountMax === 1}
             >
@@ -253,7 +227,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               value={maxTurnsMin.toString()}
               onChange={(e) => setMaxTurnsMin(Number(e.target.value))}
             >
-              {getStoryLengthOptions(MIN_TURNS, maxTurnsMax, 5).map((turns) => (
+              {getMinTurnsOptions().map((turns) => (
                 <option key={turns} value={turns}>
                   {turns}
                 </option>
@@ -271,7 +245,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               value={maxTurnsMax.toString()}
               onChange={(e) => setMaxTurnsMax(Number(e.target.value))}
             >
-              {getStoryLengthOptions(maxTurnsMin, MAX_TURNS, 5).map((turns) => (
+              {getMaxTurnsOptions().map((turns) => (
                 <option key={turns} value={turns}>
                   {turns}
                 </option>

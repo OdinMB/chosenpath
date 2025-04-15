@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton, Icons } from "@components/ui";
-import { StoriesOverview } from "./components/StoriesOverview";
-import { AdminLogin } from "./components/AdminLogin";
-import { StoryLibrary } from "./components/StoryLibrary";
-import { TemplateForm } from "./components/template";
+import { StoriesOverview } from "./StoriesOverview";
+import { AdminLogin } from "./AdminLogin";
+import { StoryLibrary } from "./StoryLibrary";
+import { TemplateForm } from "./template/components";
 import { StoryTemplate, PublicationStatus } from "@core/types";
-import { createDefaultTemplate } from "./components/template/templateFactory";
+import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import { PrimaryButton, Icons } from "@components/ui";
 import { Outcome } from "@core/types/outcome";
 import { ExpandableOutcome } from "./";
+import { useOutcomes } from "../hooks/useOutcomes";
 
 interface OutcomesTabProps {
   outcomes: Outcome[];
@@ -12,40 +13,13 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   outcomes,
   onChange,
 }) => {
-  // Track which outcomes are being edited by their IDs
-  const [editingOutcomes, setEditingOutcomes] = useState<Set<string>>(
-    new Set()
-  );
-
-  const handleAddOutcome = () => {
-    const tempId = `shared_outcome_${Date.now()}`;
-    const newOutcome: Outcome = {
-      id: tempId,
-      question: "",
-      possibleResolutions: {
-        favorable: "",
-        unfavorable: "",
-        mixed: "",
-      },
-      resonance: "",
-      intendedNumberOfMilestones: 2,
-      milestones: [],
-    };
-    // Start in edit mode
-    setEditingOutcomes((prev) => new Set(prev).add(tempId));
-    onChange([...outcomes, newOutcome]);
-  };
-
-  const handleUpdateOutcome = (index: number, updatedOutcome: Outcome) => {
-    const updated = [...outcomes];
-    updated[index] = updatedOutcome;
-    onChange(updated);
-  };
-
-  const handleRemoveOutcome = (index: number) => {
-    const updated = outcomes.filter((_, i) => i !== index);
-    onChange(updated);
-  };
+  const {
+    editingOutcomes,
+    setEditingOutcomes,
+    handleAddOutcome,
+    handleUpdateOutcome,
+    handleRemoveOutcome,
+  } = useOutcomes(outcomes, onChange);
 
   return (
     <div className="space-y-4">

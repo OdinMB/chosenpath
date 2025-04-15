@@ -15,21 +15,19 @@ interface GuidelinesTabProps {
   conflicts: string[];
   decisions: string[];
   handleArrayFieldChange: (
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    setter: (values: string[]) => void,
     index: number,
     value: string
   ) => void;
-  handleAddArrayItem: (
-    setter: React.Dispatch<React.SetStateAction<string[]>>
-  ) => void;
+  handleAddArrayItem: (setter: (values: string[]) => void) => void;
   handleRemoveArrayItem: (
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    setter: (values: string[]) => void,
     index: number
   ) => void;
-  setRules: React.Dispatch<React.SetStateAction<string[]>>;
-  setTone: React.Dispatch<React.SetStateAction<string[]>>;
-  setConflicts: React.Dispatch<React.SetStateAction<string[]>>;
-  setDecisions: React.Dispatch<React.SetStateAction<string[]>>;
+  setRules: (rules: string[]) => void;
+  setTone: (tone: string[]) => void;
+  setConflicts: (conflicts: string[]) => void;
+  setDecisions: (decisions: string[]) => void;
 }
 
 export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({

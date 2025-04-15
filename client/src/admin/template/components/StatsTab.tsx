@@ -1,0 +1,102 @@
+import { useState } from "react";
+import {
+  Stat,
+  StatValueEntry,
+  PlayerSlot,
+  PlayerOptionsGeneration,
+} from "@core/types";
+import { useStatEditorHelpers } from "../hooks/useStatEditor";
+import { StatGroups } from "./StatGroups";
+import { StatListSection } from "./StatListSection";
+
+type StatsTabProps = {
+  statGroups: string[];
+  sharedStats: Stat[];
+  playerStats: Stat[];
+  initialSharedStatValues: StatValueEntry[];
+  playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
+  onChange: (updates: {
+    statGroups?: string[];
+    sharedStats?: Stat[];
+    playerStats?: Stat[];
+    initialSharedStatValues?: StatValueEntry[];
+    playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
+  }) => void;
+};
+
+export const StatsTab = ({
+  statGroups,
+  sharedStats,
+  playerStats,
+  initialSharedStatValues,
+  playerOptions,
+  onChange,
+}: StatsTabProps) => {
+  // Track which stats are being edited by their IDs
+  const [editingStats, setEditingStats] = useState<Set<string>>(new Set());
+
+  // Use the extracted helper functions
+  const {
+    handleAddStat,
+    handleUpdateStat,
+    handleRemoveStat,
+    handleUpdateInitialValue,
+    handleConvertStat,
+  } = useStatEditorHelpers({
+    statGroups,
+    sharedStats,
+    playerStats,
+    initialSharedStatValues,
+    playerOptions,
+    editingStats,
+    onChange,
+    setEditingStats,
+  });
+
+  const handleUpdateStatGroups = (updatedGroups: string[]) => {
+    onChange({ statGroups: updatedGroups });
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Stat Groups */}
+      <StatGroups statGroups={statGroups} onChange={handleUpdateStatGroups} />
+
+      {/* Shared Stats */}
+      <StatListSection
+        title="Shared Stats"
+        tooltip="Stats shared by all players in the game"
+        icon="Shared stats apply to all players"
+        iconColor="bg-blue-500"
+        stats={sharedStats}
+        statGroups={statGroups}
+        type="shared"
+        editingStats={editingStats}
+        initialValues={initialSharedStatValues}
+        onUpdateInitialValue={handleUpdateInitialValue}
+        onAddStat={handleAddStat}
+        onUpdateStat={handleUpdateStat}
+        onRemoveStat={handleRemoveStat}
+        onConvertStat={handleConvertStat}
+        setEditingStats={setEditingStats}
+      />
+
+      {/* Player Stats */}
+      <StatListSection
+        title="Player Stats"
+        tooltip="Stats that are unique to each player"
+        icon="Player stats are unique to each player"
+        iconColor="bg-green-500"
+        stats={playerStats}
+        statGroups={statGroups}
+        type="player"
+        editingStats={editingStats}
+        onAddStat={handleAddStat}
+        onUpdateStat={handleUpdateStat}
+        onRemoveStat={handleRemoveStat}
+        onConvertStat={handleConvertStat}
+        setEditingStats={setEditingStats}
+      />
+    </div>
+  );
+};

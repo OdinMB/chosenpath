@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  CharacterIdentity,
-  CharacterBackground,
   CharacterSelectionIntroduction,
   PlayerOptionsGeneration,
   PlayerSlot,
@@ -10,18 +8,8 @@ import {
 import { MAX_PLAYERS } from "@core/config";
 import { ExpandableOutcome, PlayerIdentity, PlayerBackground } from "./";
 import { PrimaryButton, Icons, Select } from "@components/ui";
-
-interface PlayerOutcome {
-  id: string;
-  question: string;
-  resonance: string;
-  possibleResolutions:
-    | { favorable: string; unfavorable: string; mixed: string }
-    | { resolution1: string; resolution2: string; resolution3: string }
-    | { mixed: string; sideAWins: string; sideBWins: string };
-  intendedNumberOfMilestones: number;
-  milestones: string[];
-}
+import { usePlayers } from "../hooks/usePlayers";
+import { usePlayerEditor } from "../hooks/usePlayerEditor";
 
 interface PlayersTabProps {
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
@@ -197,108 +185,20 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   characterSelectionIntroduction,
   onCharacterSelectionIntroductionChange,
 }) => {
-  // Track which players are being edited
-  const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
-  // Track which identities are being edited
-  const [editingIdentities, setEditingIdentities] = useState<Set<string>>(
-    new Set()
-  );
-  // Track which backgrounds are being edited
-  const [editingBackgrounds, setEditingBackgrounds] = useState<Set<string>>(
-    new Set()
-  );
-  // Track which outcomes are being edited
-  const [editingOutcomes, setEditingOutcomes] = useState<Set<string>>(
-    new Set()
-  );
-
-  const handleUpdatePlayer = (
-    playerSlot: PlayerSlot,
-    updates: Partial<PlayerOptionsGeneration>
-  ) => {
-    // Create the updated player options
-    const updatedPlayerOptions = {
-      ...playerOptions,
-      [playerSlot]: {
-        ...playerOptions[playerSlot],
-        ...updates,
-      },
-    };
-
-    // Immediately propagate the change to parent component
-    onChange(updatedPlayerOptions);
-  };
-
-  const createEmptyIdentity = (): CharacterIdentity => ({
-    name: "",
-    appearance: "",
-    pronouns: {
-      personal: "",
-      object: "",
-      possessive: "",
-      reflexive: "",
-    },
-  });
-
-  const createEmptyBackground = (): CharacterBackground => {
-    const initialPlayerStatValues = playerStats.map((stat) => {
-      let initialValue: number | string | string[];
-
-      switch (stat.type) {
-        case "string":
-          initialValue = "";
-          break;
-        case "string[]":
-          initialValue = [];
-          break;
-        case "number":
-        case "percentage":
-        case "opposites":
-        default:
-          initialValue = 50;
-      }
-
-      return {
-        statId: stat.id,
-        value: initialValue,
-      };
-    });
-
-    return {
-      title: "",
-      fluffTemplate: "",
-      initialPlayerStatValues,
-    };
-  };
-
-  const handleAddPlayerOutcome = (playerSlot: PlayerSlot) => {
-    const outcomeId = crypto.randomUUID();
-    const newOutcome: PlayerOutcome = {
-      id: outcomeId,
-      question: "",
-      resonance: "",
-      possibleResolutions: {
-        favorable: "",
-        unfavorable: "",
-        mixed: "",
-      },
-      intendedNumberOfMilestones: 3,
-      milestones: [],
-    };
-
-    // Start in edit mode for the new outcome
-    const outcomeStateKey = `${playerSlot}_outcome_${outcomeId}`;
-    setEditingOutcomes((prev) => new Set(prev).add(outcomeStateKey));
-
-    // Get current outcomes for this player
-    const currentOutcomes = playerOptions[playerSlot]?.outcomes || [];
-    const updatedOutcomes = [...currentOutcomes, newOutcome];
-
-    // Save changes immediately
-    handleUpdatePlayer(playerSlot, {
-      outcomes: updatedOutcomes,
-    });
-  };
+  const {
+    editingPlayers,
+    editingIdentities,
+    editingBackgrounds,
+    editingOutcomes,
+    setEditingPlayers,
+    setEditingIdentities,
+    setEditingBackgrounds,
+    setEditingOutcomes,
+    handleUpdatePlayer,
+    createEmptyIdentity,
+    createEmptyBackground,
+    handleAddPlayerOutcome,
+  } = usePlayers(playerOptions, onChange, playerStats);
 
   const PlayerEditor = ({
     playerSlot,
@@ -308,187 +208,28 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     options: PlayerOptionsGeneration;
   }) => {
     const isEditing = editingPlayers.has(playerSlot);
-    const [localOptions, setLocalOptions] = useState<PlayerOptionsGeneration>(
-      () => ({
-        ...options,
-        possibleCharacterIdentities: options.possibleCharacterIdentities.length
-          ? options.possibleCharacterIdentities
-          : Array(3).fill(null).map(createEmptyIdentity),
-        possibleCharacterBackgrounds: options.possibleCharacterBackgrounds
-          .length
-          ? options.possibleCharacterBackgrounds
-          : Array(3).fill(null).map(createEmptyBackground),
-        outcomes: options.outcomes || [],
-      })
+
+    const {
+      localOptions,
+      handleCopyOutcome,
+      handleUpdateIdentity,
+      handleDeleteIdentity,
+      handleAddIdentity,
+      handleUpdateBackground,
+      handleDeleteBackground,
+      handleAddBackground,
+      handleUpdateOutcome,
+      handleDeleteOutcome,
+      handleSave,
+    } = usePlayerEditor(
+      playerSlot,
+      options,
+      playerOptions,
+      handleUpdatePlayer,
+      createEmptyIdentity,
+      createEmptyBackground,
+      setEditingPlayers
     );
-
-    const handleCopyOutcome = (
-      sourcePlayerSlot: PlayerSlot,
-      outcomeIndex: number
-    ) => {
-      const sourceOutcome =
-        playerOptions[sourcePlayerSlot]?.outcomes[outcomeIndex];
-
-      if (sourceOutcome) {
-        const copiedOutcome: PlayerOutcome = {
-          ...sourceOutcome,
-          id: crypto.randomUUID(),
-        };
-
-        // Update local state
-        const updatedOutcomes = [...localOptions.outcomes, copiedOutcome];
-        setLocalOptions((prev) => ({
-          ...prev,
-          outcomes: updatedOutcomes,
-        }));
-
-        // Immediately save changes to the parent component
-        handleUpdatePlayer(playerSlot, {
-          outcomes: updatedOutcomes,
-        });
-      }
-    };
-
-    const handleUpdateIdentity = (
-      index: number,
-      updatedIdentity: CharacterIdentity
-    ) => {
-      const updated = [...localOptions.possibleCharacterIdentities];
-      updated[index] = updatedIdentity;
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterIdentities: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterIdentities: updated,
-      });
-    };
-
-    const handleDeleteIdentity = (index: number) => {
-      const updated = [...localOptions.possibleCharacterIdentities];
-      updated.splice(index, 1);
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterIdentities: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterIdentities: updated,
-      });
-    };
-
-    const handleAddIdentity = () => {
-      const updated = [
-        ...localOptions.possibleCharacterIdentities,
-        createEmptyIdentity(),
-      ];
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterIdentities: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterIdentities: updated,
-      });
-    };
-
-    const handleUpdateBackground = (
-      index: number,
-      updatedBackground: CharacterBackground
-    ) => {
-      const updated = [...localOptions.possibleCharacterBackgrounds];
-      updated[index] = updatedBackground;
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterBackgrounds: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterBackgrounds: updated,
-      });
-    };
-
-    const handleDeleteBackground = (index: number) => {
-      const updated = [...localOptions.possibleCharacterBackgrounds];
-      updated.splice(index, 1);
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterBackgrounds: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterBackgrounds: updated,
-      });
-    };
-
-    const handleAddBackground = () => {
-      const updated = [
-        ...localOptions.possibleCharacterBackgrounds,
-        createEmptyBackground(),
-      ];
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        possibleCharacterBackgrounds: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        possibleCharacterBackgrounds: updated,
-      });
-    };
-
-    const handleUpdateOutcome = (
-      index: number,
-      updatedOutcome: PlayerOutcome
-    ) => {
-      const updated = [...localOptions.outcomes];
-      updated[index] = updatedOutcome;
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        outcomes: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        outcomes: updated,
-      });
-    };
-
-    const handleDeleteOutcome = (index: number) => {
-      const updated = [...localOptions.outcomes];
-      updated.splice(index, 1);
-
-      // Update local state
-      setLocalOptions((prev) => ({
-        ...prev,
-        outcomes: updated,
-      }));
-
-      // Immediately save changes to the parent component
-      handleUpdatePlayer(playerSlot, {
-        outcomes: updated,
-      });
-    };
 
     if (!isEditing) {
       return (
@@ -514,15 +255,6 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
         </div>
       );
     }
-
-    const handleSave = () => {
-      handleUpdatePlayer(playerSlot, localOptions);
-      setEditingPlayers((prev) => {
-        const next = new Set(prev);
-        next.delete(playerSlot);
-        return next;
-      });
-    };
 
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4">
