@@ -99,7 +99,12 @@ export function ExpandableItem<T>({
     <div className="bg-white p-4 rounded-lg shadow mb-4">
       {renderEditForm(localData, handleChange, handleCancelEdit)}
       <div className="flex justify-end gap-2 mt-4">
-        <PrimaryButton onClick={handleCancelEdit} variant="outline" size="sm">
+        <PrimaryButton
+          onClick={handleCancelEdit}
+          variant="outline"
+          leftBorder={false}
+          size="sm"
+        >
           Cancel
         </PrimaryButton>
         <PrimaryButton
