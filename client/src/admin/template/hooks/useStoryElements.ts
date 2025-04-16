@@ -17,6 +17,17 @@ type SingleElementResult = Pick<
   "localElement" | "setLocalElement"
 >;
 
+// Helper function to create an empty story element
+function createEmptyStoryElement(): StoryElement {
+  return {
+    id: `element_${Date.now()}`,
+    name: "",
+    role: "",
+    instructions: "",
+    facts: [],
+  };
+}
+
 // Function overload signatures
 export function useStoryElements(element: StoryElement): SingleElementResult;
 export function useStoryElements(
@@ -34,26 +45,17 @@ export function useStoryElements(
     new Set()
   );
 
-  // Always create both states to avoid conditional hook calls
+  // State for individual element editing mode
   const [singleLocalElement, setSingleLocalElement] = useState<StoryElement>(
     !Array.isArray(elementsOrElement)
       ? elementsOrElement
-      : {
-          id: "",
-          name: "",
-          role: "",
-          instructions: "",
-          facts: [],
-        }
+      : createEmptyStoryElement()
   );
 
-  const [arrayLocalElement, setArrayLocalElement] = useState<StoryElement>({
-    id: "",
-    name: "",
-    role: "",
-    instructions: "",
-    facts: [],
-  });
+  // State for working with arrays of elements
+  const [arrayLocalElement, setArrayLocalElement] = useState<StoryElement>(
+    createEmptyStoryElement()
+  );
 
   // For single element case (used in ElementEditor)
   if (!Array.isArray(elementsOrElement)) {
@@ -69,13 +71,7 @@ export function useStoryElements(
   const handleAddElement = () => {
     if (!onChange) return;
 
-    const newElement: StoryElement = {
-      id: `element_${Date.now()}`,
-      name: "",
-      role: "",
-      instructions: "",
-      facts: [],
-    };
+    const newElement = createEmptyStoryElement();
 
     // Start in edit mode
     setEditingElements((prev) => new Set(prev).add(newElement.id));

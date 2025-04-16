@@ -1,35 +1,23 @@
 import React from "react";
-import { Outcome } from "@core/types";
+import {
+  Outcome,
+  ChallengeResolution,
+  ExplorationResolution,
+  ResolutionType,
+} from "@core/types";
 import { ExpandableItem } from "./";
 import { InfoIcon, Input, Select } from "@components/ui";
 import { useOutcomeForm } from "../hooks/useOutcomeForm";
 
-// Define PlayerOutcome here since it's not exported from a module
+// Define PlayerOutcome here since it's specific to the client
 interface PlayerOutcome {
   id: string;
   question: string;
   resonance: string;
-  possibleResolutions:
-    | { favorable: string; unfavorable: string; mixed: string }
-    | { resolution1: string; resolution2: string; resolution3: string };
+  possibleResolutions: ChallengeResolution | ExplorationResolution;
   intendedNumberOfMilestones: number;
   milestones: string[];
 }
-
-// Define resolution types interfaces
-interface ChallengeResolution {
-  favorable: string;
-  unfavorable: string;
-  mixed: string;
-}
-
-interface ExplorationResolution {
-  resolution1: string;
-  resolution2: string;
-  resolution3: string;
-}
-
-type ResolutionType = ChallengeResolution | ExplorationResolution;
 
 type OutcomeType = Outcome | PlayerOutcome;
 

@@ -5,7 +5,7 @@ import {
   GameModes,
   PublicationStatus,
   StoryElement,
-} from "@core/types/index";
+} from "@core/types";
 import { MAX_PLAYERS } from "@core/config";
 
 /**

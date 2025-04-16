@@ -1,17 +1,10 @@
 import React from "react";
 import { PrimaryButton, Icons, Input, Select } from "@components/ui";
-import { Outcome } from "@core/types/outcome";
+import { Outcome, ExplorationResolution } from "@core/types";
 import { ExpandableItem } from "./ExpandableItem";
 import { useOutcomes } from "../hooks/useOutcomes";
 import { useOutcomeForm } from "../hooks/useOutcomeForm";
 import { InfoIcon } from "@components/ui";
-
-// Types needed for proper type checking
-interface ExplorationResolution {
-  resolution1: string;
-  resolution2: string;
-  resolution3: string;
-}
 
 interface OutcomesTabProps {
   outcomes: Outcome[];

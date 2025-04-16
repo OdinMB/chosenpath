@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outcome } from "@core/types/outcome";
+import { Outcome } from "@core/types";
 
 interface UseOutcomesResult {
   editingOutcomes: Set<string>;

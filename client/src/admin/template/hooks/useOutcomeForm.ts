@@ -1,31 +1,20 @@
-import { Outcome } from "@core/types";
+import {
+  Outcome,
+  ChallengeResolution,
+  ExplorationResolution,
+  ResolutionType,
+} from "@core/types";
 
-// Define PlayerOutcome type
+// Define PlayerOutcome type - keep this since it might be specific to the client
 interface PlayerOutcome {
   id: string;
   question: string;
   resonance: string;
-  possibleResolutions:
-    | { favorable: string; unfavorable: string; mixed: string }
-    | { resolution1: string; resolution2: string; resolution3: string };
+  possibleResolutions: ChallengeResolution | ExplorationResolution;
   intendedNumberOfMilestones: number;
   milestones: string[];
 }
 
-// Define resolution types
-interface ChallengeResolution {
-  favorable: string;
-  unfavorable: string;
-  mixed: string;
-}
-
-interface ExplorationResolution {
-  resolution1: string;
-  resolution2: string;
-  resolution3: string;
-}
-
-type ResolutionType = ChallengeResolution | ExplorationResolution;
 type OutcomeType = Outcome | PlayerOutcome;
 
 interface UseOutcomeFormResult {

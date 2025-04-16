@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 const challengeResolutionsSchema = z
   .object({
     favorable: z
@@ -16,6 +17,7 @@ const challengeResolutionsSchema = z
       .describe("A resolution that is between favorable and unfavorable."),
   })
   .describe("Use this for outcomes that can succeed or fail.");
+export type ChallengeResolution = z.infer<typeof challengeResolutionsSchema>;
 
 const contestResolutionsSchema = z
   .object({
@@ -24,6 +26,7 @@ const contestResolutionsSchema = z
     mixed: z.string().describe("Resolution of a draw/compromise."),
   })
   .describe("Use this for outcomes that are contested between players.");
+export type ContestResolution = z.infer<typeof contestResolutionsSchema>;
 
 const explorationResolutionsSchema = z
   .object({
@@ -34,6 +37,14 @@ const explorationResolutionsSchema = z
   .describe(
     "Use this for outcomes that don't follow a success/failure and win/lose structure. Example: Does Alex choose loyalty to the family or their own ambitions?"
   );
+export type ExplorationResolution = z.infer<
+  typeof explorationResolutionsSchema
+>;
+
+export type ResolutionType =
+  | ChallengeResolution
+  | ContestResolution
+  | ExplorationResolution;
 
 export const outcomeSchema = z
   .object({

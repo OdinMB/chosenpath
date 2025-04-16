@@ -1,8 +1,6 @@
 Smaller and more commits!
 
-# Feature backlog
-
-Next
+# Next
 
 - List of types of scenes that the story should include (generation, switch/thread generation)
 - CoT schema attribute to list "show don't tell" elements for the beat.
@@ -10,7 +8,7 @@ Next
 - Always introduce other players in beat 1
 - First thread always together
 
-New features
+# Feature Backlog
 
 - User accounts
   - Manage games
@@ -39,7 +37,7 @@ New features
 - Include music (OpenAI's new API)
 - System to view/navigate save files
 
-Error resilience
+# Error resilience
 
 - Update client logging to use the new logger util
 - Retry mechanism for queue actions
@@ -47,12 +45,16 @@ Error resilience
 - Make sure that there are only 3 backgrounds per player, turn backgrounds into background1-3, or just delete duplicate backgrounds.
 - Check if ids actually exist (e.g. outcome ID)
 
-Improve stat setups and option definitions
+# Improve stat setups and option definitions
 
 - Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
 - Break this whole 20-step mess down into smaller LLM interactions?
 
-Other improvements
+# Refactors
+
+- separate ui from business logic in client for game/page
+
+# Other improvements
 
 - For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Consideration to make 2-beat threads more likely
