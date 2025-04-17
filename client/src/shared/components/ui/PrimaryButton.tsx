@@ -3,6 +3,7 @@ import { ColoredBox } from "./";
 
 type ButtonVariant = "primary" | "secondary" | "outline";
 type ButtonSize = "sm" | "md" | "lg";
+type TextAlignment = "left" | "center" | "right";
 
 interface PrimaryButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,6 +14,7 @@ interface PrimaryButtonProps
   leftBorder?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  textAlign?: TextAlignment;
 }
 
 export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
@@ -24,6 +26,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   leftBorder = true,
   leftIcon,
   rightIcon,
+  textAlign = "center",
   className = "",
   disabled,
   ...props
@@ -48,6 +51,17 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     }
   };
 
+  const getTextAlignClasses = (): string => {
+    switch (textAlign) {
+      case "left":
+        return "text-left";
+      case "right":
+        return "text-right";
+      default:
+        return "text-center";
+    }
+  };
+
   return (
     <ColoredBox
       as="button"
@@ -59,6 +73,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         font-medium focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
         ${getSizeClasses()}
         ${getVariantClasses()}
+        ${getTextAlignClasses()}
         ${fullWidth ? "w-full" : ""}
         ${className}
       `}
@@ -71,12 +86,26 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         </div>
       ) : (
         <div
-          className={`flex items-center ${
-            rightIcon && children ? "justify-between" : "justify-center"
+          className={`flex items-center w-full ${
+            rightIcon && children
+              ? "justify-between"
+              : textAlign === "left"
+              ? "justify-start"
+              : textAlign === "right"
+              ? "justify-end"
+              : "justify-center"
           } gap-2`}
         >
           {(leftIcon || children) && (
-            <div className="flex items-center gap-2">
+            <div
+              className={`flex items-start ${
+                textAlign === "left"
+                  ? "text-left"
+                  : textAlign === "right"
+                  ? "text-right"
+                  : "text-center"
+              }`}
+            >
               {leftIcon}
               {children}
             </div>

@@ -313,7 +313,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               key={index}
               onClick={() => handleChoiceClick(index)}
               size="lg"
-              className={`w-full text-lg md:text-xl text-left p-6 ${
+              textAlign="left"
+              className={`w-full text-lg md:text-xl p-6 ${
                 localSelectedChoice === index ? "opacity-70 bg-primary-50" : ""
               }`}
               disabled={
