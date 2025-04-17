@@ -195,7 +195,7 @@ ${
       story.getCurrentThreadDuration()
         ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
         : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
-          "--- Example: Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
+          "--- Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
 }
 ${
   story.isMultiplayer()
@@ -209,6 +209,14 @@ Create a bullet list of things that happened in other beats that you already cre
 }
 How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
+
+How to make sure that the text follows the principle of 'Show Don't Tell'?
+Based on the consequences to narrate, requirements for the ${story.getCurrentBeatType()}, ${
+      story.isMultiplayer() ? ", multiplayer" : ""
+    }, and world building considerations: create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. Examples:
+- The old sage provides a cryptic hint: we should spell out the cryptic hint and deliver it in direct speech.
+- The player gets attacked by a goblin: we should describe the actual attack.
+- The faction leader makes a tempting offer: we should spell out the offer and deliver it in direct speech.
 
 ${
   story.getCurrentBeatType() !== "ending"
@@ -290,7 +298,9 @@ ${
                 : "") +
               "--- The goal of multiplayer games is to have an interesting interactions between players. The beat text should reflect that.\n"
             : "") +
-          "- Show, don't tell. If the player decided to talk to a character, open with the actual conversation. If the player punshes someone, describe the actual punch.\n" +
+          "- Show, don't tell.\n" +
+          "--- Use the list of 'show don't tell' instructions that you generated in the plan for the beat.\n" +
+          "--- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.\n" +
           "- Use direct speech\n" +
           "--- Both for the player characters and the NPCs.\n" +
           "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X' or 'you talk to X'.\n" +
@@ -304,8 +314,8 @@ ${
           "--- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.\n" +
           "- The last paragraph\n" +
           "--- Never mention or even refer to the player's options and choices.\n" +
-          "--- Players will see their options clearly below the beat text. Talking about them in the beat text is redundant.\n" +
-          "--- AVOID all of these formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'\n" +
+          "--- Players will see the options below the beat text. Talking about them in the beat text is redundant.\n" +
+          "--- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'\n" +
           "\n\nImages (optional)\n" +
           "If you want to generate an image for a beat, leave the imageId field empty.\n" +
           "If you want to use an existing image, specify its ID.\n" +

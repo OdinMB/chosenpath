@@ -3,8 +3,8 @@ Smaller and more commits!
 # Next
 
 - List of types of scenes that the story should include (generation, switch/thread generation)
-- CoT schema attribute to list "show don't tell" elements for the beat.
-- Not the same type of decision several times over the course of a thread
+- Not the same type of decision several times over the course of a thread (new consideration for thread progressions)
+  - align with previousTypesOfThreadsNotToBeRepeated
 - Always introduce other players in beat 1
 - First thread always together
 
@@ -19,6 +19,7 @@ Smaller and more commits!
 - See pending players, current beat, etc. of games of stored codes
 
 - Images: generate one for each player and story element and only use iamges from that list?
+- Audio version
 - Use React routing thingy for frontend
 - Resolution elements
   - what about overall result in multiplayer beats?
@@ -36,14 +37,14 @@ Smaller and more commits!
   - different ones for different players
 - Include music (OpenAI's new API)
 - System to view/navigate save files
+- Generate premise prompts based on online searches? ("Shameless" -> "I'm a member of a ...")
 
 # Error resilience
 
-- Update client logging to use the new logger util
 - Retry mechanism for queue actions
-- Redundancy in case story initiation didn't provide proper values for shared stats: use the first beat generation to set proper stat values. (See getDefaultStatValue for "fix me" indicators.)
-- Make sure that there are only 3 backgrounds per player, turn backgrounds into background1-3, or just delete duplicate backgrounds.
-- Check if ids actually exist (e.g. outcome ID)
+- Make sure that there are only 3 backgrounds per player / 3 options per beat
+  => still an issue with 4.1?
+- Check if ids actually exist when changes are proposed by the AI (e.g. outcome ID, stat ID)
 
 # Improve stat setups and option definitions
 
@@ -52,11 +53,12 @@ Smaller and more commits!
 
 # Refactors
 
-- separate ui from business logic in client for game/page
+- Update client logging to use the new logger util
+- Separate ui from business logic in client for game/page
 
 # Other improvements
 
-- For beat (non-switch/thread) resolutions, only change stats if their canBeChangedInBeatResolutions is true
+- In beat resolutions that are not also thread resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - Consideration to make 2-beat threads more likely
 - Attach facts to players
 - adjust scope of story setup based on the number of beats

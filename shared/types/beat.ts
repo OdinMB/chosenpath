@@ -115,6 +115,11 @@ export const beatPlanSchema = z.object({
     .describe(
       "List of new story elements to add to the story state. Leave this empty if no new story elements are to be created in this beat. Only use this if a new story element is to be created in this beat that is likely to be used in later beats."
     ),
+  showDontTell: z
+    .array(z.string())
+    .describe(
+      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'."
+    ),
   newIntroductionsOfStoryElements: z
     .array(addIntroductionOfStoryElementSchema)
     .describe(
@@ -175,6 +180,7 @@ export const beatGenerationSchema = z.object({
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
         "- Describe the player's actions following their decision in the previous beat and the consequences of that decision. Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.\n" +
+        "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
         "- NEVER introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- AVOID all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
@@ -198,7 +204,7 @@ export const beatGenerationSchema = z.object({
       ])
     )
     .describe(
-      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences."
+      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Don't mention specific numbers, percentages, or probabilities for sacrifices and rewards. Remember that both sacrifices and rewards are certain (and not just risks or potential rewards)."
     ),
 });
 
