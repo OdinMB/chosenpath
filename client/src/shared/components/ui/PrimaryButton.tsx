@@ -98,7 +98,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         >
           {(leftIcon || children) && (
             <div
-              className={`flex items-start ${
+              className={`flex items-center ${
                 textAlign === "left"
                   ? "text-left"
                   : textAlign === "right"
@@ -106,11 +106,15 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
                   : "text-center"
               }`}
             >
-              {leftIcon}
+              {leftIcon && (
+                <span className={children ? "mr-2" : ""}>{leftIcon}</span>
+              )}
               {children}
             </div>
           )}
-          {rightIcon}
+          {rightIcon && (
+            <span className={children ? "ml-2" : ""}>{rightIcon}</span>
+          )}
         </div>
       )}
     </ColoredBox>
