@@ -99,7 +99,7 @@ router.get("/templates", async (req, res) => {
     const forWelcomeScreen = req.query.forWelcomeScreen === "true";
 
     // Filter templates based on publication status and welcome screen flag
-    const templates = allTemplates.filter((template) => {
+    let templates = allTemplates.filter((template) => {
       // Always require templates to be published
       const isPublished =
         template.publicationStatus === PublicationStatus.Published;
@@ -112,6 +112,18 @@ router.get("/templates", async (req, res) => {
       // Otherwise just return all published templates
       return isPublished;
     });
+
+    // If retrieving templates for the welcome screen, sort them by order
+    if (forWelcomeScreen) {
+      templates = templates.sort((a, b) => {
+        // Handle undefined order values
+        const orderA =
+          a.order !== undefined ? a.order : Number.MAX_SAFE_INTEGER;
+        const orderB =
+          b.order !== undefined ? b.order : Number.MAX_SAFE_INTEGER;
+        return orderA - orderB;
+      });
+    }
 
     Logger.Route.log(
       `Returning ${templates.length} templates${
@@ -192,6 +204,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
     title,
     publicationStatus,
     showOnWelcomeScreen,
+    order,
     ...templateData
   } = req.body;
 
@@ -210,6 +223,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
       teaser: teaser || "",
       publicationStatus: publicationStatus || PublicationStatus.Draft,
       showOnWelcomeScreen: showOnWelcomeScreen || false,
+      order: order !== undefined ? order : 999, // Default to end of list
     };
 
     const template = await libraryService.createTemplate(
@@ -243,6 +257,7 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
     title,
     publicationStatus,
     showOnWelcomeScreen,
+    order,
     ...templateData
   } = req.body;
 
@@ -262,6 +277,7 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
       publicationStatus: publicationStatus || PublicationStatus.Draft,
       showOnWelcomeScreen:
         showOnWelcomeScreen !== undefined ? showOnWelcomeScreen : false,
+      order: order !== undefined ? order : 999,
     };
 
     const template = await libraryService.updateTemplate(

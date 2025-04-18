@@ -27,6 +27,7 @@ export function createDefaultTemplate(): StoryTemplate {
     title: "",
     publicationStatus: PublicationStatus.Draft,
     showOnWelcomeScreen: false,
+    order: 999, // Default to a high number to place new templates at the end
     guidelines: {
       world: "",
       rules: [],

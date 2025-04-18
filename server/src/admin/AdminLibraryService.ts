@@ -282,6 +282,11 @@ export class AdminLibraryService {
           dataWithPlayerOptions.showOnWelcomeScreen !== undefined
             ? dataWithPlayerOptions.showOnWelcomeScreen
             : existingTemplate.showOnWelcomeScreen || false,
+        // Explicitly include order property, preserving existing value if not provided
+        order:
+          dataWithPlayerOptions.order !== undefined
+            ? dataWithPlayerOptions.order
+            : existingTemplate.order,
         guidelines:
           dataWithPlayerOptions.guidelines as StoryTemplate["guidelines"],
         storyElements:

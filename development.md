@@ -2,7 +2,7 @@ Smaller and more commits!
 
 # Next
 
-- Admin area for sorting story templates on the welcome screen
+- Links to generate a new story based on a template
 - A browsable library of story templates
 
 - Always introduce other players in beat 1

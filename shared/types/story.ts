@@ -186,6 +186,7 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   tags: string[];
   publicationStatus: PublicationStatusType;
   showOnWelcomeScreen: boolean;
+  order: number;
 };
 
 // TYPES USED BY APP (not LLM)

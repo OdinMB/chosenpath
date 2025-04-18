@@ -4,12 +4,13 @@ import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
 import { StoryLibrary } from "./StoryLibrary";
 import { TemplateForm } from "./template/components";
+import { StoryCarouselManager } from "./StoryCarouselManager";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 
-type AdminTab = "stories" | "library" | "template-form";
+type AdminTab = "stories" | "library" | "template-form" | "carousel";
 
 export const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -166,6 +167,16 @@ export const Admin = () => {
               >
                 Story Library
               </button>
+              <button
+                className={`px-4 py-2 font-medium ${
+                  activeTab === "carousel"
+                    ? "text-secondary border-b-2 border-secondary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("carousel")}
+              >
+                Story Carousel
+              </button>
             </div>
 
             {/* Content based on active tab */}
@@ -189,6 +200,10 @@ export const Admin = () => {
                   setIsLoading={setIsFormLoading}
                 />
               </div>
+            )}
+
+            {activeTab === "carousel" && (
+              <StoryCarouselManager token={authToken} />
             )}
           </div>
         </div>
