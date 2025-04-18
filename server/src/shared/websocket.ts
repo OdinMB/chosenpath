@@ -21,8 +21,9 @@ import {
 export class GameWebSocketServer {
   private io: Server;
   private clients: Map<string, Socket> = new Map();
+  private gameHandler: GameHandler;
 
-  constructor(server: http.Server) {
+  constructor(server: http.Server, gameHandler: GameHandler) {
     this.io = new Server(server, {
       cors: {
         origin: (origin, callback) => {
@@ -43,6 +44,9 @@ export class GameWebSocketServer {
       pingInterval: SOCKET_CONFIG.SERVER.pingInterval,
       pingTimeout: SOCKET_CONFIG.SERVER.pingTimeout,
     });
+
+    // Set the injected GameHandler
+    this.gameHandler = gameHandler;
 
     // Set io instance in ConnectionManager
     connectionManager.setIo(this.io);
@@ -124,6 +128,9 @@ export class GameWebSocketServer {
       console.log(`[WebSocket] New connection established: ${socket.id}`);
       this.clients.set(socket.id, socket);
 
+      // Register the socket with the GameHandler
+      this.gameHandler.registerSocket(socket);
+
       // Add disconnect handler with detailed logging
       socket.on("disconnect", (reason) => {
         try {
@@ -149,8 +156,6 @@ export class GameWebSocketServer {
           );
         }
       });
-
-      const gameHandler = new GameHandler(socket);
 
       // Set up global error handler for socket errors
       socket.on("error", (error) => {
@@ -210,14 +215,16 @@ export class GameWebSocketServer {
               return;
             }
 
-            // Process the request
-            await gameHandler.initializeStory(
+            // Process the request using the GameHandler
+            await this.gameHandler.initializeStory(
+              socket,
               data.prompt,
               data.generateImages,
               data.playerCount as PlayerCount,
               data.maxTurns,
               data.gameMode
             );
+
             // Send immediate success response that the request was accepted
             socket.emit("response", {
               type: "initialize_story_response",
@@ -265,8 +272,9 @@ export class GameWebSocketServer {
               return;
             }
 
-            // Process the request
-            await gameHandler.initializeFromTemplate(
+            // Process the request using the GameHandler
+            await this.gameHandler.initializeFromTemplate(
+              socket,
               data.templateId,
               data.playerCount as PlayerCount,
               data.maxTurns
@@ -303,6 +311,8 @@ export class GameWebSocketServer {
         "make_choice",
         async (data: { optionIndex: number; requestId?: string }) => {
           try {
+            console.log("[WebSocket] Make choice request:", data);
+
             // Check rate limiting
             if (
               this.checkAndHandleRateLimit(
@@ -314,8 +324,9 @@ export class GameWebSocketServer {
               return;
             }
 
-            // Process the request
-            await gameHandler.makeChoice(data.optionIndex);
+            // Process the request using the GameHandler
+            await this.gameHandler.makeChoice(socket, data.optionIndex);
+
             // Send immediate success response that the request was accepted
             socket.emit("response", {
               type: "make_choice_response",
@@ -348,6 +359,8 @@ export class GameWebSocketServer {
           requestId?: string;
         }) => {
           try {
+            console.log("[WebSocket] Select character request:", data);
+
             // Check rate limiting
             if (
               this.checkAndHandleRateLimit(
@@ -359,11 +372,13 @@ export class GameWebSocketServer {
               return;
             }
 
-            // Process the request
-            await gameHandler.selectCharacter(
+            // Process the request using the GameHandler
+            await this.gameHandler.selectCharacter(
+              socket,
               data.identityIndex,
               data.backgroundIndex
             );
+
             // Send immediate success response that the request was accepted
             socket.emit("response", {
               type: "select_character_response",
@@ -551,6 +566,9 @@ export class GameWebSocketServer {
   }
 
   close(callback?: () => void): void {
+    // Clean up GameHandler before closing
+    this.gameHandler.dispose();
+
     this.io.close(callback);
   }
 }

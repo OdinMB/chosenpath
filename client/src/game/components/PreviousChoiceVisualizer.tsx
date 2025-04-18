@@ -604,7 +604,7 @@ export const PreviousChoiceVisualizer: React.FC<
                           {resolutionDetails.readablePointModifiers &&
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
-                              <div className="ml-0.5 mt-[7px]">
+                              <div>
                                 <InfoIcon
                                   tooltipText={formatPointBreakdown()}
                                   contentClassName="max-w-[400px]"

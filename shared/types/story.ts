@@ -84,7 +84,7 @@ export const guidelinesSchema = z
     typesOfThreads: z
       .array(z.string())
       .describe(
-        "7 types of threads that fit the story. For example: witness interview, car chase, romantic date, physical fight, etc."
+        "6-8 types of threads that fit the story. For example: witness interview, car chase, romantic date, physical fight, etc."
       ),
   })
   .describe("Story guidelines and parameters");

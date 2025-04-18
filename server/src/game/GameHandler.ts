@@ -20,69 +20,117 @@ import { AdminLibraryService } from "../admin/AdminLibraryService.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
-  private socket: Socket;
+  private sockets: Map<string, Socket> = new Map();
   private pendingOperations: Map<
     string,
-    { resolve: () => void; reject: (error: Error) => void }
+    { resolve: () => void; reject: (error: Error) => void; socketId: string }
   > = new Map();
+  private pendingInitializations = new Map<
+    string,
+    { resolve: () => void; codes: Record<PlayerSlot, string>; socketId: string }
+  >();
   private storyInitializedHandler: (event: any) => void;
   private operationErrorHandler: (event: any) => void;
 
-  constructor(socket: Socket) {
-    this.socket = socket;
+  constructor() {
     this.storyRepository = StoryRepository.getInstance();
-    console.log("[GameHandler] Created new handler for socket:", socket.id);
+    console.log("[GameHandler] Creating game handler instance");
 
-    // Create bound handlers that we can remove later
-    this.storyInitializedHandler = ({ gameId, story }) => {
-      console.log("[GameHandler] Story initialized for game:", gameId);
-
-      // Since codes have been sent immediately, we now just need to notify
-      // that the story is ready to be joined
-      this.socket.emit("story_ready_notification", {
-        type: "story_ready_notification",
-        gameId,
-      } as StoryReadyNotification);
-
-      if (this.pendingOperations.has(gameId)) {
-        const { resolve } = this.pendingOperations.get(gameId)!;
-        resolve();
-        this.pendingOperations.delete(gameId);
-      }
-    };
-
+    // Create bound handlers for events
+    this.storyInitializedHandler = this.handleStoryInitialized.bind(this);
     this.operationErrorHandler = this.handleOperationError.bind(this);
 
-    // Add event listeners for queue processor events
+    // Add event listeners for queue processor events - only once per instance
     gameQueueProcessor.events.on(
       "storyInitialized",
       this.storyInitializedHandler
     );
     gameQueueProcessor.events.on("operationError", this.operationErrorHandler);
+  }
 
-    // Clean up event listeners when socket disconnects
-    this.socket.on("disconnect", () => {
-      console.log(
-        "[GameHandler] Socket disconnected, removing event listeners"
-      );
-      this.removeEventListeners();
+  public registerSocket(socket: Socket): void {
+    this.sockets.set(socket.id, socket);
+    console.log(
+      `[GameHandler] Registered socket: ${socket.id}, total sockets: ${this.sockets.size}`
+    );
+
+    // Set up disconnect handler to remove the socket
+    socket.on("disconnect", () => {
+      this.unregisterSocket(socket.id);
     });
   }
 
-  /**
-   * Remove all event listeners to prevent memory leaks and duplicate handling
-   */
-  private removeEventListeners(): void {
-    gameQueueProcessor.events.off(
-      "storyInitialized",
-      this.storyInitializedHandler
+  public unregisterSocket(socketId: string): void {
+    this.sockets.delete(socketId);
+    console.log(
+      `[GameHandler] Unregistered socket: ${socketId}, remaining sockets: ${this.sockets.size}`
     );
-    gameQueueProcessor.events.off("operationError", this.operationErrorHandler);
+
+    // Clean up any pending operations for this socket
+    for (const [key, operation] of this.pendingOperations.entries()) {
+      if (operation.socketId === socketId) {
+        operation.reject(new Error("Socket disconnected"));
+        this.pendingOperations.delete(key);
+      }
+    }
+
+    // Clean up any pending initializations for this socket
+    for (const [key, initialization] of this.pendingInitializations.entries()) {
+      if (initialization.socketId === socketId) {
+        this.pendingInitializations.delete(key);
+      }
+    }
   }
 
-  /**
-   * Centralized error handler for all operation errors
-   */
+  private handleStoryInitialized(event: {
+    gameId: string;
+    story: Story;
+  }): void {
+    const { gameId, story } = event;
+    console.log(`[GameHandler] Story initialized for game: ${gameId}`);
+
+    // Get all sockets associated with this game
+    const gameSocketIds = this.getSocketIdsForGame(gameId);
+
+    // Send notification to all sockets in the game
+    for (const socketId of gameSocketIds) {
+      const socket = this.sockets.get(socketId);
+      if (socket) {
+        socket.emit("story_ready_notification", {
+          type: "story_ready_notification",
+          gameId,
+        } as StoryReadyNotification);
+      }
+    }
+
+    // Resolve any pending operations for this game
+    if (this.pendingOperations.has(gameId)) {
+      const { resolve } = this.pendingOperations.get(gameId)!;
+      resolve();
+      this.pendingOperations.delete(gameId);
+    }
+  }
+
+  private getSocketIdsForGame(gameId: string): string[] {
+    // Use ConnectionManager to find sockets in this game
+    const playerSlots = connectionManager
+      .getActivePlayersInGame(gameId)
+      .map((p) => p.playerSlot);
+
+    const socketIds: string[] = [];
+
+    // For each player in the game, get their active sockets
+    for (const playerSlot of playerSlots) {
+      const activeSockets = connectionManager.getActiveSockets(
+        gameId,
+        playerSlot
+      );
+      socketIds.push(...Array.from(activeSockets));
+    }
+
+    return socketIds;
+  }
+
   private handleOperationError(event: OperationErrorEvent): void {
     console.error(`[GameHandler] Operation error: ${event.error}`);
     if (event.stack) {
@@ -112,29 +160,43 @@ export class GameHandler {
         userFriendlyMessage = `Something went wrong with operation ${event.operationType}. Please try again.`;
     }
 
-    // Send only the user-friendly message to the client
-    this.socket.emit("error", {
-      error: userFriendlyMessage,
-      operationType: event.operationType,
-    });
-
-    // Resolve any pending operations with error
+    // Find the socket associated with this operation or game
     if (this.pendingOperations.has(event.operationId)) {
-      const { reject } = this.pendingOperations.get(event.operationId)!;
+      const { reject, socketId } = this.pendingOperations.get(
+        event.operationId
+      )!;
+      const socket = this.sockets.get(socketId);
+
+      // Send the error message to the client if socket still exists
+      if (socket) {
+        socket.emit("error", {
+          error: userFriendlyMessage,
+          operationType: event.operationType,
+        });
+      }
+
+      // Reject the pending operation
       reject(new Error(event.error));
       this.pendingOperations.delete(event.operationId);
-    }
+    } else if (event.gameId) {
+      // If we don't have the operation but we do have the gameId, try to notify all sockets in the game
+      const socketIds = this.getSocketIdsForGame(event.gameId);
+      for (const socketId of socketIds) {
+        const socket = this.sockets.get(socketId);
+        if (socket) {
+          socket.emit("error", {
+            error: userFriendlyMessage,
+            operationType: event.operationType,
+          });
+        }
+      }
 
-    // Also check pending initializations
-    if (this.pendingInitializations.has(event.gameId)) {
-      this.pendingInitializations.delete(event.gameId);
+      // Also check pending initializations
+      if (this.pendingInitializations.has(event.gameId)) {
+        this.pendingInitializations.delete(event.gameId);
+      }
     }
   }
-
-  private pendingInitializations = new Map<
-    string,
-    { resolve: () => void; codes: Record<PlayerSlot, string> }
-  >();
 
   private generatePlayerCodes(
     playerCount: PlayerCount
@@ -152,6 +214,7 @@ export class GameHandler {
   }
 
   async initializeStory(
+    socket: Socket,
     prompt: string,
     generateImages: boolean,
     playerCount: PlayerCount,
@@ -182,7 +245,7 @@ export class GameHandler {
         "[GameHandler] Immediately emitting story codes:",
         playerCodes
       );
-      this.socket.emit("story_codes_notification", {
+      socket.emit("story_codes_notification", {
         type: "story_codes_notification",
         gameId,
         codes: playerCodes,
@@ -191,7 +254,11 @@ export class GameHandler {
       // Create a promise that will resolve when initialization is complete
       await new Promise<void>(async (resolve, reject) => {
         // Store the resolve/reject handlers for later use
-        this.pendingOperations.set(gameId, { resolve, reject });
+        this.pendingOperations.set(gameId, {
+          resolve,
+          reject,
+          socketId: socket.id,
+        });
 
         // Queue the story initialization
         const operationId = await gameQueueProcessor.addOperation({
@@ -215,7 +282,7 @@ export class GameHandler {
           timestamp: Date.now(),
           data: {},
         } as InitializeStoryResponse;
-        this.socket.emit("response", requestResponse);
+        socket.emit("response", requestResponse);
         console.log(
           "[GameHandler] Emitted initialize_story_response to client: ",
           requestResponse
@@ -225,7 +292,7 @@ export class GameHandler {
       console.error("[GameHandler] Failed to initialize story:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      this.socket.emit("error", {
+      socket.emit("error", {
         error: "Failed to initialize story",
         details: errorMessage,
       });
@@ -234,6 +301,7 @@ export class GameHandler {
   }
 
   async initializeFromTemplate(
+    socket: Socket,
     templateId: string,
     playerCount: PlayerCount,
     maxTurns: number
@@ -282,7 +350,7 @@ export class GameHandler {
         "[GameHandler] Immediately emitting story codes:",
         playerCodes
       );
-      this.socket.emit("story_codes_notification", {
+      socket.emit("story_codes_notification", {
         type: "story_codes_notification",
         gameId,
         codes: playerCodes,
@@ -291,7 +359,11 @@ export class GameHandler {
       // Create a promise that will resolve when initialization is complete
       await new Promise<void>(async (resolve, reject) => {
         // Store the resolve/reject handlers for later use
-        this.pendingOperations.set(gameId, { resolve, reject });
+        this.pendingOperations.set(gameId, {
+          resolve,
+          reject,
+          socketId: socket.id,
+        });
 
         // Queue the story initialization from template
         const operationId = await gameQueueProcessor.addOperation({
@@ -313,7 +385,7 @@ export class GameHandler {
           timestamp: Date.now(),
           data: {},
         } as InitializeStoryResponse;
-        this.socket.emit("response", requestResponse);
+        socket.emit("response", requestResponse);
         console.log(
           "[GameHandler] Emitted initialize_story_response to client: ",
           requestResponse
@@ -326,7 +398,7 @@ export class GameHandler {
       );
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      this.socket.emit("error", {
+      socket.emit("error", {
         error: "Failed to initialize story from template",
         details: errorMessage,
       });
@@ -334,13 +406,13 @@ export class GameHandler {
     }
   }
 
-  async makeChoice(optionIndex: number) {
+  async makeChoice(socket: Socket, optionIndex: number) {
     console.log(
       `\n====== [GameHandler] Processing choice: ${optionIndex} ======`
     );
 
     try {
-      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+      const playerInfo = connectionManager.getPlayerBySocket(socket.id);
       if (!playerInfo) {
         throw new Error("Player not found");
       }
@@ -352,7 +424,7 @@ export class GameHandler {
       }
 
       // Validate player state and choice
-      this.validateChoice(story, playerInfo.playerSlot, optionIndex);
+      this.validateChoice(socket.id, story, playerInfo.playerSlot, optionIndex);
 
       // Queue the validated choice
       const operationId = await gameQueueProcessor.addOperation({
@@ -375,7 +447,7 @@ export class GameHandler {
           optionIndex,
         },
       } as MakeChoiceResponse;
-      this.socket.emit("response", requestResponse);
+      socket.emit("response", requestResponse);
       console.log(
         "[GameHandler] Emitted request response to client:",
         requestResponse
@@ -383,11 +455,15 @@ export class GameHandler {
 
       // Create a promise that will resolve when the operation is complete
       await new Promise<void>((resolve, reject) => {
-        this.pendingOperations.set(operationId, { resolve, reject });
+        this.pendingOperations.set(operationId, {
+          resolve,
+          reject,
+          socketId: socket.id,
+        });
       });
     } catch (error) {
       console.error("[GameHandler] Error processing choice:", error);
-      this.socket.emit("error", {
+      socket.emit("error", {
         error:
           error instanceof Error ? error.message : "Failed to process choice",
       });
@@ -395,13 +471,17 @@ export class GameHandler {
     }
   }
 
-  async selectCharacter(identityIndex: number, backgroundIndex: number) {
+  async selectCharacter(
+    socket: Socket,
+    identityIndex: number,
+    backgroundIndex: number
+  ) {
     console.log(
       `\n====== [GameHandler] Processing character selection: identity=${identityIndex}, background=${backgroundIndex} ======`
     );
 
     try {
-      const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+      const playerInfo = connectionManager.getPlayerBySocket(socket.id);
       if (!playerInfo) {
         throw new Error("Player not found");
       }
@@ -414,6 +494,7 @@ export class GameHandler {
 
       // Validate character selection
       this.validateCharacterSelection(
+        socket.id,
         story,
         playerInfo.playerSlot,
         identityIndex,
@@ -443,7 +524,7 @@ export class GameHandler {
           backgroundIndex,
         },
       } as SelectCharacterResponse;
-      this.socket.emit("response", requestResponse);
+      socket.emit("response", requestResponse);
       console.log(
         "[GameHandler] Emitted select_character_response to client:",
         requestResponse
@@ -451,14 +532,18 @@ export class GameHandler {
 
       // Create a promise that will resolve when the operation is complete
       await new Promise<void>((resolve, reject) => {
-        this.pendingOperations.set(operationId, { resolve, reject });
+        this.pendingOperations.set(operationId, {
+          resolve,
+          reject,
+          socketId: socket.id,
+        });
       });
     } catch (error) {
       console.error(
         "[GameHandler] Error processing character selection:",
         error
       );
-      this.socket.emit("error", {
+      socket.emit("error", {
         error:
           error instanceof Error
             ? error.message
@@ -469,13 +554,14 @@ export class GameHandler {
   }
 
   private validateCharacterSelection(
+    socketId: string,
     story: Story,
     playerSlot: PlayerSlot,
     identityIndex: number,
     backgroundIndex: number
   ): void {
     // Ensure player's socket is still valid
-    const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+    const playerInfo = connectionManager.getPlayerBySocket(socketId);
     if (!playerInfo) {
       throw new Error("Player not found");
     }
@@ -484,7 +570,7 @@ export class GameHandler {
       playerInfo.storyId,
       playerSlot
     );
-    if (!activeSockets.has(this.socket.id)) {
+    if (!activeSockets.has(socketId)) {
       throw new Error("Socket connection needs refresh");
     }
 
@@ -520,11 +606,12 @@ export class GameHandler {
   }
 
   private validateChoice(
+    socketId: string,
     story: Story,
     playerSlot: PlayerSlot,
     optionIndex: number
   ): void {
-    const playerInfo = connectionManager.getPlayerBySocket(this.socket.id);
+    const playerInfo = connectionManager.getPlayerBySocket(socketId);
     if (!playerInfo) {
       throw new Error("Player not found");
     }
@@ -534,7 +621,7 @@ export class GameHandler {
       playerInfo.storyId,
       playerSlot
     );
-    if (!activeSockets.has(this.socket.id)) {
+    if (!activeSockets.has(socketId)) {
       throw new Error("Socket connection needs refresh");
     }
 
@@ -557,8 +644,19 @@ export class GameHandler {
     }
   }
 
-  // Make sure to clean up when handler is no longer needed
   public dispose(): void {
-    this.removeEventListeners();
+    console.log("[GameHandler] Disposing GameHandler instance");
+
+    // Remove event listeners
+    gameQueueProcessor.events.off(
+      "storyInitialized",
+      this.storyInitializedHandler
+    );
+    gameQueueProcessor.events.off("operationError", this.operationErrorHandler);
+
+    // Clear all maps
+    this.sockets.clear();
+    this.pendingOperations.clear();
+    this.pendingInitializations.clear();
   }
 }

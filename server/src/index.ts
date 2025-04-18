@@ -4,6 +4,7 @@ import cors from "cors";
 import { config } from "./config.js";
 import { Router } from "./routes.js";
 import { GameWebSocketServer } from "@common/websocket.js";
+import { GameHandler } from "./game/GameHandler.js";
 
 async function startServer() {
   const app = express();
@@ -38,8 +39,14 @@ async function startServer() {
   app.set("trust proxy", true);
   const server = http.createServer(app);
 
-  // Initialize WebSocket server
-  const wsServer = new GameWebSocketServer(server);
+  // Create a single GameHandler instance to be used by the WebSocket server
+  const gameHandler = new GameHandler();
+  console.log("[Server] Created GameHandler instance");
+
+  // Initialize WebSocket server with the GameHandler
+  const wsServer = new GameWebSocketServer(server, gameHandler);
+  console.log("[Server] Created WebSocket server with GameHandler");
+
   // Start HTTP server
   server.listen(config.port, () => {
     console.log(

@@ -6,7 +6,6 @@ Smaller and more commits!
 (Use `node --trace-warnings ...` to show where the warning was created)
 (node:94576) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 operationError listeners added to [EventEmitter]. Use emitter.setMaxListeners() to increase limit
 
-- List of types of scenes that the story should include (generation, switch/thread generation)
 - Always introduce other players in beat 1
 - First thread always together
 
