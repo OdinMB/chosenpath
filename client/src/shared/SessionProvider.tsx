@@ -13,30 +13,88 @@ function storeCodeSet(
   title?: string,
   lastActive?: boolean
 ): void {
-  const codeSet: StoredCodeSet = {
-    codes,
-    timestamp: Date.now(),
-    title,
-    lastActive: lastActive || false,
-  };
+  try {
+    const codeSet: StoredCodeSet = {
+      codes,
+      timestamp: Date.now(),
+      title,
+      lastActive: lastActive || false,
+    };
 
-  // Get existing code sets
-  const existingSetsJSON = localStorage.getItem("storyCodes");
-  const existingSets: StoredCodeSet[] = existingSetsJSON
-    ? JSON.parse(existingSetsJSON)
-    : [];
+    // Get existing code sets
+    const existingSetsJSON = localStorage.getItem("storyCodes");
+    let existingSets: StoredCodeSet[] = [];
 
-  // Add new code set
-  existingSets.push(codeSet);
+    if (existingSetsJSON) {
+      try {
+        existingSets = JSON.parse(existingSetsJSON);
+        console.log(
+          "[SessionProvider] Successfully loaded existing code sets:",
+          existingSets.length
+        );
+      } catch (parseError) {
+        console.error(
+          "[SessionProvider] Failed to parse storyCodes from localStorage:",
+          parseError
+        );
+        // If we can't parse, start fresh rather than losing all codes
+        existingSets = [];
+      }
+    } else {
+      console.log(
+        "[SessionProvider] No existing code sets found in localStorage"
+      );
+    }
 
-  // Save back to localStorage
-  localStorage.setItem("storyCodes", JSON.stringify(existingSets));
+    // Add new code set
+    existingSets.push(codeSet);
+    console.log(
+      "[SessionProvider] Adding new code set. Total sets:",
+      existingSets.length
+    );
+
+    // Save back to localStorage
+    const jsonString = JSON.stringify(existingSets);
+    localStorage.setItem("storyCodes", jsonString);
+    console.log(
+      "[SessionProvider] Successfully saved storyCodes to localStorage"
+    );
+  } catch (error) {
+    console.error(
+      "[SessionProvider] Error storing code set in localStorage:",
+      error
+    );
+  }
 }
 
 // Function to get all stored code sets
 function getStoredCodeSets(): StoredCodeSet[] {
-  const setsJSON = localStorage.getItem("storyCodes");
-  return setsJSON ? JSON.parse(setsJSON) : [];
+  try {
+    const setsJSON = localStorage.getItem("storyCodes");
+    if (!setsJSON) {
+      console.log("[SessionProvider] No storyCodes found in localStorage");
+      return [];
+    }
+
+    try {
+      const sets = JSON.parse(setsJSON);
+      console.log(
+        "[SessionProvider] Retrieved storyCodes from localStorage:",
+        sets.length,
+        "sets"
+      );
+      return sets;
+    } catch (parseError) {
+      console.error(
+        "[SessionProvider] Failed to parse storyCodes from localStorage:",
+        parseError
+      );
+      return [];
+    }
+  } catch (error) {
+    console.error("[SessionProvider] Error getting stored code sets:", error);
+    return [];
+  }
 }
 
 // Function to update a stored set with a new code
@@ -46,42 +104,85 @@ function updateStoredSetWithCode(
   title?: string,
   lastActive?: boolean
 ): void {
-  const sets = getStoredCodeSets();
+  try {
+    console.log(
+      "[SessionProvider] Updating stored code set with code:",
+      code,
+      "for role:",
+      playerRole
+    );
+    const sets = getStoredCodeSets();
 
-  // Find if any set contains this code
-  for (const set of sets) {
-    if (Object.values(set.codes).includes(code)) {
-      // Update the set with the new player role and code
-      set.codes[playerRole] = code;
-      // Update title if provided and not already set
-      if (title && !set.title) {
-        set.title = title;
-      }
-      if (lastActive !== undefined) {
-        set.lastActive = lastActive;
-        // If the set is now active, set all other sets to inactive
-        if (lastActive) {
-          for (const otherSet of sets) {
-            if (otherSet !== set) {
-              otherSet.lastActive = false;
+    // Find if any set contains this code
+    let updatedExisting = false;
+    for (const set of sets) {
+      if (Object.values(set.codes).includes(code)) {
+        // Update the set with the new player role and code
+        set.codes[playerRole] = code;
+        console.log(
+          "[SessionProvider] Updated existing code set for code:",
+          code
+        );
+
+        // Update title if provided and not already set
+        if (title && !set.title) {
+          set.title = title;
+          console.log(
+            "[SessionProvider] Added title to existing code set:",
+            title
+          );
+        }
+
+        if (lastActive !== undefined) {
+          set.lastActive = lastActive;
+          console.log("[SessionProvider] Set lastActive flag to:", lastActive);
+
+          // If the set is now active, set all other sets to inactive
+          if (lastActive) {
+            for (const otherSet of sets) {
+              if (otherSet !== set) {
+                otherSet.lastActive = false;
+              }
             }
+            console.log("[SessionProvider] Updated other sets to inactive");
           }
         }
-      }
-      localStorage.setItem("storyCodes", JSON.stringify(sets));
-      return;
-    }
-  }
 
-  // If no set contains this code, create a new one
-  const newSet: StoredCodeSet = {
-    codes: { [playerRole]: code },
-    timestamp: Date.now(),
-    title,
-    lastActive: lastActive || false,
-  };
-  sets.push(newSet);
-  localStorage.setItem("storyCodes", JSON.stringify(sets));
+        const jsonString = JSON.stringify(sets);
+        localStorage.setItem("storyCodes", jsonString);
+        console.log(
+          "[SessionProvider] Successfully saved updated storyCodes to localStorage"
+        );
+        updatedExisting = true;
+        return;
+      }
+    }
+
+    // If no set contains this code, create a new one
+    if (!updatedExisting) {
+      const newSet: StoredCodeSet = {
+        codes: { [playerRole]: code },
+        timestamp: Date.now(),
+        title,
+        lastActive: lastActive || false,
+      };
+      sets.push(newSet);
+      console.log("[SessionProvider] Created new code set for code:", code);
+
+      const jsonString = JSON.stringify(sets);
+      localStorage.setItem("storyCodes", jsonString);
+      console.log(
+        "[SessionProvider] Successfully saved new storyCodes to localStorage"
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[SessionProvider] Error updating stored code with code:",
+      code,
+      "Error:",
+      error
+    );
+  }
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
@@ -106,10 +207,41 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // Function to delete a code set by timestamp
   function handleDeleteCodeSet(timestamp: number): void {
-    const sets = getStoredCodeSets();
-    const filteredSets = sets.filter((set) => set.timestamp !== timestamp);
-    localStorage.setItem("storyCodes", JSON.stringify(filteredSets));
-    setStoredCodeSets(filteredSets);
+    try {
+      console.log(
+        "[SessionProvider] Deleting code set with timestamp:",
+        timestamp
+      );
+      const sets = getStoredCodeSets();
+      const originalLength = sets.length;
+      const filteredSets = sets.filter((set) => set.timestamp !== timestamp);
+
+      if (filteredSets.length === originalLength) {
+        console.warn(
+          "[SessionProvider] No code set found with timestamp:",
+          timestamp
+        );
+      } else {
+        console.log(
+          "[SessionProvider] Removed code set. Remaining sets:",
+          filteredSets.length
+        );
+      }
+
+      const jsonString = JSON.stringify(filteredSets);
+      localStorage.setItem("storyCodes", jsonString);
+      console.log(
+        "[SessionProvider] Successfully saved updated storyCodes after deletion"
+      );
+      setStoredCodeSets(filteredSets);
+    } catch (error) {
+      console.error(
+        "[SessionProvider] Error deleting code set with timestamp:",
+        timestamp,
+        "Error:",
+        error
+      );
+    }
   }
 
   // Use a ref to track the loading state without causing effect reruns

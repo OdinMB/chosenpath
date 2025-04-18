@@ -2,9 +2,7 @@ Smaller and more commits!
 
 # Next
 
-- Links to generate a new story based on a template
 - A browsable library of story templates
-
 - Always introduce other players in beat 1
 - First thread always together
 
