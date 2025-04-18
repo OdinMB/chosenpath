@@ -14,6 +14,7 @@ export class ThreadPromptService {
     detailedStats: false,
     outcomes: true,
     players: true,
+    previousThreads: true,
     // storyProgress: true,
   } as const;
 
@@ -36,7 +37,7 @@ export class ThreadPromptService {
         story,
         this.SECTIONS_SWITCH
       );
-    // console.log("\x1b[36m%s\x1b[0m", prompt);
+    // console.debug("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
@@ -138,12 +139,14 @@ ${story.isMultiplayer() ? "3" : "2"}. Exploration Threads
 - Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
 
 Create a list of threads, each with:
-1. Players involved (Side A and, if it's a Contest thread, Side B)
-2. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
-3. Possible milestones that might be added to that outcome
+1. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
+2. Players involved (Side A and, if it's a Contest thread, Side B)
+3. A list of previous thread types that the players in this thread have been involved in. (These types of threads should be avoided for the next thread to avoid repetition.)
+4. The type of thread, summarized in a few words. Examples: Romantic Date, Physical Fight, Witness Interview, etc.
+5. Possible milestones that might be added to that outcome
    - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
    - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
-4. A progression of 2-4 beats (matching the duration) that:
+6. A progression of 2-4 beats (matching the duration) that:
    - Adds to the variety of threads in the story. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)
    - Builds dramatic tension toward the thread's climax on the last beat
    - For Challenge ${
@@ -155,6 +158,7 @@ Create a list of threads, each with:
 
 EXAMPLE 1: 3-BEAT CHALLENGE THREAD
 Players (Side A): player1, player2
+Type: Infiltration
 Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
 Possible Milestones:
 - Favorable: "The group steals incriminating documents about the noble's involvement"
@@ -165,20 +169,20 @@ Title: Infiltrating the Noble's Manor
 
 Beat Progression:
 1. Getting Past the Guards
-Question: How do [insert player names] approach the manor's security?
+Question: Stealth: How do [insert player names] approach the manor's security?
 - Favorable: The guards are distracted, giving easy access to the manor
 - Mixed: [insert player names] find a way in but the guards are on higher alert
 - Unfavorable: The guards are suspicious and increase their patrols
 (Note how the beat progression can continue no matter the resolution of step 1.)
 
 2. Searching the Study
-Question: How do [insert player names] search the study without leaving traces?
+Question: Thievery: How do [insert player names] search the study without leaving traces?
 - Favorable: [insert player names] find promising leads and the study remains undisturbed
 - Mixed: [insert player names] find some leads but leave signs of searching
 - Unfavorable: The study is a mess and [insert player names] alert the household
 
 3. Final Confrontation
-Question: The noble returns early! How do [insert player names] handle the situation?
+Question: Escape: The noble returns early! How do [insert player names] handle the situation?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
 
     if (story.isMultiplayer()) {
@@ -188,6 +192,7 @@ EXAMPLE 2: 2-BEAT CONTEST THREAD
 Title: Swaying the Council
 Side A: player1 (supports military action)
 Side B: player2 (advocates for diplomacy)
+Type: Council Debate
 Outcome: Will there be war? (with ID shared_will_there_be_war)
 Possible Milestones:
 - Side A Wins: "The council votes for immediate military action"
@@ -196,14 +201,14 @@ Possible Milestones:
 
 Beat Progression:
 1. Opening Arguments
-Question: How do [insert player names] present their initial cases to the council?
+Question: Opening Arguments: How do [insert player names] present their cases to the council?
 - Side A Wins: Military urgency resonates with the council
 - Mixed: The council remains divided and uncertain
 - Side B Wins: Diplomatic opportunities capture the council's interest
-(Leads to the climax in beat 2 witout preempting the council's final vote.)
+(Leads to the climax in beat 2 without preempting the council's final vote.)
 
 2. Final Deliberation
-Question: How do [insert player names] address the council's key concerns?
+Question: Addressing Concerns: How do [insert player names] address the council's key concerns?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
     }
 
@@ -212,6 +217,7 @@ Since this is the final beat of the thread, the possible results are the list of
 EXAMPLE ${story.isMultiplayer() ? "3" : "2"}: 2-BEAT EXPLORATORY THREAD
 Title: Personal Crossroads
 Players: player1
+Type: Choosing a Life Path
 Outcome: Will Alex choose family or ambition? (with ID player1_family_vs_ambition)
 Possible Milestones:
 - Resolution 1: "Alex prioritizes family obligations over the job opportunity"
@@ -220,7 +226,7 @@ Possible Milestones:
 
 Beat Progression:
 1. Weighing the Options
-Question: How does Alex approach the difficult conversation with family?
+Question: Conversation with Family: How does Alex approach the difficult conversation with family?
 - Resolution 1: Alex tries to find out what is important to his family
 - Resolution 2: Alex tries to convince his family that following the job opportunity is a good idea
 - Resolution 3: Alex lies about the job opportunity to make it seem more appealing
@@ -229,7 +235,7 @@ Each resolution says something about Alex's character and motivations.
 The beat is not about succeeding or failing, but about exploring Alex's character.)
 
 2. Making the Choice
-Question: What does Alex ultimately prioritize when forced to choose?
+Question: Choosing a Career: What does Alex ultimately prioritize when forced to choose?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
 

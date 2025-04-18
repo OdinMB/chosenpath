@@ -109,7 +109,7 @@ const threadStepSchema = z.object({
   question: z
     .string()
     .describe(
-      "Question about how the players act given this step's challenge or decision. Bad: 'What do [insert player names] find in the cellar?' (not related to player choices). Good: 'How do [insert player names] search for clues in the cellar?'"
+      "Type of decision that the player(s) make in this step of the thread. Format: 'Title: Question'. Bad: 'What do [insert player names] find in the cellar?' (not related to player choices). Good: 'Investigation: How do [insert player names] search for clues in the cellar?'"
     ),
   possibleResolutions: z
     .union([
@@ -123,11 +123,6 @@ const threadStepSchema = z.object({
 });
 
 export const threadSchema = z.object({
-  plan: z
-    .string()
-    .describe(
-      "A plan guiding the creation of this thread. Include the following points:\n- More specifically, which outcome will this thread add a milestone to?\n- Given that outcome, what type of milestone could this thread be adding to the outcome (finding/not finding a clue, convincing/not convincing the council, etc.)?\n- Which progression of beats (as many beats as the thread's duration) will lead us to the resolution of this thread (where we add a milestone to the outcome)? Make sure that each step infers an advantage or disadvantage on the next step, without making the next step impossible to reach or resolve. The milestone will be decided after the last player decision on the last beat. Other beats should work towards that climax."
-    ),
   outcomeId: z
     .string()
     .describe(
@@ -143,6 +138,21 @@ export const threadSchema = z.object({
     .describe(
       "Only relevant for multiplayer threads over contested outcomes. IDs of players who make up Side B. In a singleplayer or cooperative thread, leave this empty."
     ),
+  previousThreadTypesToBeAvoided: z
+    .array(z.string())
+    .describe(
+      "Previous thread types that the players in this thread have been involved in. (These types of threads should be avoided for this thread to avoid repetition.)"
+    ),
+  typeOfThread: z
+    .string()
+    .describe(
+      "Short description of the type of thread. Examples: Chase, Negotiation, Exploration, Fight. Should be different from the previous three threads. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)"
+    ),
+  typeOfMilestone: z
+    .string()
+    .describe(
+      "What type of milestone sould this thread be adding to the outcome (finding/not finding a clue, convincing/not convincing the council, etc.)?"
+    ),
   possibleMilestones: z
     .union([
       challengeMilestonesSchema,
@@ -155,7 +165,7 @@ export const threadSchema = z.object({
   progression: z
     .array(threadStepSchema)
     .describe(
-      "Progression of steps that structure this thread. Must have exactly as many steps as the duration of the thread. (If the thread has a duration of 3 beats, this field must have 3 steps.) Should be a different kind of thread than the previous three threads. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)"
+      "Progression of steps that structure this thread. Must have exactly as many steps as the duration of the thread. (If the thread has a duration of 3 beats, this field must have 3 steps.) The milestone will be decided after the last player decision on the last beat. The other beats should work towards that climax. Make sure that each step infers an advantage or disadvantage on the next step, without making the next step impossible to reach or resolve. The types of decisions that player(s) make should be different for each step."
     ),
   title: z
     .string()

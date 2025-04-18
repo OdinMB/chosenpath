@@ -101,6 +101,7 @@ export function createEmptyPlayerState(outcomes: any[] = []) {
     statValues: [],
     knownStoryElements: [],
     beatHistory: [],
+    previousTypesOfThreads: [],
     characterSelected: false,
   };
 }

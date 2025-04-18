@@ -16,6 +16,7 @@ export class SwitchPromptService {
     outcomes: true,
     imageLibrary: true,
     players: true,
+    previousThreads: true,
     storyProgress: true,
   } as const;
 
@@ -42,7 +43,7 @@ export class SwitchPromptService {
             this.SECTIONS_PREVIOUS_THREAD
           )
         : "");
-    // console.log("\x1b[36m%s\x1b[0m", prompt);
+    console.debug("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
@@ -104,28 +105,23 @@ Player agency in the form of a topic switch is valuable and should not be squand
 c) Decision. Justify your choice of using a flavor switch or a topic switch.
 
 Consider both player outcomes and shared outcomes throughout this process.
-
-2. Determine which types of threads have been used in the previous (up to) 10 beats
-
-This helps to avoid repeating similar types of threads, which would be boring.
-Do not create switch configurations that feature the same types of threads that have been used recently.
 `;
 
     if (story.isMultiplayer()) {
-      instructions += `\n3. Determine switch coordination between players
+      instructions += `\n2. Determine switch coordination between players
 
 a) Consider the game mode's implications
 ${
   story.getGameMode() === GameModes.Cooperative
-    ? "This game is marked as Cooperative. Prioritize shared outcomes and opportunities for players to help each other\n  Example: Players should often get switches that let them contribute to shared goals"
+    ? "This game is marked as Cooperative. Prioritize shared outcomes and opportunities for players to be in the same thread to help each other"
     : ""
 }${
         story.getGameMode() === GameModes.Competitive
-          ? "This game is marked as Competitive. Focus on personal outcomes and meaningful competition opportunities\n  Example: Players' switches should create interesting points of conflict or resource competition"
+          ? "This game is marked as Competitive. Focus on shared outcomes that players compete over. Over the course of the story, create both separate (preparation, eavesdropping, etc.) and joint (duel, direct competition, etc.) threads competition."
           : ""
       }${
         story.getGameMode() === GameModes.CooperativeCompetitive
-          ? "This game is marked as Cooperative-competitive. Balance shared and competing interests\n  Example: Players might need to choose between advancing personal goals or shared objectives"
+          ? "This game is marked as Cooperative-competitive. Balance joint threads for shared goals and individual threads for personal goals"
           : ""
       }
 
@@ -158,14 +154,15 @@ Follow steps 1a-c for each player, then apply step 2 to determine how their swit
 
 A list of switches, including
 
-1. Switch type (topic/flavor) and justification
-2. Relationship to other switches${
+1. Which players are linked to this thread
+2. Switch type (topic/flavor) and justification
+3. Previous thread types that the players in this switch have been involved in. (These types of threads should be avoided for the next thread to avoid repetition.)
+4. Relationship to other switches${
       story.isMultiplayer()
         ? ""
         : ". Since this is a single-player story, you can ignore this step."
     }
-3. If flavor switch: Outcome/question that will be explored in the next thread
-4. Which players are linked to this thread
+5. If flavor switch: Outcome/question that will be explored in the next thread. If topic switch: Possible next steps that the players can make.
 
 EXAMPLE OUTPUT:
 

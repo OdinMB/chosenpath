@@ -13,6 +13,7 @@ import type {
   PlayerCount,
   BeatsNeedingImages,
   GameMode,
+  Thread,
 } from "@core/types/index.js";
 import {
   createStorySetupSchema,
@@ -20,6 +21,7 @@ import {
   threadAnalysisSchema,
   PLAYER_SLOTS,
   PlayerState,
+  getThreadType,
 } from "@core/types/index.js";
 import { getPlayerSlots } from "@core/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "@core/types/beat.js";
@@ -257,7 +259,12 @@ export class AIStoryGenerator {
       threads: transformedThreads,
     };
 
-    return story.addPhase(transformedResponse);
+    // Modify players' previousTypesOfThreads to include the new thread type
+    let updatedStory =
+      story.updatePlayerPreviousThreadTypes(transformedThreads);
+
+    // Add the phase to the updated story
+    return updatedStory.addPhase(transformedResponse);
   }
 
   async generateBeats(

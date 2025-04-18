@@ -118,7 +118,7 @@ export const beatPlanSchema = z.object({
   showDontTell: z
     .array(z.string())
     .describe(
-      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'."
+      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. The list must include how exactly the player performs the action that was chosen in the previous beat and the consequences of that action."
     ),
   newIntroductionsOfStoryElements: z
     .array(addIntroductionOfStoryElementSchema)

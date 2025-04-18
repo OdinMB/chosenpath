@@ -2,9 +2,11 @@ Smaller and more commits!
 
 # Next
 
+(node:94576) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 storyInitialized listeners added to [EventEmitter]. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:94576) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 operationError listeners added to [EventEmitter]. Use emitter.setMaxListeners() to increase limit
+
 - List of types of scenes that the story should include (generation, switch/thread generation)
-- Not the same type of decision several times over the course of a thread (new consideration for thread progressions)
-  - align with previousTypesOfThreadsNotToBeRepeated
 - Always introduce other players in beat 1
 - First thread always together
 

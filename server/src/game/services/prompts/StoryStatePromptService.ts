@@ -13,6 +13,7 @@ export interface SectionConfig {
   outcomes?: boolean;
   imageLibrary?: boolean;
   players?: boolean;
+  previousThreads?: boolean;
   storyProgress?: boolean;
   switchConfiguration?: boolean;
   switchWithDecisionsConfiguration?: boolean;
@@ -289,6 +290,17 @@ ${modeDescriptions[story.getGameMode()]}
           playerState.appearance + " " + playerState.fluff,
           "",
         ];
+
+        // Include previous thread types if requested
+        if (sections?.previousThreads) {
+          playerSections.push(
+            "PREVIOUS THREAD TYPES: ",
+            playerState.previousTypesOfThreads?.length
+              ? playerState.previousTypesOfThreads.join(", ")
+              : "None",
+            ""
+          );
+        }
 
         // Only include character stats if the stats setting is true
         if (sections?.stats) {

@@ -261,10 +261,11 @@ Title: ${
     }
 
 Text
-- The first paragraph
---- Should continue exactly where the previous beat for this player ended
---- Describe the immediate consequences of the player's decision in the previous beat.
---- Don't skip over actions or events. Examples: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is. If the player took a risk to look for medical plants while trying to move silently through a forest, describe how they do it and what the outcome is.
+- The first paragraph must
+--- continue exactly where the previous beat for this player ended
+--- describe how the player performs the action that was chosen in the previous beat
+--- describe the consequences of that action
+Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is.
 ${
   story.getCurrentBeatType() === "thread" &&
   story.getCurrentThreadBeatsCompleted() > 0
@@ -303,8 +304,7 @@ ${
           "--- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.\n" +
           "- Use direct speech\n" +
           "--- Both for the player characters and the NPCs.\n" +
-          "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X' or 'you talk to X'.\n" +
-          "--- Exception: you want to skip over a routine conversation that doesn't add to the story.\n" +
+          "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X'. Spell out the actual words that the character says.\n" +
           "- Address the player directly (with 'You' in the second person)\n" +
           (story.isMultiplayer()
             ? "--- Only address the player that will see this beat directly. Other players in the same thread should be referenced by name or with third person pronouns.\n"

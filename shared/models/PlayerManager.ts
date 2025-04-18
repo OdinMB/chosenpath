@@ -6,6 +6,7 @@ import {
   Beat,
   Resolution,
   ResolutionDetails,
+  Thread,
 } from "@core/types/index.js";
 import { replacePronounPlaceholders } from "@core/utils/playerUtils.js";
 
@@ -294,6 +295,55 @@ export class PlayerManager {
         ...state.players,
         [playerSlot]: updatedPlayer,
       },
+    };
+  }
+
+  /**
+   * Update players' previousTypesOfThreads with new thread types
+   * Keeps the most recent 3 thread types with newest at the front
+   */
+  updatePreviousThreadTypes(state: StoryState, threads: Thread[]): StoryState {
+    // Create a mapping of player slots to their thread types
+    const playerThreadTypes: Record<string, string> = {};
+
+    // For each thread, get its type and assign to each player in the thread
+    threads.forEach((thread) => {
+      const threadType = thread.typeOfThread;
+
+      // Assign the thread type to all players in the thread (both sides)
+      [...thread.playersSideA, ...thread.playersSideB].forEach((playerSlot) => {
+        playerThreadTypes[playerSlot] = threadType;
+      });
+    });
+
+    // Get a copy of the current players to update
+    const players = { ...state.players };
+
+    // Update each player's previousTypesOfThreads array
+    Object.entries(playerThreadTypes).forEach(([playerSlot, threadType]) => {
+      const player = this.getPlayer(state, playerSlot);
+      if (!player) return;
+
+      // Create a new array with the new thread type at the front
+      const updatedThreadTypes = [
+        threadType,
+        ...(player.previousTypesOfThreads || []),
+      ];
+
+      // Limit to 3 items
+      const limitedThreadTypes = updatedThreadTypes.slice(0, 3);
+
+      // Update the player state
+      players[playerSlot] = {
+        ...player,
+        previousTypesOfThreads: limitedThreadTypes,
+      };
+    });
+
+    // Return updated state
+    return {
+      ...state,
+      players,
     };
   }
 }

@@ -294,6 +294,14 @@ export class Story {
     return this.playerManager.getPlayer(this.state, playerSlot);
   }
 
+  updatePlayerPreviousThreadTypes(threads: Thread[]): Story {
+    const updatedState = this.playerManager.updatePreviousThreadTypes(
+      this.state,
+      threads
+    );
+    return new Story(updatedState);
+  }
+
   getCurrentBeat(playerSlot: PlayerSlot) {
     return this.playerManager.getCurrentBeat(this.state, playerSlot);
   }
