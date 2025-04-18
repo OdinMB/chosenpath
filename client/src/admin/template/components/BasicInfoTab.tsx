@@ -209,18 +209,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           </div>
         </div>
       </div>
-      {/* Tags section */}
-      <div>
-        <ArrayField
-          title="Tags"
-          tooltipText="Categories to help players find your story"
-          items={tags}
-          onChange={handleTagsChange}
-          placeholder="Add a tag"
-          emptyPlaceholder="Click + to add tags"
-        />
-      </div>
-
       {/* Show on welcome screen checkbox */}
       <div className="flex items-center gap-2 mt-2">
         <Checkbox
@@ -235,12 +223,23 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           className="font-semibold text-gray-700 flex items-center"
         >
           Show on welcome screen
-          <InfoIcon
-            tooltipText="Featured templates will appear on the welcome screen carousel"
-            position="right"
-            className="ml-2 mt-1"
-          />
         </label>
+        <InfoIcon
+          tooltipText="Featured templates will appear on the welcome screen carousel"
+          position="right"
+          className="ml-1 mt-1"
+        />
+      </div>
+      {/* Tags section */}
+      <div>
+        <ArrayField
+          title="Tags"
+          tooltipText="Categories to help players find your story"
+          items={tags}
+          onChange={handleTagsChange}
+          placeholder="Add a tag"
+          emptyPlaceholder="Click + to add tags"
+        />
       </div>
     </div>
   );

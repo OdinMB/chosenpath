@@ -11,6 +11,7 @@ import { StoryInitializer } from "@page/StoryInitializer";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { PrimaryButton, Icons, Select } from "@components/ui";
 import { useTemplateForm } from "../hooks/useTemplateForm";
+import { ShareLink } from "../../../shared/components/ShareLink";
 
 type TabType =
   | "basic"
@@ -97,20 +98,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         <h2 className="text-xl font-semibold text-gray-800 truncate">
           {formData.title ? formData.title : "New Template"}
         </h2>
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0">
-            <Select
-              value={formData.publicationStatus || PublicationStatus.Draft}
-              onChange={handlePublicationStatusChange}
-              variant="large"
-              size="lg"
-              className="w-40"
-            >
-              <option value={PublicationStatus.Draft}>Draft</option>
-              <option value={PublicationStatus.Review}>Review</option>
-              <option value={PublicationStatus.Published}>Published</option>
-            </Select>
-          </div>
+        <div>
           <PrimaryButton
             type="submit"
             disabled={isLoading}
@@ -120,6 +108,25 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             Save
           </PrimaryButton>
         </div>
+      </div>
+
+      <div className="flex items-center gap-3 mb-4">
+        <Select
+          value={formData.publicationStatus || PublicationStatus.Draft}
+          onChange={handlePublicationStatusChange}
+          variant="default"
+          size="sm"
+          className="w-40"
+        >
+          <option value={PublicationStatus.Draft}>Draft</option>
+          <option value={PublicationStatus.Review}>Review</option>
+          <option value={PublicationStatus.Published}>Published</option>
+        </Select>
+
+        {formData.id &&
+          formData.publicationStatus === PublicationStatus.Published && (
+            <ShareLink templateId={formData.id} showText={false} />
+          )}
       </div>
 
       <div className="border-b border-gray-200">

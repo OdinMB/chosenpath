@@ -3,6 +3,7 @@ import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui/index";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
+import { ShareLink } from "@components/ShareLink";
 
 type StoryLibraryProps = {
   token: string;
@@ -407,6 +408,10 @@ export const StoryLibrary = ({
                       >
                         <Icons.Edit className="h-5 w-5" />
                       </button>
+                      {template.publicationStatus ===
+                        PublicationStatus.Published && (
+                        <ShareLink templateId={template.id} />
+                      )}
                       <button
                         onClick={() => handleExportTemplate(template)}
                         className="text-secondary hover:text-secondary-700 transition-colors"

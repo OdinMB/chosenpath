@@ -171,17 +171,7 @@ export const StoryCarouselManager: React.FC<StoryCarouselManagerProps> = ({
   }
 
   if (templates.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="mb-4">
-          No templates are marked for display on the welcome screen.
-        </p>
-        <p className="mb-4">
-          To add templates to the welcome screen, edit a template and check
-          "Show on welcome screen".
-        </p>
-      </div>
-    );
+    return "";
   }
 
   return (
