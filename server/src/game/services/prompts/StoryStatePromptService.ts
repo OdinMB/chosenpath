@@ -103,15 +103,25 @@ ${modeDescriptions[story.getGameMode()]}
   }
 
   private static createGuidelinesSection(story: Story): string {
+    const guidelines = story.getGuidelines();
     return [
       "STORY GUIDELINES",
-      `- World: ${story.getGuidelines().world}`,
-      `- Rules: ${story.getGuidelines().rules.join(", ")}`,
-      `- Tone: ${story.getGuidelines().tone.join(", ")}`,
-      `- Core conflicts: ${story.getGuidelines().conflicts.join(", ")}`,
-      `- Types of decisions that players will make: ${story
-        .getGuidelines()
-        .decisions.join(", ")}`,
+      guidelines.world ? `- World: ${guidelines.world}` : "",
+      guidelines.rules ? `- Rules: ${guidelines.rules.join(", ")}` : "",
+      guidelines.tone ? `- Tone: ${guidelines.tone.join(", ")}` : "",
+      guidelines.conflicts
+        ? `- Core conflicts: ${guidelines.conflicts.join(", ")}`
+        : "",
+      guidelines.decisions
+        ? `- Types of decisions that players will make: ${guidelines.decisions.join(
+            ", "
+          )}`
+        : "",
+      guidelines.typesOfThreads
+        ? `- Types of threads that should be considered for the story: ${guidelines.typesOfThreads.join(
+            ", "
+          )}`
+        : "",
       "",
     ].join("\n");
   }

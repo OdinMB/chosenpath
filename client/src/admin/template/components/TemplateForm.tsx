@@ -49,7 +49,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     setTone,
     setConflicts,
     setDecisions,
-    setTags,
+    setTypesOfThreads,
     // Field handlers
     handleTitleChange,
     handleTeaserChange,
@@ -64,6 +64,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handlePlayerOptionsChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
+    handleTagsChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -160,7 +161,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             setMaxTurnsMin={handleMaxTurnsMinChange}
             setMaxTurnsMax={handleMaxTurnsMaxChange}
             tags={tags}
-            handleTagsChange={setTags}
+            handleTagsChange={handleTagsChange}
             handleAddTag={handleAddTag}
             handleRemoveTag={handleRemoveTag}
             // Helper functions
@@ -179,13 +180,21 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             onChange={(updates) => {
               // Delegate to useTemplateForm's update mechanisms
               if (updates.guidelines) {
-                const { world, rules, tone, conflicts, decisions } =
-                  updates.guidelines;
+                const {
+                  world,
+                  rules,
+                  tone,
+                  conflicts,
+                  decisions,
+                  typesOfThreads,
+                } = updates.guidelines;
                 if (world !== undefined) setWorld(world);
                 if (rules !== undefined) setRules(rules);
                 if (tone !== undefined) setTone(tone);
                 if (conflicts !== undefined) setConflicts(conflicts);
                 if (decisions !== undefined) setDecisions(decisions);
+                if (typesOfThreads !== undefined)
+                  setTypesOfThreads(typesOfThreads);
               }
             }}
           />

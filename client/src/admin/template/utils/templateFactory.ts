@@ -32,6 +32,7 @@ export function createDefaultTemplate(): StoryTemplate {
       tone: [],
       conflicts: [],
       decisions: [],
+      typesOfThreads: [],
     },
     storyElements: [] as StoryElement[],
     sharedOutcomes: [],

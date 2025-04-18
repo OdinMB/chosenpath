@@ -53,8 +53,6 @@ export class StorySetupPromptService {
 
   private static getStatGuidelines(isMultiplayer: boolean): string {
     return `Guidelines for the initial story state:
-- 3 overarching conflicts
-- 3 types of decisions that the players will be able to make
 - 6-8 story elements
 --- 2-4 NPCs.
 --- 2-4 locations

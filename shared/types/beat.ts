@@ -204,7 +204,7 @@ export const beatGenerationSchema = z.object({
       ])
     )
     .describe(
-      "3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Don't mention specific numbers, percentages, or probabilities for sacrifices and rewards. Remember that both sacrifices and rewards are certain (and not just risks or potential rewards)."
+      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Put specific numbers for sacrifices and rewards in brackets (e.g. 'push through (-10 stamina)'). Remember that both sacrifices and rewards are certain and not just risks or potential rewards."
     ),
 });
 

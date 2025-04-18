@@ -18,11 +18,13 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
     tone,
     conflicts,
     decisions,
+    typesOfThreads,
     setWorld,
     setRules,
     setTone,
     setConflicts,
     setDecisions,
+    setTypesOfThreads,
   } = useTemplateGuidelines({
     template,
     onChange,
@@ -84,6 +86,15 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setDecisions}
         placeholder="Add a decision"
         emptyPlaceholder="Click + to add decisions"
+      />
+
+      <ArrayField
+        title="Types of Threads"
+        tooltipText="Suggested types of threads for the story (e.g. witness interview, car chase, romantic date)"
+        items={typesOfThreads}
+        onChange={setTypesOfThreads}
+        placeholder="Add a thread type"
+        emptyPlaceholder="Click + to add thread types"
       />
     </div>
   );

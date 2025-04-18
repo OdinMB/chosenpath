@@ -47,6 +47,11 @@ export const switchSchema = z.object({
     .describe(
       "List of previous thread types that the players have been involved in."
     ),
+  relevantSuggestedThreadTypes: z
+    .array(z.string())
+    .describe(
+      "List of thread types that are suggested for this story in general and that might work well for this switch (or rather the thread that will be created as a result of this switch)."
+    ),
   outcomeId: z
     .string()
     .describe(

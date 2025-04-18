@@ -25,6 +25,9 @@ export function useTemplateGuidelines({
   const [decisions, setDecisionsState] = useState<string[]>(
     template.guidelines?.decisions || []
   );
+  const [typesOfThreads, setTypesOfThreadsState] = useState<string[]>(
+    template.guidelines?.typesOfThreads || []
+  );
 
   // Generic function to update guidelines with changes to a specific field
   const updateGuidelineField = <T>(
@@ -39,6 +42,7 @@ export function useTemplateGuidelines({
         tone,
         conflicts,
         decisions,
+        typesOfThreads,
         [field]: value,
       },
     });
@@ -70,6 +74,11 @@ export function useTemplateGuidelines({
     updateGuidelineField("decisions", newDecisions);
   };
 
+  const setTypesOfThreads = (newTypesOfThreads: string[]) => {
+    setTypesOfThreadsState(newTypesOfThreads);
+    updateGuidelineField("typesOfThreads", newTypesOfThreads);
+  };
+
   // Update all guidelines at once
   const updateGuidelines = () => {
     onChange({
@@ -80,6 +89,7 @@ export function useTemplateGuidelines({
         tone,
         conflicts,
         decisions,
+        typesOfThreads,
       },
     });
   };
@@ -125,6 +135,8 @@ export function useTemplateGuidelines({
       handleArrayFieldChange(setConflicts, conflicts, index, value);
     } else if (setter === setDecisions) {
       handleArrayFieldChange(setDecisions, decisions, index, value);
+    } else if (setter === setTypesOfThreads) {
+      handleArrayFieldChange(setTypesOfThreads, typesOfThreads, index, value);
     }
   };
 
@@ -137,6 +149,8 @@ export function useTemplateGuidelines({
       handleAddArrayItem(setConflicts, conflicts);
     } else if (setter === setDecisions) {
       handleAddArrayItem(setDecisions, decisions);
+    } else if (setter === setTypesOfThreads) {
+      handleAddArrayItem(setTypesOfThreads, typesOfThreads);
     }
   };
 
@@ -152,6 +166,8 @@ export function useTemplateGuidelines({
       handleRemoveArrayItem(setConflicts, conflicts, index);
     } else if (setter === setDecisions) {
       handleRemoveArrayItem(setDecisions, decisions, index);
+    } else if (setter === setTypesOfThreads) {
+      handleRemoveArrayItem(setTypesOfThreads, typesOfThreads, index);
     }
   };
 
@@ -161,11 +177,13 @@ export function useTemplateGuidelines({
     tone,
     conflicts,
     decisions,
+    typesOfThreads,
     setWorld,
     setRules,
     setTone,
     setConflicts,
     setDecisions,
+    setTypesOfThreads,
     handleArrayFieldChange: handleArrayFieldChangeAdapter,
     handleAddArrayItem: handleAddArrayItemAdapter,
     handleRemoveArrayItem: handleRemoveArrayItemAdapter,

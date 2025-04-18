@@ -143,6 +143,11 @@ export const threadSchema = z.object({
     .describe(
       "Previous thread types that the players in this thread have been involved in. (These types of threads should be avoided for this thread to avoid repetition.)"
     ),
+  relevantSuggestedThreadTypes: z
+    .array(z.string())
+    .describe(
+      "Thread types that are suggested for this story in general and that might work well for this thread."
+    ),
   typeOfThread: z
     .string()
     .describe(

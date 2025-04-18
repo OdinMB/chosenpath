@@ -81,6 +81,11 @@ export const guidelinesSchema = z
       .describe(
         "Types of decisions that players will make. Should be tied to the conflicts. For example, prioritizing investigation leads given limited amount of time, following common sense morals vs. speeding up the investigation, how to manage resources, etc."
       ),
+    typesOfThreads: z
+      .array(z.string())
+      .describe(
+        "7 types of threads that fit the story. For example: witness interview, car chase, romantic date, physical fight, etc."
+      ),
   })
   .describe("Story guidelines and parameters");
 

@@ -142,11 +142,12 @@ Create a list of threads, each with:
 1. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. A list of previous thread types that the players in this thread have been involved in. (These types of threads should be avoided for the next thread to avoid repetition.)
-4. The type of thread, summarized in a few words. Examples: Romantic Date, Physical Fight, Witness Interview, etc.
-5. Possible milestones that might be added to that outcome
+4. Thread types that are suggested for this story in general and that might work well for this thread.
+5. The type of thread, summarized in a few words. Examples: Romantic Date, Physical Fight, Witness Interview, etc.
+6. Possible milestones that might be added to that outcome
    - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
    - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
-6. A progression of 2-4 beats (matching the duration) that:
+7. A progression of 2-4 beats (matching the duration) that:
    - Adds to the variety of threads in the story. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)
    - Builds dramatic tension toward the thread's climax on the last beat
    - For Challenge ${
