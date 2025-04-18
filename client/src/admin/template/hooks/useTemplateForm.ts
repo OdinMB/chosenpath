@@ -59,6 +59,7 @@ export function useTemplateForm({
     handleRemoveTag,
     handlePublicationStatusChange,
     handleTagsChange,
+    handleShowOnWelcomeScreenChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -314,6 +315,7 @@ export function useTemplateForm({
     handlePlayerOptionsChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
+    handleShowOnWelcomeScreenChange,
     // Helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,

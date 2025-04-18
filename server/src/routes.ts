@@ -95,15 +95,30 @@ router.get("/templates", async (req, res) => {
   try {
     const allTemplates = await libraryService.getAllTemplates();
 
-    // Filter only published templates for the public API
-    const publishedTemplates = allTemplates.filter(
-      (template) => template.publicationStatus === PublicationStatus.Published
-    );
+    // Check if the request is for welcome screen templates
+    const forWelcomeScreen = req.query.forWelcomeScreen === "true";
+
+    // Filter templates based on publication status and welcome screen flag
+    const templates = allTemplates.filter((template) => {
+      // Always require templates to be published
+      const isPublished =
+        template.publicationStatus === PublicationStatus.Published;
+
+      // If requesting welcome screen templates, also check the showOnWelcomeScreen flag
+      if (forWelcomeScreen) {
+        return isPublished && template.showOnWelcomeScreen;
+      }
+
+      // Otherwise just return all published templates
+      return isPublished;
+    });
 
     Logger.Route.log(
-      `Returning ${publishedTemplates.length} published templates`
+      `Returning ${templates.length} templates${
+        forWelcomeScreen ? " for welcome screen" : ""
+      }`
     );
-    res.json({ templates: publishedTemplates });
+    res.json({ templates });
   } catch (error) {
     Logger.Route.error("Failed to load templates", error);
     res.status(500).json({ error: "Failed to load templates" });
@@ -176,6 +191,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
     teaser,
     title,
     publicationStatus,
+    showOnWelcomeScreen,
     ...templateData
   } = req.body;
 
@@ -193,6 +209,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
       title,
       teaser: teaser || "",
       publicationStatus: publicationStatus || PublicationStatus.Draft,
+      showOnWelcomeScreen: showOnWelcomeScreen || false,
     };
 
     const template = await libraryService.createTemplate(
@@ -225,6 +242,7 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
     teaser,
     title,
     publicationStatus,
+    showOnWelcomeScreen,
     ...templateData
   } = req.body;
 
@@ -242,6 +260,8 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
       title,
       teaser: teaser || "",
       publicationStatus: publicationStatus || PublicationStatus.Draft,
+      showOnWelcomeScreen:
+        showOnWelcomeScreen !== undefined ? showOnWelcomeScreen : false,
     };
 
     const template = await libraryService.updateTemplate(

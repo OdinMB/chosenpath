@@ -20,15 +20,19 @@ export const TemplateBrowser = ({ onSelectTemplate }: TemplateBrowserProps) => {
       setError(null);
 
       try {
-        // Fetch templates from the API
-        const response = await fetch(`${config.apiUrl}/templates`);
+        // Fetch templates from the API specifically for the welcome screen
+        const response = await fetch(
+          `${config.apiUrl}/templates?forWelcomeScreen=true`
+        );
 
         if (!response.ok) {
           throw new Error(`Error fetching templates: ${response.status}`);
         }
 
         const data = await response.json();
-        Logger.App.log(`Loaded ${data.templates.length} published templates`);
+        Logger.App.log(
+          `Loaded ${data.templates.length} templates for welcome screen`
+        );
         setTemplates(data.templates);
       } catch (error) {
         Logger.App.error("Failed to load templates", error);

@@ -1,5 +1,11 @@
 import React from "react";
-import { ArrayField, PrimaryButton, Icons, Input } from "@components/ui";
+import {
+  ArrayField,
+  PrimaryButton,
+  Icons,
+  Input,
+  Checkbox,
+} from "@components/ui";
 import { Stat, StatValueEntry } from "@core/types";
 import { StatValueInput } from "./StatValueInput";
 import { useStatEditor } from "../hooks/useStatEditor";
@@ -184,12 +190,13 @@ export const StatEditor: React.FC<StatEditorProps> = ({
           )}
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id={`stat-visible-${stat.id}`}
                 name={`stat-visible-${stat.id}`}
                 checked={localStat.isVisible}
-                onChange={(e) => updateStatField("isVisible", e.target.checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  updateStatField("isVisible", e.target.checked)
+                }
               />
               <label
                 htmlFor={`stat-visible-${stat.id}`}
@@ -248,12 +255,11 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id={`stat-beat-changes-${stat.id}`}
                 name={`stat-beat-changes-${stat.id}`}
                 checked={localStat.canBeChangedInBeatResolutions}
-                onChange={(e) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   updateStatField(
                     "canBeChangedInBeatResolutions",
                     e.target.checked

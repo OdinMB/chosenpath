@@ -26,6 +26,7 @@ export function createDefaultTemplate(): StoryTemplate {
     updatedAt: new Date().toISOString(),
     title: "",
     publicationStatus: PublicationStatus.Draft,
+    showOnWelcomeScreen: false,
     guidelines: {
       world: "",
       rules: [],

@@ -16,9 +16,9 @@ export const Select: React.FC<SelectProps> = ({
   ...props
 }) => {
   const sizeClasses = {
-    sm: "text-sm py-1 pl-2 pr-8",
-    md: "py-2 pl-3 pr-10",
-    lg: "text-lg py-2 pl-3 pr-10",
+    sm: "text-sm py-1 pl-2 pr-4",
+    md: "py-2 pl-3 pr-4",
+    lg: "text-lg py-2 pl-3 pr-4",
   };
 
   const variantClasses = {

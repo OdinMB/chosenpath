@@ -2,9 +2,8 @@ Smaller and more commits!
 
 # Next
 
-(node:94576) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 storyInitialized listeners added to [EventEmitter]. Use emitter.setMaxListeners() to increase limit
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:94576) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 operationError listeners added to [EventEmitter]. Use emitter.setMaxListeners() to increase limit
+- Admin area for sorting story templates on the welcome screen
+- A browsable library of story templates
 
 - Always introduce other players in beat 1
 - First thread always together

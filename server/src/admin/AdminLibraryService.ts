@@ -181,6 +181,7 @@ export class AdminLibraryService {
         teaser: dataWithPlayerOptions.teaser,
         publicationStatus:
           dataWithPlayerOptions.publicationStatus || PublicationStatus.Draft,
+        showOnWelcomeScreen: dataWithPlayerOptions.showOnWelcomeScreen || false,
         guidelines: dataWithPlayerOptions.guidelines,
         storyElements: dataWithPlayerOptions.storyElements,
         sharedOutcomes: dataWithPlayerOptions.sharedOutcomes,
@@ -277,6 +278,10 @@ export class AdminLibraryService {
           dataWithPlayerOptions.publicationStatus ||
           existingTemplate.publicationStatus ||
           PublicationStatus.Draft,
+        showOnWelcomeScreen:
+          dataWithPlayerOptions.showOnWelcomeScreen !== undefined
+            ? dataWithPlayerOptions.showOnWelcomeScreen
+            : existingTemplate.showOnWelcomeScreen || false,
         guidelines:
           dataWithPlayerOptions.guidelines as StoryTemplate["guidelines"],
         storyElements:

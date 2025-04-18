@@ -1,6 +1,13 @@
 import React from "react";
 import { PlayerCount } from "@core/types";
-import { ArrayField, Input, TextArea, InfoIcon, Select } from "@components/ui";
+import {
+  ArrayField,
+  Input,
+  TextArea,
+  InfoIcon,
+  Select,
+  Checkbox,
+} from "@components/ui";
 
 interface BasicInfoTabProps {
   title: string;
@@ -18,8 +25,8 @@ interface BasicInfoTabProps {
   setMaxTurnsMax: (turns: number) => void;
   tags: string[];
   handleTagsChange: (tags: string[]) => void;
-  handleAddTag: () => void;
-  handleRemoveTag: (index: number) => void;
+  showOnWelcomeScreen: boolean;
+  setShowOnWelcomeScreen: (show: boolean) => void;
   // Helper functions
   getMinPlayerOptions: () => number[];
   getMaxPlayerOptions: () => number[];
@@ -45,6 +52,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   setMaxTurnsMax,
   tags,
   handleTagsChange,
+  showOnWelcomeScreen,
+  setShowOnWelcomeScreen,
   // Helper functions
   getMinPlayerOptions,
   getMaxPlayerOptions,
@@ -77,18 +86,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           onChange={(e) => setTeaser(e.target.value)}
           placeholder="A short teaser to attract players to your story"
           rows={3}
-        />
-      </div>
-
-      {/* Tags section */}
-      <div>
-        <ArrayField
-          title="Tags"
-          tooltipText="Categories to help players find your story"
-          items={tags}
-          onChange={handleTagsChange}
-          placeholder="Add a tag"
-          emptyPlaceholder="Click + to add tags"
         />
       </div>
 
@@ -211,6 +208,39 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             </Select>
           </div>
         </div>
+      </div>
+      {/* Tags section */}
+      <div>
+        <ArrayField
+          title="Tags"
+          tooltipText="Categories to help players find your story"
+          items={tags}
+          onChange={handleTagsChange}
+          placeholder="Add a tag"
+          emptyPlaceholder="Click + to add tags"
+        />
+      </div>
+
+      {/* Show on welcome screen checkbox */}
+      <div className="flex items-center gap-2 mt-2">
+        <Checkbox
+          id="show-on-welcome"
+          checked={showOnWelcomeScreen}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setShowOnWelcomeScreen(e.target.checked)
+          }
+        />
+        <label
+          htmlFor="show-on-welcome"
+          className="font-semibold text-gray-700 flex items-center"
+        >
+          Show on welcome screen
+          <InfoIcon
+            tooltipText="Featured templates will appear on the welcome screen carousel"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </label>
       </div>
     </div>
   );

@@ -145,6 +145,8 @@ export function useTemplateBasics({
     handleAddTag,
     handleRemoveTag,
     handlePublicationStatusChange,
+    handleShowOnWelcomeScreenChange: (value: boolean) =>
+      handleChange("showOnWelcomeScreen", value),
     // Export UI helper functions
     getStoryLengthOptions,
     getPlayerCountOptions,

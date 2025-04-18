@@ -65,6 +65,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
     handleTagsChange,
+    handleShowOnWelcomeScreenChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -72,8 +73,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     getMaxTurnsOptions,
     gameModeOptions,
     getGameModeValue,
-    handleAddTag,
-    handleRemoveTag,
   } = useTemplateForm({
     initialTemplate: template,
     onSubmit,
@@ -105,7 +104,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               onChange={handlePublicationStatusChange}
               variant="large"
               size="lg"
-              className="w-48"
+              className="w-40"
             >
               <option value={PublicationStatus.Draft}>Draft</option>
               <option value={PublicationStatus.Review}>Review</option>
@@ -162,8 +161,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             setMaxTurnsMax={handleMaxTurnsMaxChange}
             tags={tags}
             handleTagsChange={handleTagsChange}
-            handleAddTag={handleAddTag}
-            handleRemoveTag={handleRemoveTag}
             // Helper functions
             getMinPlayerOptions={getMinPlayerOptions}
             getMaxPlayerOptions={getMaxPlayerOptions}
@@ -171,6 +168,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             getMaxTurnsOptions={getMaxTurnsOptions}
             gameModeOptions={gameModeOptions}
             getGameModeValue={getGameModeValue}
+            showOnWelcomeScreen={formData.showOnWelcomeScreen || false}
+            setShowOnWelcomeScreen={handleShowOnWelcomeScreenChange}
           />
         )}
 

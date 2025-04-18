@@ -32,6 +32,7 @@ export function useTemplateApi({
       tags: template.tags,
       title: template.title,
       publicationStatus: template.publicationStatus || PublicationStatus.Draft,
+      showOnWelcomeScreen: template.showOnWelcomeScreen || false,
       guidelines: template.guidelines,
       storyElements: template.storyElements,
       sharedOutcomes: template.sharedOutcomes,
