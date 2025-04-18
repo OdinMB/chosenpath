@@ -15,6 +15,7 @@ import { storyRepository } from "@common/StoryRepository.js";
 import { connectionManager } from "@common/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { createStoryStateFromTemplate } from "./StoryStateFactory.js";
+import { Logger } from "@common/logger.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -91,29 +92,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     connectionManager.broadcastStoryUpdate(gameId, story);
   }
 
-  /**
-   * Helper method to emit story initialization events and notifications
-   */
-  private async emitStoryInitialized(
-    gameId: string,
-    story: Story
-  ): Promise<void> {
-    // Emit the initialization event after storing and broadcasting
-    this.events.emit("storyInitialized", {
-      gameId,
-      story,
-    });
-
-    // Send story_ready_notification to all clients to indicate the story is ready to join
-    const io = connectionManager.getIo();
-    if (io) {
-      io.to(gameId).emit("story_ready_notification", {
-        type: "story_ready_notification",
-        gameId,
-      });
-    }
-  }
-
   private async handleInitializeStory(operation: GameOperation): Promise<void> {
     if (operation.type !== "initializeStory") return;
 
@@ -125,6 +103,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       maxTurns,
       gameMode,
       playerCodes,
+      originalSocket,
     } = input;
 
     // Create initial state
@@ -147,7 +126,13 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     await this.updateAndBroadcastStory(gameId, storyWithCodes);
 
     // Emit initialization events
-    await this.emitStoryInitialized(gameId, storyWithCodes);
+    Logger.Websocket.log(
+      `[GameQueueProcessor] Emitting story_ready_notification to client: ${originalSocket.id}`
+    );
+    originalSocket.emit("story_ready_notification", {
+      type: "story_ready_notification",
+      gameId,
+    });
   }
 
   private async handleInitializeStoryFromTemplate(
@@ -156,7 +141,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     if (operation.type !== "initializeStoryFromTemplate") return;
 
     const { gameId, input } = operation;
-    const { template, playerCount, maxTurns, playerCodes } = input;
+    const { template, playerCount, maxTurns, playerCodes, originalSocket } =
+      input;
 
     try {
       console.log(
@@ -179,7 +165,13 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       await this.updateAndBroadcastStory(gameId, story);
 
       // Emit initialization events
-      await this.emitStoryInitialized(gameId, story);
+      Logger.Websocket.log(
+        `[GameQueueProcessor] Emitting story_ready_notification to client: ${originalSocket.id}`
+      );
+      originalSocket.emit("story_ready_notification", {
+        type: "story_ready_notification",
+        gameId,
+      });
     } catch (error) {
       console.error(
         "[GameQueueProcessor] Failed to initialize story from template:",

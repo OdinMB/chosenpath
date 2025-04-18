@@ -10,7 +10,7 @@ type LoggerCategory = "Admin" | "Story" | "WebSocket" | "UI" | "App";
 const COLORS = {
   Admin: "color: #f59e0b; font-weight: bold", // Amber
   Story: "color: #8b5cf6; font-weight: bold", // Purple
-  WebSocket: "color: #0ea5e9; font-weight: bold", // Sky blue
+  WebSocket: "color: #ff0000; font-weight: bold", // Red
   UI: "color: #10b981; font-weight: bold", // Emerald
   App: "color: #6366f1; font-weight: bold", // Indigo
 };

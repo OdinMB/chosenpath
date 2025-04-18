@@ -253,12 +253,20 @@ function App() {
   }, [sessionId]);
 
   // Helper function to reset all story creation state
-  const resetStoryCreationState = useCallback(() => {
-    setTransientStoryCodes(null);
-    setIsLoading(false);
-    storyCreationStatus.current = "NONE";
-  }, [setTransientStoryCodes, setIsLoading]);
+  const resetStoryCreationState = () => {
+    Logger.App.log("resetStoryCreationState called");
 
+    setStoryState(null);
+    setPlayerCode(null);
+    localStorage.removeItem(playerCodeKey);
+
+    setSelectedTemplate(null);
+    setTransientStoryCodes(null);
+    setStoryReady(false);
+    storyCreationStatus.current = "NONE";
+  };
+
+  // premise-based, called by StoryInitializer
   const handleStorySetup = (options: {
     prompt: string;
     generateImages: boolean;
@@ -268,12 +276,6 @@ function App() {
   }) => {
     Logger.App.log("handleStorySetup called, initializing a new story");
     setIsLoading(true);
-    setPlayerCode(null);
-    setStoryReady(false); // Reset story ready state when starting a new story
-    localStorage.removeItem(playerCodeKey);
-
-    // Make sure transientStoryCodes is null before starting a new story
-    setTransientStoryCodes(null);
 
     // Set story creation status to PREMISE
     storyCreationStatus.current = "PREMISE";
@@ -287,6 +289,14 @@ function App() {
     );
   };
 
+  // premise-based, called by WelcomeScreen
+  const handleNewStory = () => {
+    Logger.App.log("handleNewStory called, clearing story state and codes");
+    resetStoryCreationState();
+    loggedSetViewState("SETUP");
+  };
+
+  // template-based, called by WelcomeScreen
   const handleSelectTemplate = (template: StoryTemplate) => {
     Logger.App.log(`handleSelectTemplate called with template: ${template.id}`);
 
@@ -309,6 +319,7 @@ function App() {
     loggedSetViewState("TEMPLATE_CONFIG");
   };
 
+  // template-based, called by TemplateConfigurator
   const handleConfigureTemplate = (options: {
     templateId: string;
     playerCount: number;
@@ -317,12 +328,6 @@ function App() {
     Logger.App.log("handleConfigureTemplate called with options:", options);
 
     setIsLoading(true);
-    setPlayerCode(null);
-    setStoryReady(false);
-    localStorage.removeItem(playerCodeKey);
-
-    // Make sure to clear any existing story codes first
-    setTransientStoryCodes(null);
 
     // Initialize story from template
     gameService.initializeFromTemplate(
@@ -337,6 +342,7 @@ function App() {
   };
 
   const handleCodeSubmit = (code: string) => {
+    Logger.App.log("handleCodeSubmit called with code:", code);
     setIsLoading(true);
     gameService.verifyCode(code);
     setPlayerCode(code);
@@ -344,6 +350,7 @@ function App() {
   };
 
   const handleExitGame = () => {
+    Logger.App.log("handleExitGame called, exiting game");
     gameService.exitStory();
     setStoryState(null);
     setTransientStoryCodes(null);
@@ -351,13 +358,6 @@ function App() {
     setPlayerCode(null);
     localStorage.removeItem(playerCodeKey);
     loggedSetViewState("WELCOME");
-  };
-
-  const handleNewStory = () => {
-    Logger.App.log("handleNewStory called, clearing story state and codes");
-    setStoryState(null);
-    resetStoryCreationState();
-    loggedSetViewState("SETUP");
   };
 
   const handlePlayerChoice = (optionIndex: number) => {
@@ -426,7 +426,6 @@ function App() {
               <AppTitle
                 size="large"
                 onClick={() => {
-                  setTransientStoryCodes(null);
                   loggedSetViewState("WELCOME");
                 }}
               />
@@ -434,7 +433,6 @@ function App() {
             <StoryInitializer
               onSetup={handleStorySetup}
               onBack={() => {
-                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
             />
@@ -470,8 +468,6 @@ function App() {
               <AppTitle
                 size="large"
                 onClick={() => {
-                  setSelectedTemplate(null);
-                  resetStoryCreationState();
                   loggedSetViewState("WELCOME");
                 }}
               />
@@ -479,8 +475,6 @@ function App() {
             <TemplateConfigurator
               template={selectedTemplate}
               onBack={() => {
-                setSelectedTemplate(null);
-                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
               onConfigure={handleConfigureTemplate}
@@ -521,13 +515,11 @@ function App() {
             <PlayerCodes
               codes={transientStoryCodes}
               onBack={() => {
-                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
               onCodeSubmit={handleCodeSubmit}
               storyReady={storyReady}
               onGoToWelcome={() => {
-                resetStoryCreationState();
                 loggedSetViewState("WELCOME");
               }}
             />

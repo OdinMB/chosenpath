@@ -4,6 +4,7 @@ import { inspect } from "util";
 const COLORS = {
   RESET: "\x1b[0m",
   QUEUE: "\x1b[36m", // Cyan (existing)
+  WEBSOCKET: "\x1b[31m", // Red
   STORY: "\x1b[35m", // Magenta
   CONNECTION: "\x1b[35m", // Magenta (same as Story)
   ADMIN: "\x1b[33m", // Yellow for admin-related logs
@@ -53,10 +54,11 @@ function createLogger(serviceName: string, color: string) {
 
 // Create loggers for each service
 export const Logger = {
+  ConnectionManager: createLogger("ConnectionManager", COLORS.CONNECTION),
+  Websocket: createLogger("Websocket", COLORS.WEBSOCKET),
   Route: createLogger("Route", COLORS.ROUTE),
   Queue: createLogger("Queue", COLORS.QUEUE),
   StoryRepository: createLogger("StoryRepository", COLORS.STORY),
-  ConnectionManager: createLogger("ConnectionManager", COLORS.CONNECTION),
   Admin: createLogger("Admin", COLORS.ADMIN),
   AdminService: createLogger("AdminService", COLORS.ADMIN),
 

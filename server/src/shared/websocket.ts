@@ -17,6 +17,7 @@ import {
   incrementRateLimit,
   getClientIP,
 } from "./rateLimiter.js";
+import { Logger } from "./logger.js";
 
 export class GameWebSocketServer {
   private io: Server;
@@ -94,7 +95,7 @@ export class GameWebSocketServer {
     });
 
     if (limitStatus.isLimited) {
-      console.log(`[WebSocket] Rate limited for ${action}:`, {
+      Logger.Websocket.log(`[WebSocket] Rate limited for ${action}:`, {
         ip,
         timeRemaining: limitStatus.timeRemaining,
         requestsRemaining: limitStatus.requestsRemaining,
@@ -159,7 +160,7 @@ export class GameWebSocketServer {
 
       // Set up global error handler for socket errors
       socket.on("error", (error) => {
-        console.error("[WebSocket] Socket error:", error);
+        Logger.Websocket.error("[WebSocket] Socket error:", error);
         socket.emit("error", {
           error: "Connection error",
           details: error instanceof Error ? error.message : String(error),
@@ -177,9 +178,12 @@ export class GameWebSocketServer {
             timestamp: Date.now(),
             data: { sessionId },
           });
-          console.log("[WebSocket] Session created:", sessionId);
+          Logger.Websocket.log(
+            "[WebSocket] create_session_response with sessionId:",
+            sessionId
+          );
         } catch (error) {
-          console.error("[WebSocket] Error creating session:", error);
+          Logger.Websocket.error("[WebSocket] Error creating session:", error);
           socket.emit("response", {
             type: "create_session_response",
             status: ResponseStatus.ERROR,
@@ -202,7 +206,7 @@ export class GameWebSocketServer {
           requestId?: string;
         }) => {
           try {
-            console.log("[WebSocket] Initialize story request:", data);
+            Logger.Websocket.log("[WebSocket] Initialize story request:", data);
 
             // Check rate limiting
             if (
@@ -233,8 +237,15 @@ export class GameWebSocketServer {
               timestamp: Date.now(),
               data: { message: "Story initialization queued" },
             });
+            Logger.Websocket.log(
+              "[WebSocket] initialize_story_response with message:",
+              "Story initialization queued"
+            );
           } catch (error) {
-            console.error("[WebSocket] Error initializing story:", error);
+            Logger.Websocket.error(
+              "[WebSocket] Error initializing story:",
+              error
+            );
             socket.emit("response", {
               type: "initialize_story_response",
               status: ResponseStatus.ERROR,
@@ -288,8 +299,12 @@ export class GameWebSocketServer {
               timestamp: Date.now(),
               data: { message: "Template-based story initialization queued" },
             });
+            Logger.Websocket.log(
+              "[WebSocket] initialize_story_response with message:",
+              "Template-based story initialization queued"
+            );
           } catch (error) {
-            console.error(
+            Logger.Websocket.error(
               "[WebSocket] Error initializing from template:",
               error
             );
@@ -335,8 +350,12 @@ export class GameWebSocketServer {
               timestamp: Date.now(),
               data: { optionIndex: data.optionIndex },
             });
+            Logger.Websocket.log(
+              "[WebSocket] make_choice_response with optionIndex:",
+              data.optionIndex
+            );
           } catch (error) {
-            console.error("[WebSocket] Error making choice:", error);
+            Logger.Websocket.error("[WebSocket] Error making choice:", error);
             socket.emit("response", {
               type: "make_choice_response",
               status: ResponseStatus.ERROR,
@@ -390,8 +409,15 @@ export class GameWebSocketServer {
                 backgroundIndex: data.backgroundIndex,
               },
             });
+            Logger.Websocket.log(
+              "[WebSocket] select_character_response with identityIndex:",
+              data.identityIndex
+            );
           } catch (error) {
-            console.error("[WebSocket] Error selecting character:", error);
+            Logger.Websocket.error(
+              "[WebSocket] Error selecting character:",
+              error
+            );
             socket.emit("response", {
               type: "select_character_response",
               status: ResponseStatus.ERROR,
@@ -461,8 +487,16 @@ export class GameWebSocketServer {
                 timestamp: Date.now(),
                 data: { code: data.code, state: result.state },
               } as VerifyCodeResponse);
+              Logger.Websocket.log(
+                "[WebSocket] verify_code_response with code:",
+                data.code
+              );
             } else {
               // Send error response
+              Logger.Websocket.error(
+                "[WebSocket] verify_code_response with error:",
+                "Invalid code"
+              );
               socket.emit("response", {
                 type: "verify_code_response",
                 status: ResponseStatus.ERROR,
@@ -472,7 +506,7 @@ export class GameWebSocketServer {
               } as ErrorResponse);
             }
           } catch (error) {
-            console.error("[WebSocket] Error verifying code:", error);
+            Logger.Websocket.error("[WebSocket] Error verifying code:", error);
             socket.emit("response", {
               type: "verify_code_response",
               status: ResponseStatus.ERROR,
@@ -497,8 +531,9 @@ export class GameWebSocketServer {
             timestamp: Date.now(),
             data: {},
           });
+          Logger.Websocket.log("[WebSocket] exit_story_response");
         } catch (error) {
-          console.error("[WebSocket] Error exiting story:", error);
+          Logger.Websocket.error("[WebSocket] Error exiting story:", error);
           socket.emit("response", {
             type: "exit_story_response",
             status: ResponseStatus.ERROR,
@@ -525,14 +560,6 @@ export class GameWebSocketServer {
     this.io.to(storyId).emit("story_codes_notification", {
       gameId: storyId,
       codes,
-    });
-  }
-
-  // Send story ready notification to clients
-  public sendStoryReady(storyId: string): void {
-    this.io.to(storyId).emit("story_ready_notification", {
-      type: "story_ready_notification",
-      gameId: storyId,
     });
   }
 

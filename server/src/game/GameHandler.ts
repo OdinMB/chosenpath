@@ -15,8 +15,8 @@ import type {
   MakeChoiceResponse,
   InitializeStoryResponse,
 } from "@core/types/websocket.js";
-import { nanoid } from "nanoid";
 import { AdminLibraryService } from "../admin/AdminLibraryService.js";
+import { Logger } from "@common/logger.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
@@ -96,6 +96,9 @@ export class GameHandler {
     for (const socketId of gameSocketIds) {
       const socket = this.sockets.get(socketId);
       if (socket) {
+        Logger.Websocket.log(
+          `[GameHandler] Emitting story_ready_notification to socket: ${socketId}`
+        );
         socket.emit("story_ready_notification", {
           type: "story_ready_notification",
           gameId,
@@ -169,6 +172,9 @@ export class GameHandler {
 
       // Send the error message to the client if socket still exists
       if (socket) {
+        Logger.Websocket.error(
+          `[GameHandler] Emitting error to socket: ${socketId}`
+        );
         socket.emit("error", {
           error: userFriendlyMessage,
           operationType: event.operationType,
@@ -184,6 +190,9 @@ export class GameHandler {
       for (const socketId of socketIds) {
         const socket = this.sockets.get(socketId);
         if (socket) {
+          Logger.Websocket.error(
+            `[GameHandler] Emitting error to socket: ${socketId}`
+          );
           socket.emit("error", {
             error: userFriendlyMessage,
             operationType: event.operationType,
@@ -241,7 +250,7 @@ export class GameHandler {
       });
 
       // Send the codes immediately so the client has them
-      console.log(
+      Logger.Websocket.log(
         "[GameHandler] Immediately emitting story codes:",
         playerCodes
       );
@@ -271,6 +280,7 @@ export class GameHandler {
             maxTurns,
             gameMode,
             playerCodes,
+            originalSocket: socket,
           },
         });
 
@@ -283,13 +293,16 @@ export class GameHandler {
           data: {},
         } as InitializeStoryResponse;
         socket.emit("response", requestResponse);
-        console.log(
+        Logger.Websocket.log(
           "[GameHandler] Emitted initialize_story_response to client: ",
           requestResponse
         );
       });
     } catch (error) {
-      console.error("[GameHandler] Failed to initialize story:", error);
+      Logger.Websocket.error(
+        "[GameHandler] Failed to initialize story:",
+        error
+      );
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       socket.emit("error", {
@@ -346,7 +359,7 @@ export class GameHandler {
       });
 
       // Send the codes immediately so the client has them
-      console.log(
+      Logger.Websocket.log(
         "[GameHandler] Immediately emitting story codes:",
         playerCodes
       );
@@ -374,6 +387,7 @@ export class GameHandler {
             playerCount,
             maxTurns,
             playerCodes,
+            originalSocket: socket,
           },
         });
 
@@ -386,13 +400,13 @@ export class GameHandler {
           data: {},
         } as InitializeStoryResponse;
         socket.emit("response", requestResponse);
-        console.log(
+        Logger.Websocket.log(
           "[GameHandler] Emitted initialize_story_response to client: ",
           requestResponse
         );
       });
     } catch (error) {
-      console.error(
+      Logger.Websocket.error(
         "[GameHandler] Failed to initialize story from template:",
         error
       );
@@ -448,7 +462,7 @@ export class GameHandler {
         },
       } as MakeChoiceResponse;
       socket.emit("response", requestResponse);
-      console.log(
+      Logger.Websocket.log(
         "[GameHandler] Emitted request response to client:",
         requestResponse
       );
@@ -462,7 +476,7 @@ export class GameHandler {
         });
       });
     } catch (error) {
-      console.error("[GameHandler] Error processing choice:", error);
+      Logger.Websocket.error("[GameHandler] Error processing choice:", error);
       socket.emit("error", {
         error:
           error instanceof Error ? error.message : "Failed to process choice",
@@ -525,7 +539,7 @@ export class GameHandler {
         },
       } as SelectCharacterResponse;
       socket.emit("response", requestResponse);
-      console.log(
+      Logger.Websocket.log(
         "[GameHandler] Emitted select_character_response to client:",
         requestResponse
       );
@@ -539,7 +553,7 @@ export class GameHandler {
         });
       });
     } catch (error) {
-      console.error(
+      Logger.Websocket.error(
         "[GameHandler] Error processing character selection:",
         error
       );

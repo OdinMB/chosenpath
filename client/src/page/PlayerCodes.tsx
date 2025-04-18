@@ -43,7 +43,7 @@ export function PlayerCodes({
   const singlePlayerCode = isSinglePlayer ? Object.values(codes)[0] : null;
 
   return (
-    <div className="min-h-screen p-4 md:p-6 font-lora">
+    <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
         <div className="p-6 bg-white rounded-lg border border-primary-100 shadow-md mb-6">
           {isLikelyReady && (

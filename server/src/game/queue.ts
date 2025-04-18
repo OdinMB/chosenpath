@@ -6,6 +6,7 @@ import type {
   PlayerSlot,
   StoryTemplate,
 } from "@core/types/index.js";
+import type { Socket } from "socket.io";
 
 // Base operation type for any queueable operation
 export interface QueueableOperation {
@@ -27,6 +28,7 @@ export interface GameOperations {
       maxTurns: number;
       gameMode: GameMode;
       playerCodes: Record<PlayerSlot, string>;
+      originalSocket: Socket;
     };
     story: Story;
   };
@@ -36,6 +38,7 @@ export interface GameOperations {
       playerCount: PlayerCount;
       maxTurns: number;
       playerCodes: Record<PlayerSlot, string>;
+      originalSocket: Socket;
     };
     story: Story;
   };

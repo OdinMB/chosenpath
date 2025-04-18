@@ -10,6 +10,7 @@ import {
 } from "@core/types";
 import { RateLimitedAction, SOCKET_CONFIG } from "@core/config";
 import type { ClientStoryState } from "@core/types";
+import { Logger } from "@common/logger";
 import { config } from "@/config";
 
 type MessageHandler = (data: WSServerMessage) => void;
@@ -145,7 +146,7 @@ export class WebSocketService {
     this.playerCode = localStorage.getItem(playerCodeKey);
     this.sessionId = localStorage.getItem("sessionId");
 
-    console.log("[WebSocketService] Initialized with:", {
+    Logger.WebSocket.log("[WebSocketService] Initialized with:", {
       tabId: this.tabId,
       playerCode: this.playerCode,
       sessionId: this.sessionId,
@@ -155,13 +156,17 @@ export class WebSocketService {
   // Track a request that's waiting for a response
   addPendingRequest(requestType: string): void {
     this.pendingRequests.add(requestType);
-    console.log(`[WebSocketService] Added pending request: ${requestType}`);
+    Logger.WebSocket.log(
+      `[WebSocketService] Added pending request: ${requestType}`
+    );
   }
 
   // Remove a request from pending
   removePendingRequest(requestType: string): void {
     this.pendingRequests.delete(requestType);
-    console.log(`[WebSocketService] Removed pending request: ${requestType}`);
+    Logger.WebSocket.log(
+      `[WebSocketService] Removed pending request: ${requestType}`
+    );
   }
 
   // Check if a request is pending
@@ -172,7 +177,7 @@ export class WebSocketService {
   // Add a background operation
   addBackgroundOperation(operationType: string): void {
     this.backgroundOperations.add(operationType);
-    console.log(
+    Logger.WebSocket.log(
       `[WebSocketService] Added background operation: ${operationType}`
     );
   }
@@ -180,7 +185,7 @@ export class WebSocketService {
   // Remove a background operation
   removeBackgroundOperation(operationType: string): void {
     this.backgroundOperations.delete(operationType);
-    console.log(
+    Logger.WebSocket.log(
       `[WebSocketService] Removed background operation: ${operationType}`
     );
   }
@@ -204,7 +209,7 @@ export class WebSocketService {
 
   connect(sessionId?: string) {
     if (this.isConnecting) {
-      console.log("[WebSocketService] Connection already in progress");
+      Logger.WebSocket.log("[WebSocketService] Connection already in progress");
       return;
     }
 
@@ -216,13 +221,13 @@ export class WebSocketService {
     // Don't disconnect if already connected with the correct session ID
     if (this.socket?.connected) {
       if (this.sessionId === sessionId || !sessionId) {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Already connected with correct sessionId"
         );
         return;
       }
       // Only disconnect if we need to use a different session ID
-      console.log(
+      Logger.WebSocket.log(
         "[WebSocketService] Disconnecting to reconnect with a different sessionId"
       );
       this.disconnect();
@@ -233,7 +238,7 @@ export class WebSocketService {
     const socketUrl = import.meta.env.PROD
       ? config.wsServerUrl
       : `${window.location.protocol}//${window.location.hostname}:${config.wsPort}`;
-    console.log("[WebSocketService] Connecting to:", socketUrl);
+    Logger.WebSocket.log("[WebSocketService] Connecting to:", socketUrl);
 
     // Use WebSocket only (no polling) to prevent transport changes
     // This eliminates the polling->websocket upgrade cycle which can cause disconnects
@@ -255,24 +260,30 @@ export class WebSocketService {
 
     // Add low-level socket transport error handlers
     this.socket.io.engine.on("error", (err) => {
-      console.error("[WebSocketService] Transport error:", err);
+      Logger.WebSocket.error("[WebSocketService] Transport error:", err);
     });
 
     this.socket.io.engine.on("close", (reason) => {
-      console.log("[WebSocketService] Transport closed:", reason);
+      Logger.WebSocket.log("[WebSocketService] Transport closed:", reason);
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("[WebSocketService] Connection error:", error.message);
+      Logger.WebSocket.error(
+        "[WebSocketService] Connection error:",
+        error.message
+      );
     });
 
     this.socket.on("connect", () => {
       this.isConnecting = false;
-      console.log("[WebSocketService] Connected to server with state:", {
-        playerCode: this.playerCode,
-        sessionId: this.sessionId,
-        socketId: this.socket?.id,
-      });
+      Logger.WebSocket.log(
+        "[WebSocketService] Connected to server with state:",
+        {
+          playerCode: this.playerCode,
+          sessionId: this.sessionId,
+          socketId: this.socket?.id,
+        }
+      );
 
       if (this.playerCode) {
         // Check if the player code is still in localStorage
@@ -280,7 +291,7 @@ export class WebSocketService {
         const storedCode = localStorage.getItem(playerCodeKey);
 
         if (storedCode === this.playerCode) {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Attempting to reconnect with player code:",
             this.playerCode
           );
@@ -290,26 +301,26 @@ export class WebSocketService {
             code: this.playerCode,
           });
         } else {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Player code no longer valid, creating new session"
           );
           this.playerCode = null;
           this.sendMessage({ type: "create_session" });
         }
       } else if (!this.sessionId) {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] No existing session or code, creating new session"
         );
         this.sendMessage({ type: "create_session" });
       } else {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Already have sessionId, no need to create session"
         );
       }
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("[WebSocketService] Disconnected:", {
+      Logger.WebSocket.log("[WebSocketService] Disconnected:", {
         reason,
         playerCode: this.playerCode,
         sessionId: this.sessionId,
@@ -320,7 +331,7 @@ export class WebSocketService {
         this.pendingRequests.size > 0 || this.backgroundOperations.size > 0;
 
       if (hasPendingOperation) {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Reconnecting due to disconnect with pending operations"
         );
 
@@ -336,18 +347,13 @@ export class WebSocketService {
     this.socket.on(
       "state_update_notification",
       (data: StateUpdateNotification) => {
-        // console.log(
-        //   "[WebSocketService] Received state_update_notification:",
-        //   data
-        // );
-
         // If this is a state update after character selection, clean up the pending request
         if (
           data.state.characterSelectionCompleted &&
           (this.pendingRequests.has("select_character") ||
             this.isOperationRunning("select_character"))
         ) {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Clearing pending select_character operations after state update notification"
           );
           this.removePendingRequest("select_character");
@@ -365,7 +371,7 @@ export class WebSocketService {
     this.socket.on(
       "story_codes_notification",
       (data: StoryCodesNotification) => {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Player codes notification received:",
           data
         );
@@ -373,17 +379,22 @@ export class WebSocketService {
         if (handler) {
           handler(data);
         } else {
-          console.warn("[WebSocketService] No handler for story_codes");
+          Logger.WebSocket.warn(
+            "[WebSocketService] No handler for story_codes"
+          );
         }
       }
     );
 
-    // Handle response messages (including rate limits)
+    // Handle request response messages (including rate limits)
     this.socket.on("response", (data: ServerResponse) => {
-      console.log("[WebSocketService] Response received:", data);
+      Logger.WebSocket.log("[WebSocketService] Response received:", data);
 
       if (!data.type || !data.status) {
-        console.warn("[WebSocketService] Received malformed response:", data);
+        Logger.WebSocket.warn(
+          "[WebSocketService] Received malformed response:",
+          data
+        );
         return;
       }
 
@@ -394,7 +405,7 @@ export class WebSocketService {
 
       // Handle rate limited responses
       if (data.status === ResponseStatus.RATE_LIMITED) {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Rate limited:",
           (data as RateLimitedResponse).rateLimit
         );
@@ -411,14 +422,15 @@ export class WebSocketService {
       if (data.status === ResponseStatus.SUCCESS) {
         // For init story success, add to background operations
         if (data.type === "initialize_story_response") {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Story initialization queued, adding background operation"
           );
+          this.removePendingRequest("initialize_from_template");
           this.addBackgroundOperation("initialize_story");
         }
         // For select_character_response, add to background operations
         else if (data.type === "select_character_response") {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Character selection queued, adding background operation"
           );
           this.addBackgroundOperation("select_character");
@@ -474,7 +486,7 @@ export class WebSocketService {
       (errorData: string | { error: string; operationType?: string }) => {
         // Handle string errors (backward compatibility)
         if (typeof errorData === "string") {
-          console.log("[WebSocketService] Socket error:", errorData);
+          Logger.WebSocket.log("[WebSocketService] Socket error:", errorData);
           if (
             errorData === "Session not found" ||
             errorData === "Invalid session"
@@ -496,7 +508,7 @@ export class WebSocketService {
         }
         // Handle new error object format
         else {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Socket error:",
             errorData.error,
             errorData.operationType ? `(${errorData.operationType})` : ""
@@ -527,14 +539,14 @@ export class WebSocketService {
     this.socket.on(
       "story_ready_notification",
       (data: StoryReadyNotification) => {
-        console.log(
+        Logger.WebSocket.log(
           "[WebSocketService] Story ready notification received:",
           data
         );
 
         // Clear any pending background initialize_story operation
         if (this.isOperationRunning("initialize_story")) {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Clearing initialize_story background operation after story ready"
           );
           this.removeBackgroundOperation("initialize_story");
@@ -544,7 +556,7 @@ export class WebSocketService {
         if (handler) {
           handler(data);
         } else {
-          console.warn(
+          Logger.WebSocket.warn(
             "[WebSocketService] No handler for story_ready_notification"
           );
         }
@@ -555,11 +567,14 @@ export class WebSocketService {
     this.socket.on(
       "verify_code_response",
       (data: { state: ClientStoryState | null; error?: string }) => {
-        console.log("[WebSocketService] Code verification response:", data);
+        Logger.WebSocket.log(
+          "[WebSocketService] Code verification response:",
+          data
+        );
 
         // If there's an error, clear the player code
         if (data.error) {
-          console.log(
+          Logger.WebSocket.log(
             "[WebSocketService] Code verification failed:",
             data.error
           );
@@ -583,13 +598,15 @@ export class WebSocketService {
   }
 
   sendMessage(message: WSMessage) {
-    console.log("[WebSocketService] Sending message:", {
+    Logger.WebSocket.log("[WebSocketService] Sending message:", {
       type: message.type,
       socketId: this.socket?.id,
       connected: this.socket?.connected,
     });
     if (!this.socket?.connected) {
-      console.warn("[WebSocketService] Cannot send message: not connected");
+      Logger.WebSocket.warn(
+        "[WebSocketService] Cannot send message: not connected"
+      );
       return;
     }
 
@@ -605,7 +622,7 @@ export class WebSocketService {
   }
 
   clearSession() {
-    console.log("[WebSocketService] Clearing session:", {
+    Logger.WebSocket.log("[WebSocketService] Clearing session:", {
       oldSessionId: this.sessionId,
     });
 
@@ -621,12 +638,15 @@ export class WebSocketService {
 
   disconnect(clearCode = false) {
     if (this.socket) {
-      console.log("[WebSocketService] Manually disconnecting socket:", {
-        socketId: this.socket.id,
-        connected: this.socket.connected,
-        pendingRequests: Array.from(this.pendingRequests),
-        clearCode,
-      });
+      Logger.WebSocket.log(
+        "[WebSocketService] Manually disconnecting socket:",
+        {
+          socketId: this.socket.id,
+          connected: this.socket.connected,
+          pendingRequests: Array.from(this.pendingRequests),
+          clearCode,
+        }
+      );
       this.socket.disconnect();
       this.socket = null;
     }
@@ -639,14 +659,17 @@ export class WebSocketService {
   }
 
   clearPlayerCode() {
-    console.log("[WebSocketService] Clearing player code:", this.playerCode);
+    Logger.WebSocket.log(
+      "[WebSocketService] Clearing player code:",
+      this.playerCode
+    );
     this.playerCode = null;
     const playerCodeKey = `playerCode_${this.tabId}`;
     localStorage.removeItem(playerCodeKey);
   }
 
   setPlayerCode(code: string) {
-    console.log("[WebSocketService] Setting player code:", code);
+    Logger.WebSocket.log("[WebSocketService] Setting player code:", code);
     this.playerCode = code;
     const playerCodeKey = `playerCode_${this.tabId}`;
     localStorage.setItem(playerCodeKey, code);
