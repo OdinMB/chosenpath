@@ -11,6 +11,7 @@ import { RateLimitNotification } from "@components/RateLimitNotification";
 import { AppTitle } from "@components/AppTitle";
 import { TemplateConfigurator } from "@page/TemplateConfigurator";
 import { Logger } from "@common/logger";
+import { config } from "@/config";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -47,6 +48,7 @@ function App() {
   const [viewState, setViewState] = useState<ViewState>("CONNECTING");
   const [selectedTemplate, setSelectedTemplate] =
     useState<StoryTemplate | null>(null);
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
 
   // Replace templateConfigPending with a more general story creation status
   const storyCreationStatus = useRef<StoryCreationType>("NONE");
@@ -77,6 +79,70 @@ function App() {
     },
     [viewState]
   );
+
+  // Function to load a template by ID
+  const loadTemplateById = useCallback(
+    async (templateId: string) => {
+      if (isLoadingTemplate) return;
+
+      setIsLoadingTemplate(true);
+      Logger.App.log(`Loading template with ID: ${templateId}`);
+
+      try {
+        const response = await fetch(
+          `${config.apiUrl}/templates/${templateId}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load template: ${response.status}`);
+        }
+
+        const data = await response.json();
+        Logger.App.log(`Successfully loaded template: ${data.template.title}`);
+
+        // Set template and transition to template config view
+        setSelectedTemplate(data.template);
+        loggedSetViewState("TEMPLATE_CONFIG");
+      } catch (error) {
+        Logger.App.error(`Failed to load template ${templateId}`, error);
+        setError(
+          "Failed to load shared template. It may have been removed or is no longer available."
+        );
+      } finally {
+        setIsLoadingTemplate(false);
+      }
+    },
+    [
+      isLoadingTemplate,
+      setIsLoadingTemplate,
+      setSelectedTemplate,
+      loggedSetViewState,
+      setError,
+    ]
+  );
+
+  // Check for shared template URL pattern on load
+  useEffect(() => {
+    const checkForSharedTemplate = async () => {
+      const path = window.location.pathname;
+      const templateShareMatch = path.match(/^\/share\/template\/([^/]+)$/);
+
+      if (templateShareMatch && templateShareMatch[1]) {
+        const templateId = templateShareMatch[1];
+        Logger.App.log(`Found shared template ID in URL: ${templateId}`);
+
+        // Remove the template ID from the URL to prevent reloading on refresh
+        window.history.replaceState({}, document.title, "/");
+
+        // Load the shared template
+        await loadTemplateById(templateId);
+      }
+    };
+
+    if (!isConnecting && viewState === "WELCOME") {
+      checkForSharedTemplate();
+    }
+  }, [isConnecting, viewState, loadTemplateById]);
 
   useEffect(() => {
     // If we need to show connecting screen
