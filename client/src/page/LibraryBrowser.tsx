@@ -6,7 +6,6 @@ import { TemplateCard } from "./components/TemplateCard";
 import { PrimaryButton, Icons } from "@components/ui";
 import { MAX_PLAYERS } from "@core/config";
 import { groupTagsByCategories } from "@common/tag-categories";
-import { FilterTagGroup } from "@components/FilterTagGroup";
 
 type LibraryBrowserProps = {
   onSelectTemplate: (template: StoryTemplate) => void;
@@ -23,6 +22,7 @@ export function LibraryBrowser({
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filters
   const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
@@ -113,54 +113,115 @@ export function LibraryBrowser({
   };
 
   const renderFilterSection = () => {
+    // Count of active filters
+    const activeFilterCount =
+      (playerCountFilter !== null ? 1 : 0) + selectedTags.length;
+
     return (
-      <div className="mb-8 p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-        <div className="space-y-4">
-          {/* Player Count section */}
-          <FilterTagGroup
-            title="Players"
-            tags={Array.from({ length: MAX_PLAYERS }, (_, i) =>
-              (i + 1).toString()
+      <div
+        className={`mb-8 p-4 ${
+          !showFilters ? "pb-1" : ""
+        } bg-white rounded-lg border border-primary-100 shadow-md`}
+      >
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-medium text-primary-800">
+            Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+          </h2>
+          <div className="flex items-center gap-2 sm:ml-0 ml-auto">
+            {activeFilterCount > 0 && (
+              <>
+                <PrimaryButton
+                  onClick={clearFilters}
+                  size="sm"
+                  variant="outline"
+                  leftBorder={false}
+                  leftIcon={<Icons.Close className="w-3 h-3" />}
+                  className="text-xs py-0.5 px-2"
+                >
+                  <span className="hidden sm:inline">Clear filters</span>
+                  <span className="sm:hidden">Clear</span>
+                </PrimaryButton>
+              </>
             )}
-            selectedTags={
-              playerCountFilter !== null ? [playerCountFilter.toString()] : []
-            }
-            onTagToggle={(tagValue) => {
-              const count = parseInt(tagValue, 10);
-              setPlayerCountFilter(count === playerCountFilter ? null : count);
-            }}
-            expandedByDefault={true}
-          />
-
-          {/* Categories Sections - in columns on larger screens */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-            {Object.entries(tagCategories).map(([category, tags]) => (
-              <FilterTagGroup
-                key={category}
-                title={category}
-                tags={tags}
-                selectedTags={selectedTags}
-                onTagToggle={handleTagToggle}
-                expandedByDefault={false}
-              />
-            ))}
+            <PrimaryButton
+              onClick={() => setShowFilters(!showFilters)}
+              size="sm"
+              variant="outline"
+              leftBorder={false}
+              leftIcon={
+                showFilters ? (
+                  <Icons.ChevronUp className="w-4 h-4" />
+                ) : (
+                  <Icons.ChevronDown className="w-4 h-4" />
+                )
+              }
+              className="text-xs py-0.5 px-2"
+            >
+              <span className="hidden sm:inline">
+                {showFilters ? "Hide" : "Show"} filters
+              </span>
+              <span className="sm:hidden">{showFilters ? "Hide" : "Show"}</span>
+            </PrimaryButton>
           </div>
-
-          {/* Clear Filters Button */}
-          {(playerCountFilter !== null || selectedTags.length > 0) && (
-            <div className="flex justify-end mt-2">
-              <PrimaryButton
-                onClick={clearFilters}
-                size="sm"
-                variant="outline"
-                leftBorder={false}
-                leftIcon={<Icons.Close className="w-3 h-3" />}
-              >
-                Clear filters
-              </PrimaryButton>
-            </div>
-          )}
         </div>
+
+        {showFilters && (
+          <div className="space-y-4">
+            {/* Player Count as horizontal row */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-primary-700 mb-2">
+                Players
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from({ length: MAX_PLAYERS }, (_, i) => i + 1).map(
+                  (count) => (
+                    <button
+                      key={count}
+                      onClick={() =>
+                        setPlayerCountFilter(
+                          count === playerCountFilter ? null : count
+                        )
+                      }
+                      className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
+                        playerCountFilter === count
+                          ? "bg-primary-600 text-white"
+                          : "bg-primary-50 text-primary-700 hover:bg-primary-100"
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Categories in a compact grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+              {Object.entries(tagCategories).map(([category, tags]) => (
+                <div key={category} className="space-y-2">
+                  <h3 className="text-sm font-medium text-primary-700">
+                    {category}
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => handleTagToggle(tag)}
+                        className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
+                          selectedTags.includes(tag)
+                            ? "bg-primary-600 text-white"
+                            : "bg-primary-50 text-primary-700 hover:bg-primary-100"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };

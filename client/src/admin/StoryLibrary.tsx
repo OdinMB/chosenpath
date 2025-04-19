@@ -4,6 +4,7 @@ import { config } from "@/config";
 import { Logger } from "@common/logger";
 import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
 import { ShareLink } from "@components/ShareLink";
+import { sortTagsByCategory } from "@common/tag-categories";
 
 type StoryLibraryProps = {
   token: string;
@@ -368,7 +369,7 @@ export const StoryLibrary = ({
                   <td className="hidden lg:table-cell py-3 px-4">
                     <div className="flex flex-wrap gap-1">
                       {template.tags && template.tags.length > 0 ? (
-                        template.tags.map((tag, index) => (
+                        sortTagsByCategory(template.tags).map((tag, index) => (
                           <span
                             key={index}
                             className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-md"
