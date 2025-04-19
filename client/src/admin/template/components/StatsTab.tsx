@@ -60,7 +60,12 @@ export const StatsTab = ({
   return (
     <div className="space-y-8">
       {/* Stat Groups */}
-      <StatGroups statGroups={statGroups} onChange={handleUpdateStatGroups} />
+      <StatGroups
+        statGroups={statGroups}
+        onChange={handleUpdateStatGroups}
+        sharedStats={sharedStats}
+        playerStats={playerStats}
+      />
 
       {/* Shared Stats */}
       <StatListSection

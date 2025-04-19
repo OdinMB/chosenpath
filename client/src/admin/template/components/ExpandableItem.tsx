@@ -5,7 +5,7 @@ interface ExpandableItemProps<T> {
   /** Unique identifier for this item */
   id: string;
   /** Display name for the item when collapsed */
-  title: string;
+  title: ReactNode;
   /** Object that will be edited */
   data: T;
   /** Set of IDs currently being edited */

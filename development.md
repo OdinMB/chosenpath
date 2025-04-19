@@ -2,12 +2,12 @@ Smaller and more commits!
 
 # Next
 
-- A browsable library of story templates
 - Always introduce other players in beat 1
 - First thread always together
 
 # Feature Backlog
 
+- AI generated templates: iterate based on feedback
 - User accounts
   - Manage games
   - Invite specific account to a player slot

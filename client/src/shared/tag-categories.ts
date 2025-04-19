@@ -16,6 +16,7 @@ export const TAG_CATEGORIES: TagCategory[] = [
     name: "Genre",
     tags: [
       "Adventure",
+      "Comedy",
       "Crime",
       "Drama",
       "Mystery",

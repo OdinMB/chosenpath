@@ -5,6 +5,8 @@ import { ExpandableItem } from "./ExpandableItem";
 interface StatGroupsProps {
   statGroups: string[];
   onChange: (updatedGroups: string[]) => void;
+  sharedStats?: { id: string; name: string; group: string }[];
+  playerStats?: { id: string; name: string; group: string }[];
 }
 
 interface StatGroup {
@@ -15,6 +17,8 @@ interface StatGroup {
 export const StatGroups: React.FC<StatGroupsProps> = ({
   statGroups,
   onChange,
+  sharedStats = [],
+  playerStats = [],
 }) => {
   const [editingGroups, setEditingGroups] = useState<Set<string>>(new Set());
 
@@ -44,6 +48,14 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
   const handleRemoveGroup = (index: number) => {
     const updated = statGroups.filter((_, i) => i !== index);
     onChange(updated);
+  };
+
+  // Get stats for a specific group
+  const getStatsForGroup = (groupName: string) => {
+    const stats = [...sharedStats, ...playerStats].filter(
+      (stat) => stat.group === groupName
+    );
+    return stats;
   };
 
   const renderGroupForm = (
@@ -87,12 +99,23 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
       {groups.length === 0 ? (
         <p className="text-gray-500">Add at least one stat group</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {groups.map((group, index) => (
             <ExpandableItem
               key={group.id}
               id={group.id}
-              title={group.name || `Group ${index + 1}`}
+              title={
+                <div>
+                  <span>{group.name || `Group ${index + 1}`}</span>
+                  {group.name && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      {getStatsForGroup(group.name)
+                        .map((stat) => stat.name)
+                        .join(", ")}
+                    </div>
+                  )}
+                </div>
+              }
               data={group}
               editingSet={editingGroups}
               setEditing={setEditingGroups}
