@@ -30,18 +30,18 @@ function createEmptyStoryElement(): StoryElement {
 }
 
 // Function overload signatures
-export function useStoryElements(
+export function useStoryElementsEditor(
   element: StoryElement,
   readOnly?: boolean
 ): SingleElementResult;
-export function useStoryElements(
+export function useStoryElementsEditor(
   elements: StoryElement[],
   onChange?: (elements: StoryElement[]) => void,
   readOnly?: boolean
 ): UseStoryElementsResult;
 
 // Implementation
-export function useStoryElements(
+export function useStoryElementsEditor(
   elementsOrElement: StoryElement[] | StoryElement,
   onChangeOrReadOnly?: ((elements: StoryElement[]) => void) | boolean,
   readOnlyParam?: boolean

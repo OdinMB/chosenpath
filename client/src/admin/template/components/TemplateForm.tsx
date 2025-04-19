@@ -1,7 +1,7 @@
 import React from "react";
 import {
   BasicInfoTab,
-  GuidelinesTab,
+  GuidelinesEditor,
   StatsTab,
   StoryElementsTab,
   OutcomesTab,
@@ -181,7 +181,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         )}
 
         {activeTab === "guidelines" && (
-          <GuidelinesTab
+          <GuidelinesEditor
             template={formData}
             onChange={(updates) => {
               // Delegate to useTemplateForm's update mechanisms

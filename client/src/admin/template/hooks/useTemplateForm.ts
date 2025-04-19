@@ -14,8 +14,8 @@ import {
 } from "@core/types";
 import { Logger } from "@common/logger";
 import { MAX_PLAYERS } from "@core/config";
-import { useTemplateBasics } from "./useTemplateBasics";
-import { useTemplateGuidelines } from "./useTemplateGuidelines";
+import { useBasicInfoTab } from "./useBasicInfoTab";
+import { useGuidelinesEditor } from "./useGuidelinesEditor";
 import { useTemplateApi } from "./useTemplateApi";
 
 // Define the TabType type
@@ -67,7 +67,7 @@ export function useTemplateForm({
     getMaxTurnsOptions,
     gameModeOptions,
     getGameModeValue,
-  } = useTemplateBasics({
+  } = useBasicInfoTab({
     template: formData,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
   });
@@ -89,7 +89,7 @@ export function useTemplateForm({
     handleAddArrayItem,
     handleRemoveArrayItem,
     updateGuidelines,
-  } = useTemplateGuidelines({
+  } = useGuidelinesEditor({
     template: formData,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
   });

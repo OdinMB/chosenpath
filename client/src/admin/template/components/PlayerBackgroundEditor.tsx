@@ -1,10 +1,10 @@
 import React from "react";
-import { StatValueInput } from "./";
+import { StatValueInput } from ".";
 import { InfoIcon, Input } from "@components/ui";
 import { ExpandableItem } from "@components";
 import { CharacterBackground, Stat } from "@core/types";
 
-interface PlayerBackgroundProps {
+interface PlayerBackgroundEditorProps {
   background: CharacterBackground;
   index: number;
   editingBackgrounds: Set<string>;
@@ -15,7 +15,7 @@ interface PlayerBackgroundProps {
   readOnly?: boolean;
 }
 
-export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
+export const PlayerBackgroundEditor: React.FC<PlayerBackgroundEditorProps> = ({
   background,
   index,
   editingBackgrounds,

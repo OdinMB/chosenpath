@@ -2,15 +2,15 @@ import React from "react";
 import { TextArea, InfoIcon } from "@components/ui";
 import { ArrayField } from "@components";
 import { StoryTemplate } from "@core/types";
-import { useTemplateGuidelines } from "../hooks/useTemplateGuidelines";
+import { useGuidelinesEditor } from "../hooks/useGuidelinesEditor";
 
-interface GuidelinesTabProps {
+interface GuidelinesEditorProps {
   template: StoryTemplate;
   onChange?: (updates: Partial<StoryTemplate>) => void;
   readOnly?: boolean;
 }
 
-export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
+export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
   template,
   onChange,
   readOnly = false,
@@ -28,7 +28,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
     setConflicts,
     setDecisions,
     setTypesOfThreads,
-  } = useTemplateGuidelines({
+  } = useGuidelinesEditor({
     template,
     onChange,
     readOnly,

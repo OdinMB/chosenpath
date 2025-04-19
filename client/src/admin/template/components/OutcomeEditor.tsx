@@ -2,9 +2,9 @@ import React from "react";
 import { Outcome, ExplorationResolution, ResolutionType } from "@core/types";
 import { ExpandableItem } from "@components";
 import { InfoIcon, Input, Select } from "@components/ui";
-import { useOutcomes } from "../hooks/useOutcomes";
+import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
 
-interface ExpandableOutcomeProps {
+interface OutcomeEditorProps {
   outcome: Outcome;
   index: number;
   editingOutcomes: Set<string>;
@@ -14,7 +14,7 @@ interface ExpandableOutcomeProps {
   readOnly?: boolean;
 }
 
-export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
+export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
   outcome,
   index,
   editingOutcomes,
@@ -28,7 +28,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
     isExploration,
     handleResolutionTypeChange,
     handleResolutionFieldChange,
-  } = useOutcomes([], undefined, readOnly);
+  } = useOutcomeEditor([], undefined, readOnly);
 
   const renderOutcomeForm = (
     data: Outcome,

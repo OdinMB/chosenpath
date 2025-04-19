@@ -8,7 +8,7 @@ import {
 } from "@core/types";
 import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
 
-interface UseTemplateBasicsProps {
+interface UseBasicInfoTabProps {
   template: StoryTemplate;
   onChange: (updates: Partial<StoryTemplate>) => void;
 }
@@ -18,10 +18,7 @@ interface GameModeOption {
   label: string;
 }
 
-export function useTemplateBasics({
-  template,
-  onChange,
-}: UseTemplateBasicsProps) {
+export function useBasicInfoTab({ template, onChange }: UseBasicInfoTabProps) {
   const [tags, setTags] = useState<string[]>(template.tags || []);
 
   const handleChange = <K extends keyof StoryTemplate>(

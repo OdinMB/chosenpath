@@ -6,9 +6,12 @@ import {
   Stat,
 } from "@core/types";
 import { MAX_PLAYERS } from "@core/config";
-import { ExpandableOutcome, PlayerIdentity, PlayerBackground } from "./";
+import {
+  OutcomeEditor,
+  PlayerIdentityEditor,
+  PlayerBackgroundEditor,
+} from "./";
 import { PrimaryButton, Icons, Select } from "@components/ui";
-import { usePlayers } from "../hooks/usePlayers";
 import { usePlayerEditor } from "../hooks/usePlayerEditor";
 
 interface PlayersTabProps {
@@ -199,11 +202,20 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     setEditingIdentities,
     setEditingBackgrounds,
     setEditingOutcomes,
-    handleUpdatePlayer,
     createEmptyIdentity,
     createEmptyBackground,
     handleAddPlayerOutcome,
-  } = usePlayers(playerOptions, onChange, playerStats, readOnly);
+    handleCopyOutcome,
+    handleUpdateIdentity,
+    handleDeleteIdentity,
+    handleAddIdentity,
+    handleUpdateBackground,
+    handleDeleteBackground,
+    handleAddBackground,
+    handleUpdateOutcome,
+    handleDeleteOutcome,
+    handleSave,
+  } = usePlayerEditor(playerOptions, onChange, playerStats, readOnly);
 
   const PlayerEditor = ({
     playerSlot,
@@ -213,29 +225,6 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     options: PlayerOptionsGeneration;
   }) => {
     const isEditing = editingPlayers.has(playerSlot);
-
-    const {
-      localOptions,
-      handleCopyOutcome,
-      handleUpdateIdentity,
-      handleDeleteIdentity,
-      handleAddIdentity,
-      handleUpdateBackground,
-      handleDeleteBackground,
-      handleAddBackground,
-      handleUpdateOutcome,
-      handleDeleteOutcome,
-      handleSave,
-    } = usePlayerEditor(
-      playerSlot,
-      options,
-      playerOptions,
-      handleUpdatePlayer,
-      createEmptyIdentity,
-      createEmptyBackground,
-      setEditingPlayers,
-      readOnly
-    );
 
     const handleExpandCollapse = () => {
       if (readOnly) {
@@ -316,20 +305,22 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                   variant="outline"
                   leftBorder={false}
                   size="sm"
-                  onClick={handleAddIdentity}
+                  onClick={() => handleAddIdentity(playerSlot)}
                   leftIcon={<Icons.Plus className="h-4 w-4" />}
                 ></PrimaryButton>
               )}
             </div>
-            {localOptions.possibleCharacterIdentities.map((identity, index) => (
-              <PlayerIdentity
+            {options.possibleCharacterIdentities.map((identity, index) => (
+              <PlayerIdentityEditor
                 key={`${playerSlot}_identity_${index}`}
                 identity={identity}
                 index={index}
                 editingIdentities={editingIdentities}
                 setEditingIdentities={setEditingIdentities}
-                onDelete={handleDeleteIdentity}
-                onUpdate={handleUpdateIdentity}
+                onDelete={() => handleDeleteIdentity(playerSlot, index)}
+                onUpdate={(idx, updatedIdentity) =>
+                  handleUpdateIdentity(playerSlot, idx, updatedIdentity)
+                }
                 pronounSets={PRONOUN_SETS}
                 readOnly={readOnly}
               />
@@ -345,26 +336,26 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                   variant="outline"
                   leftBorder={false}
                   size="sm"
-                  onClick={handleAddBackground}
+                  onClick={() => handleAddBackground(playerSlot)}
                   leftIcon={<Icons.Plus className="h-4 w-4" />}
                 ></PrimaryButton>
               )}
             </div>
-            {localOptions.possibleCharacterBackgrounds.map(
-              (background, index) => (
-                <PlayerBackground
-                  key={`${playerSlot}_background_${index}`}
-                  background={background}
-                  index={index}
-                  editingBackgrounds={editingBackgrounds}
-                  setEditingBackgrounds={setEditingBackgrounds}
-                  onDelete={handleDeleteBackground}
-                  onUpdate={handleUpdateBackground}
-                  playerStats={playerStats}
-                  readOnly={readOnly}
-                />
-              )
-            )}
+            {options.possibleCharacterBackgrounds.map((background, index) => (
+              <PlayerBackgroundEditor
+                key={`${playerSlot}_background_${index}`}
+                background={background}
+                index={index}
+                editingBackgrounds={editingBackgrounds}
+                setEditingBackgrounds={setEditingBackgrounds}
+                onDelete={() => handleDeleteBackground(playerSlot, index)}
+                onUpdate={(idx, updatedBackground) =>
+                  handleUpdateBackground(playerSlot, idx, updatedBackground)
+                }
+                playerStats={playerStats}
+                readOnly={readOnly}
+              />
+            ))}
           </div>
 
           {/* Individual Outcomes */}
@@ -387,6 +378,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                       const [sourcePlayer, outcomeIndex] =
                         e.target.value.split(":");
                       handleCopyOutcome(
+                        playerSlot,
                         sourcePlayer as PlayerSlot,
                         parseInt(outcomeIndex)
                       );
@@ -412,15 +404,17 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
               )}
             </div>
 
-            {localOptions.outcomes.map((outcome, index) => (
-              <ExpandableOutcome
+            {options.outcomes.map((outcome, index) => (
+              <OutcomeEditor
                 key={outcome.id}
                 outcome={outcome}
                 index={index}
                 editingOutcomes={editingOutcomes}
                 setEditingOutcomes={setEditingOutcomes}
-                onDelete={handleDeleteOutcome}
-                onUpdate={handleUpdateOutcome}
+                onDelete={() => handleDeleteOutcome(playerSlot, index)}
+                onUpdate={(idx, updatedOutcome) =>
+                  handleUpdateOutcome(playerSlot, idx, updatedOutcome)
+                }
                 readOnly={readOnly}
               />
             ))}
@@ -438,7 +432,10 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
           </div>
         ) : (
           <div className="flex justify-end gap-2 mt-4">
-            <PrimaryButton onClick={handleSave} variant="outline">
+            <PrimaryButton
+              onClick={() => handleSave(playerSlot)}
+              variant="outline"
+            >
               Save
             </PrimaryButton>
           </div>

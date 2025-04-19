@@ -3,7 +3,7 @@ import { ExpandableItem } from "@components";
 import { Input, Select } from "@components/ui";
 import { CharacterIdentity } from "@core/types";
 
-interface PlayerIdentityProps {
+interface PlayerIdentityEditorProps {
   identity: CharacterIdentity;
   index: number;
   editingIdentities: Set<string>;
@@ -22,7 +22,7 @@ interface PlayerIdentityProps {
   readOnly?: boolean;
 }
 
-export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
+export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   identity,
   index,
   editingIdentities,

@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { StoryTemplate, Guidelines } from "@core/types";
 
-interface UseTemplateGuidelinesProps {
+interface UseGuidelinesEditorProps {
   template: StoryTemplate;
   onChange?: (updates: Partial<StoryTemplate>) => void;
   readOnly?: boolean;
 }
 
-export function useTemplateGuidelines({
+export function useGuidelinesEditor({
   template,
   onChange,
   readOnly = false,
-}: UseTemplateGuidelinesProps) {
+}: UseGuidelinesEditorProps) {
   // Single state object to manage all guidelines
   const [state, setState] = useState<Guidelines>({
     world: template.guidelines?.world || "",

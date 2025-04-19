@@ -1,8 +1,8 @@
 import React from "react";
 import { PrimaryButton, Icons } from "@components/ui";
 import { Outcome } from "@core/types";
-import { ExpandableOutcome } from "./ExpandableOutcome";
-import { useOutcomes } from "../hooks/useOutcomes";
+import { OutcomeEditor } from "./OutcomeEditor";
+import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
 
 interface OutcomesTabProps {
   outcomes: Outcome[];
@@ -21,7 +21,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
     handleAddOutcome,
     handleUpdateOutcome,
     handleRemoveOutcome,
-  } = useOutcomes(outcomes, onChange, readOnly);
+  } = useOutcomeEditor(outcomes, onChange, readOnly);
 
   return (
     <div className="space-y-4">
@@ -41,7 +41,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
       </div>
 
       {outcomes.map((outcome, index) => (
-        <ExpandableOutcome
+        <OutcomeEditor
           key={outcome.id}
           outcome={outcome}
           index={index}

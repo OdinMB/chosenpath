@@ -6,7 +6,7 @@ import {
   PlayerOptionsGeneration,
 } from "@core/types";
 import { useStatEditorHelpers } from "../hooks/useStatEditor";
-import { StatGroups } from "./StatGroups";
+import { StatGroupEditor } from "./StatGroupEditor";
 import { StatListSection } from "./StatListSection";
 
 type StatsTabProps = {
@@ -64,7 +64,7 @@ export const StatsTab = ({
   return (
     <div className="space-y-8">
       {/* Stat Groups */}
-      <StatGroups
+      <StatGroupEditor
         statGroups={statGroups}
         onChange={handleUpdateStatGroups}
         sharedStats={sharedStats}

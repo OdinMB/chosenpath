@@ -8,7 +8,7 @@ import {
   Icons,
 } from "@components/ui";
 import { ArrayField, ExpandableItem } from "@components";
-import { useStoryElements } from "../hooks/useStoryElements";
+import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];
@@ -28,7 +28,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
     handleRemoveElement,
     setEditingElement,
     removeEditingElement,
-  } = useStoryElements(elements, onChange, readOnly);
+  } = useStoryElementsEditor(elements, onChange, readOnly);
 
   // Function to set editing state compatible with ExpandableItem
   const setEditingElements = (updater: (prev: Set<string>) => Set<string>) => {

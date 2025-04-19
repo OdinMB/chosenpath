@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
 import { ExpandableItem } from "@components";
+import { useStatGroupEditor } from "../hooks/useStatGroupEditor";
 
-interface StatGroupsProps {
+interface StatGroupEditorProps {
   statGroups: string[];
   onChange: (updatedGroups: string[]) => void;
   sharedStats?: { id: string; name: string; group: string }[];
@@ -15,56 +16,28 @@ interface StatGroup {
   name: string;
 }
 
-export const StatGroups: React.FC<StatGroupsProps> = ({
+export const StatGroupEditor: React.FC<StatGroupEditorProps> = ({
   statGroups,
   onChange,
   sharedStats = [],
   playerStats = [],
   readOnly = false,
 }) => {
-  const [editingGroups, setEditingGroups] = useState<Set<string>>(new Set());
-
-  // Convert string[] to StatGroup[] with unique IDs
-  const groups: StatGroup[] = statGroups.map((name, index) => ({
-    id: `group_${index}`,
-    name,
-  }));
-
-  const handleAddGroup = () => {
-    if (readOnly) return;
-
-    const newGroup = { id: `group_${Date.now()}`, name: "" };
-    const newId = newGroup.id;
-
-    // Add to editing set
-    setEditingGroups((prev) => new Set(prev).add(newId));
-
-    // Add empty group to the list
-    onChange([...statGroups, ""]);
-  };
-
-  const handleUpdateGroup = (index: number, updatedGroup: StatGroup) => {
-    if (readOnly) return;
-
-    const updatedGroups = [...statGroups];
-    updatedGroups[index] = updatedGroup.name;
-    onChange(updatedGroups);
-  };
-
-  const handleRemoveGroup = (index: number) => {
-    if (readOnly) return;
-
-    const updated = statGroups.filter((_, i) => i !== index);
-    onChange(updated);
-  };
-
-  // Get stats for a specific group
-  const getStatsForGroup = (groupName: string) => {
-    const stats = [...sharedStats, ...playerStats].filter(
-      (stat) => stat.group === groupName
-    );
-    return stats;
-  };
+  const {
+    groups,
+    editingGroups,
+    setEditingGroups,
+    handleAddGroup,
+    handleUpdateGroup,
+    handleRemoveGroup,
+    getStatsForGroup,
+  } = useStatGroupEditor(
+    statGroups,
+    onChange,
+    sharedStats,
+    playerStats,
+    readOnly
+  );
 
   const renderGroupForm = (
     group: StatGroup,

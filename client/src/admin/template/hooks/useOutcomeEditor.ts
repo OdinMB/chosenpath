@@ -7,7 +7,7 @@ import {
   ResolutionType,
 } from "@core/types";
 
-export const useOutcomes = (
+export const useOutcomeEditor = (
   initialOutcomes: Outcome[] = [],
   onChange?: (outcomes: Outcome[]) => void,
   readOnly = false
