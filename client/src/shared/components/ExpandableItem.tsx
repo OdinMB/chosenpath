@@ -145,6 +145,8 @@ export function ExpandableItem<T>({
 
   // Original interactive editing behavior - collapsed view
   if (!isEditing) {
+    const isNoOpFunction = onDelete.toString().replace(/\s/g, "") === "()=>{}";
+
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
         <span className="font-medium">{title}</span>
@@ -156,13 +158,16 @@ export function ExpandableItem<T>({
           >
             <Icons.Edit className="h-5 w-5" />
           </button>
-          <button
-            onClick={onDelete}
-            className="text-tertiary hover:text-tertiary-700"
-            aria-label={`Remove ${title}`}
-          >
-            <Icons.Trash className="h-5 w-5" />
-          </button>
+          {/* Only show delete button if onDelete is not an empty function */}
+          {!isNoOpFunction && (
+            <button
+              onClick={onDelete}
+              className="text-tertiary hover:text-tertiary-700"
+              aria-label={`Remove ${title}`}
+            >
+              <Icons.Trash className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
     );

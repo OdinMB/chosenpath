@@ -1,14 +1,8 @@
 import React from "react";
 import { StoryElement } from "@core/types";
-import {
-  InfoIcon,
-  Input,
-  TextArea,
-  PrimaryButton,
-  Icons,
-} from "@components/ui";
-import { ArrayField, ExpandableItem } from "@components";
+import { InfoIcon, PrimaryButton, Icons } from "@components/ui";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
+import { StoryElementEditor } from "./StoryElementEditor";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];
@@ -49,84 +43,6 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
     });
   };
 
-  const renderElementForm = (
-    element: StoryElement,
-    onFormChange: (updatedElement: StoryElement) => void
-  ) => {
-    return (
-      <div className="flex-1 space-y-4 mr-4">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold w-24">Name</span>
-          <Input
-            id={`element-name-${element.id}`}
-            name={`element-name-${element.id}`}
-            className="flex-1"
-            value={element.name}
-            onChange={(e) => onFormChange({ ...element, name: e.target.value })}
-            placeholder="Enter element name"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="font-semibold w-24">ID</span>
-          <Input
-            id={`element-id-${element.id}`}
-            name={`element-id-${element.id}`}
-            className="flex-1"
-            value={element.id}
-            onChange={(e) => onFormChange({ ...element, id: e.target.value })}
-            placeholder="Enter element ID (use underscores, e.g., mr_x)"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="flex items-start gap-2">
-          <span className="font-semibold w-24 pt-2">Role</span>
-          <TextArea
-            id={`element-role-${element.id}`}
-            name={`element-role-${element.id}`}
-            className="flex-1"
-            rows={3}
-            value={element.role}
-            onChange={(e) => onFormChange({ ...element, role: e.target.value })}
-            placeholder="What can players do with this element? How does it relate to outcomes?"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="flex items-start gap-2">
-          <span className="font-semibold w-36 pt-2">Instructions</span>
-          <TextArea
-            id={`element-instructions-${element.id}`}
-            name={`element-instructions-${element.id}`}
-            className="flex-1"
-            rows={3}
-            value={element.instructions}
-            onChange={(e) =>
-              onFormChange({
-                ...element,
-                instructions: e.target.value,
-              })
-            }
-            placeholder="Instructions on how to use this element (narrative and mechanics)"
-            disabled={readOnly}
-          />
-        </div>
-
-        <ArrayField
-          title="Facts"
-          tooltipText="Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
-          items={element.facts}
-          onChange={(facts: string[]) => onFormChange({ ...element, facts })}
-          placeholder="Enter a fact about this element"
-          emptyPlaceholder="Click + to add facts"
-          readOnly={readOnly}
-        />
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
@@ -150,19 +66,14 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
       </div>
 
       {elements.map((element, index) => (
-        <ExpandableItem
+        <StoryElementEditor
           key={element.id}
-          id={element.id}
-          title={element.name || "Unnamed Element"}
-          data={element}
-          editingSet={editingElements}
-          setEditing={setEditingElements}
-          onDelete={() => handleRemoveElement(index)}
-          onSave={(updatedElement) =>
-            handleUpdateElement(index, updatedElement)
-          }
-          renderEditForm={renderElementForm}
-          isSaveDisabled={(element) => !element.name || !element.id}
+          element={element}
+          index={index}
+          editingElements={editingElements}
+          setEditingElements={setEditingElements}
+          onDelete={handleRemoveElement}
+          onUpdate={handleUpdateElement}
           readOnly={readOnly}
         />
       ))}
