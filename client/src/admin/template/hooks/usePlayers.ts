@@ -40,7 +40,8 @@ interface UsePlayersResult {
 export function usePlayers(
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>,
   onChange: (updates: Record<PlayerSlot, PlayerOptionsGeneration>) => void,
-  playerStats: Stat[]
+  playerStats: Stat[],
+  readOnly: boolean = false
 ): UsePlayersResult {
   // Track which players are being edited
   const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
@@ -61,6 +62,8 @@ export function usePlayers(
     playerSlot: PlayerSlot,
     updates: Partial<PlayerOptionsGeneration>
   ) => {
+    if (readOnly) return;
+
     // Create the updated player options
     const updatedPlayerOptions = {
       ...playerOptions,
@@ -117,6 +120,8 @@ export function usePlayers(
   };
 
   const handleAddPlayerOutcome = (playerSlot: PlayerSlot) => {
+    if (readOnly) return;
+
     const outcomeId = crypto.randomUUID();
     const newOutcome: PlayerOutcome = {
       id: outcomeId,

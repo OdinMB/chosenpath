@@ -50,12 +50,21 @@ export function ExpandableItem<T>({
   }, [data]);
 
   const handleToggleExpand = () => {
-    setIsExpanded(!isExpanded);
+    if (readOnly) {
+      setIsExpanded(!isExpanded);
+    } else {
+      if (!isExpanded) {
+        // When expanding, enter edit mode in non-readOnly
+        setEditing((prev) => new Set(prev).add(id));
+      }
+      setIsExpanded(!isExpanded);
+    }
   };
 
   const handleStartEditing = () => {
     if (readOnly) return;
     setEditing((prev) => new Set(prev).add(id));
+    setIsExpanded(true);
   };
 
   const handleCancelEdit = () => {
@@ -65,6 +74,11 @@ export function ExpandableItem<T>({
       next.delete(id);
       return next;
     });
+    setIsExpanded(false);
+  };
+
+  const handleBack = () => {
+    setIsExpanded(false);
   };
 
   const handleSave = () => {
@@ -74,13 +88,14 @@ export function ExpandableItem<T>({
       next.delete(id);
       return next;
     });
+    setIsExpanded(false);
   };
 
   const handleChange = (updatedData: T) => {
     setLocalData(updatedData);
   };
 
-  // Render expanded view without edit buttons in readOnly mode
+  // When in readOnly mode and expanded
   if (readOnly && isExpanded) {
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4">
@@ -89,21 +104,30 @@ export function ExpandableItem<T>({
           <button
             onClick={handleToggleExpand}
             className="text-gray-500 hover:text-gray-700"
-            aria-label={isExpanded ? "Collapse" : "Expand"}
+            aria-label="Collapse"
           >
             <Icons.ChevronUp className="h-5 w-5" />
           </button>
         </div>
         {renderEditForm(
           data,
-          () => {},
+          () => {}, // No-op since it's readonly
           () => {}
         )}
+        <div className="flex justify-end gap-2 mt-4">
+          <PrimaryButton
+            onClick={handleBack}
+            variant="outline"
+            leftBorder={false}
+          >
+            Back
+          </PrimaryButton>
+        </div>
       </div>
     );
   }
 
-  // Render collapsed view with only expand button in readOnly mode
+  // When in readOnly mode and collapsed
   if (readOnly) {
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
@@ -111,7 +135,7 @@ export function ExpandableItem<T>({
         <button
           onClick={handleToggleExpand}
           className="text-gray-500 hover:text-gray-700"
-          aria-label={isExpanded ? "Collapse" : "Expand"}
+          aria-label="Expand"
         >
           <Icons.ChevronDown className="h-5 w-5" />
         </button>
@@ -119,7 +143,7 @@ export function ExpandableItem<T>({
     );
   }
 
-  // Original interactive editing behavior
+  // Original interactive editing behavior - collapsed view
   if (!isEditing) {
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
@@ -144,6 +168,7 @@ export function ExpandableItem<T>({
     );
   }
 
+  // Edit mode - expanded with form
   return (
     <div className="bg-white p-4 rounded-lg shadow mb-4">
       {renderEditForm(localData, handleChange, handleCancelEdit)}

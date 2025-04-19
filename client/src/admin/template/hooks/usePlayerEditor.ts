@@ -51,7 +51,8 @@ export function usePlayerEditor(
   ) => void,
   createEmptyIdentity: () => CharacterIdentity,
   createEmptyBackground: () => CharacterBackground,
-  setEditingPlayers: (callback: (prev: Set<string>) => Set<string>) => void
+  setEditingPlayers: (callback: (prev: Set<string>) => Set<string>) => void,
+  readOnly: boolean = false
 ): UsePlayerEditorResult {
   const [localOptions, setLocalOptions] = useState<PlayerOptionsGeneration>(
     () => ({
@@ -70,6 +71,8 @@ export function usePlayerEditor(
     sourcePlayerSlot: PlayerSlot,
     outcomeIndex: number
   ) => {
+    if (readOnly) return;
+
     const sourceOutcome =
       playerOptions[sourcePlayerSlot]?.outcomes[outcomeIndex];
 
@@ -97,6 +100,8 @@ export function usePlayerEditor(
     index: number,
     updatedIdentity: CharacterIdentity
   ) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.possibleCharacterIdentities];
     updated[index] = updatedIdentity;
 
@@ -113,6 +118,8 @@ export function usePlayerEditor(
   };
 
   const handleDeleteIdentity = (index: number) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.possibleCharacterIdentities];
     updated.splice(index, 1);
 
@@ -129,6 +136,8 @@ export function usePlayerEditor(
   };
 
   const handleAddIdentity = () => {
+    if (readOnly) return;
+
     const updated = [
       ...localOptions.possibleCharacterIdentities,
       createEmptyIdentity(),
@@ -150,6 +159,8 @@ export function usePlayerEditor(
     index: number,
     updatedBackground: CharacterBackground
   ) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.possibleCharacterBackgrounds];
     updated[index] = updatedBackground;
 
@@ -166,6 +177,8 @@ export function usePlayerEditor(
   };
 
   const handleDeleteBackground = (index: number) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.possibleCharacterBackgrounds];
     updated.splice(index, 1);
 
@@ -182,6 +195,8 @@ export function usePlayerEditor(
   };
 
   const handleAddBackground = () => {
+    if (readOnly) return;
+
     const updated = [
       ...localOptions.possibleCharacterBackgrounds,
       createEmptyBackground(),
@@ -203,6 +218,8 @@ export function usePlayerEditor(
     index: number,
     updatedOutcome: PlayerOutcome
   ) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.outcomes];
     updated[index] = updatedOutcome;
 
@@ -219,6 +236,8 @@ export function usePlayerEditor(
   };
 
   const handleDeleteOutcome = (index: number) => {
+    if (readOnly) return;
+
     const updated = [...localOptions.outcomes];
     updated.splice(index, 1);
 
@@ -235,6 +254,8 @@ export function usePlayerEditor(
   };
 
   const handleSave = () => {
+    if (readOnly) return;
+
     handleUpdatePlayer(playerSlot, localOptions);
     setEditingPlayers((prev) => {
       const next = new Set(prev);

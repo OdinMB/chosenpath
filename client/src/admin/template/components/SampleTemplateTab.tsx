@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { GuidelinesTab, StoryElementsTab, OutcomesTab, StatsTab } from "./";
+import {
+  GuidelinesTab,
+  StoryElementsTab,
+  OutcomesTab,
+  StatsTab,
+  PlayersTab,
+} from "./";
 import {
   StoryTemplate,
   PlayerSlot,
@@ -11,24 +17,6 @@ import { Logger } from "@common/logger";
 interface SampleTemplateTabProps {
   token: string;
 }
-
-// Create default empty playerOptions when it doesn't exist on the template
-const getDefaultPlayerOptions = (): Record<
-  PlayerSlot,
-  PlayerOptionsGeneration
-> => {
-  const emptyPlayerOption: PlayerOptionsGeneration = {
-    possibleCharacterBackgrounds: [],
-    possibleCharacterIdentities: [],
-    outcomes: [],
-  };
-
-  return {
-    player1: emptyPlayerOption,
-    player2: emptyPlayerOption,
-    player3: emptyPlayerOption,
-  };
-};
 
 export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
   token,
@@ -90,9 +78,41 @@ export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
   // Create playerOptions record from the template or use default
   const templatedOptions = template as StoryTemplate & {
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
+    characterSelectionIntroduction?: {
+      title: string;
+      text: string;
+    };
   };
-  const playerOptions =
-    templatedOptions.playerOptions || getDefaultPlayerOptions();
+
+  // In the template, player options might be stored either in a playerOptions object
+  // or directly as properties of the template (player1, player2, player3)
+  const playerOptions: Record<PlayerSlot, PlayerOptionsGeneration> = {};
+  const playerSlots: PlayerSlot[] = ["player1", "player2", "player3"];
+
+  playerSlots.forEach((slot) => {
+    // Check if the player data exists directly on the template (e.g., template.player1)
+    const playerData = template[slot as keyof StoryTemplate] as
+      | PlayerOptionsGeneration
+      | undefined;
+
+    // Or if it exists in the playerOptions object
+    const optionsData = templatedOptions.playerOptions?.[slot];
+
+    // Use whichever is available, or default if neither exists
+    const defaultOption: PlayerOptionsGeneration = {
+      possibleCharacterBackgrounds: [],
+      possibleCharacterIdentities: [],
+      outcomes: [],
+    };
+
+    playerOptions[slot] = playerData || optionsData || defaultOption;
+  });
+
+  const characterSelectionIntroduction =
+    templatedOptions.characterSelectionIntroduction || {
+      title: "Choose Your Character",
+      text: "Select your character's identity and background",
+    };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -128,6 +148,20 @@ export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
             playerStats={template.playerStats || []}
             initialSharedStatValues={template.initialSharedStatValues || []}
             playerOptions={playerOptions}
+            readOnly
+          />
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-3">Players</h3>
+        <div className="bg-gray-50 p-4 rounded-md">
+          <PlayersTab
+            playerOptions={playerOptions}
+            onChange={() => {}} // No-op since it's read-only
+            playerStats={template.playerStats || []}
+            characterSelectionIntroduction={characterSelectionIntroduction}
+            onCharacterSelectionIntroductionChange={() => {}} // No-op since it's read-only
             readOnly
           />
         </div>

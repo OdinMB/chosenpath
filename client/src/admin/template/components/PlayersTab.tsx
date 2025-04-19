@@ -19,16 +19,18 @@ interface PlayersTabProps {
   onCharacterSelectionIntroductionChange: (
     updatedIntro: CharacterSelectionIntroduction
   ) => void;
+  readOnly?: boolean;
 }
 
 interface CharacterSelectionIntroductionCardProps {
   introduction: CharacterSelectionIntroduction;
   onChange: (updatedIntro: CharacterSelectionIntroduction) => void;
+  readOnly?: boolean;
 }
 
 const CharacterSelectionIntroductionCard: React.FC<
   CharacterSelectionIntroductionCardProps
-> = ({ introduction, onChange }) => {
+> = ({ introduction, onChange, readOnly = false }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localIntroduction, setLocalIntroduction] = useState(introduction);
 
@@ -54,13 +56,15 @@ const CharacterSelectionIntroductionCard: React.FC<
           <h3 className="text-lg font-semibold">
             Character Selection Introduction
           </h3>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-secondary hover:text-secondary-700"
-            aria-label="Edit character selection introduction"
-          >
-            <Icons.Edit className="h-5 w-5" />
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="text-secondary hover:text-secondary-700"
+              aria-label="Edit character selection introduction"
+            >
+              <Icons.Edit className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <div className="space-y-2">
           <div>
@@ -184,6 +188,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   playerStats,
   characterSelectionIntroduction,
   onCharacterSelectionIntroductionChange,
+  readOnly = false,
 }) => {
   const {
     editingPlayers,
@@ -198,7 +203,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
     createEmptyIdentity,
     createEmptyBackground,
     handleAddPlayerOutcome,
-  } = usePlayers(playerOptions, onChange, playerStats);
+  } = usePlayers(playerOptions, onChange, playerStats, readOnly);
 
   const PlayerEditor = ({
     playerSlot,
@@ -228,8 +233,23 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
       handleUpdatePlayer,
       createEmptyIdentity,
       createEmptyBackground,
-      setEditingPlayers
+      setEditingPlayers,
+      readOnly
     );
+
+    const handleExpandCollapse = () => {
+      if (readOnly) {
+        setEditingPlayers((prev) => {
+          const next = new Set(prev);
+          if (next.has(playerSlot)) {
+            next.delete(playerSlot);
+          } else {
+            next.add(playerSlot);
+          }
+          return next;
+        });
+      }
+    };
 
     if (!isEditing) {
       return (
@@ -240,17 +260,27 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                 Player {playerSlot.replace("player", "")}
               </span>
             </div>
-            <div className="flex gap-2">
+            {readOnly ? (
               <button
-                onClick={() =>
-                  setEditingPlayers((prev) => new Set(prev).add(playerSlot))
-                }
-                className="text-secondary hover:text-secondary-700"
-                aria-label={`Edit ${playerSlot}`}
+                onClick={handleExpandCollapse}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label={`Expand Player ${playerSlot.replace("player", "")}`}
               >
-                <Icons.Edit className="h-5 w-5" />
+                <Icons.ChevronDown className="h-5 w-5" />
               </button>
-            </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    setEditingPlayers((prev) => new Set(prev).add(playerSlot))
+                  }
+                  className="text-secondary hover:text-secondary-700"
+                  aria-label={`Edit ${playerSlot}`}
+                >
+                  <Icons.Edit className="h-5 w-5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -263,19 +293,33 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             <h3 className="text-lg font-semibold">
               Player {playerSlot.replace("player", "")}
             </h3>
+            {readOnly && (
+              <button
+                onClick={handleExpandCollapse}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label={`Collapse Player ${playerSlot.replace(
+                  "player",
+                  ""
+                )}`}
+              >
+                <Icons.ChevronUp className="h-5 w-5" />
+              </button>
+            )}
           </div>
 
           {/* Character Identities */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Character Identities</h3>
-              <PrimaryButton
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={handleAddIdentity}
-                leftIcon={<Icons.Plus className="h-4 w-4" />}
-              ></PrimaryButton>
+              {!readOnly && (
+                <PrimaryButton
+                  variant="outline"
+                  leftBorder={false}
+                  size="sm"
+                  onClick={handleAddIdentity}
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
+                ></PrimaryButton>
+              )}
             </div>
             {localOptions.possibleCharacterIdentities.map((identity, index) => (
               <PlayerIdentity
@@ -287,6 +331,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                 onDelete={handleDeleteIdentity}
                 onUpdate={handleUpdateIdentity}
                 pronounSets={PRONOUN_SETS}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -295,13 +340,15 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Character Backgrounds</h3>
-              <PrimaryButton
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={handleAddBackground}
-                leftIcon={<Icons.Plus className="h-4 w-4" />}
-              ></PrimaryButton>
+              {!readOnly && (
+                <PrimaryButton
+                  variant="outline"
+                  leftBorder={false}
+                  size="sm"
+                  onClick={handleAddBackground}
+                  leftIcon={<Icons.Plus className="h-4 w-4" />}
+                ></PrimaryButton>
+              )}
             </div>
             {localOptions.possibleCharacterBackgrounds.map(
               (background, index) => (
@@ -314,6 +361,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                   onDelete={handleDeleteBackground}
                   onUpdate={handleUpdateBackground}
                   playerStats={playerStats}
+                  readOnly={readOnly}
                 />
               )
             )}
@@ -323,43 +371,45 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold mb-1">Individual Outcomes</h3>
-              <div className="flex gap-2">
-                <PrimaryButton
-                  onClick={() => handleAddPlayerOutcome(playerSlot)}
-                  variant="outline"
-                  leftBorder={false}
-                  size="sm"
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                ></PrimaryButton>{" "}
-                <Select
-                  className="text-sm w-44"
-                  size="sm"
-                  onChange={(e) => {
-                    const [sourcePlayer, outcomeIndex] =
-                      e.target.value.split(":");
-                    handleCopyOutcome(
-                      sourcePlayer as PlayerSlot,
-                      parseInt(outcomeIndex)
-                    );
-                  }}
-                  value=""
-                >
-                  <option value="">Copy from...</option>
-                  {Object.entries(playerOptions).map(
-                    ([otherSlot, otherOptions]) =>
-                      otherSlot !== playerSlot &&
-                      otherOptions.outcomes.map((outcome, idx) => (
-                        <option
-                          key={`${otherSlot}-${idx}`}
-                          value={`${otherSlot}:${idx}`}
-                        >
-                          Player {otherSlot.replace("player", "")}:{" "}
-                          {outcome.question}
-                        </option>
-                      ))
-                  )}
-                </Select>
-              </div>
+              {!readOnly && (
+                <div className="flex gap-2">
+                  <PrimaryButton
+                    onClick={() => handleAddPlayerOutcome(playerSlot)}
+                    variant="outline"
+                    leftBorder={false}
+                    size="sm"
+                    leftIcon={<Icons.Plus className="h-4 w-4" />}
+                  ></PrimaryButton>{" "}
+                  <Select
+                    className="text-sm w-44"
+                    size="sm"
+                    onChange={(e) => {
+                      const [sourcePlayer, outcomeIndex] =
+                        e.target.value.split(":");
+                      handleCopyOutcome(
+                        sourcePlayer as PlayerSlot,
+                        parseInt(outcomeIndex)
+                      );
+                    }}
+                    value=""
+                  >
+                    <option value="">Copy from...</option>
+                    {Object.entries(playerOptions).map(
+                      ([otherSlot, otherOptions]) =>
+                        otherSlot !== playerSlot &&
+                        otherOptions.outcomes.map((outcome, idx) => (
+                          <option
+                            key={`${otherSlot}-${idx}`}
+                            value={`${otherSlot}:${idx}`}
+                          >
+                            Player {otherSlot.replace("player", "")}:{" "}
+                            {outcome.question}
+                          </option>
+                        ))
+                    )}
+                  </Select>
+                </div>
+              )}
             </div>
 
             {localOptions.outcomes.map((outcome, index) => (
@@ -371,15 +421,28 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
                 setEditingOutcomes={setEditingOutcomes}
                 onDelete={handleDeleteOutcome}
                 onUpdate={handleUpdateOutcome}
+                readOnly={readOnly}
               />
             ))}
           </div>
         </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <PrimaryButton onClick={handleSave} variant="outline">
-            Save
-          </PrimaryButton>
-        </div>
+        {readOnly ? (
+          <div className="flex justify-end gap-2 mt-4">
+            <PrimaryButton
+              onClick={handleExpandCollapse}
+              variant="outline"
+              leftBorder={false}
+            >
+              Back
+            </PrimaryButton>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2 mt-4">
+            <PrimaryButton onClick={handleSave} variant="outline">
+              Save
+            </PrimaryButton>
+          </div>
+        )}
       </div>
     );
   };
@@ -389,6 +452,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
       <CharacterSelectionIntroductionCard
         introduction={characterSelectionIntroduction}
         onChange={onCharacterSelectionIntroductionChange}
+        readOnly={readOnly}
       />
 
       {Array.from({ length: MAX_PLAYERS }, (_, i) => {

@@ -12,6 +12,7 @@ interface PlayerBackgroundProps {
   onDelete: (index: number) => void;
   onUpdate: (index: number, updatedBackground: CharacterBackground) => void;
   playerStats: Stat[];
+  readOnly?: boolean;
 }
 
 export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
@@ -22,6 +23,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
   onDelete,
   onUpdate,
   playerStats,
+  readOnly = false,
 }) => {
   const renderBackgroundForm = (
     data: CharacterBackground,
@@ -36,6 +38,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
             value={data.title}
             onChange={(e) => onChange({ ...data, title: e.target.value })}
             placeholder="Background title"
+            disabled={readOnly}
           />
         </div>
 
@@ -49,6 +52,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
               onChange({ ...data, fluffTemplate: e.target.value })
             }
             placeholder="Background description with placeholders: {name}, {personal}, {object}, {possessive}, {reflexive}"
+            disabled={readOnly}
           />
         </div>
 
@@ -83,6 +87,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
                   placeholder={`Initial ${stat.name}`}
                   className="flex-1"
                   label={stat.name}
+                  disabled={readOnly}
                 />
               </div>
             );
@@ -103,6 +108,7 @@ export const PlayerBackground: React.FC<PlayerBackgroundProps> = ({
       onSave={(updatedBackground) => onUpdate(index, updatedBackground)}
       renderEditForm={renderBackgroundForm}
       isSaveDisabled={() => false}
+      readOnly={readOnly}
     />
   );
 };

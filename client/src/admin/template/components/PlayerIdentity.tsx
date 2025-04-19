@@ -19,6 +19,7 @@ interface PlayerIdentityProps {
       reflexive: string;
     };
   }>;
+  readOnly?: boolean;
 }
 
 export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
@@ -29,6 +30,7 @@ export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
   onDelete,
   onUpdate,
   pronounSets,
+  readOnly = false,
 }) => {
   const renderIdentityForm = (
     data: CharacterIdentity,
@@ -46,6 +48,7 @@ export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
             onChange={(e) => onChange({ ...data, name: e.target.value })}
             placeholder="Character name"
             className="flex-1"
+            disabled={readOnly}
           />
           <Select
             size="sm"
@@ -63,6 +66,7 @@ export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
                 pronouns: pronounSets[Number(e.target.value)].pronouns,
               });
             }}
+            disabled={readOnly}
           >
             <option value={-1}>Select pronouns...</option>
             {pronounSets.map((set, i) => (
@@ -77,6 +81,7 @@ export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
           value={data.appearance}
           onChange={(e) => onChange({ ...data, appearance: e.target.value })}
           placeholder="Character appearance"
+          disabled={readOnly}
         />
       </div>
     );
@@ -93,6 +98,7 @@ export const PlayerIdentity: React.FC<PlayerIdentityProps> = ({
       onSave={(updatedIdentity) => onUpdate(index, updatedIdentity)}
       renderEditForm={renderIdentityForm}
       isSaveDisabled={() => false}
+      readOnly={readOnly}
     />
   );
 };
