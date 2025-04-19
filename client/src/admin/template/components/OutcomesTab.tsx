@@ -1,7 +1,7 @@
 import React from "react";
 import { PrimaryButton, Icons, Input, Select } from "@components/ui";
 import { Outcome, ExplorationResolution } from "@core/types";
-import { ExpandableItem } from "./ExpandableItem";
+import { ExpandableItem } from "../../../shared/components/ExpandableItem";
 import { useOutcomes } from "../hooks/useOutcomes";
 import { useOutcomeForm } from "../hooks/useOutcomeForm";
 import { InfoIcon } from "@components/ui";

@@ -28,6 +28,7 @@
       "@/*": ["src/*"],
       "@core/*": ["../shared/*"],
       "@common/*": ["src/shared/*"],
+      "@components": ["src/shared/components"],
       "@components/*": ["src/shared/components/*"],
       "@admin/*": ["src/admin/*"],
       "@game/*": ["src/game/*"],

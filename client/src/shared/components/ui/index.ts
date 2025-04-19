@@ -1,4 +1,3 @@
-export { ArrayField } from "./ArrayField";
 export { Checkbox } from "./Checkbox";
 export { ColoredBox } from "./ColoredBox";
 export { ConfirmDialog } from "./ConfirmDialog";

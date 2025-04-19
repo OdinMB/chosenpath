@@ -1,15 +1,14 @@
 import React from "react";
 import { StoryElement } from "@core/types";
 import {
-  ArrayField,
   InfoIcon,
   Input,
   TextArea,
   PrimaryButton,
   Icons,
 } from "@components/ui";
+import { ArrayField, ExpandableItem } from "@components";
 import { useStoryElements } from "../hooks/useStoryElements";
-import { ExpandableItem } from "./ExpandableItem";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];

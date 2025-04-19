@@ -1,5 +1,6 @@
 import React from "react";
-import { ArrayField, TextArea, InfoIcon } from "@components/ui";
+import { TextArea, InfoIcon } from "@components/ui";
+import { ArrayField } from "@components";
 import { StoryTemplate } from "@core/types";
 import { useTemplateGuidelines } from "../hooks/useTemplateGuidelines";
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
-import { ExpandableItem } from "./ExpandableItem";
+import { ExpandableItem } from "@components";
 
 interface StatGroupsProps {
   statGroups: string[];

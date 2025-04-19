@@ -1,5 +1,5 @@
 export { BasicInfoTab } from "./BasicInfoTab";
-export { ExpandableItem } from "./ExpandableItem";
+export { ExpandableItem } from "../../../shared/components/ExpandableItem";
 export { ExpandableOutcome } from "./ExpandableOutcome";
 export { GuidelinesTab } from "./GuidelinesTab";
 export { OutcomesTab } from "./OutcomesTab";

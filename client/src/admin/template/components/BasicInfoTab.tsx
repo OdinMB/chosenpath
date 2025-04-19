@@ -1,14 +1,7 @@
 import React, { useMemo } from "react";
 import { PlayerCount } from "@core/types";
-import {
-  ArrayField,
-  Input,
-  TextArea,
-  InfoIcon,
-  Select,
-  Checkbox,
-} from "@components/ui";
-import { TagSelector } from "@common/components/TagSelector";
+import { Input, TextArea, InfoIcon, Select, Checkbox } from "@components/ui";
+import { ArrayField, TagSelector } from "@components";
 import { TAG_CATEGORIES } from "@common/tag-categories";
 
 interface BasicInfoTabProps {
@@ -274,7 +267,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         <div className="mb-4">
           <ArrayField
             items={customTags}
-            onChange={(newCustomTags) => {
+            onChange={(newCustomTags: string[]) => {
               // Keep all predefined tags and replace custom tags
               const predefinedSelected = tags.filter((tag) =>
                 allPredefinedTags.includes(tag)

@@ -1,5 +1,6 @@
 import React from "react";
-import { ArrayField, Input } from "@components/ui";
+import { Input } from "@components/ui";
+import { ArrayField } from "@components";
 import { Stat } from "@core/types";
 
 interface StatValueInputProps {
