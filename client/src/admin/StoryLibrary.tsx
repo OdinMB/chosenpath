@@ -326,7 +326,7 @@ export const StoryLibrary = ({
               <tr>
                 <th className="py-3 px-4 text-left">Title</th>
                 <th className="py-3 px-4 text-left">Status</th>
-                <th className="hidden lg:table-cell py-3 px-4 text-left">
+                <th className="hidden xl:table-cell py-3 px-4 text-left">
                   Tags
                 </th>
                 <th className="hidden md:table-cell py-3 px-4 text-left">
@@ -366,7 +366,7 @@ export const StoryLibrary = ({
                       </span>
                     </span>
                   </td>
-                  <td className="hidden lg:table-cell py-3 px-4">
+                  <td className="hidden xl:table-cell py-3 px-4">
                     <div className="flex flex-wrap gap-1">
                       {template.tags && template.tags.length > 0 ? (
                         sortTagsByCategory(template.tags).map((tag, index) => (
