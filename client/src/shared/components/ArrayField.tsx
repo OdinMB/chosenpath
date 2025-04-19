@@ -1,11 +1,12 @@
 import React from "react";
 import { Icons, Input, PrimaryButton, InfoIcon } from "@components/ui";
+import { useArrayField } from "../hooks/useArrayField";
 
 export interface ArrayFieldProps {
   title?: string;
   tooltipText?: string;
   items: string[];
-  onChange: (items: string[]) => void;
+  onChange?: (items: string[]) => void;
   placeholder?: string;
   emptyPlaceholder?: string;
   buttonText?: string;
@@ -14,12 +15,13 @@ export interface ArrayFieldProps {
   label?: string;
   showLabel?: boolean;
   inline?: boolean;
+  readOnly?: boolean;
 }
 
 export const ArrayField: React.FC<ArrayFieldProps> = ({
   title,
   tooltipText,
-  items,
+  items: initialItems,
   onChange,
   placeholder = "Add an item",
   emptyPlaceholder = "Click + to add items",
@@ -29,20 +31,14 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
   label,
   showLabel = true,
   inline = false,
+  readOnly = false,
 }) => {
-  const handleAddItem = () => {
-    onChange([...items, ""]);
-  };
-
-  const handleUpdateItem = (index: number, value: string) => {
-    const updatedItems = [...items];
-    updatedItems[index] = value;
-    onChange(updatedItems);
-  };
-
-  const handleRemoveItem = (index: number) => {
-    onChange(items.filter((_, i) => i !== index));
-  };
+  const { items, handleAddItem, handleUpdateItem, handleRemoveItem } =
+    useArrayField({
+      initialItems,
+      onChange,
+      readOnly,
+    });
 
   const fieldId = title
     ? title.toLowerCase().replace(/\s+/g, "-")
@@ -62,19 +58,21 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
               />
             )}
           </div>
-          <PrimaryButton
-            variant="outline"
-            leftBorder={false}
-            size="sm"
-            onClick={handleAddItem}
-            leftIcon={<Icons.Plus className="h-4 w-4" />}
-          >
-            {buttonText}
-          </PrimaryButton>
+          {!readOnly && (
+            <PrimaryButton
+              variant="outline"
+              leftBorder={false}
+              size="sm"
+              onClick={handleAddItem}
+              leftIcon={<Icons.Plus className="h-4 w-4" />}
+            >
+              {buttonText}
+            </PrimaryButton>
+          )}
         </div>
       )}
 
-      {!title && !label && (
+      {!title && !label && !readOnly && (
         <div className="flex justify-end mb-1">
           <PrimaryButton
             variant="outline"
@@ -109,17 +107,20 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
               value={item}
               onChange={(e) => handleUpdateItem(index, e.target.value)}
               placeholder={placeholder}
+              disabled={readOnly}
             />
-            <button
-              type="button"
-              onClick={() => handleRemoveItem(index)}
-              className="text-tertiary hover:text-tertiary-700"
-              aria-label={`Remove ${title ? title.toLowerCase() : "item"} ${
-                index + 1
-              }`}
-            >
-              <Icons.Trash className="h-4 w-4" />
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => handleRemoveItem(index)}
+                className="text-tertiary hover:text-tertiary-700"
+                aria-label={`Remove ${title ? title.toLowerCase() : "item"} ${
+                  index + 1
+                }`}
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ))
       )}

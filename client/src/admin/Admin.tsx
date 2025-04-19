@@ -3,14 +3,19 @@ import { PrimaryButton, Icons } from "@components/ui";
 import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
 import { StoryLibrary } from "./StoryLibrary";
-import { TemplateForm } from "./template/components";
+import { TemplateForm, SampleTemplateTab } from "./template/components";
 import { StoryCarouselManager } from "./StoryCarouselManager";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
 
-type AdminTab = "stories" | "library" | "template-form" | "carousel";
+type AdminTab =
+  | "stories"
+  | "library"
+  | "template-form"
+  | "carousel"
+  | "sample-template";
 
 export const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -177,6 +182,16 @@ export const Admin = () => {
               >
                 Story Carousel
               </button>
+              <button
+                className={`px-4 py-2 font-medium ${
+                  activeTab === "sample-template"
+                    ? "text-secondary border-b-2 border-secondary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setActiveTab("sample-template")}
+              >
+                View Sample Template
+              </button>
             </div>
 
             {/* Content based on active tab */}
@@ -204,6 +219,10 @@ export const Admin = () => {
 
             {activeTab === "carousel" && (
               <StoryCarouselManager token={authToken} />
+            )}
+
+            {activeTab === "sample-template" && (
+              <SampleTemplateTab token={authToken} />
             )}
           </div>
         </div>

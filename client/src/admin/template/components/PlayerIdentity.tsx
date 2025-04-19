@@ -1,5 +1,5 @@
 import React from "react";
-import { ExpandableItem } from "./";
+import { ExpandableItem } from "@components";
 import { Input, Select } from "@components/ui";
 import { CharacterIdentity } from "@core/types";
 

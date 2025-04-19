@@ -3,12 +3,14 @@ import { StoryTemplate } from "@core/types";
 
 interface UseTemplateGuidelinesProps {
   template: StoryTemplate;
-  onChange: (updates: Partial<StoryTemplate>) => void;
+  onChange?: (updates: Partial<StoryTemplate>) => void;
+  readOnly?: boolean;
 }
 
 export function useTemplateGuidelines({
   template,
   onChange,
+  readOnly = false,
 }: UseTemplateGuidelinesProps) {
   const [world, setWorldState] = useState<string>(
     template.guidelines?.world || ""
@@ -34,6 +36,8 @@ export function useTemplateGuidelines({
     field: keyof typeof template.guidelines,
     value: T
   ) => {
+    if (readOnly || !onChange) return;
+
     onChange({
       guidelines: {
         ...template.guidelines,
@@ -50,37 +54,51 @@ export function useTemplateGuidelines({
 
   // Create wrapper setters that update parent state
   const setWorld = (newWorld: string) => {
+    if (readOnly) return;
+
     setWorldState(newWorld);
     updateGuidelineField("world", newWorld);
   };
 
   const setRules = (newRules: string[]) => {
+    if (readOnly) return;
+
     setRulesState(newRules);
     updateGuidelineField("rules", newRules);
   };
 
   const setTone = (newTone: string[]) => {
+    if (readOnly) return;
+
     setToneState(newTone);
     updateGuidelineField("tone", newTone);
   };
 
   const setConflicts = (newConflicts: string[]) => {
+    if (readOnly) return;
+
     setConflictsState(newConflicts);
     updateGuidelineField("conflicts", newConflicts);
   };
 
   const setDecisions = (newDecisions: string[]) => {
+    if (readOnly) return;
+
     setDecisionsState(newDecisions);
     updateGuidelineField("decisions", newDecisions);
   };
 
   const setTypesOfThreads = (newTypesOfThreads: string[]) => {
+    if (readOnly) return;
+
     setTypesOfThreadsState(newTypesOfThreads);
     updateGuidelineField("typesOfThreads", newTypesOfThreads);
   };
 
   // Update all guidelines at once
   const updateGuidelines = () => {
+    if (readOnly || !onChange) return;
+
     onChange({
       guidelines: {
         ...template.guidelines,
@@ -101,6 +119,8 @@ export function useTemplateGuidelines({
     index: number,
     value: string
   ) => {
+    if (readOnly) return;
+
     const updated = [...currentValues];
     updated[index] = value;
     setter(updated);
@@ -110,6 +130,8 @@ export function useTemplateGuidelines({
     setter: (value: string[]) => void,
     currentValues: string[]
   ) => {
+    if (readOnly) return;
+
     setter([...currentValues, ""]);
   };
 
@@ -118,6 +140,8 @@ export function useTemplateGuidelines({
     currentValues: string[],
     index: number
   ) => {
+    if (readOnly) return;
+
     setter(currentValues.filter((_, i) => i !== index));
   };
 
@@ -127,6 +151,8 @@ export function useTemplateGuidelines({
     index: number,
     value: string
   ) => {
+    if (readOnly) return;
+
     if (setter === setRules) {
       handleArrayFieldChange(setRules, rules, index, value);
     } else if (setter === setTone) {
@@ -141,6 +167,8 @@ export function useTemplateGuidelines({
   };
 
   const handleAddArrayItemAdapter = (setter: (values: string[]) => void) => {
+    if (readOnly) return;
+
     if (setter === setRules) {
       handleAddArrayItem(setRules, rules);
     } else if (setter === setTone) {
@@ -158,6 +186,8 @@ export function useTemplateGuidelines({
     setter: (values: string[]) => void,
     index: number
   ) => {
+    if (readOnly) return;
+
     if (setter === setRules) {
       handleRemoveArrayItem(setRules, rules, index);
     } else if (setter === setTone) {

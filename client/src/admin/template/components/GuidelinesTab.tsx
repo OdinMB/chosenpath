@@ -6,12 +6,14 @@ import { useTemplateGuidelines } from "../hooks/useTemplateGuidelines";
 
 interface GuidelinesTabProps {
   template: StoryTemplate;
-  onChange: (updates: Partial<StoryTemplate>) => void;
+  onChange?: (updates: Partial<StoryTemplate>) => void;
+  readOnly?: boolean;
 }
 
 export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
   template,
   onChange,
+  readOnly = false,
 }) => {
   const {
     world,
@@ -29,6 +31,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
   } = useTemplateGuidelines({
     template,
     onChange,
+    readOnly,
   });
 
   return (
@@ -49,6 +52,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
             className="flex-1"
             rows={3}
             placeholder="Describe the essence of the story world in three sentences"
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -60,6 +64,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setRules}
         placeholder="Add a rule"
         emptyPlaceholder="Click + to add rules"
+        readOnly={readOnly}
       />
 
       <ArrayField
@@ -69,6 +74,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setTone}
         placeholder="Add a tone guideline"
         emptyPlaceholder="Click + to add tone guidelines"
+        readOnly={readOnly}
       />
 
       <ArrayField
@@ -78,6 +84,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setConflicts}
         placeholder="Add a conflict"
         emptyPlaceholder="Click + to add conflicts"
+        readOnly={readOnly}
       />
 
       <ArrayField
@@ -87,6 +94,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setDecisions}
         placeholder="Add a decision"
         emptyPlaceholder="Click + to add decisions"
+        readOnly={readOnly}
       />
 
       <ArrayField
@@ -96,6 +104,7 @@ export const GuidelinesTab: React.FC<GuidelinesTabProps> = ({
         onChange={setTypesOfThreads}
         placeholder="Add a thread type"
         emptyPlaceholder="Click + to add thread types"
+        readOnly={readOnly}
       />
     </div>
   );

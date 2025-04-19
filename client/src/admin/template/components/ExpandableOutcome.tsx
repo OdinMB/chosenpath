@@ -5,7 +5,7 @@ import {
   ExplorationResolution,
   ResolutionType,
 } from "@core/types";
-import { ExpandableItem } from "./";
+import { ExpandableItem } from "@components";
 import { InfoIcon, Input, Select } from "@components/ui";
 import { useOutcomeForm } from "../hooks/useOutcomeForm";
 
