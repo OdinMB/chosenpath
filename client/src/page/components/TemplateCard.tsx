@@ -1,5 +1,6 @@
 import { StoryTemplate } from "@core/types";
 import { PrimaryButton } from "@components/ui";
+import { sortTagsByCategory } from "../../shared/tag-categories";
 
 type TemplateCardProps = {
   template: StoryTemplate;
@@ -7,6 +8,9 @@ type TemplateCardProps = {
 };
 
 export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
+  // Sort tags by category
+  const sortedTags = template.tags ? sortTagsByCategory(template.tags) : [];
+
   return (
     <div className="w-full p-4 bg-white rounded-lg border border-primary-100">
       <div className="w-full">
@@ -41,9 +45,9 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
         </p>
 
         {/* Tags */}
-        {template.tags && template.tags.length > 0 && (
+        {sortedTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {template.tags.map((tag, index) => (
+            {sortedTags.map((tag, index) => (
               <span
                 key={index}
                 className="inline-block px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded-md"

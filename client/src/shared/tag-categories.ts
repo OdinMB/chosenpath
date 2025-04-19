@@ -5,24 +5,31 @@ export type TagCategory = {
 
 export const TAG_CATEGORIES: TagCategory[] = [
   {
-    name: "Type",
+    name: "Format",
     tags: ["Novella", "Simulation"],
   },
   {
     name: "Motivation",
-    tags: ["Satire"],
+    tags: ["Reading Pleasure", "Satire", "Serious"],
   },
   {
     name: "Genre",
-    tags: ["Adventure", "Crime", "Mystery"],
+    tags: [
+      "Adventure",
+      "Crime",
+      "Drama",
+      "Mystery",
+      "Romance",
+      "Slice of Life",
+    ],
   },
   {
     name: "Setting",
-    tags: ["Fantasy", "Sci-Fi", "Wild West"],
+    tags: ["Fantasy", "Glamour", "Reality", "Sci-Fi", "Wild West"],
   },
   {
     name: "Tone",
-    tags: ["Contemplative", "Humor", "Surreal"],
+    tags: ["Contemplative", "Dark", "Humorous", "Surreal", "Tense"],
   },
 ];
 
@@ -76,4 +83,35 @@ export function groupTagsByCategories(
   });
 
   return result;
+}
+
+/**
+ * Sort tags according to the order of categories in TAG_CATEGORIES
+ * Format tags come first, then Motivation tags, then Genre tags, etc.
+ * Tags not in any category come last
+ * @param tags Array of tags to sort
+ * @returns Sorted array of tags
+ */
+export function sortTagsByCategory(tags: string[]): string[] {
+  // Create a map of category indices for fast lookup
+  const categoryIndices: Record<string, number> = {};
+  TAG_CATEGORIES.forEach((category, index) => {
+    categoryIndices[category.name] = index;
+  });
+
+  // Sort the tags based on their category's index
+  return [...tags].sort((a, b) => {
+    const categoryA = findTagCategory(a);
+    const categoryB = findTagCategory(b);
+
+    // If neither tag has a category, maintain original order
+    if (!categoryA && !categoryB) return 0;
+
+    // Uncategorized tags should come last
+    if (!categoryA) return 1;
+    if (!categoryB) return -1;
+
+    // Sort by category index
+    return categoryIndices[categoryA] - categoryIndices[categoryB];
+  });
 }

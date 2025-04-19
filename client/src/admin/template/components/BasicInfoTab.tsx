@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { PlayerCount } from "@core/types";
 import {
   ArrayField,
@@ -8,6 +8,8 @@ import {
   Select,
   Checkbox,
 } from "@components/ui";
+import { TagSelector } from "@common/components/TagSelector";
+import { TAG_CATEGORIES } from "@common/tag-categories";
 
 interface BasicInfoTabProps {
   title: string;
@@ -62,6 +64,33 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   gameModeOptions,
   getGameModeValue,
 }) => {
+  // Debugging TAG_CATEGORIES
+  console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
+
+  // Get all available predefined tags from all categories
+  const allPredefinedTags = useMemo(() => {
+    const tags = TAG_CATEGORIES.flatMap((category) => category.tags);
+    console.log("Available predefined tags:", tags);
+    return tags;
+  }, []);
+
+  // Custom tags are those not in the predefined list
+  const customTags = useMemo(() => {
+    const customTags = tags.filter((tag) => !allPredefinedTags.includes(tag));
+    console.log("Custom tags:", customTags);
+    console.log("All selected tags:", tags);
+    return customTags;
+  }, [tags, allPredefinedTags]);
+
+  // Toggle a tag (add if not present, remove if present)
+  const handleTagToggle = (tag: string) => {
+    if (tags.includes(tag)) {
+      handleTagsChange(tags.filter((t) => t !== tag));
+    } else {
+      handleTagsChange([...tags, tag]);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -231,15 +260,43 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         />
       </div>
       {/* Tags section */}
-      <div>
-        <ArrayField
-          title="Tags"
-          tooltipText="Categories to help players find your story"
-          items={tags}
-          onChange={handleTagsChange}
-          placeholder="Add a tag"
-          emptyPlaceholder="Click + to add tags"
-        />
+      <div className="space-y-2">
+        <div className="flex items-center mb-2">
+          <h3 className="font-semibold">Tags</h3>
+          <InfoIcon
+            tooltipText="Categories to help players find your story"
+            position="right"
+            className="ml-2 mt-1"
+          />
+        </div>
+
+        {/* Custom tags input */}
+        <div className="mb-4">
+          <ArrayField
+            items={customTags}
+            onChange={(newCustomTags) => {
+              // Keep all predefined tags and replace custom tags
+              const predefinedSelected = tags.filter((tag) =>
+                allPredefinedTags.includes(tag)
+              );
+              handleTagsChange([...predefinedSelected, ...newCustomTags]);
+            }}
+            placeholder="Add a custom tag"
+            emptyPlaceholder="Click + to add custom tags"
+            label="Custom Tags"
+            showLabel={true}
+          />
+        </div>
+
+        {/* Predefined tags */}
+        <div>
+          <h4 className="font-semibold text-gray-600 mb-2">Suggested Tags</h4>
+          <TagSelector
+            selectedTags={tags}
+            onTagToggle={handleTagToggle}
+            expandedByDefault={true}
+          />
+        </div>
       </div>
     </div>
   );
