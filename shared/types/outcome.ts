@@ -84,3 +84,21 @@ export const outcomeSchema = z
   );
 
 export type Outcome = z.infer<typeof outcomeSchema>;
+
+/**
+ * PlayerOutcome represents a client-side outcome specific to a player.
+ * It has the same structure as the base Outcome type.
+ */
+export interface PlayerOutcome {
+  id: string;
+  question: string;
+  resonance: string;
+  possibleResolutions: ChallengeResolution | ExplorationResolution;
+  intendedNumberOfMilestones: number;
+  milestones: string[];
+}
+
+/**
+ * OutcomeType is a union type that can be either a shared Outcome or a PlayerOutcome
+ */
+export type OutcomeType = Outcome | PlayerOutcome;

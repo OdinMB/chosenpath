@@ -1,33 +1,17 @@
 import React from "react";
-import {
-  Outcome,
-  ChallengeResolution,
-  ExplorationResolution,
-  ResolutionType,
-} from "@core/types";
+import { Outcome, ExplorationResolution, ResolutionType } from "@core/types";
 import { ExpandableItem } from "@components";
 import { InfoIcon, Input, Select } from "@components/ui";
-import { useOutcomeForm } from "../hooks/useOutcomeForm";
-
-// Define PlayerOutcome here since it's specific to the client
-interface PlayerOutcome {
-  id: string;
-  question: string;
-  resonance: string;
-  possibleResolutions: ChallengeResolution | ExplorationResolution;
-  intendedNumberOfMilestones: number;
-  milestones: string[];
-}
-
-type OutcomeType = Outcome | PlayerOutcome;
+import { useOutcomes } from "../hooks/useOutcomes";
 
 interface ExpandableOutcomeProps {
-  outcome: OutcomeType;
+  outcome: Outcome;
   index: number;
   editingOutcomes: Set<string>;
   setEditingOutcomes: (updater: (prev: Set<string>) => Set<string>) => void;
   onDelete: (index: number) => void;
-  onUpdate: (index: number, updatedOutcome: OutcomeType) => void;
+  onUpdate: (index: number, updatedOutcome: Outcome) => void;
+  readOnly?: boolean;
 }
 
 export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
@@ -37,17 +21,18 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
   setEditingOutcomes,
   onDelete,
   onUpdate,
+  readOnly = false,
 }) => {
   const {
     isChallenge,
     isExploration,
     handleResolutionTypeChange,
     handleResolutionFieldChange,
-  } = useOutcomeForm();
+  } = useOutcomes([], undefined, readOnly);
 
   const renderOutcomeForm = (
-    data: OutcomeType,
-    onChange: (updatedData: OutcomeType) => void
+    data: Outcome,
+    onChange: (updatedData: Outcome) => void
   ) => {
     const resolutions = data.possibleResolutions as ResolutionType;
 
@@ -60,6 +45,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
             value={data.question}
             onChange={(e) => onChange({ ...data, question: e.target.value })}
             placeholder="Question that defines the outcome"
+            disabled={readOnly}
           />
         </div>
 
@@ -70,6 +56,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
             value={data.resonance}
             onChange={(e) => onChange({ ...data, resonance: e.target.value })}
             placeholder="Why does this matter to the character or group?"
+            disabled={readOnly}
           />
         </div>
 
@@ -92,6 +79,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                 intendedNumberOfMilestones: parseInt(e.target.value, 10),
               })
             }
+            disabled={readOnly}
           />
         </div>
 
@@ -105,17 +93,19 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                 className="ml-2 mt-1"
               />
             </div>
-            <Select
-              className="text-sm"
-              size="sm"
-              value={isExploration(resolutions) ? "exploration" : "challenge"}
-              onChange={(e) => {
-                handleResolutionTypeChange(e.target.value, data, onChange);
-              }}
-            >
-              <option value="challenge">Challenge</option>
-              <option value="exploration">Exploration</option>
-            </Select>
+            {!readOnly && (
+              <Select
+                className="text-sm"
+                size="sm"
+                value={isExploration(resolutions) ? "exploration" : "challenge"}
+                onChange={(e) => {
+                  handleResolutionTypeChange(e.target.value, data, onChange);
+                }}
+              >
+                <option value="challenge">Challenge</option>
+                <option value="exploration">Exploration</option>
+              </Select>
+            )}
           </div>
 
           {isChallenge(resolutions) ? (
@@ -135,6 +125,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="Resolution that is favorable to the player(s)"
+                  disabled={readOnly}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -151,6 +142,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="Resolution that is unfavorable for the player(s)"
+                  disabled={readOnly}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -167,6 +159,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="Resolution for a mixed outcome"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -187,6 +180,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="First possible resolution"
+                  disabled={readOnly}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -203,6 +197,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="Second possible resolution"
+                  disabled={readOnly}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -219,6 +214,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
                     );
                   }}
                   placeholder="Third possible resolution"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -239,6 +235,7 @@ export const ExpandableOutcome: React.FC<ExpandableOutcomeProps> = ({
       onSave={(updatedOutcome) => onUpdate(index, updatedOutcome)}
       renderEditForm={renderOutcomeForm}
       isSaveDisabled={(data) => !data.question}
+      readOnly={readOnly}
     />
   );
 };
