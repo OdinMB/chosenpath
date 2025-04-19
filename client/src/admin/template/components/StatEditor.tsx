@@ -22,6 +22,7 @@ interface StatEditorProps {
   ) => void;
   onRemoveStat: (type: "shared" | "player", index: number) => void;
   setEditingStats: (updater: (prev: Set<string>) => Set<string>) => void;
+  readOnly?: boolean;
 }
 
 export const StatEditor: React.FC<StatEditorProps> = ({
@@ -34,6 +35,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
   onUpdateStat,
   onRemoveStat,
   setEditingStats,
+  readOnly = false,
 }) => {
   const {
     localStat,
@@ -42,6 +44,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
     handleSave,
     updateStatField,
     handleRemoveStat,
+    handleClose,
   } = useStatEditor({
     stat,
     index,
@@ -51,6 +54,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
     onUpdateStat,
     onRemoveStat,
     setEditingStats,
+    readOnly,
   });
 
   return (
@@ -68,6 +72,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 updateStatField("name", e.target.value)
               }
               placeholder="Enter stat name"
+              disabled={readOnly}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -87,6 +92,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                   updateStatField("id", newId);
                 }}
                 placeholder="Enter stat ID"
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -101,6 +107,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 updateStatField("tooltip", e.target.value)
               }
               placeholder="Enter stat description"
+              disabled={readOnly}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -113,6 +120,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 updateStatField("group", e.target.value)
               }
+              disabled={readOnly}
             >
               {statGroups.map((group, i) => (
                 <option key={i} value={group}>
@@ -142,6 +150,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                   }
                 }
               }}
+              disabled={readOnly}
             >
               <option value="percentage">Percentage</option>
               <option value="number">Number</option>
@@ -160,6 +169,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 placeholder="Enter initial value"
                 className="flex-1"
                 label="Initial Value"
+                disabled={readOnly}
               />
             </div>
           )}
@@ -180,6 +190,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                     ? "e.g., Novice, Apprentice, Master"
                     : "e.g., only minor spells, (max 4 items)"
                 }
+                disabled={readOnly}
               />
             </div>
           )}
@@ -192,6 +203,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   updateStatField("isVisible", e.target.checked)
                 }
+                disabled={readOnly}
               />
               <label
                 htmlFor={`stat-visible-${stat.id}`}
@@ -210,6 +222,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               }
               placeholder="e.g., Below 30% causes visible weakness"
               emptyPlaceholder="Click + to add narrative implications"
+              readOnly={readOnly}
             />
 
             <ArrayField
@@ -221,6 +234,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               }
               placeholder="e.g., Above 70% provides +15 points to social challenges"
               emptyPlaceholder="Click + to add effects"
+              readOnly={readOnly}
             />
 
             <div className="flex items-center gap-2">
@@ -234,6 +248,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                   updateStatField("optionsToSacrifice", e.target.value)
                 }
                 placeholder="How can this stat be sacrificed for bonuses?"
+                disabled={readOnly}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -247,6 +262,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                   updateStatField("optionsToGainAsReward", e.target.value)
                 }
                 placeholder="How can this stat be gained as a reward?"
+                disabled={readOnly}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -260,6 +276,7 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                     e.target.checked
                   )
                 }
+                disabled={readOnly}
               />
               <label
                 htmlFor={`stat-beat-changes-${stat.id}`}
@@ -278,27 +295,49 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               }
               placeholder="e.g., Mana regenerates by 10% after each thread"
               emptyPlaceholder="Click + to add thread adjustments"
+              readOnly={readOnly}
             />
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <button
-            onClick={handleRemoveStat}
-            className="text-tertiary hover:text-tertiary-700"
-            aria-label="Remove stat"
-          >
-            <Icons.Trash className="h-5 w-5" />
-          </button>
+          {readOnly && (
+            <button
+              onClick={handleClose}
+              className="text-secondary hover:text-secondary-700"
+              aria-label={`Collapse ${stat.name}`}
+              title="Collapse details"
+            >
+              <Icons.ChevronUp className="h-5 w-5" />
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              onClick={handleRemoveStat}
+              className="text-tertiary hover:text-tertiary-700"
+              aria-label="Remove stat"
+            >
+              <Icons.Trash className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
       <div className="flex justify-end gap-2">
         <PrimaryButton
-          onClick={handleSave}
-          disabled={!localStat.name}
+          onClick={handleClose}
           variant="outline"
+          leftBorder={false}
         >
-          Save
+          Close
         </PrimaryButton>
+        {!readOnly && (
+          <PrimaryButton
+            onClick={handleSave}
+            disabled={!localStat.name}
+            variant="outline"
+          >
+            Save
+          </PrimaryButton>
+        )}
       </div>
     </div>
   );

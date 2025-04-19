@@ -1,4 +1,3 @@
-import React from "react";
 import { InfoIcon, PrimaryButton, Icons } from "@components/ui";
 import { Stat, StatValueEntry } from "@core/types";
 import { StatListItem } from "./StatListItem";
@@ -27,9 +26,10 @@ interface StatListSectionProps {
   onRemoveStat: (type: "shared" | "player", index: number) => void;
   onConvertStat: (type: "shared" | "player", index: number) => void;
   setEditingStats: (updater: (prev: Set<string>) => Set<string>) => void;
+  readOnly?: boolean;
 }
 
-export const StatListSection: React.FC<StatListSectionProps> = ({
+export function StatListSection({
   title,
   tooltip,
   icon,
@@ -45,7 +45,12 @@ export const StatListSection: React.FC<StatListSectionProps> = ({
   onRemoveStat,
   onConvertStat,
   setEditingStats,
-}) => {
+  readOnly = false,
+}: StatListSectionProps) {
+  const handleEditStat = (statId: string) => {
+    setEditingStats((prev) => new Set(prev).add(statId));
+  };
+
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
@@ -63,51 +68,64 @@ export const StatListSection: React.FC<StatListSectionProps> = ({
             className="ml-2 mt-1"
           />
         </div>
-        <PrimaryButton
-          variant="outline"
-          leftBorder={false}
-          size="sm"
-          onClick={() => onAddStat(type)}
-          disabled={statGroups.length === 0}
-          leftIcon={<Icons.Plus className="h-4 w-4" />}
-        ></PrimaryButton>
+        {!readOnly && (
+          <PrimaryButton
+            variant="outline"
+            leftBorder={false}
+            size="sm"
+            onClick={() => onAddStat(type)}
+            disabled={statGroups.length === 0}
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
+          ></PrimaryButton>
+        )}
       </div>
       {statGroups.length === 0 ? (
         <p className="text-gray-500">Add at least one stat group first</p>
       ) : (
-        stats.map((stat, index) =>
-          editingStats.has(stat.id) ? (
-            <StatEditor
+        stats.map((stat, index) => {
+          const isEditing = editingStats.has(stat.id);
+          return (
+            <div
               key={stat.id}
-              stat={stat}
-              index={index}
-              type={type}
-              statGroups={statGroups}
-              initialValue={
-                type === "shared"
-                  ? initialValues?.find((v) => v.statId === stat.id)?.value
-                  : undefined
-              }
-              onUpdateInitialValue={onUpdateInitialValue}
-              onUpdateStat={onUpdateStat}
-              onRemoveStat={onRemoveStat}
-              setEditingStats={setEditingStats}
-            />
-          ) : (
-            <StatListItem
-              key={stat.id}
-              stat={stat}
-              index={index}
-              type={type}
-              onEdit={(statId) =>
-                setEditingStats((prev) => new Set(prev).add(statId))
-              }
-              onConvert={onConvertStat}
-              onDelete={onRemoveStat}
-            />
-          )
-        )
+              className={`overflow-hidden mb-2 ${
+                isEditing ? "border border-border rounded-md" : ""
+              }`}
+            >
+              {isEditing ? (
+                <>
+                  <StatEditor
+                    stat={stat}
+                    index={index}
+                    type={type}
+                    onUpdateStat={onUpdateStat}
+                    onRemoveStat={onRemoveStat}
+                    setEditingStats={setEditingStats}
+                    statGroups={statGroups}
+                    initialValue={
+                      type === "shared"
+                        ? initialValues?.find((v) => v.statId === stat.id)
+                            ?.value
+                        : undefined
+                    }
+                    onUpdateInitialValue={onUpdateInitialValue}
+                    readOnly={readOnly}
+                  />
+                </>
+              ) : (
+                <StatListItem
+                  stat={stat}
+                  index={index}
+                  type={type}
+                  onEdit={handleEditStat}
+                  onConvert={onConvertStat}
+                  onDelete={onRemoveStat}
+                  readOnly={readOnly}
+                />
+              )}
+            </div>
+          );
+        })
       )}
     </section>
   );
-};
+}

@@ -15,13 +15,14 @@ type StatsTabProps = {
   playerStats: Stat[];
   initialSharedStatValues: StatValueEntry[];
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
-  onChange: (updates: {
+  onChange?: (updates: {
     statGroups?: string[];
     sharedStats?: Stat[];
     playerStats?: Stat[];
     initialSharedStatValues?: StatValueEntry[];
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => void;
+  readOnly?: boolean;
 };
 
 export const StatsTab = ({
@@ -31,6 +32,7 @@ export const StatsTab = ({
   initialSharedStatValues,
   playerOptions,
   onChange,
+  readOnly = false,
 }: StatsTabProps) => {
   // Track which stats are being edited by their IDs
   const [editingStats, setEditingStats] = useState<Set<string>>(new Set());
@@ -51,9 +53,11 @@ export const StatsTab = ({
     editingStats,
     onChange,
     setEditingStats,
+    readOnly,
   });
 
   const handleUpdateStatGroups = (updatedGroups: string[]) => {
+    if (readOnly || !onChange) return;
     onChange({ statGroups: updatedGroups });
   };
 
@@ -65,6 +69,7 @@ export const StatsTab = ({
         onChange={handleUpdateStatGroups}
         sharedStats={sharedStats}
         playerStats={playerStats}
+        readOnly={readOnly}
       />
 
       {/* Shared Stats */}
@@ -84,6 +89,7 @@ export const StatsTab = ({
         onRemoveStat={handleRemoveStat}
         onConvertStat={handleConvertStat}
         setEditingStats={setEditingStats}
+        readOnly={readOnly}
       />
 
       {/* Player Stats */}
@@ -101,6 +107,7 @@ export const StatsTab = ({
         onRemoveStat={handleRemoveStat}
         onConvertStat={handleConvertStat}
         setEditingStats={setEditingStats}
+        readOnly={readOnly}
       />
     </div>
   );

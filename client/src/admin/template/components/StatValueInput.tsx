@@ -10,6 +10,7 @@ interface StatValueInputProps {
   placeholder?: string;
   className?: string;
   label?: string;
+  disabled?: boolean;
 }
 
 export const StatValueInput: React.FC<StatValueInputProps> = ({
@@ -19,6 +20,7 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
   placeholder,
   className = "",
   label,
+  disabled = false,
 }) => {
   // For string arrays
   if (statType === "string[]") {
@@ -33,6 +35,7 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
         emptyPlaceholder="No items added"
         className={className}
         buttonText="Add Item"
+        readOnly={disabled}
       />
     );
   }
@@ -41,33 +44,38 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
   if (statType === "string") {
     if (label) {
       return (
-        <div className="flex items-center gap-2">
-          <span className="font-semibold flex-grow">{label}</span>
+        <div className={`flex items-center gap-2 ${className}`}>
+          <span className="font-semibold w-24">{label}</span>
           <Input
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder || "Enter text value"}
             className="flex-1"
+            disabled={disabled}
           />
         </div>
       );
     }
 
     return (
-      <Input
-        value={value as string}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder || "Enter text value"}
-        className={className}
-      />
+      <div className={`flex items-center gap-2 ${className}`}>
+        <span className="font-semibold w-24">{label}</span>
+        <Input
+          value={value as string}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder || "Enter text value"}
+          className="flex-1"
+          disabled={disabled}
+        />
+      </div>
     );
   }
 
   // For number, percentage, and opposites types
   if (label) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="font-semibold flex-grow">{label}</span>
+      <div className={`flex items-center gap-2 ${className}`}>
+        <span className="font-semibold w-24">{label}</span>
         <Input
           type="number"
           value={value as number}
@@ -75,21 +83,28 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
           min={0}
           max={100}
           placeholder={placeholder || "Enter a value from 0-100"}
-          className="flex-1"
+          className="w-24"
+          disabled={disabled}
         />
+        {statType === "percentage" && <span className="ml-1">%</span>}
       </div>
     );
   }
 
   return (
-    <Input
-      type="number"
-      value={value as number}
-      onChange={(e) => onChange(Number(e.target.value))}
-      min={0}
-      max={100}
-      placeholder={placeholder || "Enter a value from 0-100"}
-      className={className}
-    />
+    <div className={`flex items-center gap-2 ${className}`}>
+      <span className="font-semibold w-24">{label}</span>
+      <Input
+        type="number"
+        value={value as number}
+        onChange={(e) => onChange(Number(e.target.value))}
+        min={0}
+        max={100}
+        placeholder={placeholder || "Enter a value from 0-100"}
+        className="w-24"
+        disabled={disabled}
+      />
+      {statType === "percentage" && <span className="ml-1">%</span>}
+    </div>
   );
 };

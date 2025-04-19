@@ -7,6 +7,7 @@ interface StatGroupsProps {
   onChange: (updatedGroups: string[]) => void;
   sharedStats?: { id: string; name: string; group: string }[];
   playerStats?: { id: string; name: string; group: string }[];
+  readOnly?: boolean;
 }
 
 interface StatGroup {
@@ -19,6 +20,7 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
   onChange,
   sharedStats = [],
   playerStats = [],
+  readOnly = false,
 }) => {
   const [editingGroups, setEditingGroups] = useState<Set<string>>(new Set());
 
@@ -29,6 +31,8 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
   }));
 
   const handleAddGroup = () => {
+    if (readOnly) return;
+
     const newGroup = { id: `group_${Date.now()}`, name: "" };
     const newId = newGroup.id;
 
@@ -40,12 +44,16 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
   };
 
   const handleUpdateGroup = (index: number, updatedGroup: StatGroup) => {
+    if (readOnly) return;
+
     const updatedGroups = [...statGroups];
     updatedGroups[index] = updatedGroup.name;
     onChange(updatedGroups);
   };
 
   const handleRemoveGroup = (index: number) => {
+    if (readOnly) return;
+
     const updated = statGroups.filter((_, i) => i !== index);
     onChange(updated);
   };
@@ -71,6 +79,7 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
           onChange={(e) => onFormChange({ ...group, name: e.target.value })}
           placeholder="Enter group name"
           className="flex-1"
+          disabled={readOnly}
         />
       </div>
     );
@@ -87,13 +96,15 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
             className="ml-2 mt-1"
           />
         </div>
-        <PrimaryButton
-          variant="outline"
-          leftBorder={false}
-          size="sm"
-          onClick={handleAddGroup}
-          leftIcon={<Icons.Plus className="h-4 w-4" />}
-        ></PrimaryButton>
+        {!readOnly && (
+          <PrimaryButton
+            variant="outline"
+            leftBorder={false}
+            size="sm"
+            onClick={handleAddGroup}
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
+          ></PrimaryButton>
+        )}
       </div>
 
       {groups.length === 0 ? (
@@ -123,6 +134,7 @@ export const StatGroups: React.FC<StatGroupsProps> = ({
               onSave={(updatedGroup) => handleUpdateGroup(index, updatedGroup)}
               renderEditForm={renderGroupForm}
               isSaveDisabled={(group) => !group.name}
+              readOnly={readOnly}
             />
           ))}
         </div>

@@ -3,6 +3,7 @@ import {
   StatValueEntry,
   PlayerSlot,
   PlayerOptionsGeneration,
+  CharacterBackground,
 } from "@core/types";
 import { useState, useEffect } from "react";
 
@@ -13,7 +14,7 @@ interface StatEditorHelperProps {
   initialSharedStatValues: StatValueEntry[];
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   editingStats: Set<string>;
-  onChange: (updates: {
+  onChange?: (updates: {
     statGroups?: string[];
     sharedStats?: Stat[];
     playerStats?: Stat[];
@@ -21,6 +22,7 @@ interface StatEditorHelperProps {
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => void;
   setEditingStats: (updater: (prev: Set<string>) => Set<string>) => void;
+  readOnly?: boolean;
 }
 
 export const useStatEditorHelpers = ({
@@ -32,6 +34,7 @@ export const useStatEditorHelpers = ({
   editingStats,
   onChange,
   setEditingStats,
+  readOnly = false,
 }: StatEditorHelperProps) => {
   // Helper function to update player stat references when an ID changes
   const updatePlayerStatReferences = (oldId: string, newId: string) => {
@@ -63,6 +66,8 @@ export const useStatEditorHelpers = ({
   };
 
   const handleAddStat = (type: "shared" | "player") => {
+    if (readOnly || !onChange) return;
+
     const prefix = type === "shared" ? "shared_" : "player_";
     const tempId = `${prefix}new_stat_${Date.now()}`;
     const newStat: Stat = {
@@ -133,6 +138,8 @@ export const useStatEditorHelpers = ({
     index: number,
     updates: Partial<Stat>
   ) => {
+    if (readOnly || !onChange) return;
+
     const oldStat = type === "shared" ? sharedStats[index] : playerStats[index];
     const oldId = oldStat?.id;
     const newId = updates.id;
@@ -178,6 +185,8 @@ export const useStatEditorHelpers = ({
   };
 
   const handleRemoveStat = (type: "shared" | "player", index: number) => {
+    if (readOnly || !onChange) return;
+
     if (type === "shared") {
       const updated = sharedStats.filter((_, i) => i !== index);
       const updatedValues = initialSharedStatValues.filter((entry) =>
@@ -226,6 +235,8 @@ export const useStatEditorHelpers = ({
     statId: string,
     value: number | string | string[]
   ) => {
+    if (readOnly || !onChange) return;
+
     const updated = initialSharedStatValues.map((entry) =>
       entry.statId === statId ? { ...entry, value } : entry
     );
@@ -237,6 +248,8 @@ export const useStatEditorHelpers = ({
     sourceType: "shared" | "player",
     index: number
   ) => {
+    if (readOnly || !onChange) return;
+
     // Get the stat to convert
     const statToConvert =
       sourceType === "shared" ? sharedStats[index] : playerStats[index];
@@ -266,12 +279,48 @@ export const useStatEditorHelpers = ({
     };
 
     // Handle updates to playerOptions if needed
-    let updatedPlayerOptions = null;
+    let updatedPlayerOptions: Record<
+      PlayerSlot,
+      PlayerOptionsGeneration
+    > | null = null;
     const oldId = statToConvert.id;
 
     if (sourceType === "player") {
-      // Converting from player to shared - need to update references
-      updatedPlayerOptions = updatePlayerStatReferences(oldId, newId);
+      // Converting from player to shared - need to update references AND remove the stat from all character backgrounds
+      updatedPlayerOptions = { ...playerOptions };
+      let hasChanges = false;
+
+      // Remove this stat from all character backgrounds
+      if (updatedPlayerOptions) {
+        Object.keys(updatedPlayerOptions).forEach((playerSlot) => {
+          const slotKey = playerSlot as PlayerSlot;
+          const player = updatedPlayerOptions![slotKey];
+
+          if (player && player.possibleCharacterBackgrounds) {
+            player.possibleCharacterBackgrounds.forEach(
+              (background: CharacterBackground) => {
+                const originalLength =
+                  background.initialPlayerStatValues.length;
+                background.initialPlayerStatValues =
+                  background.initialPlayerStatValues.filter(
+                    (sv: StatValueEntry) => sv.statId !== oldId
+                  );
+
+                if (
+                  originalLength !== background.initialPlayerStatValues.length
+                ) {
+                  hasChanges = true;
+                }
+              }
+            );
+          }
+        });
+      }
+
+      if (!hasChanges) {
+        // If no changes were made to playerOptions, use the original value
+        updatedPlayerOptions = null;
+      }
     }
 
     if (sourceType === "shared") {
@@ -354,6 +403,7 @@ export const useStatEditorHelpers = ({
     handleRemoveStat,
     handleUpdateInitialValue,
     handleConvertStat,
+    readOnly,
   };
 };
 
@@ -373,6 +423,7 @@ interface UseStatEditorProps {
   ) => void;
   onRemoveStat: (type: "shared" | "player", index: number) => void;
   setEditingStats: (updater: (prev: Set<string>) => Set<string>) => void;
+  readOnly?: boolean;
 }
 
 interface UseStatEditorResult {
@@ -389,6 +440,8 @@ interface UseStatEditorResult {
   removeArrayItem: <K extends keyof Stat>(field: K, index: number) => void;
   addArrayItem: <K extends keyof Stat>(field: K) => void;
   handleRemoveStat: () => void;
+  handleClose: () => void;
+  readOnly: boolean;
 }
 
 export const useStatEditor = ({
@@ -400,6 +453,7 @@ export const useStatEditor = ({
   onUpdateStat,
   onRemoveStat,
   setEditingStats,
+  readOnly = false,
 }: UseStatEditorProps): UseStatEditorResult => {
   const [localStat, setLocalStat] = useState<Stat>(stat);
   const [localInitialValue, setLocalInitialValue] = useState<
@@ -424,6 +478,8 @@ export const useStatEditor = ({
   }, [stat, initialValue]);
 
   const handleSave = () => {
+    if (readOnly) return;
+
     if (
       localStat.name &&
       localStat.id.startsWith(type === "shared" ? "shared_" : "player_")
@@ -451,6 +507,7 @@ export const useStatEditor = ({
   };
 
   const updateStatField = <K extends keyof Stat>(field: K, value: Stat[K]) => {
+    if (readOnly) return;
     setLocalStat((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -459,6 +516,7 @@ export const useStatEditor = ({
     index: number,
     value: string
   ) => {
+    if (readOnly) return;
     setLocalStat((prev) => {
       const array = [...(prev[field] as string[])];
       array[index] = value;
@@ -467,6 +525,7 @@ export const useStatEditor = ({
   };
 
   const removeArrayItem = <K extends keyof Stat>(field: K, index: number) => {
+    if (readOnly) return;
     setLocalStat((prev) => {
       const array = (prev[field] as string[]).filter((_, i) => i !== index);
       return { ...prev, [field]: array };
@@ -474,6 +533,7 @@ export const useStatEditor = ({
   };
 
   const addArrayItem = <K extends keyof Stat>(field: K) => {
+    if (readOnly) return;
     setLocalStat((prev) => {
       const array = [...(prev[field] as string[]), ""];
       return { ...prev, [field]: array };
@@ -482,6 +542,20 @@ export const useStatEditor = ({
 
   const handleRemoveStat = () => {
     onRemoveStat(type, index);
+    setEditingStats((prev) => {
+      const next = new Set(prev);
+      next.delete(stat.id);
+      return next;
+    });
+  };
+
+  const handleClose = () => {
+    // Just close the editor without saving changes
+    setEditingStats((prev) => {
+      const next = new Set(prev);
+      next.delete(stat.id);
+      return next;
+    });
   };
 
   return {
@@ -494,5 +568,7 @@ export const useStatEditor = ({
     removeArrayItem,
     addArrayItem,
     handleRemoveStat,
+    handleClose,
+    readOnly,
   };
 };

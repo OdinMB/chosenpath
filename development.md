@@ -3,6 +3,7 @@ Smaller commits!
 # Next
 
 - AI generated templates: iterate based on feedback
+- create Tab ui component and use it in Admin and TemplateForm
 - Moderation step for premise-based story creation
 - Always introduce other players in beat 1
 - First thread always together
