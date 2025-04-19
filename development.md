@@ -1,13 +1,15 @@
-Smaller and more commits!
+Smaller commits!
 
 # Next
 
+- AI generated templates: iterate based on feedback
+- Moderation step for premise-based story creation
 - Always introduce other players in beat 1
 - First thread always together
+- show options of previous beats in the thread to avoid repeating any of them
 
 # Feature Backlog
 
-- AI generated templates: iterate based on feedback
 - User accounts
   - Manage games
   - Invite specific account to a player slot
@@ -43,11 +45,6 @@ Smaller and more commits!
 - Make sure that there are only 3 backgrounds per player / 3 options per beat
   => still an issue with 4.1?
 - Check if ids actually exist when changes are proposed by the AI (e.g. outcome ID, stat ID)
-
-# Improve stat setups and option definitions
-
-- Repeat most important information at the end of beat prompts alongside switch/thread configurations (so that they gain more weight)?
-- Break this whole 20-step mess down into smaller LLM interactions?
 
 # Refactors
 
