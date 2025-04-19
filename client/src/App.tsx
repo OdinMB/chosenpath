@@ -12,6 +12,7 @@ import { AppTitle } from "@components/AppTitle";
 import { TemplateConfigurator } from "@page/TemplateConfigurator";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
+import { LibraryBrowser } from "@page/LibraryBrowser";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -20,7 +21,8 @@ type ViewState =
   | "SETUP"
   | "PLAYER_CODES"
   | "GAME"
-  | "TEMPLATE_CONFIG";
+  | "TEMPLATE_CONFIG"
+  | "LIBRARY";
 
 // Define story creation types to unify handling
 type StoryCreationType = "PREMISE" | "TEMPLATE" | "NONE";
@@ -390,6 +392,12 @@ function App() {
     gameService.selectCharacter(identityIndex, backgroundIndex);
   };
 
+  // template-based, called by WelcomeScreen
+  const handleBrowseLibrary = () => {
+    Logger.App.log("handleBrowseLibrary called, navigating to library view");
+    loggedSetViewState("LIBRARY");
+  };
+
   // Get the current view content
   const getCurrentView = () => {
     Logger.App.log(`getCurrentView called with viewState: ${viewState}`);
@@ -414,6 +422,7 @@ function App() {
               onCodeSubmit={handleCodeSubmit}
               onNewStory={handleNewStory}
               onSelectTemplate={handleSelectTemplate}
+              onBrowseLibrary={handleBrowseLibrary}
             />
           </>
         );
@@ -536,6 +545,26 @@ function App() {
               onCharacterSelected={handleCharacterSelected}
             />
           </div>
+        );
+
+      case "LIBRARY":
+        return (
+          <>
+            <div className="max-w-2xl mx-auto pt-4">
+              <AppTitle
+                size="large"
+                onClick={() => {
+                  loggedSetViewState("WELCOME");
+                }}
+              />
+            </div>
+            <LibraryBrowser
+              onSelectTemplate={handleSelectTemplate}
+              onBack={() => {
+                loggedSetViewState("WELCOME");
+              }}
+            />
+          </>
         );
 
       default:

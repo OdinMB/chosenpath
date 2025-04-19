@@ -9,6 +9,7 @@ interface WelcomeScreenProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
   onSelectTemplate?: (template: StoryTemplate) => void;
+  onBrowseLibrary?: () => void;
 }
 
 // Helper function to format timestamp
@@ -44,6 +45,7 @@ export function WelcomeScreen({
   onCodeSubmit,
   onNewStory,
   onSelectTemplate,
+  onBrowseLibrary,
 }: WelcomeScreenProps) {
   const [code, setCode] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -273,6 +275,12 @@ export function WelcomeScreen({
         </div>
 
         <TemplateBrowser onSelectTemplate={handleSelectTemplate} />
+
+        {onBrowseLibrary && (
+          <PrimaryButton onClick={onBrowseLibrary} fullWidth size="lg">
+            Browse Our Library
+          </PrimaryButton>
+        )}
       </div>
 
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">

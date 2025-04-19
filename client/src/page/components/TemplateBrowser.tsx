@@ -51,7 +51,7 @@ export const TemplateBrowser = ({ onSelectTemplate }: TemplateBrowserProps) => {
   };
 
   return (
-    <div className="w-full pb-1">
+    <div className="w-full">
       {error && <div className="text-center text-tertiary mb-4">{error}</div>}
 
       <TemplateCarousel
