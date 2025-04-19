@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { GuidelinesTab } from "./";
+import { GuidelinesTab, StoryElementsTab } from "./";
 import { StoryTemplate } from "@core/types";
 import { config } from "@/config";
 import { Logger } from "@common/logger";
@@ -73,6 +73,13 @@ export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
         <h3 className="text-lg font-medium mb-3">Guidelines</h3>
         <div className="bg-gray-50 p-4 rounded-md">
           <GuidelinesTab template={template} readOnly />
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-3">Story Elements</h3>
+        <div className="bg-gray-50 p-4 rounded-md">
+          <StoryElementsTab elements={template.storyElements || []} readOnly />
         </div>
       </div>
     </div>

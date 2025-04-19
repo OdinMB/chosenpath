@@ -12,12 +12,14 @@ import { useStoryElements } from "../hooks/useStoryElements";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];
-  onChange: (elements: StoryElement[]) => void;
+  onChange?: (elements: StoryElement[]) => void;
+  readOnly?: boolean;
 }
 
 export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   elements,
   onChange,
+  readOnly = false,
 }) => {
   const {
     editingElements,
@@ -26,10 +28,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
     handleRemoveElement,
     setEditingElement,
     removeEditingElement,
-  } = useStoryElements(elements, onChange);
+  } = useStoryElements(elements, onChange, readOnly);
 
   // Function to set editing state compatible with ExpandableItem
   const setEditingElements = (updater: (prev: Set<string>) => Set<string>) => {
+    if (readOnly) return;
+
     const newSet = updater(editingElements);
     // Add elements to edit mode
     Array.from(newSet).forEach((id) => {
@@ -60,6 +64,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             value={element.name}
             onChange={(e) => onFormChange({ ...element, name: e.target.value })}
             placeholder="Enter element name"
+            disabled={readOnly}
           />
         </div>
 
@@ -72,6 +77,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             value={element.id}
             onChange={(e) => onFormChange({ ...element, id: e.target.value })}
             placeholder="Enter element ID (use underscores, e.g., mr_x)"
+            disabled={readOnly}
           />
         </div>
 
@@ -85,6 +91,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             value={element.role}
             onChange={(e) => onFormChange({ ...element, role: e.target.value })}
             placeholder="What can players do with this element? How does it relate to outcomes?"
+            disabled={readOnly}
           />
         </div>
 
@@ -103,6 +110,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
               })
             }
             placeholder="Instructions on how to use this element (narrative and mechanics)"
+            disabled={readOnly}
           />
         </div>
 
@@ -113,6 +121,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           onChange={(facts: string[]) => onFormChange({ ...element, facts })}
           placeholder="Enter a fact about this element"
           emptyPlaceholder="Click + to add facts"
+          readOnly={readOnly}
         />
       </div>
     );
@@ -129,13 +138,15 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             className="ml-2 mt-1"
           />
         </div>
-        <PrimaryButton
-          variant="outline"
-          leftBorder={false}
-          size="sm"
-          onClick={handleAddElement}
-          leftIcon={<Icons.Plus className="h-4 w-4" />}
-        ></PrimaryButton>
+        {!readOnly && (
+          <PrimaryButton
+            variant="outline"
+            leftBorder={false}
+            size="sm"
+            onClick={handleAddElement}
+            leftIcon={<Icons.Plus className="h-4 w-4" />}
+          />
+        )}
       </div>
 
       {elements.map((element, index) => (
@@ -152,6 +163,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           }
           renderEditForm={renderElementForm}
           isSaveDisabled={(element) => !element.name || !element.id}
+          readOnly={readOnly}
         />
       ))}
     </div>

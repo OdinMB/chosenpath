@@ -24,6 +24,8 @@ interface ExpandableItemProps<T> {
   ) => ReactNode;
   /** Whether the save button should be disabled */
   isSaveDisabled?: (data: T) => boolean;
+  /** Whether the component is in read-only mode */
+  readOnly?: boolean;
 }
 
 export function ExpandableItem<T>({
@@ -36,8 +38,10 @@ export function ExpandableItem<T>({
   onSave,
   renderEditForm,
   isSaveDisabled = () => false,
+  readOnly = false,
 }: ExpandableItemProps<T>) {
   const isEditing = editingSet.has(id);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [localData, setLocalData] = useState<T>(data);
 
   // Update localData when data prop changes
@@ -45,7 +49,12 @@ export function ExpandableItem<T>({
     setLocalData(data);
   }, [data]);
 
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   const handleStartEditing = () => {
+    if (readOnly) return;
     setEditing((prev) => new Set(prev).add(id));
   };
 
@@ -71,6 +80,46 @@ export function ExpandableItem<T>({
     setLocalData(updatedData);
   };
 
+  // Render expanded view without edit buttons in readOnly mode
+  if (readOnly && isExpanded) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-medium text-lg">{title}</h3>
+          <button
+            onClick={handleToggleExpand}
+            className="text-gray-500 hover:text-gray-700"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            <Icons.ChevronUp className="h-5 w-5" />
+          </button>
+        </div>
+        {renderEditForm(
+          data,
+          () => {},
+          () => {}
+        )}
+      </div>
+    );
+  }
+
+  // Render collapsed view with only expand button in readOnly mode
+  if (readOnly) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
+        <span className="font-medium">{title}</span>
+        <button
+          onClick={handleToggleExpand}
+          className="text-gray-500 hover:text-gray-700"
+          aria-label={isExpanded ? "Collapse" : "Expand"}
+        >
+          <Icons.ChevronDown className="h-5 w-5" />
+        </button>
+      </div>
+    );
+  }
+
+  // Original interactive editing behavior
   if (!isEditing) {
     return (
       <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">

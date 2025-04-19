@@ -10,6 +10,7 @@ interface UseStoryElementsResult {
   handleRemoveElement: (index: number) => void;
   setEditingElement: (id: string) => void;
   removeEditingElement: (id: string) => void;
+  readOnly?: boolean;
 }
 
 type SingleElementResult = Pick<
@@ -29,17 +30,32 @@ function createEmptyStoryElement(): StoryElement {
 }
 
 // Function overload signatures
-export function useStoryElements(element: StoryElement): SingleElementResult;
+export function useStoryElements(
+  element: StoryElement,
+  readOnly?: boolean
+): SingleElementResult;
 export function useStoryElements(
   elements: StoryElement[],
-  onChange: (elements: StoryElement[]) => void
+  onChange?: (elements: StoryElement[]) => void,
+  readOnly?: boolean
 ): UseStoryElementsResult;
 
 // Implementation
 export function useStoryElements(
   elementsOrElement: StoryElement[] | StoryElement,
-  onChange?: (elements: StoryElement[]) => void
+  onChangeOrReadOnly?: ((elements: StoryElement[]) => void) | boolean,
+  readOnlyParam?: boolean
 ): UseStoryElementsResult | SingleElementResult {
+  // Determine if we're in readOnly mode based on arguments
+  const readOnly =
+    typeof onChangeOrReadOnly === "boolean"
+      ? onChangeOrReadOnly
+      : readOnlyParam ?? false;
+
+  // Determine the onChange function based on arguments
+  const onChange =
+    typeof onChangeOrReadOnly === "function" ? onChangeOrReadOnly : undefined;
+
   // Track which elements are being edited
   const [editingElements, setEditingElements] = useState<Set<string>>(
     new Set()
@@ -69,7 +85,7 @@ export function useStoryElements(
   const elements = elementsOrElement;
 
   const handleAddElement = () => {
-    if (!onChange) return;
+    if (readOnly || !onChange) return;
 
     const newElement = createEmptyStoryElement();
 
@@ -79,7 +95,7 @@ export function useStoryElements(
   };
 
   const handleUpdateElement = (index: number, updates: StoryElement) => {
-    if (!onChange) return;
+    if (readOnly || !onChange) return;
 
     const updated = elements.map((element, i) =>
       i === index ? updates : element
@@ -88,17 +104,19 @@ export function useStoryElements(
   };
 
   const handleRemoveElement = (index: number) => {
-    if (!onChange) return;
+    if (readOnly || !onChange) return;
 
     const updated = elements.filter((_, i) => i !== index);
     onChange(updated);
   };
 
   const setEditingElement = (id: string) => {
+    if (readOnly) return;
     setEditingElements((prev) => new Set(prev).add(id));
   };
 
   const removeEditingElement = (id: string) => {
+    if (readOnly) return;
     setEditingElements((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -115,5 +133,6 @@ export function useStoryElements(
     handleRemoveElement,
     setEditingElement,
     removeEditingElement,
+    readOnly,
   };
 }
