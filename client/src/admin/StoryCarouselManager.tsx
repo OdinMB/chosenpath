@@ -65,14 +65,18 @@ export const StoryCarouselManager: React.FC<StoryCarouselManagerProps> = ({
               template.publicationStatus === PublicationStatus.Published &&
               template.showOnWelcomeScreen
           )
-          .sort(
-            (a: StoryTemplate, b: StoryTemplate) =>
-              (a.order || Number.MAX_SAFE_INTEGER) -
-              (b.order || Number.MAX_SAFE_INTEGER)
-          );
+          .map((template: StoryTemplate) => ({
+            ...template,
+            // Ensure all templates have an order value
+            order:
+              template.order !== undefined
+                ? template.order
+                : Number.MAX_SAFE_INTEGER,
+          }))
+          .sort((a: StoryTemplate, b: StoryTemplate) => a.order - b.order);
 
         Logger.Admin.log(
-          `Loaded ${welcomeScreenTemplates.length} templates for carousel management`
+          `Loaded ${welcomeScreenTemplates.length} templates for carousel management, sorted by position`
         );
         setTemplates(welcomeScreenTemplates);
       } catch (error) {
