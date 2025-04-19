@@ -1,19 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { StoryTemplate } from "@core/types";
+import { StoryTemplate, Guidelines } from "@core/types";
 
 interface UseTemplateGuidelinesProps {
   template: StoryTemplate;
   onChange?: (updates: Partial<StoryTemplate>) => void;
   readOnly?: boolean;
-}
-
-interface GuidelinesState {
-  world: string;
-  rules: string[];
-  tone: string[];
-  conflicts: string[];
-  decisions: string[];
-  typesOfThreads: string[];
 }
 
 export function useTemplateGuidelines({
@@ -22,7 +13,7 @@ export function useTemplateGuidelines({
   readOnly = false,
 }: UseTemplateGuidelinesProps) {
   // Single state object to manage all guidelines
-  const [state, setState] = useState<GuidelinesState>({
+  const [state, setState] = useState<Guidelines>({
     world: template.guidelines?.world || "",
     rules: template.guidelines?.rules || [],
     tone: template.guidelines?.tone || [],
@@ -58,9 +49,9 @@ export function useTemplateGuidelines({
   ]);
 
   // Helper to update state and notify parent
-  const updateField = <K extends keyof GuidelinesState>(
+  const updateField = <K extends keyof Guidelines>(
     field: K,
-    value: GuidelinesState[K]
+    value: Guidelines[K]
   ) => {
     if (readOnly) return;
 
@@ -68,11 +59,13 @@ export function useTemplateGuidelines({
     setState((current) => {
       const newState = { ...current, [field]: value };
 
-      // Notify parent of change
+      // Notify parent of change - use setTimeout to avoid update during render
       if (onChange) {
-        onChange({
-          guidelines: newState,
-        });
+        setTimeout(() => {
+          onChange({
+            guidelines: newState,
+          });
+        }, 0);
       }
 
       return newState;
