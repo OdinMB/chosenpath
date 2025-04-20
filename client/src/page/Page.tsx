@@ -3,9 +3,9 @@ import { ConfirmDialog, Icons, PrimaryButton, Tooltip } from "@components/ui";
 import { useSession } from "@common/useSession";
 import { StoredCodeSet } from "@common/SessionContext";
 import { StoryTemplate } from "@core/types";
-import { TemplateBrowser } from "./components/TemplateBrowser";
+import { TemplateCarousel } from "./components/TemplateCarousel.js";
 
-interface WelcomeScreenProps {
+interface PageProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
   onSelectTemplate?: (template: StoryTemplate) => void;
@@ -41,12 +41,12 @@ function formatPlayerLabel(player: string, isFirstPlayer: boolean): string {
   return player;
 }
 
-export function WelcomeScreen({
+export function Page({
   onCodeSubmit,
   onNewStory,
   onSelectTemplate,
   onBrowseLibrary,
-}: WelcomeScreenProps) {
+}: PageProps) {
   const [code, setCode] = useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [codeSetToDelete, setCodeSetToDelete] = useState<number | null>(null);
@@ -274,7 +274,7 @@ export function WelcomeScreen({
           </div>
         </div>
 
-        <TemplateBrowser onSelectTemplate={handleSelectTemplate} />
+        <TemplateCarousel onPlay={handleSelectTemplate} />
 
         {onBrowseLibrary && (
           <PrimaryButton onClick={onBrowseLibrary} fullWidth size="lg">

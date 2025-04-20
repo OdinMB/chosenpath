@@ -1,3 +1,6 @@
+export { LibraryBrowser } from "./LibraryBrowser";
+export { PlayerCodes } from "./PlayerCodes";
+export { StoryInitializer } from "./StoryInitializer";
 export { TemplateCard } from "./TemplateCard";
 export { TemplateCarousel } from "./TemplateCarousel";
-export { TemplateBrowser } from "./TemplateBrowser";
+export { TemplateConfigurator } from "./TemplateConfigurator";

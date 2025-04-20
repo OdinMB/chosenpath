@@ -36,9 +36,17 @@ declare global {
 
 // Add withRequestId method to all objects
 if (!Object.prototype.withRequestId) {
-  Object.prototype.withRequestId = function <T>(this: T): WithRequestId<T> {
-    return withRequestId(this);
-  };
+  // Use defineProperty to make the method non-enumerable
+  // This prevents it from showing up in Object.keys and for...in loops
+  // which prevents React from trying to pass it as a DOM prop
+  Object.defineProperty(Object.prototype, "withRequestId", {
+    value: function <T>(this: T): WithRequestId<T> {
+      return withRequestId(this);
+    },
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
 }
 
 /**
@@ -75,11 +83,8 @@ export async function sendTrackedRequest<
 >(options: RequestOptions<BodyType>): Promise<ResponseType> {
   const { path, method, token, body } = options;
 
-  if (!token) {
-    const errorMsg = "Invalid token for API request";
-    Logger.API.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+  // Allow empty tokens for public endpoints
+  const hasToken = !!token;
 
   // For GET requests, we can't include a body
   const isGetRequest = method === "GET";
@@ -89,9 +94,12 @@ export async function sendTrackedRequest<
   let requestId: string | undefined;
 
   // Create headers for request
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-  };
+  const headers: Record<string, string> = {};
+
+  // Add authorization header only if token exists
+  if (hasToken) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   // For non-GET requests, set content type and prepare body
   let requestBody: unknown;

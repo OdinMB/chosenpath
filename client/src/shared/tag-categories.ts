@@ -10,7 +10,7 @@ export const TAG_CATEGORIES: TagCategory[] = [
   },
   {
     name: "Motivation",
-    tags: ["Reading Pleasure", "Satire", "Serious"],
+    tags: ["Satire", "Serious"],
   },
   {
     name: "Genre",

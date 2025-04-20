@@ -1,18 +1,20 @@
-import { useSession } from "@common/useSession";
-import { StoryInitializer } from "@page/StoryInitializer";
-import { GameLayout } from "@game/components/GameLayout";
-import { wsService } from "@common/WebSocketService";
-import { gameService } from "@game/GameService";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { WelcomeScreen } from "@page/WelcomeScreen";
-import { PlayerCodes } from "@page/PlayerCodes";
+import { useSession } from "@common/useSession";
+import { wsService } from "@common/WebSocketService";
+import { GameLayout } from "@game/components/GameLayout";
+import { gameService } from "@game/GameService";
+import { Page } from "@/page/Page";
 import { GameMode, StoryTemplate } from "@core/types";
 import { RateLimitNotification } from "@components/RateLimitNotification";
 import { AppTitle } from "@components/AppTitle";
-import { TemplateConfigurator } from "@page/TemplateConfigurator";
+import {
+  LibraryBrowser,
+  PlayerCodes,
+  StoryInitializer,
+  TemplateConfigurator,
+} from "@/page/components";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
-import { LibraryBrowser } from "@page/LibraryBrowser";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -418,7 +420,7 @@ function App() {
             <div className="max-w-md mx-auto pt-4">
               <AppTitle size="large" />
             </div>
-            <WelcomeScreen
+            <Page
               onCodeSubmit={handleCodeSubmit}
               onNewStory={handleNewStory}
               onSelectTemplate={handleSelectTemplate}

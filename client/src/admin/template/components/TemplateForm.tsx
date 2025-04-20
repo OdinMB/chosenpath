@@ -9,7 +9,7 @@ import {
   AiIterationForm,
   AiIterationModal,
 } from "./";
-import { StoryInitializer } from "@page/StoryInitializer";
+import { StoryInitializer } from "@/page/components/StoryInitializer";
 import {
   StoryTemplate,
   PublicationStatus,
