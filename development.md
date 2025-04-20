@@ -2,7 +2,7 @@ Smaller commits!
 
 # Next
 
-- properly typed api requests and responses for admin stuff (except iterations)
+- properly typed api requests and responses for admin stuff
 - create Tab ui component and use it in Admin and TemplateForm
 - Moderation step for premise-based story creation
 - Always introduce other players in beat 1

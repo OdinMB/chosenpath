@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton, Icons } from "@components/ui";
 import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
-import { StoryLibrary } from "./StoryLibrary";
+import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateForm, SampleTemplateTab } from "./template/components";
-import { StoryCarouselManager } from "./StoryCarouselManager";
+import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { config } from "@/config";
@@ -198,7 +198,7 @@ export const Admin = () => {
             {activeTab === "stories" && <StoriesOverview token={authToken} />}
 
             {activeTab === "library" && (
-              <StoryLibrary
+              <TemplateLibrary
                 token={authToken}
                 onCreateNew={handleCreateTemplate}
                 onEdit={handleEditTemplate}
@@ -218,7 +218,7 @@ export const Admin = () => {
             )}
 
             {activeTab === "carousel" && (
-              <StoryCarouselManager token={authToken} />
+              <TemplateCarouselManager token={authToken} />
             )}
 
             {activeTab === "sample-template" && (

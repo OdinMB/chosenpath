@@ -1,127 +1,35 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui/index";
-import { config } from "@/config";
-import { Logger } from "@common/logger";
-import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
+import { StoryTemplate, PublicationStatus } from "@core/types";
 import { ShareLink } from "@components/ShareLink";
 import { sortTagsByCategory } from "@common/tag-categories";
+import { useTemplateLibrary } from "./hooks/useTemplateLibrary.js";
 
-type StoryLibraryProps = {
+type TemplateLibraryProps = {
   token: string;
   onCreateNew: () => void;
   onEdit: (template: StoryTemplate) => void;
 };
 
-export const StoryLibrary = ({
+export const TemplateLibrary = ({
   token,
   onCreateNew,
   onEdit,
-}: StoryLibraryProps) => {
-  const [templates, setTemplates] = useState<StoryTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{
-    isOpen: boolean;
-    templateId: string;
-  }>({
-    isOpen: false,
-    templateId: "",
-  });
-
-  const loadTemplates = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    Logger.Admin.log("Loading story templates");
-
-    try {
-      const response = await fetch(`${config.apiUrl}/admin/templates`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        Logger.Admin.error("Server returned an error response", {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to load story templates");
-      }
-
-      const data = await response.json();
-      Logger.Admin.log(
-        `Successfully loaded ${data.templates.length} story templates`
-      );
-      setTemplates(data.templates);
-    } catch (error) {
-      Logger.Admin.error("Failed to load story templates", error);
-      setError("Failed to load story templates. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Unknown";
-
-    const date = new Date(dateString);
-
-    // Format: "2025-04-07"
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  const handleDeleteTemplate = async (templateId: string) => {
-    Logger.Admin.log(`Attempting to delete template: ${templateId}`);
-    try {
-      const response = await fetch(
-        `${config.apiUrl}/admin/templates/${templateId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        Logger.Admin.error(`Failed to delete template: ${templateId}`, {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to delete story template");
-      }
-
-      Logger.Admin.log(`Successfully deleted template: ${templateId}`);
-      // Refresh the list
-      loadTemplates();
-    } catch (error) {
-      Logger.Admin.error(`Error deleting template: ${templateId}`, error);
-      setError("Failed to delete template. Please try again.");
-    }
-  };
-
-  const openDeleteDialog = (templateId: string) => {
-    setDeleteDialog({
-      isOpen: true,
-      templateId,
-    });
-  };
-
-  const closeDeleteDialog = () => {
-    setDeleteDialog({
-      isOpen: false,
-      templateId: "",
-    });
-  };
+}: TemplateLibraryProps) => {
+  const {
+    templates,
+    isLoading,
+    error,
+    fileInputRef,
+    deleteDialog,
+    loadTemplates,
+    formatDate,
+    handleDeleteTemplate,
+    openDeleteDialog,
+    closeDeleteDialog,
+    handleExportTemplate,
+    handleFileInputChange,
+  } = useTemplateLibrary(token);
 
   const getStatusColor = (status: PublicationStatus) => {
     switch (status) {
@@ -136,116 +44,9 @@ export const StoryLibrary = ({
     }
   };
 
-  const handleExportTemplate = (template: StoryTemplate) => {
-    Logger.Admin.log(`Exporting template: ${template.id}`);
-
-    try {
-      // Create a blob with the JSON data
-      const json = JSON.stringify(template, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
-
-      // Create an object URL for the blob
-      const url = URL.createObjectURL(blob);
-
-      // Create a download link and trigger it
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${template.title
-        .replace(/\s+/g, "-")
-        .toLowerCase()}-template.json`;
-      document.body.appendChild(a);
-      a.click();
-
-      // Clean up
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      Logger.Admin.log(`Successfully exported template: ${template.id}`);
-    } catch (error) {
-      Logger.Admin.error(`Error exporting template: ${template.id}`, error);
-      setError("Failed to export template. Please try again.");
-    }
-  };
-
-  const handleImportTemplate = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    Logger.Admin.log(`Importing template from file: ${file.name}`);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const content = e.target?.result as string;
-        const templateData = JSON.parse(content);
-
-        // Create a new template with essential fields
-        const templateWithoutId: Partial<StoryTemplate> = {
-          title: templateData.title || "Imported Template",
-          publicationStatus: PublicationStatus.Draft,
-          playerCountMin: templateData.playerCountMin,
-          playerCountMax: templateData.playerCountMax,
-          maxTurnsMin: templateData.maxTurnsMin,
-          maxTurnsMax: templateData.maxTurnsMax,
-          gameMode: templateData.gameMode || GameModes.SinglePlayer,
-          tags: templateData.tags || [],
-          teaser: templateData.teaser || "",
-          guidelines: templateData.guidelines || {
-            world: "",
-            rules: [],
-            tone: [],
-            conflicts: [],
-            decisions: [],
-          },
-          storyElements: templateData.storyElements || [],
-          sharedOutcomes: templateData.sharedOutcomes || [],
-          statGroups: templateData.statGroups || [],
-          sharedStats: templateData.sharedStats || [],
-          initialSharedStatValues: templateData.initialSharedStatValues || [],
-          playerStats: templateData.playerStats || [],
-          characterSelectionIntroduction:
-            templateData.characterSelectionIntroduction || {
-              title: "",
-              text: "",
-            },
-        };
-
-        // Send to server
-        const response = await fetch(`${config.apiUrl}/admin/templates`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(templateWithoutId),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to import template");
-        }
-
-        Logger.Admin.log("Template imported successfully");
-
-        // Refresh templates list
-        loadTemplates();
-
-        // Clear file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-      } catch (error) {
-        Logger.Admin.error("Failed to import template", error);
-        setError("Failed to import template. Please check the file format.");
-      }
-    };
-
-    reader.onerror = () => {
-      Logger.Admin.error("Error reading file");
-      setError("Failed to read the file. Please try again.");
-    };
-
-    reader.readAsText(file);
-  };
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   return (
     <div className="bg-gray-50 pt-4 rounded-lg">
@@ -264,7 +65,7 @@ export const StoryLibrary = ({
             type="file"
             accept="application/json"
             ref={fileInputRef}
-            onChange={handleImportTemplate}
+            onChange={handleFileInputChange}
             className="hidden"
           />
           <PrimaryButton
@@ -335,7 +136,6 @@ export const StoryLibrary = ({
                 <th className="hidden lg:table-cell py-3 px-4 text-left">
                   Length
                 </th>
-                {/* <th className="py-3 px-4 text-left">Created</th> */}
                 <th className="hidden md:table-cell py-3 px-4 text-left">
                   Updated
                 </th>
@@ -353,16 +153,14 @@ export const StoryLibrary = ({
                   <td className="py-3 px-4">
                     <span
                       className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
-                        template.publicationStatus || PublicationStatus.Draft
+                        template.publicationStatus
                       )}`}
                     >
                       <span className="md:hidden">
-                        {(
-                          template.publicationStatus || PublicationStatus.Draft
-                        ).substring(0, 5)}
+                        {template.publicationStatus.substring(0, 5)}
                       </span>
                       <span className="hidden md:inline">
-                        {template.publicationStatus || PublicationStatus.Draft}
+                        {template.publicationStatus}
                       </span>
                     </span>
                   </td>
@@ -392,9 +190,6 @@ export const StoryLibrary = ({
                       ? `${template.maxTurnsMin}`
                       : `${template.maxTurnsMin} - ${template.maxTurnsMax}`}
                   </td>
-                  {/* <td className="py-3 px-4">
-                    {formatDate(template.createdAt)}
-                  </td> */}
                   <td className="hidden md:table-cell py-3 px-4">
                     <span className="whitespace-nowrap">
                       {formatDate(template.updatedAt)}
