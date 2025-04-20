@@ -33,6 +33,7 @@ export function useTemplateApi({
       title: template.title,
       publicationStatus: template.publicationStatus || PublicationStatus.Draft,
       showOnWelcomeScreen: template.showOnWelcomeScreen || false,
+      order: template.order,
       guidelines: template.guidelines,
       storyElements: template.storyElements,
       sharedOutcomes: template.sharedOutcomes,
