@@ -30,7 +30,7 @@ export const TAG_CATEGORIES: TagCategory[] = [
   },
   {
     name: "Tone",
-    tags: ["Contemplative", "Dark", "Humorous", "Surreal", "Tense"],
+    tags: ["Contemplative", "Cozy", "Dark", "Humorous", "Surreal", "Tense"],
   },
 ];
 

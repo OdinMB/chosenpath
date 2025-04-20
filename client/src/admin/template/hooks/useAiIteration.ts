@@ -1,14 +1,14 @@
 import { useState } from "react";
+import { StoryTemplate } from "@core/types";
 import {
-  StoryTemplate,
-  PlayerSlot,
-  PlayerOptionsGeneration,
-} from "@core/types";
-import { SectionData, TemplateIterationRequest } from "@core/types/admin";
-import { ResponseStatus } from "@core/types/api";
-import { config } from "@/config";
+  SectionData,
+  TemplateIterationRequest,
+  TemplateIterationResponse,
+} from "@core/types/admin";
 import { Logger } from "@common/logger";
-import { v4 as uuidv4 } from "uuid";
+import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { PlayerOptionsGeneration } from "@core/types";
+import { PlayerSlot } from "@core/types/player";
 
 interface UseAiIterationProps {
   token: string;
@@ -25,8 +25,8 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     feedback: string,
     sections: Array<keyof SectionData>
   ) => {
-    if (!token || !template.id) {
-      const errorMsg = "Invalid token or template ID for AI iteration";
+    if (!template.id) {
+      const errorMsg = "Invalid template ID for AI iteration";
       Logger.Admin.error(errorMsg);
       setError(errorMsg);
       throw new Error(errorMsg);
@@ -36,89 +36,29 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
       setError(null);
       setIsLoading(true);
 
-      // Generate a UUID for request tracking
-      const requestId = uuidv4();
-
-      const requestData: TemplateIterationRequest = {
-        requestId,
+      // Create a request with the proper type and add requestId
+      const request: TemplateIterationRequest = withRequestId({
         templateId: template.id,
         feedback,
         sections,
         gameMode: template.gameMode,
         playerCount: template.playerCountMax,
         maxTurns: template.maxTurnsMin,
-      };
-
-      Logger.Admin.log("Sending AI iteration request:", {
-        requestId,
-        id: template.id,
-        sections,
-        gameMode: template.gameMode,
       });
 
-      const response = await fetch(
-        `${config.apiUrl}/admin/templates/${template.id}/iterate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(requestData),
-        }
-      );
+      // Make the API request with specific request and response types
+      const response = await sendTrackedRequest<
+        TemplateIterationResponse,
+        TemplateIterationRequest
+      >({
+        path: `/admin/templates/${template.id}/iterate`,
+        token,
+        body: request,
+      });
 
-      const data = await response.json();
-      Logger.Admin.log("AI iteration response received:", data);
-
-      // Validate the response
-      if (!response.ok) {
-        let errorMsg = `Failed to generate AI iteration: ${response.status}`;
-
-        // Try to extract error message from response if available
-        if (data.status === ResponseStatus.ERROR && data.errorMessage) {
-          errorMsg = data.errorMessage;
-        } else if (typeof data === "string") {
-          errorMsg += ` ${data}`;
-        }
-
-        Logger.Admin.error(errorMsg);
-        setError(errorMsg);
-        throw new Error(errorMsg);
-      }
-
-      // Check for rate limiting
-      if (data.status === ResponseStatus.RATE_LIMITED) {
-        const rateLimitMsg = `Rate limited: Please try again in ${Math.ceil(
-          data.rateLimit.timeRemaining / 1000
-        )} seconds`;
-        Logger.Admin.error(rateLimitMsg, data.rateLimit);
-        setError(rateLimitMsg);
-        throw new Error(rateLimitMsg);
-      }
-
-      // Verify it's a success response with expected data
-      if (
-        data.status !== ResponseStatus.SUCCESS ||
-        !data.data ||
-        !data.data.templateUpdate ||
-        Object.keys(data.data.templateUpdate).length === 0
-      ) {
-        const errorMsg = "AI iteration response did not contain valid updates";
-        Logger.Admin.error(errorMsg, data);
-        setError(errorMsg);
-        throw new Error(errorMsg);
-      }
-
-      // Check if the request IDs match
-      if (data.requestId !== requestId) {
-        Logger.Admin.warn(
-          `Request ID mismatch: sent ${requestId}, received ${data.requestId}`
-        );
-      }
+      const templateUpdate = response.data.templateUpdate;
 
       // Process and restructure the template update data
-      const templateUpdate = data.data.templateUpdate;
       const processedData = processPotentialPlayerData(templateUpdate);
 
       setIterationData(processedData);
@@ -126,7 +66,6 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
       return processedData;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      Logger.Admin.error("Error in AI iteration:", errorMsg);
       setError(errorMsg);
       throw error;
     } finally {

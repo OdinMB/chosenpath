@@ -2,7 +2,6 @@ Smaller commits!
 
 # Next
 
-- based on requestAiIteration: create helper function for sending requests
 - properly typed api requests and responses for admin stuff (except iterations)
 - create Tab ui component and use it in Admin and TemplateForm
 - Moderation step for premise-based story creation
