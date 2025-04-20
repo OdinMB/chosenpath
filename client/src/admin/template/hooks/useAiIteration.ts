@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { StoryTemplate } from "@core/types";
-import {
-  SectionData,
-  TemplateIterationRequest,
-  TemplateIterationResponse,
-} from "@core/types/admin";
 import { Logger } from "@common/logger";
 import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
-import { PlayerOptionsGeneration } from "@core/types";
-import { PlayerSlot } from "@core/types/player";
+import {
+  PlayerSlot,
+  PlayerOptionsGeneration,
+  SectionData,
+  StoryTemplate,
+  TemplateIterationRequest,
+  TemplateIterationResponse,
+} from "@core/types";
 
 interface UseAiIterationProps {
   token: string;
@@ -52,6 +52,7 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
         TemplateIterationRequest
       >({
         path: `/admin/templates/${template.id}/iterate`,
+        method: "POST",
         token,
         body: request,
       });

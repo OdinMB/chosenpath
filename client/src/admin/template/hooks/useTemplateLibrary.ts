@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef } from "react";
-import { config } from "@/config";
 import { Logger } from "@common/logger";
 import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
+import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import {
+  CreateTemplateRequest,
+  DeleteResponse,
+  SuccessResponse,
+} from "@core/types";
 
 export const useTemplateLibrary = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -22,25 +27,18 @@ export const useTemplateLibrary = (token: string) => {
     Logger.Admin.log("Loading story templates");
 
     try {
-      const response = await fetch(`${config.apiUrl}/admin/templates`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await sendTrackedRequest<
+        SuccessResponse<{ templates: StoryTemplate[] }>
+      >({
+        path: `/admin/templates`,
+        method: "GET",
+        token,
       });
 
-      if (!response.ok) {
-        Logger.Admin.error("Server returned an error response", {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to load story templates");
-      }
-
-      const data = await response.json();
       Logger.Admin.log(
-        `Successfully loaded ${data.templates.length} story templates`
+        `Successfully loaded ${response.data.templates.length} story templates`
       );
-      setTemplates(data.templates);
+      setTemplates(response.data.templates);
     } catch (error) {
       Logger.Admin.error("Failed to load story templates", error);
       setError("Failed to load story templates. Please try again.");
@@ -65,23 +63,16 @@ export const useTemplateLibrary = (token: string) => {
   const handleDeleteTemplate = async (templateId: string) => {
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
-      const response = await fetch(
-        `${config.apiUrl}/admin/templates/${templateId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const request = withRequestId({
+        id: templateId,
+      });
 
-      if (!response.ok) {
-        Logger.Admin.error(`Failed to delete template: ${templateId}`, {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to delete story template");
-      }
+      await sendTrackedRequest<DeleteResponse>({
+        path: `/admin/templates/${templateId}`,
+        method: "DELETE",
+        token,
+        body: request,
+      });
 
       Logger.Admin.log(`Successfully deleted template: ${templateId}`);
       // Refresh the list
@@ -151,7 +142,7 @@ export const useTemplateLibrary = (token: string) => {
           const templateData = JSON.parse(content);
 
           // Create a new template with essential fields
-          const templateWithoutId: Partial<StoryTemplate> = {
+          const newTemplate: CreateTemplateRequest = withRequestId({
             title: templateData.title || "Imported Template",
             publicationStatus: PublicationStatus.Draft,
             playerCountMin: templateData.playerCountMin,
@@ -179,21 +170,18 @@ export const useTemplateLibrary = (token: string) => {
                 title: "",
                 text: "",
               },
-          };
-
-          // Send to server
-          const response = await fetch(`${config.apiUrl}/admin/templates`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(templateWithoutId),
           });
 
-          if (!response.ok) {
-            throw new Error("Failed to import template");
-          }
+          // Send to server
+          await sendTrackedRequest<
+            SuccessResponse<{ template: StoryTemplate }>,
+            CreateTemplateRequest
+          >({
+            path: `/admin/templates`,
+            method: "POST",
+            token,
+            body: newTemplate,
+          });
 
           Logger.Admin.log("Template imported successfully");
 

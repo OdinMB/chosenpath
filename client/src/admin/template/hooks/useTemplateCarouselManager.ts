@@ -2,8 +2,13 @@ import { useState, useEffect } from "react";
 import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "@core/types";
-import { config } from "@/config";
 import { Logger } from "@common/logger";
+import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import {
+  TemplatesResponse,
+  UpdateTemplateRequest,
+  TemplateResponse,
+} from "@core/types/admin";
 
 export const useTemplateCarouselManager = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -18,20 +23,14 @@ export const useTemplateCarouselManager = (token: string) => {
       setError(null);
 
       try {
-        const response = await fetch(`${config.apiUrl}/admin/templates`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const response = await sendTrackedRequest<TemplatesResponse>({
+          path: `/admin/templates`,
+          method: "GET",
+          token,
         });
 
-        if (!response.ok) {
-          throw new Error(`Error fetching templates: ${response.status}`);
-        }
-
-        const data = await response.json();
-
         // Filter for published templates marked for welcome screen
-        const welcomeScreenTemplates = data.templates
+        const welcomeScreenTemplates = response.data.templates
           .filter(
             (template: StoryTemplate) =>
               template.publicationStatus === PublicationStatus.Published &&
@@ -84,29 +83,34 @@ export const useTemplateCarouselManager = (token: string) => {
       const updatePromises = templates.map(async (template, index) => {
         // Only update if order has changed
         if (template.order !== index) {
-          const updatedTemplate = { ...template, order: index };
+          const request: UpdateTemplateRequest = withRequestId({
+            id: template.id,
+            title: template.title,
+            playerCountMin: template.playerCountMin,
+            playerCountMax: template.playerCountMax,
+            gameMode: template.gameMode,
+            maxTurnsMin: template.maxTurnsMin,
+            maxTurnsMax: template.maxTurnsMax,
+            publicationStatus: template.publicationStatus,
+            showOnWelcomeScreen: template.showOnWelcomeScreen,
+            teaser: template.teaser,
+            tags: template.tags,
+            order: index,
+          });
 
-          const response = await fetch(
-            `${config.apiUrl}/admin/templates/${template.id}`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(updatedTemplate),
-            }
-          );
+          const response = await sendTrackedRequest<
+            TemplateResponse,
+            UpdateTemplateRequest
+          >({
+            path: `/admin/templates/${template.id}`,
+            method: "PUT",
+            token,
+            body: request,
+          });
 
-          if (!response.ok) {
-            throw new Error(
-              `Failed to update template order: ${response.status}`
-            );
-          }
-
-          return await response.json();
+          return response;
         }
-        return { template };
+        return { data: { template } };
       });
 
       await Promise.all(updatePromises);

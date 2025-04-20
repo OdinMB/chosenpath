@@ -4,13 +4,14 @@
  */
 
 // Logger namespaces/categories
-type LoggerCategory = "Admin" | "Story" | "WebSocket" | "UI" | "App";
+type LoggerCategory = "Admin" | "Story" | "WebSocket" | "UI" | "App" | "API";
 
 // Log message colors (for browsers that support CSS in console)
 const COLORS = {
   Admin: "color: #f59e0b; font-weight: bold", // Amber
   Story: "color: #8b5cf6; font-weight: bold", // Purple
   WebSocket: "color: #ff0000; font-weight: bold", // Red
+  API: "color: #ff2222; font-weight: bold",
   UI: "color: #10b981; font-weight: bold", // Emerald
   App: "color: #6366f1; font-weight: bold", // Indigo
 };
@@ -54,6 +55,14 @@ const createLogger = (category: LoggerCategory) => {
         console.info(`%c${prefix} ${message}`, style);
       }
     },
+
+    debug(message: string, ...data: unknown[]): void {
+      if (data.length > 0) {
+        console.debug(`%c${prefix} ${message}`, style, ...data);
+      } else {
+        console.debug(`%c${prefix} ${message}`, style);
+      }
+    },
   };
 };
 
@@ -64,4 +73,5 @@ export const Logger = {
   WebSocket: createLogger("WebSocket"),
   UI: createLogger("UI"),
   App: createLogger("App"),
+  API: createLogger("API"),
 };

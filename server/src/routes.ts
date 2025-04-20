@@ -19,12 +19,16 @@ export const verifyAdmin = (
   next: express.NextFunction
 ) => {
   const authHeader = req.headers.authorization;
+  const requestId =
+    (req.query.requestId as string) ||
+    (req.body && req.body.requestId) ||
+    "unknown";
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     Logger.Route.error(
       "Authentication failed: missing or invalid Authorization header"
     );
-    return res.status(401).json({ error: "Authentication required" });
+    return sendError(res, "Authentication required", 401, requestId);
   }
 
   const token = authHeader.split(" ")[1];
@@ -32,7 +36,7 @@ export const verifyAdmin = (
   // Simple password check - should be replaced with a more secure method in production
   if (token !== config.adminPassword) {
     Logger.Route.error("Authentication failed: invalid password");
-    return res.status(403).json({ error: "Invalid credentials" });
+    return sendError(res, "Invalid credentials", 403, requestId);
   }
 
   Logger.Route.log("Authentication successful");
@@ -45,53 +49,63 @@ const libraryService = new AdminLibraryService();
 // Auth check route
 router.get("/admin/auth", verifyAdmin, (req, res) => {
   Logger.Route.log("Auth check successful");
-  res.json({ authenticated: true });
+  sendSuccess(res, { authenticated: true }, req.query.requestId as string);
 });
 
 // STORY MANAGEMENT
 
 // Get list of stories
 router.get("/admin/stories", verifyAdmin, async (req, res) => {
+  const requestId = req.query.requestId as string;
+
   try {
     Logger.Route.log("Fetching list of stories");
     const stories = await adminStoryService.getStoriesList();
     Logger.Route.log(`Returning ${stories.length} stories`);
-    res.json({ stories });
+    sendSuccess(res, { stories }, requestId);
   } catch (error) {
     Logger.Route.error("Failed to load stories", error);
-    res.status(500).json({ error: "Failed to load stories" });
+    sendError(res, "Failed to load stories", 500, requestId, error);
   }
 });
 
 // Get story details
 router.get("/admin/stories/:id", verifyAdmin, async (req, res) => {
+  const requestId = req.query.requestId as string;
+
   try {
     const storyId = req.params.id;
     Logger.Route.log(`Fetching story details: ${storyId}`);
     const storyState = await adminStoryService.getStory(storyId);
     Logger.Route.log(`Successfully fetched story: ${storyId}`);
-    res.json(storyState);
+    sendSuccess(res, { story: storyState }, requestId);
   } catch (error) {
     if ((error as Error).message === "Story not found") {
       Logger.Route.error(`Story not found: ${req.params.id}`);
-      return res.status(404).json({ error: "Story not found" });
+      return sendNotFound(res, "Story not found", requestId);
     }
     Logger.Route.error(`Failed to load story: ${req.params.id}`, error);
-    res.status(500).json({ error: "Failed to load story" });
+    sendError(res, "Failed to load story", 500, requestId, error);
   }
 });
 
 // Delete story
 router.delete("/admin/stories/:id", verifyAdmin, async (req, res) => {
+  const requestId = req.body.requestId;
+
   try {
     const storyId = req.params.id;
     Logger.Route.log(`Deleting story: ${storyId}`);
     await adminStoryService.deleteStory(storyId);
     Logger.Route.log(`Successfully deleted story: ${storyId}`);
-    res.json({ success: true });
+    sendSuccess(res, { success: true }, requestId);
   } catch (error) {
+    if ((error as Error).message === "Story not found") {
+      Logger.Route.error(`Story not found: ${req.params.id}`);
+      return sendNotFound(res, "Story not found", requestId);
+    }
     Logger.Route.error(`Failed to delete story: ${req.params.id}`, error);
-    res.status(500).json({ error: "Failed to delete story" });
+    sendError(res, "Failed to delete story", 500, requestId, error);
   }
 });
 
@@ -99,6 +113,8 @@ router.delete("/admin/stories/:id", verifyAdmin, async (req, res) => {
 
 // Get all published templates
 router.get("/templates", async (req, res) => {
+  const requestId = req.query.requestId as string;
+
   try {
     const allTemplates = await libraryService.getAllTemplates();
 
@@ -137,65 +153,74 @@ router.get("/templates", async (req, res) => {
         forWelcomeScreen ? " for welcome screen" : ""
       }`
     );
-    res.json({ templates });
+    sendSuccess(res, { templates }, requestId);
   } catch (error) {
     Logger.Route.error("Failed to load templates", error);
-    res.status(500).json({ error: "Failed to load templates" });
+    sendError(res, "Failed to load templates", 500, requestId, error);
   }
 });
 
 // Get template by ID (only if published)
 router.get("/templates/:id", async (req, res) => {
   const { id } = req.params;
+  const requestId = req.query.requestId as string;
 
   try {
     const template = await libraryService.getTemplateById(id);
 
     if (!template) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     // Only return the template if it's published
     if (template.publicationStatus !== PublicationStatus.Published) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     Logger.Route.log(`Serving published template ${id}`);
-    res.json({ template });
+    sendSuccess(res, { template }, requestId);
   } catch (error) {
     Logger.Route.error(`Error retrieving template ${id}`, error);
-    res.status(500).json({ error: "Failed to retrieve template" });
+    sendError(res, "Failed to retrieve template", 500, requestId, error);
   }
 });
 
 // Admin - Get all templates
 router.get("/admin/templates", verifyAdmin, async (req, res) => {
   try {
+    const requestId = req.query.requestId as string;
     const templates = await libraryService.getAllTemplates();
     Logger.Route.log(`Retrieved ${templates.length} templates`);
-    res.json({ templates });
+    sendSuccess(res, { templates }, requestId);
   } catch (error) {
     Logger.Route.error("Error retrieving templates", error);
-    res.status(500).json({ error: "Failed to retrieve templates" });
+    sendError(
+      res,
+      "Failed to retrieve templates",
+      500,
+      req.query.requestId as string,
+      error
+    );
   }
 });
 
 // Admin - Get template by ID
 router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
+  const requestId = req.query.requestId as string;
 
   try {
     const template = await libraryService.getTemplateById(id);
 
     if (!template) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     Logger.Route.log(`Retrieved template ${id}`);
-    res.json({ template });
+    sendSuccess(res, { template }, requestId);
   } catch (error) {
     Logger.Route.error(`Error retrieving template ${id}`, error);
-    res.status(500).json({ error: "Failed to retrieve template" });
+    sendError(res, "Failed to retrieve template", 500, requestId, error);
   }
 });
 
@@ -212,14 +237,16 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
     publicationStatus,
     showOnWelcomeScreen,
     order,
+    requestId,
     ...templateData
   } = req.body;
 
   if (!playerCountMin || !playerCountMax || !gameMode || !title) {
-    return res.status(400).json({
-      error:
-        "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
-    });
+    return sendBadRequest(
+      res,
+      "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
+      requestId
+    );
   }
 
   try {
@@ -244,10 +271,10 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
     );
 
     Logger.Route.log(`Created template ${template.id}: ${title}`);
-    res.status(201).json({ template });
+    sendSuccess(res, { template }, requestId, 201);
   } catch (error) {
     Logger.Route.error("Error creating template", error);
-    res.status(500).json({ error: "Failed to create template" });
+    sendError(res, "Failed to create template", 500, requestId, error);
   }
 });
 
@@ -265,14 +292,16 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
     publicationStatus,
     showOnWelcomeScreen,
     order,
+    requestId,
     ...templateData
   } = req.body;
 
   if (!playerCountMin || !playerCountMax || !gameMode || !title) {
-    return res.status(400).json({
-      error:
-        "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
-    });
+    return sendBadRequest(
+      res,
+      "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
+      requestId
+    );
   }
 
   try {
@@ -299,50 +328,53 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
     );
 
     Logger.Route.log(`Updated template ${id}: ${title}`);
-    res.json({ template });
+    sendSuccess(res, { template }, requestId);
   } catch (error) {
     // Check if it's a not found error
     if ((error as Error).message.includes("not found")) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     Logger.Route.error(`Error updating template ${id}`, error);
-    res.status(500).json({ error: "Failed to update template" });
+    sendError(res, "Failed to update template", 500, requestId, error);
   }
 });
 
 // Delete a template
 router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
+  const requestId = req.body.requestId;
 
   try {
     const result = await libraryService.deleteTemplate(id);
 
     if (!result) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     Logger.Route.log(`Deleted template ${id}`);
-    res.json({ success: true });
+    sendSuccess(res, { success: true }, requestId);
   } catch (error) {
     // Check if it's a not found error
     if ((error as Error).message.includes("not found")) {
-      return res.status(404).json({ error: "Template not found" });
+      return sendNotFound(res, "Template not found", requestId);
     }
 
     Logger.Route.error(`Error deleting template ${id}`, error);
-    res.status(500).json({ error: "Failed to delete template" });
+    sendError(res, "Failed to delete template", 500, requestId, error);
   }
 });
 
 // Generate a template using AI
 router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
-  const { prompt, playerCount, maxTurns, gameMode } = req.body;
+  const { prompt, playerCount, maxTurns, gameMode, requestId } = req.body;
 
   if (!prompt || !playerCount || !maxTurns || !gameMode) {
-    return res.status(400).json({
-      error: "Missing required fields: prompt, playerCount, maxTurns, gameMode",
-    });
+    return sendBadRequest(
+      res,
+      "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+      requestId
+    );
   }
 
   try {
@@ -357,35 +389,42 @@ router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
     );
 
     Logger.Route.log(`Generated template: ${template.title}`);
-    res.status(201).json({ template });
+    sendSuccess(res, { template }, requestId, 201);
   } catch (error) {
     Logger.Route.error("Error generating template", error);
-    res.status(500).json({ error: "Failed to generate template" });
+    sendError(res, "Failed to generate template", 500, requestId, error);
   }
 });
 
 // Iterate on a template with AI
 router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const { requestId, feedback, sections, gameMode, playerCount, maxTurns } =
+  const { feedback, sections, gameMode, playerCount, maxTurns, requestId } =
     req.body;
 
   if (
-    !id ||
     !feedback ||
     !sections ||
-    !Array.isArray(sections) ||
+    !sections.length ||
     !gameMode ||
     !playerCount ||
     !maxTurns
   ) {
-    return sendBadRequest(res, "Missing parameters", requestId);
+    return sendBadRequest(
+      res,
+      "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
+      requestId
+    );
   }
 
   try {
-    Logger.Route.log(`Iterating template ${id} with feedback`);
+    // Check if template exists
+    const template = await libraryService.getTemplateById(id);
+    if (!template) {
+      return sendNotFound(res, `Template with ID ${id} not found`, requestId);
+    }
 
-    const updatedSections = await libraryService.iterateTemplate(
+    const templateUpdate = await libraryService.iterateTemplate(
       id,
       feedback,
       sections,
@@ -394,19 +433,23 @@ router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
       maxTurns
     );
 
-    return sendSuccess(res, { templateUpdate: updatedSections }, requestId);
+    Logger.Route.log(`Generated iteration for template ${id}`);
+    sendSuccess(res, { templateUpdate }, requestId);
   } catch (error) {
-    if ((error as Error).message.includes("not found")) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-    return sendError(res, "Failed to iterate template", 500, requestId, error);
+    Logger.Route.error(`Error iterating template ${id}`, error);
+    sendError(res, `Failed to iterate template ${id}`, 500, requestId, error);
   }
 });
 
 // Catch-all 404 handler
 router.use((req, res) => {
+  const requestId =
+    (req.query.requestId as string) ||
+    (req.body && req.body.requestId) ||
+    "unknown";
+
   Logger.Route.error(`404 Not Found: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ error: "Route not found" });
+  sendNotFound(res, "Route not found", requestId);
 });
 
 export const Router = router;

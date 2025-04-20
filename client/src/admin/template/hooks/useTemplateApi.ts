@@ -3,10 +3,16 @@ import {
   GameMode,
   PLAYER_SLOTS,
   PublicationStatus,
+  PlayerCount,
 } from "@core/types";
+import {
+  UpdateTemplateRequest,
+  GenerateTemplateRequest,
+} from "@core/types/admin";
 import { Logger } from "@common/logger";
-import { config } from "@/config";
 import { MAX_PLAYERS } from "@core/config";
+import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { SuccessResponse } from "@core/types/api";
 
 interface UseTemplateApiProps {
   token: string;
@@ -23,6 +29,7 @@ export function useTemplateApi({
   const createRequestBody = (template: StoryTemplate) => {
     // Create a base request body with common fields
     const baseRequestBody = {
+      id: template.id,
       playerCountMin: template.playerCountMin,
       playerCountMax: template.playerCountMax,
       gameMode: template.gameMode,
@@ -69,32 +76,24 @@ export function useTemplateApi({
         throw new Error("Template has no ID");
       }
 
-      const url = `${config.apiUrl}/admin/templates/${template.id}`;
       const requestBody = createRequestBody(template);
+      const request: UpdateTemplateRequest = withRequestId(requestBody);
 
-      Logger.Admin.log("Request payload:", requestBody);
-
-      const response = await fetch(url, {
+      const response = await sendTrackedRequest<
+        SuccessResponse<{ template: StoryTemplate }>,
+        UpdateTemplateRequest
+      >({
+        path: `/admin/templates/${template.id}`,
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
+        token,
+        body: request,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        Logger.Admin.error(`API error (${response.status}): ${errorText}`);
-        throw new Error("Failed to update template");
-      }
-
-      const data = await response.json();
-      Logger.Admin.log("Template saved successfully", data);
+      Logger.Admin.log("Template saved successfully", response);
 
       // Pass the updated template back to the parent component
-      onSuccess(data.template);
-      return data.template;
+      onSuccess(response.data.template);
+      return response.data.template;
     } catch (error) {
       Logger.Admin.error("Error saving template:", error);
       throw error;
@@ -128,7 +127,7 @@ export function useTemplateApi({
       const effectivePlayerCount =
         currentTemplate.playerCountMin > 0
           ? currentTemplate.playerCountMin
-          : playerCount;
+          : (playerCount as PlayerCount);
       const effectiveMaxTurns =
         currentTemplate.maxTurnsMin > 0
           ? currentTemplate.maxTurnsMin
@@ -136,29 +135,25 @@ export function useTemplateApi({
       const effectiveGameMode = currentTemplate.gameMode || gameMode;
 
       // First, call API to generate template content
-      const generateResponse = await fetch(
-        `${config.apiUrl}/admin/templates/generate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            playerCount: effectivePlayerCount,
-            maxTurns: effectiveMaxTurns,
-            gameMode: effectiveGameMode,
-          }),
-        }
-      );
+      const request: GenerateTemplateRequest = withRequestId({
+        prompt,
+        playerCount: effectivePlayerCount,
+        maxTurns: effectiveMaxTurns,
+        gameMode: effectiveGameMode,
+        generateImages: false,
+      });
 
-      if (!generateResponse.ok) {
-        throw new Error("Failed to generate template");
-      }
+      const response = await sendTrackedRequest<
+        SuccessResponse<{ template: StoryTemplate }>,
+        GenerateTemplateRequest
+      >({
+        path: `/admin/templates/generate`,
+        method: "POST",
+        token,
+        body: request,
+      });
 
-      const data = await generateResponse.json();
-      const generatedTemplate = data.template;
+      const generatedTemplate = response.data.template;
 
       if (!currentTemplate.id) {
         Logger.Admin.error("Cannot update template without an ID");

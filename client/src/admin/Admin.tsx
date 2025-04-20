@@ -7,8 +7,9 @@ import { TemplateForm, SampleTemplateTab } from "./template/components";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
-import { config } from "@/config";
 import { Logger } from "@common/logger";
+import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { CreateTemplateRequest, TemplateResponse } from "@core/types/admin";
 
 type AdminTab =
   | "stories"
@@ -38,19 +39,14 @@ export const Admin = () => {
       // Validate token with the server
       const validateToken = async (token: string) => {
         try {
-          const response = await fetch(`${config.apiUrl}/admin/auth`, {
+          await sendTrackedRequest({
+            path: `/admin/auth`,
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            token,
           });
 
-          if (response.ok) {
-            setAuthToken(token);
-            setIsAuthenticated(true);
-          } else {
-            handleLogout();
-          }
+          setAuthToken(token);
+          setIsAuthenticated(true);
         } catch {
           handleLogout();
         }
@@ -77,35 +73,36 @@ export const Admin = () => {
       const defaultTemplate = createDefaultTemplate();
 
       // Create a new template record on the server first to get an ID
-      const response = await fetch(`${config.apiUrl}/admin/templates`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          playerCountMin: defaultTemplate.playerCountMin,
-          playerCountMax: defaultTemplate.playerCountMax,
-          gameMode: defaultTemplate.gameMode,
-          maxTurnsMin: defaultTemplate.maxTurnsMin,
-          maxTurnsMax: defaultTemplate.maxTurnsMax,
-          teaser: defaultTemplate.teaser,
-          tags: defaultTemplate.tags,
-          title: defaultTemplate.title || "New Template",
-          publicationStatus: PublicationStatus.Draft,
-          guidelines: defaultTemplate.guidelines,
-        }),
+      const createRequest: CreateTemplateRequest = withRequestId({
+        playerCountMin: defaultTemplate.playerCountMin,
+        playerCountMax: defaultTemplate.playerCountMax,
+        gameMode: defaultTemplate.gameMode,
+        maxTurnsMin: defaultTemplate.maxTurnsMin,
+        maxTurnsMax: defaultTemplate.maxTurnsMax,
+        teaser: defaultTemplate.teaser,
+        tags: defaultTemplate.tags,
+        title: defaultTemplate.title || "New Template",
+        publicationStatus: PublicationStatus.Draft,
+        guidelines: defaultTemplate.guidelines,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create new template");
-      }
+      const response = await sendTrackedRequest<
+        TemplateResponse,
+        CreateTemplateRequest
+      >({
+        path: `/admin/templates`,
+        method: "POST",
+        token: authToken,
+        body: createRequest,
+      });
 
-      const data = await response.json();
-      Logger.Admin.log("New template created with ID:", data.template.id);
+      Logger.Admin.log(
+        "New template created with ID:",
+        response.data.template.id
+      );
 
       // Set the new template with its ID as the selected template
-      setSelectedTemplate(data.template);
+      setSelectedTemplate(response.data.template);
       setActiveTab("template-form");
     } catch (error) {
       Logger.Admin.error("Error creating new template:", error);
@@ -170,7 +167,7 @@ export const Admin = () => {
                 }`}
                 onClick={() => setActiveTab("library")}
               >
-                Story Library
+                Template Library
               </button>
               <button
                 className={`px-4 py-2 font-medium ${
@@ -180,7 +177,7 @@ export const Admin = () => {
                 }`}
                 onClick={() => setActiveTab("carousel")}
               >
-                Story Carousel
+                Template Carousel
               </button>
               <button
                 className={`px-4 py-2 font-medium ${
