@@ -62,7 +62,7 @@ export const PlayerBackgroundEditor: React.FC<PlayerBackgroundEditorProps> = ({
             <InfoIcon
               tooltipText="Starting stat values for characters with this background"
               position="right"
-              className="ml-2 mt-0"
+              className="ml-2 mt-1"
             />
           </div>
           {data.initialPlayerStatValues.map((statValue, statIndex) => {

@@ -34,7 +34,6 @@ export const StatValueInput: React.FC<StatValueInputProps> = ({
         placeholder={placeholder || "Enter a value"}
         emptyPlaceholder="No items added"
         className={className}
-        buttonText="Add Item"
         readOnly={disabled}
       />
     );

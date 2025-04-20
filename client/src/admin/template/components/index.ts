@@ -18,3 +18,7 @@ export { TemplateForm } from "./TemplateForm";
 export { SampleTemplateTab } from "./SampleTemplateTab";
 
 export { SortableItem } from "./SortableItem";
+
+export { StoryElementEditor } from "./StoryElementEditor";
+export { AiIterationForm } from "./AiIterationForm";
+export { AiIterationModal } from "./AiIterationModal";

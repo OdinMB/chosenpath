@@ -375,4 +375,68 @@ export class AIStoryGenerator {
       ...allNewIntroductions,
     ];
   }
+
+  /**
+   * Generates updated sections for an existing template
+   * @param prompt The iteration prompt
+   * @param sections Array of sections to regenerate
+   * @param playerCount Player count for the story
+   * @returns Partial template update with only the requested sections
+   */
+  async generatePartialTemplateUpdate(
+    prompt: string,
+    sections: string[],
+    playerCount: PlayerCount
+  ): Promise<Partial<StorySetupGeneration<typeof playerCount>>> {
+    try {
+      console.log("Generating partial template update for sections:", sections);
+
+      // Create a partial schema based on the requested sections
+      const fullSchema = createStorySetupSchema(playerCount);
+
+      // Create a subset of the schema with only the requested fields
+      // This uses zod's pick method to select specific sections of the schema
+      const partialSchema = fullSchema.pick(
+        sections.reduce((acc, section) => {
+          // Handle special cases for grouped sections
+          if (section === "stats") {
+            return {
+              ...acc,
+              statGroups: true,
+              sharedStats: true,
+              playerStats: true,
+              initialSharedStatValues: true,
+            };
+          }
+          if (section === "players") {
+            // For players, we need to include player1, player2, etc. based on playerCount
+            const playerFields = Object.fromEntries(
+              Array.from({ length: playerCount }, (_, i) => [
+                `player${i + 1}`,
+                true,
+              ])
+            );
+            return {
+              ...acc,
+              ...playerFields,
+              characterSelectionIntroduction: true,
+            };
+          }
+          return { ...acc, [section]: true };
+        }, {})
+      );
+
+      const structuredModel = this.model.withStructuredOutput(partialSchema);
+      const result = await structuredModel.invoke(prompt);
+
+      console.log(
+        "Partial template update generated:",
+        JSON.stringify(result, null, 2)
+      );
+      return result;
+    } catch (error) {
+      console.error("Failed to generate partial template update:", error);
+      throw new Error("Failed to generate template updates. Please try again.");
+    }
+  }
 }

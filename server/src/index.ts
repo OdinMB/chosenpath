@@ -31,6 +31,7 @@ async function startServer() {
 
   // Routes
   app.use("", Router);
+
   // Health check endpoint
   app.get("/health", (_, res) => {
     res.json({ status: "ok" });

@@ -1,51 +1,44 @@
-import { useState, useEffect, useRef } from "react";
-import { StoryTemplate, Guidelines } from "@core/types";
+import { useState, useEffect } from "react";
+import { Guidelines } from "@core/types";
 
 interface UseGuidelinesEditorProps {
-  template: StoryTemplate;
-  onChange?: (updates: Partial<StoryTemplate>) => void;
+  guidelines: Guidelines;
+  onChange?: (updates: { guidelines: Guidelines }) => void;
   readOnly?: boolean;
 }
 
 export function useGuidelinesEditor({
-  template,
+  guidelines,
   onChange,
   readOnly = false,
 }: UseGuidelinesEditorProps) {
   // Single state object to manage all guidelines
   const [state, setState] = useState<Guidelines>({
-    world: template.guidelines?.world || "",
-    rules: template.guidelines?.rules || [],
-    tone: template.guidelines?.tone || [],
-    conflicts: template.guidelines?.conflicts || [],
-    decisions: template.guidelines?.decisions || [],
-    typesOfThreads: template.guidelines?.typesOfThreads || [],
+    world: guidelines?.world || "",
+    rules: guidelines?.rules || [],
+    tone: guidelines?.tone || [],
+    conflicts: guidelines?.conflicts || [],
+    decisions: guidelines?.decisions || [],
+    typesOfThreads: guidelines?.typesOfThreads || [],
   });
 
-  // Track template ID to detect template changes
-  const previousTemplateId = useRef(template.id);
-
-  // Update state when template changes
+  // Update state when guidelines change
   useEffect(() => {
-    if (previousTemplateId.current !== template.id) {
-      setState({
-        world: template.guidelines?.world || "",
-        rules: template.guidelines?.rules || [],
-        tone: template.guidelines?.tone || [],
-        conflicts: template.guidelines?.conflicts || [],
-        decisions: template.guidelines?.decisions || [],
-        typesOfThreads: template.guidelines?.typesOfThreads || [],
-      });
-      previousTemplateId.current = template.id;
-    }
+    setState({
+      world: guidelines?.world || "",
+      rules: guidelines?.rules || [],
+      tone: guidelines?.tone || [],
+      conflicts: guidelines?.conflicts || [],
+      decisions: guidelines?.decisions || [],
+      typesOfThreads: guidelines?.typesOfThreads || [],
+    });
   }, [
-    template.id,
-    template.guidelines?.world,
-    template.guidelines?.rules,
-    template.guidelines?.tone,
-    template.guidelines?.conflicts,
-    template.guidelines?.decisions,
-    template.guidelines?.typesOfThreads,
+    guidelines?.world,
+    guidelines?.rules,
+    guidelines?.tone,
+    guidelines?.conflicts,
+    guidelines?.decisions,
+    guidelines?.typesOfThreads,
   ]);
 
   // Helper to update state and notify parent

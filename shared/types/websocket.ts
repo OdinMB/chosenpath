@@ -1,7 +1,13 @@
 import type { ClientStoryState } from "./story.js";
 import type { PlayerSlot } from "./player.js";
 import type { GameMode } from "./story.js";
-import { RateLimitedAction } from "../config.js";
+import {
+  ResponseStatus,
+  BaseServerResponse,
+  RateLimitedResponse,
+  SuccessResponse,
+  ErrorResponse,
+} from "./api.js";
 
 // ===============================================
 // Client -> Server message types
@@ -74,107 +80,72 @@ export type WSClientMessage =
 
 // ----- Response Types (directly responding to client requests) -----
 
-/**
- * Standardized response status types for all API requests
- */
-export enum ResponseStatus {
-  RATE_LIMITED = "rate_limited",
-  INVALID = "invalid",
-  ERROR = "error",
-  SUCCESS = "success",
-}
+// Reuse ResponseStatus, BaseServerResponse, RateLimitedResponse, SuccessResponse, and ErrorResponse from api.ts
 
-/**
- * Rate limit information returned when a request is limited
- */
-export interface RateLimitInfo {
-  action: RateLimitedAction;
-  timeRemaining: number;
-  maxRequests?: number;
-  windowMs?: number;
-  requestsRemaining: number;
-}
-
-/**
- * Base response for direct replies to client requests
- */
-export interface BaseServerResponse {
+// Type augmented versions of the response types
+export interface WSBaseServerResponse extends BaseServerResponse {
   type: string;
-  requestId: string;
-  status: ResponseStatus;
-  timestamp: number;
 }
 
-export interface RateLimitedResponse extends BaseServerResponse {
+export interface WSRateLimitedResponse
+  extends RateLimitedResponse,
+    WSBaseServerResponse {
   status: ResponseStatus.RATE_LIMITED;
-  rateLimit: RateLimitInfo;
 }
 
-/**
- * Success response with data
- */
-export interface SuccessResponse extends BaseServerResponse {
+export interface WSSuccessResponse<T = unknown>
+  extends SuccessResponse<T>,
+    WSBaseServerResponse {
   status: ResponseStatus.SUCCESS;
-  data: any;
 }
 
-/**
- * Error response for invalid input or processing errors
- */
-export interface ErrorResponse extends BaseServerResponse {
+export interface WSErrorResponse extends ErrorResponse, WSBaseServerResponse {
   status: ResponseStatus.ERROR | ResponseStatus.INVALID;
-  errorMessage: string;
 }
 
-export interface CreateSessionResponse extends SuccessResponse {
+export interface CreateSessionResponse
+  extends WSSuccessResponse<{ sessionId: string }> {
   type: "create_session_response";
-  data: {
-    sessionId: string;
-  };
 }
 
 /**
  * Initialize story response (acknowledges the request was queued)
  */
-export interface InitializeStoryResponse extends SuccessResponse {
+export interface InitializeStoryResponse
+  extends WSSuccessResponse<Record<string, never>> {
   type: "initialize_story_response";
 }
 
 /**
  * Make choice response (acknowledges the choice was queued)
  */
-export interface MakeChoiceResponse extends SuccessResponse {
+export interface MakeChoiceResponse
+  extends WSSuccessResponse<{ optionIndex: number }> {
   type: "make_choice_response";
-  data: {
-    optionIndex: number;
-  };
 }
 
 /**
  * Select character response (acknowledges the selection was queued)
  */
-export interface SelectCharacterResponse extends SuccessResponse {
-  type: "select_character_response";
-  data: {
+export interface SelectCharacterResponse
+  extends WSSuccessResponse<{
     identityIndex: number;
     backgroundIndex: number;
-  };
+  }> {
+  type: "select_character_response";
 }
 
 /**
  * Verify code response - successful connection to game
  */
-export interface VerifyCodeResponse extends SuccessResponse {
+export interface VerifyCodeResponse
+  extends WSSuccessResponse<{ code: string; state: ClientStoryState }> {
   type: "verify_code_response";
-  data: {
-    code: string;
-    state: ClientStoryState;
-  };
 }
 
-export interface ExitStoryResponse extends SuccessResponse {
+export interface ExitStoryResponse
+  extends WSSuccessResponse<Record<string, never>> {
   type: "exit_story_response";
-  data: Record<string, never>; // Empty object
 }
 
 export type WSServerResponse =
@@ -184,8 +155,8 @@ export type WSServerResponse =
   | SelectCharacterResponse
   | MakeChoiceResponse
   | ExitStoryResponse
-  | RateLimitedResponse
-  | ErrorResponse;
+  | WSRateLimitedResponse
+  | WSErrorResponse;
 
 //
 // ----- Notification Types (server-initiated events) -----

@@ -1,17 +1,17 @@
 import React from "react";
 import { TextArea, InfoIcon } from "@components/ui";
 import { ArrayField } from "@components";
-import { StoryTemplate } from "@core/types";
+import { Guidelines } from "@core/types";
 import { useGuidelinesEditor } from "../hooks/useGuidelinesEditor";
 
 interface GuidelinesEditorProps {
-  template: StoryTemplate;
-  onChange?: (updates: Partial<StoryTemplate>) => void;
+  guidelines: Guidelines;
+  onChange?: (updates: { guidelines: Guidelines }) => void;
   readOnly?: boolean;
 }
 
 export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
-  template,
+  guidelines,
   onChange,
   readOnly = false,
 }) => {
@@ -29,7 +29,7 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
     setDecisions,
     setTypesOfThreads,
   } = useGuidelinesEditor({
-    template,
+    guidelines,
     onChange,
     readOnly,
   });

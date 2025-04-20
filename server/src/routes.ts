@@ -2,6 +2,13 @@ import express from "express";
 import { config } from "@/config.js";
 import { Logger } from "@common/logger.js";
 import { PublicationStatus } from "@core/types/index.js";
+
+import {
+  sendSuccess,
+  sendError,
+  sendBadRequest,
+  sendNotFound,
+} from "./shared/responseUtils.js";
 import { adminStoryService } from "./admin/AdminStoryService.js";
 import { AdminLibraryService } from "./admin/AdminLibraryService.js";
 
@@ -354,6 +361,45 @@ router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
   } catch (error) {
     Logger.Route.error("Error generating template", error);
     res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
+// Iterate on a template with AI
+router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { requestId, feedback, sections, gameMode, playerCount, maxTurns } =
+    req.body;
+
+  if (
+    !id ||
+    !feedback ||
+    !sections ||
+    !Array.isArray(sections) ||
+    !gameMode ||
+    !playerCount ||
+    !maxTurns
+  ) {
+    return sendBadRequest(res, "Missing parameters", requestId);
+  }
+
+  try {
+    Logger.Route.log(`Iterating template ${id} with feedback`);
+
+    const updatedSections = await libraryService.iterateTemplate(
+      id,
+      feedback,
+      sections,
+      gameMode,
+      playerCount,
+      maxTurns
+    );
+
+    return sendSuccess(res, { templateUpdate: updatedSections }, requestId);
+  } catch (error) {
+    if ((error as Error).message.includes("not found")) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+    return sendError(res, "Failed to iterate template", 500, requestId, error);
   }
 });
 

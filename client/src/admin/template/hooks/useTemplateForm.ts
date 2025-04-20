@@ -26,7 +26,8 @@ type TabType =
   | "outcomes"
   | "stats"
   | "players"
-  | "ai-draft";
+  | "ai-draft"
+  | "ai-iterate";
 
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
@@ -90,7 +91,7 @@ export function useTemplateForm({
     handleRemoveArrayItem,
     updateGuidelines,
   } = useGuidelinesEditor({
-    template: formData,
+    guidelines: formData.guidelines,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
   });
 

@@ -121,7 +121,7 @@ export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
       <div className="mb-6">
         <h3 className="text-lg font-medium mb-3">Guidelines</h3>
         <div className="bg-gray-50 p-4 rounded-md">
-          <GuidelinesEditor template={template} readOnly />
+          <GuidelinesEditor guidelines={template.guidelines} readOnly />
         </div>
       </div>
 

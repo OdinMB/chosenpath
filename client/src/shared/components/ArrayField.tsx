@@ -87,13 +87,7 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
       )}
 
       {items.length === 0 ? (
-        <Input
-          id={`new-${fieldId}`}
-          name={`new-${fieldId}`}
-          placeholder={emptyPlaceholder}
-          disabled
-          className={inputClassName}
-        />
+        <span className="text-tertiary-500">{emptyPlaceholder}</span>
       ) : (
         items.map((item, index) => (
           <div

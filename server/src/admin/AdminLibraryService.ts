@@ -10,6 +10,7 @@ import {
   PublicationStatus,
   Stat,
 } from "@core/types/index.js";
+import { SectionData } from "@core/types/admin.js";
 import {
   readStorageFile,
   writeStorageFile,
@@ -19,6 +20,7 @@ import {
 } from "@common/storageUtils.js";
 import { Logger } from "@common/logger.js";
 import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
+import { StoryIterationPromptService } from "../game/services/prompts/StoryIterationPromptService.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -92,6 +94,78 @@ export class AdminLibraryService {
   }
 
   /**
+   * Create a template object with common properties
+   * Encapsulates the template creation logic used in multiple places
+   */
+  private createTemplateObject(
+    id: string,
+    playerCountMin: PlayerCount,
+    playerCountMax: PlayerCount,
+    gameMode: GameMode,
+    templateData: TemplateDataInput | TemplateDataUpdate,
+    tags: string[] = [],
+    maxTurnsMin: number = 10,
+    maxTurnsMax: number = 15,
+    createdAt?: string
+  ): StoryTemplate {
+    const now = new Date().toISOString();
+    const dataWithPlayerOptions = this.ensurePlayerOptions(
+      templateData
+    ) as TemplateDataInput;
+
+    // First create a base template without player properties
+    const baseTemplate = {
+      id,
+      gameMode,
+      playerCountMin,
+      playerCountMax,
+      maxTurnsMin,
+      maxTurnsMax,
+      tags,
+      createdAt: createdAt || now,
+      updatedAt: now,
+      title: dataWithPlayerOptions.title || "",
+      teaser: dataWithPlayerOptions.teaser || "",
+      publicationStatus:
+        dataWithPlayerOptions.publicationStatus || PublicationStatus.Draft,
+      showOnWelcomeScreen: dataWithPlayerOptions.showOnWelcomeScreen || false,
+      order: dataWithPlayerOptions.order,
+      guidelines: dataWithPlayerOptions.guidelines,
+      storyElements: dataWithPlayerOptions.storyElements || [],
+      sharedOutcomes: dataWithPlayerOptions.sharedOutcomes || [],
+      statGroups: dataWithPlayerOptions.statGroups || ["General"],
+      sharedStats: dataWithPlayerOptions.sharedStats || [],
+      initialSharedStatValues:
+        dataWithPlayerOptions.initialSharedStatValues || [],
+      playerStats: dataWithPlayerOptions.playerStats || [],
+      characterSelectionIntroduction:
+        dataWithPlayerOptions.characterSelectionIntroduction || {
+          title: "",
+          text: "",
+        },
+    };
+
+    // Then add player-specific properties
+    // Use Record type to create a map of player slots to player options
+    const playerProperties: Record<string, PlayerOptionsGeneration> = {};
+    PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
+      playerProperties[slot] = (dataWithPlayerOptions[
+        slot as keyof StoryTemplate
+      ] as unknown as PlayerOptionsGeneration) || {
+        outcomes: [],
+        possibleCharacterIdentities: [],
+        possibleCharacterBackgrounds: [],
+      };
+    });
+
+    // Combine the base template with player properties to create a valid StoryTemplate
+    return {
+      ...baseTemplate,
+      ...playerProperties,
+    } as StoryTemplate;
+  }
+
+  /**
    * Get all templates
    */
   async getAllTemplates(): Promise<StoryTemplate[]> {
@@ -159,58 +233,18 @@ export class AdminLibraryService {
   ): Promise<StoryTemplate> {
     try {
       const id = uuidv4();
-      const now = new Date().toISOString();
 
-      // Ensure all required player options exist
-      const dataWithPlayerOptions = this.ensurePlayerOptions(
-        templateData
-      ) as TemplateDataInput;
-
-      // First create a base template without player properties
-      const baseTemplate = {
+      // Use the common template creation function
+      const template = this.createTemplateObject(
         id,
-        gameMode,
         playerCountMin,
         playerCountMax,
-        maxTurnsMin,
-        maxTurnsMax,
+        gameMode,
+        templateData,
         tags,
-        createdAt: now,
-        updatedAt: now,
-        title: dataWithPlayerOptions.title,
-        teaser: dataWithPlayerOptions.teaser,
-        publicationStatus:
-          dataWithPlayerOptions.publicationStatus || PublicationStatus.Draft,
-        showOnWelcomeScreen: dataWithPlayerOptions.showOnWelcomeScreen || false,
-        guidelines: dataWithPlayerOptions.guidelines,
-        storyElements: dataWithPlayerOptions.storyElements,
-        sharedOutcomes: dataWithPlayerOptions.sharedOutcomes,
-        statGroups: dataWithPlayerOptions.statGroups,
-        sharedStats: dataWithPlayerOptions.sharedStats,
-        initialSharedStatValues: dataWithPlayerOptions.initialSharedStatValues,
-        playerStats: dataWithPlayerOptions.playerStats,
-        characterSelectionIntroduction:
-          dataWithPlayerOptions.characterSelectionIntroduction,
-      };
-
-      // Then add player-specific properties
-      // Use Record type to create a map of player slots to player options
-      const playerProperties: Record<string, PlayerOptionsGeneration> = {};
-      PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
-        playerProperties[slot] = (dataWithPlayerOptions[
-          slot as keyof StoryTemplate
-        ] as unknown as PlayerOptionsGeneration) || {
-          outcomes: [],
-          possibleCharacterIdentities: [],
-          possibleCharacterBackgrounds: [],
-        };
-      });
-
-      // Combine the base template with player properties to create a valid StoryTemplate
-      const template = {
-        ...baseTemplate,
-        ...playerProperties,
-      } as StoryTemplate;
+        maxTurnsMin,
+        maxTurnsMax
+      );
 
       await writeStorageFile(
         "library",
@@ -218,7 +252,7 @@ export class AdminLibraryService {
         JSON.stringify(template, null, 2)
       );
 
-      this.logger.log(`Created template ${id}: ${templateData.title}`);
+      this.logger.log(`Created template ${id}: ${template.title}`);
       return template;
     } catch (error) {
       this.logger.error("Failed to create template", error);
@@ -247,82 +281,27 @@ export class AdminLibraryService {
         throw new Error(`Template with ID ${id} not found`);
       }
 
-      const now = new Date().toISOString();
+      // Use effective max turns values
+      const effectiveMaxTurnsMin =
+        maxTurnsMin !== undefined ? maxTurnsMin : existingTemplate.maxTurnsMin;
+      const effectiveMaxTurnsMax =
+        maxTurnsMax !== undefined ? maxTurnsMax : existingTemplate.maxTurnsMax;
 
       // Merge existing data with the updates
       const mergedData = { ...existingTemplate, ...templateData };
 
-      // Ensure all required player options exist
-      const dataWithPlayerOptions = this.ensurePlayerOptions(mergedData);
-
-      // First create a base template without player properties
-      const baseTemplate = {
+      // Use the common template creation function, preserving creation date
+      const updatedTemplate = this.createTemplateObject(
         id,
-        gameMode,
         playerCountMin,
         playerCountMax,
+        gameMode,
+        mergedData,
         tags,
-        createdAt: existingTemplate.createdAt,
-        updatedAt: now,
-        maxTurnsMin:
-          maxTurnsMin !== undefined
-            ? maxTurnsMin
-            : existingTemplate.maxTurnsMin,
-        maxTurnsMax:
-          maxTurnsMax !== undefined
-            ? maxTurnsMax
-            : existingTemplate.maxTurnsMax,
-        title: dataWithPlayerOptions.title as string,
-        teaser: dataWithPlayerOptions.teaser as string,
-        publicationStatus:
-          dataWithPlayerOptions.publicationStatus ||
-          existingTemplate.publicationStatus ||
-          PublicationStatus.Draft,
-        showOnWelcomeScreen:
-          dataWithPlayerOptions.showOnWelcomeScreen !== undefined
-            ? dataWithPlayerOptions.showOnWelcomeScreen
-            : existingTemplate.showOnWelcomeScreen || false,
-        // Explicitly include order property, preserving existing value if not provided
-        order:
-          dataWithPlayerOptions.order !== undefined
-            ? dataWithPlayerOptions.order
-            : existingTemplate.order,
-        guidelines:
-          dataWithPlayerOptions.guidelines as StoryTemplate["guidelines"],
-        storyElements:
-          dataWithPlayerOptions.storyElements as StoryTemplate["storyElements"],
-        sharedOutcomes:
-          dataWithPlayerOptions.sharedOutcomes as StoryTemplate["sharedOutcomes"],
-        statGroups:
-          dataWithPlayerOptions.statGroups as StoryTemplate["statGroups"],
-        sharedStats:
-          dataWithPlayerOptions.sharedStats as StoryTemplate["sharedStats"],
-        initialSharedStatValues:
-          dataWithPlayerOptions.initialSharedStatValues as StoryTemplate["initialSharedStatValues"],
-        playerStats:
-          dataWithPlayerOptions.playerStats as StoryTemplate["playerStats"],
-        characterSelectionIntroduction:
-          dataWithPlayerOptions.characterSelectionIntroduction as StoryTemplate["characterSelectionIntroduction"],
-      };
-
-      // Then add player-specific properties
-      // Use Record type to create a map of player slots to player options
-      const playerProperties: Record<string, PlayerOptionsGeneration> = {};
-      PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
-        playerProperties[slot] = (dataWithPlayerOptions[
-          slot as keyof StoryTemplate
-        ] as unknown as PlayerOptionsGeneration) || {
-          outcomes: [],
-          possibleCharacterIdentities: [],
-          possibleCharacterBackgrounds: [],
-        };
-      });
-
-      // Combine the base template with player properties to create a valid StoryTemplate
-      const updatedTemplate = {
-        ...baseTemplate,
-        ...playerProperties,
-      } as StoryTemplate;
+        effectiveMaxTurnsMin,
+        effectiveMaxTurnsMax,
+        existingTemplate.createdAt
+      );
 
       await writeStorageFile(
         "library",
@@ -330,11 +309,7 @@ export class AdminLibraryService {
         JSON.stringify(updatedTemplate, null, 2)
       );
 
-      this.logger.log(
-        `Updated template ${id}: ${
-          templateData.title || existingTemplate.title
-        }`
-      );
+      this.logger.log(`Updated template ${id}: ${updatedTemplate.title}`);
       return updatedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template ${id}`, error);
@@ -394,7 +369,6 @@ export class AdminLibraryService {
       // Convert story state to template
       // Create an ID for the new template
       const id = uuidv4();
-      const now = new Date().toISOString();
 
       // Extract player options from the state
       const playerOptions: Record<string, PlayerOptionsGeneration> = {};
@@ -404,10 +378,8 @@ export class AdminLibraryService {
         }
       );
 
-      // Create the template data using the ensurePlayerOptions method
-      // which will make sure all required player slots are filled
+      // Use the common template creation function
       const templateData = {
-        id,
         title: initialState.title,
         teaser: `Generated from prompt: ${prompt}`,
         guidelines: initialState.guidelines,
@@ -418,16 +390,6 @@ export class AdminLibraryService {
         playerStats: initialState.playerStats,
         characterSelectionIntroduction:
           initialState.characterSelectionIntroduction,
-        gameMode,
-        playerCountMin: playerCount,
-        playerCountMax: playerCount,
-        maxTurnsMin: maxTurns,
-        maxTurnsMax: maxTurns,
-        tags: [],
-        publicationStatus: PublicationStatus.Draft,
-        createdAt: now,
-        updatedAt: now,
-        // Use statGroups from initialState
         statGroups: this.extractStatGroups(
           initialState.sharedStats,
           initialState.playerStats
@@ -435,16 +397,72 @@ export class AdminLibraryService {
         ...playerOptions,
       };
 
-      // Ensure all player slots are properly filled
-      const templateWithPlayerOptions = this.ensurePlayerOptions(templateData);
+      const generatedTemplate = this.createTemplateObject(
+        id,
+        playerCount,
+        playerCount,
+        gameMode,
+        templateData,
+        [],
+        maxTurns,
+        maxTurns
+      );
 
       this.logger.log(
-        `Generated template with title: ${templateWithPlayerOptions.title}`
+        `Generated template with title: ${generatedTemplate.title}`
       );
-      return templateWithPlayerOptions as StoryTemplate;
+      return generatedTemplate;
     } catch (error) {
       this.logger.error("Failed to generate template", error);
       throw new Error("Failed to generate story template");
+    }
+  }
+
+  /**
+   * Iterate on a template with AI based on feedback and specified sections
+   */
+  async iterateTemplate(
+    id: string,
+    feedback: string,
+    sections: Array<keyof SectionData>,
+    gameMode: GameMode,
+    playerCount: PlayerCount,
+    maxTurns: number
+  ): Promise<SectionData> {
+    try {
+      // Get the existing template
+      const template = await this.getTemplateById(id);
+
+      if (!template) {
+        throw new Error(`Template with ID ${id} not found`);
+      }
+
+      // Create an instance of the AI generator
+      const generator = new AIStoryGenerator();
+
+      // Generate the partial template update based on user-selected sections
+      const templateJson = JSON.stringify(template);
+      const aiPrompt = StoryIterationPromptService.createIterationPrompt(
+        templateJson,
+        feedback,
+        sections as string[],
+        playerCount,
+        gameMode,
+        maxTurns
+      );
+
+      // Create a partial schema for just the requested sections
+      const updatedSections = await generator.generatePartialTemplateUpdate(
+        aiPrompt,
+        sections as string[],
+        playerCount
+      );
+
+      this.logger.log(`Generated iteration for template ${id}`);
+      return updatedSections as SectionData;
+    } catch (error) {
+      this.logger.error(`Failed to iterate template ${id}`, error);
+      throw new Error(`Failed to iterate template ${id}`);
     }
   }
 
