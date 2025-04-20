@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui";
-import { config } from "@/config";
 import { Logger } from "@common/logger";
+import { sendTrackedRequest } from "@/shared/requestUtils";
+import { SuccessResponse } from "@core/types";
 
 type StoryListItem = {
   id: string;
@@ -38,23 +39,18 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     Logger.Admin.log("Loading stories list");
 
     try {
-      const response = await fetch(`${config.apiUrl}/admin/stories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await sendTrackedRequest<
+        SuccessResponse<{ stories: StoryListItem[] }>
+      >({
+        path: "/admin/stories",
+        method: "GET",
+        token,
       });
 
-      if (!response.ok) {
-        Logger.Admin.error("Server returned an error response", {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to load stories");
-      }
-
-      const data = await response.json();
-      Logger.Admin.log(`Successfully loaded ${data.stories.length} stories`);
-      setStories(data.stories);
+      Logger.Admin.log(
+        `Successfully loaded ${response.data.stories.length} stories`
+      );
+      setStories(response.data.stories);
     } catch (error) {
       Logger.Admin.error("Failed to load stories", error);
       setError("Failed to load stories. Please try again.");
@@ -89,23 +85,11 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   const handleDeleteStory = async (storyId: string) => {
     Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
-      const response = await fetch(
-        `${config.apiUrl}/admin/stories/${storyId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        Logger.Admin.error(`Failed to delete story: ${storyId}`, {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new Error("Failed to delete story");
-      }
+      await sendTrackedRequest<SuccessResponse<{ success: boolean }>>({
+        path: `/admin/stories/${storyId}`,
+        method: "DELETE",
+        token,
+      });
 
       Logger.Admin.log(`Successfully deleted story: ${storyId}`);
       // Refresh the list

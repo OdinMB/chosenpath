@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PrimaryButton, Icons } from "@components/ui/index";
-import { config } from "@/config";
+import { sendTrackedRequest } from "@/shared/requestUtils";
+import { SuccessResponse } from "@core/types";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;
@@ -17,21 +18,23 @@ export const AdminLogin = ({ onLogin }: AdminLoginProps) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.apiUrl}/admin/auth`, {
+      const response = await sendTrackedRequest<
+        SuccessResponse<{ authenticated: boolean }>
+      >({
+        path: "/admin/auth",
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${password}`,
-        },
+        token: password,
       });
 
-      if (response.ok) {
+      if (response.data.authenticated) {
         onLogin(password);
       } else {
-        const data = await response.json();
-        setError(data.error || "Authentication failed");
+        setError("Authentication failed");
       }
-    } catch {
-      setError("Failed to connect to server");
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Failed to connect to server"
+      );
     } finally {
       setIsLoading(false);
     }

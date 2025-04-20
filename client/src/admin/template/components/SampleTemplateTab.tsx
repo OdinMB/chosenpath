@@ -11,8 +11,9 @@ import {
   PlayerSlot,
   PlayerOptionsGeneration,
 } from "@core/types";
-import { config } from "@/config";
 import { Logger } from "@common/logger";
+import { sendTrackedRequest } from "@/shared/requestUtils";
+import { TemplateResponse } from "@core/types/admin";
 
 interface SampleTemplateTabProps {
   token: string;
@@ -33,23 +34,16 @@ export const SampleTemplateTab: React.FC<SampleTemplateTabProps> = ({
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(
-          `${config.apiUrl}/admin/templates/${templateId}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const response = await sendTrackedRequest<TemplateResponse>({
+          path: `/admin/templates/${templateId}`,
+          method: "GET",
+          token,
+        });
+
+        Logger.Admin.log(
+          `Loaded sample template: ${response.data.template.title}`
         );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch template");
-        }
-
-        const data = await response.json();
-        Logger.Admin.log(`Loaded sample template: ${data.template.title}`);
-        setTemplate(data.template);
+        setTemplate(response.data.template);
       } catch (error) {
         Logger.Admin.error("Error fetching sample template:", error);
         setError("Failed to load sample template. Please try again.");
