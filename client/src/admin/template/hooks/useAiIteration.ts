@@ -2,13 +2,12 @@ import { useState } from "react";
 import { Logger } from "@common/logger";
 import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
 import {
-  PlayerSlot,
-  PlayerOptionsGeneration,
-  SectionData,
   StoryTemplate,
   TemplateIterationRequest,
   TemplateIterationResponse,
+  TemplateIterationSections,
 } from "@core/types";
+import { templateIterationSections } from "@core/utils/templateIterationSections";
 
 interface UseAiIterationProps {
   token: string;
@@ -17,13 +16,15 @@ interface UseAiIterationProps {
 
 export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [iterationData, setIterationData] = useState<SectionData>({});
+  const [iterationData, setIterationData] = useState<Partial<StoryTemplate>>(
+    {}
+  );
   const [error, setError] = useState<string | null>(null);
 
   const requestAiIteration = async (
     template: StoryTemplate,
     feedback: string,
-    sections: Array<keyof SectionData>
+    sections: TemplateIterationSections[]
   ) => {
     if (!template.id) {
       const errorMsg = "Invalid template ID for AI iteration";
@@ -40,7 +41,7 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
       const request: TemplateIterationRequest = withRequestId({
         templateId: template.id,
         feedback,
-        sections,
+        sections: sections as TemplateIterationSections[],
         gameMode: template.gameMode,
         playerCount: template.playerCountMax,
         maxTurns: template.maxTurnsMin,
@@ -57,16 +58,17 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
         body: request,
       });
 
-      const templateUpdate = response.data.templateUpdate;
+      const templateUpdate: Partial<StoryTemplate> =
+        response.data.templateUpdate;
 
-      // Process and restructure the template update data
-      const processedData = processPotentialPlayerData(templateUpdate);
+      Logger.Admin.log("AI partial StoryTemplate:", templateUpdate);
 
-      setIterationData(processedData);
+      setIterationData(templateUpdate);
       setIsModalOpen(true);
-      return processedData;
+      return templateUpdate;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      Logger.Admin.error("AI iteration error:", errorMsg);
       setError(errorMsg);
       throw error;
     } finally {
@@ -74,49 +76,14 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     }
   };
 
-  // Process the server response to restructure player data if needed
-  const processPotentialPlayerData = (data: SectionData): SectionData => {
-    const processedData: SectionData = { ...data };
-    const playerKeys = Object.keys(data).filter((key) =>
-      key.startsWith("player")
-    );
-
-    if (playerKeys.length > 0) {
-      // Extract player data and create playerOptions structure
-      const playerOptions: Record<PlayerSlot, PlayerOptionsGeneration> = {};
-
-      playerKeys.forEach((key) => {
-        // Add to playerOptions
-        playerOptions[key as PlayerSlot] = data[
-          key as keyof SectionData
-        ] as PlayerOptionsGeneration;
-        // Remove from root
-        delete processedData[key as keyof SectionData];
-      });
-
-      // Add players structure that contains playerOptions
-      processedData.players = {
-        playerOptions,
-        characterSelectionIntroduction: data.characterSelectionIntroduction,
-      };
-
-      // Remove characterSelectionIntroduction from root if it exists
-      if (processedData.characterSelectionIntroduction) {
-        delete processedData.characterSelectionIntroduction;
-      }
-    }
-
-    Logger.Admin.log("Processed AI iteration data:", processedData);
-    return processedData;
-  };
-
   const handleCloseModal = () => {
     setIsModalOpen(false);
   };
 
+  // Clears the modal data for the section that was accepted
   const handleAcceptSection = (
-    sectionKey: keyof SectionData,
-    data: unknown
+    sectionKey: TemplateIterationSections,
+    data: Partial<StoryTemplate>
   ) => {
     // Handle the acceptance of a section
     Logger.Admin.log(`Accepted section: ${String(sectionKey)}`, data);
@@ -124,7 +91,24 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     // Clear the data for that section since it's been accepted
     setIterationData((prev) => {
       const updated = { ...prev };
-      delete updated[sectionKey];
+
+      // Delete all fields related to the selected section
+      if (sectionKey in templateIterationSections) {
+        const fieldsToDelete = templateIterationSections[sectionKey];
+        // Delete each field
+        fieldsToDelete.forEach((field: string) => {
+          delete updated[field as keyof Partial<StoryTemplate>];
+        });
+
+        // Special handling for players section - also delete player1-n fields
+        if (sectionKey === "players") {
+          Object.keys(updated).forEach((key) => {
+            if (key.startsWith("player")) {
+              delete updated[key as keyof Partial<StoryTemplate>];
+            }
+          });
+        }
+      }
 
       // If no more sections, close the modal
       if (Object.keys(updated).length === 0) {

@@ -61,6 +61,7 @@ export const Logger = {
   StoryRepository: createLogger("StoryRepository", COLORS.STORY),
   Admin: createLogger("Admin", COLORS.ADMIN),
   AdminService: createLogger("AdminService", COLORS.ADMIN),
+  Story: createLogger("Story", COLORS.STORY),
 
   // Factory method for other services
   forService(serviceName: string) {

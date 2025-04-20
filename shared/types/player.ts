@@ -143,7 +143,7 @@ export const characterSelectionPlanSchema = z.object({
         )
     )
     .describe(
-      "Outline 3 generic archetypes that the background options for the players could implement. Each archetype should represent a particular tradeoff between player stats, considering the player stat conversion rates. These generic archetypes will be turned into more flavorful backgrounds later."
+      "Outline exactly 3 generic archetypes that the background options for the players could implement. Each archetype should represent a particular tradeoff between player stats, considering the player stat conversion rates. These generic archetypes will be turned into more flavorful backgrounds later."
     ),
 });
 export type CharacterSelectionPlan = z.infer<

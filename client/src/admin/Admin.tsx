@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons } from "@components/ui";
+import { PrimaryButton, Icons, Tabs, useTabs } from "@components/ui";
 import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateForm, SampleTemplateTab } from "./template/components";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
-import { StoryTemplate, PublicationStatus } from "@core/types";
+import { StoryTemplate } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { Logger } from "@common/logger";
 import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
@@ -19,9 +19,9 @@ type AdminTab =
   | "sample-template";
 
 export const Admin = () => {
+  const { activeTab, setActiveTab } = useTabs<AdminTab>("stories");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("stories");
   const [selectedTemplate, setSelectedTemplate] =
     useState<StoryTemplate | null>(null);
   const [isFormLoading, setIsFormLoading] = useState(false);
@@ -74,16 +74,7 @@ export const Admin = () => {
 
       // Create a new template record on the server first to get an ID
       const createRequest: CreateTemplateRequest = withRequestId({
-        playerCountMin: defaultTemplate.playerCountMin,
-        playerCountMax: defaultTemplate.playerCountMax,
-        gameMode: defaultTemplate.gameMode,
-        maxTurnsMin: defaultTemplate.maxTurnsMin,
-        maxTurnsMax: defaultTemplate.maxTurnsMax,
-        teaser: defaultTemplate.teaser,
-        tags: defaultTemplate.tags,
-        title: defaultTemplate.title || "New Template",
-        publicationStatus: PublicationStatus.Draft,
-        guidelines: defaultTemplate.guidelines,
+        template: defaultTemplate,
       });
 
       const response = await sendTrackedRequest<
@@ -121,6 +112,13 @@ export const Admin = () => {
     setSelectedTemplate(updatedTemplate);
   };
 
+  const tabItems = [
+    { id: "stories" as AdminTab, label: "Active Stories" },
+    { id: "library" as AdminTab, label: "Template Library" },
+    { id: "carousel" as AdminTab, label: "Template Carousel" },
+    { id: "sample-template" as AdminTab, label: "Read-only Test" },
+  ];
+
   const renderAdminDashboard = () => {
     if (!authToken) return null;
 
@@ -148,47 +146,13 @@ export const Admin = () => {
         <div className="container mx-auto px-6 py-6">
           <div className="max-w-6xl mx-auto">
             {/* Tabs */}
-            <div className="flex border-b mb-6">
-              <button
-                className={`px-4 py-2 font-medium ${
-                  activeTab === "stories"
-                    ? "text-secondary border-b-2 border-secondary"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("stories")}
-              >
-                Active Stories
-              </button>
-              <button
-                className={`px-4 py-2 font-medium ${
-                  activeTab === "library" || activeTab === "template-form"
-                    ? "text-secondary border-b-2 border-secondary"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("library")}
-              >
-                Template Library
-              </button>
-              <button
-                className={`px-4 py-2 font-medium ${
-                  activeTab === "carousel"
-                    ? "text-secondary border-b-2 border-secondary"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("carousel")}
-              >
-                Template Carousel
-              </button>
-              <button
-                className={`px-4 py-2 font-medium ${
-                  activeTab === "sample-template"
-                    ? "text-secondary border-b-2 border-secondary"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("sample-template")}
-              >
-                Read-only Test
-              </button>
+            <div className="mb-6">
+              <Tabs
+                items={tabItems}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                variant="underline"
+              />
             </div>
 
             {/* Content based on active tab */}

@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { Checkbox, TextArea, PrimaryButton, Icons } from "@components/ui";
-import { SectionData } from "@core/types";
+import { TemplateIterationSections } from "@core/types";
 
 interface AiIterationFormProps {
   onSubmit: (
     feedback: string,
-    sections: Array<keyof SectionData>
+    sections: TemplateIterationSections[]
   ) => Promise<void>;
   isLoading: boolean;
 }
@@ -16,10 +16,10 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
 }) => {
   const [feedback, setFeedback] = useState("");
   const [selectedSections, setSelectedSections] = useState<
-    Array<keyof SectionData>
+    TemplateIterationSections[]
   >([]);
 
-  const handleSectionToggle = (section: keyof SectionData) => {
+  const handleSectionToggle = (section: TemplateIterationSections) => {
     setSelectedSections((prev) => {
       if (prev.includes(section)) {
         return prev.filter((s) => s !== section);
@@ -46,22 +46,6 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
   return (
     <div className="bg-white p-4 rounded-lg border border-primary-100 shadow-md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-2">
-          <div className="flex items-start">
-            <Icons.Info className="h-5 w-5 text-blue-400 mr-2 mt-0.5" />
-            <div>
-              <p className="text-sm text-blue-700 font-medium">
-                Iterate with AI
-              </p>
-              <p className="text-sm text-blue-600">
-                Let the AI help you improve specific sections of your story
-                template. Select the sections you want to regenerate and provide
-                feedback.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Select sections to regenerate:

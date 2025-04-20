@@ -3,14 +3,15 @@ import { v4 as uuidv4 } from "uuid";
 import { isDevelopment, STORAGE_PATHS, MAX_PLAYERS } from "@core/config.js";
 import {
   GameMode,
+  GameModes,
   StoryTemplate,
   PlayerOptionsGeneration,
   PlayerCount,
   PLAYER_SLOTS,
   PublicationStatus,
   Stat,
+  TemplateIterationSections,
 } from "@core/types/index.js";
-import { SectionData } from "@core/types/admin.js";
 import {
   readStorageFile,
   writeStorageFile,
@@ -95,61 +96,53 @@ export class AdminLibraryService {
 
   /**
    * Create a template object with common properties
-   * Encapsulates the template creation logic used in multiple places
    */
-  private createTemplateObject(
-    id: string,
-    playerCountMin: PlayerCount,
-    playerCountMax: PlayerCount,
-    gameMode: GameMode,
-    templateData: TemplateDataInput | TemplateDataUpdate,
-    tags: string[] = [],
-    maxTurnsMin: number = 10,
-    maxTurnsMax: number = 15,
-    createdAt?: string
+  private createFullTemplateObject(
+    baseTemplate: Partial<StoryTemplate>
   ): StoryTemplate {
     const now = new Date().toISOString();
-    const dataWithPlayerOptions = this.ensurePlayerOptions(
-      templateData
-    ) as TemplateDataInput;
 
-    // First create a base template without player properties
-    const baseTemplate = {
-      id,
-      gameMode,
-      playerCountMin,
-      playerCountMax,
-      maxTurnsMin,
-      maxTurnsMax,
-      tags,
-      createdAt: createdAt || now,
+    // First fill the base template without player properties
+    const filledTemplate = {
+      id: baseTemplate.id || uuidv4(),
+      gameMode: baseTemplate.gameMode || GameModes.Cooperative,
+      playerCountMin: baseTemplate.playerCountMin || 1,
+      playerCountMax: baseTemplate.playerCountMax || 1,
+      maxTurnsMin: baseTemplate.maxTurnsMin || 10,
+      maxTurnsMax: baseTemplate.maxTurnsMax || 15,
+      tags: baseTemplate.tags || [],
+      createdAt: baseTemplate.createdAt || now,
       updatedAt: now,
-      title: dataWithPlayerOptions.title || "",
-      teaser: dataWithPlayerOptions.teaser || "",
+      title: baseTemplate.title || "",
+      teaser: baseTemplate.teaser || "",
       publicationStatus:
-        dataWithPlayerOptions.publicationStatus || PublicationStatus.Draft,
-      showOnWelcomeScreen: dataWithPlayerOptions.showOnWelcomeScreen || false,
-      order: dataWithPlayerOptions.order,
-      guidelines: dataWithPlayerOptions.guidelines,
-      storyElements: dataWithPlayerOptions.storyElements || [],
-      sharedOutcomes: dataWithPlayerOptions.sharedOutcomes || [],
-      statGroups: dataWithPlayerOptions.statGroups || ["General"],
-      sharedStats: dataWithPlayerOptions.sharedStats || [],
-      initialSharedStatValues:
-        dataWithPlayerOptions.initialSharedStatValues || [],
-      playerStats: dataWithPlayerOptions.playerStats || [],
+        baseTemplate.publicationStatus || PublicationStatus.Draft,
+      showOnWelcomeScreen: baseTemplate.showOnWelcomeScreen || false,
+      order: baseTemplate.order || 999,
+      guidelines: baseTemplate.guidelines || {
+        world: "",
+        rules: [],
+        tone: [],
+        conflicts: [],
+        decisions: [],
+        typesOfThreads: [],
+      },
+      storyElements: baseTemplate.storyElements || [],
+      sharedOutcomes: baseTemplate.sharedOutcomes || [],
+      statGroups: baseTemplate.statGroups || ["General"],
+      sharedStats: baseTemplate.sharedStats || [],
+      initialSharedStatValues: baseTemplate.initialSharedStatValues || [],
+      playerStats: baseTemplate.playerStats || [],
       characterSelectionIntroduction:
-        dataWithPlayerOptions.characterSelectionIntroduction || {
+        baseTemplate.characterSelectionIntroduction || {
           title: "",
           text: "",
         },
     };
 
-    // Then add player-specific properties
-    // Use Record type to create a map of player slots to player options
-    const playerProperties: Record<string, PlayerOptionsGeneration> = {};
+    // Add player properties
     PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
-      playerProperties[slot] = (dataWithPlayerOptions[
+      filledTemplate[slot as keyof StoryTemplate] = (baseTemplate[
         slot as keyof StoryTemplate
       ] as unknown as PlayerOptionsGeneration) || {
         outcomes: [],
@@ -158,11 +151,7 @@ export class AdminLibraryService {
       };
     });
 
-    // Combine the base template with player properties to create a valid StoryTemplate
-    return {
-      ...baseTemplate,
-      ...playerProperties,
-    } as StoryTemplate;
+    return filledTemplate as StoryTemplate;
   }
 
   /**
@@ -223,37 +212,23 @@ export class AdminLibraryService {
    * Create a new template
    */
   async createTemplate(
-    playerCountMin: PlayerCount,
-    playerCountMax: PlayerCount,
-    gameMode: GameMode,
-    templateData: TemplateDataInput,
-    tags: string[] = [],
-    maxTurnsMin: number = 10,
-    maxTurnsMax: number = 15
+    template: Partial<StoryTemplate>
   ): Promise<StoryTemplate> {
     try {
-      const id = uuidv4();
-
-      // Use the common template creation function
-      const template = this.createTemplateObject(
-        id,
-        playerCountMin,
-        playerCountMax,
-        gameMode,
-        templateData,
-        tags,
-        maxTurnsMin,
-        maxTurnsMax
-      );
+      template.id = uuidv4();
+      const fullTemplate: StoryTemplate =
+        this.createFullTemplateObject(template);
 
       await writeStorageFile(
         "library",
-        `${id}.json`,
-        JSON.stringify(template, null, 2)
+        `${fullTemplate.id}.json`,
+        JSON.stringify(fullTemplate, null, 2)
       );
 
-      this.logger.log(`Created template ${id}: ${template.title}`);
-      return template;
+      this.logger.log(
+        `Created template ${fullTemplate.id}: ${fullTemplate.title}`
+      );
+      return fullTemplate;
     } catch (error) {
       this.logger.error("Failed to create template", error);
       throw new Error("Failed to create story template");
@@ -265,13 +240,7 @@ export class AdminLibraryService {
    */
   async updateTemplate(
     id: string,
-    playerCountMin: PlayerCount,
-    playerCountMax: PlayerCount,
-    gameMode: GameMode,
-    templateData: TemplateDataUpdate,
-    tags: string[] = [],
-    maxTurnsMin?: number,
-    maxTurnsMax?: number
+    template: Partial<StoryTemplate>
   ): Promise<StoryTemplate> {
     try {
       // Check if template exists
@@ -281,36 +250,20 @@ export class AdminLibraryService {
         throw new Error(`Template with ID ${id} not found`);
       }
 
-      // Use effective max turns values
-      const effectiveMaxTurnsMin =
-        maxTurnsMin !== undefined ? maxTurnsMin : existingTemplate.maxTurnsMin;
-      const effectiveMaxTurnsMax =
-        maxTurnsMax !== undefined ? maxTurnsMax : existingTemplate.maxTurnsMax;
-
       // Merge existing data with the updates
-      const mergedData = { ...existingTemplate, ...templateData };
-
-      // Use the common template creation function, preserving creation date
-      const updatedTemplate = this.createTemplateObject(
-        id,
-        playerCountMin,
-        playerCountMax,
-        gameMode,
-        mergedData,
-        tags,
-        effectiveMaxTurnsMin,
-        effectiveMaxTurnsMax,
-        existingTemplate.createdAt
-      );
+      const mergedTemplate: StoryTemplate = {
+        ...existingTemplate,
+        ...template,
+      };
 
       await writeStorageFile(
         "library",
         `${id}.json`,
-        JSON.stringify(updatedTemplate, null, 2)
+        JSON.stringify(mergedTemplate, null, 2)
       );
 
-      this.logger.log(`Updated template ${id}: ${updatedTemplate.title}`);
-      return updatedTemplate;
+      this.logger.log(`Updated template ${id}: ${mergedTemplate.title}`);
+      return mergedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template ${id}`, error);
       throw new Error(`Failed to update story template ${id}`);
@@ -397,16 +350,16 @@ export class AdminLibraryService {
         ...playerOptions,
       };
 
-      const generatedTemplate = this.createTemplateObject(
+      const generatedTemplate = this.createFullTemplateObject({
         id,
-        playerCount,
-        playerCount,
+        playerCountMin: playerCount,
+        playerCountMax: playerCount,
         gameMode,
-        templateData,
-        [],
-        maxTurns,
-        maxTurns
-      );
+        maxTurnsMin: maxTurns,
+        maxTurnsMax: maxTurns,
+        ...templateData,
+        tags: [],
+      });
 
       this.logger.log(
         `Generated template with title: ${generatedTemplate.title}`
@@ -424,11 +377,11 @@ export class AdminLibraryService {
   async iterateTemplate(
     id: string,
     feedback: string,
-    sections: Array<keyof SectionData>,
+    sections: TemplateIterationSections[],
     gameMode: GameMode,
     playerCount: PlayerCount,
     maxTurns: number
-  ): Promise<SectionData> {
+  ): Promise<Partial<StoryTemplate>> {
     try {
       // Get the existing template
       const template = await this.getTemplateById(id);
@@ -445,7 +398,7 @@ export class AdminLibraryService {
       const aiPrompt = StoryIterationPromptService.createIterationPrompt(
         templateJson,
         feedback,
-        sections as string[],
+        sections as TemplateIterationSections[],
         playerCount,
         gameMode,
         maxTurns
@@ -454,12 +407,12 @@ export class AdminLibraryService {
       // Create a partial schema for just the requested sections
       const updatedSections = await generator.generatePartialTemplateUpdate(
         aiPrompt,
-        sections as string[],
+        sections as TemplateIterationSections[],
         playerCount
       );
 
       this.logger.log(`Generated iteration for template ${id}`);
-      return updatedSections as SectionData;
+      return updatedSections as Partial<StoryTemplate>;
     } catch (error) {
       this.logger.error(`Failed to iterate template ${id}`, error);
       throw new Error(`Failed to iterate template ${id}`);

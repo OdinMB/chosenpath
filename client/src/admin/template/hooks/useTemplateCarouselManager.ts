@@ -85,17 +85,9 @@ export const useTemplateCarouselManager = (token: string) => {
         if (template.order !== index) {
           const request: UpdateTemplateRequest = withRequestId({
             id: template.id,
-            title: template.title,
-            playerCountMin: template.playerCountMin,
-            playerCountMax: template.playerCountMax,
-            gameMode: template.gameMode,
-            maxTurnsMin: template.maxTurnsMin,
-            maxTurnsMax: template.maxTurnsMax,
-            publicationStatus: template.publicationStatus,
-            showOnWelcomeScreen: template.showOnWelcomeScreen,
-            teaser: template.teaser,
-            tags: template.tags,
-            order: index,
+            template: {
+              order: index,
+            },
           });
 
           const response = await sendTrackedRequest<

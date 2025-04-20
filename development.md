@@ -2,8 +2,7 @@ Smaller commits!
 
 # Next
 
-- properly typed api requests and responses for admin stuff
-- create Tab ui component and use it in Admin and TemplateForm
+- StoryGeneration prompt: only show what's needed for iteration
 - Moderation step for premise-based story creation
 - Always introduce other players in beat 1
 - First thread always together
@@ -60,6 +59,7 @@ Smaller commits!
 - adjust scope of story setup based on the number of beats
 - Have the equivalent of Story on the client side
 - Track story elements that a player has NOT been introduced to yet
+- for generation + iteration: generate a stats = Stat[] attribute where Stat includes a "shared" vs. "player" attribute. That way, the whole zod stuff doesn't have to be sent to the servers twice.
 
 - Move newMilestone changes to switch generation (away from beat generation)?
 - Flavor switch / Thread generation for the final milestone of an outcome: when designing the final thread, make sure that it actually resolves the outcome!

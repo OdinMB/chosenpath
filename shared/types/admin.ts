@@ -1,49 +1,17 @@
-import {
-  GameMode,
-  PlayerCount,
-  StoryTemplate,
-  PublicationStatus,
-  Guidelines,
-  Outcome,
-  StoryElement,
-  Stat,
-  StatValueEntry,
-  PlayerOptionsGeneration,
-  CharacterSelectionIntroduction,
-  PlayerSlot,
-} from "./index.js";
+import { GameMode, PlayerCount, StoryTemplate } from "./index.js";
 import {
   ClientRequest,
   RateLimitedResponse,
   SuccessResponse,
   ErrorResponse,
 } from "./api.js";
+import { templateIterationSections } from "../utils/templateIterationSections.js";
 
 // ===============================================
 // Common types
 // ===============================================
 
-export interface SectionData {
-  guidelines?: Guidelines;
-  storyElements?: StoryElement[];
-  sharedOutcomes?: Outcome[];
-  statGroups?: string[];
-  sharedStats?: Stat[];
-  playerStats?: Stat[];
-  initialSharedStatValues?: StatValueEntry[];
-  playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
-  characterSelectionIntroduction?: CharacterSelectionIntroduction;
-  stats?: {
-    statGroups?: string[];
-    sharedStats?: Stat[];
-    playerStats?: Stat[];
-    initialSharedStatValues?: StatValueEntry[];
-  };
-  players?: {
-    playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
-    characterSelectionIntroduction?: CharacterSelectionIntroduction;
-  };
-}
+export type TemplateIterationSections = keyof typeof templateIterationSections;
 
 // ===============================================
 // Request Types
@@ -60,27 +28,7 @@ export interface GetTemplateByIdRequest extends ClientRequest {
 
 // Template Creation/Update
 export interface CreateTemplateRequest extends ClientRequest {
-  playerCountMin: PlayerCount;
-  playerCountMax: PlayerCount;
-  gameMode: GameMode;
-  maxTurnsMin?: number;
-  maxTurnsMax?: number;
-  title: string;
-  teaser?: string;
-  publicationStatus?: PublicationStatus;
-  showOnWelcomeScreen?: boolean;
-  order?: number;
-  tags?: string[];
-  guidelines?: Guidelines;
-  storyElements?: StoryElement[];
-  sharedOutcomes?: Outcome[];
-  statGroups?: string[];
-  sharedStats?: Stat[];
-  playerStats?: Stat[];
-  initialSharedStatValues?: StatValueEntry[];
-  characterSelectionIntroduction?: CharacterSelectionIntroduction;
-  // Plus player options for each player slot
-  [key: `player${number}`]: PlayerOptionsGeneration;
+  template: Partial<StoryTemplate>;
 }
 
 export interface UpdateTemplateRequest extends CreateTemplateRequest {
@@ -103,7 +51,7 @@ export interface GenerateTemplateRequest extends ClientRequest {
 export interface TemplateIterationRequest extends ClientRequest {
   templateId: string;
   feedback: string;
-  sections: Array<keyof SectionData>;
+  sections: TemplateIterationSections[];
   gameMode: GameMode;
   playerCount: PlayerCount;
   maxTurns: number;
@@ -143,7 +91,7 @@ export interface DeleteResponse extends SuccessResponse<{ success: boolean }> {
 
 // Template AI Iteration Response
 export interface TemplateIterationResponse
-  extends SuccessResponse<{ templateUpdate: SectionData }> {
+  extends SuccessResponse<{ templateUpdate: Partial<StoryTemplate> }> {
   // No additional fields needed
 }
 

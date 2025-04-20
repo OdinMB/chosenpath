@@ -17,9 +17,10 @@ import { MAX_PLAYERS } from "@core/config";
 import { useBasicInfoTab } from "./useBasicInfoTab";
 import { useGuidelinesEditor } from "./useGuidelinesEditor";
 import { useTemplateApi } from "./useTemplateApi";
+import { useTabs } from "@components/ui/useTabs";
 
 // Define the TabType type
-type TabType =
+export type TabType =
   | "basic"
   | "guidelines"
   | "elements"
@@ -43,7 +44,7 @@ export function useTemplateForm({
   setIsLoading,
 }: UseTemplateFormProps) {
   // Core state
-  const [activeTab, setActiveTab] = useState<TabType>("basic");
+  const { activeTab, setActiveTab } = useTabs<TabType>("basic");
   const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
 
   // Use specialized hooks
@@ -184,7 +185,9 @@ export function useTemplateForm({
   };
 
   // Get player options for use in UI components
-  const getPlayerOptions = () => {
+  const getPlayerOptionsFromStoryTemplate = (
+    template: Partial<StoryTemplate>
+  ) => {
     const playerOptions: Record<string, PlayerOptionsGeneration> = {};
     const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
 
@@ -195,7 +198,7 @@ export function useTemplateForm({
         possibleCharacterBackgrounds: [],
       };
 
-      const playerOption = formData[playerSlot as keyof StoryTemplate] as
+      const playerOption = template[playerSlot as keyof StoryTemplate] as
         | PlayerOptionsGeneration
         | undefined;
       playerOptions[playerSlot] = playerOption || defaultOptions;
@@ -261,9 +264,19 @@ export function useTemplateForm({
   const handleOutcomesChange = (outcomes: Outcome[]) =>
     setFormData((prev) => ({ ...prev, sharedOutcomes: outcomes }));
 
-  const handlePlayerOptionsChange = (
-    updates: Record<string, PlayerOptionsGeneration>
-  ) => setFormData((prev: StoryTemplate) => ({ ...prev, ...updates }));
+  const handlePlayerChange = (update: Partial<StoryTemplate>): void => {
+    // go through playerX attributes
+    const playerKeys = Object.keys(update).filter((key) =>
+      key.startsWith("player")
+    );
+    // apply each player key to the setFormData function
+    playerKeys.forEach((key) => {
+      setFormData((prev: StoryTemplate) => ({
+        ...prev,
+        [key]: update[key as keyof Partial<StoryTemplate>],
+      }));
+    });
+  };
 
   const handleCharacterSelectionIntroductionChange = (
     updatedIntro: CharacterSelectionIntroduction
@@ -313,7 +326,7 @@ export function useTemplateForm({
     handleStatsChange,
     handleStoryElementsChange,
     handleOutcomesChange,
-    handlePlayerOptionsChange,
+    handlePlayerChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
     handleShowOnWelcomeScreenChange,
@@ -326,7 +339,7 @@ export function useTemplateForm({
     getGameModeValue,
     // Misc utils
     handleSubmit,
-    getPlayerOptions,
+    getPlayerOptionsFromStoryTemplate,
     handleAIDraftSetup,
   };
 }

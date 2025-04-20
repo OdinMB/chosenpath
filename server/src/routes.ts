@@ -2,6 +2,14 @@ import express from "express";
 import { config } from "@/config.js";
 import { Logger } from "@common/logger.js";
 import { PublicationStatus } from "@core/types/index.js";
+import {
+  UpdateTemplateRequest,
+  CreateTemplateRequest,
+  DeleteTemplateRequest,
+  GenerateTemplateRequest,
+  TemplateIterationRequest,
+  DeleteStoryRequest,
+} from "@core/types/admin.js";
 
 import {
   sendSuccess,
@@ -91,10 +99,12 @@ router.get("/admin/stories/:id", verifyAdmin, async (req, res) => {
 
 // Delete story
 router.delete("/admin/stories/:id", verifyAdmin, async (req, res) => {
-  const requestId = req.body.requestId;
+  const requestId = req.body?.requestId || "unknown";
 
   try {
+    const deleteRequest = req.body as DeleteStoryRequest;
     const storyId = req.params.id;
+
     Logger.Route.log(`Deleting story: ${storyId}`);
     await adminStoryService.deleteStory(storyId);
     Logger.Route.log(`Successfully deleted story: ${storyId}`);
@@ -226,52 +236,21 @@ router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
 
 // Create a new template
 router.post("/admin/templates", verifyAdmin, async (req, res) => {
-  const {
-    playerCountMin,
-    playerCountMax,
-    gameMode,
-    maxTurnsMin,
-    maxTurnsMax,
-    teaser,
-    title,
-    publicationStatus,
-    showOnWelcomeScreen,
-    order,
-    requestId,
-    ...templateData
-  } = req.body;
-
-  if (!playerCountMin || !playerCountMax || !gameMode || !title) {
-    return sendBadRequest(
-      res,
-      "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
-      requestId
-    );
-  }
+  const requestId = req.body?.requestId || "unknown";
 
   try {
-    // Prepare template data with the title field
-    const fullTemplateData = {
-      ...templateData,
-      title,
-      teaser: teaser || "",
-      publicationStatus: publicationStatus || PublicationStatus.Draft,
-      showOnWelcomeScreen: showOnWelcomeScreen || false,
-      order: order !== undefined ? order : 999, // Default to end of list
-    };
+    const { template } = req.body as CreateTemplateRequest;
 
-    const template = await libraryService.createTemplate(
-      playerCountMin,
-      playerCountMax,
-      gameMode,
-      fullTemplateData,
-      templateData.tags || [],
-      maxTurnsMin || 10,
-      maxTurnsMax || 15
+    if (!template) {
+      return sendBadRequest(res, "Missing template data", requestId);
+    }
+
+    const createdTemplate = await libraryService.createTemplate(template);
+
+    Logger.Route.log(
+      `Created template ${createdTemplate.id}: ${createdTemplate.title}`
     );
-
-    Logger.Route.log(`Created template ${template.id}: ${title}`);
-    sendSuccess(res, { template }, requestId, 201);
+    sendSuccess(res, { template: createdTemplate }, requestId, 201);
   } catch (error) {
     Logger.Route.error("Error creating template", error);
     sendError(res, "Failed to create template", 500, requestId, error);
@@ -281,60 +260,23 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
 // Update a template
 router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const {
-    playerCountMin,
-    playerCountMax,
-    gameMode,
-    maxTurnsMin,
-    maxTurnsMax,
-    teaser,
-    title,
-    publicationStatus,
-    showOnWelcomeScreen,
-    order,
-    requestId,
-    ...templateData
-  } = req.body;
-
-  if (!playerCountMin || !playerCountMax || !gameMode || !title) {
-    return sendBadRequest(
-      res,
-      "Missing required fields: playerCountMin, playerCountMax, gameMode, title",
-      requestId
-    );
-  }
+  const requestId = req.body?.requestId || "unknown";
 
   try {
-    // Prepare template data with the title field
-    const fullTemplateData = {
-      ...templateData,
-      title,
-      teaser: teaser || "",
-      publicationStatus: publicationStatus || PublicationStatus.Draft,
-      showOnWelcomeScreen:
-        showOnWelcomeScreen !== undefined ? showOnWelcomeScreen : false,
-      order: order !== undefined ? order : 999,
-    };
+    const { template } = req.body as UpdateTemplateRequest;
+    if (!template) {
+      return sendBadRequest(res, "Missing template data", requestId);
+    }
 
-    const template = await libraryService.updateTemplate(
-      id,
-      playerCountMin,
-      playerCountMax,
-      gameMode,
-      fullTemplateData,
-      templateData.tags || [],
-      maxTurnsMin,
-      maxTurnsMax
-    );
+    const updatedTemplate = await libraryService.updateTemplate(id, template);
 
-    Logger.Route.log(`Updated template ${id}: ${title}`);
-    sendSuccess(res, { template }, requestId);
+    Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
+    sendSuccess(res, { template: updatedTemplate }, requestId);
   } catch (error) {
     // Check if it's a not found error
     if ((error as Error).message.includes("not found")) {
       return sendNotFound(res, "Template not found", requestId);
     }
-
     Logger.Route.error(`Error updating template ${id}`, error);
     sendError(res, "Failed to update template", 500, requestId, error);
   }
@@ -343,9 +285,10 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
 // Delete a template
 router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const requestId = req.body.requestId;
+  const requestId = req.body?.requestId || "unknown";
 
   try {
+    const deleteRequest = req.body as DeleteTemplateRequest;
     const result = await libraryService.deleteTemplate(id);
 
     if (!result) {
@@ -367,22 +310,25 @@ router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
 
 // Generate a template using AI
 router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
-  const { prompt, playerCount, maxTurns, gameMode, requestId } = req.body;
-
-  if (!prompt || !playerCount || !maxTurns || !gameMode) {
-    return sendBadRequest(
-      res,
-      "Missing required fields: prompt, playerCount, maxTurns, gameMode",
-      requestId
-    );
-  }
+  const requestId = req.body?.requestId || "unknown";
 
   try {
+    const { prompt, playerCount, maxTurns, gameMode, generateImages } =
+      req.body as GenerateTemplateRequest;
+
+    if (!prompt || !playerCount || !maxTurns || !gameMode) {
+      return sendBadRequest(
+        res,
+        "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+        requestId
+      );
+    }
+
     Logger.Route.log(`Generating template with prompt: ${prompt}`);
 
     const template = await libraryService.generateTemplate(
       prompt,
-      false,
+      generateImages || false,
       playerCount,
       maxTurns,
       gameMode
@@ -399,25 +345,27 @@ router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
 // Iterate on a template with AI
 router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
   const { id } = req.params;
-  const { feedback, sections, gameMode, playerCount, maxTurns, requestId } =
-    req.body;
-
-  if (
-    !feedback ||
-    !sections ||
-    !sections.length ||
-    !gameMode ||
-    !playerCount ||
-    !maxTurns
-  ) {
-    return sendBadRequest(
-      res,
-      "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
-      requestId
-    );
-  }
+  const requestId = req.body?.requestId || "unknown";
 
   try {
+    const { feedback, sections, gameMode, playerCount, maxTurns } =
+      req.body as TemplateIterationRequest;
+
+    if (
+      !feedback ||
+      !sections ||
+      !sections.length ||
+      !gameMode ||
+      !playerCount ||
+      !maxTurns
+    ) {
+      return sendBadRequest(
+        res,
+        "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
+        requestId
+      );
+    }
+
     // Check if template exists
     const template = await libraryService.getTemplateById(id);
     if (!template) {

@@ -13,31 +13,15 @@ import { StoryInitializer } from "@/page/components/StoryInitializer";
 import {
   StoryTemplate,
   PublicationStatus,
-  Guidelines,
   Outcome,
   StoryElement,
-  StatValueEntry,
-  Stat,
-  PlayerOptionsGeneration,
-  CharacterSelectionIntroduction,
-  PlayerSlot,
+  TemplateIterationSections,
 } from "@core/types";
-import { PrimaryButton, Icons, Select } from "@components/ui";
-import { useTemplateForm } from "../hooks/useTemplateForm";
+import { PrimaryButton, Icons, Select, Tabs } from "@components/ui";
+import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "@components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
-import { SectionData } from "@core/types/admin";
 import { Logger } from "@common/logger";
-
-type TabType =
-  | "basic"
-  | "guidelines"
-  | "elements"
-  | "outcomes"
-  | "stats"
-  | "players"
-  | "ai-draft"
-  | "ai-iterate";
 
 interface TemplateFormProps {
   template: StoryTemplate;
@@ -60,7 +44,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     formData,
     tags,
     handleSubmit,
-    getPlayerOptions,
+    getPlayerOptionsFromStoryTemplate,
     handleAIDraftSetup,
     setWorld,
     setRules,
@@ -79,7 +63,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleStatsChange,
     handleStoryElementsChange,
     handleOutcomesChange,
-    handlePlayerOptionsChange,
+    handlePlayerChange,
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
     handleTagsChange,
@@ -112,84 +96,62 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
   // Define tab navigation items
   const tabItems = [
-    { id: "basic", label: "Basic Info" },
-    { id: "guidelines", label: "Guidelines" },
-    { id: "elements", label: "Elements" },
-    { id: "outcomes", label: "Outcomes" },
-    { id: "stats", label: "Stats" },
-    { id: "players", label: "Players" },
-    { id: "ai-draft", label: "AI Draft" },
-    { id: "ai-iterate", label: "AI Iteration" },
+    { id: "basic" as TabType, label: "Basic Info" },
+    { id: "guidelines" as TabType, label: "Guidelines" },
+    { id: "elements" as TabType, label: "Elements" },
+    { id: "outcomes" as TabType, label: "Outcomes" },
+    { id: "stats" as TabType, label: "Stats" },
+    { id: "players" as TabType, label: "Players" },
+    { id: "ai-draft" as TabType, label: "AI Draft" },
+    { id: "ai-iterate" as TabType, label: "AI Iteration" },
   ];
 
-  // Add this handler to handle section acceptance
   const handleAcceptSectionUpdate = (
-    sectionKey: keyof SectionData,
-    data: unknown
+    sectionKey: TemplateIterationSections,
+    data: Partial<StoryTemplate>
   ) => {
-    const result = handleAcceptSection(sectionKey, data);
-    Logger.UI.log(
-      `Accepting section update for ${String(sectionKey)}:`,
-      result
-    );
+    Logger.UI.log(`Accepting section update for ${String(sectionKey)}`);
 
     // Update the form state based on the section
-    if (sectionKey === "guidelines" && result) {
-      const guidelines = result as Guidelines;
+    if (sectionKey === "guidelines" && data.guidelines) {
+      const guidelines = data.guidelines;
       setWorld(guidelines.world || "");
       setRules(guidelines.rules || []);
       setTone(guidelines.tone || []);
       setConflicts(guidelines.conflicts || []);
       setDecisions(guidelines.decisions || []);
       setTypesOfThreads(guidelines.typesOfThreads || []);
-    } else if (sectionKey === "storyElements" && result) {
-      handleStoryElementsChange(result as StoryElement[]);
-    } else if (sectionKey === "sharedOutcomes" && result) {
-      handleOutcomesChange(result as Outcome[]);
-    } else if (sectionKey === "stats" && result) {
-      const statData = result as {
-        statGroups?: string[];
-        sharedStats?: Stat[];
-        playerStats?: Stat[];
-        initialSharedStatValues?: StatValueEntry[];
-      };
+    } else if (sectionKey === "storyElements" && data.storyElements) {
+      handleStoryElementsChange(data.storyElements as StoryElement[]);
+    } else if (sectionKey === "sharedOutcomes" && data.sharedOutcomes) {
+      handleOutcomesChange(data.sharedOutcomes as Outcome[]);
+    } else if (sectionKey === "stats" && data.statGroups) {
       handleStatsChange({
-        statGroups: statData.statGroups,
-        sharedStats: statData.sharedStats,
-        playerStats: statData.playerStats,
-        initialSharedStatValues: statData.initialSharedStatValues,
+        statGroups: data.statGroups,
+        sharedStats: data.sharedStats,
+        playerStats: data.playerStats,
+        initialSharedStatValues: data.initialSharedStatValues,
       });
-    } else if (sectionKey === "players" && result) {
-      const playerData = result as {
-        playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
-        characterSelectionIntroduction?: CharacterSelectionIntroduction;
-      };
-
-      Logger.UI.log("Processing player data for form update:", playerData);
-
-      if (playerData.playerOptions) {
-        // Apply each player option update individually
-        const playerOptions = playerData.playerOptions;
-        handlePlayerOptionsChange(playerOptions);
-        Logger.UI.log("Updated player options:", playerOptions);
+    } else if (sectionKey === "players") {
+      if (data.player1) {
+        handlePlayerChange(data);
       }
 
-      if (playerData.characterSelectionIntroduction) {
+      if (data.characterSelectionIntroduction) {
         handleCharacterSelectionIntroductionChange(
-          playerData.characterSelectionIntroduction
-        );
-        Logger.UI.log(
-          "Updated character selection introduction:",
-          playerData.characterSelectionIntroduction
+          data.characterSelectionIntroduction
         );
       }
     }
+
+    // Delete the section from the iteration state and modal
+    handleAcceptSection(sectionKey, data);
   };
 
   // Add this handler for submitting AI iteration requests
   const handleAiIterationSubmit = async (
     feedback: string,
-    sections: Array<keyof SectionData>
+    sections: Array<TemplateIterationSections>
   ) => {
     try {
       setIsLoading(true);
@@ -253,26 +215,12 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             )}
         </div>
 
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex">
-            <div className="flex space-x-8">
-              {tabItems.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </nav>
-        </div>
+        <Tabs
+          items={tabItems}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          variant="bordered"
+        />
 
         <div className="mt-6">
           {activeTab === "basic" && (
@@ -359,15 +307,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               sharedStats={formData.sharedStats || []}
               playerStats={formData.playerStats || []}
               initialSharedStatValues={formData.initialSharedStatValues || []}
-              playerOptions={getPlayerOptions()}
+              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
               onChange={handleStatsChange}
             />
           )}
 
           {activeTab === "players" && (
             <PlayersTab
-              playerOptions={getPlayerOptions()}
-              onChange={handlePlayerOptionsChange}
+              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
+              onChange={handlePlayerChange}
               playerStats={formData.playerStats || []}
               characterSelectionIntroduction={
                 formData.characterSelectionIntroduction || {
@@ -422,7 +370,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         onClose={handleCloseModal}
         iterationData={iterationData}
         onAcceptSection={handleAcceptSectionUpdate}
-        playerOptions={getPlayerOptions()}
+        playerOptions={getPlayerOptionsFromStoryTemplate(iterationData)}
         originalPlayerStats={formData.playerStats || []}
       />
     </>

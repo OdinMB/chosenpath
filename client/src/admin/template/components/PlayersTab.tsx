@@ -13,10 +13,10 @@ interface PlayersTabProps {
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   onChange: (updates: Record<PlayerSlot, PlayerOptionsGeneration>) => void;
   playerStats: Stat[];
-  characterSelectionIntroduction: CharacterSelectionIntroduction;
   onCharacterSelectionIntroductionChange: (
     updatedIntro: CharacterSelectionIntroduction
   ) => void;
+  characterSelectionIntroduction?: CharacterSelectionIntroduction;
   readOnly?: boolean;
 }
 
@@ -54,11 +54,20 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 
   return (
     <div className="space-y-8">
-      <CharacterSelectionIntroEditor
-        introduction={characterSelectionIntroduction}
-        onChange={onCharacterSelectionIntroductionChange}
-        readOnly={readOnly}
-      />
+      {characterSelectionIntroduction ? (
+        <CharacterSelectionIntroEditor
+          introduction={characterSelectionIntroduction}
+          onChange={onCharacterSelectionIntroductionChange}
+          readOnly={readOnly}
+        />
+      ) : (
+        <div className="bg-white p-4 rounded-lg shadow mb-4">
+          <h3 className="text-lg font-semibold">
+            Character Selection Introduction
+          </h3>
+          <p>No character selection introduction found</p>
+        </div>
+      )}
 
       {Array.from({ length: MAX_PLAYERS }, (_, i) => {
         const playerSlot = `player${i + 1}` as PlayerSlot;

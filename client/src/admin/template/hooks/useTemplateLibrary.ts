@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { Logger } from "@common/logger";
-import { StoryTemplate, PublicationStatus, GameModes } from "@core/types";
+import { StoryTemplate } from "@core/types";
 import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
 import {
   CreateTemplateRequest,
@@ -143,33 +143,7 @@ export const useTemplateLibrary = (token: string) => {
 
           // Create a new template with essential fields
           const newTemplate: CreateTemplateRequest = withRequestId({
-            title: templateData.title || "Imported Template",
-            publicationStatus: PublicationStatus.Draft,
-            playerCountMin: templateData.playerCountMin,
-            playerCountMax: templateData.playerCountMax,
-            maxTurnsMin: templateData.maxTurnsMin,
-            maxTurnsMax: templateData.maxTurnsMax,
-            gameMode: templateData.gameMode || GameModes.SinglePlayer,
-            tags: templateData.tags || [],
-            teaser: templateData.teaser || "",
-            guidelines: templateData.guidelines || {
-              world: "",
-              rules: [],
-              tone: [],
-              conflicts: [],
-              decisions: [],
-            },
-            storyElements: templateData.storyElements || [],
-            sharedOutcomes: templateData.sharedOutcomes || [],
-            statGroups: templateData.statGroups || [],
-            sharedStats: templateData.sharedStats || [],
-            initialSharedStatValues: templateData.initialSharedStatValues || [],
-            playerStats: templateData.playerStats || [],
-            characterSelectionIntroduction:
-              templateData.characterSelectionIntroduction || {
-                title: "",
-                text: "",
-              },
+            template: templateData as Partial<StoryTemplate>,
           });
 
           // Send to server

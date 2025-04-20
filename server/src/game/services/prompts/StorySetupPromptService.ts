@@ -108,9 +108,9 @@ STATS
 Stat groups
 are used to group stats in the UI. Both character and shared stats can be grouped and will be displayed in the UI together.
 - Group stats in a way that is flavorful and makes sense for the story.
-- Use a maximum of 4 different stat groups. Otherwise, the UI will become too crowded and confusing.
+- Use a maximum of 3 different stat groups. Otherwise, the UI will become too crowded and confusing.
 - Keep the group names short.
-- Examples: Character/Empire/Politics (for building a mafia empire), Detective/Investigation/Contacts (for a mystery story), Character/Ship/Crew/Resources (for a space opera)
+- Examples: Character/Empire/Politics (for building a mafia empire), Detective/Investigation/Contacts (for a mystery story), Character/Ship/Crew (for a space opera)
 
 Stat guidelines
 - In general, favor string and string[] over numbers

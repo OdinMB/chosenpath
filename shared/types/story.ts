@@ -113,7 +113,7 @@ export type PlayerOptionsGeneration = z.infer<
 export const statGroupsSchema = z
   .array(z.string())
   .describe(
-    "Names of groups for character stats. This is just a way to organize stats in the UI."
+    "Names of groups for character stats. This is just a way to organize stats in the UI. Maximum of 3 groups."
   );
 
 export const createStorySetupSchema = (playerCount: PlayerCount) => {

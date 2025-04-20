@@ -1,6 +1,8 @@
 import { type GameMode } from "@core/types/story.js";
 import type { PlayerCount } from "@core/types/player.js";
+import type { TemplateIterationSections } from "@core/types/admin.js";
 import { StorySetupPromptService } from "./StorySetupPromptService.js";
+import { Logger } from "@common/logger.js";
 
 export class StoryIterationPromptService {
   /**
@@ -16,13 +18,13 @@ export class StoryIterationPromptService {
   public static createIterationPrompt(
     templateJson: string,
     feedback: string,
-    sections: string[],
+    sections: TemplateIterationSections[],
     playerCount: PlayerCount,
     gameMode: GameMode,
     maxTurns: number
   ): string {
     const basePrompt = StorySetupPromptService.createSetupPrompt(
-      feedback,
+      "These instructions are the default instructions for creating a full story template based on a prompt. Your job is to adjust an existing story template based on feedback that will be provided below.",
       playerCount,
       gameMode,
       maxTurns
@@ -30,19 +32,21 @@ export class StoryIterationPromptService {
 
     const sectionsString = sections.join(", ");
 
-    return (
+    const prompt =
       `${basePrompt}\n\n` +
       `#`.repeat(100) +
-      `\n\n` +
-      `IMPORTANT: I am providing you with an existing story template that needs to be improved. ` +
-      `You must ONLY regenerate the following sections: ${sectionsString}.\n\n` +
-      `Maintain consistency with the other parts of the template that you are not changing.\n\n` +
-      `Here is the current template:\n\n` +
+      `\n\nIMPORTANT: I am providing you with an existing story template that needs to be improved. ` +
+      `You must ONLY regenerate the following sections: ${sectionsString}.` +
+      `\n\nMaintain consistency with the other parts of the template that you are not changing.` +
+      `\n\nHere is the current template:\n\n` +
       `${templateJson}\n\n` +
       `#`.repeat(100) +
-      `\n\n` +
-      `Based on the feedback: "${feedback}"\n\n` +
-      `Generate only the requested sections (${sectionsString}) with improved content, keeping the same structure but enhancing the quality and addressing the feedback.`
-    );
+      `\n\nHere is the feedback from the user on the existing story template:\n\n"${feedback.toUpperCase()}"` +
+      `\n\nGenerate only the following requested sections with improved content, keeping the same structure but enhancing the quality and addressing the feedback: ${sectionsString}` +
+      `\nThe user can only accept entire sections. If you make changes to the guidelines, provide a fully generated guidelines section. Same for stats, players, etc. Don't just generate additional elements that the user asked for, or make changes to a few specific items. We always need the full, updated section.`;
+
+    // Logger.Admin.log(`Story iteration prompt: ${prompt}`);
+
+    return prompt;
   }
 }

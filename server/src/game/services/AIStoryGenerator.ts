@@ -13,7 +13,6 @@ import type {
   PlayerCount,
   BeatsNeedingImages,
   GameMode,
-  Thread,
 } from "@core/types/index.js";
 import {
   createStorySetupSchema,
@@ -21,8 +20,8 @@ import {
   threadAnalysisSchema,
   PLAYER_SLOTS,
   PlayerState,
-  getThreadType,
 } from "@core/types/index.js";
+import { Logger } from "@common/logger.js";
 import { getPlayerSlots } from "@core/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "@core/types/beat.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
@@ -37,6 +36,9 @@ import {
 import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "@/config.js";
 import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
+import { z } from "zod";
+import { logZodSchema } from "@/shared/zodUtils.js";
+import { templateIterationSections } from "@core/utils/templateIterationSections.js";
 
 dotenv.config();
 
@@ -133,7 +135,7 @@ export class AIStoryGenerator {
 
     // If mock stories are enabled, try to read from file
     if (mockStoriesEnabled) {
-      console.log(
+      Logger.Story.log(
         `Using mock story setup with playerCount: ${playerCount}, gameMode: ${gameMode}`
       );
 
@@ -145,15 +147,15 @@ export class AIStoryGenerator {
       try {
         // Try to read the mock file
         const mockData = await readStorageFile("mocks", mockFilename);
-        console.log(`Reading mock story from ${mockFilename}`);
+        Logger.Story.log(`Reading mock story from ${mockFilename}`);
         return JSON.parse(mockData) as StorySetupGeneration<typeof playerCount>;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          console.log(
+          Logger.Story.log(
             `Mock file ${mockFilename} not found. Generating new story.`
           );
         } else {
-          console.error(`Error reading mock file: ${error}`);
+          Logger.Story.error(`Error reading mock file: ${error}`);
         }
       }
     }
@@ -163,7 +165,9 @@ export class AIStoryGenerator {
     const structuredModel = this.model.withStructuredOutput(schema);
 
     try {
-      console.log("Generating story setup with playerCount:", playerCount);
+      Logger.Story.log(
+        `Generating story setup with playerCount: ${playerCount}`
+      );
 
       const setupPrompt = StorySetupPromptService.createSetupPrompt(
         prompt,
@@ -173,7 +177,7 @@ export class AIStoryGenerator {
       );
 
       const result = await structuredModel.invoke(setupPrompt);
-      console.log("Raw response:", JSON.stringify(result, null, 2));
+      Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
 
       // If mock stories are enabled, save the result to a file for later use
       if (mockStoriesEnabled) {
@@ -183,9 +187,9 @@ export class AIStoryGenerator {
             mockFilename,
             JSON.stringify(result, null, 2)
           );
-          console.log(`Saved mock story to ${mockFilename}`);
+          Logger.Story.log(`Saved mock story to ${mockFilename}`);
         } catch (error) {
-          console.error(`Error saving mock file: ${error}`);
+          Logger.Story.error(`Error saving mock file: ${error}`);
         }
       }
 
@@ -194,7 +198,7 @@ export class AIStoryGenerator {
 
       return storySetupData as StorySetupGeneration<typeof playerCount>;
     } catch (error) {
-      console.error("Failed to initialize story:", error);
+      Logger.Story.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
     }
   }
@@ -207,7 +211,7 @@ export class AIStoryGenerator {
     const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
-    console.log("Response:\n", JSON.stringify(response, null, 2));
+    Logger.Story.log(JSON.stringify(response, null, 2));
 
     const currentBeatIndex = story.getCurrentTurn() - 1;
     const firstBeatIndexOfSwitch = currentBeatIndex + 1;
@@ -228,7 +232,7 @@ export class AIStoryGenerator {
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
-    console.log("Response:\n", JSON.stringify(response, null, 2));
+    Logger.Story.log(JSON.stringify(response, null, 2));
 
     const currentBeatIndex = story.getCurrentTurn() - 1;
     const firstBeatIndexOfThread = currentBeatIndex + 1;
@@ -280,7 +284,7 @@ export class AIStoryGenerator {
 
       return [updatedStory, mergedChanges, beatsNeedingImages];
     } catch (error) {
-      console.error("Failed to generate next beats:", error);
+      Logger.Story.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
     }
   }
@@ -298,13 +302,15 @@ export class AIStoryGenerator {
     );
     const structuredModel = this.model.withStructuredOutput(schema);
 
-    console.log("Generating beats for turn:", story.getCurrentTurn() + 1);
+    Logger.Story.log(
+      `Generating beats for turn: ${story.getCurrentTurn() + 1}`
+    );
 
     const response = (await structuredModel.invoke(
       BeatPromptService.createBeatPrompt(story)
     )) as SetOfBeatGenerationSchema;
 
-    console.log("Response:\n", JSON.stringify(response, null, 2));
+    Logger.Story.log(JSON.stringify(response, null, 2));
     return response;
   }
 
@@ -389,53 +395,54 @@ export class AIStoryGenerator {
     playerCount: PlayerCount
   ): Promise<Partial<StorySetupGeneration<typeof playerCount>>> {
     try {
-      console.log("Generating partial template update for sections:", sections);
-
-      // Create a partial schema based on the requested sections
-      const fullSchema = createStorySetupSchema(playerCount);
-
-      // Create a subset of the schema with only the requested fields
-      // This uses zod's pick method to select specific sections of the schema
-      const partialSchema = fullSchema.pick(
-        sections.reduce((acc, section) => {
-          // Handle special cases for grouped sections
-          if (section === "stats") {
-            return {
-              ...acc,
-              statGroups: true,
-              sharedStats: true,
-              playerStats: true,
-              initialSharedStatValues: true,
-            };
-          }
-          if (section === "players") {
-            // For players, we need to include player1, player2, etc. based on playerCount
-            const playerFields = Object.fromEntries(
-              Array.from({ length: playerCount }, (_, i) => [
-                `player${i + 1}`,
-                true,
-              ])
-            );
-            return {
-              ...acc,
-              ...playerFields,
-              characterSelectionIntroduction: true,
-            };
-          }
-          return { ...acc, [section]: true };
-        }, {})
+      Logger.Story.log(
+        "Generating partial template update for sections:",
+        sections
       );
 
+      // Get the full schema
+      const fullSchema = createStorySetupSchema(playerCount);
+      const shapeEntries = Object.entries(fullSchema.shape);
+
+      // Set to track fields to keep
+      const fieldsToKeep = new Set<string>();
+      // Add fields based on requested sections using templateIterationSections
+      for (const section of sections) {
+        if (section in templateIterationSections) {
+          const sectionFields =
+            templateIterationSections[
+              section as keyof typeof templateIterationSections
+            ];
+          sectionFields.forEach((field) => fieldsToKeep.add(field));
+        }
+      }
+      // Special handling for player fields to match current playerCount
+      if (sections.includes("players")) {
+        // Add correct player fields for the current playerCount
+        for (let i = 1; i <= playerCount; i++) {
+          fieldsToKeep.add(`player${i}`);
+        }
+      }
+      Logger.Story.log("Fields to keep:", Array.from(fieldsToKeep));
+
+      // Filter the shape entries to only include fields we want to keep
+      const filteredShapeEntries = shapeEntries.filter(([key]) =>
+        fieldsToKeep.has(key)
+      );
+      // Create a new schema with just the fields we want
+      const filteredShape = Object.fromEntries(filteredShapeEntries);
+      const partialSchema = z.object(filteredShape);
+
+      // Create a structured model with the partial schema
       const structuredModel = this.model.withStructuredOutput(partialSchema);
       const result = await structuredModel.invoke(prompt);
 
-      console.log(
-        "Partial template update generated:",
-        JSON.stringify(result, null, 2)
-      );
+      Logger.Story.log("Result:", JSON.stringify(result, null, 2));
+      Logger.Story.log("Partial template update generated");
+
       return result;
     } catch (error) {
-      console.error("Failed to generate partial template update:", error);
+      Logger.Story.error("Failed to generate partial template update:", error);
       throw new Error("Failed to generate template updates. Please try again.");
     }
   }

@@ -8,5 +8,7 @@ export { LoadingSpinner } from "./LoadingSpinner";
 export { Notification } from "./Notification";
 export { PrimaryButton } from "./PrimaryButton";
 export { Select } from "./Select";
+export { Tabs } from "./Tabs";
 export { TextArea } from "./TextArea";
 export { Tooltip } from "./Tooltip";
+export { useTabs } from "./useTabs";
