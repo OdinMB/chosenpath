@@ -190,7 +190,7 @@ export const Admin = () => {
                 }`}
                 onClick={() => setActiveTab("sample-template")}
               >
-                View Sample Template
+                Read-only Test
               </button>
             </div>
 

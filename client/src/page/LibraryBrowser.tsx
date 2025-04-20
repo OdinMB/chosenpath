@@ -228,16 +228,16 @@ export function LibraryBrowser({
 
   return (
     <div className="max-w-4xl mx-auto p-6 font-lora">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-primary-800 md:text-center md:w-full">
-          Story Library
-        </h1>
+      <div className="flex justify-between items-center mb-6 relative">
+        <div className="w-full flex justify-start lg:justify-center">
+          <h1 className="text-2xl font-bold text-primary-800">Story Library</h1>
+        </div>
         <PrimaryButton
           onClick={onBack}
           size="sm"
           variant="outline"
           leftBorder={false}
-          className="flex items-center gap-1 md:absolute md:right-8"
+          className="flex items-center gap-1 absolute right-0"
         >
           <Icons.ArrowLeft className="w-4 h-4" />
           Back
