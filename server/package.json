@@ -35,11 +35,11 @@
     "typescript": "^5.0.0"
   },
   "_moduleAliases": {
-    "@core": "./dist/core",
-    "@common": "./dist/shared",
-    "@admin": "./dist/admin",
-    "@game": "./dist/game",
-    "@page": "./dist/page",
-    "@user": "./dist/user"
+    "@core": "dist/core",
+    "@common": "dist/shared",
+    "@admin": "dist/admin",
+    "@game": "dist/game",
+    "@page": "dist/page",
+    "@user": "dist/user"
   }
 }
