@@ -14,9 +14,12 @@ import type {
   SelectCharacterResponse,
   MakeChoiceResponse,
   InitializeStoryResponse,
+  WSErrorResponse,
 } from "@core/types/websocket.js";
+import { ContentModerationResponse, ResponseStatus } from "@core/types/api.js";
 import { AdminLibraryService } from "../admin/AdminLibraryService.js";
 import { Logger } from "@common/logger.js";
+import { ContentFilterService } from "./services/ContentFilterService.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;
@@ -31,9 +34,11 @@ export class GameHandler {
   >();
   private storyInitializedHandler: (event: any) => void;
   private operationErrorHandler: (event: any) => void;
+  private contentFilter: ContentFilterService;
 
   constructor() {
     this.storyRepository = StoryRepository.getInstance();
+    this.contentFilter = new ContentFilterService();
     console.log("[GameHandler] Creating game handler instance");
 
     // Create bound handlers for events
@@ -229,7 +234,7 @@ export class GameHandler {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       console.log(`\n====== [GameHandler] Initializing story ======`);
       if (!isValidPlayerCount(playerCount)) {
@@ -259,6 +264,32 @@ export class GameHandler {
         gameId,
         codes: playerCodes,
       } as StoryCodesNotification);
+
+      // Check if the prompt contains inappropriate content
+      const contentCheck = await this.contentFilter.isAppropriatePrompt(prompt);
+      if (!contentCheck.isAppropriate) {
+        const contentModerationResponse: ContentModerationResponse = {
+          status: ResponseStatus.CONTENT_MODERATION,
+          type: "initialize_story_response",
+          requestId: randomUUID(),
+          timestamp: Date.now(),
+          message:
+            "Content moderation failed. Your story prompt contains inappropriate content.",
+          promptSubmitted: prompt,
+          moderationReason:
+            contentCheck.reason || "Inappropriate content detected",
+        };
+
+        socket.emit("response", contentModerationResponse);
+
+        Logger.Websocket.log(
+          `[GameHandler] Content moderation failed: ${contentCheck.reason}`,
+          { prompt, operationType: "contentFilter" }
+        );
+
+        // Return false to indicate that the story was not initialized
+        return false;
+      }
 
       // Create a promise that will resolve when initialization is complete
       await new Promise<void>(async (resolve, reject) => {
@@ -298,6 +329,8 @@ export class GameHandler {
           requestResponse
         );
       });
+
+      return true;
     } catch (error) {
       Logger.Websocket.error(
         "[GameHandler] Failed to initialize story:",

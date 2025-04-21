@@ -35,7 +35,7 @@ export function StoryInitializer({
   initialMaxTurns,
   initialGameMode,
   showBackButton = true,
-  isLoading = false,
+  isLoading: externalIsLoading = false,
   wrappingForm = false,
   templateMode = false,
 }: StoryInitializerProps) {
@@ -49,8 +49,14 @@ export function StoryInitializer({
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
-  const { isRequestPending } = useSession();
-
+  const {
+    isRequestPending,
+    error,
+    setError,
+    contentModeration,
+    setContentModeration,
+    isLoading: sessionIsLoading,
+  } = useSession();
   // Completely separate the game mode state for single player and multiplayer
   const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
   const [multiplayerMode, setMultiplayerMode] = useState<GameMode>(
@@ -58,6 +64,22 @@ export function StoryInitializer({
       ? initialGameMode
       : GameModes.Cooperative
   );
+
+  const isLoading = useMemo(() => {
+    return (
+      (sessionIsLoading ||
+        externalIsLoading ||
+        isRequestPending("initialize_story")) &&
+      !contentModeration &&
+      !error
+    );
+  }, [
+    sessionIsLoading,
+    externalIsLoading,
+    isRequestPending,
+    contentModeration,
+    error,
+  ]);
 
   // Compute the effective game mode based on player count
   const effectiveGameMode =
@@ -199,6 +221,14 @@ export function StoryInitializer({
     });
   };
 
+  // Clear error when prompt changes
+  useEffect(() => {
+    if (error) {
+      setError(null);
+      setContentModeration(null);
+    }
+  }, [prompt, error, setError, setContentModeration]);
+
   const renderForm = () => (
     <div className="space-y-6">
       <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
@@ -217,6 +247,7 @@ export function StoryInitializer({
             value={playerCount}
             onChange={(e) => setPlayerCount(Number(e.target.value))}
             className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            disabled={isLoading}
           />
           <div className="flex justify-between text-xs md:text-sm text-primary-600">
             <span>1 Player</span>
@@ -247,7 +278,7 @@ export function StoryInitializer({
             }
             onChange={(e) => handleGameModeChange(Number(e.target.value))}
             className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-            disabled={playerCount === 1}
+            disabled={playerCount === 1 || isLoading}
           />
           <div className="flex justify-between text-xs md:text-sm text-primary-600">
             <span>Shared Goals</span>
@@ -272,6 +303,7 @@ export function StoryInitializer({
             size="sm"
             leftBorder={false}
             className="self-end sm:self-auto"
+            disabled={isLoading}
           >
             Get suggestion
           </PrimaryButton>
@@ -280,8 +312,9 @@ export function StoryInitializer({
           id="prompt"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+          className={`w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
           placeholder={getPlaceholderText()}
+          disabled={isLoading}
         />
       </div>
 
@@ -314,7 +347,7 @@ export function StoryInitializer({
           checked={generateImages}
           onChange={(e) => setGenerateImages(e.target.checked)}
           className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-          disabled={true} // {isLoading}
+          disabled={isLoading}
         />
         <label
           htmlFor="generate-images"

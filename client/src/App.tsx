@@ -6,6 +6,7 @@ import { gameService } from "@game/GameService";
 import { Page } from "@/page/Page";
 import { GameMode, StoryTemplate } from "@core/types";
 import { RateLimitNotification } from "@components/RateLimitNotification";
+import { ContentModerationNotification } from "@common/components/ContentModerationNotification";
 import { AppTitle } from "@components/AppTitle";
 import {
   LibraryBrowser,
@@ -44,6 +45,8 @@ function App() {
     setError,
     rateLimit,
     setRateLimit,
+    contentModeration,
+    setContentModeration,
     isRequestPending,
     isOperationRunning,
     isConnecting,
@@ -281,7 +284,6 @@ function App() {
     Logger.App.log("handleStorySetup called, initializing a new story");
     setIsLoading(true);
 
-    // Set story creation status to PREMISE
     storyCreationStatus.current = "PREMISE";
 
     gameService.initializeStory(
@@ -313,7 +315,6 @@ function App() {
     // Reset loading state and story state
     resetStoryCreationState();
 
-    // Set a flag to indicate we're about to show template config
     storyCreationStatus.current = "TEMPLATE";
 
     // Set the selected template first
@@ -605,6 +606,22 @@ function App() {
               <RateLimitNotification
                 rateLimit={rateLimit}
                 onTimeout={() => setRateLimit(null)}
+                className="border-2 bg-white"
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Show all rate limit notifications centrally */}
+      {contentModeration && (
+        <>
+          {/* Full screen overlay with solid backdrop */}
+          <div className="fixed inset-0 bg-black bg-opacity-75 z-[999] flex items-center justify-center">
+            <div className="max-w-md w-full mx-4">
+              <ContentModerationNotification
+                contentModeration={contentModeration}
+                onClose={() => setContentModeration(null)}
                 className="border-2 bg-white"
               />
             </div>

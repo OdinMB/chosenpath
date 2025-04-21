@@ -1,13 +1,16 @@
 import { createContext } from "react";
-import type { ClientStoryState, RateLimitInfo } from "@core/types";
+import type {
+  ClientStoryState,
+  ContentModerationInfo,
+  RateLimitInfo,
+} from "@core/types";
 
-// Interface for story code sets stored in localStorage
-export interface StoredCodeSet {
+export type StoredCodeSet = {
   codes: Record<string, string>;
   timestamp: number;
   title?: string;
   lastActive: boolean;
-}
+};
 
 export type SessionContextType = {
   storyState: ClientStoryState | null;
@@ -28,12 +31,16 @@ export type SessionContextType = {
   // Rate limiting
   rateLimit: RateLimitInfo | null;
   setRateLimit: (rateLimit: RateLimitInfo | null) => void;
+  contentModeration: ContentModerationInfo | null;
+  setContentModeration: (
+    contentModeration: ContentModerationInfo | null
+  ) => void;
   // Request status utilities
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
   // Stored code sets
   storedCodeSets: StoredCodeSet[];
-  getStoredCodeSets: () => StoredCodeSet[];
+  refreshStoredCodeSets: () => void;
   deleteCodeSet: (timestamp: number) => void;
 };
 
@@ -55,9 +62,11 @@ export const SessionContext = createContext<SessionContextType>({
   setError: () => {},
   rateLimit: null,
   setRateLimit: () => {},
+  contentModeration: null,
+  setContentModeration: () => {},
   isRequestPending: () => false,
   isOperationRunning: () => false,
   storedCodeSets: [],
-  getStoredCodeSets: () => [],
+  refreshStoredCodeSets: () => {},
   deleteCodeSet: () => {},
 });

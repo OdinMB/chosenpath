@@ -220,7 +220,7 @@ export class GameWebSocketServer {
             }
 
             // Process the request using the GameHandler
-            await this.gameHandler.initializeStory(
+            const enteredQueue = await this.gameHandler.initializeStory(
               socket,
               data.prompt,
               data.generateImages,
@@ -228,6 +228,11 @@ export class GameWebSocketServer {
               data.maxTurns,
               data.gameMode
             );
+
+            // e.g. failed content moderation
+            if (!enteredQueue) {
+              return;
+            }
 
             // Send immediate success response that the request was accepted
             socket.emit("response", {

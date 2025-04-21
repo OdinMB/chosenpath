@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TAG_CATEGORIES } from "../tag-categories";
+import { TAG_CATEGORIES } from "../tagCategories";
 import { Icons } from "@components/ui";
 
 interface TagSelectorProps {

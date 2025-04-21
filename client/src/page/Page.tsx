@@ -4,6 +4,11 @@ import { useSession } from "@common/useSession";
 import { StoredCodeSet } from "@common/SessionContext";
 import { StoryTemplate } from "@core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
+import {
+  getSortedCodeSets,
+  deleteStoredCodeSet,
+} from "../shared/codeSetUtils.ts";
+import { Logger } from "../shared/logger.js";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;
@@ -51,18 +56,17 @@ export function Page({
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [codeSetToDelete, setCodeSetToDelete] = useState<number | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [codeSets, setCodeSets] = useState<StoredCodeSet[]>(
+    getSortedCodeSets()
+  );
 
-  const { storedCodeSets, deleteCodeSet } = useSession();
+  const { refreshStoredCodeSets } = useSession();
 
-  // Sort code sets to put the lastActive code set at the top
-  const sortedCodeSets = [...storedCodeSets].sort((a, b) => {
-    // First priority: lastActive flag
-    if (a.lastActive && !b.lastActive) return -1;
-    if (!a.lastActive && b.lastActive) return 1;
-
-    // Second priority: timestamp (newest first)
-    return b.timestamp - a.timestamp;
-  });
+  // Refresh UI when code sets change
+  const refreshLocalCodeSets = () => {
+    setCodeSets(getSortedCodeSets());
+    refreshStoredCodeSets();
+  };
 
   // Clear copied status after 2 seconds
   useEffect(() => {
@@ -93,14 +97,26 @@ export function Page({
     // Play button defaults to first code - individual codes can be clicked directly
     const firstCode = Object.values(codeSet.codes)[0];
     if (firstCode) {
+      Logger.UI.log("Joining game with code from stored code set");
       onCodeSubmit(firstCode);
     }
   };
 
   const confirmDelete = () => {
     if (codeSetToDelete !== null) {
-      deleteCodeSet(codeSetToDelete);
+      // Use the utility function directly
+      if (deleteStoredCodeSet(codeSetToDelete)) {
+        Logger.UI.log("Successfully deleted code set");
+      } else {
+        Logger.UI.warn("Failed to delete code set");
+      }
+
+      // Refresh both local and context state
+      refreshLocalCodeSets();
+
+      // Reset deletion state
       setCodeSetToDelete(null);
+      setIsConfirmDialogOpen(false);
     }
   };
 
@@ -141,10 +157,10 @@ export function Page({
 
       <div className="space-y-6">
         {/* Stored Code Sets */}
-        {sortedCodeSets.length > 0 && (
+        {codeSets.length > 0 && (
           <>
             <div className="flex flex-col gap-3">
-              {sortedCodeSets.map((codeSet) => {
+              {codeSets.map((codeSet) => {
                 return (
                   <div
                     key={codeSet.timestamp}

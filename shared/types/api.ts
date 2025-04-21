@@ -1,4 +1,4 @@
-import { RateLimitedAction } from "../config.js";
+import { RateLimitedAction, ContentModerationAction } from "../config.js";
 
 // Base client request type
 export interface ClientRequest {
@@ -13,6 +13,7 @@ export enum ResponseStatus {
   INVALID = "invalid",
   ERROR = "error",
   SUCCESS = "success",
+  CONTENT_MODERATION = "content_moderation",
 }
 
 /**
@@ -24,6 +25,15 @@ export interface RateLimitInfo {
   maxRequests?: number;
   windowMs?: number;
   requestsRemaining: number;
+}
+
+/**
+ * Content moderation information returned when a request is moderated
+ */
+export interface ContentModerationInfo {
+  action: ContentModerationAction;
+  reason: string;
+  prompt: string;
 }
 
 /**
@@ -58,4 +68,15 @@ export interface ErrorResponse extends BaseServerResponse {
   status: ResponseStatus.ERROR | ResponseStatus.INVALID;
   errorMessage: string;
   operationType?: string;
+}
+
+/**
+ * Content moderation response for content that fails moderation checks
+ */
+export interface ContentModerationResponse extends BaseServerResponse {
+  status: ResponseStatus.CONTENT_MODERATION;
+  type: string;
+  message: string;
+  promptSubmitted: string;
+  moderationReason: string;
 }

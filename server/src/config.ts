@@ -40,3 +40,9 @@ export const IMAGE_QUERY_MODEL_NAME =
   process.env.IMAGE_QUERY_MODEL_NAME || "gpt-4.1-mini";
 export const IMAGE_QUERY_MODEL_TEMPERATURE =
   process.env.IMAGE_QUERY_MODEL_TEMPERATURE || 0.1;
+
+// Content filter model settings
+export const CONTENT_FILTER_MODEL_NAME =
+  process.env.CONTENT_FILTER_MODEL_NAME || "gpt-4.1-mini";
+export const CONTENT_FILTER_MODEL_TEMPERATURE =
+  process.env.CONTENT_FILTER_MODEL_TEMPERATURE || 0;

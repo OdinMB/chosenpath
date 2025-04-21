@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { StoryTemplate } from "@core/types";
 import { Logger } from "@common/logger";
-import { groupTagsByCategories } from "@common/tag-categories";
+import { groupTagsByCategories } from "@/shared/tagCategories";
 import { sendTrackedRequest } from "@/shared/requestUtils";
 import { SuccessResponse } from "@core/types/api";
 

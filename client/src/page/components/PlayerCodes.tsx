@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useSession } from "@common/useSession";
+import { deleteCodeSetsByContent } from "@common/codeSetUtils";
 import { LoadingSpinner, PrimaryButton } from "@components/ui";
 
 interface PlayerCodesProps {
@@ -17,6 +19,20 @@ export function PlayerCodes({
   onGoToWelcome,
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
+
+  const { error, contentModeration } = useSession();
+  useEffect(() => {
+    if (contentModeration || error) {
+      console.log(
+        "Received error or content moderation response. Deleting codes and leaving."
+      );
+      // delete codes from session and local storage
+      deleteCodeSetsByContent(codes);
+      // leave this view
+      onBack();
+    }
+  }, [contentModeration, onBack, codes, error]);
+
   const FALLBACK_READY_TIME = 60; // in seconds
 
   // If the story isn't marked ready by the server after 60 seconds,

@@ -35,6 +35,22 @@ function createLogger(serviceName: string, color: string) {
       }
     },
 
+    warn(message: string, ...args: any[]): void {
+      if (args.length > 0) {
+        const formattedArgs = args.map((arg) =>
+          typeof arg === "object"
+            ? inspect(arg, { depth: null, colors: true })
+            : arg
+        );
+        console.warn(
+          `${color}[${serviceName}] ${message}${COLORS.RESET}`,
+          ...formattedArgs
+        );
+      } else {
+        console.warn(`${color}[${serviceName}] ${message}${COLORS.RESET}`);
+      }
+    },
+
     error(message: string, error?: any): void {
       if (error) {
         const formattedError =

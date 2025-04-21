@@ -1,189 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type {
   ClientStoryState,
   WSServerMessage,
   RateLimitInfo,
+  ContentModerationInfo,
 } from "@core/types";
 import { wsService } from "./WebSocketService.js";
 import { SessionContext, StoredCodeSet } from "./SessionContext.js";
+import {
+  storeCodeSet,
+  getStoredCodeSets,
+  deleteStoredCodeSet,
+  updateStoredSetWithCode,
+} from "./codeSetUtils.ts";
+import { Logger } from "./logger.js";
 
-// Function to store codes in localStorage
-function storeCodeSet(
-  codes: Record<string, string>,
-  title?: string,
-  lastActive?: boolean
-): void {
-  try {
-    const codeSet: StoredCodeSet = {
-      codes,
-      timestamp: Date.now(),
-      title,
-      lastActive: lastActive || false,
-    };
-
-    // Get existing code sets
-    const existingSetsJSON = localStorage.getItem("storyCodes");
-    let existingSets: StoredCodeSet[] = [];
-
-    if (existingSetsJSON) {
-      try {
-        existingSets = JSON.parse(existingSetsJSON);
-        console.log(
-          "[SessionProvider] Successfully loaded existing code sets:",
-          existingSets.length
-        );
-      } catch (parseError) {
-        console.error(
-          "[SessionProvider] Failed to parse storyCodes from localStorage:",
-          parseError
-        );
-        // If we can't parse, start fresh rather than losing all codes
-        existingSets = [];
-      }
-    } else {
-      console.log(
-        "[SessionProvider] No existing code sets found in localStorage"
-      );
-    }
-
-    // Add new code set
-    existingSets.push(codeSet);
-    console.log(
-      "[SessionProvider] Adding new code set. Total sets:",
-      existingSets.length
-    );
-
-    // Save back to localStorage
-    const jsonString = JSON.stringify(existingSets);
-    localStorage.setItem("storyCodes", jsonString);
-    console.log(
-      "[SessionProvider] Successfully saved storyCodes to localStorage"
-    );
-  } catch (error) {
-    console.error(
-      "[SessionProvider] Error storing code set in localStorage:",
-      error
-    );
-  }
-}
-
-// Function to get all stored code sets
-function getStoredCodeSets(): StoredCodeSet[] {
-  try {
-    const setsJSON = localStorage.getItem("storyCodes");
-    if (!setsJSON) {
-      console.log("[SessionProvider] No storyCodes found in localStorage");
-      return [];
-    }
-
-    try {
-      const sets = JSON.parse(setsJSON);
-      console.log(
-        "[SessionProvider] Retrieved storyCodes from localStorage:",
-        sets.length,
-        "sets"
-      );
-      return sets;
-    } catch (parseError) {
-      console.error(
-        "[SessionProvider] Failed to parse storyCodes from localStorage:",
-        parseError
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error("[SessionProvider] Error getting stored code sets:", error);
-    return [];
-  }
-}
-
-// Function to update a stored set with a new code
-function updateStoredSetWithCode(
-  code: string,
-  playerRole: string,
-  title?: string,
-  lastActive?: boolean
-): void {
-  try {
-    console.log(
-      "[SessionProvider] Updating stored code set with code:",
-      code,
-      "for role:",
-      playerRole
-    );
-    const sets = getStoredCodeSets();
-
-    // Find if any set contains this code
-    let updatedExisting = false;
-    for (const set of sets) {
-      if (Object.values(set.codes).includes(code)) {
-        // Update the set with the new player role and code
-        set.codes[playerRole] = code;
-        console.log(
-          "[SessionProvider] Updated existing code set for code:",
-          code
-        );
-
-        // Update title if provided and not already set
-        if (title && !set.title) {
-          set.title = title;
-          console.log(
-            "[SessionProvider] Added title to existing code set:",
-            title
-          );
-        }
-
-        if (lastActive !== undefined) {
-          set.lastActive = lastActive;
-          console.log("[SessionProvider] Set lastActive flag to:", lastActive);
-
-          // If the set is now active, set all other sets to inactive
-          if (lastActive) {
-            for (const otherSet of sets) {
-              if (otherSet !== set) {
-                otherSet.lastActive = false;
-              }
-            }
-            console.log("[SessionProvider] Updated other sets to inactive");
-          }
-        }
-
-        const jsonString = JSON.stringify(sets);
-        localStorage.setItem("storyCodes", jsonString);
-        console.log(
-          "[SessionProvider] Successfully saved updated storyCodes to localStorage"
-        );
-        updatedExisting = true;
-        return;
-      }
-    }
-
-    // If no set contains this code, create a new one
-    if (!updatedExisting) {
-      const newSet: StoredCodeSet = {
-        codes: { [playerRole]: code },
-        timestamp: Date.now(),
-        title,
-        lastActive: lastActive || false,
-      };
-      sets.push(newSet);
-      console.log("[SessionProvider] Created new code set for code:", code);
-
-      const jsonString = JSON.stringify(sets);
-      localStorage.setItem("storyCodes", jsonString);
-      console.log(
-        "[SessionProvider] Successfully saved new storyCodes to localStorage"
-      );
-    }
-  } catch (error) {
-    console.error(
-      "[SessionProvider] Error updating stored code with code:",
-      code,
-      "Error:",
-      error
-    );
-  }
-}
+// Create a dedicated logger for session operations
+const logger = Logger.App;
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [storyState, setStoryState] = useState<ClientStoryState | null>(null);
@@ -199,58 +32,31 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
+  const [contentModeration, setContentModeration] =
+    useState<ContentModerationInfo | null>(null);
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
   const [storyReady, setStoryReady] = useState(false);
   const [storedCodeSets, setStoredCodeSets] = useState<StoredCodeSet[]>(
     getStoredCodeSets()
   );
 
-  // Function to delete a code set by timestamp
-  function handleDeleteCodeSet(timestamp: number): void {
-    try {
-      console.log(
-        "[SessionProvider] Deleting code set with timestamp:",
-        timestamp
-      );
-      const sets = getStoredCodeSets();
-      const originalLength = sets.length;
-      const filteredSets = sets.filter((set) => set.timestamp !== timestamp);
-
-      if (filteredSets.length === originalLength) {
-        console.warn(
-          "[SessionProvider] No code set found with timestamp:",
-          timestamp
-        );
-      } else {
-        console.log(
-          "[SessionProvider] Removed code set. Remaining sets:",
-          filteredSets.length
-        );
-      }
-
-      const jsonString = JSON.stringify(filteredSets);
-      localStorage.setItem("storyCodes", jsonString);
-      console.log(
-        "[SessionProvider] Successfully saved updated storyCodes after deletion"
-      );
-      setStoredCodeSets(filteredSets);
-    } catch (error) {
-      console.error(
-        "[SessionProvider] Error deleting code set with timestamp:",
-        timestamp,
-        "Error:",
-        error
-      );
-    }
-  }
-
-  // Use a ref to track the loading state without causing effect reruns
+  // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
+  const transientStoryCodesRef = useRef(transientStoryCodes);
 
-  // Keep the ref updated with the latest value
+  // Keep the refs updated with the latest values
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
+
+  useEffect(() => {
+    transientStoryCodesRef.current = transientStoryCodes;
+  }, [transientStoryCodes]);
+
+  // Function to update the storedCodeSets state after changes
+  const refreshStoredCodeSets = useCallback(() => {
+    setStoredCodeSets(getStoredCodeSets());
+  }, []);
 
   useEffect(() => {
     wsService.clearMessageHandlers();
@@ -261,14 +67,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         "data" in data &&
         data.data.sessionId
       ) {
-        console.log("[SessionProvider] Session created:", data.data.sessionId);
+        logger.info("[SessionProvider] Session created:", data.data.sessionId);
         setSessionId(data.data.sessionId);
         localStorage.setItem("sessionId", data.data.sessionId);
         wsService.setSessionId(data.data.sessionId);
 
         // Ensure we mark connection as complete
         setIsConnecting(false);
-        console.log(
+        logger.info(
           "[SessionProvider] Connection complete, isConnecting set to false"
         );
       }
@@ -278,7 +84,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       "state_update_notification",
       (data: WSServerMessage) => {
         if (data.type === "state_update_notification" && "state" in data) {
-          console.log("[SessionProvider] Received state update:", {
+          logger.info("[SessionProvider] Received state update:", {
             state: data.state,
             trigger: data.trigger,
           });
@@ -292,14 +98,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       "initialize_story_response",
       (data: WSServerMessage) => {
         if (data.type === "initialize_story_response") {
-          console.log("[SessionProvider] Story initialization acknowledged");
+          logger.info("[SessionProvider] Story initialization acknowledged");
         }
       }
     );
 
     wsService.onMessage("exit_story_response", (data: WSServerMessage) => {
       if (data.type === "exit_story_response") {
-        console.log("[SessionProvider] Story exit confirmed");
+        logger.info("[SessionProvider] Story exit confirmed");
         setStoryState(null);
         setSessionId(null);
         setStoryCodes(null);
@@ -310,8 +116,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("rate_limited", (data: WSServerMessage) => {
       if ("rateLimit" in data) {
-        console.log("[SessionProvider] Rate limited:", data.rateLimit);
+        logger.info("[SessionProvider] Rate limited:", data.rateLimit);
         setRateLimit(data.rateLimit);
+        setIsLoading(false);
+      }
+    });
+
+    wsService.onMessage("content_moderation", (data: WSServerMessage) => {
+      if ("contentModeration" in data) {
+        logger.info(
+          "[SessionProvider] Content moderation:",
+          data.contentModeration
+        );
+        setContentModeration(data.contentModeration as ContentModerationInfo);
         setIsLoading(false);
       }
     });
@@ -320,10 +137,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (data.type === "error") {
         if ("error" in data && typeof data.error === "string") {
           if (data.error === "Session not found") {
-            console.warn("[SessionProvider] Session not found - reconnecting");
+            logger.warn("[SessionProvider] Session not found - reconnecting");
             return;
           }
-          console.error(
+          logger.error(
             `[SessionProvider] WebSocket error${
               "operationType" in data && data.operationType
                 ? ` (${data.operationType})`
@@ -331,6 +148,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }:`,
             data.error
           );
+
+          // Simply set the error - let components handle cleanup
           setError(data.error);
         }
 
@@ -340,30 +159,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("story_codes_notification", (data: WSServerMessage) => {
       if (data.type === "story_codes_notification" && "codes" in data) {
-        console.log(
+        logger.info(
           "[SessionProvider] Received player codes notification:",
           data.codes
         );
         setStoryCodes(data.codes);
         setTransientStoryCodes(data.codes);
-        console.log(
+        logger.info(
           "[SessionProvider] Updated transientStoryCodes with new codes"
         );
 
         // Always mark the story as not ready initially
         // The server will send a story_ready_notification when it's ready
-        console.log("[SessionProvider] Waiting for story ready notification");
+        logger.info("[SessionProvider] Waiting for story ready notification");
         setStoryReady(false);
 
         // Store codes in localStorage
         storeCodeSet(data.codes);
-        setStoredCodeSets(getStoredCodeSets());
+        refreshStoredCodeSets();
       }
     });
 
     wsService.onMessage("story_ready_notification", (data: WSServerMessage) => {
       if (data.type === "story_ready_notification") {
-        console.log(
+        logger.info(
           "[SessionProvider] Story generation completed and ready to join"
         );
         setStoryReady(true);
@@ -373,7 +192,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("verify_code_response", (data: WSServerMessage) => {
       if (data.type === "verify_code_response") {
-        console.log("[SessionProvider] Code verification response:", data);
+        logger.info("[SessionProvider] Code verification response:", data);
         if ("data" in data && data.data.state) {
           setStoryState(data.data.state);
           setIsLoading(false);
@@ -393,9 +212,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
           // Store or update the code
           updateStoredSetWithCode(data.data.code, playerRole, title, true);
-          setStoredCodeSets(getStoredCodeSets());
+          refreshStoredCodeSets();
         } else if ("errorMessage" in data) {
-          console.log(
+          logger.info(
             "[SessionProvider] Code verification failed:",
             data.errorMessage
           );
@@ -409,7 +228,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     wsService.onMessage("connection_stale", (data: WSServerMessage) => {
       if (data.type === "connection_stale" && "message" in data) {
-        console.log("[SessionProvider] Connection stale:", data.message);
+        logger.info("[SessionProvider] Connection stale:", data.message);
         setConnectionStale(data.message as string);
         setIsLoading(false);
       }
@@ -421,7 +240,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Auto-reconnect when becoming visible if connection is lost
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && !wsService.isConnected()) {
-        console.log(
+        logger.info(
           "[SessionProvider] Tab became visible, reconnecting if needed"
         );
         wsService.connect();
@@ -435,7 +254,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       wsService.disconnect();
       wsService.clearMessageHandlers();
     };
-  }, []); // intentionally empty to run only on mount
+  }, [refreshStoredCodeSets]);
 
   useEffect(() => {
     if (rateLimit && rateLimit.timeRemaining > 0) {
@@ -474,13 +293,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setError,
     rateLimit,
     setRateLimit,
+    contentModeration,
+    setContentModeration,
     connectionStale,
     setConnectionStale,
     isRequestPending: (type: string) => wsService.isRequestPending(type),
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
     storedCodeSets,
-    getStoredCodeSets,
-    deleteCodeSet: handleDeleteCodeSet,
+    refreshStoredCodeSets,
+    deleteCodeSet: (timestamp: number) => {
+      deleteStoredCodeSet(timestamp);
+      refreshStoredCodeSets();
+    },
   };
 
   return (

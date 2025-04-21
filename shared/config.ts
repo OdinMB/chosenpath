@@ -7,7 +7,7 @@ export const isDevelopment =
         window.location.hostname === "127.0.0.1");
 
 // Only enable mocks in development environment
-export const MOCK_STORIES_IN_DEVELOPMENT = false;
+export const MOCK_STORIES_IN_DEVELOPMENT = true;
 export const MOCK_STORIES_DELAY_MS = 4 * 1000;
 
 // Story settings
@@ -30,8 +30,11 @@ export const RATE_LIMITED_ACTIONS = [
   "make_choice",
   "join_game",
 ] as const;
-
 export type RateLimitedAction = (typeof RATE_LIMITED_ACTIONS)[number];
+
+export const CONTENT_MODERATION_ACTIONS = ["initialize_story"] as const;
+export type ContentModerationAction =
+  (typeof CONTENT_MODERATION_ACTIONS)[number];
 
 // Rate limit configurations
 export const RATE_LIMITS: Record<

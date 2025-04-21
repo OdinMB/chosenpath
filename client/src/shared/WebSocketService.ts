@@ -7,8 +7,14 @@ import {
   GameErrorNotification,
   RateLimitInfo,
   StoryReadyNotification,
+  ContentModerationResponse,
+  WSSuccessResponse,
+  WSErrorResponse,
+  WSRateLimitedResponse,
+  ContentModerationInfo,
 } from "@core/types";
-import { RateLimitedAction, SOCKET_CONFIG } from "@core/config";
+import { SOCKET_CONFIG } from "@core/config";
+import { ContentModerationAction } from "@core/config";
 import type { ClientStoryState } from "@core/types";
 import { Logger } from "@common/logger";
 import { config } from "@/config";
@@ -20,37 +26,13 @@ type WSMessage = {
   [key: string]: unknown;
 };
 
-// Define server response types consistent with shared types
-interface BaseResponse {
-  type: string;
-  status: ResponseStatus;
-  requestId: string;
-  timestamp: number;
-}
-
-interface SuccessResponse extends BaseResponse {
-  status: ResponseStatus.SUCCESS;
-  data: Record<string, unknown>;
-}
-
-interface ErrorResponse extends BaseResponse {
-  status: ResponseStatus.ERROR | ResponseStatus.INVALID;
-  errorMessage: string;
-  operationType?: string; // Add this field to match our usage
-}
-
-interface RateLimitedResponse extends BaseResponse {
-  status: ResponseStatus.RATE_LIMITED;
-  rateLimit: {
-    action: RateLimitedAction;
-    timeRemaining: number;
-    maxRequests: number;
-    windowMs: number;
-    requestsRemaining: number;
-  };
-}
-
-type ServerResponse = SuccessResponse | ErrorResponse | RateLimitedResponse;
+// Extended ContentModerationResponse with type field for internal use
+// Define a more specific server response type for internal use
+type ServerResponse =
+  | WSSuccessResponse<Record<string, unknown>>
+  | WSErrorResponse
+  | WSRateLimitedResponse
+  | ContentModerationResponse;
 
 // Helper functions to create properly typed WSServerMessage objects
 function createRateLimitedMessage(rateLimit: RateLimitInfo): WSServerMessage {
@@ -119,6 +101,30 @@ function createSuccessResponse(type: string, data: unknown): WSServerMessage {
     data: data,
     requestId: generateRequestId(),
     timestamp: Date.now(),
+  } as unknown as WSServerMessage;
+}
+
+// Helper function to create a content moderation error message
+function createContentModerationMessage(
+  reason: string,
+  prompt: string,
+  operationType?: string
+): WSServerMessage {
+  const contentModeration: ContentModerationInfo = {
+    action: (operationType === "initialize_story"
+      ? "initialize_story"
+      : "initialize_story") as ContentModerationAction,
+    reason,
+    prompt,
+  };
+
+  return {
+    type: "content_moderation",
+    contentModeration,
+    message: `Inappropriate content: ${reason}`,
+    promptSubmitted: prompt,
+    moderationReason: reason,
+    operationType: operationType || "content_filter",
   } as unknown as WSServerMessage;
 }
 
@@ -407,13 +413,40 @@ export class WebSocketService {
       if (data.status === ResponseStatus.RATE_LIMITED) {
         Logger.WebSocket.log(
           "[WebSocketService] Rate limited:",
-          (data as RateLimitedResponse).rateLimit
+          data.rateLimit
         );
         const handler = this.messageHandlers.get("rate_limited");
         if (handler) {
-          handler(
-            createRateLimitedMessage((data as RateLimitedResponse).rateLimit)
+          handler(createRateLimitedMessage(data.rateLimit));
+        }
+        return;
+      }
+
+      // Handle content moderation responses
+      if (data.status === ResponseStatus.CONTENT_MODERATION) {
+        const moderationData = data as ContentModerationResponse;
+        Logger.WebSocket.log(
+          "[WebSocketService] Content moderation failed:",
+          moderationData.message
+        );
+
+        // Clear any background operations for story initialization
+        if (this.isOperationRunning("initialize_story")) {
+          Logger.WebSocket.log(
+            "[WebSocketService] Clearing initialize_story background operation after content moderation failure"
           );
+          this.removeBackgroundOperation("initialize_story");
+        }
+
+        // Create a content moderation message
+        const handler = this.messageHandlers.get("content_moderation");
+        if (handler) {
+          const moderationMessage = createContentModerationMessage(
+            moderationData.moderationReason,
+            moderationData.promptSubmitted,
+            requestType
+          );
+          handler(moderationMessage);
         }
         return;
       }
@@ -438,10 +471,10 @@ export class WebSocketService {
         // For create_session_response, update the sessionId
         else if (
           data.type === "create_session_response" &&
-          (data as SuccessResponse).data &&
-          "sessionId" in (data as SuccessResponse).data
+          (data as WSSuccessResponse).data &&
+          "sessionId" in data.data
         ) {
-          this.sessionId = (data as SuccessResponse).data.sessionId as string;
+          this.sessionId = data.data.sessionId as string;
           localStorage.setItem("sessionId", this.sessionId);
         }
 
@@ -449,7 +482,7 @@ export class WebSocketService {
         const handler = this.messageHandlers.get(data.type);
         if (handler) {
           handler(
-            createSuccessResponse(data.type, (data as SuccessResponse).data)
+            createSuccessResponse(data.type, (data as WSSuccessResponse).data)
           );
         }
         return;
@@ -460,7 +493,7 @@ export class WebSocketService {
         data.status === ResponseStatus.ERROR ||
         data.status === ResponseStatus.INVALID
       ) {
-        const errorData = data as ErrorResponse;
+        const errorData = data as WSErrorResponse;
         const handler = this.messageHandlers.get("error");
         if (handler) {
           const errorInfo: GameErrorNotification = createErrorMessage(
