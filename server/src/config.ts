@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import {
   API_CONFIG,
   STORAGE_PATHS as SHARED_STORAGE_PATHS,
-} from "@core/config.js";
+} from "../../shared/config.js";
 
 // Load environment variables
 dotenv.config();
