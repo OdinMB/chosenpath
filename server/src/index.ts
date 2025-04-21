@@ -1,5 +1,5 @@
 // Register module aliases for path resolution
-import "module-alias/register";
+import "module-alias/register.js";
 
 import http from "http";
 import express from "express";
