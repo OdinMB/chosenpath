@@ -23,6 +23,11 @@
     "alwaysStrict": false
   },
   "references": [{ "path": "../shared" }],
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "src/config.ts",
+    "../shared/**/*",
+    "../shared/config.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

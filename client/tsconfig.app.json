@@ -36,14 +36,5 @@
       "@user/*": ["src/user/*"]
     }
   },
-  "include": [
-    "src",
-    "shared/types/beat.ts",
-    "shared/types/change.ts",
-    "shared/types/image.ts",
-    "shared/types/outcome.ts",
-    "shared/types/stat.ts",
-    "shared/types/story.ts",
-    "../src/components"
-  ]
+  "include": ["src/**/*"]
 }
