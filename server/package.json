@@ -12,9 +12,9 @@
     "@user": "dist/user"
   },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias --project tsconfig.alias.json",
     "dev": "tsx watch src/index.ts",
-    "start": "node --experimental-specifier-resolution=node dist/index.js"
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",

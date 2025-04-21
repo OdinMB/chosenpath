@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "baseUrl": "dist",
+    "paths": {
+      "@core/*": ["./core/*"],
+      "@common/*": ["./shared/*"],
+      "@admin/*": ["./admin/*"],
+      "@game/*": ["./game/*"],
+      "@page/*": ["./page/*"],
+      "@user/*": ["./user/*"]
+    }
+  }
+}
