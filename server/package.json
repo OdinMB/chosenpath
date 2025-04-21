@@ -3,17 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && npx tsc-alias && npm run debug-build",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && npx tsc-alias && npm run copy-core && npm run debug-build",
+    "copy-core": "mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && echo 'Copied core files to dist/core'",
     "dev": "tsx watch src/index.ts",
-    "start": "cross-env NODE_OPTIONS=\"--experimental-specifier-resolution=node --experimental-loader=module-alias/register.js\" node dist/index.js",
-    "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Core dist/core directory structure (if exists) =====\\n' && ls -la ../core/dist/core || echo 'No core/dist/core directory' && echo '\\n===== DEBUG: Server dist/core directory structure (if exists) =====\\n' && ls -la dist/core || echo 'No dist/core directory' && echo '\\n===== DEBUG: Checking @core imports in compiled JS =====\\n' && grep -r '@core' dist/ && echo '\\n===== DEBUG: Sample of a config.js file =====\\n' && head -20 ../core/dist/config.js || echo 'Core config.js not found' && echo '\\n===== DEBUG: Checking module-alias paths =====\\n' && echo '@core resolves to:' && realpath '../core/dist' && echo '\\n===== DEBUG: Done debugging ====='"
+    "start": "NODE_OPTIONS=\"--es-module-specifier-resolution=node\" node dist/index.js",
+    "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Server dist/core directory structure =====\\n' && ls -la dist/core && echo '\\n===== DEBUG: Sample config.js in server dist/core =====\\n' && head -20 dist/core/config.js && echo '\\n===== DEBUG: Done debugging ====='"
   },
   "keywords": [],
   "author": "Odin Mühlenbein",
   "license": "",
   "_moduleAliases": {
-    "@core": "../core/dist",
+    "@core": "dist/core",
     "@common": "dist/shared",
     "@admin": "dist/admin",
     "@game": "dist/game",
