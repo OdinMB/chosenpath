@@ -9,7 +9,7 @@
     "core"
   ],
   "scripts": {
-    "build": "npm run build:core && npm run build:server && npm run build:client",
+    "build": "npm install && npm run build:core && npm run build:server && npm run build:client",
     "build:core": "cd core && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",

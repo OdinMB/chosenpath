@@ -12,9 +12,10 @@
     "@user": "dist/user"
   },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias --project tsconfig.alias.json",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias --project tsconfig.alias.json && npm run debug-build",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "debug-build": "echo 'DEBUG: Listing dist directory structure' && ls -la dist && echo 'DEBUG: Checking for core directory' && ls -la dist/core && echo 'DEBUG: Checking config.js imports' && grep -r '@core' dist/ && echo 'DEBUG: Done debugging'"
   },
   "keywords": [],
   "author": "",
