@@ -5,8 +5,8 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import { Router } from "./routes.js";
-import { GameWebSocketServer } from "@common/websocket.js";
-import { GameHandler } from "@game/GameHandler.js";
+import { GameWebSocketServer } from "./shared/websocket.js";
+import { GameHandler } from "./game/GameHandler.js";
 
 async function startServer() {
   const app = express();
