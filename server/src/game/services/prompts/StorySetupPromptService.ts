@@ -1,5 +1,7 @@
 import { type GameMode, GameModes } from "@core/types/story.js";
 import type { PlayerCount } from "@core/types/player.js";
+import { TemplateIterationSections } from "@core/types/admin.js";
+import { templateIterationSections } from "@core/utils/templateIterationSections.js";
 
 const GAME_MODE_DESCRIPTIONS: Record<
   Exclude<GameModes, GameModes.SinglePlayer>,
@@ -25,57 +27,92 @@ export class StorySetupPromptService {
     prompt: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
-    maxTurns: number
+    maxTurns: number,
+    iterationMode: boolean = false,
+    // default: all sections
+    sections: TemplateIterationSections[] = Object.keys(
+      templateIterationSections
+    ) as TemplateIterationSections[],
+    templateJson: string = ""
   ): string {
     const setupPrompt =
-      "Create a setup for an interactive fiction game for " +
-      playerCount +
-      " player" +
-      (playerCount > 1 ? "s" : "") +
-      " based on the following prompt:\n\n" +
-      '"' +
-      prompt.toUpperCase() +
-      '"' +
+      this.getCreationModeInstructions(iterationMode) +
+      "Guidelines for story setups:\n\n" +
+      this.getInventoryInstructions(sections, playerCount > 1) +
+      this.getOutcomesInstructions(sections, playerCount > 1) +
+      this.getStoryElementsInstructions(sections) +
+      this.getStatInstructions(sections, playerCount > 1) +
+      this.getExampleStatSetups(iterationMode) +
+      this.getCharacterSelectionInstructions(sections, playerCount > 1) +
+      "#".repeat(50) +
       "\n\n" +
-      "#".repeat(100) +
-      "\n\n" +
-      this.getGameModeInstructions(gameMode) +
-      this.getStatGuidelines(playerCount > 1) +
-      "\n\n" +
-      "#".repeat(100) +
-      '\n\nRemember: these are all just examples. The story setup that you will be creating now must be fully custimized to work for the following prompt:\n\n"' +
-      prompt.toUpperCase() +
-      '"';
+      this.getConfigurationInstructions(
+        playerCount,
+        gameMode,
+        prompt,
+        iterationMode,
+        sections,
+        templateJson
+      );
 
-    // console.log("\x1b[36m%s\x1b[0m", setupPrompt);
+    console.log("\x1b[36m%s\x1b[0m", setupPrompt);
     return setupPrompt;
   }
 
-  private static getStatGuidelines(isMultiplayer: boolean): string {
-    return `Guidelines for the initial story state:
-- 6-8 story elements
+  private static getCreationModeInstructions(iterativeMode: boolean): string {
+    if (iterativeMode) {
+      return `We already have a setup for an interactive fiction game. Adjust parts of that setup based on user feedback that is provided below.\n\n`;
+    } else {
+      return `Create a setup for an interactive fiction game based on a user prompt that is provided below.\n\n`;
+    }
+  }
+
+  private static getInventoryInstructions(
+    sections: TemplateIterationSections[],
+    isMultiplayer: boolean
+  ): string {
+    return `Include the following elements:
+${
+  sections.includes("storyElements")
+    ? `\n- 6-8 story elements
 --- 2-4 NPCs.
 --- 2-4 locations
 --- 2-4 miscellaneous elements (like items, factions, organizations, dangers, mysteries, conflicts, or whatever the story might need)
 --- Add three facts about each story element.
---- Don't include the player characters (main protagonists) in this list.
-- In multiplayer games, 0-3 shared outcomes, with a total of 0-6 milestones towards the outcomes' resolution between them
---- Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
---- Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
-- 3-4 visible shared stats for things that are not directly linked to one player
+--- Don't include the player characters (main protagonists) in this list.`
+    : ""
+}${
+      sections.includes("sharedOutcomes") || sections.includes("players")
+        ? `\n- A total of 3 outcomes for each player
+--- In multiplayer games, 0-3 shared outcomes, with a total of 0-6 milestones towards the outcomes' resolution between them
+    Can include outcomes for shared goals/interests (for cooperative and cooperative-competitive games)
+    Can include outcomes for things that players compete over (for competitive and cooperative-competitive games)
+--- For each player, (3 - number of shared outcomes) individual outcomes, with a total of (6 - milestones toward shared outcomes) milestones between them
+    Examples: If there are 2 shared outcomes with a total of 4 milestones, there should be 1 individual outcome with 2 milestones. If there are 3 shared outcomes with a total of 6 milestones, there should be 0 individual outcomes.`
+        : ""
+    }${
+      sections.includes("stats")
+        ? `\n- 3-4 visible shared stats for things that are not directly linked to one player
 --- Things that are shared between players (e.g. variables about a group/organization that several players belong to, a spaceship that players use together, a flat that players share, etc.)
 --- Stats about the world (e.g. tension between factions, environment conditions, etc.)${
-      isMultiplayer
-        ? "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)"
-        : ""
-    }- Any invisible shared stats that you think are important
-For each player
-- (3 - number of shared outcomes) individual outcomes, with a total of (6 - milestones toward shared outcomes) milestones between them
---- Examples: If there are 2 shared outcomes with a total of 4 milestones, there should be 1 individual outcome with 2 milestones. If there are 3 shared outcomes with a total of 6 milestones, there should be 0 individual outcomes.
+            isMultiplayer
+              ? "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)"
+              : ""
+          }
+--- Any invisible shared stats that you think are important
 - 3-4 visible stats that are directly linked to the player (traits, skills, dispositions, health, personal relationships, personal resources, personal reputation, personal inventory, etc.)
-- Any invisible stats that are linked to that player that you think are important
+--- Any invisible stats that are linked to that player that you think are important`
+        : ""
+    }\n\n`;
+  }
 
-Outcomes
+  private static getOutcomesInstructions(
+    sections: TemplateIterationSections[],
+    isMultiplayer: boolean
+  ): string {
+    if (sections.includes("sharedOutcomes") || sections.includes("players")) {
+      if (isMultiplayer) {
+        return `Outcomes
 - Every player should have 3 outcomes as the sum of individual and shared outcomes, with a total of 6 milestones towards these outcomes' resolutions.
 --- 1 milestone for side-outcomes
 --- 2 milestones as a default
@@ -84,14 +121,33 @@ Outcomes
 --- The final resolution will be decided based on the milestones that have been established over the course of the story.
 --- Individual and shared cooperative outcomes that have a success/failure structure, the possible resolutions should include one favorable (and/or particularly interesting), one unfavorable (and/or unsatisfactory), and one mixed.
 --- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.
---- Exploratory outcomes (= anything other than success/failure and win/lose) can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.
-${
-  isMultiplayer
-    ? "- If an outcome is shared, it should not be repeated as an individual outcome.\n" +
-      "--- Example: If the shared (competitive) outcome is 'Who will reign over the forst?', there should not be any individual outcome like 'Will [insert player name] become the new spirit leader?'\n"
-    : ""
-}
-Story elements
+--- Exploratory outcomes (= anything other than success/failure and win/lose) can define any 3 possible resolutions. Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty. 2. Ambitions. 3. A mix of both.${
+          isMultiplayer
+            ? "\n- If an outcome is shared, it should not be repeated as an individual outcome." +
+              "\n--- Example: If the shared (competitive) outcome is 'Who will reign over the forst?', there should not be any individual outcome like 'Will [insert player name] become the new spirit leader?'\n"
+            : ""
+        }\n\n`;
+      } // singleplayer
+      else {
+        return `Outcomes
+- The player should have 3 outcomes, with a total of 6 milestones towards these outcomes' resolutions.
+--- 1 milestone for side-outcomes
+--- 2 milestones as a default
+--- 3 milestones for outcomes that are particularly important for the ending.
+- Each outcome has 3 possible resolutions.
+--- The final resolution will be decided based on the milestones that have been established over the course of the story.
+--- For outcomes that have a success/failure structure, the possible resolutions should include one favorable (and/or particularly interesting), one unfavorable (and/or unsatisfactory), and one mixed.\n\n`;
+      }
+    } else {
+      return "";
+    }
+  }
+
+  private static getStoryElementsInstructions(
+    sections: TemplateIterationSections[]
+  ): string {
+    if (sections.includes("storyElements")) {
+      return `Story elements
 - For NPCs, include their preferred pronouns and motivations.
 - Use the instructions attribute to establish story hints and gameplay mechanics.
 --- Example: "Mr. X only helps players in exchange for gold."
@@ -101,9 +157,18 @@ Story elements
 No franchise copyright infringement!
 Don't borrow story elements from established franchises.
 - Example: a story about a teenage wizard should not have NPCs named "Luna" or "Dumbledore".
-- Example: a space opera should not have story elements from the universes of Star Trek Enterprise or Firefly.
+- Example: a space opera should not have story elements from the universes of Star Trek Enterprise or Firefly.\n\n`;
+    } else {
+      return "";
+    }
+  }
 
-STATS
+  private static getStatInstructions(
+    sections: TemplateIterationSections[],
+    isMultiplayer: boolean
+  ): string {
+    if (sections.includes("stats") || sections.includes("players")) {
+      return `STATS
 
 Stat groups
 are used to group stats in the UI. Both character and shared stats can be grouped and will be displayed in the UI together.
@@ -133,10 +198,10 @@ Stat guidelines
 --- Bad: 'Relationship with NPC' (Which NPC?)
 - Don't use stats for things that are covered by other mechanics.
 --- Don't track progress toward outcomes (tracked separately via milestones)${
-      isMultiplayer
-        ? " -- except for contested outcomes in multiplayer games"
-        : ""
-    }.
+        isMultiplayer
+          ? " -- except for contested outcomes in multiplayer games"
+          : ""
+      }.
 --- Don't track the number of remaining turns or story beats (tracked separately)
 --- Don't track ordinary player decisions (tracked separately)
 ${
@@ -233,11 +298,15 @@ Define if the stat can be changed in beat resolutions.
 - If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly.
 - If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect. This should only happen after a relevant thread is resolved.
 
-These lists are just examples. Feel free to be creative. The important thing is that the stat plays a relevant, plausible, and interesting part in the story.
+These lists are just examples. Feel free to be creative. The important thing is that the stat plays a relevant, plausible, and interesting part in the story.\n\n`;
+    } else {
+      return "";
+    }
+  }
 
-##########
-
-EXAMPLE STAT SETUPS
+  private static getExampleStatSetups(iterationMode: boolean): string {
+    if (!iterationMode) {
+      return `EXAMPLE STAT SETUPS
 
 Premise: Nature spirits guard the forest and compete for followers (cooperative-competitive)
 player stats:
@@ -533,11 +602,18 @@ shared stats:
     "Affected by the average Band Loyalty|Solo Ambition balance across all players"
   ]
   canBeChangedInBeatResolutions: true (group chemistry can fluctuate a little in a single beat)
-  Initial value: 70
+  Initial value: 70\n\n`;
+    } else {
+      return "";
+    }
+  }
 
-##########
-
-Character Selection Instructions
+  private static getCharacterSelectionInstructions(
+    sections: TemplateIterationSections[],
+    isMultiplayer: boolean
+  ): string {
+    if (sections.includes("players")) {
+      return `Character Selection Instructions
 
 For the character selection options, make sure that the stats in the different backgrounds are different and balanced.
 ${
@@ -564,17 +640,65 @@ Outline generic archetypes that the backgrounds could implement and flesh out.
 - Each archetype should represent a particular tradeoff between player stats.
 - Generic archetypes will be turned into more flavorful backgrounds later.
 - Example: 'No starting gold, but high reputation and high loyalty'
-- Example: 'High Instrument Mastery, but low Stage Presence'
-`;
+- Example: 'High Instrument Mastery, but low Stage Presence'\n\n`;
+    } else {
+      return "";
+    }
   }
 
-  private static getGameModeInstructions(gameMode: GameMode): string {
-    return (
-      "\n" +
-      (GAME_MODE_DESCRIPTIONS[
-        gameMode as keyof typeof GAME_MODE_DESCRIPTIONS
-      ] || "") +
-      "\n"
-    );
+  private static getConfigurationInstructions(
+    playerCount: number,
+    gameMode: GameMode,
+    prompt: string,
+    iterationMode: boolean,
+    sections: TemplateIterationSections[],
+    templateJson: string
+  ): string {
+    if (iterationMode) {
+      return `Your job is to recreate parts of an existing story template based on user feedback. Remember: everything so far has only been general instructions and examples. The pieces of the story setup that you will be creating now must be fully custimized to work for the following specific case.
+
+Here is the original story template:
+
+##############################
+
+Game mode: ${this.getGameModeInstructions(gameMode, playerCount > 1)}
+
+${templateJson}
+
+##############################
+
+Here is the feedback from the user on the existing story template:
+
+${prompt.toUpperCase()}
+
+You must ONLY regenerate the following sections:
+${sections.join(", ")}
+
+Maintain consistency with the other parts of the template that you are not changing.
+
+Note that the user can only accept entire sections. If you make changes to the guidelines, provide a fully generated guidelines section. Same for stats, players, etc. Don't just generate additional elements that the user asked for, or make changes to a few specific items. We always need the full, updated sections.`;
+    } else {
+      return `Remember: everything so far has only been general instructions and examples. The story setup that you will be creating now must be fully custimized to work for the following prompt:
+
+Number of players: ${playerCount}
+Game mode: ${this.getGameModeInstructions(gameMode, playerCount > 1)}
+
+${prompt.toUpperCase()}`;
+    }
+  }
+
+  private static getGameModeInstructions(
+    gameMode: GameMode,
+    isMultiplayer: boolean
+  ): string {
+    if (isMultiplayer) {
+      return (
+        GAME_MODE_DESCRIPTIONS[
+          gameMode as keyof typeof GAME_MODE_DESCRIPTIONS
+        ] || ""
+      );
+    } else {
+      return "Singleplayer";
+    }
   }
 }

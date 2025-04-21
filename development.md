@@ -2,8 +2,6 @@ Smaller commits!
 
 # Next
 
-- StoryGeneration prompt: only show what's needed for iteration
-- Moderation step for premise-based story creation
 - Always introduce other players in beat 1
 - First thread always together
 - show options of previous beats in the thread to avoid repeating any of them

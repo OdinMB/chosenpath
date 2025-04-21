@@ -21,7 +21,7 @@ import {
 } from "@common/storageUtils.js";
 import { Logger } from "@common/logger.js";
 import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
-import { StoryIterationPromptService } from "../game/services/prompts/StoryIterationPromptService.js";
+import { StorySetupPromptService } from "../game/services/prompts/StorySetupPromptService.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -395,13 +395,14 @@ export class AdminLibraryService {
 
       // Generate the partial template update based on user-selected sections
       const templateJson = JSON.stringify(template);
-      const aiPrompt = StoryIterationPromptService.createIterationPrompt(
-        templateJson,
+      const aiPrompt = StorySetupPromptService.createSetupPrompt(
         feedback,
-        sections as TemplateIterationSections[],
         playerCount,
         gameMode,
-        maxTurns
+        maxTurns,
+        true, // iteration mode
+        sections,
+        templateJson
       );
 
       // Create a partial schema for just the requested sections

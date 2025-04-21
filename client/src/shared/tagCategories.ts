@@ -4,10 +4,12 @@ export type TagCategory = {
 };
 
 export const TAG_CATEGORIES: TagCategory[] = [
+  // assumed default: novella
   {
     name: "Format",
-    tags: ["Novella", "Simulation"],
+    tags: ["Simulation"],
   },
+  // assumed default: reading pleasure
   {
     name: "Motivation",
     tags: ["Satire", "Serious"],
