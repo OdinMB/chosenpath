@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { API_CONFIG } from "../../core/config.js";
+import { API_CONFIG } from "@core/config.js";
 
 // Load environment variables
 dotenv.config();
