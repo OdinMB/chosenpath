@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && npx tsc-alias",
+    "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/node_modules/@core && cp -r ../shared/dist/* dist/node_modules/@core/ && npx tsc-alias",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js"
+    "start": "cd dist && node --es-module-specifier-resolution=node index.js"
   },
   "keywords": [],
   "author": "",
