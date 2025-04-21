@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/ && npx tsc-alias && npm run debug-build",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/ && npm run debug-build",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "debug-build": "echo 'DEBUG: Listing dist directory structure' && ls -la dist && echo 'DEBUG: Checking for core directory' && ls -la dist/core && echo 'DEBUG: Checking config.js imports' && grep -r '@core' dist/ && echo 'DEBUG: Done debugging'"
@@ -19,6 +19,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.18.0",
     "langchain": "^0.3.15",
+    "module-alias": "^2.2.3",
     "openai": "^4.83.0",
     "socket.io": "^4.8.1",
     "ws": "^8.16.0",
@@ -32,5 +33,8 @@
     "tsc-alias": "^1.8.8",
     "tsx": "^4.7.1",
     "typescript": "^5.0.0"
+  },
+  "_moduleAliases": {
+    "@core": "./dist/core"
   }
 }
