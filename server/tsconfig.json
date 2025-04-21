@@ -12,7 +12,7 @@
       "@game/*": ["./game/*"],
       "@page/*": ["./page/*"],
       "@user/*": ["./user/*"],
-      "shared/*": ["../shared/*"]
+      "shared/*": ["../../shared/*"]
     },
     "strict": true,
     "strictNullChecks": true,
