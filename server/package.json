@@ -12,6 +12,14 @@
   "keywords": [],
   "author": "Odin Mühlenbein",
   "license": "",
+  "_moduleAliases": {
+    "@core": "../core/dist",
+    "@common": "dist/shared",
+    "@admin": "dist/admin",
+    "@game": "dist/game",
+    "@page": "dist/page",
+    "@user": "dist/user"
+  },
   "dependencies": {
     "core": "file:../core",
     "@langchain/openai": "^0.4.3",
@@ -34,13 +42,5 @@
     "tsc-alias": "^1.8.8",
     "tsx": "^4.7.1",
     "typescript": "^5.0.0"
-  },
-  "_moduleAliases": {
-    "@core": "../core/dist",
-    "@common": "dist/shared",
-    "@admin": "dist/admin",
-    "@game": "dist/game",
-    "@page": "dist/page",
-    "@user": "dist/user"
   }
 }

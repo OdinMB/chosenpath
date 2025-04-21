@@ -10,10 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "composite": true,
-    "rootDir": "..",
-    "baseUrl": "..",
+    "rootDir": ".",
+    "baseUrl": ".",
     "paths": {
-      "@core/*": ["core/*"]
+      "@core/*": ["./*"]
     }
   },
   "include": ["types/**/*", "utils/**/*", "models/**/*", "config.ts"],
