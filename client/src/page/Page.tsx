@@ -7,8 +7,8 @@ import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import {
   getSortedCodeSets,
   deleteStoredCodeSet,
-} from "../shared/codeSetUtils.ts";
-import { Logger } from "../shared/logger.js";
+} from "@common/codeSetUtils.ts";
+import { Logger } from "@common/logger.js";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;

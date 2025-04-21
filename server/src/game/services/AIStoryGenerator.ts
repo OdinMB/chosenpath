@@ -37,7 +37,7 @@ import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "@/config.js";
 import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { z } from "zod";
-import { logZodSchema } from "@/shared/zodUtils.js";
+import { logZodSchema } from "@common/zodUtils.js";
 import { templateIterationSections } from "@core/utils/templateIterationSections.js";
 
 dotenv.config();

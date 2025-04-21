@@ -8,10 +8,10 @@ import {
   StateUpdateNotification,
   VerifyCodeResponse,
   ErrorResponse,
-} from "shared/types/index.js";
+} from "@core/types/index.js";
 import { config } from "../config.js";
 import { connectionManager } from "./ConnectionManager.js";
-import { RateLimitedAction, SOCKET_CONFIG } from "shared/config.js";
+import { RateLimitedAction, SOCKET_CONFIG } from "@core/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,

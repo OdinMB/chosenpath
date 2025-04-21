@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
 import {
   StoryTemplate,
   TemplateIterationRequest,

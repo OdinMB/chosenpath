@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { Logger } from "@common/logger";
 import { StoryTemplate } from "@core/types";
-import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
 import {
   CreateTemplateRequest,
   DeleteResponse,

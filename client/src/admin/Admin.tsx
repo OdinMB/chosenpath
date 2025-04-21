@@ -8,7 +8,7 @@ import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoryTemplate } from "@core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
 import { CreateTemplateRequest, TemplateResponse } from "@core/types/admin";
 
 type AdminTab =

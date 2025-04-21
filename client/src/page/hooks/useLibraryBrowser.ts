@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { StoryTemplate } from "@core/types";
 import { Logger } from "@common/logger";
-import { groupTagsByCategories } from "@/shared/tagCategories";
-import { sendTrackedRequest } from "@/shared/requestUtils";
+import { groupTagsByCategories } from "@common/tagCategories";
+import { sendTrackedRequest } from "@common/requestUtils";
 import { SuccessResponse } from "@core/types/api";
 
 export function useLibraryBrowser() {

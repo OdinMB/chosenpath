@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PrimaryButton, Icons } from "@components/ui/index";
-import { sendTrackedRequest } from "@/shared/requestUtils";
+import { sendTrackedRequest } from "@common/requestUtils";
 import { SuccessResponse } from "@core/types";
 
 type AdminLoginProps = {

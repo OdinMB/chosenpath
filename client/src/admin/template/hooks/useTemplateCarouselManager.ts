@@ -3,7 +3,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "@core/types";
 import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@/shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
 import {
   TemplatesResponse,
   UpdateTemplateRequest,

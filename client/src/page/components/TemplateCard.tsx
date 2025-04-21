@@ -1,6 +1,6 @@
 import { StoryTemplate } from "@core/types";
 import { PrimaryButton } from "@components/ui";
-import { sortTagsByCategory } from "../../shared/tagCategories";
+import { sortTagsByCategory } from "@common/tagCategories";
 
 type TemplateCardProps = {
   template: StoryTemplate;

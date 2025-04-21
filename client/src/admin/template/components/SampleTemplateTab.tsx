@@ -12,7 +12,7 @@ import {
   PlayerOptionsGeneration,
 } from "@core/types";
 import { Logger } from "@common/logger";
-import { sendTrackedRequest } from "@/shared/requestUtils";
+import { sendTrackedRequest } from "@common/requestUtils";
 import { TemplateResponse } from "@core/types/admin";
 
 interface SampleTemplateTabProps {

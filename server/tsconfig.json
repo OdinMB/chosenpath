@@ -2,21 +2,16 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "..",
-    "baseUrl": "..",
-    "composite": true,
-    "declaration": true,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "baseUrl": "src",
     "paths": {
-      "@/*": ["server/src/*"],
-      "@core/*": ["shared/*"],
-      "@common/*": ["server/src/shared/*"],
-      "@admin/*": ["server/src/admin/*"],
-      "@game/*": ["server/src/game/*"],
-      "@page/*": ["server/src/page/*"],
-      "@user/*": ["server/src/user/*"],
-      "shared/*": ["shared/*"]
+      "@/*": ["./*"],
+      "@core/*": ["../../shared/*"],
+      "@common/*": ["./shared/*"],
+      "@admin/*": ["./admin/*"],
+      "@game/*": ["./game/*"],
+      "@page/*": ["./page/*"],
+      "@user/*": ["./user/*"]
     },
     "strict": true,
     "strictNullChecks": true,
@@ -27,10 +22,7 @@
     "noImplicitThis": false,
     "alwaysStrict": false
   },
+  "references": [{ "path": "../shared" }],
   "include": ["src/**/*"],
-  "references": [
-    {
-      "path": "../shared"
-    }
-  ]
+  "exclude": ["node_modules", "dist"]
 }
