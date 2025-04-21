@@ -13,6 +13,7 @@ export const useTemplateLibrary = (token: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const collectionFileInputRef = useRef<HTMLInputElement>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
     templateId: string;
@@ -97,12 +98,24 @@ export const useTemplateLibrary = (token: string) => {
     });
   };
 
+  const prepareTemplateForExport = (
+    template: StoryTemplate
+  ): Partial<StoryTemplate> => {
+    // Create a copy of the template without the ID, createdAt, and updatedAt fields
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, createdAt, updatedAt, ...exportTemplate } = template;
+    return exportTemplate;
+  };
+
   const handleExportTemplate = (template: StoryTemplate) => {
     Logger.Admin.log(`Exporting template: ${template.id}`);
 
     try {
+      // Create export-ready template without server-specific fields
+      const exportTemplate = prepareTemplateForExport(template);
+
       // Create a blob with the JSON data
-      const json = JSON.stringify(template, null, 2);
+      const json = JSON.stringify(exportTemplate, null, 2);
       const blob = new Blob([json], { type: "application/json" });
 
       // Create an object URL for the blob
@@ -125,6 +138,45 @@ export const useTemplateLibrary = (token: string) => {
     } catch (error) {
       Logger.Admin.error(`Error exporting template: ${template.id}`, error);
       setError("Failed to export template. Please try again.");
+    }
+  };
+
+  const handleExportAllTemplates = () => {
+    Logger.Admin.log("Exporting all templates");
+
+    try {
+      if (templates.length === 0) {
+        setError("No templates to export");
+        return;
+      }
+
+      // Create export-ready templates without server-specific fields
+      const exportTemplates = templates.map(prepareTemplateForExport);
+
+      // Create a blob with the JSON data
+      const json = JSON.stringify(exportTemplates, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+
+      // Create an object URL for the blob
+      const url = URL.createObjectURL(blob);
+
+      // Create a download link and trigger it
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `all-templates-${
+        new Date().toISOString().split("T")[0]
+      }.json`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      Logger.Admin.log(`Successfully exported ${templates.length} templates`);
+    } catch (error) {
+      Logger.Admin.error("Error exporting all templates", error);
+      setError("Failed to export all templates. Please try again.");
     }
   };
 
@@ -185,6 +237,84 @@ export const useTemplateLibrary = (token: string) => {
     });
   };
 
+  const handleImportTemplateCollection = async (file: File) => {
+    if (!file) return;
+
+    Logger.Admin.log(`Importing template collection from file: ${file.name}`);
+    setIsLoading(true);
+    setError(null);
+
+    return new Promise<void>((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        try {
+          const content = e.target?.result as string;
+          const templatesData = JSON.parse(content);
+
+          if (!Array.isArray(templatesData)) {
+            throw new Error(
+              "Invalid file format. Expected an array of templates."
+            );
+          }
+
+          Logger.Admin.log(
+            `Found ${templatesData.length} templates in collection`
+          );
+
+          // Import each template sequentially
+          for (const templateData of templatesData) {
+            // Create a new template with essential fields
+            const newTemplate: CreateTemplateRequest = withRequestId({
+              template: templateData as Partial<StoryTemplate>,
+            });
+
+            // Send to server
+            await sendTrackedRequest<
+              SuccessResponse<{ template: StoryTemplate }>,
+              CreateTemplateRequest
+            >({
+              path: `/admin/templates`,
+              method: "POST",
+              token,
+              body: newTemplate,
+            });
+          }
+
+          Logger.Admin.log(
+            `Successfully imported ${templatesData.length} templates`
+          );
+
+          // Refresh templates list
+          loadTemplates();
+
+          // Clear file input
+          if (collectionFileInputRef.current) {
+            collectionFileInputRef.current.value = "";
+          }
+
+          resolve();
+        } catch (error) {
+          Logger.Admin.error("Failed to import template collection", error);
+          setError(
+            "Failed to import template collection. Please check the file format."
+          );
+          setIsLoading(false);
+          reject(error);
+        }
+      };
+
+      reader.onerror = () => {
+        Logger.Admin.error("Error reading file");
+        setError("Failed to read the file. Please try again.");
+        setIsLoading(false);
+        reject(new Error("Failed to read file"));
+      };
+
+      reader.readAsText(file);
+    });
+  };
+
   const handleFileInputChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -194,11 +324,21 @@ export const useTemplateLibrary = (token: string) => {
     }
   };
 
+  const handleCollectionFileInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleImportTemplateCollection(file);
+    }
+  };
+
   return {
     templates,
     isLoading,
     error,
     fileInputRef,
+    collectionFileInputRef,
     deleteDialog,
     loadTemplates,
     formatDate,
@@ -206,6 +346,8 @@ export const useTemplateLibrary = (token: string) => {
     openDeleteDialog,
     closeDeleteDialog,
     handleExportTemplate,
+    handleExportAllTemplates,
     handleFileInputChange,
+    handleCollectionFileInputChange,
   };
 };

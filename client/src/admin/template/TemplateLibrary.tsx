@@ -21,6 +21,7 @@ export const TemplateLibrary = ({
     isLoading,
     error,
     fileInputRef,
+    collectionFileInputRef,
     deleteDialog,
     loadTemplates,
     formatDate,
@@ -28,7 +29,9 @@ export const TemplateLibrary = ({
     openDeleteDialog,
     closeDeleteDialog,
     handleExportTemplate,
+    handleExportAllTemplates,
     handleFileInputChange,
+    handleCollectionFileInputChange,
   } = useTemplateLibrary(token);
 
   const getStatusColor = (status: PublicationStatus) => {
@@ -60,7 +63,10 @@ export const TemplateLibrary = ({
             leftBorder={false}
             disabled={isLoading}
             leftIcon={<Icons.Refresh className="h-4 w-4" />}
+            title="Refresh templates"
           ></PrimaryButton>
+
+          {/* Single Import */}
           <input
             type="file"
             accept="application/json"
@@ -73,10 +79,37 @@ export const TemplateLibrary = ({
             size="sm"
             variant="outline"
             leftBorder={false}
-            leftIcon={<Icons.Import className="h-4 w-4" />}
-          >
-            Import
-          </PrimaryButton>
+            leftIcon={<Icons.SingleImport className="h-4 w-4" />}
+            title="Import single template"
+          ></PrimaryButton>
+
+          {/* Import Collection */}
+          <input
+            type="file"
+            accept="application/json"
+            ref={collectionFileInputRef}
+            onChange={handleCollectionFileInputChange}
+            className="hidden"
+          />
+          <PrimaryButton
+            onClick={() => collectionFileInputRef.current?.click()}
+            size="sm"
+            variant="outline"
+            leftBorder={false}
+            leftIcon={<Icons.ImportCollection className="h-4 w-4" />}
+            title="Import template collection"
+          ></PrimaryButton>
+
+          {/* Export All */}
+          <PrimaryButton
+            onClick={handleExportAllTemplates}
+            size="sm"
+            variant="outline"
+            leftBorder={false}
+            leftIcon={<Icons.ExportAll className="h-4 w-4" />}
+            title="Export all templates"
+          ></PrimaryButton>
+
           <PrimaryButton
             onClick={onCreateNew}
             size="sm"
