@@ -22,7 +22,7 @@
     "noImplicitThis": false,
     "alwaysStrict": false
   },
-  "references": [{ "path": "../../core" }, { "path": "./src" }],
-  "include": ["src/**/*", "../../core/**/*"],
+  "references": [{ "path": "../core" }],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
