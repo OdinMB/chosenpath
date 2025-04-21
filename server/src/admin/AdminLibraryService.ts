@@ -1,6 +1,10 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { isDevelopment, STORAGE_PATHS, MAX_PLAYERS } from "@core/config.js";
+import {
+  isDevelopment,
+  STORAGE_PATHS,
+  MAX_PLAYERS,
+} from "../../../core/config.js";
 import {
   GameMode,
   GameModes,
