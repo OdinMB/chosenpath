@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && npx tsc",
+    "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && npm exec -- tsc",
     "dev": "tsx watch src/index.ts",
     "start": "NODE_OPTIONS=\"--experimental-modules --es-module-specifier-resolution=node\" node dist/src/index.js"
   },
