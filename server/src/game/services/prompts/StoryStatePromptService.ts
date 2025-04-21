@@ -118,7 +118,7 @@ ${modeDescriptions[story.getGameMode()]}
           )}`
         : "",
       guidelines.typesOfThreads
-        ? `- Types of threads that should be considered for the story: ${guidelines.typesOfThreads.join(
+        ? `- Types of threads that should be considered for the story (if and when appropriate): ${guidelines.typesOfThreads.join(
             ", "
           )}`
         : "",

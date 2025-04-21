@@ -41,7 +41,7 @@ const optionChallengeSchema = z
     text: z
       .string()
       .describe(
-        "Text shown to player for this choice. For sacrifice and reward options, mention the stat that will be sacrificed or gained (regardless of the resolution of this beat) so the player knows what the trade-off is."
+        "Text shown to player for this choice. For sacrifice and reward options, mention the stat that will be sacrificed or gained (regardless of the resolution of this beat) so the player knows what the trade-off is. Prioritize flavor and consistency between beat and option text over mechanical accuracy."
       ),
     riskType: z
       .enum(OPTION_RISK_TYPES)
@@ -118,7 +118,7 @@ export const beatPlanSchema = z.object({
   showDontTell: z
     .array(z.string())
     .describe(
-      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. The list must include how exactly the player performs the action that was chosen in the previous beat and the consequences of that action."
+      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. The list must include the player action that they decided to do in the previous beat and the consequences of that action."
     ),
   newIntroductionsOfStoryElements: z
     .array(addIntroductionOfStoryElementSchema)
@@ -179,12 +179,11 @@ export const beatGenerationSchema = z.object({
         "- Write 5-6 paragraphs.\n" +
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
-        "- Describe the player's actions following their decision in the previous beat and the consequences of that decision. Don't skip over actions or events. Example: If the player decided to organize a vote, describe how the vote is conducted and what the outcome is.\n" +
+        "- Describe the action that the player decided to do in the previous beat. Show don't tell!\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
-        "- NEVER introduce, talk about, or even hint at the player's options in the beat text.\n" +
-        "- AVOID all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
-        "- You can use markdown for formatting."
+        "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
+        "- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
     ),
   summary: z
     .string()
@@ -204,7 +203,7 @@ export const beatGenerationSchema = z.object({
       ])
     )
     .describe(
-      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Only put specific numbers for sacrifices and rewards in brackets (e.g. 'push through (-10 stamina)', 'bribe the guard (-100 gold)'). Remember that both sacrifices and rewards are certain and not just risks or potential rewards."
+      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options."
     ),
 });
 

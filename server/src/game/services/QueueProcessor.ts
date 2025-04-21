@@ -6,6 +6,7 @@ import type {
 } from "../queue.js";
 import EventEmitter from "events";
 import { Logger } from "@common/logger.js";
+import { setImmediate } from "timers";
 
 export abstract class BaseQueueProcessor<
   TOperation extends QueueableOperation,
@@ -121,47 +122,53 @@ export abstract class BaseQueueProcessor<
 
   private async processQueues(): Promise<void> {
     Logger.Queue.log("Process queues started");
+
+    // Process new operations as they arrive
+    this.events.on("newOperation", () => {
+      // Schedule processing of all available queues
+      this.processAvailableQueues();
+    });
+
+    // Initial processing of all available queues
+    await this.processAvailableQueues();
+
+    // Wait until processing is stopped
     while (this.processing) {
-      const queueIds = Array.from(this.queues.keys());
-      Logger.Queue.log(`Processing ${queueIds.length} queues`);
-
-      await Promise.all(
-        queueIds.map(async (queueId) => {
-          if (this.processingItems.has(queueId)) {
-            Logger.Queue.log(`Queue ${queueId} is already processing`);
-            return;
-          }
-
-          const queue = this.queues.get(queueId)!;
-          if (queue.length === 0) return;
-
-          Logger.Queue.log(
-            `Processing queue ${queueId.slice(-5)} with ${queue.length} items`
-          );
-          await this.processQueue(queueId);
-        })
-      );
-
-      if (this.allQueuesEmpty()) {
-        Logger.Queue.log("All queues empty, waiting for new operations");
-        await new Promise<void>((resolve) => {
-          const handler = () => {
-            this.events.removeListener("newOperation", handler);
-            resolve();
-          };
-          this.events.once("newOperation", handler);
-        });
-      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
-  private async processQueue(queueId: string): Promise<void> {
+  private async processAvailableQueues(): Promise<void> {
+    if (!this.processing) return;
+
+    const queueIds = Array.from(this.queues.keys());
+
+    // Start processing each unprocessed queue in parallel
+    queueIds.forEach((queueId) => {
+      if (
+        !this.processingItems.has(queueId) &&
+        (this.queues.get(queueId)?.length ?? 0) > 0
+      ) {
+        // Process this queue independently
+        this.processQueueIndependently(queueId).catch((error) => {
+          Logger.Queue.error(`Error processing queue ${queueId}:`, error);
+        });
+      }
+    });
+  }
+
+  private async processQueueIndependently(queueId: string): Promise<void> {
+    // Mark this queue as being processed
     this.processingItems.add(queueId);
 
     try {
-      const queue = this.queues.get(queueId)!;
+      const queue = this.queues.get(queueId);
+      if (!queue || queue.length === 0) return;
+
+      // Process the first operation in this queue
       const operationId = queue[0];
-      const operation = this.operations.get(operationId)!;
+      const operation = this.operations.get(operationId);
+      if (!operation) return;
 
       Logger.Queue.log(
         `Processing ${(operation as any).type} operation ${operationId.slice(
@@ -182,14 +189,17 @@ export abstract class BaseQueueProcessor<
           )}`
         );
       } catch (error) {
-        // Use the centralized error handler
         this.handleOperationError(operation, error);
       }
 
+      // Remove the processed operation from the queue
       queue.shift();
       if (queue.length === 0) {
         Logger.Queue.log(`Queue ${queueId.slice(-5)} is now empty`);
         this.queues.delete(queueId);
+      } else {
+        // Process the next operation in this queue
+        setImmediate(() => this.processQueueIndependently(queueId));
       }
     } finally {
       this.processingItems.delete(queueId);

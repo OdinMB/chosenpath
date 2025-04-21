@@ -107,7 +107,7 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
             <div className="mb-1 text-primary">{name}:</div>
           </Tooltip>
           {(value as string[]).length === 0 ? (
-            <span className="text-primary-500">None</span>
+            <span className="text-primary-500 ml-2">None</span>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {(value as string[]).map((item, index) => (

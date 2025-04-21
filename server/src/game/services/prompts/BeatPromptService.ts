@@ -213,10 +213,12 @@ ${gameWorldInstructions}
 How to make sure that the text follows the principle of 'Show Don't Tell'?
 Based on the consequences to narrate, requirements for the ${story.getCurrentBeatType()}, ${
       story.isMultiplayer() ? ", multiplayer" : ""
-    }, and world building considerations: create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. Examples:
+    }, and world building considerations: create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
+Always include how the players perform the actions that they chose in the previous beat, how they played out, and what the consequences are.
+Examples:
+- The player decided to bribe the guard: we should describe the actual bribe.
 - The old sage provides a cryptic hint: we should spell out the cryptic hint and deliver it in direct speech.
 - The player gets attacked by a goblin: we should describe the actual attack.
-- The faction leader makes a tempting offer: we should spell out the offer and deliver it in direct speech.
 
 ${
   story.getCurrentBeatType() !== "ending"
@@ -265,7 +267,7 @@ Text
 --- continue exactly where the previous beat for this player ended
 --- describe how the player performs the action that was chosen in the previous beat
 --- describe the consequences of that action
-Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is.
+Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is. Don't immediately jump to after the vote!
 ${
   story.getCurrentBeatType() === "thread" &&
   story.getCurrentThreadBeatsCompleted() > 0
@@ -320,7 +322,7 @@ ${
           "If you want to generate an image for a beat, leave the imageId field empty.\n" +
           "If you want to use an existing image, specify its ID.\n" +
           "\nOptions\n" +
-          "- Offer 3 options.\n" +
+          "- Offer exactly 3 options.\n" +
           "- Make sure that the beat implements the current " +
           story.getCurrentBeatType() +
           " configuration.\n" +
@@ -346,7 +348,8 @@ ${
               "--- Use 'challenge' for options in Challenge threads and Contest threads.\n") +
           "- Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).\n" +
           "--- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.\n" +
-          "--- You can only generate 0-1 sacrifice/reward option per beat. 2-3 options must be normal.\n" +
+          "--- You can only generate no or exactly 1 sacrifice/reward option per beat. The rest of the options must be normal.\n" +
+          "--- Formulate the option with flavor in mind. Bad: 'Take a bold risk, sacrificing 10% emotional stability for a higher chance of catching his attention (-10% emotional stability).'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'\n" +
           (story.getCurrentBeatType() === "thread"
             ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
               "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +" +
