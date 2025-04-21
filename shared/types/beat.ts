@@ -41,7 +41,7 @@ const optionChallengeSchema = z
     text: z
       .string()
       .describe(
-        "Text shown to player for this choice. For sacrifice and reward options, mention the stat that will be sacrificed or gained (regardless of the resolution of this beat) so the player knows what the trade-off is. Prioritize flavor and consistency between beat and option text over mechanical accuracy."
+        "Text shown to player for this choice. For sacrifice and reward options, mention the stat that will be sacrificed or gained (regardless of the resolution of this beat) so the player knows what the trade-off is. Prioritize flavor and consistency between beat and option text over mechanical accuracy. Don't use the terms 'sacrifice' or 'reward' in the option text."
       ),
     riskType: z
       .enum(OPTION_RISK_TYPES)
