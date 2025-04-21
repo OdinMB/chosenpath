@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { API_CONFIG } from "../../shared/config.js";
+import { API_CONFIG } from "shared/config.js";
 
 // Load environment variables
 dotenv.config();
