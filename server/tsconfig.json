@@ -2,15 +2,16 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "baseUrl": ".",
+    "rootDir": "src",
+    "baseUrl": "src",
     "paths": {
-      "@/*": ["./src/*"],
-      "@core/*": ["../core/*"],
-      "@common/*": ["./src/shared/*"],
-      "@admin/*": ["./src/admin/*"],
-      "@game/*": ["./src/game/*"],
-      "@page/*": ["./src/page/*"],
-      "@user/*": ["./src/user/*"]
+      "core/*": ["../../core/*"],
+      "@/*": ["./*"],
+      "@common/*": ["./shared/*"],
+      "@admin/*": ["./admin/*"],
+      "@game/*": ["./game/*"],
+      "@page/*": ["./page/*"],
+      "@user/*": ["./user/*"]
     },
     "strict": true,
     "strictNullChecks": true,
