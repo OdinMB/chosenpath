@@ -11,7 +11,8 @@
       "@admin/*": ["./admin/*"],
       "@game/*": ["./game/*"],
       "@page/*": ["./page/*"],
-      "@user/*": ["./user/*"]
+      "@user/*": ["./user/*"],
+      "shared/*": ["../shared/*"]
     },
     "strict": true,
     "strictNullChecks": true,
@@ -23,11 +24,6 @@
     "alwaysStrict": false
   },
   "references": [{ "path": "../shared" }],
-  "include": [
-    "src/**/*",
-    "src/config.ts",
-    "../shared/**/*",
-    "../shared/config.ts"
-  ],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "cd ../shared && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/shared && cp -r ../shared/dist/* dist/shared/ && npx tsc-alias",
     "dev": "tsx watch src/index.ts",
-    "start": "node --experimental-modules --es-module-specifier-resolution=node dist/index.js"
+    "start": "node --es-module-specifier-resolution=node dist/index.js"
   },
   "keywords": [],
   "author": "",

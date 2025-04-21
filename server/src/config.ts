@@ -1,8 +1,5 @@
 import dotenv from "dotenv";
-import {
-  API_CONFIG,
-  STORAGE_PATHS as SHARED_STORAGE_PATHS,
-} from "../../shared/config.js";
+import { API_CONFIG } from "../../shared/config.js";
 
 // Load environment variables
 dotenv.config();
@@ -26,9 +23,6 @@ export const config = {
   // Authentication
   adminPassword: process.env.ADMIN_PASSWORD || "admin-dev-password",
 } as const;
-
-// Use storage paths from shared config
-export const STORAGE_PATHS = SHARED_STORAGE_PATHS;
 
 // OpenAI model settings
 export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1";
