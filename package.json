@@ -2,6 +2,9 @@
   "name": "ai-story-game",
   "version": "1.0.0",
   "private": true,
+  "keywords": [],
+  "author": "Odin Mühlenbein",
+  "license": "",
   "type": "module",
   "workspaces": [
     "client",

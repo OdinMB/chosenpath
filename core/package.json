@@ -2,6 +2,15 @@
   "name": "core",
   "version": "1.0.0",
   "type": "module",
+  "keywords": [],
+  "author": "Odin Mühlenbein",
+  "license": "",
+  "exports": {
+    "./config.js": "./dist/config.js",
+    "./models/*": "./dist/models/*",
+    "./utils/*": "./dist/utils/*",
+    "./types/*": "./dist/types/*"
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w"

@@ -4,15 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && npx tsc-alias && npm run debug-build",
     "dev": "tsx watch src/index.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js",
-    "debug-build": "echo 'DEBUG: Listing dist directory structure' && ls -la dist && echo 'DEBUG: Checking for core directory' && ls -la dist/core && echo 'DEBUG: Checking config.js imports' && grep -r '@core' dist/ && echo 'DEBUG: Done debugging'"
+    "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Core dist/core directory structure (if exists) =====\\n' && ls -la ../core/dist/core || echo 'No core/dist/core directory' && echo '\\n===== DEBUG: Server dist/core directory structure (if exists) =====\\n' && ls -la dist/core || echo 'No dist/core directory' && echo '\\n===== DEBUG: Checking @core imports in compiled JS =====\\n' && grep -r '@core' dist/ && echo '\\n===== DEBUG: Sample of a config.js file =====\\n' && head -20 ../core/dist/config.js || echo 'Core config.js not found' && echo '\\n===== DEBUG: Checking module-alias paths =====\\n' && echo '@core resolves to:' && realpath '../core/dist' && echo '\\n===== DEBUG: Done debugging ====='"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Odin Mühlenbein",
+  "license": "",
   "dependencies": {
+    "core": "file:../core",
     "@langchain/openai": "^0.4.3",
     "@types/socket.io": "^3.0.1",
     "cors": "^2.8.5",
@@ -35,7 +36,7 @@
     "typescript": "^5.0.0"
   },
   "_moduleAliases": {
-    "@core": "dist/core",
+    "@core": "../core/dist",
     "@common": "dist/shared",
     "@admin": "dist/admin",
     "@game": "dist/game",
