@@ -11,14 +11,13 @@ const config = {
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@core": path.resolve(__dirname, "../shared"),
+      "@core": path.resolve(__dirname, "../core"),
       "@admin": path.resolve(__dirname, "./src/admin"),
       "@common": path.resolve(__dirname, "./src/shared"),
       "@components": path.resolve(__dirname, "./src/shared/components"),
       "@game": path.resolve(__dirname, "./src/game"),
       "@page": path.resolve(__dirname, "./src/page"),
       "@user": path.resolve(__dirname, "./src/user"),
-      shared: path.resolve(__dirname, "../shared"),
     },
     extensions: [".ts", ".js", ".jsx", ".tsx", ".json"],
   },

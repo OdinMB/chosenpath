@@ -6,13 +6,12 @@
     "baseUrl": "src",
     "paths": {
       "@/*": ["./*"],
-      "@core/*": ["../../shared/*"],
+      "@core/*": ["../../core/*"],
       "@common/*": ["./shared/*"],
       "@admin/*": ["./admin/*"],
       "@game/*": ["./game/*"],
       "@page/*": ["./page/*"],
-      "@user/*": ["./user/*"],
-      "shared/*": ["../../shared/*"]
+      "@user/*": ["./user/*"]
     },
     "strict": true,
     "strictNullChecks": true,
@@ -23,7 +22,7 @@
     "noImplicitThis": false,
     "alwaysStrict": false
   },
-  "references": [{ "path": "../shared" }],
+  "references": [{ "path": "../core" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
