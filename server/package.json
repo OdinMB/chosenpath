@@ -3,8 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "_moduleAliases": {
+    "@core": "dist/core",
+    "@common": "dist/shared",
+    "@admin": "dist/admin",
+    "@game": "dist/game",
+    "@page": "dist/page",
+    "@user": "dist/user"
+  },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc -b && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias",
     "dev": "tsx watch src/index.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js"
   },
@@ -18,6 +26,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.18.0",
     "langchain": "^0.3.15",
+    "module-alias": "^2.2.3",
     "openai": "^4.83.0",
     "socket.io": "^4.8.1",
     "ws": "^8.16.0",

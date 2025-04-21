@@ -1,3 +1,6 @@
+// Register module aliases for path resolution
+import "module-alias/register";
+
 import http from "http";
 import express from "express";
 import cors from "cors";
