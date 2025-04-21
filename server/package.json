@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/ && npm run debug-build",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node --es-module-specifier-resolution=node dist/index.js",
     "debug-build": "echo 'DEBUG: Listing dist directory structure' && ls -la dist && echo 'DEBUG: Checking for core directory' && ls -la dist/core && echo 'DEBUG: Checking config.js imports' && grep -r '@core' dist/ && echo 'DEBUG: Done debugging'"
   },
   "keywords": [],
