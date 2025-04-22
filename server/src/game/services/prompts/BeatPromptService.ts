@@ -57,7 +57,7 @@ export class BeatPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of 4-5 sentences each followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.${
       story.getCurrentBeatType() === "thread"
         ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
@@ -214,7 +214,11 @@ How to make sure that the text follows the principle of 'Show Don't Tell'?
 Based on the consequences to narrate, requirements for the ${story.getCurrentBeatType()}, ${
       story.isMultiplayer() ? ", multiplayer" : ""
     }, and world building considerations: create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
-Always include how the players perform the actions that they chose in the previous beat, how they played out, and what the consequences are.
+Always include how the players perform the actions that they chose in the previous beat, how they played out, and what the consequences are.${
+      story.isMultiplayer() && story.isFirstBeat()
+        ? "\nSince this is the first beat of a multiplayer story, introduce the characters of the other players."
+        : ""
+    }
 Examples:
 - The player decided to bribe the guard: we should describe the actual bribe.
 - The old sage provides a cryptic hint: we should spell out the cryptic hint and deliver it in direct speech.
@@ -267,16 +271,18 @@ Text
 --- continue exactly where the previous beat for this player ended
 --- describe how the player performs the action that was chosen in the previous beat
 --- describe the consequences of that action
-Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is. Don't immediately jump to after the vote!
-${
-  story.getCurrentBeatType() === "thread" &&
-  story.getCurrentThreadBeatsCompleted() > 0
-    ? "- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult.\n"
-    : ""
-}${
+Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is. Don't immediately jump to after the vote!${
+      story.getCurrentBeatType() === "thread" &&
+      story.getCurrentThreadBeatsCompleted() > 0
+        ? "\n- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult.\n"
+        : ""
+    }${
+      story.isMultiplayer() && story.isFirstBeat()
+        ? "\n- This is the first beat of a multiplayer story. Introduce the other player characters, including this player character's relationship to them"
+        : ""
+    }${
       !story.isFirstBeat() && story.getCurrentBeatType() === "switch"
-        ? "- Most of the beat text\n" +
-          "--- should be about the resolution of the previous thread that the player was involved in.\n" +
+        ? "\n- For the beat text, focus on the resolution of the previous thread that the player was involved in.\n" +
           "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
           (story.isMultiplayer()
             ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players.\n" +
@@ -287,81 +293,98 @@ ${
       story.getCurrentBeatType() === "ending"
         ? "- Most of the beat text should be about the ending of the story for the player at hand.\n" +
           "--- Process the outcome of the previous thread that the player was involved in, then transition to the overall ending of the story.\n"
-        : (story.isMultiplayer()
-            ? "- If several players are in the same " +
-              story.getCurrentBeatType() +
-              ", focus on the interplay between the players and their decisions.\n" +
-              (story.getGameMode() === "cooperative" ||
-              story.getGameMode() === "cooperative-competitive"
-                ? "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n"
-                : "") +
-              (story.getGameMode() === "competitive" ||
-              story.getGameMode() === "cooperative-competitive"
-                ? "--- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.\n"
-                : "") +
-              "--- The goal of multiplayer games is to have an interesting interactions between players. The beat text should reflect that.\n"
-            : "") +
-          "- Show, don't tell.\n" +
-          "--- Use the list of 'show don't tell' instructions that you generated in the plan for the beat.\n" +
-          "--- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.\n" +
-          "- Use direct speech\n" +
-          "--- Both for the player characters and the NPCs.\n" +
-          "--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X'. Spell out the actual words that the character says.\n" +
-          "- Address the player directly (with 'You' in the second person)\n" +
-          (story.isMultiplayer()
-            ? "--- Only address the player that will see this beat directly. Other players in the same thread should be referenced by name or with third person pronouns.\n"
-            : "") +
-          "- Story elements\n" +
-          "--- If a player encounters a story element for the first time, introduce it properly.\n" +
-          "--- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.\n" +
-          "- The last paragraph\n" +
-          "--- Never mention or even refer to the player's options and choices.\n" +
-          "--- Players will see the options below the beat text. Talking about them in the beat text is redundant.\n" +
-          "--- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'\n" +
-          "\n\nImages (optional)\n" +
-          "If you want to generate an image for a beat, leave the imageId field empty.\n" +
-          "If you want to use an existing image, specify its ID.\n" +
-          "\nOptions\n" +
-          "- Offer exactly 3 options.\n" +
-          "- Make sure that the beat implements the current " +
+        : ""
+    }${
+      story.getCurrentBeatType() !== "ending" && story.isMultiplayer()
+        ? "- If several players are in the same " +
           story.getCurrentBeatType() +
-          " configuration.\n" +
-          (story.getCurrentBeatType() === "thread"
-            ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n"
+          ", focus on the interplay between the players and their decisions.\n" +
+          (story.getGameMode() === "cooperative" ||
+          story.getGameMode() === "cooperative-competitive"
+            ? "--- If the outcome of the thread is a shared goal or interest, the beat should be about how the players are collaborating.\n"
             : "") +
-          "--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the " +
-          story.getCurrentBeatType() +
-          " in any other way.\n" +
-          (story.isMultiplayer()
-            ? "- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
-              "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this.\n"
+          (story.getGameMode() === "competitive" ||
+          story.getGameMode() === "cooperative-competitive"
+            ? "--- If the outcome of the thread is a conflict or a contested goal, the beat should be about how the players are competing.\n"
             : "") +
-          "- Be specific.\n" +
-          "--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.\n" +
-          "--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'\n" +
-          "- Do NOT include the actual or likely consequences of a decision. (Except for mentioning the stat that is sacrificed or gained as a reward in sacrifice and reward options.)\n" +
-          "- Options determine how the story will continue after this beat. Whatever happened in the beat text is already established.\n" +
-          "- For each option, set the optionType field:\n" +
-          (story.getCurrentBeatType() === "switch"
-            ? "--- Use 'exploration' for all options in switches.\n"
-            : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
-              "--- Use 'challenge' for options in Challenge threads and Contest threads.\n") +
-          "- Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).\n" +
-          "--- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.\n" +
-          "--- You can only generate no or exactly 1 sacrifice/reward option per beat. The rest of the options must be normal.\n" +
-          "--- Formulate the option with flavor in mind. Bad: 'Take a bold risk, sacrificing 10% emotional stability for a higher chance of catching his attention (-10% emotional stability).'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'\n" +
-          (story.getCurrentBeatType() === "thread"
-            ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
-              "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +" +
-              POINTS_FOR_SACRIFICE +
-              " for sacrifice options. " +
-              POINTS_FOR_REWARD +
-              " for reward options.\n" +
-              "--- modifiers: identify stats (individual and shared) that given their current value have an effect on the likelihood of success. This must be consistent with the stat's 'effects on challenge success' in the story state. Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere.\n" +
-              "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
-            : "")
+          "--- The goal of multiplayer games is to have an interesting interactions between players. The beat text should reflect that.\n"
+        : ""
+    } 
+- Show, don't tell.
+--- Use the list of 'show don't tell' instructions that you generated in the plan for the beat.
+--- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.
+- Use direct speech
+--- Both for the player characters and the NPCs.
+--- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X'. Spell out the actual words that the character says.
+- Address the player directly (with 'You' in the second person)${
+      story.isMultiplayer()
+        ? "\n--- Only address the player that will see this beat directly. Other players in the same thread should be referenced by name or with third person pronouns.\n"
+        : ""
     }
-`;
+- Don't break the fourth wall
+--- Don't use terms like 'NPC', 'player character', 'stat', 'story beat', etc. in the beat text.
+- Story elements
+--- If a player encounters a story element for the first time, introduce it properly.
+--- If a player encounters a story element when they already encountered it before, don't introduce it again. Just refer to it assuming that the player knows what it is.
+- The last paragraph
+--- Never mention or even refer to the player's options and choices.
+--- Players will see the options below the beat text. Talking about them in the beat text is redundant.
+--- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'
+
+Images (optional)
+If you want to generate an image for a beat, leave the imageId field empty.
+If you want to use an existing image, specify its ID.
+${
+  story.getCurrentBeatType() !== "ending"
+    ? this.createOptionInstructions(story)
+    : ""
+}`;
+  }
+
+  private static createOptionInstructions(story: Story): string {
+    return `
+Options
+- Offer exactly 3 options.
+- Make sure that the beat implements the current ${story.getCurrentBeatType()} configuration.${
+      story.getCurrentBeatType() === "thread"
+        ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n"
+        : ""
+    }
+--- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${story.getCurrentBeatType()} in any other way.${
+      story.isMultiplayer()
+        ? "- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
+          "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this.\n"
+        : ""
+    }
+- Be specific.
+--- Bad: 'Propose a compromise'. Good: Specify what the compromise is.
+--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'
+- Do NOT include the actual or likely consequences of a decision. (Except for mentioning the stat that is sacrificed or gained as a reward in sacrifice and reward options.)
+- Options determine how the story will continue after this beat. Whatever happened in the beat text is already established.
+- For each option, set the optionType field:
+${
+  story.getCurrentBeatType() === "switch"
+    ? "--- Use 'exploration' for all options in switches.\n"
+    : "--- Use 'exploration' for options in Exploration threads (that don't follow a success/failure or win/lose pattern).\n" +
+      "--- Use 'challenge' for options in Challenge threads and Contest threads.\n"
+}
+- Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
+--- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.
+--- You can only generate no or exactly 1 sacrifice/reward option per beat. The rest of the options must be normal.
+--- Formulate the option with flavor in mind. Bad: 'Take a bold risk, sacrificing 10% emotional stability for a higher chance of catching his attention (-10% emotional stability).'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
+${
+  story.getCurrentBeatType() === "thread"
+    ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
+      "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +" +
+      POINTS_FOR_SACRIFICE +
+      " for sacrifice options. " +
+      POINTS_FOR_REWARD +
+      " for reward options.\n" +
+      "--- modifiers: identify stats (individual and shared) that given their current value have an effect on the likelihood of success. This must be consistent with the stat's 'effects on challenge success' in the story state. Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere.\n" +
+      "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
+    : ""
+}
+    `;
   }
 
   private static createGameWorldInstructions(story: Story): string {

@@ -257,7 +257,7 @@ Context for additional stat parameters
 - Threads are resolved as favorable/mixed/unfavorable.
 - At the end of a thread and depending on the resolution, a milestone is added to the story state. This is what drives the story to its overall resolution.
 - Each thread consists of 2-4 beats.
-- Each beat is 5-6 paragraphs of text followed by a player decision.
+- Each beat is 5-6 paragraphs of text (4-5 sentences each) followed by a player decision.
 - Beats have a probability distribution for favorable/mixed/unfavorable resolutions.
 - This distribution can be influenced by stats.
 - It can be shifted in the player's favor by sacrificing something, or in the player's disadvantage by choosing a reward that is going to help the player in other ways later on.

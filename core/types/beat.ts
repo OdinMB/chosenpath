@@ -176,7 +176,7 @@ export const beatGenerationSchema = z.object({
     .string()
     .describe(
       "Main narrative text for this player.\n" +
-        "- Write 5-6 paragraphs.\n" +
+        "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
         "- Describe the action that the player decided to do in the previous beat. Show don't tell!\n" +

@@ -53,7 +53,7 @@ Milestones
 are added to outcomes at the end of threads. Milestones mark progress toward the outcome's resolution and make some resolutions more likely.
 
 Beats
-are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text (4-5 sentences each) followed by a decision that the player must make.
 Beats are the smallest narrative unit in the game.
 
 Switches

@@ -51,7 +51,7 @@ export class SwitchPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 5-6 paragraphs of text followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text (4-5 sentences each) followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.
 
 Threads
