@@ -129,6 +129,17 @@ function App() {
     ]
   );
 
+  const handleCodeSubmit = useCallback(
+    (code: string) => {
+      Logger.App.log("handleCodeSubmit called with code:", code);
+      setIsLoading(true);
+      gameService.verifyCode(code);
+      setPlayerCode(code);
+      localStorage.setItem(playerCodeKey, code);
+    },
+    [playerCodeKey, setIsLoading, setPlayerCode]
+  );
+
   // Check for shared template URL pattern on load
   useEffect(() => {
     const checkForSharedTemplate = async () => {
@@ -147,10 +158,27 @@ function App() {
       }
     };
 
+    const checkForJoinCode = () => {
+      const path = window.location.pathname;
+      const codeMatch = path.match(/^\/join\/([^/]+)$/);
+
+      if (codeMatch && codeMatch[1]) {
+        const code = codeMatch[1];
+        Logger.App.log(`Found shared code in URL: ${code}`);
+
+        // Remove the code from the URL to prevent reloading on refresh
+        window.history.replaceState({}, document.title, "/");
+
+        // Use the code to join the game
+        handleCodeSubmit(code);
+      }
+    };
+
     if (!isConnecting && viewState === "WELCOME") {
       checkForSharedTemplate();
+      checkForJoinCode();
     }
-  }, [isConnecting, viewState, loadTemplateById]);
+  }, [isConnecting, viewState, loadTemplateById, handleCodeSubmit]);
 
   useEffect(() => {
     // If we need to show connecting screen
@@ -274,6 +302,7 @@ function App() {
     storyCreationStatus.current = "NONE";
   };
 
+  // Define all remaining event handlers below
   // premise-based, called by StoryInitializer
   const handleStorySetup = (options: {
     prompt: string;
@@ -345,14 +374,6 @@ function App() {
     // Set the template pending flag to prevent premature state transitions
     // until we receive the story codes
     storyCreationStatus.current = "TEMPLATE";
-  };
-
-  const handleCodeSubmit = (code: string) => {
-    Logger.App.log("handleCodeSubmit called with code:", code);
-    setIsLoading(true);
-    gameService.verifyCode(code);
-    setPlayerCode(code);
-    localStorage.setItem(playerCodeKey, code);
   };
 
   const handleExitGame = () => {
