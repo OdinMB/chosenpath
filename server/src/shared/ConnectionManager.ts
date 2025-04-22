@@ -9,6 +9,7 @@ import { storyRepository } from "common/StoryRepository.js";
 import { Story } from "core/models/Story.js";
 import { Server } from "socket.io";
 import { Logger } from "common/logger.js";
+import { GAME_SESSION_CONFIG } from "core/config.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -108,16 +109,35 @@ export class ConnectionManager {
     this.codeMap.set(code, { storyId, playerSlot });
   }
 
+  /**
+   * Remove a socket from all connections
+   * Called when a socket disconnects or is cleaned up
+   */
   removeSocket(socketId: string): void {
     const connection = this.socketMap.get(socketId);
-    if (!connection) return;
+    if (!connection) {
+      // No mapping found - socket likely wasn't part of any game
+      return;
+    }
 
     const { storyId, playerSlot } = connection;
+    Logger.ConnectionManager.log(
+      `Removing socket ${socketId} from game ${storyId}, player ${playerSlot}`
+    );
+
     const session = this.gameSessions.get(storyId);
-    if (!session) return;
+    if (!session) {
+      // Clean up mapping even if session is gone
+      this.socketMap.delete(socketId);
+      return;
+    }
 
     const player = session.players.get(playerSlot);
-    if (!player) return;
+    if (!player) {
+      // Clean up mapping even if player is gone
+      this.socketMap.delete(socketId);
+      return;
+    }
 
     // Remove socket from player's connections
     player.socketIds.delete(socketId);
@@ -126,6 +146,9 @@ export class ConnectionManager {
     // If no more connections, update last active time
     if (player.socketIds.size === 0) {
       player.lastActive = new Date();
+      Logger.ConnectionManager.log(
+        `Player ${playerSlot} in game ${storyId} now has no active connections`
+      );
     }
   }
 
@@ -218,38 +241,59 @@ export class ConnectionManager {
   }
 
   // Helper method to clean up inactive sessions (can be called periodically)
-  cleanupInactiveSessions(maxInactiveTime: number = 1000 * 60 * 60 * 24): void {
-    const now = new Date();
-    for (const [storyId, session] of this.gameSessions) {
-      let hasActivePlayers = false;
+  cleanupInactiveSessions(): void {
+    let cleanedSessionsCount = 0;
 
-      for (const [playerSlot, player] of session.players) {
-        if (
-          player.socketIds.size > 0 ||
-          now.getTime() - player.lastActive.getTime() < maxInactiveTime
-        ) {
-          hasActivePlayers = true;
+    Logger.ConnectionManager.log("Running game session cleanup:", {
+      totalSessions: this.gameSessions.size,
+    });
+
+    for (const [storyId, session] of this.gameSessions) {
+      let hasConnectedPlayers = false;
+
+      // Check if any player has active socket connections
+      for (const [_, player] of session.players) {
+        if (player.socketIds.size > 0) {
+          hasConnectedPlayers = true;
           break;
         }
       }
 
-      if (!hasActivePlayers) {
+      // If no players are connected, clean up the session
+      if (!hasConnectedPlayers) {
+        Logger.ConnectionManager.log(
+          `Cleaning up inactive game session: ${storyId}`
+        );
+
         // Clean up all references
-        session.players.forEach((player, playerSlot) => {
-          player.socketIds.forEach((socketId) =>
-            this.socketMap.delete(socketId)
-          );
+        session.players.forEach((player) => {
+          // No need to delete socketIds as there are none
           this.codeMap.delete(player.code);
         });
         this.gameSessions.delete(storyId);
+        cleanedSessionsCount++;
       }
     }
+
+    Logger.ConnectionManager.log("Game session cleanup complete:", {
+      cleanedSessions: cleanedSessionsCount,
+      remainingSessions: this.gameSessions.size,
+    });
   }
 
   getPlayerBySocket(
     socketId: string
   ): { storyId: string; playerSlot: PlayerSlot } | undefined {
     return this.socketMap.get(socketId);
+  }
+
+  /**
+   * Check if a socket is associated with any game
+   * @param socketId The ID of the socket to check
+   * @returns True if the socket is part of a game, false otherwise
+   */
+  isSocketInGame(socketId: string): boolean {
+    return this.socketMap.has(socketId);
   }
 
   registerCode(storyId: string, playerSlot: PlayerSlot, code: string): void {

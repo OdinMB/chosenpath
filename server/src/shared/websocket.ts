@@ -11,7 +11,11 @@ import {
 } from "core/types/index.js";
 import { config } from "server/config.js";
 import { connectionManager } from "./ConnectionManager.js";
-import { RateLimitedAction, SOCKET_CONFIG } from "core/config.js";
+import {
+  RateLimitedAction,
+  SOCKET_CONFIG,
+  GAME_SESSION_CONFIG,
+} from "core/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,
@@ -22,7 +26,10 @@ import { Logger } from "./logger.js";
 export class GameWebSocketServer {
   private io: Server;
   private clients: Map<string, Socket> = new Map();
+  private clientLastActivity: Map<string, number> = new Map();
   private gameHandler: GameHandler;
+  private socketCleanupInterval: NodeJS.Timeout | null = null;
+  private sessionCleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(server: http.Server, gameHandler: GameHandler) {
     this.io = new Server(server, {
@@ -53,6 +60,59 @@ export class GameWebSocketServer {
     connectionManager.setIo(this.io);
 
     this.setupSocketServer();
+    this.setupCleanupIntervals();
+  }
+
+  /**
+   * Setup separate intervals for socket and session cleanup
+   */
+  private setupCleanupIntervals(): void {
+    // Setup socket cleanup interval
+    this.socketCleanupInterval = setInterval(() => {
+      this.cleanupIdleSocketConnections();
+    }, SOCKET_CONFIG.STALE_CONNECTION_CLEANUP_INTERVAL_MS);
+
+    // Setup game session cleanup interval
+    this.sessionCleanupInterval = setInterval(() => {
+      connectionManager.cleanupInactiveSessions();
+    }, GAME_SESSION_CONFIG.INACTIVE_SESSION_CLEANUP_INTERVAL_MS);
+  }
+
+  /**
+   * Clean up socket connections that have been inactive for too long
+   */
+  private cleanupIdleSocketConnections(): void {
+    const now = Date.now();
+    const threshold = SOCKET_CONFIG.STALE_CONNECTION_THRESHOLD_MS;
+    let disconnectedCount = 0;
+
+    Logger.Websocket.log("[WebSocket] Checking for idle socket connections", {
+      totalSockets: this.clients.size,
+      inactivityThresholdMin: Math.round(threshold / 1000 / 60),
+    });
+
+    for (const [socketId, socket] of this.clients.entries()) {
+      // Get last activity time (or connection time if no activity)
+      const lastActivity = this.clientLastActivity.get(socketId) || 0;
+      const idleTime = now - lastActivity;
+
+      // If socket has been idle too long, disconnect it
+      if (idleTime > threshold) {
+        // Ensure the socket is properly removed from ConnectionManager
+        connectionManager.removeSocket(socketId);
+
+        // Disconnect and clean up local tracking
+        socket.disconnect(true);
+        this.clients.delete(socketId);
+        this.clientLastActivity.delete(socketId);
+        disconnectedCount++;
+      }
+    }
+
+    Logger.Websocket.log("[WebSocket] Idle socket cleanup complete", {
+      disconnectedCount,
+      remainingSockets: this.clients.size,
+    });
   }
 
   /**
@@ -128,6 +188,8 @@ export class GameWebSocketServer {
     this.io.on("connection", (socket: Socket) => {
       console.log(`[WebSocket] New connection established: ${socket.id}`);
       this.clients.set(socket.id, socket);
+      // Record connection time as last activity
+      this.clientLastActivity.set(socket.id, Date.now());
 
       // Register the socket with the GameHandler
       this.gameHandler.registerSocket(socket);
@@ -139,6 +201,7 @@ export class GameWebSocketServer {
             `[WebSocket] Client disconnected: ${socket.id}, reason: ${reason}`
           );
           this.clients.delete(socket.id);
+          this.clientLastActivity.delete(socket.id);
 
           // Remove socket from connection manager
           connectionManager.removeSocket(socket.id);
@@ -157,6 +220,14 @@ export class GameWebSocketServer {
           );
         }
       });
+
+      // Update last activity time on any socket event
+      const updateActivity = () => {
+        this.clientLastActivity.set(socket.id, Date.now());
+      };
+
+      // Track activity on all relevant events
+      socket.onAny(updateActivity);
 
       // Set up global error handler for socket errors
       socket.on("error", (error) => {
@@ -600,6 +671,20 @@ export class GameWebSocketServer {
   close(callback?: () => void): void {
     // Clean up GameHandler before closing
     this.gameHandler.dispose();
+
+    // Clear all intervals
+    if (this.socketCleanupInterval) {
+      clearInterval(this.socketCleanupInterval);
+      this.socketCleanupInterval = null;
+    }
+
+    if (this.sessionCleanupInterval) {
+      clearInterval(this.sessionCleanupInterval);
+      this.sessionCleanupInterval = null;
+    }
+
+    // Clean up client activity tracking
+    this.clientLastActivity.clear();
 
     this.io.close(callback);
   }

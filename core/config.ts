@@ -70,7 +70,7 @@ export const RATE_LIMITS: Record<
 export const SOCKET_CONFIG = {
   // Client-side configuration
   CLIENT: {
-    timeout: 180000, // 3 minutes in ms
+    timeout: 300000, // 5 minutes in ms
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
@@ -79,11 +79,16 @@ export const SOCKET_CONFIG = {
   // Server-side configuration
   SERVER: {
     pingInterval: 25000, // Default ping interval (25 seconds)
-    pingTimeout: 180000, // 3 minutes ping timeout
+    pingTimeout: 300000, // 5 minutes ping timeout
   },
 
-  // When to show the reload message after tab becomes visible again
-  STALE_CONNECTION_THRESHOLD_MS: 180000, // 3 minutes
+  STALE_CONNECTION_CLEANUP_INTERVAL_MS: 1000 * 60 * 60 * 2, // 2 hours
+  STALE_CONNECTION_THRESHOLD_MS: 1000 * 60 * 30, // 30 minutes
+};
+
+export const GAME_SESSION_CONFIG = {
+  INACTIVE_SESSION_CLEANUP_INTERVAL_MS: 1000 * 60 * 60 * 2, // 2 hours
+  INACTIVE_SESSION_THRESHOLD_MS: 1000 * 60 * 60 * 1, // 1 hour
 };
 
 // Storage paths configuration
