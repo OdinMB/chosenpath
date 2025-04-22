@@ -103,15 +103,15 @@ Possible player configurations:
 - Independent threads: Each player gets their own standard thread
 - Shared threads: All players are in the same thread
 - Mixed setup: Some players are in a joint thread while others are in independent threads.`;
-    } else {
-      instructions += `
 
-For single-player games, there is always only one thread.`;
+      if (story.getCurrentTurn() === 0) {
+        instructions += `\n\nIMPORTANT: Since this is the first thread of the game, ALL players MUST be in a SINGLE JOINT THREAD together. This is a hard requirement - create one thread that involves all players.`;
+      }
+    } else {
+      instructions += `\n\nFor single-player games, there is always only one thread.`;
     }
 
-    instructions += `
-
-Types of Threads:
+    instructions += `\n\nTypes of Threads:
 1. Challenge Threads
 - One or several players work towards a goal
 - Resolutions are favorable/mixed/unfavorable
@@ -124,7 +124,11 @@ Types of Threads:
 - Players are split into Side A and Side B, competing over an outcome
 - Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
-- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")`;
+- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")${
+        story.getCurrentTurn() === 0
+          ? "\n- NOT appropriate for the first thread of the game where all players must be on the same side"
+          : ""
+      }`;
     }
 
     instructions += `

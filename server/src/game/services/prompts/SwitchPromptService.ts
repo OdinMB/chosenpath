@@ -132,7 +132,11 @@ b) Analyze potential for player coordination based on
 - Game mode alignment: Does the coordination serve the intended cooperative/competitive dynamic?
 
 c) Choose a coordination pattern
-- Grouped thread: All players get flavor switches for the same outcome/question when the story demands their cooperation
+${
+  story.getCurrentTurn() === 0
+    ? "Since after this switch, players will enter the first thread of the game, ALL players must be in a single joint thread together regardless of other factors. Create a setup where all players get either flavor switches or topic switches that lead them to the same shared thread."
+    : `- Grouped thread: All players get flavor switches for the same outcome/question when the story demands their cooperation`
+}
   Example: All players must deal with an incoming invasion, but each can choose their approach
 - Opt-in grouping: Players can choose to join a grouped thread with a topic switch.
   Example: Each player chooses between some variation of "Help the band prepare for the concert" or "Handle personal business". The ones who choose "help the band" end up in the same thread.
