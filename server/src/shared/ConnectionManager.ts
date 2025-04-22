@@ -5,10 +5,10 @@ import type {
   StoryState,
   StateUpdateNotification,
 } from "core/types/index.js";
-import { storyRepository } from "common/StoryRepository.js";
+import { storyRepository } from "shared/StoryRepository.js";
 import { Story } from "core/models/Story.js";
 import { Server } from "socket.io";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 import { GAME_SESSION_CONFIG } from "core/config.js";
 
 interface PlayerConnection {

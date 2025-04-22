@@ -2,8 +2,8 @@ import type { Socket } from "socket.io";
 import type { Story } from "core/models/Story.js";
 import { isValidPlayerCount, getPlayerSlots } from "core/utils/playerUtils.js";
 import type { PlayerCount, PlayerSlot, GameMode } from "core/types/index.js";
-import { StoryRepository } from "common/StoryRepository.js";
-import { connectionManager } from "common/ConnectionManager.js";
+import { StoryRepository } from "shared/StoryRepository.js";
+import { connectionManager } from "shared/ConnectionManager.js";
 import { MAX_TURNS, MIN_TURNS } from "core/config.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
@@ -18,7 +18,7 @@ import type {
 } from "core/types/websocket.js";
 import { ContentModerationResponse, ResponseStatus } from "core/types/api.js";
 import { AdminLibraryService } from "admin/AdminLibraryService.js";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 import { ContentFilterService } from "./services/ContentFilterService.js";
 
 export class GameHandler {

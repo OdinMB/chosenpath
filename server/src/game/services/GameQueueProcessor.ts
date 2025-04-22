@@ -11,11 +11,11 @@ import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "core/models/Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 import { Resolution } from "core/types/index.js";
-import { storyRepository } from "common/StoryRepository.js";
-import { connectionManager } from "common/ConnectionManager.js";
+import { storyRepository } from "shared/StoryRepository.js";
+import { connectionManager } from "shared/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { createStoryStateFromTemplate } from "./StoryStateFactory.js";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;

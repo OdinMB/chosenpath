@@ -7,7 +7,7 @@
     "paths": {
       "core/*": ["../../core/*"],
       "server/*": ["./*"],
-      "common/*": ["./shared/*"],
+      "shared/*": ["./shared/*"],
       "admin/*": ["./admin/*"],
       "game/*": ["./game/*"],
       "page/*": ["./page/*"],

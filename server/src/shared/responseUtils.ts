@@ -7,7 +7,7 @@ import {
   RateLimitedResponse,
   RateLimitInfo,
 } from "core/types/api.js";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 
 /**
  * Get request path from Express response object

@@ -1,10 +1,10 @@
-import { storyRepository } from "common/StoryRepository.js";
+import { storyRepository } from "shared/StoryRepository.js";
 import {
   readStorageFile,
   listStorageFiles,
   getStorageFileStats,
-} from "common/storageUtils.js";
-import { Logger } from "common/logger.js";
+} from "shared/storageUtils.js";
+import { Logger } from "shared/logger.js";
 import { Story } from "core/models/Story.js";
 import path from "path";
 

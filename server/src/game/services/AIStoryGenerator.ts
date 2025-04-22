@@ -21,7 +21,7 @@ import {
   PLAYER_SLOTS,
   PlayerState,
 } from "core/types/index.js";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 import { getPlayerSlots } from "core/utils/playerUtils.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
@@ -34,10 +34,10 @@ import {
   MOCK_STORIES_DELAY_MS,
 } from "core/config.js";
 import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "server/config.js";
-import { readStorageFile, writeStorageFile } from "common/storageUtils.js";
+import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { z } from "zod";
-import { logZodSchema } from "common/zodUtils.js";
+import { logZodSchema } from "shared/zodUtils.js";
 import { templateIterationSections } from "core/utils/templateIterationSections.js";
 
 dotenv.config();

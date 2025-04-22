@@ -1,6 +1,6 @@
 import express from "express";
 import { config } from "./config.js";
-import { Logger } from "common/logger.js";
+import { Logger } from "shared/logger.js";
 import {
   UpdateTemplateRequest,
   CreateTemplateRequest,

@@ -18,8 +18,8 @@ import {
   getStorageFiles,
   deleteStorageFile,
   ensureStorageDirectory,
-} from "common/storageUtils.js";
-import { Logger } from "common/logger.js";
+} from "shared/storageUtils.js";
+import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
 
