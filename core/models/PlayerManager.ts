@@ -7,8 +7,8 @@ import {
   Resolution,
   ResolutionDetails,
   Thread,
-} from "@core/types/index.js";
-import { replacePronounPlaceholders } from "@core/utils/playerUtils.js";
+} from "../types/index.js";
+import { replacePronounPlaceholders } from "../utils/playerUtils.js";
 
 /**
  * Manages all player-related operations for Story class

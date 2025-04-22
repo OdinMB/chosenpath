@@ -4,11 +4,11 @@ import type {
   ClientStoryState,
   StoryState,
   StateUpdateNotification,
-} from "@core/types/index.js";
-import { storyRepository } from "@common/StoryRepository.js";
-import { Story } from "@core/models/Story.js";
+} from "core/types/index.js";
+import { storyRepository } from "common/StoryRepository.js";
+import { Story } from "core/models/Story.js";
 import { Server } from "socket.io";
-import { Logger } from "@common/logger.js";
+import { Logger } from "common/logger.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;

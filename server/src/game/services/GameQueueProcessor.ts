@@ -2,20 +2,20 @@ import type {
   GameOperation,
   StoryUpdateEvent,
   OperationErrorEvent,
-} from "../queue.js";
-import type { PlayerSlot } from "@core/types/index.js";
+} from "game/queue.js";
+import type { PlayerSlot } from "core/types/index.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "./AIImageGenerator.js";
 import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
-import { Story } from "@core/models/Story.js";
+import { Story } from "core/models/Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
-import { Resolution } from "@core/types/index.js";
-import { storyRepository } from "@common/StoryRepository.js";
-import { connectionManager } from "@common/ConnectionManager.js";
+import { Resolution } from "core/types/index.js";
+import { storyRepository } from "common/StoryRepository.js";
+import { connectionManager } from "common/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { createStoryStateFromTemplate } from "./StoryStateFactory.js";
-import { Logger } from "@common/logger.js";
+import { Logger } from "common/logger.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;

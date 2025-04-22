@@ -3,9 +3,9 @@ import type {
   QueueableOperation,
   QueueEvents,
   OperationErrorEvent,
-} from "../queue.js";
+} from "game/queue.js";
 import EventEmitter from "events";
-import { Logger } from "@common/logger.js";
+import { Logger } from "common/logger.js";
 import { setImmediate } from "timers";
 
 export abstract class BaseQueueProcessor<

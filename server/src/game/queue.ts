@@ -1,11 +1,11 @@
-import type { Story } from "@core/models/Story.js";
+import type { Story } from "core/models/Story.js";
 import type {
   Beat,
   GameMode,
   PlayerCount,
   PlayerSlot,
   StoryTemplate,
-} from "@core/types/index.js";
+} from "core/types/index.js";
 import type { Socket } from "socket.io";
 
 // Base operation type for any queueable operation

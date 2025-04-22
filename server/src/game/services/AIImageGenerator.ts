@@ -4,15 +4,15 @@ import type {
   ImageGeneration,
   BeatsNeedingImages,
   Beat,
-} from "@core/types/index.js";
-import { imageGenerationSchema } from "@core/types/index.js";
+} from "core/types/index.js";
+import { imageGenerationSchema } from "core/types/index.js";
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
-import { Story } from "@core/models/Story.js";
+import { Story } from "core/models/Story.js";
 import {
   IMAGE_QUERY_MODEL_NAME,
   IMAGE_QUERY_MODEL_TEMPERATURE,
-} from "@/config.js";
+} from "server/config.js";
 
 dotenv.config();
 

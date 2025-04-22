@@ -1,5 +1,5 @@
 // Rate limiter implementation for limiting access to API endpoints
-import { RateLimitedAction, RATE_LIMITS } from "@core/config.js";
+import { RateLimitedAction, RATE_LIMITS } from "core/config.js";
 import { Socket } from "socket.io";
 
 // RateLimitRecord tracks requests for a specific IP and action

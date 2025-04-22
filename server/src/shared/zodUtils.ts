@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Logger } from "@common/logger.js";
+import { Logger } from "common/logger.js";
 
 /**
  * A utility function to recursively examine a Zod schema and print its structure

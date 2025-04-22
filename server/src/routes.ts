@@ -1,7 +1,6 @@
 import express from "express";
-import { config } from "@/config.js";
-import { Logger } from "@common/logger.js";
-import { PublicationStatus } from "@core/types/index.js";
+import { config } from "./config.js";
+import { Logger } from "common/logger.js";
 import {
   UpdateTemplateRequest,
   CreateTemplateRequest,
@@ -9,7 +8,8 @@ import {
   GenerateTemplateRequest,
   TemplateIterationRequest,
   DeleteStoryRequest,
-} from "@core/types/admin.js";
+  PublicationStatus,
+} from "core/types/index.js";
 
 import {
   sendSuccess,

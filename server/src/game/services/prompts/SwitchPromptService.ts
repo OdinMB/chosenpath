@@ -1,9 +1,9 @@
-import { Story } from "@core/models/Story.js";
+import { Story } from "core/models/Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
-import { GameModes } from "@core/types/story.js";
+import { GameModes } from "core/types/story.js";
 
 export class SwitchPromptService {
   private static readonly SECTIONS_GAME_STATE: SectionConfig = {

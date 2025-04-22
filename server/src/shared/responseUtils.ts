@@ -6,8 +6,8 @@ import {
   SuccessResponse,
   RateLimitedResponse,
   RateLimitInfo,
-} from "@core/types/api.js";
-import { Logger } from "@common/logger.js";
+} from "core/types/api.js";
+import { Logger } from "common/logger.js";
 
 /**
  * Get request path from Express response object

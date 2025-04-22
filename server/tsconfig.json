@@ -6,12 +6,12 @@
     "baseUrl": "src",
     "paths": {
       "core/*": ["../../core/*"],
-      "@/*": ["./*"],
-      "@common/*": ["./shared/*"],
-      "@admin/*": ["./admin/*"],
-      "@game/*": ["./game/*"],
-      "@page/*": ["./page/*"],
-      "@user/*": ["./user/*"]
+      "server/*": ["./*"],
+      "common/*": ["./shared/*"],
+      "admin/*": ["./admin/*"],
+      "game/*": ["./game/*"],
+      "page/*": ["./page/*"],
+      "user/*": ["./user/*"]
     },
     "strict": true,
     "strictNullChecks": true,

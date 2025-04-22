@@ -1,10 +1,6 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import {
-  isDevelopment,
-  STORAGE_PATHS,
-  MAX_PLAYERS,
-} from "../../../core/config.js";
+import { isDevelopment, STORAGE_PATHS, MAX_PLAYERS } from "core/config.js";
 import {
   GameMode,
   GameModes,
@@ -15,17 +11,17 @@ import {
   PublicationStatus,
   Stat,
   TemplateIterationSections,
-} from "@core/types/index.js";
+} from "core/types/index.js";
 import {
   readStorageFile,
   writeStorageFile,
   getStorageFiles,
   deleteStorageFile,
   ensureStorageDirectory,
-} from "@common/storageUtils.js";
-import { Logger } from "@common/logger.js";
-import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
-import { StorySetupPromptService } from "../game/services/prompts/StorySetupPromptService.js";
+} from "common/storageUtils.js";
+import { Logger } from "common/logger.js";
+import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
+import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -331,7 +327,7 @@ export class AdminLibraryService {
       const playerOptions: Record<string, PlayerOptionsGeneration> = {};
       Object.entries(initialState.characterSelectionOptions).forEach(
         ([slot, options]) => {
-          playerOptions[slot] = options;
+          playerOptions[slot] = options as PlayerOptionsGeneration;
         }
       );
 

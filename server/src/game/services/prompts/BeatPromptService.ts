@@ -1,9 +1,9 @@
-import { Story } from "@core/models/Story.js";
+import { Story } from "core/models/Story.js";
 import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
-import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "@core/config.js";
+import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
 
 export class BeatPromptService {
   private static readonly SECTIONS_GAME_STATE: SectionConfig = {

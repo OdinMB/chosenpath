@@ -13,32 +13,32 @@ import type {
   PlayerCount,
   BeatsNeedingImages,
   GameMode,
-} from "@core/types/index.js";
+} from "core/types/index.js";
 import {
   createStorySetupSchema,
   createSwitchAnalysisSchema,
   threadAnalysisSchema,
   PLAYER_SLOTS,
   PlayerState,
-} from "@core/types/index.js";
-import { Logger } from "@common/logger.js";
-import { getPlayerSlots } from "@core/utils/playerUtils.js";
-import { createSetOfBeatGenerationSchema } from "@core/types/beat.js";
+} from "core/types/index.js";
+import { Logger } from "common/logger.js";
+import { getPlayerSlots } from "core/utils/playerUtils.js";
+import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
-import { Story } from "@core/models/Story.js";
+import { Story } from "core/models/Story.js";
 import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
-} from "@core/config.js";
-import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "@/config.js";
-import { readStorageFile, writeStorageFile } from "@common/storageUtils.js";
+} from "core/config.js";
+import { TEXT_MODEL_NAME, TEXT_MODEL_TEMPERATURE } from "server/config.js";
+import { readStorageFile, writeStorageFile } from "common/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { z } from "zod";
-import { logZodSchema } from "@common/zodUtils.js";
-import { templateIterationSections } from "@core/utils/templateIterationSections.js";
+import { logZodSchema } from "common/zodUtils.js";
+import { templateIterationSections } from "core/utils/templateIterationSections.js";
 
 dotenv.config();
 

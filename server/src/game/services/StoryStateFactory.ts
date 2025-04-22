@@ -3,7 +3,7 @@ import {
   PlayerSlot,
   StoryState,
   StoryTemplate,
-} from "@core/types/index.js";
+} from "core/types/index.js";
 
 /**
  * Creates a story state from a template with the given parameters

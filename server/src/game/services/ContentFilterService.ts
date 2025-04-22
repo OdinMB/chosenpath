@@ -1,10 +1,10 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
-import { Logger } from "@common/logger.js";
+import { Logger } from "common/logger.js";
 import {
   CONTENT_FILTER_MODEL_NAME,
   CONTENT_FILTER_MODEL_TEMPERATURE,
-} from "../../config.js";
+} from "server/config.js";
 import dotenv from "dotenv";
 
 dotenv.config();

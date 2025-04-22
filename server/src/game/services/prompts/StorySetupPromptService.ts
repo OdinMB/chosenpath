@@ -1,7 +1,7 @@
-import { type GameMode, GameModes } from "@core/types/story.js";
-import type { PlayerCount } from "@core/types/player.js";
-import { TemplateIterationSections } from "@core/types/admin.js";
-import { templateIterationSections } from "@core/utils/templateIterationSections.js";
+import { type GameMode, GameModes } from "core/types/index.js";
+import type { PlayerCount } from "core/types/index.js";
+import { TemplateIterationSections } from "core/types/admin.js";
+import { templateIterationSections } from "core/utils/templateIterationSections.js";
 
 const GAME_MODE_DESCRIPTIONS: Record<
   Exclude<GameModes, GameModes.SinglePlayer>,

@@ -10,12 +10,12 @@ import {
   ResolutionChallenge,
   Resolution,
   ResolutionExploration,
-} from "@core/types/index.js";
+} from "core/types/index.js";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
   POINTS_FOR_MIXED_RESOLUTION,
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
-} from "@core/config.js";
+} from "core/config.js";
 
 export interface ChallengeResolutionResult {
   resolution: ResolutionChallenge;

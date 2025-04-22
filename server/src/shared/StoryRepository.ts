@@ -1,8 +1,8 @@
 import path from "path";
-import { connectionManager } from "@common/ConnectionManager.js";
-import type { StoryState, PlayerSlot } from "@core/types/index.js";
-import { Story } from "@core/models/Story.js";
-import { Logger } from "@common/logger.js";
+import { connectionManager } from "common/ConnectionManager.js";
+import type { StoryState, PlayerSlot } from "core/types/index.js";
+import { Story } from "core/models/Story.js";
+import { Logger } from "common/logger.js";
 import {
   readStorageFile,
   writeStorageFile,

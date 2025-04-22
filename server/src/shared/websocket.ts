@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import http from "http";
-import { GameHandler } from "../game/GameHandler.js";
+import { GameHandler } from "game/GameHandler.js";
 import {
   GameMode,
   PlayerCount,
@@ -8,10 +8,10 @@ import {
   StateUpdateNotification,
   VerifyCodeResponse,
   ErrorResponse,
-} from "@core/types/index.js";
-import { config } from "../config.js";
+} from "core/types/index.js";
+import { config } from "server/config.js";
 import { connectionManager } from "./ConnectionManager.js";
-import { RateLimitedAction, SOCKET_CONFIG } from "@core/config.js";
+import { RateLimitedAction, SOCKET_CONFIG } from "core/config.js";
 import {
   checkRateLimit,
   incrementRateLimit,

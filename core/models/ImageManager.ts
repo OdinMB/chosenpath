@@ -1,4 +1,4 @@
-import { Beat, StoryState, Image, PlayerSlot } from "@core/types/index.js";
+import { Beat, StoryState, Image, PlayerSlot } from "../types/index.js";
 
 /**
  * Manages all image-related operations for Story class

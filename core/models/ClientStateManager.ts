@@ -6,7 +6,7 @@ import {
   ClientStat,
   Beat,
   BeatType,
-} from "@core/types/index.js";
+} from "../types/index.js";
 
 /**
  * Manages client state filtering operations for Story class
