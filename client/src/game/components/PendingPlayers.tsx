@@ -1,5 +1,5 @@
-import type { PlayerSlot } from "@core/types";
-import { useSession } from "@common/useSession";
+import type { PlayerSlot } from "core/types";
+import { useSession } from "shared/useSession";
 
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];

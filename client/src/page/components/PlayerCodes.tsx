@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useSession } from "@common/useSession";
-import { deleteCodeSetsByContent } from "@common/codeSetUtils";
-import { LoadingSpinner, PrimaryButton } from "@components/ui";
-import { PlayerCode } from "@common/components";
+import { useSession } from "shared/useSession";
+import { deleteCodeSetsByContent } from "shared/codeSetUtils";
+import { LoadingSpinner, PrimaryButton } from "components/ui";
+import { PlayerCode } from "shared/components";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;

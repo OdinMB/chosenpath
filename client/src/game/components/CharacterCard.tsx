@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ColoredBox } from "@components/ui";
+import { ColoredBox } from "components/ui";
 
 interface CharacterCardProps {
   isSelected: boolean;

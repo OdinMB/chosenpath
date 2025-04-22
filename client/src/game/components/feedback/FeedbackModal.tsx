@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useSession } from "@common/useSession";
-import { PrimaryButton, Icons } from "@components/ui";
+import { useSession } from "shared/useSession";
+import { PrimaryButton, Icons } from "components/ui";
 // Types for feedback
 type FeedbackType = "story" | "general" | "issue" | "idea";
 type FeedbackRating = "positive" | "negative" | null;

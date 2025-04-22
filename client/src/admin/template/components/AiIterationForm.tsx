@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Checkbox, TextArea, PrimaryButton, Icons } from "@components/ui";
-import { TemplateIterationSections } from "@core/types";
+import { Checkbox, TextArea, PrimaryButton, Icons } from "components/ui";
+import { TemplateIterationSections } from "core/types";
 
 interface AiIterationFormProps {
   onSubmit: (

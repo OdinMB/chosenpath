@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
 import {
   StoryTemplate,
   TemplateIterationRequest,
   TemplateIterationResponse,
   TemplateIterationSections,
-} from "@core/types";
-import { templateIterationSections } from "@core/utils/templateIterationSections";
+} from "core/types";
+import { templateIterationSections } from "core/utils/templateIterationSections";
 
 interface UseAiIterationProps {
   token: string;

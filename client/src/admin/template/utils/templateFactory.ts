@@ -5,8 +5,8 @@ import {
   GameModes,
   PublicationStatus,
   StoryElement,
-} from "@core/types";
-import { MAX_PLAYERS } from "@core/config";
+} from "core/types";
+import { MAX_PLAYERS } from "core/config";
 
 /**
  * Creates a default empty template for a single player game

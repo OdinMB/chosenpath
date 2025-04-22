@@ -1,4 +1,4 @@
-import { API_CONFIG, isDevelopment } from "@core/config";
+import { API_CONFIG, isDevelopment } from "core/config";
 
 export const config = {
   wsPort: import.meta.env.VITE_WS_PORT || API_CONFIG.DEFAULT_PORT.toString(),

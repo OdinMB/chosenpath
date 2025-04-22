@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { TAG_CATEGORIES } from "../tagCategories";
-import { Icons } from "@components/ui";
+import { Icons } from "components/ui";
 
 interface TagSelectorProps {
   selectedTags: string[];

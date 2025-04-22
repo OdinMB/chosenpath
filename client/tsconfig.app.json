@@ -25,15 +25,15 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@core/*": ["../core/*"],
-      "@common/*": ["src/shared/*"],
-      "@components": ["src/shared/components"],
-      "@components/*": ["src/shared/components/*"],
-      "@admin/*": ["src/admin/*"],
-      "@game/*": ["src/game/*"],
-      "@page/*": ["src/page/*"],
-      "@user/*": ["src/user/*"]
+      "client/*": ["src/*"],
+      "core/*": ["../core/*"],
+      "shared/*": ["src/shared/*"],
+      "components": ["src/shared/components"],
+      "components/*": ["src/shared/components/*"],
+      "admin/*": ["src/admin/*"],
+      "game/*": ["src/game/*"],
+      "page/*": ["src/page/*"],
+      "user/*": ["src/user/*"]
     }
   },
   "include": ["src/**/*"]

@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons, Tabs, useTabs } from "@components/ui";
+import { PrimaryButton, Icons, Tabs, useTabs } from "components/ui";
 import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateForm, SampleTemplateTab } from "./template/components";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
-import { StoryTemplate } from "@core/types";
+import { StoryTemplate } from "core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
-import { CreateTemplateRequest, TemplateResponse } from "@core/types/admin";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
+import { CreateTemplateRequest, TemplateResponse } from "core/types/admin";
 
 type AdminTab =
   | "stories"

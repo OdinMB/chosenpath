@@ -11,13 +11,13 @@ import {
   StatValueEntry,
   StoryElement,
   Outcome,
-} from "@core/types";
-import { Logger } from "@common/logger";
-import { MAX_PLAYERS } from "@core/config";
+} from "core/types";
+import { Logger } from "shared/logger";
+import { MAX_PLAYERS } from "core/config";
 import { useBasicInfoTab } from "./useBasicInfoTab";
 import { useGuidelinesEditor } from "./useGuidelinesEditor";
 import { useTemplateApi } from "./useTemplateApi";
-import { useTabs } from "@components/ui/useTabs";
+import { useTabs } from "components/ui/useTabs";
 
 // Define the TabType type
 export type TabType =

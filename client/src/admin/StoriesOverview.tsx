@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest } from "@common/requestUtils";
-import { SuccessResponse } from "@core/types";
+import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest } from "shared/requestUtils";
+import { SuccessResponse } from "core/types";
 
 type StoryListItem = {
   id: string;

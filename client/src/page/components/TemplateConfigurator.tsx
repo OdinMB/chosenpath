@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { StoryTemplate, GameMode, PlayerCount } from "@core/types";
-import { PrimaryButton, Icons } from "@components/ui";
-import { useSession } from "@common/useSession";
+import { StoryTemplate, GameMode, PlayerCount } from "core/types";
+import { PrimaryButton, Icons } from "components/ui";
+import { useSession } from "shared/useSession";
 
 interface TemplateConfiguratorProps {
   template: StoryTemplate;

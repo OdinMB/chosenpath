@@ -1,7 +1,7 @@
 import React from "react";
-import { StoryElement } from "@core/types";
-import { Input, TextArea } from "@components/ui";
-import { ArrayField, ExpandableItem } from "@components";
+import { StoryElement } from "core/types";
+import { Input, TextArea } from "components/ui";
+import { ArrayField, ExpandableItem } from "components";
 
 interface StoryElementEditorProps {
   element: StoryElement;

@@ -6,9 +6,9 @@ import {
   ResponseStatus,
   BaseServerResponse,
   RateLimitedResponse,
-} from "@core/types";
+} from "core/types";
 import { Logger } from "./logger";
-import { API_CONFIG } from "@core/config";
+import { API_CONFIG } from "core/config";
 
 /**
  * Type that represents a request payload with requestId

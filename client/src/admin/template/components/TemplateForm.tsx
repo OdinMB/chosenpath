@@ -9,19 +9,19 @@ import {
   AiIterationForm,
   AiIterationModal,
 } from "./";
-import { StoryInitializer } from "@/page/components/StoryInitializer";
+import { StoryInitializer } from "page/components/StoryInitializer";
 import {
   StoryTemplate,
   PublicationStatus,
   Outcome,
   StoryElement,
   TemplateIterationSections,
-} from "@core/types";
-import { PrimaryButton, Icons, Select, Tabs } from "@components/ui";
+} from "core/types";
+import { PrimaryButton, Icons, Select, Tabs } from "components/ui";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
-import { ShareLink } from "@components/ShareLink";
+import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
-import { Logger } from "@common/logger";
+import { Logger } from "shared/logger";
 
 interface TemplateFormProps {
   template: StoryTemplate;

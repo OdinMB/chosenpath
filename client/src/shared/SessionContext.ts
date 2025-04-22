@@ -3,7 +3,7 @@ import type {
   ClientStoryState,
   ContentModerationInfo,
   RateLimitInfo,
-} from "@core/types";
+} from "core/types";
 
 export type StoredCodeSet = {
   codes: Record<string, string>;

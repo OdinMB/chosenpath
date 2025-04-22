@@ -1,12 +1,12 @@
 import React, { useEffect } from "react";
-import { PrimaryButton, Icons, Tabs, useTabs } from "@components/ui";
+import { PrimaryButton, Icons, Tabs, useTabs } from "components/ui";
 import {
   PlayerOptionsGeneration,
   PlayerSlot,
   Stat,
   StoryTemplate,
   TemplateIterationSections,
-} from "@core/types";
+} from "core/types";
 import {
   GuidelinesEditor,
   StoryElementsTab,
@@ -14,7 +14,7 @@ import {
   StatsTab,
   PlayersTab,
 } from "./";
-import { Logger } from "@common/logger";
+import { Logger } from "shared/logger";
 
 type ModalTabType =
   | "guidelines"

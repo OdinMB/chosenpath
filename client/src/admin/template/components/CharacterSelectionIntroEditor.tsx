@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { CharacterSelectionIntroduction } from "@core/types";
-import { PrimaryButton, Icons } from "@components/ui";
+import { CharacterSelectionIntroduction } from "core/types";
+import { PrimaryButton, Icons } from "components/ui";
 
 interface CharacterSelectionIntroEditorProps {
   introduction: CharacterSelectionIntroduction;

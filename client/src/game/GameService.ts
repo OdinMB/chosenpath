@@ -1,6 +1,6 @@
-import { wsService } from "@common/WebSocketService";
-import { isValidPlayerCount } from "@core/utils/playerUtils";
-import { GameMode } from "@core/types";
+import { wsService } from "shared/WebSocketService";
+import { isValidPlayerCount } from "core/utils/playerUtils";
+import { GameMode } from "core/types";
 
 class GameService {
   initializeStory(

@@ -6,14 +6,10 @@ import {
   StatsTab,
   PlayersTab,
 } from "./";
-import {
-  StoryTemplate,
-  PlayerSlot,
-  PlayerOptionsGeneration,
-} from "@core/types";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest } from "@common/requestUtils";
-import { TemplateResponse } from "@core/types/admin";
+import { StoryTemplate, PlayerSlot, PlayerOptionsGeneration } from "core/types";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest } from "shared/requestUtils";
+import { TemplateResponse } from "core/types/admin";
 
 interface SampleTemplateTabProps {
   token: string;

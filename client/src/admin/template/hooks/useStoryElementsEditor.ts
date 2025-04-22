@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StoryElement } from "@core/types";
+import { StoryElement } from "core/types";
 
 interface UseStoryElementsResult {
   editingElements: Set<string>;

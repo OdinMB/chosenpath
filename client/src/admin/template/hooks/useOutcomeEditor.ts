@@ -5,7 +5,7 @@ import {
   ChallengeResolution,
   ExplorationResolution,
   ResolutionType,
-} from "@core/types";
+} from "core/types";
 
 export const useOutcomeEditor = (
   initialOutcomes: Outcome[] = [],

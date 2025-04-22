@@ -1,7 +1,7 @@
 import React from "react";
-import { Input } from "@components/ui";
-import { ArrayField } from "@components";
-import { Stat } from "@core/types";
+import { Input } from "components/ui";
+import { ArrayField } from "components";
+import { Stat } from "core/types";
 
 interface StatValueInputProps {
   value: string | number | string[];

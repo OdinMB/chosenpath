@@ -4,8 +4,8 @@ import {
   PlayerOptionsGeneration,
   PlayerSlot,
   Stat,
-} from "@core/types";
-import { MAX_PLAYERS } from "@core/config";
+} from "core/types";
+import { MAX_PLAYERS } from "core/config";
 import { usePlayerEditor } from "../hooks/usePlayerEditor";
 import { PlayerEditor, CharacterSelectionIntroEditor } from "./";
 

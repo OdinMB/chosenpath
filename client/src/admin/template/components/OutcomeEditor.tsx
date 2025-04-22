@@ -1,7 +1,7 @@
 import React from "react";
-import { Outcome, ExplorationResolution, ResolutionType } from "@core/types";
-import { ExpandableItem } from "@components";
-import { InfoIcon, Input, Select } from "@components/ui";
+import { Outcome, ExplorationResolution, ResolutionType } from "core/types";
+import { ExpandableItem } from "components";
+import { InfoIcon, Input, Select } from "components/ui";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
 
 interface OutcomeEditorProps {

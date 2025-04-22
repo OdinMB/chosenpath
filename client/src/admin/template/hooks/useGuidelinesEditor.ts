@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Guidelines } from "@core/types";
+import { Guidelines } from "core/types";
 
 interface UseGuidelinesEditorProps {
   guidelines: Guidelines;

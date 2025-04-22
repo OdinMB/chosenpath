@@ -1,6 +1,6 @@
 import React from "react";
-import { PrimaryButton, Icons } from "@components/ui";
-import { Outcome } from "@core/types";
+import { PrimaryButton, Icons } from "components/ui";
+import { Outcome } from "core/types";
 import { OutcomeEditor } from "./OutcomeEditor";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
 

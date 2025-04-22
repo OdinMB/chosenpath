@@ -4,7 +4,7 @@ import {
   PlayerSlot,
   PlayerOptionsGeneration,
   CharacterBackground,
-} from "@core/types";
+} from "core/types";
 import { useState, useEffect } from "react";
 
 interface StatEditorHelperProps {

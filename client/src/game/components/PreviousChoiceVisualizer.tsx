@@ -5,8 +5,8 @@ import {
   SAFE_DISTRIBUTION,
   RISKY_DISTRIBUTION,
   Resolution,
-} from "@core/types";
-import { Tooltip, InfoIcon, ColoredBox, Icons } from "@components/ui";
+} from "core/types";
+import { Tooltip, InfoIcon, ColoredBox, Icons } from "components/ui";
 
 interface PreviousChoiceVisualizerProps {
   choice: {

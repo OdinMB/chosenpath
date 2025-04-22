@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Icons } from "@components/ui";
-import { Stat } from "@core/types";
-import { ConfirmDialog } from "@components/ui/ConfirmDialog";
+import { Icons } from "components/ui";
+import { Stat } from "core/types";
+import { ConfirmDialog } from "components/ui/ConfirmDialog";
 
 interface StatListItemProps {
   stat: Stat;

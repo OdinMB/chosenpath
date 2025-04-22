@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { StoryTemplate, PublicationStatus } from "@core/types";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
+import { StoryTemplate, PublicationStatus } from "core/types";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
 import {
   TemplatesResponse,
   UpdateTemplateRequest,
   TemplateResponse,
-} from "@core/types/admin";
+} from "core/types/admin";
 
 export const useTemplateCarouselManager = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);

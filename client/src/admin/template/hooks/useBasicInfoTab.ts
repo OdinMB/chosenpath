@@ -5,8 +5,8 @@ import {
   GameModes,
   PlayerCount,
   PublicationStatusType,
-} from "@core/types";
-import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "@core/config";
+} from "core/types";
+import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "core/config";
 
 interface UseBasicInfoTabProps {
   template: StoryTemplate;

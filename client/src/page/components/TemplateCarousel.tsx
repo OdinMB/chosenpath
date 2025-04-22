@@ -1,7 +1,7 @@
 import { useRef } from "react";
-import { StoryTemplate } from "@core/types";
+import { StoryTemplate } from "core/types";
 import { TemplateCard } from "./TemplateCard";
-import { Icons } from "@components/ui";
+import { Icons } from "components/ui";
 import { useTemplateCarousel, useSwipe } from "../hooks/useTemplateCarousel";
 
 type TemplateCarouselProps = {

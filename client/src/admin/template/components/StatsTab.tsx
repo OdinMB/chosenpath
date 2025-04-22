@@ -4,7 +4,7 @@ import {
   StatValueEntry,
   PlayerSlot,
   PlayerOptionsGeneration,
-} from "@core/types";
+} from "core/types";
 import { useStatEditorHelpers } from "../hooks/useStatEditor";
 import { StatGroupEditor } from "./StatGroupEditor";
 import { StatListSection } from "./StatListSection";

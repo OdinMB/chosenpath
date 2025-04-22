@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
-import { PlayerCount } from "@core/types";
-import { Input, TextArea, InfoIcon, Select, Checkbox } from "@components/ui";
-import { ArrayField, TagSelector } from "@components";
-import { TAG_CATEGORIES } from "@common/tagCategories";
+import { PlayerCount } from "core/types";
+import { Input, TextArea, InfoIcon, Select, Checkbox } from "components/ui";
+import { ArrayField, TagSelector } from "components";
+import { TAG_CATEGORIES } from "shared/tagCategories";
 
 interface BasicInfoTabProps {
   title: string;

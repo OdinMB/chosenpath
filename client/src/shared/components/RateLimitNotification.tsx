@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, memo, useRef } from "react";
-import { RateLimitInfo } from "@core/types";
+import { RateLimitInfo } from "core/types";
 import { Notification } from "./ui";
 
 interface RateLimitNotificationProps {

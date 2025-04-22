@@ -1,6 +1,6 @@
 import React from "react";
-import { StoryElement } from "@core/types";
-import { InfoIcon, PrimaryButton, Icons } from "@components/ui";
+import { StoryElement } from "core/types";
+import { InfoIcon, PrimaryButton, Icons } from "components/ui";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 import { StoryElementEditor } from "./StoryElementEditor";
 

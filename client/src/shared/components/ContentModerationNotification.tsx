@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { ContentModerationInfo } from "@core/types";
+import { ContentModerationInfo } from "core/types";
 import { Notification } from "./ui";
 
 interface ContentModerationNotificationProps {

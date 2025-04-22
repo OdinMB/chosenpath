@@ -1,21 +1,21 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSession } from "@common/useSession";
-import { wsService } from "@common/WebSocketService";
-import { GameLayout } from "@game/components/GameLayout";
-import { gameService } from "@game/GameService";
-import { Page } from "@/page/Page";
-import { GameMode, StoryTemplate } from "@core/types";
-import { RateLimitNotification } from "@components/RateLimitNotification";
-import { ContentModerationNotification } from "@common/components/ContentModerationNotification";
-import { AppTitle } from "@components/AppTitle";
+import { useSession } from "shared/useSession";
+import { wsService } from "shared/WebSocketService";
+import { GameLayout } from "game/components/GameLayout";
+import { gameService } from "game/GameService";
+import { Page } from "page/Page";
+import { GameMode, StoryTemplate } from "core/types";
+import { RateLimitNotification } from "components/RateLimitNotification";
+import { ContentModerationNotification } from "shared/components/ContentModerationNotification";
+import { AppTitle } from "components/AppTitle";
 import {
   LibraryBrowser,
   PlayerCodes,
   StoryInitializer,
   TemplateConfigurator,
-} from "@/page/components";
-import { Logger } from "@common/logger";
-import { config } from "@/config";
+} from "page/components";
+import { Logger } from "shared/logger";
+import { config } from "client/config";
 
 // Add this type at the top with the imports
 type ViewState =

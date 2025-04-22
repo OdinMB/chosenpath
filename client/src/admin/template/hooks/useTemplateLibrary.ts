@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from "react";
-import { Logger } from "@common/logger";
-import { StoryTemplate } from "@core/types";
-import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
+import { Logger } from "shared/logger";
+import { StoryTemplate } from "core/types";
+import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
 import {
   CreateTemplateRequest,
   DeleteResponse,
   SuccessResponse,
-} from "@core/types";
+} from "core/types";
 
 export const useTemplateLibrary = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);

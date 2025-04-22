@@ -1,8 +1,8 @@
 import React from "react";
 import { StatValueInput } from ".";
-import { InfoIcon, Input } from "@components/ui";
-import { ExpandableItem } from "@components";
-import { CharacterBackground, Stat } from "@core/types";
+import { InfoIcon, Input } from "components/ui";
+import { ExpandableItem } from "components";
+import { CharacterBackground, Stat } from "core/types";
 
 interface PlayerBackgroundEditorProps {
   background: CharacterBackground;

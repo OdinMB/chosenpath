@@ -4,7 +4,7 @@ import type {
   WSServerMessage,
   RateLimitInfo,
   ContentModerationInfo,
-} from "@core/types";
+} from "core/types";
 import { wsService } from "./WebSocketService.js";
 import { SessionContext, StoredCodeSet } from "./SessionContext.js";
 import {

@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { PrimaryButton, Icons, ConfirmDialog } from "@components/ui/index";
-import { StoryTemplate, PublicationStatus } from "@core/types";
-import { ShareLink } from "@components/ShareLink";
-import { sortTagsByCategory } from "@common/tagCategories.js";
+import { PrimaryButton, Icons, ConfirmDialog } from "components/ui/index";
+import { StoryTemplate, PublicationStatus } from "core/types";
+import { ShareLink } from "components/ShareLink";
+import { sortTagsByCategory } from "shared/tagCategories.js";
 import { useTemplateLibrary } from "./hooks/useTemplateLibrary.js";
 
 type TemplateLibraryProps = {

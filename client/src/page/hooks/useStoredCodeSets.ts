@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
-import { StoredCodeSet } from "@common/SessionContext";
+import { StoredCodeSet } from "shared/SessionContext";
 import {
   getSortedCodeSets,
   deleteStoredCodeSet,
   generateJoinLink,
-} from "@common/codeSetUtils";
-import { useSession } from "@common/useSession";
-import { Logger } from "@common/logger";
+} from "shared/codeSetUtils";
+import { useSession } from "shared/useSession";
+import { Logger } from "shared/logger";
 
 export function useStoredCodeSets() {
   const [codeSets, setCodeSets] = useState<StoredCodeSet[]>(

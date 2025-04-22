@@ -1,11 +1,11 @@
-import { StoryTemplate, GameMode, PlayerCount } from "@core/types";
+import { StoryTemplate, GameMode, PlayerCount } from "core/types";
 import {
   UpdateTemplateRequest,
   GenerateTemplateRequest,
-} from "@core/types/admin";
-import { Logger } from "@common/logger";
-import { sendTrackedRequest, withRequestId } from "@common/requestUtils";
-import { SuccessResponse } from "@core/types/api";
+} from "core/types/admin";
+import { Logger } from "shared/logger";
+import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
+import { SuccessResponse } from "core/types/api";
 
 interface UseTemplateApiProps {
   token: string;

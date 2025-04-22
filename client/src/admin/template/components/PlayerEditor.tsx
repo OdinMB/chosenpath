@@ -6,9 +6,9 @@ import {
   CharacterIdentity,
   CharacterBackground,
   Outcome,
-} from "@core/types";
-import { ExpandableItem } from "@components";
-import { PrimaryButton, Icons, Select } from "@components/ui";
+} from "core/types";
+import { ExpandableItem } from "components";
+import { PrimaryButton, Icons, Select } from "components/ui";
 import {
   PlayerIdentityEditor,
   PlayerBackgroundEditor,

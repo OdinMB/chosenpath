@@ -1,7 +1,7 @@
 import React from "react";
-import { PrimaryButton, Icons, Input, Checkbox } from "@components/ui";
-import { ArrayField } from "@components";
-import { Stat, StatValueEntry } from "@core/types";
+import { PrimaryButton, Icons, Input, Checkbox } from "components/ui";
+import { ArrayField } from "components";
+import { Stat, StatValueEntry } from "core/types";
 import { StatValueInput } from "./StatValueInput";
 import { useStatEditor } from "../hooks/useStatEditor";
 

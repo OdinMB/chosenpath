@@ -5,7 +5,7 @@ import {
   CharacterIdentity,
   CharacterBackground,
   Stat,
-} from "@core/types";
+} from "core/types";
 
 interface PlayerOutcome {
   id: string;

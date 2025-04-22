@@ -13,7 +13,7 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["./*"]
+      "core/*": ["./*"]
     }
   },
   "include": ["types/**/*", "utils/**/*", "models/**/*", "config.ts"],

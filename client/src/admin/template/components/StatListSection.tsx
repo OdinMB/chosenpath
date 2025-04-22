@@ -1,5 +1,5 @@
-import { InfoIcon, PrimaryButton, Icons } from "@components/ui";
-import { Stat, StatValueEntry } from "@core/types";
+import { InfoIcon, PrimaryButton, Icons } from "components/ui";
+import { Stat, StatValueEntry } from "core/types";
 import { StatListItem } from "./StatListItem";
 import { StatEditor } from "./StatEditor";
 

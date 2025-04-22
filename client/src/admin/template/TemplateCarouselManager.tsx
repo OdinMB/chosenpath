@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "./components/SortableItem.js";
-import { PrimaryButton, InfoIcon } from "@components/ui";
+import { PrimaryButton, InfoIcon } from "components/ui";
 import { useTemplateCarouselManager } from "./hooks/useTemplateCarouselManager.js";
 
 interface TemplateCarouselManagerProps {

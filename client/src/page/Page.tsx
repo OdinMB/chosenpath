@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { PrimaryButton, Icons } from "@components/ui";
-import { StoryTemplate } from "@core/types";
+import { PrimaryButton, Icons } from "components/ui";
+import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { StoredCodeSetsList } from "./components/StoredCodeSetsList";
 

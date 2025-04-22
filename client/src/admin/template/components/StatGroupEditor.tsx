@@ -1,6 +1,6 @@
 import React from "react";
-import { InfoIcon, PrimaryButton, Icons, Input } from "@components/ui";
-import { ExpandableItem } from "@components";
+import { InfoIcon, PrimaryButton, Icons, Input } from "components/ui";
+import { ExpandableItem } from "components";
 import { useStatGroupEditor } from "../hooks/useStatGroupEditor";
 
 interface StatGroupEditorProps {

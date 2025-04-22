@@ -12,12 +12,12 @@ import {
   WSErrorResponse,
   WSRateLimitedResponse,
   ContentModerationInfo,
-} from "@core/types";
-import { SOCKET_CONFIG } from "@core/config";
-import { ContentModerationAction } from "@core/config";
-import type { ClientStoryState } from "@core/types";
-import { Logger } from "@common/logger";
-import { config } from "@/config";
+} from "core/types";
+import { SOCKET_CONFIG } from "core/config";
+import { ContentModerationAction } from "core/config";
+import type { ClientStoryState } from "core/types";
+import { Logger } from "shared/logger";
+import { config } from "client/config";
 
 type MessageHandler = (data: WSServerMessage) => void;
 

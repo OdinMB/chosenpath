@@ -1,5 +1,5 @@
 import React from "react";
-import { Icons, Input, PrimaryButton, InfoIcon } from "@components/ui";
+import { Icons, Input, PrimaryButton, InfoIcon } from "components/ui";
 import { useArrayField } from "../hooks/useArrayField";
 
 export interface ArrayFieldProps {

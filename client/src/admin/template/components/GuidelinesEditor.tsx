@@ -1,7 +1,7 @@
 import React from "react";
-import { TextArea, InfoIcon } from "@components/ui";
-import { ArrayField } from "@components";
-import { Guidelines } from "@core/types";
+import { TextArea, InfoIcon } from "components/ui";
+import { ArrayField } from "components";
+import { Guidelines } from "core/types";
 import { useGuidelinesEditor } from "../hooks/useGuidelinesEditor";
 
 interface GuidelinesEditorProps {

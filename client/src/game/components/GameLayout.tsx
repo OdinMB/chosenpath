@@ -1,13 +1,13 @@
-import { useSession } from "@common/useSession";
+import { useSession } from "shared/useSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
 import { SidebarFeedbackButton } from "./feedback/SidebarFeedbackButton";
 import { FeedbackModal } from "./feedback/FeedbackModal";
-import { ClientStat, StatValue, StatValueEntry } from "@core/types";
+import { ClientStat, StatValue, StatValueEntry } from "core/types";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
-import { LoadingSpinner, PrimaryButton, Icons } from "@components/ui";
+import { LoadingSpinner, PrimaryButton, Icons } from "components/ui";
 
 interface Props {
   onExitGame: () => void;

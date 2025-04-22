@@ -1,6 +1,6 @@
-import { StoredCodeSet } from "@common/SessionContext";
-import { ConfirmDialog, Icons, PrimaryButton, Tooltip } from "@components/ui";
-import { PlayerCode } from "@common/components";
+import { StoredCodeSet } from "shared/SessionContext";
+import { ConfirmDialog, Icons, PrimaryButton, Tooltip } from "components/ui";
+import { PlayerCode } from "shared/components";
 import { useStoredCodeSets } from "../hooks/useStoredCodeSets";
 
 // Helper function to format timestamp

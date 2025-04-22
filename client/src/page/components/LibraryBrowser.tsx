@@ -1,7 +1,7 @@
-import { StoryTemplate } from "@core/types";
+import { StoryTemplate } from "core/types";
 import { TemplateCard } from "./TemplateCard";
-import { PrimaryButton, Icons } from "@components/ui";
-import { MAX_PLAYERS } from "@core/config";
+import { PrimaryButton, Icons } from "components/ui";
+import { MAX_PLAYERS } from "core/config";
 import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
 
 type LibraryBrowserProps = {
