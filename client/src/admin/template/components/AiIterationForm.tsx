@@ -47,8 +47,8 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
     <div className="bg-white p-4 rounded-lg border border-primary-100 shadow-md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select sections to regenerate:
+          <label className="block font-semibold text-gray-700 mb-2">
+            Sections to regenerate
           </label>
           <div className="space-y-2">
             <div className="flex items-center">
@@ -61,8 +61,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 htmlFor="guidelines-section"
                 className="ml-2 text-sm text-gray-700"
               >
-                Guidelines (world, rules, tone, conflicts, decisions, thread
-                types)
+                Guidelines
               </label>
             </div>
             <div className="flex items-center">
@@ -75,7 +74,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 htmlFor="storyElements-section"
                 className="ml-2 text-sm text-gray-700"
               >
-                Story Elements (NPCs, locations, items, etc.)
+                Story Elements
               </label>
             </div>
             <div className="flex items-center">
@@ -101,7 +100,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 htmlFor="stats-section"
                 className="ml-2 text-sm text-gray-700"
               >
-                Stats (player and shared stats)
+                Stats
               </label>
             </div>
             <div className="flex items-center">
@@ -114,7 +113,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 htmlFor="players-section"
                 className="ml-2 text-sm text-gray-700"
               >
-                Player Options (identities, backgrounds, individual outcomes)
+                Players
               </label>
             </div>
           </div>
@@ -123,9 +122,9 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
         <div>
           <label
             htmlFor="feedback"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="block font-semibold text-gray-700 mb-2"
           >
-            Feedback or instructions for the AI:
+            Feedback or instructions for the AI
           </label>
           <TextArea
             id="feedback"

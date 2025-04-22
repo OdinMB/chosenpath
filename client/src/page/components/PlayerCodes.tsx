@@ -20,18 +20,22 @@ export function PlayerCodes({
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
 
-  const { error, contentModeration } = useSession();
+  const { contentModeration } = useSession();
   useEffect(() => {
-    if (contentModeration || error) {
+    if (
+      !!contentModeration &&
+      typeof contentModeration === "object" &&
+      "reason" in contentModeration
+    ) {
       console.log(
-        "Received error or content moderation response. Deleting codes and leaving."
+        "Received content moderation response. Deleting codes and leaving."
       );
       // delete codes from session and local storage
       deleteCodeSetsByContent(codes);
       // leave this view
       onBack();
     }
-  }, [contentModeration, onBack, codes, error]);
+  }, [contentModeration, onBack, codes]);
 
   const FALLBACK_READY_TIME = 60; // in seconds
 

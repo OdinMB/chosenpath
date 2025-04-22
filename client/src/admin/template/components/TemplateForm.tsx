@@ -96,14 +96,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
   // Define tab navigation items
   const tabItems = [
-    { id: "basic" as TabType, label: "Basic Info" },
+    { id: "basic" as TabType, label: "Setup" },
     { id: "guidelines" as TabType, label: "Guidelines" },
     { id: "elements" as TabType, label: "Elements" },
     { id: "outcomes" as TabType, label: "Outcomes" },
     { id: "stats" as TabType, label: "Stats" },
     { id: "players" as TabType, label: "Players" },
-    { id: "ai-draft" as TabType, label: "AI Draft" },
-    { id: "ai-iterate" as TabType, label: "AI Iteration" },
+    { id: "ai-draft" as TabType, label: "Draft" },
+    { id: "ai-iterate" as TabType, label: "Iteration" },
   ];
 
   const handleAcceptSectionUpdate = (

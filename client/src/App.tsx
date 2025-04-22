@@ -105,10 +105,11 @@ function App() {
         }
 
         const data = await response.json();
-        Logger.App.log(`Successfully loaded template: ${data.template.title}`);
+        const template = data.data.template;
+        Logger.App.log(`Successfully loaded template: ${template.title}`);
 
         // Set template and transition to template config view
-        setSelectedTemplate(data.template);
+        setSelectedTemplate(template);
         loggedSetViewState("TEMPLATE_CONFIG");
       } catch (error) {
         Logger.App.error(`Failed to load template ${templateId}`, error);
