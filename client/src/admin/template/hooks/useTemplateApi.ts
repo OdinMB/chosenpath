@@ -78,16 +78,15 @@ export function useTemplateApi({
         onUpdate,
       } = options;
 
-      // Use form values if available
-      const effectivePlayerCount =
-        currentTemplate.playerCountMin > 0
-          ? currentTemplate.playerCountMin
-          : (playerCount as PlayerCount);
-      const effectiveMaxTurns =
-        currentTemplate.maxTurnsMin > 0
-          ? currentTemplate.maxTurnsMin
-          : maxTurns;
-      const effectiveGameMode = currentTemplate.gameMode || gameMode;
+      // Always use the provided playerCount value from StoryInitializer
+      const effectivePlayerCount = Math.max(
+        playerCount,
+        currentTemplate.playerCountMax
+      ) as PlayerCount;
+
+      // Use other form values if available
+      const effectiveMaxTurns = Math.max(currentTemplate.maxTurnsMin, maxTurns);
+      const effectiveGameMode = gameMode;
 
       // First, call API to generate template content
       const request: GenerateTemplateRequest = withRequestId({

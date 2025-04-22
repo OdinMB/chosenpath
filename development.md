@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 1 Template AI draft doesn't seem to respect # players
+- 1 Use path aliases without @ in client for consistency
 - 1 Always introduce other players in beat 1
 - 1 First thread always together
 - 2 Track options of previous beats in the thread to avoid repeating any of them
@@ -11,7 +11,6 @@ Smaller commits!
   - Slip into a different role (Slice of Life)
   - Vent on reality (Satire)
   - Enjoy fiction (Crime, Fantasy, etc.)
-- 1 Swipe feature for carousel
 - 10 More multiplayer templates
 - 5 Title images for templates (esp. carousel titles)
 

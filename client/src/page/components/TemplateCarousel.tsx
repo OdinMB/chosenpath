@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { StoryTemplate } from "@core/types";
 import { TemplateCard } from "./TemplateCard";
 import { Icons } from "@components/ui";
-import { useTemplateCarousel } from "../hooks/useTemplateCarousel";
+import { useTemplateCarousel, useSwipe } from "../hooks/useTemplateCarousel";
 
 type TemplateCarouselProps = {
   onPlay: (template: StoryTemplate) => void;
@@ -22,6 +22,12 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
   } = useTemplateCarousel();
 
   const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Add swipe gesture support
+  useSwipe(carouselRef, {
+    onSwipeLeft: nextTemplate,
+    onSwipeRight: prevTemplate,
+  });
 
   if (isLoading) {
     return (
@@ -48,7 +54,7 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
       <div className="overflow-hidden">
         <div
           ref={carouselRef}
-          className="flex transition-transform duration-300 ease-in-out"
+          className="flex transition-transform duration-300 ease-in-out touch-pan-x"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
           onTransitionEnd={handleTransitionEnd}
         >

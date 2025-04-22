@@ -1,8 +1,60 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, RefObject } from "react";
 import { StoryTemplate } from "@core/types";
 import { Logger } from "@common/logger";
 import { sendTrackedRequest } from "@common/requestUtils";
 import { SuccessResponse } from "@core/types/api";
+
+type SwipeHandlers = {
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
+};
+
+export function useSwipe(
+  ref: RefObject<HTMLElement>,
+  handlers: SwipeHandlers,
+  threshold = 50
+) {
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    let startX = 0;
+    let startY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!e.changedTouches[0]) return;
+
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      // Only trigger swipe if horizontal movement is greater than vertical
+      // and exceeds the threshold
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold) {
+        if (diffX > 0 && handlers.onSwipeRight) {
+          handlers.onSwipeRight();
+        } else if (diffX < 0 && handlers.onSwipeLeft) {
+          handlers.onSwipeLeft();
+        }
+      }
+    };
+
+    element.addEventListener("touchstart", handleTouchStart);
+    element.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      element.removeEventListener("touchstart", handleTouchStart);
+      element.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [ref, handlers, threshold]);
+}
 
 export function useTemplateCarousel() {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
