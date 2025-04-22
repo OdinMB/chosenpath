@@ -1,5 +1,6 @@
 import { StoredCodeSet } from "./SessionContext.js";
 import { Logger } from "./logger.js";
+import { API_CONFIG } from "@core/config";
 
 // Create a dedicated logger for code set operations
 const logger = Logger.UI;
@@ -191,4 +192,16 @@ export function updateStoredSetWithCode(
   } catch (error) {
     logger.error("Error updating stored code", error);
   }
+}
+
+/**
+ * Generate a shareable join link for a code
+ * @param code - The player code to create a link for
+ * @returns A complete URL that can be shared for direct joining
+ */
+export function generateJoinLink(code: string): string {
+  // Create URL with the domain and code
+  const domain = API_CONFIG.DEFAULT_CORS_ORIGIN;
+
+  return `${domain}/join/${code}`;
 }

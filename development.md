@@ -3,7 +3,6 @@ Smaller commits!
 # NEXT
 
 - 1 Template AI draft doesn't seem to respect # players
-- 1 Share links not working online
 - 1 Always introduce other players in beat 1
 - 1 First thread always together
 - 2 Track options of previous beats in the thread to avoid repeating any of them
@@ -27,6 +26,7 @@ Text, English, Multiplayer > other stuff
 - 20 Images for title, player identities, story elements (for templates initially)
 - 20 Dynamically add new outcomes for longer stories
 - 30 Audio version
+  https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
 - 30 Different languages
 - 10 Resolution animation elements (thread, group)
 - 5 Setting to deactivate the resolution animations

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "@common/useSession";
 import { deleteCodeSetsByContent } from "@common/codeSetUtils";
 import { LoadingSpinner, PrimaryButton } from "@components/ui";
+import { PlayerCode } from "@common/components";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;
@@ -119,7 +120,8 @@ export function PlayerCodes({
                 <div className="ml-3">
                   <p className="text-sm text-primary-700">
                     Save these codes! Each player will need their code to access
-                    their character.
+                    their character. You can also share join links with other
+                    players.
                   </p>
                 </div>
               </div>
@@ -132,8 +134,8 @@ export function PlayerCodes({
                 <div className="mb-2 text-primary-700 text-sm">
                   Your Access Code:
                 </div>
-                <div className="h-12 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm flex items-center justify-center text-lg">
-                  {singlePlayerCode}
+                <div className="flex justify-center">
+                  <PlayerCode code={singlePlayerCode!} size="lg" />
                 </div>
               </div>
 
@@ -180,9 +182,7 @@ export function PlayerCodes({
                       {formatPlayerName(slot)}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <div className="h-10 px-4 py-2 border rounded-lg border-primary-100 bg-white text-primary shadow-sm flex items-center">
-                        {code}
-                      </div>
+                      <PlayerCode code={code} />
                       <PrimaryButton
                         onClick={() => onCodeSubmit(code)}
                         className="ml-4"

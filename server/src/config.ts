@@ -17,7 +17,7 @@ export const config = {
   // CORS and domain settings
   corsOrigins: process.env.CORS_ORIGIN
     ? parseCorsOrigins(process.env.CORS_ORIGIN)
-    : API_CONFIG.DEFAULT_CORS_ORIGINS,
+    : API_CONFIG.DEFAULT_CORS_ORIGIN,
   productionDomain: process.env.PRODUCTION_DOMAIN || API_CONFIG.DEFAULT_DOMAIN,
 
   // Authentication

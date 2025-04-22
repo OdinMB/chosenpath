@@ -116,7 +116,7 @@ export const API_CONFIG = {
     : "https://api.chosenpath.ai",
 
   // Default CORS origins
-  DEFAULT_CORS_ORIGINS: isDevelopment
+  DEFAULT_CORS_ORIGIN: isDevelopment
     ? ["http://localhost:5173"]
     : ["https://chosenpath.ai"],
 
