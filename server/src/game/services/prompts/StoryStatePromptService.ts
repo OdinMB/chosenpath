@@ -54,12 +54,6 @@ export class StoryStatePromptService {
     if (sections.storyProgress) {
       promptSections.push(this.createStoryProgressSection(story));
     }
-    if (sections.switchConfiguration) {
-      promptSections.push(this.getSwitchConfiguration(story, false));
-    }
-    if (sections.switchWithDecisionsConfiguration) {
-      promptSections.push(this.getSwitchConfiguration(story, true));
-    }
     if (sections.threadConfigurationForThreadBeats) {
       promptSections.push(
         this.createThreadConfigurationSection("current", false, story) +
@@ -77,6 +71,12 @@ export class StoryStatePromptService {
       promptSections.push(
         this.createThreadConfigurationSection("current", true, story)
       );
+    }
+    if (sections.switchConfiguration) {
+      promptSections.push(this.getSwitchConfiguration(story, false));
+    }
+    if (sections.switchWithDecisionsConfiguration) {
+      promptSections.push(this.getSwitchConfiguration(story, true));
     }
 
     return promptSections.filter(Boolean).join("\n");
@@ -303,9 +303,9 @@ ${modeDescriptions[story.getGameMode()]}
         // Include previous thread types if requested
         if (sections?.previousThreads) {
           playerSections.push(
-            "PREVIOUS THREAD TYPES: ",
+            "PREVIOUS THREAD TYPES (to be avoided for upcoming threads):\n- ",
             playerState.previousTypesOfThreads?.length
-              ? playerState.previousTypesOfThreads.join(", ")
+              ? playerState.previousTypesOfThreads.join("\n- ")
               : "None",
             ""
           );
@@ -360,28 +360,31 @@ ${modeDescriptions[story.getGameMode()]}
 
     return beatHistory
       .map((beat, index) => {
-        const choiceText =
-          beat.choice !== undefined
-            ? `${beat.options[beat.choice].text}`
-            : "No choice made yet";
+        const isLastBeat = index === beatHistory.length - 1;
 
-        // Add resource type indicator
-        const resourceTypeIndicator =
-          beat.choice !== undefined &&
-          beat.options[beat.choice].resourceType !== "normal"
-            ? ` [${beat.options[beat.choice].resourceType}]`
+        // Only show choice details for the last beat
+        let choiceSection = "";
+        if (isLastBeat && beat.choice !== undefined) {
+          const choiceText = beat.options[beat.choice].text;
+
+          // Add resource type indicator
+          const resourceTypeIndicator =
+            beat.options[beat.choice].resourceType !== "normal"
+              ? ` [${beat.options[beat.choice].resourceType}]`
+              : "";
+
+          const resultText = beat.resolution
+            ? ` (Result: ${
+                beat.resolution.charAt(0).toUpperCase() +
+                beat.resolution.slice(1).toLowerCase()
+              })`
             : "";
 
-        const resultText = beat.resolution
-          ? ` (Result: ${
-              beat.resolution.charAt(0).toUpperCase() +
-              beat.resolution.slice(1).toLowerCase()
-            })`
-          : "";
+          choiceSection = `\n  Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
+        }
 
         return `- Beat ${index + 1}: ${beat.title}
-  Summary: ${beat.summary}
-  Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
+  Summary: ${beat.summary}${choiceSection}`;
       })
       .join("\n");
   }
@@ -526,9 +529,9 @@ ${modeDescriptions[story.getGameMode()]}
                 `Players: ${thread.playersSideA.join(", ")}`,
                 outcomeInfo,
                 `Possible milestones:`,
-                `- Option 1: ${thread.possibleMilestones["resolution1"]}`,
-                `- Option 2: ${thread.possibleMilestones["resolution2"]}`,
-                `- Option 3: ${thread.possibleMilestones["resolution3"]}`,
+                `1. ${thread.possibleMilestones["resolution1"]}`,
+                `2. ${thread.possibleMilestones["resolution2"]}`,
+                `3. ${thread.possibleMilestones["resolution3"]}`,
               ].join("\n")
             : threadType === "contest"
             ? [
@@ -617,7 +620,7 @@ ${modeDescriptions[story.getGameMode()]}
     );
 
     // Combine the beat progression overview with the beat texts
-    return `\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
+    return `\nFor the remainder of this thread, don't offer any options that are similar to the ones that were already offered (both chosen and not chosen).\n\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
   }
 
   /**
@@ -657,10 +660,10 @@ ${modeDescriptions[story.getGameMode()]}
             const playerBeatIndex = thread.firstBeatIndex + absoluteIndex;
             const playerBeat = player?.beatHistory?.[playerBeatIndex];
 
-            // Get special option text if this beat has a resolution
-            let specialOptionText = "";
+            // List options, highlighting the chosen option
+            let optionsText = "";
             if (beat.resolution !== null && playerBeat?.choice !== undefined) {
-              specialOptionText = this.getSpecialOptionFromBeat(playerBeat);
+              optionsText = this.listBeatOptionsFromPastBeat(playerBeat);
             }
 
             const resolution = beat.resolution
@@ -680,7 +683,7 @@ ${modeDescriptions[story.getGameMode()]}
             return `Beat ${beatNumber}/${totalBeats}: ${beat.title}\n\n${
               beatText?.text || "No text available"
             }\n\n${
-              specialOptionText ? specialOptionText + "\n" : ""
+              optionsText ? optionsText + "\n" : ""
             }RESOLUTION: ${resolution.toUpperCase()}. ${resolutionDescription}`;
           })
           .join("\n\n");
@@ -691,23 +694,33 @@ ${modeDescriptions[story.getGameMode()]}
   }
 
   /**
-   * Get special option text (sacrifice/reward) directly from a beat
+   * Returns a list of all options from a past beat, highlighting the chosen option
    * @param beat The player's beat
-   * @returns Formatted special option text if applicable, empty string otherwise
+   * @returns Formatted list of all options from a past beat, highlighting the chosen option
    */
-  private static getSpecialOptionFromBeat(beat: Beat): string {
+  private static listBeatOptionsFromPastBeat(beat: Beat): string {
     if (beat.choice === undefined || !beat.options) return "";
 
     const chosenOption = beat.options[beat.choice];
     if (!chosenOption) return "";
 
-    if (chosenOption.resourceType === "sacrifice") {
-      return `SACRIFICE OPTION: ${chosenOption.text}`;
-    } else if (chosenOption.resourceType === "reward") {
-      return `REWARD OPTION: ${chosenOption.text}`;
-    }
+    const resourceType =
+      chosenOption.resourceType !== "normal"
+        ? `[${chosenOption.resourceType.toUpperCase()}] `
+        : "";
 
-    return "";
+    // Start with the chosen option
+    const result = [`CHOSEN OPTION: ${resourceType}${chosenOption.text}`];
+    result.push("NOT CHOSEN:");
+
+    // Add non-chosen options
+    beat.options.forEach((option, index) => {
+      if (index !== beat.choice) {
+        result.push(`- ${option.text}`);
+      }
+    });
+
+    return result.join("\n");
   }
 
   /**

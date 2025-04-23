@@ -211,16 +211,14 @@ How to flesh out the game world to make it more immersive?
 ${gameWorldInstructions}
 
 How to make sure that the text follows the principle of 'Show Don't Tell'?
-Based on the consequences to narrate, requirements for the ${story.getCurrentBeatType()}, ${
-      story.isMultiplayer() ? ", multiplayer" : ""
-    }, and world building considerations: create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
-Always include how the players perform the actions that they chose in the previous beat, how they played out, and what the consequences are.${
+Create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
+The first item must always be the players performing the actions that they chose in the previous beat and how these actions play out. Concrete actions, direct speech.${
       story.isMultiplayer() && story.isFirstBeat()
         ? "\nSince this is the first beat of a multiplayer story, introduce the characters of the other players."
         : ""
     }
 Examples:
-- The player decided to bribe the guard: we should describe the actual bribe.
+- The player decided to bribe the guard: we should narrate how the player presents the bribe using direct speech.
 - The old sage provides a cryptic hint: we should spell out the cryptic hint and deliver it in direct speech.
 - The player gets attacked by a goblin: we should describe the actual attack.
 
@@ -237,13 +235,14 @@ ${
       (story.getCurrentBeatType() === "thread"
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
-          "\n- Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? These options should apply a large malus to success chances." +
+          "\n- Don't use options that are similar to options that the player had in previous beats in this thread." +
+          "\n--- Example: If the player had the option " +
+          "\n- Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? These options will apply a large malus to success chances." +
           "\n--- Only offer reward options for stats that allow for rewards in their stat definitions." +
           "\n--- Example: An energy stat might specify that it can be used as a reward when the player chooses to rest instead of focusing on the thread's goal." +
-          "\n- Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? These options should grant a large bonus to success chances." +
+          "\n- Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? These options will grant a large bonus to success chances." +
           "\n--- Only offer sacrifice options for stats that allow for sacrifices in their stat definitions." +
-          "\n--- Example: The player's gold stat might specify that 50 gold can be used to bribe NPCs." +
-          "\n--- Example: The player's mana stat might specify that the player can use special abilities for 20 mana each." +
+          "\n--- Example: The player's mana stat might specify that the player can use special abilities for 10 mana each." +
           "\n- Which stats and their current values (both individual and shared) affect which options are available to the player narratively (not mechanically in terms of success chances)? Consider especially the narrative function of stats." +
           "\n--- Example: If force|agility stat leans toward force, the options should be forceful rather than sneaky."
         : "\n- How can we reinforce the story's key conflicts and focused types of decisions?" +
@@ -347,7 +346,10 @@ Options
 - Offer exactly 3 options.
 - Make sure that the beat implements the current ${story.getCurrentBeatType()} configuration.${
       story.getCurrentBeatType() === "thread"
-        ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n"
+        ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n" +
+          "--- Avoid offering options that are similar to options that were already offered to the player in previous beats in this thread.\n"
+        : story.getCurrentBeatType() === "switch"
+        ? "--- Don't offer options for the upcoming thread that are similar to the previous threads."
         : ""
     }
 --- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${story.getCurrentBeatType()} in any other way.${

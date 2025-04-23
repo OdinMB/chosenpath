@@ -42,15 +42,15 @@ export const switchSchema = z.object({
       "List of players who are involved in this switch and will be part of the resulting thread"
     ),
   type: switchTypeSchema,
-  previousThreadTypesToBeAvoided: z
-    .array(z.string())
-    .describe(
-      "List of previous thread types that the players have been involved in."
-    ),
   relevantSuggestedThreadTypes: z
     .array(z.string())
     .describe(
       "List of thread types that are suggested for this story in general and that might work well for this switch (or rather the thread that will be created as a result of this switch)."
+    ),
+  previousThreadTypesToBeAvoided: z
+    .array(z.string())
+    .describe(
+      "List of previous thread types that the players have been involved in. We want to avoid these for the upcoming thread to avoid repetition."
     ),
   outcomeId: z
     .string()
@@ -67,11 +67,11 @@ export const switchSchema = z.object({
       z
         .string()
         .describe(
-          "Possible next step that the player can make, and, in brackets, the ID of the associated outcome or outcomes that the thread would add a milestone to."
+          "Possible next step that the player can make, and, in brackets, the ID of the associated outcome or outcomes that the thread would add a milestone to. Be specific. No placeholders. Bad: 'Investigate a whispered secret revealed during the Court'. What secret? Good: 'Investigate the rumor that ...'"
         )
     )
     .describe(
-      "If this is a topic switch: Possible next steps that the players can make. Stay clear of topics that are too similar to previous thread types that the players were involved in. (Leave empty for flavor switches)"
+      "If this is a topic switch: Exactly 3 possible directions that the players can take. Stay clear of topics that are too similar to previous thread types that the players were involved in. (Leave empty for flavor switches)"
     ),
   relationshipToOtherSwitches: z
     .string()

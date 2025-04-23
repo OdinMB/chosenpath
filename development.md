@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 2 Track options of previous beats in the thread to avoid repeating any of them
 - 1 Add "what you're looking for" filters above carousel and in library (preset filters)
   - Have fun with a kid
   - Pretend to be (Slice of Life)
@@ -16,6 +15,9 @@ Smaller commits!
 Text, English, Multiplayer > other stuff
 
 - 1 In beat resolutions that are not also thread resolutions, only change stats if their canBeChangedInBeatResolutions is true
+- 1 New type of change: replace (for string[])
+- 3 Stat attribute for personal stats: initial value or part of player background?
+- 5 Play with Gemini 2.5 Pro once integrated in Langchain
 - 5 Attach facts to players
 - 25 New multiplayer switch type using voting mechanism to decide which direction to take
 - 3 Consideration to make 2-beat threads more likely
@@ -52,3 +54,7 @@ Text, English, Multiplayer > other stuff
 - Move newMilestone changes to switch generation (away from beat generation)?
 - Allow shared outcomes only in multiplayer games?
 - Add setup and deployment instructions
+
+# NOTES
+
+- When a thread just resolved an outcome, the options in the switch beat can still try to move the story toward this now dead end. The generated thread then ignores the player choice to focus on outcomes that are still unresolved. Which is weird given the explicit choice of the player before.

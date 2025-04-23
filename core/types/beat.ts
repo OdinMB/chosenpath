@@ -115,10 +115,15 @@ export const beatPlanSchema = z.object({
     .describe(
       "List of new story elements to add to the story state. Leave this empty if no new story elements are to be created in this beat. Only use this if a new story element is to be created in this beat that is likely to be used in later beats."
     ),
+  showDontTellPreviousDecision: z
+    .string()
+    .describe(
+      "The action or actions that the player decided to do at the end of the previous beat, plus a short instruction on how to make sure that these actions are narrated based on the principle of 'show don't tell'. Concrete descriptions, direct speech. (The resolution that this decision will lead to has already been determined, but the action itself must still be narrated.)"
+    ),
   showDontTell: z
     .array(z.string())
     .describe(
-      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. The list must include the player action that they decided to do in the previous beat and the consequences of that action."
+      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. Concrete actions, direct speech."
     ),
   newIntroductionsOfStoryElements: z
     .array(addIntroductionOfStoryElementSchema)
@@ -147,6 +152,11 @@ export const beatPlanSchema = z.object({
           .string()
           .describe(
             "What are the requirements from the current switch/thread configuration?"
+          ),
+        previousOptionsToAvoid: z
+          .array(z.string())
+          .describe(
+            "Relevant options that were already offered to the player in previous beats in this thread. Make sure that the options for this beat are meaningfully different from these previous options. Just bullet points. Focus on the gist of it. Good: 'sacrifice X', 'watch other guests', etc."
           ),
         statsAffectingOptions: z
           .string()
@@ -179,7 +189,7 @@ export const beatGenerationSchema = z.object({
         "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
-        "- Describe the action that the player decided to do in the previous beat. Show don't tell!\n" +
+        "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +

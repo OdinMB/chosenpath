@@ -127,14 +127,14 @@ A list of switches, including
 
 1. Which players are linked to this thread
 2. Switch type (topic/flavor) and justification
-3. Previous thread types that the players in this switch have been involved in. (These types of threads should be avoided for the next thread to avoid repetition.)
-4. Thread types that are suggested for this story in general and that might work well for this switch.
+3. Thread types that are suggested for this story in general and that might work well for this switch.
+4. Thread types that should be avoided because the players in this switch have been involved in similar threads lately. (We want to avoid repetition.)
 5. Relationship to other switches${
       story.isMultiplayer()
         ? ""
         : ". Since this is a single-player story, you can ignore this step."
     }
-6. If flavor switch: Outcome/question that will be explored in the next thread. If topic switch: Possible next steps that the players can make.
+6. If flavor switch: Outcome/question that will be explored in the next thread. If topic switch: Exactly 3 possible directions that the players can follow.
 
 EXAMPLE OUTPUT:\n\n`;
 
@@ -161,7 +161,7 @@ Switch 1:
 
 Switch 2:
 - Type: Topic switch (Justification: No immediate pressing matters for this player)
-- Includes an option to join the grouped thread with player1 and player2
+- Topic choices: 3 directions, including an option to join the grouped thread with player1 and player2
 - Players: player3
 
 IMPORTANT:
