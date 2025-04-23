@@ -39,9 +39,9 @@ export function Page({
     <div className="max-w-md mx-auto p-6 font-lora">
       <div className="mb-8 text-primary-800">
         <p className="mb-2">
-          Step into an interactive story where your choices shape the journey.
-          Play solo or with friends. Create the stories you want, from space
-          westerns to time travel romances.
+          Dive into immersive stories. Play alone or invite friends to shape the
+          story with multiple characters — whether you're exploring distant
+          galaxies or serving croissants in a Parisian café.
         </p>
         <p>
           Everything is free during the alpha phase. Jump in and share your
