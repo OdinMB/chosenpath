@@ -2,6 +2,7 @@ import {
   StoryState,
   ClientStoryState,
   GameMode,
+  GameModes,
   Guidelines,
   StoryPhase,
   PlayerCount,
@@ -60,7 +61,11 @@ export class Story {
     return this.state.title;
   }
 
+  // gameMode is always handled separately from player count, except here!
   getGameMode(): GameMode {
+    if (!this.isMultiplayer()) {
+      return GameModes.SinglePlayer;
+    }
     return this.state.gameMode;
   }
 

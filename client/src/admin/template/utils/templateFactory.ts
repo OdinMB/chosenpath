@@ -15,7 +15,7 @@ export function createDefaultTemplate(): StoryTemplate {
   // Start with a record that we'll build up with our properties
   const template: Record<string, unknown> = {
     id: "",
-    gameMode: GameModes.SinglePlayer,
+    gameMode: GameModes.Cooperative,
     playerCountMin: 1 as PlayerCount,
     playerCountMax: 1 as PlayerCount,
     maxTurnsMin: 10,

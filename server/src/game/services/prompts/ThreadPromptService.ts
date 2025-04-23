@@ -95,7 +95,17 @@ A duration for this thread (or set of threads) between 2-4 beats.
 - Choose a duration that works for all threads`;
 
     if (story.isMultiplayer()) {
-      instructions += `
+      if (story.getCurrentTurn() === 0) {
+        instructions += `
+
+MANDATORY FIRST THREAD REQUIREMENT: 
+Since this is the first thread of a multiplayer game, you MUST create EXACTLY ONE thread that involves ALL players together. 
+DO NOT create multiple threads or separate players in any way.
+ALL players must experience the same thread together as a group.
+This is NON-NEGOTIABLE - no matter what the switches or player choices were, all players MUST end up in the same thread.
+`;
+      } else {
+        instructions += `
 
 A summary of how you want to set up the threads based on the switch configuration and player choices.
 
@@ -103,9 +113,6 @@ Possible player configurations:
 - Independent threads: Each player gets their own standard thread
 - Shared threads: All players are in the same thread
 - Mixed setup: Some players are in a joint thread while others are in independent threads.`;
-
-      if (story.getCurrentTurn() === 0) {
-        instructions += `\n\nIMPORTANT: Since this is the first thread of the game, ALL players MUST be in a SINGLE JOINT THREAD together. This is a hard requirement - create one thread that involves all players.`;
       }
     } else {
       instructions += `\n\nFor single-player games, there is always only one thread.`;
@@ -124,11 +131,7 @@ Possible player configurations:
 - Players are split into Side A and Side B, competing over an outcome
 - Resolutions are "Side A wins"/"Mixed result"/"Side B wins"
 - Example milestones (one will be added to the outcome at the end of the thread): "Side A convinces the council", "Both sides reach a compromise", "Side B convinces the council"
-- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")${
-        story.getCurrentTurn() === 0
-          ? "\n- NOT appropriate for the first thread of the game where all players must be on the same side"
-          : ""
-      }`;
+- Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")`;
     }
 
     instructions += `
@@ -160,6 +163,13 @@ Create a list of threads, each with:
    - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
    - Each progression step is defined by a question about how the players are acting to deal with this step's challenge or decision. Bad: "What do [insert player names] find in the cellar?" Good: "How do [insert player names] search for clues in the cellar?"
    - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
+${
+  story.isMultiplayer() && story.getCurrentTurn() === 0
+    ? `
+
+IMPORTANT REMINDER: For this first thread of the game, you MUST create a single thread that includes ALL players together. No player should be in a separate thread.`
+    : ""
+}
 
 EXAMPLE 1: 3-BEAT CHALLENGE THREAD
 Players (Side A): player1, player2

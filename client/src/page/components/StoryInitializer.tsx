@@ -57,13 +57,6 @@ export function StoryInitializer({
     setContentModeration,
     isLoading: sessionIsLoading,
   } = useSession();
-  // Completely separate the game mode state for single player and multiplayer
-  const [singlePlayerMode] = useState<GameMode>(GameModes.SinglePlayer);
-  const [multiplayerMode, setMultiplayerMode] = useState<GameMode>(
-    initialGameMode && initialPlayerCount && initialPlayerCount > 1
-      ? initialGameMode
-      : GameModes.Cooperative
-  );
 
   const isLoading = useMemo(() => {
     return (
@@ -81,20 +74,6 @@ export function StoryInitializer({
     error,
   ]);
 
-  // Compute the effective game mode based on player count
-  const effectiveGameMode =
-    playerCount === 1 ? singlePlayerMode : multiplayerMode;
-
-  // Update gameMode when playerCount changes
-  useEffect(() => {
-    setGameMode(effectiveGameMode);
-
-    // Reset multiplayerMode to Cooperative when switching to single player
-    if (playerCount === 1) {
-      setMultiplayerMode(GameModes.Cooperative);
-    }
-  }, [effectiveGameMode, playerCount]);
-
   // Handle game mode slider changes
   const handleGameModeChange = (value: number) => {
     const values = [
@@ -102,7 +81,7 @@ export function StoryInitializer({
       GameModes.CooperativeCompetitive,
       GameModes.Competitive,
     ] as const;
-    setMultiplayerMode(values[value]);
+    setGameMode(values[value]);
   };
 
   const storyPrompts = useMemo(
@@ -270,9 +249,9 @@ export function StoryInitializer({
             value={
               playerCount === 1
                 ? 0
-                : multiplayerMode === GameModes.Cooperative
+                : gameMode === GameModes.Cooperative
                 ? 0
-                : multiplayerMode === GameModes.CooperativeCompetitive
+                : gameMode === GameModes.CooperativeCompetitive
                 ? 1
                 : 2
             }

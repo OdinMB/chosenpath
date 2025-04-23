@@ -49,7 +49,7 @@ export class BeatPromptService {
         story,
         this.getSectionsForContext(story)
       );
-    // console.log("\x1b[36m%s\x1b[0m", prompt);
+    console.log("\x1b[36m%s\x1b[0m", prompt);
     return prompt;
   }
 
@@ -136,7 +136,7 @@ ${
 }${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
-          "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated ? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story.\n" +
+          "If several players are in the same switch or thread, how do you ensure that their options are a) meaningfully different from each other, b) consistent with each other, and c) coordinated? Spell out how exactly you ensure that no combination of choices leads to inconsistencies in the story.\n" +
           "- Example: In thread tense_negotiation, we must ensure that [insert player names] don't represent the group in an inconsistent way. Let's give [player name 1] options for proposals, while [player name 2] gets options for shifting the atmosphere in the negotiation.\n" +
           "- Example: In thread investigating_manor, we must ensure that the players don't investigate the scene in an inconsistent way. Let's give [player name 1] options for examining specific evidence, while [player name 2] gets options for questioning witnesses or securing the perimeter."
         : ""
@@ -199,7 +199,7 @@ ${
 }
 ${
   story.isMultiplayer()
-    ? `How to stay consistent?
+    ? `\nHow to stay consistent?
 Which information from other beats that you already created in this turn do we need to consider for this beat?
 Create a bullet list of things that happened in other beats that you already created in this turn that we should consider for this beat.
 - This is particularly important if several players are in the same thread or switch (so the beats for the different players are consistent with each other).

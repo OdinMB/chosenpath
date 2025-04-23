@@ -47,22 +47,18 @@ export function useBasicInfoTab({ template, onChange }: UseBasicInfoTabProps) {
 
   const handleGameModeChange = (value: number) => {
     let newGameMode: GameMode;
-    if (template.playerCountMax === 1) {
-      newGameMode = GameModes.SinglePlayer;
-    } else {
-      switch (value) {
-        case 0:
-          newGameMode = GameModes.Cooperative;
-          break;
-        case 1:
-          newGameMode = GameModes.CooperativeCompetitive;
-          break;
-        case 2:
-          newGameMode = GameModes.Competitive;
-          break;
-        default:
-          newGameMode = GameModes.Cooperative;
-      }
+    switch (value) {
+      case 0:
+        newGameMode = GameModes.Cooperative;
+        break;
+      case 1:
+        newGameMode = GameModes.CooperativeCompetitive;
+        break;
+      case 2:
+        newGameMode = GameModes.Competitive;
+        break;
+      default:
+        newGameMode = GameModes.Cooperative;
     }
     handleChange("gameMode", newGameMode);
   };
