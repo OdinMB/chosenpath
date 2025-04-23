@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1 First thread always together
 - 2 Track options of previous beats in the thread to avoid repeating any of them
 - 1 Add "what you're looking for" filters above carousel and in library (preset filters)
   - Have fun with a kid
@@ -10,7 +9,7 @@ Smaller commits!
   - Vent on reality (Satire)
   - Enjoy fiction (Crime, Fantasy, etc.)
 - 10 More multiplayer templates
-- 5 Title images for templates (esp. carousel titles)
+- 5 higher degree of direct interaction between players in joint threads
 
 # BETTER EXPERIENCE
 
