@@ -60,20 +60,18 @@ export const statSchema = z
     optionsToSacrifice: z
       .string()
       .describe(
-        "Options for sacrificing (some of) this stat to gain a higher chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options. Examples:\n" +
-          "- for percentage stats: 'Can spend 20% energy to use a Power'\n" +
-          "- for number stats: 'Can spend 50 gold to bribe an NPC'\n" +
+        "Options for sacrificing (some of) this stat to gain a higher chance of success in a beat. Write 'None' if the stat cannot be sacrificed for such a short-term benefit. Examples:\n" +
+          "- for percentage stats: 'Can spend 10% energy to use a Power'\n" +
           "- for string[] stats: 'Can send special followers on dangerous missions'\n" +
-          "- for string stats: 'Gives bonuses and maluses for actions that align/misalign with the current emotion'\n" +
-          "- for opposites stats: 'Can accept loss of sanity to stay level-headed'\n" +
           "Don't mention how large the point bonus is for sacrificing this stat. That bonus is the same for all sacrifice options. Only define how much of the stat the player has to sacrifice to gain that bonus.\n" +
-          "Large things like the tension between factions on a 4-step scale cannot be sacrificed for a bonus in a single beat. This should only happen in unfavorable resolutions of entire threads."
+          "Don't provide any options to sacrifice a stat for a momentary benefit if the stat represents a large, long-term aspect of the story (tension between factions on a 4-step scale, special powers, etc.)"
       ),
     optionsToGainAsReward: z
       .string()
       .describe(
-        "Options for gaining this stat as a reward for choosing a lower chance of success in certain beats. Must be expressed in the context of individual beats. Write 'None' if there are no options.\n" +
-          "Large things like a new superpower should not be offered as a reward for a malus in a single beat. This should only happen in favorable resolutions of entire threads."
+        "Options for gaining this stat as a reward for choosing a lower chance of success in a beat. Write 'None' if this stat cannot be gained as a reward for such a fleeting disadvantage. Examples:\n" +
+          "- for percentage stats: 'Can regain 10% energy by resting instead of taking decisive action'\n" +
+          "Don't provide any options to gain this stat as a reward for a momentary disadvantage if the stat represents a large, long-term aspect of the story (tension between factions on a 4-step scale, special powers, etc.)"
       ),
     narrativeImplications: z
       .array(z.string())
@@ -98,7 +96,7 @@ export const statSchema = z
     canBeChangedInBeatResolutions: z
       .boolean()
       .describe(
-        "Whether this stat can be changed in beat resolutions. If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly and where changes are not particularly impactful. If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect (important world stats, special powers or relationships, etc.) These larger changes should only happen after a relevant thread is resolved."
+        "Whether this stat can be changed in beat resolutions within threads. If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly and where changes are not particularly impactful. If false, the stat can only be changed after threads are resolved. Set to false for stats where a change would be very noticeable and/or have a long-term effect (important world stats, special powers or relationships, etc.) These larger changes should only happen after a relevant thread is resolved."
       ),
     isVisible: z
       .boolean()

@@ -14,7 +14,6 @@ Smaller commits!
 
 Text, English, Multiplayer > other stuff
 
-- 1 In beat resolutions that are not also thread resolutions, only change stats if their canBeChangedInBeatResolutions is true
 - 3 Stat attribute for personal stats: initial value or part of player background?
 - 5 Play with Gemini 2.5 Pro once integrated in Langchain
 - 5 Attach facts to players
