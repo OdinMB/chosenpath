@@ -124,6 +124,7 @@ ${
     : "STAT CHANGES\n" +
       "- If a player chose a sacrifice option to gain a higher chance of success, that player should lose whatever was sacrificed.\n" +
       "- If a player chose a reward option and accepted a lower chance of success, that player should gain their reward.\n" +
+      "- If you want to replace an item in a string[] stat, apply both a removeElement and addElement change.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
         ? "- The previous thread (or set of threads) was just resolved, so some meaningful stat changes might be warrented.\n" +

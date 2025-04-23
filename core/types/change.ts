@@ -22,7 +22,7 @@ export const statChangeSchema = z.object({
   value: z
     .union([z.number(), z.string(), z.boolean()])
     .describe(
-      "Value to apply in the change. For setString and addElement, use values that can be displayed to players. ('Rumor of acient artifact' instead of 'ancient_artifact_hint')"
+      "Value to apply in the change. For setString and addElement use values that can be displayed to players. (Good: 'Rumor of acient artifact'. Bad: 'ancient_artifact_hint')"
     ),
 });
 
