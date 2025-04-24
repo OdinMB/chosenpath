@@ -2,6 +2,9 @@ Smaller commits!
 
 # NEXT
 
+- 20 Images for title, player identities, story elements (for templates initially)
+  https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
+
 - 1 Add "what you're looking for" filters above carousel and in library (preset filters)
   - Enjoy fiction (Crime, Fantasy, etc.)
   - Pretend to be (Slice of Life)
@@ -19,7 +22,6 @@ Text, English, Multiplayer > other stuff
 - 5 Attach facts to players
 - 25 New multiplayer switch type using voting mechanism to decide which direction to take
 - 3 Consideration to make 2-beat threads more likely
-- 20 Images for title, player identities, story elements (for templates initially)
 - 20 Dynamically add new outcomes for longer stories
 - 30 Audio version
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming

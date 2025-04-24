@@ -1,6 +1,5 @@
-import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { isDevelopment, STORAGE_PATHS, MAX_PLAYERS } from "core/config.js";
+import { MAX_PLAYERS } from "core/config.js";
 import {
   GameMode,
   GameModes,
@@ -18,6 +17,7 @@ import {
   getStorageFiles,
   deleteStorageFile,
   ensureStorageDirectory,
+  getStoragePath,
 } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
@@ -47,12 +47,8 @@ export class AdminLibraryService {
   private aiStoryGenerator: AIStoryGenerator;
 
   constructor() {
-    // Get the appropriate storage path based on environment
-    const basePath = isDevelopment
-      ? STORAGE_PATHS.development.library
-      : STORAGE_PATHS.production.library;
-
-    this.storagePath = path.resolve(process.cwd(), basePath);
+    // Get the appropriate storage path using the utility function
+    this.storagePath = getStoragePath("library");
     this.initializeStorage();
     this.aiStoryGenerator = new AIStoryGenerator();
   }

@@ -91,20 +91,6 @@ export const GAME_SESSION_CONFIG = {
   INACTIVE_SESSION_THRESHOLD_MS: 1000 * 60 * 60 * 1, // 1 hour
 };
 
-// Storage paths configuration
-export const STORAGE_PATHS = {
-  development: {
-    stories: "data/stories",
-    library: "data/templates",
-    mocks: "data/mocks",
-  },
-  production: {
-    stories: "/data/stories",
-    library: "/data/templates",
-    mocks: "/data/mocks",
-  },
-};
-
 // API and server configuration
 export const API_CONFIG = {
   // Default ports

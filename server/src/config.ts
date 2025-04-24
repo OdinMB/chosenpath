@@ -9,6 +9,20 @@ const parseCorsOrigins = (origins: string): string[] => {
   return origins.split(",").map((origin) => origin.trim());
 };
 
+// Storage paths configuration
+export const STORAGE_PATHS = {
+  development: {
+    stories: "data/stories",
+    library: "data/templates",
+    mocks: "data/mocks",
+  },
+  production: {
+    stories: "/data/stories",
+    library: "/data/templates",
+    mocks: "/data/mocks",
+  },
+};
+
 export const config = {
   // Server settings
   port: process.env.PORT || API_CONFIG.DEFAULT_PORT,
@@ -40,3 +54,7 @@ export const CONTENT_FILTER_MODEL_NAME =
   process.env.CONTENT_FILTER_MODEL_NAME || "gpt-4.1-mini";
 export const CONTENT_FILTER_MODEL_TEMPERATURE =
   process.env.CONTENT_FILTER_MODEL_TEMPERATURE || 0;
+
+// Image generation settings
+export const IMAGE_GENERATION_MODEL =
+  process.env.IMAGE_GENERATION_MODEL || "gpt-image-1";

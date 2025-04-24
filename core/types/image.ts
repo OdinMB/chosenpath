@@ -1,6 +1,23 @@
 import { z } from "zod";
 import { Beat } from "./beat.js";
 
+// Image generation constants
+export const IMAGE_SIZES = {
+  SQUARE: "1024x1024",
+  LANDSCAPE: "1536x1024",
+  PORTRAIT: "1024x1536",
+} as const;
+
+export const IMAGE_QUALITIES = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+} as const;
+
+export type ImageSize = (typeof IMAGE_SIZES)[keyof typeof IMAGE_SIZES];
+export type ImageQuality =
+  (typeof IMAGE_QUALITIES)[keyof typeof IMAGE_QUALITIES];
+
 // Only used for LLM generation
 export const imageGenerationSchema = z.object({
   prompt: z
@@ -21,12 +38,9 @@ export const imageGenerationSchema = z.object({
 // Types used by the application
 export type ImageStatus = "ready" | "generating" | "failed";
 
-export type Image = {
-  id: string;
-  prompt: string;
-  description: string;
-  url?: string;
+export type Image = z.infer<typeof imageGenerationSchema> & {
   status: ImageStatus;
+  url?: string;
 };
 
 export type ImageLibrary = Image[];
