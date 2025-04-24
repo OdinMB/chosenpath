@@ -9,11 +9,11 @@ export const TAG_CATEGORIES: TagCategory[] = [
     name: "Format",
     tags: ["Simulation"],
   },
-  // assumed default: reading pleasure
-  {
-    name: "Motivation",
-    tags: ["Satire", "Serious"],
-  },
+  // assumed default: Enjoy Fiction
+  // {
+  //   name: "Motivation",
+  //   tags: ["Enjoy Fiction", "Slice of Life", "Kids", "Satire", "Serious"],
+  // },
   {
     name: "Genre",
     tags: [

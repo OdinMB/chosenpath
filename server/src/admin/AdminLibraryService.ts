@@ -35,6 +35,7 @@ type TemplateDataInput = Omit<
   | "maxTurnsMin"
   | "maxTurnsMax"
   | "tags"
+  | "imageFile"
 >;
 
 // Create a type that makes all fields optional for updates
@@ -111,6 +112,7 @@ export class AdminLibraryService {
       maxTurnsMin: baseTemplate.maxTurnsMin || 10,
       maxTurnsMax: baseTemplate.maxTurnsMax || 15,
       tags: baseTemplate.tags || [],
+      imageFile: baseTemplate.imageFile || "",
       createdAt: baseTemplate.createdAt || now,
       updatedAt: now,
       title: baseTemplate.title || "",
@@ -359,6 +361,7 @@ export class AdminLibraryService {
         maxTurnsMax: maxTurns,
         ...templateData,
         tags: [],
+        imageFile: "",
       });
 
       this.logger.log(

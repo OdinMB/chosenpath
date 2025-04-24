@@ -249,14 +249,17 @@ export function useTemplateForm({
   }) => {
     setFormData((prev: StoryTemplate) => ({
       ...prev,
-      statGroups: updates.statGroups ?? prev.statGroups,
-      sharedStats: updates.sharedStats ?? prev.sharedStats,
-      playerStats: updates.playerStats ?? prev.playerStats,
+      statGroups: updates.statGroups || prev.statGroups,
+      sharedStats: updates.sharedStats || prev.sharedStats,
+      playerStats: updates.playerStats || prev.playerStats,
       initialSharedStatValues:
-        updates.initialSharedStatValues ?? prev.initialSharedStatValues,
-      ...(updates.playerOptions ? updates.playerOptions : {}),
+        updates.initialSharedStatValues || prev.initialSharedStatValues,
+      ...(updates.playerOptions || {}),
     }));
   };
+
+  const handleImageFileChange = (imageFile: string) =>
+    setFormData((prev) => ({ ...prev, imageFile }));
 
   const handleStoryElementsChange = (elements: StoryElement[]) =>
     setFormData((prev) => ({ ...prev, storyElements: elements }));
@@ -324,6 +327,7 @@ export function useTemplateForm({
     handleMaxTurnsMinChange,
     handleMaxTurnsMaxChange,
     handleStatsChange,
+    handleImageFileChange,
     handleStoryElementsChange,
     handleOutcomesChange,
     handlePlayerChange,

@@ -22,6 +22,8 @@ interface BasicInfoTabProps {
   handleTagsChange: (tags: string[]) => void;
   showOnWelcomeScreen: boolean;
   setShowOnWelcomeScreen: (show: boolean) => void;
+  imageFile: string;
+  setImageFile: (imageFile: string) => void;
   // Helper functions
   getMinPlayerOptions: () => number[];
   getMaxPlayerOptions: () => number[];
@@ -49,6 +51,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   handleTagsChange,
   showOnWelcomeScreen,
   setShowOnWelcomeScreen,
+  imageFile,
+  setImageFile,
   // Helper functions
   getMinPlayerOptions,
   getMaxPlayerOptions,
@@ -231,6 +235,25 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Image input. Temporary solution. */}
+      <div className="flex items-center gap-2">
+        <span className="font-semibold w-20">Image</span>
+        <InfoIcon
+          tooltipText="Image filenames should be in the public/test folder"
+          position="top"
+          className="mr-2 mt-1"
+        />
+        <Input
+          id="story-image"
+          name="story-image"
+          className="flex-1"
+          value={imageFile}
+          onChange={(e) => setImageFile(e.target.value)}
+          placeholder="Image filename (e.g. castle-1-3.jpg)"
+        />
+      </div>
+
       {/* Show on welcome screen checkbox */}
       <div className="flex items-center gap-2 mt-2">
         <Checkbox

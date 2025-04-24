@@ -68,6 +68,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handlePublicationStatusChange,
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
+    handleImageFileChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -240,6 +241,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               setMaxTurnsMax={handleMaxTurnsMaxChange}
               tags={tags}
               handleTagsChange={handleTagsChange}
+              imageFile={formData.imageFile || ""}
+              setImageFile={handleImageFileChange}
               // Helper functions
               getMinPlayerOptions={getMinPlayerOptions}
               getMaxPlayerOptions={getMaxPlayerOptions}

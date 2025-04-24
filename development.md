@@ -3,10 +3,10 @@ Smaller commits!
 # NEXT
 
 - 1 Add "what you're looking for" filters above carousel and in library (preset filters)
-  - Have fun with a kid
-  - Pretend to be (Slice of Life)
-  - Vent on reality (Satire)
   - Enjoy fiction (Crime, Fantasy, etc.)
+  - Pretend to be (Slice of Life)
+  - Have fun with a kid
+  - Vent on reality (Satire)
 - 10 More multiplayer templates
 - 5 higher degree of direct interaction between players in joint threads
 

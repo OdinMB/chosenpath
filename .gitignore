@@ -32,6 +32,9 @@ boiler
 .vite
 .vite/**
 
+# project docs
+DOCS/**
+
 # Server data directories
 # Exclude story checkpoints (local development only)
 server/data/story_checkpoints/**
