@@ -16,9 +16,9 @@ import {
   sendError,
   sendBadRequest,
   sendNotFound,
-} from "./shared/responseUtils.js";
-import { adminStoryService } from "./admin/AdminStoryService.js";
-import { AdminLibraryService } from "./admin/AdminLibraryService.js";
+} from "shared/responseUtils.js";
+import { adminStoryService } from "admin/AdminStoryService.js";
+import { AdminLibraryService } from "admin/AdminLibraryService.js";
 
 // Simple authentication middleware
 export const verifyAdmin = (

@@ -12,9 +12,9 @@ const parseCorsOrigins = (origins: string): string[] => {
 // Storage paths configuration
 export const STORAGE_PATHS = {
   development: {
-    stories: "data/stories",
-    library: "data/templates",
-    mocks: "data/mocks",
+    stories: "../data/stories",
+    library: "../data/templates",
+    mocks: "../data/mocks",
   },
   production: {
     stories: "/data/stories",

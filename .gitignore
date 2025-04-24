@@ -37,12 +37,13 @@ DOCS/**
 
 # Server data directories
 # Exclude story checkpoints (local development only)
-server/data/story_checkpoints/**
+data/story_checkpoints/**
 # Exclude story mocks (local development only)
-server/data/mocks/**
+data/mocks/**
 # Exclude story JSON files but keep directory structure
-server/data/stories/*.json
-server/data/templates/*.json
+data/stories/*.json
+data/templates/**
+
 
 backup/
 research.txt
