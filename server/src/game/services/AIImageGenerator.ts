@@ -1,15 +1,17 @@
+import dotenv from "dotenv";
 import OpenAI from "openai";
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
   Image,
   BeatsNeedingImages,
-  Beat,
   ImageSize,
   ImageQuality,
 } from "core/types/index.js";
-import dotenv from "dotenv";
 import { Story } from "core/models/Story.js";
-import { IMAGE_GENERATION_MODEL } from "server/config.js";
+import {
+  IMAGE_GENERATION_MODEL,
+  IMAGE_GENERATION_OUTPUT_COMPRESSION,
+} from "server/config.js";
 import fs from "fs";
 import path from "path";
 import { getStoragePath } from "../../shared/storageUtils.js";
@@ -29,7 +31,9 @@ export class AIImageGenerator {
 
   private async generateImage(
     prompt: string,
-    templateId?: string
+    templateId?: string,
+    quality?: ImageQuality,
+    size?: ImageSize
   ): Promise<string> {
     try {
       console.log("Generating image with prompt:", prompt);
@@ -38,9 +42,11 @@ export class AIImageGenerator {
       const imageResponse = await this.openai.images.generate({
         model: IMAGE_GENERATION_MODEL,
         prompt,
+        moderation: "low",
         n: 1,
-        // GPT-Image-1 only supports 1024x1024 for now
-        size: "1024x1024",
+        quality: quality || IMAGE_QUALITIES.MEDIUM,
+        output_compression: IMAGE_GENERATION_OUTPUT_COMPRESSION,
+        size: size || IMAGE_SIZES.SQUARE,
       });
 
       // Get the image data - either from b64_json or URL

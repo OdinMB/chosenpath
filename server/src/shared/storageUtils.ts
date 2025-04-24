@@ -1,6 +1,7 @@
 import path from "path";
 import { STORAGE_PATHS } from "../config.js";
 import fs from "fs/promises";
+import fsSync from "fs";
 
 /**
  * Gets the appropriate fully-resolved storage path based on the current environment
@@ -194,4 +195,75 @@ export async function ensureStorageDirectory(dirPath: string): Promise<string> {
     console.error(`Failed to ensure directory exists ${dirPath}:`, error);
     throw error;
   }
+}
+
+/**
+ * Gets the path to a file within a specific storage path type
+ * @param pathType - The type of storage path ('stories', 'library', etc.)
+ * @param subPath - The subpath within the storage path
+ * @returns The full path to the file
+ */
+export function getStorageFilePath(
+  pathType: keyof typeof STORAGE_PATHS.development,
+  subPath: string
+): string {
+  const basePath = getStoragePath(pathType);
+  return path.join(basePath, subPath);
+}
+
+/**
+ * Lists all files in a subdirectory of a storage path
+ * @param pathType - The type of storage path ('stories', 'library', or 'mocks')
+ * @param subDir - The subdirectory within the storage path (or empty string for base directory)
+ * @param filter - Optional filter function to apply to filenames
+ * @returns Array of file names in the subdirectory
+ */
+export async function listStorageSubdirFiles(
+  pathType: keyof typeof STORAGE_PATHS.development,
+  subDir: string,
+  filter?: (filename: string) => boolean
+): Promise<string[]> {
+  const basePath = getStoragePath(pathType);
+  const dirPath = subDir ? path.join(basePath, subDir) : basePath;
+
+  try {
+    const files = await fs.readdir(dirPath);
+    return filter ? files.filter(filter) : files;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // Directory doesn't exist, create it
+      await ensureDirExists(dirPath);
+      // Return empty array as the directory was just created
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Checks if a file exists in storage
+ * @param pathType - The type of storage path ('stories', 'library', or 'mocks')
+ * @param subPath - The subpath within the storage path
+ * @returns Boolean indicating if the file exists
+ */
+export function storageFileExists(
+  pathType: keyof typeof STORAGE_PATHS.development,
+  subPath: string
+): boolean {
+  const filePath = getStorageFilePath(pathType, subPath);
+  return fsSync.existsSync(filePath);
+}
+
+/**
+ * Filters files by extension
+ * @param extensions - Array of file extensions to include (with dot, e.g. ['.jpg', '.png'])
+ * @returns A filter function that can be passed to listStorageSubdirFiles
+ */
+export function filterByExtension(
+  extensions: string[]
+): (filename: string) => boolean {
+  return (filename: string) => {
+    const ext = path.extname(filename).toLowerCase();
+    return extensions.includes(ext);
+  };
 }

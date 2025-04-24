@@ -6,14 +6,15 @@ import { SessionProvider } from "./shared/SessionProvider";
 import { Admin } from "./admin/Admin";
 import "./index.css";
 
-// Use hash router for all routes to avoid 404s on direct URL access in production
+// Use browser router with specific routes to avoid capturing image URLs
 const router = createBrowserRouter([
   {
     path: "/admin/*",
     element: <Admin />,
   },
   {
-    path: "/*",
+    // Exclude /images and /api paths from being captured by the router
+    path: "*",
     element: (
       <SessionProvider>
         <App />
@@ -21,6 +22,13 @@ const router = createBrowserRouter([
     ),
   },
 ]);
+
+// Add a global error handler for network issues
+window.addEventListener("error", (event) => {
+  if (event.target instanceof HTMLImageElement) {
+    console.error("Image loading error:", event.target.src);
+  }
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

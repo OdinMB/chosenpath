@@ -1,15 +1,23 @@
 import http from "http";
 import express from "express";
 import cors from "cors";
+import path from "path";
 import { config } from "./config.js";
 import { Router } from "./routes.js";
 import { GameWebSocketServer } from "./shared/websocket.js";
 import { GameHandler } from "./game/GameHandler.js";
+import { imageRouter } from "./routes/images.js";
 
 async function startServer() {
   const app = express();
 
-  // Configure middleware
+  // Request logging middleware for debugging
+  app.use((req, res, next) => {
+    console.log(`[Server] ${req.method} ${req.url}`);
+    next();
+  });
+
+  // Configure middleware with proper CORS for direct API access
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -21,6 +29,7 @@ async function startServer() {
           return callback(null, true);
         }
 
+        console.log(`[CORS] Origin ${origin} rejected`);
         callback(new Error("Not allowed by CORS"));
       },
       methods: ["GET", "POST", "PUT", "DELETE"],
@@ -29,7 +38,10 @@ async function startServer() {
   );
   app.use(express.json());
 
-  // Routes
+  // Mount the image routes for direct API access
+  app.use("/images", imageRouter);
+
+  // Regular API routes
   app.use("", Router);
 
   // Health check endpoint

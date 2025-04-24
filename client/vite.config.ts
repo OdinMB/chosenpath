@@ -23,13 +23,20 @@ const config = {
   },
   server: {
     proxy: {
+      // Only proxy API requests through /api
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
         rewrite: (pathStr: string) => pathStr.replace(/^\/api/, ""),
       },
     },
-    historyApiFallback: true,
+    historyApiFallback: {
+      disableDotRule: true,
+      rewrites: [
+        // Only exclude API paths from the SPA fallback
+        { from: /^(?!\/api\/).*/, to: "/index.html" },
+      ],
+    },
   },
   build: {
     outDir: "dist",

@@ -58,3 +58,4 @@ export const CONTENT_FILTER_MODEL_TEMPERATURE =
 // Image generation settings
 export const IMAGE_GENERATION_MODEL =
   process.env.IMAGE_GENERATION_MODEL || "gpt-image-1";
+export const IMAGE_GENERATION_OUTPUT_COMPRESSION = 90;
