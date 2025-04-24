@@ -5,43 +5,72 @@ import { sortTagsByCategory } from "shared/tagCategories";
 type TemplateCardProps = {
   template: StoryTemplate;
   onPlay: (template: StoryTemplate) => void;
+  showPlayButton?: boolean;
+  size?: "default" | "large";
+  className?: string;
 };
 
-export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
+export const TemplateCard = ({
+  template,
+  onPlay,
+  showPlayButton = true,
+  size = "default",
+  className = "",
+}: TemplateCardProps) => {
   // Sort tags by category
   const sortedTags = template.tags ? sortTagsByCategory(template.tags) : [];
 
+  // Size-based class mapping
+  const sizeClasses = {
+    title: size === "large" ? "text-xl" : "text-lg",
+    teaser: size === "large" ? "text-base" : "text-sm",
+    info: size === "large" ? "text-sm" : "text-xs",
+    tag: size === "large" ? "text-sm px-3 py-1" : "text-xs px-2 py-0.5",
+  };
+
   return (
-    <div className="w-full bg-white rounded-lg border border-primary-100 overflow-hidden">
+    <div
+      className={`w-full bg-white rounded-lg border border-primary-100 overflow-hidden ${className}`}
+    >
       <div className="flex">
         {template.imageFile && (
-          <div className="relative w-20 overflow-hidden flex-shrink-0">
+          <div
+            className={`relative ${
+              size === "large" ? "w-24" : "w-20"
+            } overflow-hidden flex-shrink-0`}
+          >
             <img
               src={`/test/${template.imageFile}`}
               alt="Template illustration"
-              className="absolute h-full w-20 object-cover object-center"
+              className={`absolute h-full ${
+                size === "large" ? "w-24" : "w-20"
+              } object-cover object-center`}
             />
           </div>
         )}
         <div className="w-full p-4">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg text-primary-800">{template.title}</h3>
-            <PrimaryButton onClick={() => onPlay(template)} className="ml-4">
-              Play
-            </PrimaryButton>
+            <h3 className={`${sizeClasses.title} text-primary-800`}>
+              {template.title}
+            </h3>
+            {showPlayButton && (
+              <PrimaryButton onClick={() => onPlay(template)} className="ml-4">
+                Play
+              </PrimaryButton>
+            )}
           </div>
 
           {/* Info */}
-          <div className="flex flex-col gap-1 text-xs text-primary-500 mb-4">
+          <div className="flex flex-col gap-1 text-primary-500 mb-4">
             <div className="flex items-center gap-8">
-              <span className="font-semibold">
+              <span className={`${sizeClasses.info} font-semibold`}>
                 {template.playerCountMin === template.playerCountMax
                   ? `${template.playerCountMin} player${
                       template.playerCountMin > 1 ? "s" : ""
                     }`
                   : `${template.playerCountMin}-${template.playerCountMax} players`}
               </span>
-              <span className="font-semibold">
+              <span className={`${sizeClasses.info} font-semibold`}>
                 {template.maxTurnsMin === template.maxTurnsMax
                   ? `${template.maxTurnsMin} turns`
                   : `${template.maxTurnsMin}-${template.maxTurnsMax} turns`}
@@ -50,7 +79,9 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
           </div>
 
           {/* Teaser */}
-          <p className="text-sm text-primary-600 mb-4 line-clamp-3">
+          <p
+            className={`${sizeClasses.teaser} text-primary-600 mb-4 line-clamp-3`}
+          >
             {template.teaser}
           </p>
 
@@ -60,7 +91,7 @@ export const TemplateCard = ({ template, onPlay }: TemplateCardProps) => {
               {sortedTags.map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-block px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded-md"
+                  className={`inline-block ${sizeClasses.tag} bg-primary-50 text-primary-700 rounded-md`}
                 >
                   {tag}
                 </span>

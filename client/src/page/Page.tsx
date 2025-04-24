@@ -2,7 +2,8 @@ import { useState } from "react";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import { StoredCodeSetsList } from "./components/StoredCodeSetsList";
+import { StoredCodeSetsList, OrDivider } from "./components";
+import { hasCodeSets } from "shared/codeSetUtils";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;
@@ -18,6 +19,7 @@ export function Page({
   onBrowseLibrary,
 }: PageProps) {
   const [code, setCode] = useState("");
+  const hasStoredCodeSets = hasCodeSets();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +55,8 @@ export function Page({
         {/* Stored Code Sets */}
         <StoredCodeSetsList onCodeSubmit={onCodeSubmit} />
 
+        {hasStoredCodeSets && <OrDivider />}
+
         <PrimaryButton
           onClick={onNewStory}
           fullWidth
@@ -62,15 +66,18 @@ export function Page({
           Create Your Own Story
         </PrimaryButton>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-primary-100"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-primary-600">or</span>
-          </div>
-        </div>
+        <OrDivider />
 
+        {/* Browse Library */}
+        {onBrowseLibrary && (
+          <PrimaryButton onClick={onBrowseLibrary} fullWidth size="lg">
+            Browse Our Library
+          </PrimaryButton>
+        )}
+
+        <OrDivider />
+
+        {/* Join with Code */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-row gap-3 w-full">
             <input
@@ -92,29 +99,10 @@ export function Page({
           </div>
         </form>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-primary-100"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-primary-600">or</span>
-          </div>
-        </div>
+        <OrDivider />
 
+        {/* Choose from Carousel */}
         <TemplateCarousel onPlay={handleSelectTemplate} />
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-primary-100"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-primary-600">or</span>
-          </div>
-        </div>
-        {onBrowseLibrary && (
-          <PrimaryButton onClick={onBrowseLibrary} fullWidth size="lg">
-            Browse Our Library
-          </PrimaryButton>
-        )}
       </div>
 
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">

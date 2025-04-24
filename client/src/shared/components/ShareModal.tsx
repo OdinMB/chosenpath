@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Icons } from "./ui";
+import { Icons, PrimaryButton } from "./ui";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -7,7 +7,7 @@ interface ShareModalProps {
   shareUrl: string;
 }
 
-export const ShareModal: React.FC<ShareModalProps> = ({
+const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
   shareUrl,
@@ -23,8 +23,24 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     });
   };
 
+  const handleCopyButton = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation(); // Stop event propagation
+    handleCopy();
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close if the click is directly on the backdrop
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+    >
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4 relative">
         <button
           onClick={onClose}
@@ -37,28 +53,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <h3 className="text-lg font-medium text-primary mb-4">Share Story</h3>
 
         <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-1">
-            Start a new story with this template:
-          </p>
-          <div className="flex items-center">
+          <div className="flex items-stretch">
             <input
               type="text"
               value={shareUrl}
               readOnly
-              className="flex-1 p-2 border rounded-l-md text-sm bg-gray-50"
+              className="flex-1 p-2 border border-r-0 rounded-l-md text-sm bg-gray-50"
               onClick={(e) => (e.target as HTMLInputElement).select()}
             />
-            <button
-              onClick={handleCopy}
-              className="p-2 bg-primary hover:bg-primary-dark text-white rounded-r-md"
+            <PrimaryButton
+              onClick={handleCopyButton}
+              variant="outline"
+              leftBorder={false}
+              className="rounded-l-none"
               aria-label="Copy to clipboard"
-            >
-              {copied ? (
-                <Icons.Check className="w-5 h-5" />
-              ) : (
-                <Icons.Copy className="w-5 h-5" />
-              )}
-            </button>
+              type="button"
+              rightIcon={
+                copied ? (
+                  <Icons.Check className="w-5 h-5" />
+                ) : (
+                  <Icons.Copy className="w-5 h-5" />
+                )
+              }
+            />
           </div>
         </div>
 
@@ -72,3 +89,5 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     </div>
   );
 };
+
+export default ShareModal;

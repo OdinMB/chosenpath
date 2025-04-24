@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { StoryTemplate, GameMode, PlayerCount } from "core/types";
+import { StoryTemplate, PlayerCount } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { useSession } from "shared/useSession";
+import { TemplateCard } from "./TemplateCard";
+import { ShareLink } from "shared/components/ShareLink";
 
 interface TemplateConfiguratorProps {
   template: StoryTemplate;
@@ -28,6 +30,7 @@ export function TemplateConfigurator({
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
+  const hasConfigurableSettings = needsPlayerConfig || needsTurnsConfig;
 
   // Monitor if the story initialization operation is pending
   useEffect(() => {
@@ -62,52 +65,41 @@ export function TemplateConfigurator({
     setPlayerCount(value as PlayerCount);
   };
 
-  const formatGameMode = (mode: GameMode) => {
-    return mode.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
   return (
     <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md mb-6">
-            <h2 className="text-xl font-semibold text-primary mb-2">
-              {template.title}
-            </h2>
-            <p className="text-primary-700 mb-4">{template.teaser}</p>
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              {playerCount > 1 && (
-                <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs">
-                  {formatGameMode(template.gameMode)}
-                </span>
-              )}
-              {template.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
+          <div className="mb-6">
+            <TemplateCard
+              template={template}
+              onPlay={() => {}}
+              showPlayButton={false}
+              size="default"
+              className="sm:hidden" // Mobile size
+            />
+            <TemplateCard
+              template={template}
+              onPlay={() => {}}
+              showPlayButton={false}
+              size="large"
+              className="hidden sm:block" // Desktop size
+            />
           </div>
 
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-            <h3 className="text-lg font-medium text-primary">Settings </h3>
+          {hasConfigurableSettings && (
+            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+              <h3 className="text-lg font-medium text-primary">Settings </h3>
 
-            {/* Player Count Section */}
-            <div className="space-y-2">
-              <label
-                htmlFor="player-count"
-                className="text-sm md:text-base font-medium text-primary"
-              >
-                Number of Players:{" "}
-                {needsPlayerConfig ? playerCount : template.playerCountMin}
-              </label>
+              {/* Player Count Section */}
+              {needsPlayerConfig && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="player-count"
+                    className="text-sm md:text-base font-medium text-primary"
+                  >
+                    Number of Players: {playerCount}
+                  </label>
 
-              {needsPlayerConfig ? (
-                <>
                   <input
                     id="player-count"
                     type="range"
@@ -127,24 +119,19 @@ export function TemplateConfigurator({
                       {template.playerCountMax > 1 ? "s" : ""}
                     </span>
                   </div>
-                </>
-              ) : (
-                ""
+                </div>
               )}
-            </div>
 
-            {/* Story Length Section */}
-            <div className="space-y-2">
-              <label
-                htmlFor="max-turns"
-                className="text-sm md:text-base font-medium text-primary"
-              >
-                Story Length:{" "}
-                {needsTurnsConfig ? maxTurns : template.maxTurnsMin} turns
-              </label>
+              {/* Story Length Section */}
+              {needsTurnsConfig && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="max-turns"
+                    className="text-sm md:text-base font-medium text-primary"
+                  >
+                    Story Length: {maxTurns} turns
+                  </label>
 
-              {needsTurnsConfig ? (
-                <>
                   <input
                     id="max-turns"
                     type="range"
@@ -158,12 +145,10 @@ export function TemplateConfigurator({
                     <span>{template.maxTurnsMin} turns</span>
                     <span>{template.maxTurnsMax} turns</span>
                   </div>
-                </>
-              ) : (
-                ""
+                </div>
               )}
             </div>
-          </div>
+          )}
 
           <div className="flex flex-row gap-3 sm:gap-4 pt-2">
             <PrimaryButton
@@ -173,9 +158,15 @@ export function TemplateConfigurator({
               variant="outline"
               leftBorder={false}
               leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
-            >
-              Back
-            </PrimaryButton>
+            ></PrimaryButton>
+
+            {/* This div wrapper prevents the ShareLink from accidentally submitting the form */}
+            <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+              <ShareLink
+                templateId={template.id}
+                buttonVariant="primary-outline"
+              />
+            </div>
 
             <PrimaryButton
               type="submit"

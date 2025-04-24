@@ -57,6 +57,14 @@ export function getStoredCodeSets(): StoredCodeSet[] {
 }
 
 /**
+ * Check if there are any stored code sets
+ * @returns Boolean indicating whether there are any stored code sets
+ */
+export function hasCodeSets(): boolean {
+  return getStoredCodeSets().length > 0;
+}
+
+/**
  * Gets code sets sorted by activity status and timestamp
  * @returns Array of code sets sorted with active sets first, then by newest first
  */
