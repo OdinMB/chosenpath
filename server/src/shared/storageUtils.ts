@@ -256,7 +256,7 @@ export function storageFileExists(
 
 /**
  * Filters files by extension
- * @param extensions - Array of file extensions to include (with dot, e.g. ['.jpg', '.png'])
+ * @param extensions - Array of file extensions to include (with dot, e.g. ['.jppg', '.png'])
  * @returns A filter function that can be passed to listStorageSubdirFiles
  */
 export function filterByExtension(

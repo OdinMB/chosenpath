@@ -14,17 +14,6 @@ const TEMPLATE_ID = "22b80460-e916-4ed2-a81a-a7e2d4940748";
 
 // Debug utility to check environment
 function checkEnvironment() {
-  const openaiKeyExists = !!process.env.OPENAI_API_KEY;
-  console.log("OPENAI_API_KEY exists:", openaiKeyExists);
-  if (openaiKeyExists) {
-    // Just log the first few characters to verify it's set but not expose it
-    console.log(
-      "OPENAI_API_KEY starts with:",
-      process.env.OPENAI_API_KEY?.substring(0, 5) + "..."
-    );
-  }
-
-  console.log("Current working directory:", process.cwd());
   // Use getStoragePath to get the library path and then add the template ID
   const templateDir = path.join(getStoragePath("library"), TEMPLATE_ID);
   console.log("Template directory exists:", fs.existsSync(templateDir));
@@ -54,9 +43,15 @@ describe("AIImageGenerator", function () {
     }
 
     try {
-      const prompt = "A mountain landscape with a waterfall";
-      console.log("Test: Generating image with prompt:", prompt);
+      const prompt = `Evelyn Drake
+A fellow neonate and one of your coterie companions.
+Evelyn can become a close ally or a source of tension depending on your relationship.
+She/her; fiercely independent but values loyalty.
+Recently Embraced and struggling with her new existence.
+Motivated by a desire to protect those she cares about, even as she adapts to Kindred life.
+`;
 
+      console.log("Test: Starting image generation");
       const imagePath = await aiImageGenerator.generateSingleImage(
         prompt,
         TEMPLATE_ID
@@ -66,11 +61,11 @@ describe("AIImageGenerator", function () {
       // Check if file exists
       expect(fs.existsSync(imagePath)).to.be.true;
 
-      // Check if file is an image (has content and ends with .png)
+      // Check if file is an image (has content and ends with .jpeg)
       const stats = fs.statSync(imagePath);
       console.log("Image file size:", stats.size);
       expect(stats.size).to.be.greaterThan(0);
-      expect(path.extname(imagePath)).to.equal(".png");
+      expect(path.extname(imagePath)).to.equal(".jpeg");
 
       // Verify the file is in the correct directory
       const templatePath = path.join(getStoragePath("library"), TEMPLATE_ID);

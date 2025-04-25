@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { getStoragePath } from "../../shared/storageUtils.js";
 import { v4 as uuidv4 } from "uuid";
+import { Logger } from "shared/logger.js";
 
 dotenv.config();
 
@@ -36,17 +37,27 @@ export class AIImageGenerator {
     size?: ImageSize
   ): Promise<string> {
     try {
-      console.log("Generating image with prompt:", prompt);
+      const fullPrompt = `Create a digital art illustration that we can show in a story book for the following story element:
+<STORY ELEMENT>
+${prompt}
+</STORY ELEMENT>
+
+The image itself should not contain any of this text.
+
+Image instructions for this book: modern, slick, tense`;
+
+      Logger.Story.log("Image prompt:\n" + fullPrompt);
 
       // Based on https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
       const imageResponse = await this.openai.images.generate({
         model: IMAGE_GENERATION_MODEL,
-        prompt,
+        prompt: fullPrompt,
         moderation: "low",
         n: 1,
         quality: quality || IMAGE_QUALITIES.MEDIUM,
+        output_format: "jpeg",
         output_compression: IMAGE_GENERATION_OUTPUT_COMPRESSION,
-        size: size || IMAGE_SIZES.SQUARE,
+        size: size || IMAGE_SIZES.AUTO,
       });
 
       // Get the image data - either from b64_json or URL
@@ -80,7 +91,7 @@ export class AIImageGenerator {
         fs.mkdirSync(tempDir, { recursive: true });
       }
 
-      const tempPath = path.normalize(path.join(tempDir, `${uuidv4()}.png`));
+      const tempPath = path.normalize(path.join(tempDir, `${uuidv4()}.jpeg`));
       fs.writeFileSync(tempPath, imageBuffer);
       return tempPath;
     } catch (error) {
@@ -104,7 +115,7 @@ export class AIImageGenerator {
     templateId: string
   ): Promise<string> {
     const imageId = uuidv4();
-    const fileName = `${imageId}.png`;
+    const fileName = `${imageId}.jpeg`;
 
     // Get the template directory path using storageUtils
     const templatesBasePath = getStoragePath("library");
@@ -139,7 +150,6 @@ export class AIImageGenerator {
           // Add placeholder to image library
           const placeholderImage: Image = {
             id: imageId,
-            prompt: beat.text,
             description: `Image for: ${beat.text.substring(0, 50)}...`,
             status: "generating",
           };
@@ -147,7 +157,7 @@ export class AIImageGenerator {
 
           // Generate actual image
           const imagePath = await this.generateImage(
-            `Digital art illustration of: ${beat.text}. No text.`,
+            `Digital art illustration for a story book. The image is supposed to accompany the following text:\n\n${beat.text}. `,
             templateId
           );
 
