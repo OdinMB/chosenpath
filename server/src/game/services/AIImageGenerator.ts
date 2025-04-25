@@ -7,6 +7,7 @@ import type {
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
   Image,
+  ImageReference,
   BeatsNeedingImages,
   ImageSize,
   ImageQuality,
@@ -37,7 +38,7 @@ export class AIImageGenerator {
   private async generateImage(
     prompt: string,
     templateId?: string,
-    references?: string[],
+    references?: ImageReference[],
     size?: ImageSize,
     quality?: ImageQuality
   ): Promise<string> {
@@ -64,14 +65,11 @@ Image instructions for this book: modern, slick, tense`;
         size: size || IMAGE_SIZES.AUTO,
       };
 
-      // Get the image data using either generate or edit based on references
+      // Generate the image using either generate or edit API endpoint
       let referenceImages: any[] = [];
       let withReferences: boolean = false;
-      if (references && references.length > 0 && templateId) {
-        referenceImages = await this.loadReferenceImages(
-          templateId,
-          references
-        );
+      if (references && references.length > 0) {
+        referenceImages = await this.loadReferenceImages(references);
         withReferences = referenceImages.length > 0;
       }
 
@@ -127,15 +125,17 @@ Image instructions for this book: modern, slick, tense`;
    * @returns Array of OpenAI-compatible File objects
    */
   private async loadReferenceImages(
-    templateId: string,
-    imageIds: string[]
+    references: ImageReference[]
   ): Promise<any[]> {
     const templatesBasePath = getStoragePath("library");
-    const templateDir = path.join(templatesBasePath, templateId);
-    const referenceImages: any[] = [];
+    const storiesBasePath = getStoragePath("stories");
 
-    for (const imageId of imageIds) {
-      const imagePath = path.join(templateDir, `${imageId}.jpeg`);
+    const referenceImages: any[] = [];
+    for (const reference of references) {
+      const imageBaseDir =
+        reference.source === "template" ? templatesBasePath : storiesBasePath;
+      const imageDir = path.join(imageBaseDir, reference.sourceId);
+      const imagePath = path.join(imageDir, `${reference.id}.jpeg`);
 
       // Check if the file exists
       if (fs.existsSync(imagePath)) {
@@ -143,15 +143,19 @@ Image instructions for this book: modern, slick, tense`;
           const stream = fs.createReadStream(imagePath);
           const file = await toFile(stream, null, { type: "image/jpeg" });
           referenceImages.push(file);
-          Logger.Story.log(`Loaded reference image: ${imageId}`);
+          Logger.Story.log(
+            `Loaded reference image: ${reference.id} in ${reference.source}-${reference.sourceId}`
+          );
         } catch (error) {
           Logger.Story.error(
-            `Failed to load reference image ${imageId}:`,
+            `Reference image found but failed to load: ${reference.id} in ${reference.source}-${reference.sourceId}:`,
             error
           );
         }
       } else {
-        Logger.Story.warn(`Reference image not found: ${imagePath}`);
+        Logger.Story.warn(
+          `Reference image not found: ${reference.id} in ${reference.source}-${reference.sourceId}`
+        );
       }
     }
 
@@ -232,7 +236,7 @@ Image instructions for this book: modern, slick, tense`;
   async generateSingleImage(
     prompt: string,
     templateId?: string,
-    references?: string[]
+    references?: ImageReference[]
   ): Promise<string> {
     try {
       // Pass reference images if provided

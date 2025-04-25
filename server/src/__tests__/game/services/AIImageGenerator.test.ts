@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import { getStoragePath } from "shared/storageUtils.js";
+import { ImageReference } from "core/types/image.js";
 
 // Load environment variables for tests
 dotenv.config();
@@ -43,13 +44,24 @@ describe("AIImageGenerator", function () {
     }
 
     try {
-      const prompt = `Evelyn Drake wearing formal attire and clearly not feeling comfortable in it.`;
+      const imgEvelyn = {
+        id: "evelyn",
+        source: "template",
+        sourceId: TEMPLATE_ID,
+      } as ImageReference;
+      const imgTommy = {
+        id: "tommy",
+        source: "template",
+        sourceId: TEMPLATE_ID,
+      } as ImageReference;
+
+      const prompt = `Evelyn and Tommy in a fist fight in a dark alley at night in London. Cinematic, wide shot.`;
 
       console.log("Test: Starting image generation");
       const imagePath = await aiImageGenerator.generateSingleImage(
         prompt,
         TEMPLATE_ID,
-        ["evelyn"]
+        [imgEvelyn, imgTommy]
       );
       console.log("Image generated at path:", imagePath);
 

@@ -18,12 +18,20 @@ export type ImageSize = (typeof IMAGE_SIZES)[keyof typeof IMAGE_SIZES];
 export type ImageQuality =
   (typeof IMAGE_QUALITIES)[keyof typeof IMAGE_QUALITIES];
 
+export type ImageSource = "template" | "story";
+
+export type ImageReference = {
+  id: string;
+  source: ImageSource;
+  sourceId: string; // templateId or storyId
+};
+
 // Types used by the application
 export type ImageStatus = "ready" | "generating" | "failed";
 
 export type Image = {
   id: string;
-  source: "template" | "story";
+  source: ImageSource;
   description: string;
   status: ImageStatus;
 };
