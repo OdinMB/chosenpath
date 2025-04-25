@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
+import type {
+  ImageEditParams,
+  ImageGenerateParams,
+} from "openai/resources/images";
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
   Image,
@@ -14,7 +18,10 @@ import {
 } from "server/config.js";
 import fs from "fs";
 import path from "path";
-import { getStoragePath } from "../../shared/storageUtils.js";
+import {
+  getStoragePath,
+  storageFileExists,
+} from "../../shared/storageUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "shared/logger.js";
 
@@ -33,8 +40,9 @@ export class AIImageGenerator {
   private async generateImage(
     prompt: string,
     templateId?: string,
-    quality?: ImageQuality,
-    size?: ImageSize
+    references?: string[],
+    size?: ImageSize,
+    quality?: ImageQuality
   ): Promise<string> {
     try {
       const fullPrompt = `Create a digital art illustration that we can show in a story book for the following story element:
@@ -48,8 +56,7 @@ Image instructions for this book: modern, slick, tense`;
 
       Logger.Story.log("Image prompt:\n" + fullPrompt);
 
-      // Based on https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
-      const imageResponse = await this.openai.images.generate({
+      const baseParams = {
         model: IMAGE_GENERATION_MODEL,
         prompt: fullPrompt,
         moderation: "low",
@@ -58,22 +65,38 @@ Image instructions for this book: modern, slick, tense`;
         output_format: "jpeg",
         output_compression: IMAGE_GENERATION_OUTPUT_COMPRESSION,
         size: size || IMAGE_SIZES.AUTO,
-      });
+      };
 
-      // Get the image data - either from b64_json or URL
-      let imageBuffer: Buffer;
-
-      if (imageResponse.data?.[0]?.b64_json) {
-        // If we have base64 data, use it directly
-        imageBuffer = Buffer.from(imageResponse.data[0].b64_json, "base64");
-      } else if (imageResponse.data?.[0]?.url) {
-        // If we have a URL, download it
-        imageBuffer = await this.downloadImageFromUrl(
-          imageResponse.data[0].url
+      // Get the image data using either generate or edit based on references
+      let referenceImages: any[] = [];
+      let withReferences: boolean = false;
+      if (references && references.length > 0 && templateId) {
+        referenceImages = await this.loadReferenceImages(
+          templateId,
+          references
         );
+        withReferences = referenceImages.length > 0;
+      }
+
+      let imageResponse: any;
+      if (withReferences) {
+        const imageParams = {
+          ...baseParams,
+          image: referenceImages,
+        } as ImageEditParams;
+        imageResponse = await this.openai.images.edit(imageParams);
       } else {
-        console.error("Image response has no usable data");
-        throw new Error("No image data in response");
+        const imageParams = {
+          ...baseParams,
+        } as ImageGenerateParams;
+        imageResponse = await this.openai.images.generate(imageParams);
+      }
+
+      let imageBuffer: Buffer;
+      if (imageResponse.data?.[0]?.b64_json) {
+        imageBuffer = Buffer.from(imageResponse.data[0].b64_json, "base64");
+      } else {
+        throw new Error("No image data in response from images.edit");
       }
 
       // If templateId is provided, save the image to the template directory
@@ -100,14 +123,42 @@ Image instructions for this book: modern, slick, tense`;
     }
   }
 
-  private async downloadImageFromUrl(url: string): Promise<Buffer> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.statusText}`);
+  /**
+   * Loads reference images for image generation
+   * @param templateId - The ID of the template
+   * @param imageIds - Array of image IDs to use as references
+   * @returns Array of OpenAI-compatible File objects
+   */
+  private async loadReferenceImages(
+    templateId: string,
+    imageIds: string[]
+  ): Promise<any[]> {
+    const templatesBasePath = getStoragePath("library");
+    const templateDir = path.join(templatesBasePath, templateId);
+    const referenceImages: any[] = [];
+
+    for (const imageId of imageIds) {
+      const imagePath = path.join(templateDir, `${imageId}.jpeg`);
+
+      // Check if the file exists
+      if (fs.existsSync(imagePath)) {
+        try {
+          const stream = fs.createReadStream(imagePath);
+          const file = await toFile(stream, null, { type: "image/jpeg" });
+          referenceImages.push(file);
+          Logger.Story.log(`Loaded reference image: ${imageId}`);
+        } catch (error) {
+          Logger.Story.error(
+            `Failed to load reference image ${imageId}:`,
+            error
+          );
+        }
+      } else {
+        Logger.Story.warn(`Reference image not found: ${imagePath}`);
+      }
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return referenceImages;
   }
 
   private async saveImageToTemplate(
@@ -182,11 +233,18 @@ Image instructions for this book: modern, slick, tense`;
 
   async generateSingleImage(
     prompt: string,
-    templateId?: string
+    templateId?: string,
+    references?: string[]
   ): Promise<string> {
     try {
-      // Simplify the prompt to match OpenAI examples
-      return await this.generateImage(prompt, templateId);
+      // Pass reference images if provided
+      return await this.generateImage(
+        prompt,
+        templateId,
+        references,
+        undefined,
+        undefined
+      );
     } catch (error) {
       console.error("Failed to generate image:", error);
       throw error;

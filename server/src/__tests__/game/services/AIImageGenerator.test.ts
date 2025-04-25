@@ -43,18 +43,13 @@ describe("AIImageGenerator", function () {
     }
 
     try {
-      const prompt = `Evelyn Drake
-A fellow neonate and one of your coterie companions.
-Evelyn can become a close ally or a source of tension depending on your relationship.
-She/her; fiercely independent but values loyalty.
-Recently Embraced and struggling with her new existence.
-Motivated by a desire to protect those she cares about, even as she adapts to Kindred life.
-`;
+      const prompt = `Evelyn Drake wearing formal attire and clearly not feeling comfortable in it.`;
 
       console.log("Test: Starting image generation");
       const imagePath = await aiImageGenerator.generateSingleImage(
         prompt,
-        TEMPLATE_ID
+        TEMPLATE_ID,
+        ["evelyn"]
       );
       console.log("Image generated at path:", imagePath);
 

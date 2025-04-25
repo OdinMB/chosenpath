@@ -1,7 +1,6 @@
 import express from "express";
 import { config } from "./config.js";
 import { Logger } from "shared/logger.js";
-import path from "path";
 import {
   UpdateTemplateRequest,
   CreateTemplateRequest,
@@ -20,7 +19,6 @@ import {
 } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
 import { AdminLibraryService } from "admin/AdminLibraryService.js";
-import { getStorageFilePath, storageFileExists } from "shared/storageUtils.js";
 
 // Simple authentication middleware
 export const verifyAdmin = (
@@ -390,10 +388,6 @@ router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
     sendError(res, `Failed to iterate template ${id}`, 500, requestId, error);
   }
 });
-
-// STATIC FILE SERVING
-
-// Note: The image route has been moved to routes/imageRoutes.ts
 
 // Catch-all 404 handler
 router.use((req, res) => {
