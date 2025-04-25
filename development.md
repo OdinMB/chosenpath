@@ -18,11 +18,11 @@ Smaller commits!
 Text, English, Multiplayer > other stuff
 
 - 3 Stat attribute for personal stats: initial value or part of player background?
-- 5 Play with Gemini 2.5 Pro once integrated in Langchain
 - 5 Attach facts to players
 - 25 New multiplayer switch type using voting mechanism to decide which direction to take
-- 3 Consideration to make 2-beat threads more likely
+- 3 story setting for # paragraphs / beat (shorter for kids stories and later roleplay mode)
 - 20 Dynamically add new outcomes for longer stories
+- 5 Play with Gemini 2.5 Pro once integrated in Langchain
 - 30 Audio version
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
 - 30 Different languages

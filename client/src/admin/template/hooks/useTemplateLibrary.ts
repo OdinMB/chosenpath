@@ -98,21 +98,12 @@ export const useTemplateLibrary = (token: string) => {
     });
   };
 
-  const prepareTemplateForExport = (
-    template: StoryTemplate
-  ): Partial<StoryTemplate> => {
-    // Create a copy of the template without the ID, createdAt, and updatedAt fields
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id, createdAt, updatedAt, ...exportTemplate } = template;
-    return exportTemplate;
-  };
-
   const handleExportTemplate = (template: StoryTemplate) => {
     Logger.Admin.log(`Exporting template: ${template.id}`);
 
     try {
       // Create export-ready template without server-specific fields
-      const exportTemplate = prepareTemplateForExport(template);
+      const exportTemplate = template;
 
       // Create a blob with the JSON data
       const json = JSON.stringify(exportTemplate, null, 2);
@@ -151,7 +142,7 @@ export const useTemplateLibrary = (token: string) => {
       }
 
       // Create export-ready templates without server-specific fields
-      const exportTemplates = templates.map(prepareTemplateForExport);
+      const exportTemplates = templates;
 
       // Create a blob with the JSON data
       const json = JSON.stringify(exportTemplates, null, 2);

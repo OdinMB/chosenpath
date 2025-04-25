@@ -64,34 +64,6 @@ export class AdminLibraryService {
   }
 
   /**
-   * Ensure template data has all the required player options
-   */
-  private ensurePlayerOptions(
-    data: Partial<StoryTemplate>
-  ): Partial<StoryTemplate> {
-    const result = { ...data };
-
-    // Get only player slots up to MAX_PLAYERS
-    const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
-
-    // Create default player options for any missing player slots
-    for (const playerSlot of relevantPlayerSlots) {
-      if (!result[playerSlot as keyof StoryTemplate]) {
-        this.logger.log(`Adding default options for ${playerSlot}`);
-        // Cast to any first to avoid the type error, as TypeScript doesn't understand
-        // we're dynamically adding properties that match the StoryTemplate structure
-        (result as any)[playerSlot] = {
-          outcomes: [],
-          possibleCharacterIdentities: [],
-          possibleCharacterBackgrounds: [],
-        };
-      }
-    }
-
-    return result;
-  }
-
-  /**
    * Create a template object with common properties
    */
   private createFullTemplateObject(
@@ -110,7 +82,7 @@ export class AdminLibraryService {
       tags: baseTemplate.tags || [],
       imageFile: baseTemplate.imageFile || "",
       createdAt: baseTemplate.createdAt || now,
-      updatedAt: now,
+      updatedAt: baseTemplate.updatedAt || now,
       title: baseTemplate.title || "",
       teaser: baseTemplate.teaser || "",
       publicationStatus:
@@ -213,9 +185,20 @@ export class AdminLibraryService {
     template: Partial<StoryTemplate>
   ): Promise<StoryTemplate> {
     try {
-      template.id = uuidv4();
+      // Only generate a new ID if one doesn't already exist
+      if (!template.id) {
+        template.id = uuidv4();
+      }
       const fullTemplate: StoryTemplate =
         this.createFullTemplateObject(template);
+
+      // Keep existing timestamps if provided
+      if (template.createdAt) {
+        fullTemplate.createdAt = template.createdAt;
+      }
+      if (template.updatedAt) {
+        fullTemplate.updatedAt = template.updatedAt;
+      }
 
       await writeStorageFile(
         "library",
