@@ -50,7 +50,7 @@ ${prompt}
 
 The image itself should not contain any of this text.
 
-Image instructions for this book: modern, slick, tense`;
+Image instructions for this book: hyper-realistic, modern, slick, tense`;
 
       Logger.Story.log("Image prompt:\n" + fullPrompt);
 
@@ -171,9 +171,8 @@ Image instructions for this book: modern, slick, tense`;
 
     // Get the template directory path using storageUtils
     const templatesBasePath = getStoragePath("library");
-
     // Create the template-specific directory if it doesn't exist
-    const templateDir = path.join(templatesBasePath, templateId);
+    const templateDir = path.join(templatesBasePath, templateId, "images");
     if (!fs.existsSync(templateDir)) {
       fs.mkdirSync(templateDir, { recursive: true });
     }

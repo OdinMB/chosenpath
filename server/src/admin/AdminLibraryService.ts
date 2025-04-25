@@ -18,10 +18,15 @@ import {
   deleteStorageFile,
   ensureStorageDirectory,
   getStoragePath,
+  storageFileExists,
+  getStorageFilePath,
 } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
+import path from "path";
+import fsSync from "fs";
+import fs from "fs/promises";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -129,33 +134,17 @@ export class AdminLibraryService {
    */
   async getAllTemplates(): Promise<StoryTemplate[]> {
     try {
-      const files = await getStorageFiles("library", "");
+      // Get all directories in the template storage path
+      const items = await fs.readdir(this.storagePath, { withFileTypes: true });
+      const templateDirs = items
+        .filter((item) => item.isDirectory())
+        .map((item) => item.name);
 
-      if (!files || files.length === 0) {
+      if (templateDirs.length === 0) {
         return [];
       }
 
-      const templates: StoryTemplate[] = [];
-
-      for (const file of files) {
-        try {
-          // Only process JSON files
-          if (file.endsWith(".json")) {
-            const content = await readStorageFile("library", file);
-            const template = JSON.parse(content) as StoryTemplate;
-            templates.push(template);
-          }
-        } catch (error) {
-          this.logger.error(`Error reading template file ${file}`, error);
-        }
-      }
-
-      // Sort by last updated, newest first
-      return templates.sort((a, b) => {
-        const dateA = new Date(a.updatedAt).getTime();
-        const dateB = new Date(b.updatedAt).getTime();
-        return dateB - dateA;
-      });
+      return this.loadTemplatesFromDirectories(templateDirs);
     } catch (error) {
       this.logger.error("Failed to get templates", error);
       throw new Error("Failed to retrieve story templates");
@@ -163,12 +152,54 @@ export class AdminLibraryService {
   }
 
   /**
+   * Loads templates from directory structure
+   */
+  private async loadTemplatesFromDirectories(
+    dirs: string[]
+  ): Promise<StoryTemplate[]> {
+    const templates: StoryTemplate[] = [];
+
+    for (const dir of dirs) {
+      try {
+        const templateFilePath = path.join(
+          this.storagePath,
+          dir,
+          "template.json"
+        );
+        if (fsSync.existsSync(templateFilePath)) {
+          const content = await fs.readFile(templateFilePath, "utf-8");
+          const template = JSON.parse(content) as StoryTemplate;
+          templates.push(template);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error reading template from directory ${dir}`,
+          error
+        );
+      }
+    }
+
+    // Sort by last updated, newest first
+    return templates.sort((a, b) => {
+      const dateA = new Date(a.updatedAt).getTime();
+      const dateB = new Date(b.updatedAt).getTime();
+      return dateB - dateA;
+    });
+  }
+
+  /**
    * Get a template by ID
    */
   async getTemplateById(id: string): Promise<StoryTemplate | null> {
     try {
-      const content = await readStorageFile("library", `${id}.json`);
-      return JSON.parse(content) as StoryTemplate;
+      const templateFilePath = path.join(this.storagePath, id, "template.json");
+
+      if (fsSync.existsSync(templateFilePath)) {
+        const content = await fs.readFile(templateFilePath, "utf-8");
+        return JSON.parse(content) as StoryTemplate;
+      }
+
+      return null;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return null;
@@ -200,9 +231,16 @@ export class AdminLibraryService {
         fullTemplate.updatedAt = template.updatedAt;
       }
 
-      await writeStorageFile(
-        "library",
-        `${fullTemplate.id}.json`,
+      // Create directory for this template
+      const templateDir = path.join(this.storagePath, fullTemplate.id);
+      if (!fsSync.existsSync(templateDir)) {
+        await fs.mkdir(templateDir, { recursive: true });
+      }
+
+      // Write template.json to the template directory
+      const templateFilePath = path.join(templateDir, "template.json");
+      await fs.writeFile(
+        templateFilePath,
         JSON.stringify(fullTemplate, null, 2)
       );
 
@@ -235,11 +273,19 @@ export class AdminLibraryService {
       const mergedTemplate: StoryTemplate = {
         ...existingTemplate,
         ...template,
+        updatedAt: new Date().toISOString(),
       };
 
-      await writeStorageFile(
-        "library",
-        `${id}.json`,
+      // Ensure the template directory exists
+      const templateDir = path.join(this.storagePath, id);
+      if (!fsSync.existsSync(templateDir)) {
+        await fs.mkdir(templateDir, { recursive: true });
+      }
+
+      // Write updated template.json to the template directory
+      const templateFilePath = path.join(templateDir, "template.json");
+      await fs.writeFile(
+        templateFilePath,
         JSON.stringify(mergedTemplate, null, 2)
       );
 
@@ -263,9 +309,13 @@ export class AdminLibraryService {
         throw new Error(`Template with ID ${id} not found`);
       }
 
-      await deleteStorageFile("library", `${id}.json`);
-      this.logger.log(`Deleted template ${id}`);
+      // Delete the entire template directory
+      const templateDir = path.join(this.storagePath, id);
+      if (fsSync.existsSync(templateDir)) {
+        await fs.rm(templateDir, { recursive: true, force: true });
+      }
 
+      this.logger.log(`Deleted template ${id}`);
       return true;
     } catch (error) {
       if ((error as Error).message.includes("not found")) {

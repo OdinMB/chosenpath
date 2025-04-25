@@ -244,7 +244,7 @@ export const TemplateLibrary = ({
                       <button
                         onClick={() => handleExportTemplate(template)}
                         className="text-secondary hover:text-secondary-700 transition-colors"
-                        title="Export template as JSON"
+                        title="Export template"
                       >
                         <Icons.Export className="h-5 w-5" />
                       </button>

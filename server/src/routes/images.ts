@@ -38,7 +38,7 @@ imageRouter.get("/templates/:templateId/:filename", async (req, res) => {
     }
 
     // Construct subpath to the image
-    const subPath = path.join(templateId, filename);
+    const subPath = path.join(templateId, "images", filename);
 
     // Check if file exists
     if (!storageFileExists("library", subPath)) {

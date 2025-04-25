@@ -1,3 +1,5 @@
+/// <reference types="multer" />
+
 import express from "express";
 import { config } from "./config.js";
 import { Logger } from "shared/logger.js";
@@ -19,6 +21,17 @@ import {
 } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
 import { AdminLibraryService } from "admin/AdminLibraryService.js";
+import path from "path";
+import fsSync from "fs";
+import fs from "fs/promises";
+import JSZip from "jszip";
+import { getStoragePath } from "shared/storageUtils.js";
+import multer from "multer";
+import os from "os";
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Simple authentication middleware
 export const verifyAdmin = (
@@ -234,160 +247,293 @@ router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
   }
 });
 
-// Create a new template
-router.post("/admin/templates", verifyAdmin, async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
+// Admin - Get all templates with their assets
+router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
+  const requestId = req.query.requestId as string;
 
   try {
-    const { template } = req.body as CreateTemplateRequest;
-
-    if (!template) {
-      return sendBadRequest(res, "Missing template data", requestId);
+    // Get all templates to check if any exist
+    const templates = await libraryService.getAllTemplates();
+    if (templates.length === 0) {
+      return sendSuccess(res, { message: "No templates found" }, requestId);
     }
 
-    const createdTemplate = await libraryService.createTemplate(template);
+    // Create archive with all templates
+    const zip = new JSZip();
 
-    Logger.Route.log(
-      `Created template ${createdTemplate.id}: ${createdTemplate.title}`
-    );
-    sendSuccess(res, { template: createdTemplate }, requestId, 201);
-  } catch (error) {
-    Logger.Route.error("Error creating template", error);
-    sendError(res, "Failed to create template", 500, requestId, error);
-  }
-});
+    // Get the templates directory
+    const templatesBasePath = getStoragePath("library");
 
-// Update a template
-router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
-  const { id } = req.params;
-  const requestId = req.body?.requestId || "unknown";
-
-  try {
-    const { template } = req.body as UpdateTemplateRequest;
-    if (!template) {
-      return sendBadRequest(res, "Missing template data", requestId);
+    // Check if directory exists
+    if (!fsSync.existsSync(templatesBasePath)) {
+      return sendError(res, "Templates directory not found", 500, requestId);
     }
 
-    const updatedTemplate = await libraryService.updateTemplate(id, template);
+    // Get all directories in the templates directory
+    const items = await fs.readdir(templatesBasePath, { withFileTypes: true });
+    const templateDirs = items
+      .filter((item) => item.isDirectory())
+      .map((item) => item.name);
 
-    Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
-    sendSuccess(res, { template: updatedTemplate }, requestId);
-  } catch (error) {
-    // Check if it's a not found error
-    if ((error as Error).message.includes("not found")) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-    Logger.Route.error(`Error updating template ${id}`, error);
-    sendError(res, "Failed to update template", 500, requestId, error);
-  }
-});
-
-// Delete a template
-router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
-  const { id } = req.params;
-  const requestId = req.body?.requestId || "unknown";
-
-  try {
-    const deleteRequest = req.body as DeleteTemplateRequest;
-    const result = await libraryService.deleteTemplate(id);
-
-    if (!result) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-
-    Logger.Route.log(`Deleted template ${id}`);
-    sendSuccess(res, { success: true }, requestId);
-  } catch (error) {
-    // Check if it's a not found error
-    if ((error as Error).message.includes("not found")) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-
-    Logger.Route.error(`Error deleting template ${id}`, error);
-    sendError(res, "Failed to delete template", 500, requestId, error);
-  }
-});
-
-// Generate a template using AI
-router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
-
-  try {
-    const { prompt, playerCount, maxTurns, gameMode, generateImages } =
-      req.body as GenerateTemplateRequest;
-
-    if (!prompt || !playerCount || !maxTurns || !gameMode) {
-      return sendBadRequest(
+    if (templateDirs.length === 0) {
+      return sendSuccess(
         res,
-        "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+        { message: "No template directories found" },
         requestId
       );
     }
 
-    Logger.Route.log(`Generating template with prompt: ${prompt}`);
+    // Function to recursively add files and subdirectories to zip
+    const addDirectoryToZip = async (sourceDir: string, zipPath: string) => {
+      const entries = await fs.readdir(sourceDir, { withFileTypes: true });
 
-    const template = await libraryService.generateTemplate(
-      prompt,
-      generateImages || false,
-      playerCount,
-      maxTurns,
-      gameMode
+      for (const entry of entries) {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const targetPath = `${zipPath}/${entry.name}`;
+
+        if (entry.isDirectory()) {
+          // Recursively process subdirectory
+          await addDirectoryToZip(sourcePath, targetPath);
+        } else {
+          // Add file to zip
+          const fileData = await fs.readFile(sourcePath);
+          zip.file(targetPath, fileData);
+        }
+      }
+    };
+
+    // Process each template directory
+    for (const dirName of templateDirs) {
+      const templateDir = path.join(templatesBasePath, dirName);
+
+      // Skip if not a directory
+      if (
+        !fsSync.existsSync(templateDir) ||
+        !fsSync.statSync(templateDir).isDirectory()
+      ) {
+        continue;
+      }
+
+      try {
+        // Add all files and subdirectories for this template
+        await addDirectoryToZip(templateDir, dirName);
+      } catch (error) {
+        Logger.Route.error(
+          `Error adding template directory ${dirName} to zip`,
+          error
+        );
+        // Continue with other templates
+      }
+    }
+
+    // Generate the zip file
+    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+
+    // Set download headers
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="all-templates-${
+        new Date().toISOString().split("T")[0]
+      }.zip"`
     );
 
-    Logger.Route.log(`Generated template: ${template.title}`);
-    sendSuccess(res, { template }, requestId, 201);
+    // Send the zip file
+    res.send(zipBuffer);
+
+    Logger.Route.log(`Exported all templates as zip (with subdirectories)`);
   } catch (error) {
-    Logger.Route.error("Error generating template", error);
-    sendError(res, "Failed to generate template", 500, requestId, error);
+    Logger.Route.error("Error exporting all templates", error);
+    sendError(res, "Failed to export templates", 500, requestId, error);
   }
 });
 
-// Iterate on a template with AI
-router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
-  const { id } = req.params;
-  const requestId = req.body?.requestId || "unknown";
+// Upload a file to a template directory (respecting subdirectories)
+router.post(
+  "/admin/templates/:id/files",
+  verifyAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    const { id } = req.params;
+    const requestId = req.query.requestId as string;
 
-  try {
-    const { feedback, sections, gameMode, playerCount, maxTurns } =
-      req.body as TemplateIterationRequest;
+    // Access file from req.file (type cast to any to bypass TS issues)
+    const uploadedFile = (req as any).file;
+    // Get optional subdirectory from query params - this will be a path like "images" or "sounds/background"
+    const subdir = (req.query.subdir as string) || "";
 
-    if (
-      !feedback ||
-      !sections ||
-      !sections.length ||
-      !gameMode ||
-      !playerCount ||
-      !maxTurns
-    ) {
+    if (!uploadedFile) {
+      return sendBadRequest(res, "No file provided", requestId);
+    }
+
+    try {
+      // Check if template exists
+      const template = await libraryService.getTemplateById(id);
+      if (!template) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
+
+      // Get the template directory path
+      const templatesBasePath = getStoragePath("library");
+      const templateDir = path.join(templatesBasePath, id);
+
+      // Create target directory including any subdirectories
+      let targetDir = templateDir;
+      if (subdir) {
+        // Security check to prevent directory traversal
+        if (subdir.includes("..")) {
+          return sendError(res, "Invalid subdirectory path", 400, requestId);
+        }
+
+        // Create the full target directory path
+        targetDir = path.join(templateDir, subdir);
+
+        // Ensure the subdirectory exists
+        if (!fsSync.existsSync(targetDir)) {
+          await fs.mkdir(targetDir, { recursive: true });
+        }
+      } else {
+        // Ensure the template directory exists
+        if (!fsSync.existsSync(templateDir)) {
+          await fs.mkdir(templateDir, { recursive: true });
+        }
+      }
+
+      // Write the file to the target directory
+      const filePath = path.join(targetDir, uploadedFile.originalname);
+      await fs.writeFile(filePath, uploadedFile.buffer);
+
+      const relativePath = subdir
+        ? `${subdir}/${uploadedFile.originalname}`
+        : uploadedFile.originalname;
+
+      Logger.Route.log(`File ${relativePath} uploaded to template ${id}`);
+      sendSuccess(
+        res,
+        {
+          success: true,
+          path: relativePath,
+        },
+        requestId
+      );
+    } catch (error) {
+      Logger.Route.error(`Error uploading file to template ${id}`, error);
+      sendError(res, "Failed to upload file", 500, requestId, error);
+    }
+  }
+);
+
+// Import template files from a zip archive
+router.post(
+  "/admin/templates/:id/import",
+  verifyAdmin,
+  upload.single("zip"),
+  async (req, res) => {
+    const { id } = req.params;
+    const requestId = req.query.requestId as string;
+
+    // Access file from req.file (type cast to any to bypass TS issues)
+    const uploadedFile = (req as any).file;
+
+    if (!uploadedFile) {
+      return sendBadRequest(res, "No zip file provided", requestId);
+    }
+
+    if (!uploadedFile.originalname.endsWith(".zip")) {
       return sendBadRequest(
         res,
-        "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
+        "Uploaded file must be a zip archive",
         requestId
       );
     }
 
-    // Check if template exists
-    const template = await libraryService.getTemplateById(id);
-    if (!template) {
-      return sendNotFound(res, `Template with ID ${id} not found`, requestId);
+    try {
+      // Check if template exists
+      const template = await libraryService.getTemplateById(id);
+      if (!template) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
+
+      // Get the template directory path
+      const templatesBasePath = getStoragePath("library");
+      const templateDir = path.join(templatesBasePath, id);
+
+      // Ensure the template directory exists
+      if (!fsSync.existsSync(templateDir)) {
+        await fs.mkdir(templateDir, { recursive: true });
+      }
+
+      // Create a temporary file for the zip
+      const tempZipPath = path.join(
+        os.tmpdir(),
+        `template-import-${id}-${Date.now()}.zip`
+      );
+      await fs.writeFile(tempZipPath, uploadedFile.buffer);
+
+      // Extract the zip to the template directory
+      const zipEntries = await extractZip(tempZipPath, templateDir);
+
+      // Clean up temporary zip file
+      await fs.unlink(tempZipPath);
+
+      Logger.Route.log(`Imported ${zipEntries.length} files to template ${id}`);
+      sendSuccess(
+        res,
+        {
+          success: true,
+          filesImported: zipEntries.length,
+          files: zipEntries,
+        },
+        requestId
+      );
+    } catch (error) {
+      Logger.Route.error(`Error importing files to template ${id}`, error);
+      sendError(res, "Failed to import files", 500, requestId, error);
+    }
+  }
+);
+
+// Helper function to extract a zip file
+async function extractZip(
+  zipPath: string,
+  targetDir: string
+): Promise<string[]> {
+  const extractedFiles: string[] = [];
+  const zipBuffer = await fs.readFile(zipPath);
+  const zip = await JSZip.loadAsync(zipBuffer);
+
+  // Process zip entries
+  const zipEntries = Object.keys(zip.files);
+
+  for (const entryPath of zipEntries) {
+    const entry = zip.files[entryPath];
+
+    // Skip directories
+    if (entry.dir) continue;
+
+    // Security check to prevent directory traversal
+    if (entryPath.includes("..")) {
+      throw new Error(`Invalid path in zip: ${entryPath}`);
     }
 
-    const templateUpdate = await libraryService.iterateTemplate(
-      id,
-      feedback,
-      sections,
-      gameMode,
-      playerCount,
-      maxTurns
-    );
+    // Get file buffer
+    const content = await entry.async("nodebuffer");
 
-    Logger.Route.log(`Generated iteration for template ${id}`);
-    sendSuccess(res, { templateUpdate }, requestId);
-  } catch (error) {
-    Logger.Route.error(`Error iterating template ${id}`, error);
-    sendError(res, `Failed to iterate template ${id}`, 500, requestId, error);
+    // Create directory structure if needed
+    const filePath = path.join(targetDir, entryPath);
+    const fileDir = path.dirname(filePath);
+
+    if (!fsSync.existsSync(fileDir)) {
+      await fs.mkdir(fileDir, { recursive: true });
+    }
+
+    // Write file
+    await fs.writeFile(filePath, content);
+    extractedFiles.push(entryPath);
   }
-});
+
+  return extractedFiles;
+}
 
 // Catch-all 404 handler
 router.use((req, res) => {

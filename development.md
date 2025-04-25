@@ -41,6 +41,7 @@ Text, English, Multiplayer > other stuff
 
 # SERIOUS PROJECT
 
+- 2: Save form state for AI iterations; sort stories and templates by column; filter both
 - 10 User accounts (DB, Login, Manage codes/games)
 - 5 Credits system for generating stories
 - 15 Stripe integration

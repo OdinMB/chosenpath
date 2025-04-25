@@ -55,13 +55,13 @@ describe("AIImageGenerator", function () {
         sourceId: TEMPLATE_ID,
       } as ImageReference;
 
-      const prompt = `Evelyn and Tommy in a fist fight in a dark alley at night in London. Cinematic, wide shot.`;
+      const prompt = `Vampire. A slender figure with androgynous features, pale skin, and a shock of silver-dyed hair.`;
 
       console.log("Test: Starting image generation");
       const imagePath = await aiImageGenerator.generateSingleImage(
         prompt,
-        TEMPLATE_ID,
-        [imgEvelyn, imgTommy]
+        TEMPLATE_ID
+        // [imgEvelyn, imgTommy]
       );
       console.log("Image generated at path:", imagePath);
 
@@ -75,7 +75,11 @@ describe("AIImageGenerator", function () {
       expect(path.extname(imagePath)).to.equal(".jpeg");
 
       // Verify the file is in the correct directory
-      const templatePath = path.join(getStoragePath("library"), TEMPLATE_ID);
+      const templatePath = path.join(
+        getStoragePath("library"),
+        TEMPLATE_ID,
+        "images"
+      );
       const normalizedImagePath = path.normalize(imagePath);
       const normalizedTemplatePath = path.normalize(templatePath);
 

@@ -39,6 +39,26 @@ export interface DeleteTemplateRequest extends ClientRequest {
   id: string;
 }
 
+// Template Assets
+export interface ExportTemplateAssetsRequest extends ClientRequest {
+  id: string;
+}
+
+export interface ExportAllTemplatesAssetsRequest extends ClientRequest {
+  // No additional fields needed
+}
+
+export interface UploadTemplateFileRequest extends ClientRequest {
+  id: string;
+  file: File;
+  subdir?: string;
+}
+
+export interface ImportTemplateFilesRequest extends ClientRequest {
+  id: string;
+  zipFile: File;
+}
+
 // AI Generation
 export interface GenerateTemplateRequest extends ClientRequest {
   prompt: string;
@@ -89,6 +109,24 @@ export interface DeleteResponse extends SuccessResponse<{ success: boolean }> {
   // No additional fields needed
 }
 
+// Template Assets Responses
+export interface UploadFileResponse
+  extends SuccessResponse<{
+    success: boolean;
+    path: string;
+  }> {
+  // No additional fields needed
+}
+
+export interface ImportFilesResponse
+  extends SuccessResponse<{
+    success: boolean;
+    filesImported: number;
+    files: string[];
+  }> {
+  // No additional fields needed
+}
+
 // Template AI Iteration Response
 export interface TemplateIterationResponse
   extends SuccessResponse<{ templateUpdate: Partial<StoryTemplate> }> {
@@ -123,5 +161,7 @@ export type AdminResponse =
   | TemplateIterationResponse
   | StoriesResponse
   | StoryResponse
+  | UploadFileResponse
+  | ImportFilesResponse
   | RateLimitedResponse
   | ErrorResponse;
