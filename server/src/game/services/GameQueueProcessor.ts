@@ -153,7 +153,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       // Convert template to story state using the factory function
       const storyState = createStoryStateFromTemplate(
         template,
-        playerCount,
         maxTurns,
         playerCodes
       );

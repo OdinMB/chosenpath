@@ -90,6 +90,7 @@ export class ClientStateManager {
 
     // Return only the properties needed for the client
     return {
+      templateId: filteredState.templateId,
       title: filteredState.title,
       numberOfPlayers: Object.keys(state.players).length,
       gameMode: filteredState.gameMode,

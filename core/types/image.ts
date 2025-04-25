@@ -23,9 +23,9 @@ export type ImageStatus = "ready" | "generating" | "failed";
 
 export type Image = {
   id: string;
+  source: "template" | "story";
   description: string;
   status: ImageStatus;
-  url?: string;
 };
 
 export type ImageLibrary = Image[];

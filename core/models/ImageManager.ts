@@ -40,7 +40,6 @@ export class ImageManager {
           ? {
               ...image,
               ...updates,
-              status: updates.url ? "ready" : image.status,
             }
           : image
       ),

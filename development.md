@@ -2,35 +2,42 @@ Smaller commits!
 
 # NEXT
 
-- 20 Images for title, player identities, story elements (for templates initially)
+- Can't reconnect after disconnect
+
+- 20: Images for title, player identities, story elements (for templates initially)
   https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
 
-- 1 Add "what you're looking for" filters above carousel and in library (preset filters)
+- 3: Add "what you're looking for" filters above carousel and in library (preset filters)
   - Enjoy fiction (Crime, Fantasy, etc.)
   - Pretend to be (Slice of Life)
   - Have fun with a kid
   - Vent on reality (Satire)
-- 10 More multiplayer templates
-- 5 higher degree of direct interaction between players in joint threads
+- 10: More multiplayer templates
 
 # BETTER EXPERIENCE
 
 Text, English, Multiplayer > other stuff
 
-- 3 Stat attribute for personal stats: initial value or part of player background?
-- 5 Attach facts to players
-- 25 New multiplayer switch type using voting mechanism to decide which direction to take
-- 3 story setting for # paragraphs / beat (shorter for kids stories and later roleplay mode)
-- 20 Dynamically add new outcomes for longer stories
-- 5 Play with Gemini 2.5 Pro once integrated in Langchain
-- 30 Audio version
+- 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
+- 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
+- 3: Stat attribute for personal stats: initial value or part of player background?
+- 1: if not first beat in a thread: don't reestablish scene; go directly into action
+- 20: Streaming text
+- 5: higher degree of direct interaction between players in joint threads
+
+- 5: Attach facts to players
+- 25: Multiplayer switch type with voting mechanism to decide which direction to take
+- 3: story setting: # paragraphs / beat (shorter for kids/roleplaying mode)
+- 20: Dynamically add new outcomes for longer stories
+- 5: Play with Gemini 2.5 Pro once integrated in Langchain
+- 30: Audio version
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
-- 30 Different languages
-- 10 Resolution animation elements (thread, group)
-- 5 Setting to deactivate the resolution animations
-- 5 Difficulty level (affecting base points)
-- 10 creation/template setting: jokers to see risky/safe or even modifiers
-- 20 Music (OpenAI's new API?)
+- 30: Different languages
+- 10: Resolution animation elements (thread, group)
+- 5: Setting to deactivate the resolution animations
+- 5: Difficulty level (affecting base points)
+- 10: creation/template setting: jokers to see risky/safe or even modifiers
+- 20: Music (OpenAI's new API?)
 
 # SERIOUS PROJECT
 

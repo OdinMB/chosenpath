@@ -211,6 +211,7 @@ export type Guidelines = z.infer<typeof guidelinesSchema>;
 
 // Direct type definition for StoryState
 export type StoryState = {
+  templateId?: string;
   title: string;
   gameMode: GameMode;
   guidelines: Guidelines;
@@ -236,6 +237,7 @@ export type StoryState = {
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
+  templateId?: string;
   title: string;
   gameMode: GameMode;
   sharedStats: ClientStat[];

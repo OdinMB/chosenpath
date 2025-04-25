@@ -15,12 +15,12 @@ import {
  */
 export function createStoryStateFromTemplate(
   template: StoryTemplate,
-  playerCount: PlayerCount,
   maxTurns: number,
-  playerCodes: Record<PlayerSlot, string>
+  playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
 ): StoryState {
   // Start with basic story state structure
   const storyState: StoryState = {
+    templateId: template.id,
     title: template.title,
     gameMode: template.gameMode,
     guidelines: template.guidelines,
@@ -44,7 +44,6 @@ export function createStoryStateFromTemplate(
   // Set up character selection options for the requested player count
   // Only include active players based on the requested player count
   const relevantPlayerSlots = Object.keys(playerCodes);
-
   for (const slot of relevantPlayerSlots) {
     // Cast slot to keyof StoryTemplate to access player options
     const playerSlot = slot as keyof typeof template;

@@ -18,6 +18,7 @@ export type StoryInfo = {
   characterSelectionCompleted: boolean;
   maxTurns: number;
   currentBeat: number;
+  templateId?: string;
   error?: string;
 };
 
@@ -62,6 +63,7 @@ export class AdminStoryService {
               currentBeat: story.getState().characterSelectionCompleted
                 ? story.getCurrentTurn()
                 : 0,
+              templateId: story.getState().templateId,
             };
           } catch (error) {
             Logger.AdminService.error(

@@ -18,10 +18,7 @@ import {
 } from "server/config.js";
 import fs from "fs";
 import path from "path";
-import {
-  getStoragePath,
-  storageFileExists,
-} from "../../shared/storageUtils.js";
+import { getStoragePath } from "shared/storageUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "shared/logger.js";
 
@@ -203,6 +200,7 @@ Image instructions for this book: modern, slick, tense`;
             id: imageId,
             description: `Image for: ${beat.text.substring(0, 50)}...`,
             status: "generating",
+            source: "story",
           };
           updatedStory = updatedStory.addImage(placeholderImage);
 
