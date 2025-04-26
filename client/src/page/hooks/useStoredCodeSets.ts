@@ -4,7 +4,7 @@ import {
   getSortedCodeSets,
   deleteStoredCodeSet,
   generateJoinLink,
-} from "shared/codeSetUtils";
+} from "shared/utils/codeSetUtils";
 import { useSession } from "shared/useSession";
 import { Logger } from "shared/logger";
 

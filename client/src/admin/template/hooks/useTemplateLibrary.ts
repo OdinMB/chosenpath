@@ -1,14 +1,18 @@
 import { useState, useCallback, useRef } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
-import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
 import {
   CreateTemplateRequest,
   DeleteResponse,
   SuccessResponse,
 } from "core/types";
 import { API_CONFIG } from "core/config";
-import * as JSZip from "jszip";
+import JSZip from "jszip";
+import {
+  findTemplateJsonInZip,
+  parseTemplateFromZip,
+} from "core/utils/zipUtils.js";
 
 export const useTemplateLibrary = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -240,70 +244,67 @@ export const useTemplateLibrary = (token: string) => {
     try {
       // Handle different file types
       if (file.name.endsWith(".zip")) {
-        // Handle ZIP file import (directory structure)
-        const zip = new JSZip();
-        const zipData = await zip.loadAsync(file);
+        try {
+          // Handle ZIP file import
+          const zip = new JSZip();
+          const zipData = await zip.loadAsync(file);
 
-        // Find template directories (should be only one in a single template export)
-        const dirEntries = Object.keys(zipData.files)
-          .filter((path) => path.endsWith("/") && path.split("/").length === 2)
-          .map((path) => path.slice(0, -1)); // Remove trailing slash
+          const zipFiles = Object.keys(zipData.files);
+          Logger.Admin.log(`ZIP contains ${zipFiles.length} files/directories`);
 
-        if (dirEntries.length === 0) {
-          throw new Error("No valid template directory found in ZIP");
+          // Find template.json and asset files
+          const { templateFile, assetFiles } = await findTemplateJsonInZip(
+            zipFiles,
+            zipData
+          );
+
+          // Parse template data
+          const templateData = await parseTemplateFromZip(templateFile);
+          Logger.Admin.log(`Found template: ${templateData.title}`);
+
+          // Create template on server
+          const templateRequest: CreateTemplateRequest = withRequestId({
+            template: templateData as Partial<StoryTemplate>,
+          });
+
+          const response = await sendTrackedRequest<
+            SuccessResponse<{ template: StoryTemplate }>,
+            CreateTemplateRequest
+          >({
+            path: `/admin/templates`,
+            method: "POST",
+            token,
+            body: templateRequest,
+          });
+
+          const createdTemplate = response.data.template;
+
+          // Upload all asset files
+          if (assetFiles.length > 0) {
+            Logger.Admin.log(`Uploading ${assetFiles.length} asset files`);
+            for (const filePath of assetFiles) {
+              const fileData = await zipData.files[filePath].async("blob");
+              const fileName = filePath.split("/").pop() || "";
+
+              // Upload file to template directory
+              await uploadFileToTemplate(
+                createdTemplate.id,
+                fileData,
+                fileName
+              );
+            }
+          }
+
+          Logger.Admin.log(
+            `Successfully imported template: ${createdTemplate.title}`
+          );
+        } catch (zipError: Error | unknown) {
+          Logger.Admin.error("ZIP processing error:", zipError);
+          const errorMessage =
+            zipError instanceof Error ? zipError.message : String(zipError);
+          setError(`ZIP processing error: ${errorMessage}`);
+          throw zipError;
         }
-
-        // Process the template directory (just use the first one if multiple)
-        const templateDir = dirEntries[0];
-
-        // Find and read template.json
-        const templateJsonPath = `${templateDir}/template.json`;
-        const templateFile = zipData.files[templateJsonPath];
-
-        if (!templateFile) {
-          throw new Error(`No template.json found in ${templateDir}`);
-        }
-
-        // Parse template data
-        const templateContent = await templateFile.async("text");
-        const templateData = JSON.parse(templateContent);
-
-        // Create template on server
-        const templateRequest: CreateTemplateRequest = withRequestId({
-          template: templateData as Partial<StoryTemplate>,
-        });
-
-        const response = await sendTrackedRequest<
-          SuccessResponse<{ template: StoryTemplate }>,
-          CreateTemplateRequest
-        >({
-          path: `/admin/templates`,
-          method: "POST",
-          token,
-          body: templateRequest,
-        });
-
-        const createdTemplate = response.data.template;
-
-        // Upload all other files in the directory
-        const otherFiles = Object.keys(zipData.files).filter(
-          (path) =>
-            path.startsWith(`${templateDir}/`) &&
-            path !== templateJsonPath &&
-            !path.endsWith("/")
-        );
-
-        for (const filePath of otherFiles) {
-          const fileData = await zipData.files[filePath].async("blob");
-          const fileName = filePath.split("/").pop() || "";
-
-          // Upload file to template directory
-          await uploadFileToTemplate(createdTemplate.id, fileData, fileName);
-        }
-
-        Logger.Admin.log(
-          `Imported template ${createdTemplate.id} with ${otherFiles.length} asset files`
-        );
       } else {
         // Handle JSON file import
         const reader = new FileReader();
@@ -374,94 +375,105 @@ export const useTemplateLibrary = (token: string) => {
     try {
       if (file.name.endsWith(".zip")) {
         // Handle ZIP file import (directory structure)
-        const zip = new JSZip();
-        const zipData = await zip.loadAsync(file);
+        try {
+          const zip = new JSZip();
+          const zipData = await zip.loadAsync(file);
+          const zipFiles = Object.keys(zipData.files);
 
-        // Find all template directories under templates/
-        const templateDirs = Object.keys(zipData.files)
-          .filter(
-            (path) =>
-              path.startsWith("templates/") &&
-              path.endsWith("/") &&
-              path.split("/").length === 3
-          )
-          .map((path) => path.slice(0, -1)); // Remove trailing slash
-
-        if (templateDirs.length === 0) {
-          throw new Error(
-            "No template directories found in the templates/ directory"
-          );
-        }
-
-        Logger.Admin.log(
-          `Found ${templateDirs.length} templates in the ZIP file`
-        );
-
-        // Import each template
-        for (const templateDir of templateDirs) {
-          try {
-            // Find and read template.json
-            const templateJsonPath = `${templateDir}/template.json`;
-            const templateFile = zipData.files[templateJsonPath];
-
-            if (!templateFile) {
-              Logger.Admin.warn(
-                `No template.json found in ${templateDir}, skipping`
-              );
-              continue;
-            }
-
-            // Parse template data
-            const templateContent = await templateFile.async("text");
-            const templateData = JSON.parse(templateContent);
-
-            // Create template on server
-            const templateRequest: CreateTemplateRequest = withRequestId({
-              template: templateData as Partial<StoryTemplate>,
-            });
-
-            const response = await sendTrackedRequest<
-              SuccessResponse<{ template: StoryTemplate }>,
-              CreateTemplateRequest
-            >({
-              path: `/admin/templates`,
-              method: "POST",
-              token,
-              body: templateRequest,
-            });
-
-            const createdTemplate = response.data.template;
-
-            // Upload all other files in the directory
-            const otherFiles = Object.keys(zipData.files).filter(
+          // Find all template directories under templates/
+          const templateDirs = zipFiles
+            .filter(
               (path) =>
-                path.startsWith(`${templateDir}/`) &&
-                path !== templateJsonPath &&
-                !path.endsWith("/")
-            );
+                path.startsWith("templates/") &&
+                path.endsWith("/") &&
+                path.split("/").length === 3
+            )
+            .map((path) => path.slice(0, -1)); // Remove trailing slash
 
-            for (const filePath of otherFiles) {
-              const fileData = await zipData.files[filePath].async("blob");
-              const fileName = filePath.split("/").pop() || "";
-
-              // Upload file to template directory
-              await uploadFileToTemplate(
-                createdTemplate.id,
-                fileData,
-                fileName
-              );
-            }
-
-            Logger.Admin.log(
-              `Imported template ${createdTemplate.id} with ${otherFiles.length} asset files`
+          if (templateDirs.length === 0) {
+            throw new Error(
+              "No template directories found in the templates/ directory"
             );
-          } catch (importError) {
-            Logger.Admin.error(
-              `Error importing template from ${templateDir}`,
-              importError
-            );
-            // Continue with other templates even if one fails
           }
+
+          Logger.Admin.log(
+            `Found ${templateDirs.length} templates in the ZIP file`
+          );
+
+          // Import each template
+          for (const templateDir of templateDirs) {
+            try {
+              // Find and read template.json
+              const templateJsonPath = `${templateDir}/template.json`;
+              const templateFile = zipData.files[templateJsonPath];
+
+              if (!templateFile) {
+                Logger.Admin.warn(
+                  `No template.json found in ${templateDir}, skipping`
+                );
+                continue;
+              }
+
+              // Parse template data
+              const templateData = await parseTemplateFromZip(templateFile);
+
+              // Create template on server
+              const templateRequest: CreateTemplateRequest = withRequestId({
+                template: templateData as Partial<StoryTemplate>,
+              });
+
+              const response = await sendTrackedRequest<
+                SuccessResponse<{ template: StoryTemplate }>,
+                CreateTemplateRequest
+              >({
+                path: `/admin/templates`,
+                method: "POST",
+                token,
+                body: templateRequest,
+              });
+
+              const createdTemplate = response.data.template;
+
+              // Upload all other files in the directory
+              const otherFiles = zipFiles.filter(
+                (path) =>
+                  path.startsWith(`${templateDir}/`) &&
+                  path !== templateJsonPath &&
+                  !path.endsWith("/")
+              );
+
+              if (otherFiles.length > 0) {
+                Logger.Admin.log(
+                  `Uploading ${otherFiles.length} asset files for template: ${createdTemplate.title}`
+                );
+                for (const filePath of otherFiles) {
+                  const fileData = await zipData.files[filePath].async("blob");
+                  const fileName = filePath.split("/").pop() || "";
+
+                  // Upload file to template directory
+                  await uploadFileToTemplate(
+                    createdTemplate.id,
+                    fileData,
+                    fileName
+                  );
+                }
+              }
+
+              Logger.Admin.log(`Imported template: ${createdTemplate.title}`);
+            } catch (importError) {
+              Logger.Admin.error(
+                `Error importing template from ${templateDir}`,
+                importError
+              );
+              // Continue with other templates even if one fails
+            }
+          }
+        } catch (zipError: Error | unknown) {
+          Logger.Admin.error("ZIP processing error:", zipError);
+          const errorMessage =
+            zipError instanceof Error ? zipError.message : String(zipError);
+          setError(`ZIP processing error: ${errorMessage}`);
+          throw zipError;
         }
       } else {
         // Handle JSON array import
@@ -550,6 +562,9 @@ export const useTemplateLibrary = (token: string) => {
   ) => {
     const file = event.target.files?.[0];
     if (file) {
+      Logger.Admin.log(
+        `Selected file: ${file.name} (${file.type}), size: ${file.size} bytes`
+      );
       handleImportTemplate(file);
     }
   };
@@ -559,6 +574,9 @@ export const useTemplateLibrary = (token: string) => {
   ) => {
     const file = event.target.files?.[0];
     if (file) {
+      Logger.Admin.log(
+        `Selected collection file: ${file.name} (${file.type}), size: ${file.size} bytes`
+      );
       handleImportTemplateCollection(file);
     }
   };

@@ -7,7 +7,7 @@ import {
   BaseServerResponse,
   RateLimitedResponse,
 } from "core/types";
-import { Logger } from "./logger";
+import { Logger } from "../logger.js";
 import { API_CONFIG } from "core/config";
 
 /**

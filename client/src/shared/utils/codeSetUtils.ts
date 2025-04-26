@@ -1,5 +1,5 @@
-import { StoredCodeSet } from "./SessionContext.js";
-import { Logger } from "./logger.js";
+import { StoredCodeSet } from "../SessionContext.js";
+import { Logger } from "../logger.js";
 import { API_CONFIG } from "core/config";
 
 // Create a dedicated logger for code set operations

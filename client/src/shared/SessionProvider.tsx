@@ -12,7 +12,7 @@ import {
   getStoredCodeSets,
   deleteStoredCodeSet,
   updateStoredSetWithCode,
-} from "./codeSetUtils.ts";
+} from "./utils/codeSetUtils.js";
 import { Logger } from "./logger.js";
 
 // Create a dedicated logger for session operations

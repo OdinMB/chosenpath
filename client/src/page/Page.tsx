@@ -3,7 +3,7 @@ import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { StoredCodeSetsList, OrDivider } from "./components";
-import { hasCodeSets } from "shared/codeSetUtils";
+import { hasCodeSets } from "shared/utils/codeSetUtils.js";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;

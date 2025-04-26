@@ -4,7 +4,7 @@ import {
   GenerateTemplateRequest,
 } from "core/types/admin";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest, withRequestId } from "shared/requestUtils";
+import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
 import { SuccessResponse } from "core/types/api";
 
 interface UseTemplateApiProps {

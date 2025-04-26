@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Icons, Tooltip } from "components/ui";
-import { generateJoinLink } from "shared/codeSetUtils";
+import { generateJoinLink } from "shared/utils/codeSetUtils";
 
 export interface PlayerCodeProps {
   code: string;

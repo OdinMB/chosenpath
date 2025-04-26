@@ -69,7 +69,7 @@ export const TemplateLibrary = ({
           {/* Single Import */}
           <input
             type="file"
-            accept="application/json"
+            accept=".zip,application/zip"
             ref={fileInputRef}
             onChange={handleFileInputChange}
             className="hidden"
@@ -86,7 +86,7 @@ export const TemplateLibrary = ({
           {/* Import Collection */}
           <input
             type="file"
-            accept="application/json"
+            accept=".zip,application/zip"
             ref={collectionFileInputRef}
             onChange={handleCollectionFileInputChange}
             className="hidden"

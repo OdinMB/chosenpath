@@ -1,7 +1,7 @@
 import { useState, useEffect, RefObject } from "react";
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest } from "shared/requestUtils";
+import { sendTrackedRequest } from "shared/utils/requestUtils";
 import { SuccessResponse } from "core/types/api";
 
 type SwipeHandlers = {

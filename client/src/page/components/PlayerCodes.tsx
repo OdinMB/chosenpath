@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSession } from "shared/useSession";
-import { deleteCodeSetsByContent } from "shared/codeSetUtils";
+import { deleteCodeSetsByContent } from "shared/utils/codeSetUtils";
 import { LoadingSpinner, PrimaryButton } from "components/ui";
 import { PlayerCode } from "shared/components";
 
