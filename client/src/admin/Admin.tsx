@@ -3,7 +3,7 @@ import { PrimaryButton, Icons, Tabs, useTabs } from "components/ui";
 import { StoriesOverview } from "./StoriesOverview";
 import { AdminLogin } from "./AdminLogin";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
-import { TemplateForm, SampleTemplateTab } from "./template/components";
+import { TemplateForm } from "./template/components";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoryTemplate } from "core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
@@ -119,7 +119,6 @@ export const Admin = () => {
     { id: "stories" as AdminTab, label: "Active Stories" },
     { id: "library" as AdminTab, label: "Template Library" },
     { id: "carousel" as AdminTab, label: "Template Carousel" },
-    { id: "sample-template" as AdminTab, label: "Read-only Test" },
   ];
 
   const renderAdminDashboard = () => {
@@ -183,10 +182,6 @@ export const Admin = () => {
 
             {activeTab === "carousel" && (
               <TemplateCarouselManager token={authToken} />
-            )}
-
-            {activeTab === "sample-template" && (
-              <SampleTemplateTab token={authToken} />
             )}
           </div>
         </div>

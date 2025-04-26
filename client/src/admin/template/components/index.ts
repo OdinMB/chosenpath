@@ -15,7 +15,6 @@ export { StoryElementsTab } from "./StoryElementsTab";
 export { OutcomesTab } from "./OutcomesTab";
 export { PlayersTab } from "./PlayersTab";
 export { TemplateForm } from "./TemplateForm";
-export { SampleTemplateTab } from "./SampleTemplateTab";
 
 export { SortableItem } from "./SortableItem";
 
