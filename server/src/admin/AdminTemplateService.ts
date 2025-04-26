@@ -11,16 +11,7 @@ import {
   Stat,
   TemplateIterationSections,
 } from "core/types/index.js";
-import {
-  readStorageFile,
-  writeStorageFile,
-  getStorageFiles,
-  deleteStorageFile,
-  ensureStorageDirectory,
-  getStoragePath,
-  storageFileExists,
-  getStorageFilePath,
-} from "shared/storageUtils.js";
+import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
@@ -46,7 +37,7 @@ type TemplateDataInput = Omit<
 // Create a type that makes all fields optional for updates
 type TemplateDataUpdate = Partial<TemplateDataInput>;
 
-export class AdminLibraryService {
+export class AdminTemplateService {
   private storagePath: string;
   private logger = Logger.forService("LibraryService");
   private aiStoryGenerator: AIStoryGenerator;
@@ -341,7 +332,7 @@ export class AdminLibraryService {
       this.logger.log(`Generating template with prompt: ${prompt}`);
 
       // Generate the initial state which includes all necessary data
-      const setupGenerator = new AIStoryGenerator();
+      const setupGenerator = this.aiStoryGenerator;
       const initialState = await setupGenerator.createInitialState(
         prompt,
         generateImages,
@@ -423,7 +414,7 @@ export class AdminLibraryService {
       }
 
       // Create an instance of the AI generator
-      const generator = new AIStoryGenerator();
+      const generator = this.aiStoryGenerator;
 
       // Generate the partial template update based on user-selected sections
       const templateJson = JSON.stringify(template);

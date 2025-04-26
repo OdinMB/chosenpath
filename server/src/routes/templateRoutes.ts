@@ -24,7 +24,7 @@ import {
   sendBadRequest,
   sendNotFound,
 } from "shared/responseUtils.js";
-import { AdminLibraryService } from "admin/AdminLibraryService.js";
+import { AdminTemplateService } from "server/admin/AdminTemplateService.js";
 import {
   getStoragePath,
   extractZip,
@@ -38,14 +38,14 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 const router = express.Router();
-const libraryService = new AdminLibraryService();
+const templateService = new AdminTemplateService();
 
 // Get all published templates
 router.get("/templates", async (req, res) => {
   const requestId = req.query.requestId as string;
 
   try {
-    const allTemplates = await libraryService.getAllTemplates();
+    const allTemplates = await templateService.getAllTemplates();
 
     // Check if the request is for welcome screen templates
     const forWelcomeScreen = req.query.forWelcomeScreen === "true";
@@ -95,7 +95,7 @@ router.get("/templates/:id", async (req, res) => {
   const requestId = req.query.requestId as string;
 
   try {
-    const template = await libraryService.getTemplateById(id);
+    const template = await templateService.getTemplateById(id);
 
     if (!template) {
       return sendNotFound(res, "Template not found", requestId);
@@ -118,7 +118,7 @@ router.get("/templates/:id", async (req, res) => {
 router.get("/admin/templates", verifyAdmin, async (req, res) => {
   try {
     const requestId = req.query.requestId as string;
-    const templates = await libraryService.getAllTemplates();
+    const templates = await templateService.getAllTemplates();
     Logger.Route.log(`Retrieved ${templates.length} templates`);
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
@@ -140,7 +140,7 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
 
   try {
     // Get all templates to check if any exist
-    const templates = await libraryService.getAllTemplates();
+    const templates = await templateService.getAllTemplates();
     if (templates.length === 0) {
       return sendSuccess(res, { message: "No templates found" }, requestId);
     }
@@ -222,7 +222,7 @@ router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const requestId = req.query.requestId as string;
 
   try {
-    const template = await libraryService.getTemplateById(id);
+    const template = await templateService.getTemplateById(id);
 
     if (!template) {
       return sendNotFound(res, "Template not found", requestId);
@@ -244,7 +244,7 @@ router.get("/admin/templates/:id/assets", verifyAdmin, async (req, res) => {
 
   try {
     // Check if template exists
-    const template = await libraryService.getTemplateById(id);
+    const template = await templateService.getTemplateById(id);
     if (!template) {
       return sendNotFound(res, "Template not found", requestId);
     }
@@ -294,7 +294,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
       return sendBadRequest(res, "Missing template data", requestId);
     }
 
-    const createdTemplate = await libraryService.createTemplate(template);
+    const createdTemplate = await templateService.createTemplate(template);
 
     Logger.Route.log(
       `Created template ${createdTemplate.id}: ${createdTemplate.title}`
@@ -318,7 +318,7 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
       return sendBadRequest(res, "Missing template data", requestId);
     }
 
-    const updatedTemplate = await libraryService.updateTemplate(id, template);
+    const updatedTemplate = await templateService.updateTemplate(id, template);
 
     Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
     sendSuccess(res, { template: updatedTemplate }, requestId);
@@ -339,7 +339,7 @@ router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
   const deleteRequest = req.body as DeleteTemplateRequest;
 
   try {
-    const result = await libraryService.deleteTemplate(id);
+    const result = await templateService.deleteTemplate(id);
 
     if (!result) {
       return sendNotFound(res, "Template not found", requestId);
@@ -377,7 +377,7 @@ router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
 
     Logger.Route.log(`Generating template with prompt: ${prompt}`);
 
-    const template = await libraryService.generateTemplate(
+    const template = await templateService.generateTemplate(
       prompt,
       generateImages || false,
       playerCount,
@@ -419,12 +419,12 @@ router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
     }
 
     // Check if template exists
-    const template = await libraryService.getTemplateById(id);
+    const template = await templateService.getTemplateById(id);
     if (!template) {
       return sendNotFound(res, `Template with ID ${id} not found`, requestId);
     }
 
-    const templateUpdate = await libraryService.iterateTemplate(
+    const templateUpdate = await templateService.iterateTemplate(
       id,
       feedback,
       sections,
@@ -469,7 +469,7 @@ router.post(
 
     try {
       // Check if template exists
-      const template = await libraryService.getTemplateById(id);
+      const template = await templateService.getTemplateById(id);
       if (!template) {
         return sendNotFound(res, "Template not found", requestId);
       }
@@ -559,7 +559,7 @@ router.post(
 
     try {
       // Check if template exists
-      const template = await libraryService.getTemplateById(id);
+      const template = await templateService.getTemplateById(id);
       if (!template) {
         return sendNotFound(res, "Template not found", requestId);
       }

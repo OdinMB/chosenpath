@@ -17,7 +17,7 @@ import type {
   WSErrorResponse,
 } from "core/types/websocket.js";
 import { ContentModerationResponse, ResponseStatus } from "core/types/api.js";
-import { AdminLibraryService } from "admin/AdminLibraryService.js";
+import { AdminTemplateService } from "server/admin/AdminTemplateService.js";
 import { Logger } from "shared/logger.js";
 import { ContentFilterService } from "./services/ContentFilterService.js";
 
@@ -364,8 +364,8 @@ export class GameHandler {
       }
 
       // Fetch the template from the library
-      const libraryService = new AdminLibraryService();
-      const template = await libraryService.getTemplateById(templateId);
+      const templateService = new AdminTemplateService();
+      const template = await templateService.getTemplateById(templateId);
 
       if (!template) {
         throw new Error(`Template not found: ${templateId}`);
