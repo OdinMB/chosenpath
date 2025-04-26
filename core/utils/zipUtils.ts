@@ -59,7 +59,7 @@ export const findTemplateJsonInZip = async (
     throw new Error("No template.json found in the ZIP file");
   }
 
-  // Get the asset files
+  // Get the asset files - include all files in template directory except template.json
   const assetFiles = zipFiles.filter((path) => {
     // Skip directories and template.json
     if (
@@ -102,9 +102,16 @@ export const parseTemplateFromZip = async (
 export const extractAssetFilesFromZip = async (
   zipData: any,
   templateDir: string
-): Promise<Array<{ path: string; blob: Blob; fileName: string }>> => {
+): Promise<
+  Array<{ path: string; blob: Blob; fileName: string; subdir?: string }>
+> => {
   const zipFiles = Object.keys(zipData.files);
-  const assetFiles: Array<{ path: string; blob: Blob; fileName: string }> = [];
+  const assetFiles: Array<{
+    path: string;
+    blob: Blob;
+    fileName: string;
+    subdir?: string;
+  }> = [];
 
   // Get all files that are not directories and not template.json
   for (const path of zipFiles) {
@@ -120,7 +127,23 @@ export const extractAssetFilesFromZip = async (
 
       const fileData = await zipData.files[path].async("blob");
       const fileName = path.split("/").pop() || "";
-      assetFiles.push({ path, blob: fileData, fileName });
+
+      // Determine subdirectory
+      let subdir: string | undefined = undefined;
+      if (templateDir && path.startsWith(`${templateDir}/`)) {
+        const relativePath = path.substring(templateDir.length + 1);
+        const lastSlashIndex = relativePath.lastIndexOf("/");
+        if (lastSlashIndex > 0) {
+          subdir = relativePath.substring(0, lastSlashIndex);
+        }
+      }
+
+      assetFiles.push({
+        path,
+        blob: fileData,
+        fileName,
+        subdir,
+      });
     }
   }
 

@@ -23,11 +23,18 @@ export const TemplateLibrary = ({
     fileInputRef,
     collectionFileInputRef,
     deleteDialog,
+    importDialog,
+    collectionImportDialog,
     loadTemplates,
     formatDate,
+    formatDateTime,
     handleDeleteTemplate,
     openDeleteDialog,
     closeDeleteDialog,
+    confirmTemplateImport,
+    closeImportDialog,
+    confirmCollectionImport,
+    closeCollectionImportDialog,
     handleExportTemplate,
     handleExportAllTemplates,
     handleFileInputChange,
@@ -127,7 +134,9 @@ export const TemplateLibrary = ({
         </div>
       )}
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialogs */}
+
+      {/* Delete Template Dialog */}
       <ConfirmDialog
         isOpen={deleteDialog.isOpen}
         onClose={closeDeleteDialog}
@@ -135,6 +144,61 @@ export const TemplateLibrary = ({
         title="Delete Template"
         message="Are you sure you want to delete this story template? This action cannot be undone."
         confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      {/* Import Single Template Dialog */}
+      <ConfirmDialog
+        isOpen={importDialog.isOpen}
+        onClose={closeImportDialog}
+        onConfirm={confirmTemplateImport}
+        title="Import Template"
+        message={
+          importDialog.existingTemplate && importDialog.newTemplate
+            ? `A template with ${
+                importDialog.existingTemplate.id === importDialog.newTemplate.id
+                  ? "the same ID"
+                  : "a matching title"
+              } already exists:
+
+${importDialog.existingTemplate.title}
+Last updated: ${formatDateTime(importDialog.existingTemplate.updatedAt)}
+
+Your template ${
+                importDialog.isNewer
+                  ? "**is newer** than"
+                  : importDialog.existingTemplate.updatedAt ===
+                    importDialog.newTemplate.updatedAt
+                  ? "**was updated at the same time** as"
+                  : "**is older** than"
+              } the existing file.
+
+Do you want to proceed with the import and override the existing template?`
+            : "Are you sure you want to import this template?"
+        }
+        confirmText="Import"
+        cancelText="Cancel"
+      />
+
+      {/* Import Collection Dialog */}
+      <ConfirmDialog
+        isOpen={collectionImportDialog.isOpen}
+        onClose={closeCollectionImportDialog}
+        onConfirm={confirmCollectionImport}
+        title="Import Template Collection"
+        message={
+          collectionImportDialog.file
+            ? `This collection contains ${collectionImportDialog.summary.total} templates:
+
+• ${collectionImportDialog.summary.new} **new templates**
+• ${collectionImportDialog.summary.newer} templates that are **newer than** existing ones
+• ${collectionImportDialog.summary.older} templates that are **older than** existing ones
+• ${collectionImportDialog.summary.same} templates with the **same update time** as existing ones
+
+Proceeding will import or update all templates in the collection. Continue?`
+            : "Are you sure you want to import this template collection?"
+        }
+        confirmText="Import All"
         cancelText="Cancel"
       />
 
