@@ -1,7 +1,10 @@
-/// <reference types="multer" />
-
 import express from "express";
-import { config } from "./config.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs/promises";
+import fsSync from "fs";
+import os from "os";
+import JSZip from "jszip";
 import { Logger } from "shared/logger.js";
 import {
   UpdateTemplateRequest,
@@ -9,130 +12,33 @@ import {
   DeleteTemplateRequest,
   GenerateTemplateRequest,
   TemplateIterationRequest,
-  DeleteStoryRequest,
   PublicationStatus,
+  ExportTemplateAssetsRequest,
+  ExportAllTemplatesAssetsRequest,
+  UploadTemplateFileRequest,
+  ImportTemplateFilesRequest,
 } from "core/types/index.js";
-
 import {
   sendSuccess,
   sendError,
   sendBadRequest,
   sendNotFound,
 } from "shared/responseUtils.js";
-import { adminStoryService } from "admin/AdminStoryService.js";
 import { AdminLibraryService } from "admin/AdminLibraryService.js";
-import path from "path";
-import fsSync from "fs";
-import fs from "fs/promises";
-import JSZip from "jszip";
-import { getStoragePath } from "shared/storageUtils.js";
-import multer from "multer";
-import os from "os";
+import {
+  getStoragePath,
+  extractZip,
+  createZipFromDirectory,
+  addDirectoryToZip,
+} from "shared/storageUtils.js";
+import { verifyAdmin } from "./auth.js";
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Simple authentication middleware
-export const verifyAdmin = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) => {
-  const authHeader = req.headers.authorization;
-  const requestId =
-    (req.query.requestId as string) ||
-    (req.body && req.body.requestId) ||
-    "unknown";
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    Logger.Route.error(
-      "Authentication failed: missing or invalid Authorization header"
-    );
-    return sendError(res, "Authentication required", 401, requestId);
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  // Simple password check - should be replaced with a more secure method in production
-  if (token !== config.adminPassword) {
-    Logger.Route.error("Authentication failed: invalid password");
-    return sendError(res, "Invalid credentials", 403, requestId);
-  }
-
-  Logger.Route.log("Authentication successful");
-  next();
-};
-
 const router = express.Router();
 const libraryService = new AdminLibraryService();
-
-// Auth check route
-router.get("/admin/auth", verifyAdmin, (req, res) => {
-  Logger.Route.log("Auth check successful");
-  sendSuccess(res, { authenticated: true }, req.query.requestId as string);
-});
-
-// STORY MANAGEMENT
-
-// Get list of stories
-router.get("/admin/stories", verifyAdmin, async (req, res) => {
-  const requestId = req.query.requestId as string;
-
-  try {
-    Logger.Route.log("Fetching list of stories");
-    const stories = await adminStoryService.getStoriesList();
-    Logger.Route.log(`Returning ${stories.length} stories`);
-    sendSuccess(res, { stories }, requestId);
-  } catch (error) {
-    Logger.Route.error("Failed to load stories", error);
-    sendError(res, "Failed to load stories", 500, requestId, error);
-  }
-});
-
-// Get story details
-router.get("/admin/stories/:id", verifyAdmin, async (req, res) => {
-  const requestId = req.query.requestId as string;
-
-  try {
-    const storyId = req.params.id;
-    Logger.Route.log(`Fetching story details: ${storyId}`);
-    const storyState = await adminStoryService.getStory(storyId);
-    Logger.Route.log(`Successfully fetched story: ${storyId}`);
-    sendSuccess(res, { story: storyState }, requestId);
-  } catch (error) {
-    if ((error as Error).message === "Story not found") {
-      Logger.Route.error(`Story not found: ${req.params.id}`);
-      return sendNotFound(res, "Story not found", requestId);
-    }
-    Logger.Route.error(`Failed to load story: ${req.params.id}`, error);
-    sendError(res, "Failed to load story", 500, requestId, error);
-  }
-});
-
-// Delete story
-router.delete("/admin/stories/:id", verifyAdmin, async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
-
-  try {
-    const deleteRequest = req.body as DeleteStoryRequest;
-    const storyId = req.params.id;
-
-    Logger.Route.log(`Deleting story: ${storyId}`);
-    await adminStoryService.deleteStory(storyId);
-    Logger.Route.log(`Successfully deleted story: ${storyId}`);
-    sendSuccess(res, { success: true }, requestId);
-  } catch (error) {
-    if ((error as Error).message === "Story not found") {
-      Logger.Route.error(`Story not found: ${req.params.id}`);
-      return sendNotFound(res, "Story not found", requestId);
-    }
-    Logger.Route.error(`Failed to delete story: ${req.params.id}`, error);
-    sendError(res, "Failed to delete story", 500, requestId, error);
-  }
-});
-
-// TEMPLATE MANAGEMENT
 
 // Get all published templates
 router.get("/templates", async (req, res) => {
@@ -227,29 +133,10 @@ router.get("/admin/templates", verifyAdmin, async (req, res) => {
   }
 });
 
-// Admin - Get template by ID
-router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
-  const { id } = req.params;
-  const requestId = req.query.requestId as string;
-
-  try {
-    const template = await libraryService.getTemplateById(id);
-
-    if (!template) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-
-    Logger.Route.log(`Retrieved template ${id}`);
-    sendSuccess(res, { template }, requestId);
-  } catch (error) {
-    Logger.Route.error(`Error retrieving template ${id}`, error);
-    sendError(res, "Failed to retrieve template", 500, requestId, error);
-  }
-});
-
 // Admin - Get all templates with their assets
 router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
   const requestId = req.query.requestId as string;
+  const request = { requestId } as ExportAllTemplatesAssetsRequest;
 
   try {
     // Get all templates to check if any exist
@@ -283,30 +170,11 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
       );
     }
 
-    // Function to recursively add files and subdirectories to zip
-    const addDirectoryToZip = async (sourceDir: string, zipPath: string) => {
-      const entries = await fs.readdir(sourceDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const sourcePath = path.join(sourceDir, entry.name);
-        const targetPath = `${zipPath}/${entry.name}`;
-
-        if (entry.isDirectory()) {
-          // Recursively process subdirectory
-          await addDirectoryToZip(sourcePath, targetPath);
-        } else {
-          // Add file to zip
-          const fileData = await fs.readFile(sourcePath);
-          zip.file(targetPath, fileData);
-        }
-      }
-    };
-
     // Process each template directory
     for (const dirName of templateDirs) {
       const templateDir = path.join(templatesBasePath, dirName);
 
-      // Skip if not a directory
+      // Skip if not a directory or doesn't exist
       if (
         !fsSync.existsSync(templateDir) ||
         !fsSync.statSync(templateDir).isDirectory()
@@ -316,7 +184,7 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
 
       try {
         // Add all files and subdirectories for this template
-        await addDirectoryToZip(templateDir, dirName);
+        await addDirectoryToZip(templateDir, dirName, zip);
       } catch (error) {
         Logger.Route.error(
           `Error adding template directory ${dirName} to zip`,
@@ -348,6 +216,231 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
   }
 });
 
+// Admin - Get template by ID
+router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const requestId = req.query.requestId as string;
+
+  try {
+    const template = await libraryService.getTemplateById(id);
+
+    if (!template) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+
+    Logger.Route.log(`Retrieved template ${id}`);
+    sendSuccess(res, { template }, requestId);
+  } catch (error) {
+    Logger.Route.error(`Error retrieving template ${id}`, error);
+    sendError(res, "Failed to retrieve template", 500, requestId, error);
+  }
+});
+
+// Admin - Get all assets for a template (images, etc.)
+router.get("/admin/templates/:id/assets", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const requestId = req.query.requestId as string;
+  const request = { id, requestId } as ExportTemplateAssetsRequest;
+
+  try {
+    // Check if template exists
+    const template = await libraryService.getTemplateById(id);
+    if (!template) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+
+    // Get template directory path
+    const templatesBasePath = getStoragePath("library");
+    const templateDir = path.join(templatesBasePath, id);
+
+    // Check if directory exists
+    if (!fsSync.existsSync(templateDir)) {
+      return sendError(res, "Template directory not found", 404, requestId);
+    }
+
+    // Create zip archive of the directory
+    const zipBuffer = await createZipFromDirectory(templateDir);
+
+    // Set download headers
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${template.title
+        .replace(/\s+/g, "-")
+        .toLowerCase()}.zip"`
+    );
+
+    // Send the zip file
+    res.send(zipBuffer);
+
+    Logger.Route.log(
+      `Exported template ${id} directory as zip (with subdirectories)`
+    );
+  } catch (error) {
+    Logger.Route.error(`Error exporting template ${id}`, error);
+    sendError(res, "Failed to export template", 500, requestId, error);
+  }
+});
+
+// Create a new template
+router.post("/admin/templates", verifyAdmin, async (req, res) => {
+  const requestId = req.body?.requestId || "unknown";
+  const createRequest = req.body as CreateTemplateRequest;
+
+  try {
+    const { template } = createRequest;
+
+    if (!template) {
+      return sendBadRequest(res, "Missing template data", requestId);
+    }
+
+    const createdTemplate = await libraryService.createTemplate(template);
+
+    Logger.Route.log(
+      `Created template ${createdTemplate.id}: ${createdTemplate.title}`
+    );
+    sendSuccess(res, { template: createdTemplate }, requestId, 201);
+  } catch (error) {
+    Logger.Route.error("Error creating template", error);
+    sendError(res, "Failed to create template", 500, requestId, error);
+  }
+});
+
+// Update a template
+router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const requestId = req.body?.requestId || "unknown";
+  const updateRequest = req.body as UpdateTemplateRequest;
+
+  try {
+    const { template } = updateRequest;
+    if (!template) {
+      return sendBadRequest(res, "Missing template data", requestId);
+    }
+
+    const updatedTemplate = await libraryService.updateTemplate(id, template);
+
+    Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
+    sendSuccess(res, { template: updatedTemplate }, requestId);
+  } catch (error) {
+    // Check if it's a not found error
+    if ((error as Error).message.includes("not found")) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+    Logger.Route.error(`Error updating template ${id}`, error);
+    sendError(res, "Failed to update template", 500, requestId, error);
+  }
+});
+
+// Delete a template
+router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const requestId = req.body?.requestId || "unknown";
+  const deleteRequest = req.body as DeleteTemplateRequest;
+
+  try {
+    const result = await libraryService.deleteTemplate(id);
+
+    if (!result) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+
+    Logger.Route.log(`Deleted template ${id}`);
+    sendSuccess(res, { success: true }, requestId);
+  } catch (error) {
+    // Check if it's a not found error
+    if ((error as Error).message.includes("not found")) {
+      return sendNotFound(res, "Template not found", requestId);
+    }
+
+    Logger.Route.error(`Error deleting template ${id}`, error);
+    sendError(res, "Failed to delete template", 500, requestId, error);
+  }
+});
+
+// Generate a template using AI
+router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
+  const requestId = req.body?.requestId || "unknown";
+  const generateRequest = req.body as GenerateTemplateRequest;
+
+  try {
+    const { prompt, playerCount, maxTurns, gameMode, generateImages } =
+      generateRequest;
+
+    if (!prompt || !playerCount || !maxTurns || !gameMode) {
+      return sendBadRequest(
+        res,
+        "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+        requestId
+      );
+    }
+
+    Logger.Route.log(`Generating template with prompt: ${prompt}`);
+
+    const template = await libraryService.generateTemplate(
+      prompt,
+      generateImages || false,
+      playerCount,
+      maxTurns,
+      gameMode
+    );
+
+    Logger.Route.log(`Generated template: ${template.title}`);
+    sendSuccess(res, { template }, requestId, 201);
+  } catch (error) {
+    Logger.Route.error("Error generating template", error);
+    sendError(res, "Failed to generate template", 500, requestId, error);
+  }
+});
+
+// Iterate on a template with AI
+router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const requestId = req.body?.requestId || "unknown";
+  const iterationRequest = req.body as TemplateIterationRequest;
+
+  try {
+    const { feedback, sections, gameMode, playerCount, maxTurns } =
+      iterationRequest;
+
+    if (
+      !feedback ||
+      !sections ||
+      !sections.length ||
+      !gameMode ||
+      !playerCount ||
+      !maxTurns
+    ) {
+      return sendBadRequest(
+        res,
+        "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
+        requestId
+      );
+    }
+
+    // Check if template exists
+    const template = await libraryService.getTemplateById(id);
+    if (!template) {
+      return sendNotFound(res, `Template with ID ${id} not found`, requestId);
+    }
+
+    const templateUpdate = await libraryService.iterateTemplate(
+      id,
+      feedback,
+      sections,
+      gameMode,
+      playerCount,
+      maxTurns
+    );
+
+    Logger.Route.log(`Generated iteration for template ${id}`);
+    sendSuccess(res, { templateUpdate }, requestId);
+  } catch (error) {
+    Logger.Route.error(`Error iterating template ${id}`, error);
+    sendError(res, `Failed to iterate template ${id}`, 500, requestId, error);
+  }
+});
+
 // Upload a file to a template directory (respecting subdirectories)
 router.post(
   "/admin/templates/:id/files",
@@ -361,6 +454,14 @@ router.post(
     const uploadedFile = (req as any).file;
     // Get optional subdirectory from query params - this will be a path like "images" or "sounds/background"
     const subdir = (req.query.subdir as string) || "";
+
+    // For type safety (client-side will have the full types)
+    const uploadRequest = {
+      id,
+      requestId,
+      file: uploadedFile,
+      subdir,
+    } as unknown as UploadTemplateFileRequest;
 
     if (!uploadedFile) {
       return sendBadRequest(res, "No file provided", requestId);
@@ -408,6 +509,8 @@ router.post(
         : uploadedFile.originalname;
 
       Logger.Route.log(`File ${relativePath} uploaded to template ${id}`);
+
+      // Send typed response
       sendSuccess(
         res,
         {
@@ -434,6 +537,13 @@ router.post(
 
     // Access file from req.file (type cast to any to bypass TS issues)
     const uploadedFile = (req as any).file;
+
+    // For type safety (client-side will have the full types)
+    const importRequest = {
+      id,
+      requestId,
+      zipFile: uploadedFile,
+    } as unknown as ImportTemplateFilesRequest;
 
     if (!uploadedFile) {
       return sendBadRequest(res, "No zip file provided", requestId);
@@ -477,6 +587,8 @@ router.post(
       await fs.unlink(tempZipPath);
 
       Logger.Route.log(`Imported ${zipEntries.length} files to template ${id}`);
+
+      // Send typed response
       sendSuccess(
         res,
         {
@@ -493,57 +605,4 @@ router.post(
   }
 );
 
-// Helper function to extract a zip file
-async function extractZip(
-  zipPath: string,
-  targetDir: string
-): Promise<string[]> {
-  const extractedFiles: string[] = [];
-  const zipBuffer = await fs.readFile(zipPath);
-  const zip = await JSZip.loadAsync(zipBuffer);
-
-  // Process zip entries
-  const zipEntries = Object.keys(zip.files);
-
-  for (const entryPath of zipEntries) {
-    const entry = zip.files[entryPath];
-
-    // Skip directories
-    if (entry.dir) continue;
-
-    // Security check to prevent directory traversal
-    if (entryPath.includes("..")) {
-      throw new Error(`Invalid path in zip: ${entryPath}`);
-    }
-
-    // Get file buffer
-    const content = await entry.async("nodebuffer");
-
-    // Create directory structure if needed
-    const filePath = path.join(targetDir, entryPath);
-    const fileDir = path.dirname(filePath);
-
-    if (!fsSync.existsSync(fileDir)) {
-      await fs.mkdir(fileDir, { recursive: true });
-    }
-
-    // Write file
-    await fs.writeFile(filePath, content);
-    extractedFiles.push(entryPath);
-  }
-
-  return extractedFiles;
-}
-
-// Catch-all 404 handler
-router.use((req, res) => {
-  const requestId =
-    (req.query.requestId as string) ||
-    (req.body && req.body.requestId) ||
-    "unknown";
-
-  Logger.Route.error(`404 Not Found: ${req.method} ${req.originalUrl}`);
-  sendNotFound(res, "Route not found", requestId);
-});
-
-export const Router = router;
+export default router;

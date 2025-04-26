@@ -9,7 +9,6 @@ import { storyRepository } from "shared/StoryRepository.js";
 import { Story } from "core/models/Story.js";
 import { Server } from "socket.io";
 import { Logger } from "shared/logger.js";
-import { GAME_SESSION_CONFIG } from "core/config.js";
 
 interface PlayerConnection {
   socketIds: Set<string>;

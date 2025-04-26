@@ -2,6 +2,7 @@ import path from "path";
 import { STORAGE_PATHS } from "../config.js";
 import fs from "fs/promises";
 import fsSync from "fs";
+import JSZip from "jszip";
 
 /**
  * Gets the appropriate fully-resolved storage path based on the current environment
@@ -266,4 +267,99 @@ export function filterByExtension(
     const ext = path.extname(filename).toLowerCase();
     return extensions.includes(ext);
   };
+}
+
+/**
+ * Extracts files from a zip archive to a target directory
+ * @param zipPath - Path to the zip file
+ * @param targetDir - Directory to extract files to
+ * @returns Array of extracted file paths relative to the target directory
+ */
+export async function extractZip(
+  zipPath: string,
+  targetDir: string
+): Promise<string[]> {
+  const extractedFiles: string[] = [];
+  const zipBuffer = await fs.readFile(zipPath);
+  const zip = await JSZip.loadAsync(zipBuffer);
+
+  // Process zip entries
+  const zipEntries = Object.keys(zip.files);
+
+  for (const entryPath of zipEntries) {
+    const entry = zip.files[entryPath];
+
+    // Skip directories
+    if (entry.dir) continue;
+
+    // Security check to prevent directory traversal
+    if (entryPath.includes("..")) {
+      throw new Error(`Invalid path in zip: ${entryPath}`);
+    }
+
+    // Get file buffer
+    const content = await entry.async("nodebuffer");
+
+    // Create directory structure if needed
+    const filePath = path.join(targetDir, entryPath);
+    const fileDir = path.dirname(filePath);
+
+    if (!fsSync.existsSync(fileDir)) {
+      await fs.mkdir(fileDir, { recursive: true });
+    }
+
+    // Write file
+    await fs.writeFile(filePath, content);
+    extractedFiles.push(entryPath);
+  }
+
+  return extractedFiles;
+}
+
+/**
+ * Creates a zip archive of a directory
+ * @param sourceDir - Directory to create a zip archive from
+ * @param zipPath - Path to save the zip file (if not provided, returns buffer)
+ * @param baseInZipPath - Base path within the zip archive
+ * @returns Buffer containing the zip file
+ */
+export async function createZipFromDirectory(
+  sourceDir: string,
+  baseInZipPath: string = ""
+): Promise<Buffer> {
+  const zip = new JSZip();
+  await addDirectoryToZip(sourceDir, baseInZipPath, zip);
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+/**
+ * Adds a directory to a zip archive recursively
+ * @param sourceDir - Source directory to add
+ * @param zipPath - Path within the zip archive
+ * @param zip - JSZip instance
+ */
+export async function addDirectoryToZip(
+  sourceDir: string,
+  zipPath: string,
+  zip: JSZip
+): Promise<void> {
+  if (!fsSync.existsSync(sourceDir)) {
+    return;
+  }
+
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const entryPath = zipPath ? `${zipPath}/${entry.name}` : entry.name;
+
+    if (entry.isDirectory()) {
+      // Recursively process subdirectory
+      await addDirectoryToZip(sourcePath, entryPath, zip);
+    } else {
+      // Add file to zip
+      const fileData = await fs.readFile(sourcePath);
+      zip.file(entryPath, fileData);
+    }
+  }
 }

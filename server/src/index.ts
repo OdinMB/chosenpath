@@ -1,12 +1,10 @@
 import http from "http";
 import express from "express";
 import cors from "cors";
-import path from "path";
 import { config } from "./config.js";
-import { Router } from "./routes.js";
-import { GameWebSocketServer } from "./shared/websocket.js";
-import { GameHandler } from "./game/GameHandler.js";
-import { imageRouter } from "./routes/images.js";
+import { router } from "./routes/index.js";
+import { GameWebSocketServer } from "./routes/websocket.js";
+import { GameHandler } from "game/GameHandler.js";
 
 async function startServer() {
   const app = express();
@@ -38,11 +36,8 @@ async function startServer() {
   );
   app.use(express.json());
 
-  // Mount the image routes for direct API access
-  app.use("/images", imageRouter);
-
   // Regular API routes
-  app.use("", Router);
+  app.use("", router);
 
   // Health check endpoint
   app.get("/health", (_, res) => {

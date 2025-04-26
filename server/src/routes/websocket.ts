@@ -10,7 +10,7 @@ import {
   ErrorResponse,
 } from "core/types/index.js";
 import { config } from "server/config.js";
-import { connectionManager } from "./ConnectionManager.js";
+import { connectionManager } from "../shared/ConnectionManager.js";
 import {
   RateLimitedAction,
   SOCKET_CONFIG,
@@ -20,8 +20,8 @@ import {
   checkRateLimit,
   incrementRateLimit,
   getClientIP,
-} from "./rateLimiter.js";
-import { Logger } from "./logger.js";
+} from "../shared/rateLimiter.js";
+import { Logger } from "../shared/logger.js";
 
 export class GameWebSocketServer {
   private io: Server;
