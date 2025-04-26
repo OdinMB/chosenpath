@@ -54,6 +54,8 @@ export const useTemplateLibrary = (token: string) => {
       template: Partial<StoryTemplate>;
       existingTemplate: StoryTemplate | null;
       isNewer: boolean;
+      templateDir: string;
+      isSameAge?: boolean;
     }>;
   }>({
     isOpen: false,
@@ -327,12 +329,28 @@ export const useTemplateLibrary = (token: string) => {
       const createdTemplate = response.data.template;
 
       // Find all files in this template directory
-      const templateFiles = zipFiles.filter(
-        (path) =>
-          path.startsWith(`${templateDir}/`) &&
-          path !== `${templateDir}/template.json` &&
-          !path.endsWith("/")
-      );
+      const templateFiles = zipFiles.filter((path) => {
+        // Skip directories and template.json itself
+        if (
+          path.endsWith("/") ||
+          path === "template.json" ||
+          (templateDir && path === `${templateDir}/template.json`)
+        ) {
+          return false;
+        }
+
+        // If we have a template directory, only include files from that directory
+        if (templateDir && !path.startsWith(`${templateDir}/`)) {
+          return false;
+        }
+
+        // If we're at root (templateDir is empty), only include root files, not subdirectories
+        if (templateDir === "" && path.includes("/")) {
+          return false;
+        }
+
+        return true;
+      });
 
       if (templateFiles.length > 0) {
         // Generate a new zip with just the template files
@@ -341,7 +359,10 @@ export const useTemplateLibrary = (token: string) => {
         // Add files to the zip with proper relative paths
         for (const filePath of templateFiles) {
           // Get the relative path from the template directory
-          const relativePath = filePath.substring(templateDir.length + 1);
+          let relativePath = filePath;
+          if (templateDir && filePath.startsWith(`${templateDir}/`)) {
+            relativePath = filePath.substring(templateDir.length + 1);
+          }
 
           // Get the file content
           const fileData = await zipData.files[filePath].async("blob");
@@ -359,7 +380,10 @@ export const useTemplateLibrary = (token: string) => {
 
       Logger.Admin.log(`Imported template: ${createdTemplate.title}`);
     } catch (error) {
-      Logger.Admin.error(`Error importing template from ${templateDir}`, error);
+      Logger.Admin.error(
+        `Error importing template from ${templateDir || "root"}`,
+        error
+      );
       throw error;
     }
   };
@@ -647,24 +671,47 @@ export const useTemplateLibrary = (token: string) => {
           const zipData = await zip.loadAsync(file);
           const zipFiles = Object.keys(zipData.files);
 
-          // Find all template directories under templates/
-          const templateDirs = zipFiles
+          // Find all directories at the root level that contain template.json files
+          // This matches the export structure: [templateId]/template.json
+          const rootDirs = new Set<string>();
+
+          // First collect all directories at root level
+          zipFiles
             .filter(
               (path) =>
-                path.startsWith("templates/") &&
-                path.endsWith("/") &&
-                path.split("/").length === 3
+                path.includes("/") &&
+                !path.substring(path.indexOf("/") + 1).includes("/")
             )
-            .map((path) => path.slice(0, -1)); // Remove trailing slash
+            .forEach((path) => {
+              const dir = path.substring(0, path.indexOf("/"));
+              if (dir) rootDirs.add(dir);
+            });
+
+          // Also include directories that have deeper structure
+          zipFiles
+            .filter((path) => path.includes("/"))
+            .forEach((path) => {
+              const dir = path.substring(0, path.indexOf("/"));
+              if (dir) rootDirs.add(dir);
+            });
+
+          Logger.Admin.log(
+            `Found ${rootDirs.size} top-level directories in ZIP`
+          );
+
+          // Filter to only include directories that contain template.json
+          const templateDirs = Array.from(rootDirs).filter((dir) =>
+            zipFiles.includes(`${dir}/template.json`)
+          );
 
           if (templateDirs.length === 0) {
             throw new Error(
-              "No template directories found in the templates/ directory"
+              "No template.json files found in the expected structure. Each template should be in its own directory at the root level."
             );
           }
 
           Logger.Admin.log(
-            `Found ${templateDirs.length} templates in the ZIP file`
+            `Found ${templateDirs.length} template directories in the ZIP file`
           );
 
           // Process each template to prepare for confirmation
@@ -673,6 +720,7 @@ export const useTemplateLibrary = (token: string) => {
             existingTemplate: StoryTemplate | null;
             isNewer: boolean;
             templateDir: string;
+            isSameAge?: boolean;
           }> = [];
 
           for (const templateDir of templateDirs) {
@@ -697,11 +745,21 @@ export const useTemplateLibrary = (token: string) => {
                 ? compareTemplateVersions(existingTemplate, templateData)
                 : false;
 
+              // Check if same age (same updatedAt timestamp)
+              const isSameAge =
+                existingTemplate &&
+                templateData.updatedAt &&
+                existingTemplate.updatedAt
+                  ? new Date(templateData.updatedAt).getTime() ===
+                    new Date(existingTemplate.updatedAt).getTime()
+                  : false;
+
               templateInfos.push({
                 template: templateData,
                 existingTemplate,
                 isNewer,
                 templateDir,
+                isSameAge,
               });
             } catch (importError) {
               Logger.Admin.error(
@@ -720,15 +778,11 @@ export const useTemplateLibrary = (token: string) => {
               (info) => info.existingTemplate && info.isNewer
             ).length,
             older: templateInfos.filter(
-              (info) => info.existingTemplate && !info.isNewer
+              (info) =>
+                info.existingTemplate && !info.isNewer && !info.isSameAge
             ).length,
             same: templateInfos.filter(
-              (info) =>
-                info.existingTemplate &&
-                info.template.updatedAt &&
-                info.existingTemplate.updatedAt &&
-                new Date(info.template.updatedAt).getTime() ===
-                  new Date(info.existingTemplate.updatedAt).getTime()
+              (info) => info.existingTemplate && info.isSameAge
             ).length,
           };
 
@@ -770,10 +824,21 @@ export const useTemplateLibrary = (token: string) => {
                 ? compareTemplateVersions(existingTemplate, templateData)
                 : false;
 
+              // Check if same age (same updatedAt timestamp)
+              const isSameAge =
+                existingTemplate &&
+                templateData.updatedAt &&
+                existingTemplate.updatedAt
+                  ? new Date(templateData.updatedAt).getTime() ===
+                    new Date(existingTemplate.updatedAt).getTime()
+                  : false;
+
               return {
                 template: templateData,
                 existingTemplate,
                 isNewer,
+                templateDir: "", // JSON templates don't have a directory structure
+                isSameAge,
               };
             });
 
@@ -786,15 +851,11 @@ export const useTemplateLibrary = (token: string) => {
                 (info) => info.existingTemplate && info.isNewer
               ).length,
               older: templateInfos.filter(
-                (info) => info.existingTemplate && !info.isNewer
+                (info) =>
+                  info.existingTemplate && !info.isNewer && !info.isSameAge
               ).length,
               same: templateInfos.filter(
-                (info) =>
-                  info.existingTemplate &&
-                  info.template.updatedAt &&
-                  info.existingTemplate.updatedAt &&
-                  new Date(info.template.updatedAt).getTime() ===
-                    new Date(info.existingTemplate.updatedAt).getTime()
+                (info) => info.existingTemplate && info.isSameAge
               ).length,
             };
 
@@ -849,33 +910,14 @@ export const useTemplateLibrary = (token: string) => {
         const zipData = await zip.loadAsync(collectionImportDialog.file);
         const zipFiles = Object.keys(zipData.files);
 
-        // Find all template directories under templates/
-        const templateDirs = zipFiles
-          .filter(
-            (path) =>
-              path.startsWith("templates/") &&
-              path.endsWith("/") &&
-              path.split("/").length === 3
-          )
-          .map((path) => path.slice(0, -1)); // Remove trailing slash
+        // Import each template from the dialog
+        for (const templateInfo of collectionImportDialog.templates) {
+          const templateDir = templateInfo.templateDir;
 
-        // Import each template
-        for (const templateDir of templateDirs) {
           try {
-            // Find and read template.json
-            const templateJsonPath = `${templateDir}/template.json`;
-            const templateFile = zipData.files[templateJsonPath];
-
-            if (!templateFile) {
-              continue;
-            }
-
-            // Parse template data
-            const templateData = await parseTemplateFromZip(templateFile);
-
             // Import this template with all its assets from its directory
             await importTemplateFromCollection(
-              templateData,
+              templateInfo.template,
               templateDir,
               zipData,
               zipFiles
