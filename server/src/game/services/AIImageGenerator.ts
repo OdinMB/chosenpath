@@ -54,6 +54,48 @@ export class AIImageGenerator {
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
 
+  public async generatePlayerImageForTemplate(
+    playerSlot: string,
+    identityIndex: number,
+    templateId: string,
+    appearance: string,
+    imageInstructions?: ImageInstructions,
+    size?: ImageSize,
+    quality?: ImageQuality
+  ): Promise<string> {
+    // Create a unique ID for the player identity image
+    const imageId = `${playerSlot}_${identityIndex}`;
+
+    // Create the full prompt for the player character
+    let prompt = `Generate a portrait image of a character with the following appearance:\n\n${appearance}`;
+
+    if (imageInstructions) {
+      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
+        imageInstructions
+      )}`;
+    }
+
+    Logger.Story.log(
+      `Generating player image for ${playerSlot} identity ${identityIndex}`
+    );
+
+    // Generate the image
+    const imageBuffer = await this.generateImage(
+      prompt,
+      undefined, // No references
+      size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
+      quality || IMAGE_QUALITIES.HIGH // Default to high quality for player images
+    );
+
+    // Save the image in template/images/players directory
+    return this.saveImageToTemplate(
+      imageId,
+      templateId,
+      imageBuffer,
+      "players" // image subdirectory
+    );
+  }
+
   public async generateCoverImageForTemplate(
     templateId: string,
     coverPrompt: string,
@@ -70,7 +112,7 @@ export class AIImageGenerator {
       )}`;
     }
 
-    Logger.Story.log("Generating cover imag");
+    Logger.Story.log("Generating cover image");
 
     // Generate the image
     const imageBuffer = await this.generateImage(
@@ -229,27 +271,36 @@ export class AIImageGenerator {
   private async saveImageToTemplate(
     imageId: string,
     templateId: string,
-    imageBuffer: Buffer
+    imageBuffer: Buffer,
+    subDir?: string
   ): Promise<string> {
     try {
-      const fileName = `${imageId}.jpeg`;
+      const fileName = `${imageId.replace(/\//g, "_")}.jpeg`;
       // Get the template directory path using storageUtils
       const templatesBasePath = getStoragePath("templates");
       // Create the template-specific directory if it doesn't exist
-      const templateDir = path.join(templatesBasePath, templateId, "images");
-      if (!fs.existsSync(templateDir)) {
-        fs.mkdirSync(templateDir, { recursive: true });
-        Logger.Story.log(`Created template images directory: ${templateDir}`);
+      const storageDir = path.join(
+        templatesBasePath,
+        templateId,
+        "images",
+        subDir || ""
+      );
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        Logger.Story.log(`Created template images directory: ${storageDir}`);
       }
+
       // Save the image
-      const filePath = path.normalize(path.join(templateDir, fileName));
+      const filePath = path.normalize(path.join(storageDir, fileName));
       fs.writeFileSync(filePath, imageBuffer);
       Logger.Story.log(
         `Saved image ${imageId} to template: ${templateId} at path: ${filePath}`
       );
 
       // Return the access path with the correct route pattern /images/templates/:templateId/:path(*)
-      return `/images/templates/${templateId}/${fileName}`;
+      return `/images/templates/${templateId}/${
+        subDir ? `${subDir}/` : ""
+      }${fileName}`;
     } catch (error) {
       Logger.Story.error(
         `Error saving image ${imageId} to template: ${templateId}`,

@@ -252,6 +252,8 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
                 playerOptions={playerOptions}
                 onChange={() => {}}
                 playerStats={getEffectivePlayerStats()}
+                templateId={iterationData.id || ""}
+                imageInstructions={iterationData.imageInstructions}
                 characterSelectionIntroduction={
                   iterationData.characterSelectionIntroduction
                 }

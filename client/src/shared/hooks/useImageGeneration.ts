@@ -5,10 +5,12 @@ import {
   ImageQuality,
   ImageSize,
   ImageInstructions,
+  CharacterIdentity,
 } from "core/types";
 import {
   GenerateElementImageRequest,
   GenerateCoverImageRequest,
+  GeneratePlayerImageRequest,
   GenerateImageResponse,
   ResponseStatus,
   SuccessResponse,
@@ -21,6 +23,9 @@ interface UseImageGenerationResult {
   ) => Promise<GenerateImageResponse | null>;
   generateCoverImage: (
     params: GenerateCoverImageParams
+  ) => Promise<GenerateImageResponse | null>;
+  generateImageForPlayer: (
+    params: GeneratePlayerImageParams
   ) => Promise<GenerateImageResponse | null>;
   isGenerating: boolean;
   error: string | null;
@@ -37,6 +42,16 @@ interface GenerateElementImageParams {
 interface GenerateCoverImageParams {
   templateId: string;
   coverPrompt: string;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
+
+interface GeneratePlayerImageParams {
+  templateId: string;
+  playerSlot: string;
+  identity: CharacterIdentity;
+  identityIndex: number;
   imageInstructions?: ImageInstructions;
   size?: ImageSize;
   quality?: ImageQuality;
@@ -210,9 +225,105 @@ export function useImageGeneration(): UseImageGenerationResult {
     }
   };
 
+  const generateImageForPlayer = async (
+    params: GeneratePlayerImageParams
+  ): Promise<GenerateImageResponse | null> => {
+    const {
+      templateId,
+      playerSlot,
+      identity,
+      identityIndex,
+      imageInstructions,
+      size,
+      quality,
+    } = params;
+
+    console.log("useImageGeneration: Starting player image generation", {
+      templateId,
+      playerSlot,
+      identity,
+      identityIndex,
+    });
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      // Prepare the request payload
+      const payload: GeneratePlayerImageRequest = {
+        templateId,
+        playerSlot,
+        identityIndex,
+        // Include character name in appearance for better results
+        appearance: identity.name
+          ? `${identity.name}: ${identity.appearance}`
+          : identity.appearance,
+        imageInstructions,
+        size,
+        quality,
+      };
+
+      console.log(
+        "Sending player image generation request with payload:",
+        payload
+      );
+
+      // Use the API_CONFIG.DEFAULT_API_URL for the endpoint
+      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/image-generation/template/player`;
+      console.log("Request URL:", apiUrl);
+
+      // Make the API request
+      const response = await axios.post<SuccessResponse<GenerateImageResponse>>(
+        apiUrl,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }
+      );
+
+      console.log("Player image generation response:", response.data);
+
+      // Handle successful response
+      if (response.data.status === ResponseStatus.SUCCESS) {
+        console.log("Player image generated successfully for", playerSlot);
+        return response.data.data;
+      }
+
+      throw new Error("Failed to generate player image");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error occurred";
+
+      setError(errorMessage);
+      console.error("Player image generation failed:", errorMessage);
+
+      if (axios.isAxiosError(err)) {
+        console.error("Axios error details:", {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          headers: err.response?.headers,
+          config: {
+            url: err.config?.url,
+            method: err.config?.method,
+            data: err.config?.data,
+          },
+        });
+      }
+
+      return null;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return {
     generateImageForElement,
     generateCoverImage,
+    generateImageForPlayer,
     isGenerating,
     error,
   };

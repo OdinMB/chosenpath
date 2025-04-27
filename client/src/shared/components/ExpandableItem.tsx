@@ -163,7 +163,7 @@ export function ExpandableItem<T>({
           <div className="flex-1">
             <span className="font-medium">{title}</span>
             {description && (
-              <p className="text-sm text-gray-600 mt-1">{description}</p>
+              <div className="text-sm text-gray-600 mt-1">{description}</div>
             )}
           </div>
           <button
@@ -233,7 +233,7 @@ export function ExpandableItem<T>({
               </div>
             </div>
             {description && (
-              <p className="text-sm text-gray-600 mt-1">{description}</p>
+              <div className="text-sm text-gray-600 mt-1">{description}</div>
             )}
           </div>
         </div>

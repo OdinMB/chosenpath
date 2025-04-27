@@ -4,6 +4,7 @@ import {
   PlayerOptionsGeneration,
   PlayerSlot,
   Stat,
+  ImageInstructions,
 } from "core/types";
 import { MAX_PLAYERS } from "core/config";
 import { usePlayerEditor } from "../hooks/usePlayerEditor";
@@ -18,6 +19,8 @@ interface PlayersTabProps {
   ) => void;
   characterSelectionIntroduction?: CharacterSelectionIntroduction;
   readOnly?: boolean;
+  templateId: string;
+  imageInstructions?: ImageInstructions;
 }
 
 export const PlayersTab: React.FC<PlayersTabProps> = ({
@@ -27,6 +30,8 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   characterSelectionIntroduction,
   onCharacterSelectionIntroductionChange,
   readOnly = false,
+  templateId,
+  imageInstructions,
 }) => {
   const {
     editingPlayers,
@@ -108,6 +113,8 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             handleDeleteOutcome={handleDeleteOutcome}
             handleSave={handleSave}
             readOnly={readOnly}
+            templateId={templateId}
+            imageInstructions={imageInstructions}
           />
         );
       })}

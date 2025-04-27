@@ -30,6 +30,19 @@ export interface GenerateCoverImageRequest extends ClientRequest {
 }
 
 /**
+ * Image generation request for a player identity
+ */
+export interface GeneratePlayerImageRequest extends ClientRequest {
+  templateId: string;
+  playerSlot: string;
+  identityIndex: number;
+  appearance: string;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
+
+/**
  * Response for a successful image generation
  */
 export interface GenerateImageResponse {

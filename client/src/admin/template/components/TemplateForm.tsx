@@ -343,6 +343,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
               onChange={handlePlayerChange}
               playerStats={formData.playerStats || []}
+              templateId={formData.id}
+              imageInstructions={formData.imageInstructions}
               characterSelectionIntroduction={
                 formData.characterSelectionIntroduction || {
                   title: "",

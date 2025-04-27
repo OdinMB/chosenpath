@@ -1,11 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { ExpandableItem } from "components";
 import { Input, Select } from "components/ui";
-import { CharacterIdentity } from "core/types";
+import { CharacterIdentity, ImageInstructions } from "core/types";
+import { Icons } from "../../../shared/components/ui/Icons";
+import { ImageWithPlaceholder } from "../../../shared/components/ui/ImageWithPlaceholder";
+import { useImageGeneration } from "../../../shared/hooks/useImageGeneration";
 
 interface PlayerIdentityEditorProps {
   identity: CharacterIdentity;
   index: number;
+  playerSlot: string;
   editingIdentities: Set<string>;
   setEditingIdentities: (updater: (prev: Set<string>) => Set<string>) => void;
   onDelete: (index: number) => void;
@@ -20,18 +24,60 @@ interface PlayerIdentityEditorProps {
     };
   }>;
   readOnly?: boolean;
+  templateId: string;
+  imageInstructions?: ImageInstructions;
 }
 
 export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   identity,
   index,
+  playerSlot,
   editingIdentities,
   setEditingIdentities,
   onDelete,
   onUpdate,
   pronounSets,
   readOnly = false,
+  templateId,
+  imageInstructions,
 }) => {
+  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
+  const { generateImageForPlayer, isGenerating: isGeneratingImage } =
+    useImageGeneration();
+
+  const handleGenerateImage = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (!templateId || !identity.appearance) {
+      console.error("Missing required parameters for image generation:", {
+        templateId,
+        appearance: identity.appearance,
+      });
+      return;
+    }
+
+    try {
+      const result = await generateImageForPlayer({
+        templateId,
+        playerSlot,
+        identity,
+        identityIndex: index,
+        imageInstructions,
+      });
+
+      if (result) {
+        console.log("Player image generation completed:", result);
+        // Force image refresh
+        setImageRefreshKey(Date.now());
+      }
+    } catch (error) {
+      console.error("Error generating player image:", error);
+    }
+  };
+
   const renderIdentityForm = (
     data: CharacterIdentity,
     onChange: (updatedData: CharacterIdentity) => void
@@ -87,10 +133,45 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
     );
   };
 
+  // Create character description with pronouns and appearance
+  const identityDescription = (
+    <div>
+      {identity.pronouns && (
+        <div className="mb-1">
+          <span className="text-sm">Pronouns: </span>
+          <span className="text-sm">
+            {identity.pronouns.personal}/{identity.pronouns.object}
+          </span>
+        </div>
+      )}
+      {identity.appearance && (
+        <div className="text-sm">{identity.appearance}</div>
+      )}
+    </div>
+  );
+
+  // Create character image for the collapsed view
+  const identityImage = (
+    <ImageWithPlaceholder
+      templateId={templateId}
+      imagePath={`players/${playerSlot}_${index}.jpeg`}
+      alt={identity.name || `Character ${index + 1}`}
+      height="80px"
+      width="80px"
+      iconOnly={true}
+      iconSize="h-6 w-6"
+      isLoading={isGeneratingImage}
+      refreshKey={imageRefreshKey}
+      borderRadius="rounded-full" // Make character images round
+    />
+  );
+
   return (
     <ExpandableItem
       id={`identity_${index}`}
       title={identity.name || `Identity ${index + 1}`}
+      description={identityDescription}
+      image={identityImage}
       data={identity}
       editingSet={editingIdentities}
       setEditing={setEditingIdentities}
@@ -99,6 +180,28 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
       renderEditForm={renderIdentityForm}
       isSaveDisabled={() => false}
       readOnly={readOnly}
+      actionIcons={[
+        {
+          icon: isGeneratingImage ? (
+            <Icons.Spinner className="h-5 w-5" />
+          ) : (
+            <Icons.CreateImage className="h-5 w-5" />
+          ),
+          onClick: handleGenerateImage,
+          className: `text-blue-500 hover:text-blue-700 ${
+            isGeneratingImage ? "text-blue-500" : ""
+          }`,
+          ariaLabel: `Generate image for ${
+            identity.name || `Identity ${index + 1}`
+          }`,
+          title: identity.appearance
+            ? isGeneratingImage
+              ? "Generating image..."
+              : "Generate an image based on the character's appearance"
+            : "Character must have an appearance description to generate an image",
+          disabled: isGeneratingImage || !identity.appearance || !templateId,
+        },
+      ]}
     />
   );
 };

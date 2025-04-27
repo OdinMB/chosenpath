@@ -48,11 +48,9 @@ export const CharacterSelectionIntroEditor: React.FC<
         </div>
         <div className="space-y-2">
           <div>
-            <span className="font-medium">Title:</span>{" "}
             <span>{introduction.title || "No title set"}</span>
           </div>
           <div>
-            <span className="font-medium">Introduction Text:</span>
             <p className="mt-1 text-sm text-gray-600">
               {introduction.text || "No introduction text set"}
             </p>

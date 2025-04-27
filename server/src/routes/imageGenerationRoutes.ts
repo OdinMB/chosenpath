@@ -75,6 +75,70 @@ router.post("/image-generation/template/element", async (req, res) => {
 });
 
 /**
+ * Generate an image for a player identity in a template
+ */
+router.post("/image-generation/template/player", async (req, res) => {
+  try {
+    const {
+      templateId,
+      playerSlot,
+      identityIndex,
+      appearance,
+      imageInstructions,
+      size,
+      quality,
+    } = req.body;
+
+    // Basic validation
+    if (
+      !templateId ||
+      !playerSlot ||
+      identityIndex === undefined ||
+      !appearance
+    ) {
+      return res.status(400).json({
+        status: ResponseStatus.INVALID,
+        requestId: req.body.requestId || uuidv4(),
+        timestamp: Date.now(),
+        errorMessage:
+          "Missing required fields: templateId, playerSlot, identityIndex, and appearance are required",
+      });
+    }
+
+    // Generate the image
+    const imagePath = await aiImageGenerator.generatePlayerImageForTemplate(
+      playerSlot,
+      identityIndex,
+      templateId,
+      appearance,
+      imageInstructions,
+      size || IMAGE_SIZES.PORTRAIT,
+      quality || IMAGE_QUALITIES.HIGH
+    );
+
+    // Return success response
+    return res.status(200).json({
+      status: ResponseStatus.SUCCESS,
+      requestId: req.body.requestId || uuidv4(),
+      timestamp: Date.now(),
+      data: {
+        imageId: `${playerSlot}_${identityIndex}`,
+        imagePath,
+      } as GenerateImageResponse,
+    });
+  } catch (error) {
+    Logger.Story.error("Error generating image for player identity:", error);
+    return res.status(500).json({
+      status: ResponseStatus.ERROR,
+      requestId: req.body.requestId || uuidv4(),
+      timestamp: Date.now(),
+      errorMessage: "Failed to generate player image",
+      operationType: "PLAYER_IMAGE_GENERATION",
+    });
+  }
+});
+
+/**
  * Generate a cover image for a template
  */
 router.post("/image-generation/template/cover", async (req, res) => {

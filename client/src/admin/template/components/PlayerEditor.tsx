@@ -6,6 +6,7 @@ import {
   CharacterIdentity,
   CharacterBackground,
   Outcome,
+  ImageInstructions,
 } from "core/types";
 import { ExpandableItem } from "components";
 import { PrimaryButton, Icons, Select } from "components/ui";
@@ -96,6 +97,8 @@ interface PlayerEditorProps {
   handleDeleteOutcome: (playerSlot: PlayerSlot, index: number) => void;
   handleSave: (playerSlot: PlayerSlot) => void;
   readOnly?: boolean;
+  templateId: string;
+  imageInstructions?: ImageInstructions;
 }
 
 export const PlayerEditor: React.FC<PlayerEditorProps> = ({
@@ -123,6 +126,8 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
   handleDeleteOutcome,
   handleSave,
   readOnly = false,
+  templateId,
+  imageInstructions,
 }) => {
   // Render form for the ExpandableItem component
   const renderPlayerForm = (
@@ -150,6 +155,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
               key={`${playerSlot}_identity_${index}`}
               identity={identity}
               index={index}
+              playerSlot={playerSlot}
               editingIdentities={editingIdentities}
               setEditingIdentities={setEditingIdentities}
               onDelete={() => handleDeleteIdentity(playerSlot, index)}
@@ -162,6 +168,8 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
               }}
               pronounSets={PRONOUN_SETS}
               readOnly={readOnly}
+              templateId={templateId}
+              imageInstructions={imageInstructions}
             />
           ))}
         </div>
