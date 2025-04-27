@@ -129,4 +129,17 @@ export class ClientStateManager {
 
     return clientStat as ClientStat;
   }
+
+  /**
+   * Check if the story has images based on templateId or generateImages flag
+   */
+  hasStoryImages(state: StoryState | ClientStoryState): boolean {
+    // Check if the story has a templateId
+    const hasTemplateId = !!state.templateId && state.templateId.trim() !== "";
+
+    // Check if the story has the generateImages flag set to true
+    const hasGenerateImages = !!state.generateImages;
+
+    return hasTemplateId || hasGenerateImages;
+  }
 }

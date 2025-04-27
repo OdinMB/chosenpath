@@ -4,11 +4,14 @@ import {
   CharacterIdentity,
   CharacterBackground,
   PlayerOptionsGeneration,
+  Image as ImageType,
 } from "core/types";
 import { CharacterCard } from "./CharacterCard";
 import { StatDisplay } from "./StatDisplay";
 import { replacePronounPlaceholders } from "core/utils/playerUtils";
 import { PrimaryButton } from "components/ui";
+import { ClientStateManager } from "core/models/ClientStateManager";
+import { StoryImage } from "shared/components/StoryImage";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -22,6 +25,7 @@ export function CharacterSelection({
   const [selectedBackground, setSelectedBackground] = useState<number | null>(
     null
   );
+  const stateManager = new ClientStateManager();
 
   // Check if we're waiting for character selection to process
   const isSelectionPending =
@@ -55,6 +59,9 @@ export function CharacterSelection({
   const currentPlayer = storyState.players[playerSlot];
   const hasSelectedCharacter = currentPlayer?.characterSelected === true;
 
+  // Check if the story has images
+  const hasImages = stateManager.hasStoryImages(storyState);
+
   if (!options) return null;
 
   const handleConfirmSelection = () => {
@@ -69,21 +76,56 @@ export function CharacterSelection({
     return null;
   }
 
-  const renderIdentityCard = (identity: CharacterIdentity, index: number) => (
-    <CharacterCard
-      key={`identity-${index}`}
-      isSelected={selectedIdentity === index}
-      onClick={() => setSelectedIdentity(index)}
-    >
-      <h3 className="font-bold text-lg md:text-xl text-primary">
-        {identity.name}
-      </h3>
-      <p className="text-primary-700 mb-3">
-        {identity.pronouns.personal}/{identity.pronouns.object}
-      </p>
-      <p className="text-primary-600 text-base">{identity.appearance}</p>
-    </CharacterCard>
-  );
+  const renderIdentityCard = (identity: CharacterIdentity, index: number) => {
+    // Create image object if the story has images
+    let characterImage: ImageType | undefined;
+    if (hasImages && storyState.templateId) {
+      console.log("story has images", hasImages);
+      characterImage = {
+        id: `${playerSlot}_${index}`,
+        fileType: "jpeg",
+        subDirectory: "players",
+        source: "template",
+        status: "ready",
+      };
+    }
+
+    return (
+      <CharacterCard
+        key={`identity-${index}`}
+        isSelected={selectedIdentity === index}
+        onClick={() => setSelectedIdentity(index)}
+      >
+        <div className="flex flex-col">
+          {characterImage && (
+            <div
+              className="w-full mb-4 overflow-hidden rounded-lg"
+              style={{ height: "180px" }}
+            >
+              <StoryImage
+                image={characterImage}
+                alt={`${identity.name}`}
+                templateId={storyState.templateId}
+                className="w-full h-full"
+                responsivePosition={true}
+                desktopOffset="5%"
+                mobileOffset="15%"
+              />
+            </div>
+          )}
+          <div>
+            <h3 className="font-bold text-lg md:text-xl text-primary">
+              {identity.name}
+            </h3>
+            <p className="text-primary-700 mb-3">
+              {identity.pronouns.personal}/{identity.pronouns.object}
+            </p>
+            <p className="text-primary-600 text-base">{identity.appearance}</p>
+          </div>
+        </div>
+      </CharacterCard>
+    );
+  };
 
   const renderBackgroundCard = (
     background: CharacterBackground,

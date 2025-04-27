@@ -486,44 +486,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
           </h2>
 
           <div className="narrative-container relative">
-            {storyState.generateImages && (
-              <div
-                className={`
-                w-full sm:w-64 sm:float-right sm:ml-6 mb-4 
-                aspect-square sm:h-64
-                max-w-[256px] mx-auto
-                ${!currentBeat.imageId ? "bg-gray-50" : ""}
-              `}
-              >
-                {currentBeat.imageId &&
-                storyState.images.find(
-                  (img) =>
-                    img.id === currentBeat.imageId && img.status === "ready"
-                ) ? (
-                  <img
-                    src={
-                      storyState.images.find(
-                        (img) => img.id === currentBeat.imageId
-                      )?.url
-                    }
-                    alt={
-                      storyState.images.find(
-                        (img) => img.id === currentBeat.imageId
-                      )?.description ?? ""
-                    }
-                    className="w-full h-full object-cover rounded-lg shadow-md border-l-4 border border-accent"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center border-l-4 border border-accent rounded-lg shadow-md bg-white">
-                    <LoadingSpinner
-                      size="small"
-                      message="Generating image..."
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
               {React.createElement(
                 ReactMarkdown as ComponentType<{

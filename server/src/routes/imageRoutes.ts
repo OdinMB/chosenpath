@@ -7,12 +7,12 @@ import { sendError, sendNotFound } from "shared/responseUtils.js";
 const imageRouter = express.Router();
 
 // Debug middleware to log all image requests
-imageRouter.use((req, res, next) => {
-  // console.log(`[IMAGE-DEBUG] Request received: ${req.method} ${req.path}`);
-  // Logger.Route.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
-  // console.log(`[IMAGE-DEBUG] Headers: ${JSON.stringify(req.headers, null, 2)}`);
-  next();
-});
+// imageRouter.use((req, res, next) => {
+// console.log(`[IMAGE-DEBUG] Request received: ${req.method} ${req.path}`);
+// Logger.Route.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
+// console.log(`[IMAGE-DEBUG] Headers: ${JSON.stringify(req.headers, null, 2)}`);
+// next();
+// });
 
 // Use a more flexible route pattern with an optional path parameter
 // Changed to /templates/:templateId/:path(*) to work with /images prefix
