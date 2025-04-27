@@ -54,23 +54,23 @@ export const Tabs = <T extends string>({
     <div
       className={
         variant === "underline" || variant === "bordered"
-          ? "border-b border-gray-200"
-          : ""
+          ? "border-b border-gray-200 w-full"
+          : "w-full"
       }
     >
       <nav
         className={
           variant === "underline" || variant === "bordered"
-            ? "-mb-px flex"
-            : "flex"
+            ? "-mb-px flex w-full overflow-x-auto scrollbar-hide"
+            : "flex w-full overflow-x-auto scrollbar-hide"
         }
       >
-        <div className="flex space-x-1">
+        <div className="flex min-w-full md:min-w-0 space-x-1 pb-1">
           {items.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              className={getTabStyles(activeTab === tab.id)}
+              className={`${getTabStyles(activeTab === tab.id)} flex-shrink-0`}
               onClick={() => onTabChange(tab.id)}
             >
               {tab.label}
