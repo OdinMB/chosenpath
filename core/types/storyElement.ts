@@ -17,10 +17,15 @@ export const storyElementSchema = z.object({
     .describe(
       "Instructions on how to use the element in the story. Can be related to both narrative and mechanics."
     ),
+  appearance: z
+    .string()
+    .describe(
+      "A description of the element's appearance in one sentence. Only for story elements that have a visual representation (e.g. NPCs, locations, items). For abstract elements (e.g. conflicts, mysteries, rumors), leave empty."
+    ),
   facts: z
     .array(z.string())
     .describe(
-      "Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
+      "Three additional facts about the story element. For NPCs, include their preferred pronouns and motivations."
     ),
 });
 

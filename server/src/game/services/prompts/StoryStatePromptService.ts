@@ -156,10 +156,14 @@ ${modeDescriptions[story.getGameMode()]}
                 element.facts.map((fact) => `- ${fact}`).join("\n")
               : "";
 
+          const appearance = element.appearance
+            ? `\nAppearance: ${element.appearance}`
+            : "";
+
           return [
             `${element.name} (id: ${element.id})`,
             `Role: ${element.role}`,
-            `Instructions: ${element.instructions}${facts}`,
+            `Instructions: ${element.instructions}${appearance}${facts}`,
           ].join("\n");
         })
         .join("\n\n"),

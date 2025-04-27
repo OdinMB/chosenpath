@@ -25,6 +25,7 @@ function createEmptyStoryElement(): StoryElement {
     name: "",
     role: "",
     instructions: "",
+    appearance: "",
     facts: [],
   };
 }

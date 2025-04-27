@@ -87,6 +87,25 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
           />
         </div>
 
+        <div className="flex items-start gap-2">
+          <span className="font-semibold w-36 pt-2">Appearance</span>
+          <TextArea
+            id={`element-appearance-${data.id}`}
+            name={`element-appearance-${data.id}`}
+            className="flex-1"
+            rows={3}
+            value={data.appearance}
+            onChange={(e) =>
+              onChange({
+                ...data,
+                appearance: e.target.value,
+              })
+            }
+            placeholder="Description of the element's visual appearance (for NPCs, locations, items)"
+            disabled={readOnly}
+          />
+        </div>
+
         <ArrayField
           title="Facts"
           tooltipText="Three facts about the story element. For NPCs, include their preferred pronouns and motivations."
