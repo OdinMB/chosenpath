@@ -1,8 +1,29 @@
 import { RateLimitedAction, ContentModerationAction } from "../config.js";
+import { ImageQuality, ImageSize, ImageInstructions } from "./index.js";
 
 // Base client request type
 export interface ClientRequest {
   requestId?: string;
+}
+
+/**
+ * Image generation request for a template element
+ */
+export interface GenerateElementImageRequest extends ClientRequest {
+  templateId: string;
+  elementId: string;
+  appearance: string;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
+
+/**
+ * Response for a successful image generation
+ */
+export interface GenerateImageResponse {
+  imageId: string;
+  imagePath: string;
 }
 
 /**

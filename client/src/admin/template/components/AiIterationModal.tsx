@@ -173,6 +173,7 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
                 elements={iterationData.storyElements}
                 onChange={() => {}}
                 readOnly={true}
+                templateId={iterationData.id}
               />
             </div>
           )}

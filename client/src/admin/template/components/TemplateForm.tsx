@@ -294,6 +294,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             <StoryElementsTab
               elements={formData.storyElements || []}
               onChange={handleStoryElementsChange}
+              templateId={formData.id}
+              imageInstructions={formData.imageInstructions}
             />
           )}
 

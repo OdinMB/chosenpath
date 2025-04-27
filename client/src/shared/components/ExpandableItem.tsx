@@ -1,6 +1,24 @@
 import React, { ReactNode, useState } from "react";
 import { PrimaryButton, Icons } from "components/ui";
 
+/**
+ * Configuration for a custom action icon in the ExpandableItem
+ */
+interface ActionIcon {
+  /** The icon component to render */
+  icon: ReactNode;
+  /** Function to call when the icon is clicked */
+  onClick: () => void;
+  /** Tooltip text for the icon */
+  title?: string;
+  /** Additional CSS classes for the icon button */
+  className?: string;
+  /** Whether the action is disabled */
+  disabled?: boolean;
+  /** Aria label for the button */
+  ariaLabel?: string;
+}
+
 interface ExpandableItemProps<T> {
   /** Unique identifier for this item */
   id: string;
@@ -26,6 +44,8 @@ interface ExpandableItemProps<T> {
   isSaveDisabled?: (data: T) => boolean;
   /** Whether the component is in read-only mode */
   readOnly?: boolean;
+  /** Additional action icons to display between edit and delete buttons */
+  actionIcons?: ActionIcon[];
 }
 
 export function ExpandableItem<T>({
@@ -39,6 +59,7 @@ export function ExpandableItem<T>({
   renderEditForm,
   isSaveDisabled = () => false,
   readOnly = false,
+  actionIcons = [],
 }: ExpandableItemProps<T>) {
   const isEditing = editingSet.has(id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -158,6 +179,28 @@ export function ExpandableItem<T>({
           >
             <Icons.Edit className="h-5 w-5" />
           </button>
+
+          {/* Render additional action icons */}
+          {actionIcons.map((actionIcon, index) => (
+            <button
+              key={`action-icon-${index}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                actionIcon.onClick();
+              }}
+              className={
+                actionIcon.className || "text-blue-500 hover:text-blue-700"
+              }
+              aria-label={actionIcon.ariaLabel || `Action for ${title}`}
+              title={actionIcon.title || ""}
+              disabled={actionIcon.disabled}
+              type="button"
+            >
+              {actionIcon.icon}
+            </button>
+          ))}
+
           {/* Only show delete button if onDelete is not an empty function */}
           {!isNoOpFunction && (
             <button

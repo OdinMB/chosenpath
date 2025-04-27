@@ -11,6 +11,7 @@ import type {
   BeatsNeedingImages,
   ImageSize,
   ImageQuality,
+  ImageInstructions,
 } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 import {
@@ -34,24 +35,16 @@ export class AIImageGenerator {
     this.openai = new OpenAI();
   }
 
-  public getImagePrompt(element: string, storyImageInstructions?: string) {
-    let prompt: string = "";
-    prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
-    prompt += `==========\n${element}\n==========`;
-    if (storyImageInstructions) {
-      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n==========\n${storyImageInstructions}\n==========`;
-    }
-    return prompt;
-  }
-
   public async generateImageForTemplate(
     imageId: string,
     templateId: string,
-    prompt: string,
+    elementAppearance: string,
+    imageInstructions?: ImageInstructions,
     references?: ImageReference[],
     size?: ImageSize,
     quality?: ImageQuality
   ): Promise<string> {
+    const prompt = this.getImagePrompt(elementAppearance, imageInstructions);
     const imageBuffer = await this.generateImage(
       prompt,
       references,
@@ -59,6 +52,28 @@ export class AIImageGenerator {
       quality
     );
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
+  }
+
+  public getImagePrompt(
+    elementAppearance: string,
+    imageInstructions?: ImageInstructions
+  ) {
+    let prompt: string = "";
+    prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
+    prompt += `==========\n${elementAppearance}\n==========`;
+    if (imageInstructions) {
+      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n==========\n`;
+
+      // Format the ImageInstructions object into a readable string
+      Object.entries(imageInstructions).forEach(([key, value]) => {
+        if (value) {
+          prompt += `${key}: ${value}\n`;
+        }
+      });
+
+      prompt += `==========`;
+    }
+    return prompt;
   }
 
   private async generateImage(

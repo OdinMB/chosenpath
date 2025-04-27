@@ -1,7 +1,9 @@
 import React from "react";
-import { StoryElement } from "core/types";
+import { StoryElement, ImageInstructions } from "core/types";
 import { Input, TextArea } from "components/ui";
 import { ArrayField, ExpandableItem } from "components";
+import { useImageGeneration } from "../../../shared/hooks/useImageGeneration";
+import { Icons } from "../../../shared/components/ui/Icons";
 
 interface StoryElementEditorProps {
   element: StoryElement;
@@ -11,6 +13,8 @@ interface StoryElementEditorProps {
   onDelete: (index: number) => void;
   onUpdate: (index: number, updatedElement: StoryElement) => void;
   readOnly?: boolean;
+  templateId: string;
+  imageInstructions?: ImageInstructions;
 }
 
 export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
@@ -21,7 +25,45 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   onDelete,
   onUpdate,
   readOnly = false,
+  templateId,
+  imageInstructions,
 }) => {
+  const { generateImageForElement, isGenerating } = useImageGeneration();
+
+  const handleGenerateImage = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (!templateId || !element.appearance) {
+      console.error("Missing required parameters for image generation:", {
+        templateId,
+        appearance: element.appearance,
+      });
+      return;
+    }
+
+    console.log(
+      "Starting image generation for element:",
+      element.id,
+      "in template:",
+      templateId
+    );
+
+    try {
+      const result = await generateImageForElement({
+        templateId,
+        element,
+        imageInstructions,
+      });
+
+      console.log("Image generation completed:", result);
+    } catch (error) {
+      console.error("Error in handleGenerateImage:", error);
+    }
+  };
+
   const renderElementForm = (
     data: StoryElement,
     onChange: (updatedData: StoryElement) => void
@@ -132,6 +174,20 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       renderEditForm={renderElementForm}
       isSaveDisabled={(element) => !element.name || !element.id}
       readOnly={readOnly}
+      actionIcons={[
+        {
+          icon: <Icons.CreateImage className="h-5 w-5" />,
+          onClick: handleGenerateImage,
+          className: `text-blue-500 hover:text-blue-700 ${
+            isGenerating ? "animate-pulse" : ""
+          }`,
+          ariaLabel: `Generate image for ${element.name}`,
+          title: element.appearance
+            ? "Generate an image based on the element's appearance"
+            : "Element must have an appearance description to generate an image",
+          disabled: isGenerating || !element.appearance || !templateId,
+        },
+      ]}
     />
   );
 };

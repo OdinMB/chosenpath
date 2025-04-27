@@ -1,20 +1,29 @@
 import React from "react";
-import { StoryElement } from "core/types";
+import { StoryElement, ImageInstructions } from "core/types";
 import { InfoIcon, PrimaryButton, Icons } from "components/ui";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 import { StoryElementEditor } from "./StoryElementEditor";
+import { useParams } from "react-router-dom";
 
 interface StoryElementsTabProps {
   elements: StoryElement[];
   onChange?: (elements: StoryElement[]) => void;
   readOnly?: boolean;
+  templateId?: string;
+  imageInstructions?: ImageInstructions;
 }
 
 export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   elements,
   onChange,
   readOnly = false,
+  templateId: propTemplateId,
+  imageInstructions,
 }) => {
+  // Get templateId from URL if not provided as prop
+  const { templateId: urlTemplateId } = useParams<{ templateId: string }>();
+  const templateId = propTemplateId || urlTemplateId;
+
   const {
     editingElements,
     handleAddElement,
@@ -42,6 +51,12 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
       }
     });
   };
+
+  if (!templateId) {
+    console.warn(
+      "StoryElementsTab: No templateId provided, image generation will be disabled"
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -75,6 +90,8 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           onDelete={handleRemoveElement}
           onUpdate={handleUpdateElement}
           readOnly={readOnly}
+          templateId={templateId || ""}
+          imageInstructions={imageInstructions}
         />
       ))}
     </div>
