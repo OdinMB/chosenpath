@@ -15,11 +15,13 @@ export const STORAGE_PATHS = {
     stories: "../data/stories",
     library: "../data/templates",
     mocks: "../data/mocks",
+    temp: "../data/temp",
   },
   production: {
     stories: "/data/stories",
     library: "/data/templates",
     mocks: "/data/mocks",
+    temp: "/data/temp",
   },
 };
 

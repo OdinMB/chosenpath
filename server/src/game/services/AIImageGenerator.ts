@@ -22,7 +22,6 @@ import path from "path";
 import { getStoragePath } from "shared/storageUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "shared/logger.js";
-
 dotenv.config();
 
 export class AIImageGenerator {
@@ -35,28 +34,45 @@ export class AIImageGenerator {
     this.openai = new OpenAI();
   }
 
-  private async generateImage(
+  public getImagePrompt(element: string, storyImageInstructions?: string) {
+    let prompt: string = "";
+    prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
+    prompt += `==========\n${element}\n==========`;
+    if (storyImageInstructions) {
+      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n==========\n${storyImageInstructions}\n==========`;
+    }
+    return prompt;
+  }
+
+  public async generateImageForTemplate(
+    imageId: string,
+    templateId: string,
     prompt: string,
-    templateId?: string,
     references?: ImageReference[],
     size?: ImageSize,
     quality?: ImageQuality
   ): Promise<string> {
+    const imageBuffer = await this.generateImage(
+      prompt,
+      references,
+      size,
+      quality
+    );
+    return this.saveImageToTemplate(imageId, templateId, imageBuffer);
+  }
+
+  private async generateImage(
+    prompt: string,
+    references?: ImageReference[],
+    size?: ImageSize,
+    quality?: ImageQuality
+  ): Promise<Buffer> {
     try {
-      const fullPrompt = `Create a digital art illustration that we can show in a story book for the following story element:
-<STORY ELEMENT>
-${prompt}
-</STORY ELEMENT>
-
-The image itself should not contain any of this text.
-
-Image instructions for this book: hyper-realistic, modern, slick, tense`;
-
-      Logger.Story.log("Image prompt:\n" + fullPrompt);
+      Logger.Story.log("Generating image for prompt:", prompt);
 
       const baseParams = {
         model: IMAGE_GENERATION_MODEL,
-        prompt: fullPrompt,
+        prompt,
         moderation: "low",
         n: 1,
         quality: quality || IMAGE_QUALITIES.MEDIUM,
@@ -94,26 +110,9 @@ Image instructions for this book: hyper-realistic, modern, slick, tense`;
         throw new Error("No image data in response from images.edit");
       }
 
-      // If templateId is provided, save the image to the template directory
-      if (templateId) {
-        const savedPath = await this.saveImageToTemplate(
-          imageBuffer,
-          templateId
-        );
-        return savedPath;
-      }
-
-      // Otherwise save to a temporary location and return the path
-      const tempDir = path.join(process.cwd(), "data", "temp");
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-
-      const tempPath = path.normalize(path.join(tempDir, `${uuidv4()}.jpeg`));
-      fs.writeFileSync(tempPath, imageBuffer);
-      return tempPath;
+      return imageBuffer;
     } catch (error) {
-      console.error("Error generating image:", error);
+      Logger.Story.error("Error generating image:", error);
       throw error;
     }
   }
@@ -163,31 +162,50 @@ Image instructions for this book: hyper-realistic, modern, slick, tense`;
   }
 
   private async saveImageToTemplate(
-    imageBuffer: Buffer,
-    templateId: string
+    imageId: string,
+    templateId: string,
+    imageBuffer: Buffer
   ): Promise<string> {
-    const imageId = uuidv4();
-    const fileName = `${imageId}.jpeg`;
-
-    // Get the template directory path using storageUtils
-    const templatesBasePath = getStoragePath("library");
-    // Create the template-specific directory if it doesn't exist
-    const templateDir = path.join(templatesBasePath, templateId, "images");
-    if (!fs.existsSync(templateDir)) {
-      fs.mkdirSync(templateDir, { recursive: true });
+    try {
+      const fileName = `${imageId}.jpeg`;
+      // Get the template directory path using storageUtils
+      const templatesBasePath = getStoragePath("library");
+      // Create the template-specific directory if it doesn't exist
+      const templateDir = path.join(templatesBasePath, templateId, "images");
+      if (!fs.existsSync(templateDir)) {
+        fs.mkdirSync(templateDir, { recursive: true });
+      }
+      // Save the image
+      const filePath = path.normalize(path.join(templateDir, fileName));
+      fs.writeFileSync(filePath, imageBuffer);
+      Logger.Story.log(`Saved image ${imageId} to template: ${templateId}`);
+      return filePath;
+    } catch (error) {
+      Logger.Story.error(
+        `Error saving image ${imageId} to template: ${templateId}`,
+        error
+      );
+      throw error;
     }
+  }
 
-    // Save the image
-    const filePath = path.normalize(path.join(templateDir, fileName));
-    fs.writeFileSync(filePath, imageBuffer);
-
-    return filePath;
+  private async saveImageToTemp(imageBuffer: Buffer): Promise<string> {
+    try {
+      const tempBasePath = getStoragePath("temp");
+      const tempPath = path.normalize(
+        path.join(tempBasePath, `${uuidv4()}.jpeg`)
+      );
+      fs.writeFileSync(tempPath, imageBuffer);
+      return tempPath;
+    } catch (error) {
+      Logger.Story.error("Error saving image to template:", error);
+      throw error;
+    }
   }
 
   async generateImagesForBeats(
     story: Story,
-    beatsNeedingImages: BeatsNeedingImages,
-    templateId?: string
+    beatsNeedingImages: BeatsNeedingImages
   ): Promise<Story> {
     let updatedStory = story;
 
@@ -209,8 +227,7 @@ Image instructions for this book: hyper-realistic, modern, slick, tense`;
 
           // Generate actual image
           const imagePath = await this.generateImage(
-            `Digital art illustration for a story book. The image is supposed to accompany the following text:\n\n${beat.text}. `,
-            templateId
+            `Digital art illustration for a story book. The image is supposed to accompany the following text:\n\n${beat.text}. `
           );
 
           updatedStory = updatedStory.updateImage(imageId, {
@@ -222,7 +239,7 @@ Image instructions for this book: hyper-realistic, modern, slick, tense`;
 
           updatedStory = updatedStory.setCurrentBeatImage(playerSlot, imageId);
         } catch (error) {
-          console.error("Failed to generate image for beat:", error);
+          Logger.Story.error("Failed to generate image for beat:", error);
         }
       }
     );
@@ -230,26 +247,6 @@ Image instructions for this book: hyper-realistic, modern, slick, tense`;
     await Promise.all(imagePromises);
 
     return updatedStory;
-  }
-
-  async generateSingleImage(
-    prompt: string,
-    templateId?: string,
-    references?: ImageReference[]
-  ): Promise<string> {
-    try {
-      // Pass reference images if provided
-      return await this.generateImage(
-        prompt,
-        templateId,
-        references,
-        undefined,
-        undefined
-      );
-    } catch (error) {
-      console.error("Failed to generate image:", error);
-      throw error;
-    }
   }
 }
 

@@ -58,9 +58,10 @@ describe("AIImageGenerator", function () {
       const prompt = `Vampire. A slender figure with androgynous features, pale skin, and a shock of silver-dyed hair.`;
 
       console.log("Test: Starting image generation");
-      const imagePath = await aiImageGenerator.generateSingleImage(
-        prompt,
-        TEMPLATE_ID
+      const imagePath = await aiImageGenerator.generateImageForTemplate(
+        "evelyn",
+        TEMPLATE_ID,
+        prompt
         // [imgEvelyn, imgTommy]
       );
       console.log("Image generated at path:", imagePath);
