@@ -76,7 +76,7 @@ export const imageInstructionsSchema = z
     coverPrompt: z
       .string()
       .describe(
-        "Prompt for generating the cover image. Focus on the elements that should be included in the cover image. Stylistic instructions will be added by the system based on the attributes above."
+        "Prompt for generating the cover image. Focus on the elements that should be included in the cover image. Stylistic instructions will be added by the system based on the attributes above. Remember that the identity of the player characters is not yet known."
       ),
   })
   .describe(

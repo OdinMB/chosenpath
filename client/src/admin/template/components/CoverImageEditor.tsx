@@ -3,7 +3,7 @@ import { TextArea, PrimaryButton } from "components/ui";
 import { Icons } from "components/ui/Icons";
 import { ImageInstructions, IMAGE_SIZES, IMAGE_QUALITIES } from "core/types";
 import { useImageGeneration } from "shared/hooks/useImageGeneration";
-import { API_CONFIG } from "core/config";
+import { ImageWithPlaceholder } from "shared/components/ui/ImageWithPlaceholder";
 
 interface CoverImageEditorProps {
   templateId: string;
@@ -18,46 +18,17 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   onUpdateCoverPrompt,
   readOnly = false,
 }) => {
-  const [coverImage, setCoverImage] = useState<string | null>(null);
   const { generateCoverImage, isGenerating, error } = useImageGeneration();
-
-  // Try to load the cover image when the component mounts or templateId changes
-  React.useEffect(() => {
-    const loadCoverImage = async () => {
-      if (!templateId) return;
-
-      // Use a timestamp query parameter to prevent caching
-      const timestamp = new Date().getTime();
-      // Format the path correctly to match the server's route pattern: /images/templates/:templateId/:path(*)
-      const coverImagePath = `${API_CONFIG.DEFAULT_API_URL}/images/templates/${templateId}/cover.jpeg?t=${timestamp}`;
-
-      try {
-        // Check if the image exists by making a HEAD request
-        const response = await fetch(coverImagePath, { method: "HEAD" });
-        if (response.ok) {
-          setCoverImage(coverImagePath);
-          console.log("Cover image found at:", coverImagePath);
-        } else {
-          setCoverImage(null);
-          console.log(
-            "Cover image not found, HEAD request failed:",
-            response.status,
-            response.statusText
-          );
-        }
-      } catch (err) {
-        console.error("Error checking cover image:", err);
-        setCoverImage(null);
-      }
-    };
-
-    loadCoverImage();
-  }, [templateId, isGenerating]);
+  const [localIsGenerating, setLocalIsGenerating] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
 
   const handleGenerateCoverImage = async () => {
     if (!templateId || !imageInstructions.coverPrompt) return;
 
     try {
+      // Set local loading state
+      setLocalIsGenerating(true);
+
       const result = await generateCoverImage({
         templateId,
         coverPrompt: imageInstructions.coverPrompt,
@@ -66,12 +37,15 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
         quality: IMAGE_QUALITIES.HIGH,
       });
 
-      if (result && result.imagePath) {
-        // Update the cover image URL to show the new image
-        setCoverImage(`${result.imagePath}?t=${new Date().getTime()}`);
-      }
+      console.log("Cover image generated:", result);
+
+      // Force a refresh of the image by updating the key
+      setImageRefreshKey(Date.now());
     } catch (err) {
       console.error("Error generating cover image:", err);
+    } finally {
+      // Reset loading state
+      setLocalIsGenerating(false);
     }
   };
 
@@ -81,24 +55,18 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
         {/* Cover Image Preview - Made smaller */}
         <div className="w-full md:w-1/3 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image</h3>
-          <div
-            className="border border-gray-300 rounded-lg flex items-center justify-center bg-gray-100 overflow-hidden"
-            style={{ height: "280px" }}
-          >
-            {coverImage ? (
-              <img
-                src={coverImage}
-                alt="Cover"
-                className="max-h-full max-w-full object-contain"
-              />
-            ) : (
-              <div className="text-center p-4 text-gray-500">
-                <Icons.CreateImage className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                <p>No cover image</p>
-                <p className="text-sm">Generate one using the prompt</p>
-              </div>
-            )}
-          </div>
+          <ImageWithPlaceholder
+            templateId={templateId}
+            imagePath="cover.jpeg"
+            alt="Cover"
+            height="280px"
+            className="w-full"
+            placeholderText="No cover image"
+            placeholderSubtext="Generate one using the prompt"
+            isLoading={localIsGenerating}
+            refreshKey={imageRefreshKey}
+            borderRadius="rounded-md"
+          />
         </div>
 
         {/* Cover Prompt Input - Moved lower and reorganized */}
@@ -118,7 +86,7 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
               placeholder="E.g., A mysterious forest at twilight with ancient ruins barely visible through the mist. A cloaked figure stands at a crossroads, their face hidden in shadow."
               className="w-full mb-4"
               rows={5}
-              disabled={readOnly}
+              disabled={readOnly || localIsGenerating}
             />
 
             {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
@@ -129,11 +97,12 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
                 onClick={handleGenerateCoverImage}
                 disabled={
                   isGenerating ||
+                  localIsGenerating ||
                   !imageInstructions.coverPrompt ||
                   readOnly ||
                   !templateId
                 }
-                isLoading={isGenerating}
+                isLoading={localIsGenerating}
                 leftIcon={<Icons.CreateImage className="h-5 w-5" />}
               >
                 Generate Cover Image

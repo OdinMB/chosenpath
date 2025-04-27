@@ -9,7 +9,7 @@ const imageRouter = express.Router();
 // Debug middleware to log all image requests
 imageRouter.use((req, res, next) => {
   // console.log(`[IMAGE-DEBUG] Request received: ${req.method} ${req.path}`);
-  Logger.Route.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
+  // Logger.Route.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
   // console.log(`[IMAGE-DEBUG] Headers: ${JSON.stringify(req.headers, null, 2)}`);
   next();
 });
@@ -37,7 +37,7 @@ imageRouter.get("/templates/:templateId/:path(*)", async (req, res) => {
     let imagePath = getStorageFilePath("templates", subPath);
 
     if (!fileExists) {
-      Logger.Route.error(`Template image not found: ${templateId}/${filePath}`);
+      // Logger.Route.error(`Template image not found: ${templateId}/${filePath}`);
       return sendNotFound(res, "Image not found", requestId);
     }
 

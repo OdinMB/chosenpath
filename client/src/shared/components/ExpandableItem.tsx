@@ -46,6 +46,10 @@ interface ExpandableItemProps<T> {
   readOnly?: boolean;
   /** Additional action icons to display between edit and delete buttons */
   actionIcons?: ActionIcon[];
+  /** Optional image to show in collapsed view */
+  image?: ReactNode;
+  /** Optional description to show in collapsed view */
+  description?: ReactNode;
 }
 
 export function ExpandableItem<T>({
@@ -60,6 +64,8 @@ export function ExpandableItem<T>({
   isSaveDisabled = () => false,
   readOnly = false,
   actionIcons = [],
+  image,
+  description,
 }: ExpandableItemProps<T>) {
   const isEditing = editingSet.has(id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -151,15 +157,23 @@ export function ExpandableItem<T>({
   // When in readOnly mode and collapsed
   if (readOnly) {
     return (
-      <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
-        <span className="font-medium">{title}</span>
-        <button
-          onClick={handleToggleExpand}
-          className="text-gray-500 hover:text-gray-700"
-          aria-label="Expand"
-        >
-          <Icons.ChevronDown className="h-5 w-5" />
-        </button>
+      <div className="bg-white p-4 rounded-lg shadow mb-4">
+        <div className="flex items-center">
+          {image && <div className="mr-4 flex-shrink-0">{image}</div>}
+          <div className="flex-1">
+            <span className="font-medium">{title}</span>
+            {description && (
+              <p className="text-sm text-gray-600 mt-1">{description}</p>
+            )}
+          </div>
+          <button
+            onClick={handleToggleExpand}
+            className="ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0"
+            aria-label="Expand"
+          >
+            <Icons.ChevronDown className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -169,48 +183,59 @@ export function ExpandableItem<T>({
     const isNoOpFunction = onDelete.toString().replace(/\s/g, "") === "()=>{}";
 
     return (
-      <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
-        <span className="font-medium">{title}</span>
-        <div className="flex gap-2">
-          <button
-            onClick={handleStartEditing}
-            className="text-secondary hover:text-secondary-700"
-            aria-label={`Edit ${title}`}
-          >
-            <Icons.Edit className="h-5 w-5" />
-          </button>
+      <div className="bg-white p-4 rounded-lg shadow mb-4">
+        <div className="flex items-center">
+          {image && <div className="mr-4 flex-shrink-0">{image}</div>}
+          <div className="flex-1">
+            <div className="flex justify-between">
+              <span className="font-medium">{title}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleStartEditing}
+                  className="text-secondary hover:text-secondary-700"
+                  aria-label={`Edit ${title}`}
+                >
+                  <Icons.Edit className="h-5 w-5" />
+                </button>
 
-          {/* Render additional action icons */}
-          {actionIcons.map((actionIcon, index) => (
-            <button
-              key={`action-icon-${index}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                actionIcon.onClick();
-              }}
-              className={
-                actionIcon.className || "text-blue-500 hover:text-blue-700"
-              }
-              aria-label={actionIcon.ariaLabel || `Action for ${title}`}
-              title={actionIcon.title || ""}
-              disabled={actionIcon.disabled}
-              type="button"
-            >
-              {actionIcon.icon}
-            </button>
-          ))}
+                {/* Render additional action icons */}
+                {actionIcons.map((actionIcon, index) => (
+                  <button
+                    key={`action-icon-${index}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      actionIcon.onClick();
+                    }}
+                    className={
+                      actionIcon.className ||
+                      "text-blue-500 hover:text-blue-700"
+                    }
+                    aria-label={actionIcon.ariaLabel || `Action for ${title}`}
+                    title={actionIcon.title || ""}
+                    disabled={actionIcon.disabled}
+                    type="button"
+                  >
+                    {actionIcon.icon}
+                  </button>
+                ))}
 
-          {/* Only show delete button if onDelete is not an empty function */}
-          {!isNoOpFunction && (
-            <button
-              onClick={onDelete}
-              className="text-tertiary hover:text-tertiary-700"
-              aria-label={`Remove ${title}`}
-            >
-              <Icons.Trash className="h-5 w-5" />
-            </button>
-          )}
+                {/* Only show delete button if onDelete is not an empty function */}
+                {!isNoOpFunction && (
+                  <button
+                    onClick={onDelete}
+                    className="text-tertiary hover:text-tertiary-700"
+                    aria-label={`Remove ${title}`}
+                  >
+                    <Icons.Trash className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            {description && (
+              <p className="text-sm text-gray-600 mt-1">{description}</p>
+            )}
+          </div>
         </div>
       </div>
     );

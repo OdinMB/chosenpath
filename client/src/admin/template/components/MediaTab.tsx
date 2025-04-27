@@ -179,7 +179,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             }
             className="flex-1"
             rows={2}
-            placeholder="E.g., Studio Ghibli, cyberpunk, art nouveau"
+            placeholder="E.g., Cyberpunk, art nouveau"
             disabled={readOnly}
           />
         </div>

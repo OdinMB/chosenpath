@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { StoryElement, ImageInstructions } from "core/types";
 import { Input, TextArea } from "components/ui";
 import { ArrayField, ExpandableItem } from "components";
 import { useImageGeneration } from "../../../shared/hooks/useImageGeneration";
 import { Icons } from "../../../shared/components/ui/Icons";
+import { ImageWithPlaceholder } from "../../../shared/components/ui/ImageWithPlaceholder";
 
 interface StoryElementEditorProps {
   element: StoryElement;
@@ -28,7 +29,9 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   templateId,
   imageInstructions,
 }) => {
-  const { generateImageForElement, isGenerating } = useImageGeneration();
+  const { generateImageForElement } = useImageGeneration();
+  const [localIsGenerating, setLocalIsGenerating] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
 
   const handleGenerateImage = async (e?: React.MouseEvent) => {
     if (e) {
@@ -52,6 +55,9 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
     );
 
     try {
+      // Set local loading state
+      setLocalIsGenerating(true);
+
       const result = await generateImageForElement({
         templateId,
         element,
@@ -59,8 +65,14 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       });
 
       console.log("Image generation completed:", result);
+
+      // Force a refresh of the image by updating the key
+      setImageRefreshKey(Date.now());
     } catch (error) {
       console.error("Error in handleGenerateImage:", error);
+    } finally {
+      // Reset loading state
+      setLocalIsGenerating(false);
     }
   };
 
@@ -161,11 +173,36 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
     );
   };
 
+  // Create element image for the collapsed view
+  const elementImage = (
+    <ImageWithPlaceholder
+      templateId={templateId}
+      imagePath={`${element.id}.jpeg`}
+      alt={element.name || "Element"}
+      height="80px"
+      width="80px"
+      iconOnly={true}
+      iconSize="h-6 w-6"
+      isLoading={localIsGenerating}
+      refreshKey={imageRefreshKey}
+    />
+  );
+
+  // Create combined description that includes both role and instructions
+  const elementDescription = (
+    <div>
+      {element.role && <div className="mb-1">{element.role}</div>}
+      {element.instructions && <div>{element.instructions}</div>}
+    </div>
+  );
+
   return (
     <ExpandableItem
       key={element.id}
       id={element.id}
       title={element.name || "Unnamed Element"}
+      description={elementDescription}
+      image={elementImage}
       data={element}
       editingSet={editingElements}
       setEditing={setEditingElements}
@@ -176,16 +213,41 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       readOnly={readOnly}
       actionIcons={[
         {
-          icon: <Icons.CreateImage className="h-5 w-5" />,
+          icon: localIsGenerating ? (
+            <svg
+              className="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          ) : (
+            <Icons.CreateImage className="h-5 w-5" />
+          ),
           onClick: handleGenerateImage,
           className: `text-blue-500 hover:text-blue-700 ${
-            isGenerating ? "animate-pulse" : ""
+            localIsGenerating ? "text-blue-500" : ""
           }`,
           ariaLabel: `Generate image for ${element.name}`,
           title: element.appearance
-            ? "Generate an image based on the element's appearance"
+            ? localIsGenerating
+              ? "Generating image..."
+              : "Generate an image based on the element's appearance"
             : "Element must have an appearance description to generate an image",
-          disabled: isGenerating || !element.appearance || !templateId,
+          disabled: localIsGenerating || !element.appearance || !templateId,
         },
       ]}
     />
