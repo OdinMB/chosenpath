@@ -1,6 +1,9 @@
 import { z } from "zod";
-import { ImageLibrary } from "./image.js";
-import { BeatHistory } from "./beat.js";
+import {
+  ImageLibrary,
+  ImageInstructions,
+  imageInstructionsSchema,
+} from "./image.js";
 import {
   statSchema,
   Stat,
@@ -14,12 +17,12 @@ import {
   ExactPlayerMap,
   PlayerCount,
   PlayerSlot,
-  characterIdentitySchema,
-  characterBackgroundSchema,
-  Pronouns,
+  PlayerState,
   characterSelectionIntroductionSchema,
   CharacterSelectionIntroduction,
   characterSelectionPlanSchema,
+  playerOptionsGenerationSchema,
+  PlayerOptionsGeneration,
 } from "./player.js";
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
@@ -88,27 +91,7 @@ export const guidelinesSchema = z
       ),
   })
   .describe("Story guidelines and parameters");
-
-export const playerOptionsGenerationSchema = z.object({
-  outcomes: z
-    .array(outcomeSchema)
-    .describe(
-      "Individual outcomes that will define the ending of the story for this player. No intermediate outcomes, only elements of the ending. No shared outcomes (those are generated elsewhere)."
-    ),
-  possibleCharacterIdentities: z
-    .array(characterIdentitySchema)
-    .describe(
-      "Generate exactly 3 possible identities that the player can choose from."
-    ),
-  possibleCharacterBackgrounds: z
-    .array(characterBackgroundSchema)
-    .describe(
-      "Generate exactly 3 possible backgrounds that the player can choose from. Implement the background archetypes in the character selection plan."
-    ),
-});
-export type PlayerOptionsGeneration = z.infer<
-  typeof playerOptionsGenerationSchema
->;
+export type Guidelines = z.infer<typeof guidelinesSchema>;
 
 export const statGroupsSchema = z
   .array(z.string())
@@ -154,19 +137,23 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
       ...playerSchemas,
       title: z.string().describe("Title of the story"),
       characterSelectionIntroduction: characterSelectionIntroductionSchema,
+      imageInstructions: imageInstructionsSchema,
     })
     .describe("Initial setup for the story");
 };
 
+// TYPES USED BY THE APP
+
 // Helper type - simplified by using ExactPlayerMap
 export type StorySetupBase<N extends PlayerCount> = {
   title: string;
-  guidelines: z.infer<typeof guidelinesSchema>;
-  storyElements: z.infer<typeof StoryElementsSchema>;
+  imageInstructions: ImageInstructions;
+  guidelines: Guidelines;
+  storyElements: StoryElement[];
   sharedOutcomes: Outcome[];
-  statGroups: z.infer<typeof statGroupsSchema>;
-  playerStats: z.infer<typeof statSchema>[];
-  sharedStats: z.infer<typeof statSchema>[];
+  statGroups: string[];
+  playerStats: Stat[];
+  sharedStats: Stat[];
   initialSharedStatValues: StatValueEntry[];
   characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
@@ -192,27 +179,13 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
 
 // TYPES USED BY APP (not LLM)
 
-// Direct type definition for PlayerState
-export type PlayerState = {
-  name: string;
-  pronouns: Pronouns;
-  appearance: string;
-  fluff: string;
-  outcomes: Outcome[];
-  statValues: StatValueEntry[];
-  knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
-  beatHistory: BeatHistory;
-  previousTypesOfThreads: string[];
-  characterSelected: boolean; // Whether the player has selected an identity and background
-};
-
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;
-export type Guidelines = z.infer<typeof guidelinesSchema>;
 
 // Direct type definition for StoryState
 export type StoryState = {
   templateId?: string;
   title: string;
+  imageInstructions: ImageInstructions;
   gameMode: GameMode;
   guidelines: Guidelines;
   storyElements: StoryElement[];

@@ -81,6 +81,13 @@ export class AdminTemplateService {
       updatedAt: baseTemplate.updatedAt || now,
       title: baseTemplate.title || "",
       teaser: baseTemplate.teaser || "",
+      imageInstructions: baseTemplate.imageInstructions || {
+        visualStyle: "",
+        atmosphere: "",
+        colorPalette: "",
+        settingDetails: "",
+        characterStyle: "",
+      },
       publicationStatus:
         baseTemplate.publicationStatus || PublicationStatus.Draft,
       showOnWelcomeScreen: baseTemplate.showOnWelcomeScreen || false,
@@ -356,6 +363,7 @@ export class AdminTemplateService {
       // Use the common template creation function
       const templateData = {
         title: initialState.title,
+        imageInstructions: initialState.imageInstructions,
         teaser: `Generated from prompt: ${prompt}`,
         guidelines: initialState.guidelines,
         storyElements: initialState.storyElements,
@@ -372,7 +380,7 @@ export class AdminTemplateService {
         ...playerOptions,
       };
 
-      const generatedTemplate = this.createFullTemplateObject({
+      const generatedTemplate: StoryTemplate = this.createFullTemplateObject({
         id,
         playerCountMin: playerCount,
         playerCountMax: playerCount,
@@ -382,7 +390,7 @@ export class AdminTemplateService {
         ...templateData,
         tags: [],
         imageFile: "",
-      });
+      }) as StoryTemplate;
 
       this.logger.log(
         `Generated template with title: ${generatedTemplate.title}`

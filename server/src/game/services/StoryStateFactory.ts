@@ -22,6 +22,7 @@ export function createStoryStateFromTemplate(
   const storyState: StoryState = {
     templateId: template.id,
     title: template.title,
+    imageInstructions: template.imageInstructions,
     gameMode: template.gameMode,
     guidelines: template.guidelines,
     storyElements: template.storyElements || [],

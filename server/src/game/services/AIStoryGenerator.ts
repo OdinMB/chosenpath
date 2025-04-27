@@ -73,6 +73,7 @@ export class AIStoryGenerator {
 
     const initialState: StoryState = {
       title: setup.title,
+      imageInstructions: setup.imageInstructions,
       gameMode,
       guidelines: setup.guidelines,
       storyElements: setup.storyElements,

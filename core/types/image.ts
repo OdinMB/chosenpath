@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Beat } from "./beat.js";
 
 // Image generation constants
@@ -39,3 +40,35 @@ export type Image = {
 export type ImageLibrary = Image[];
 
 export type BeatsNeedingImages = Record<string, Beat>;
+
+export const imageInstructionsSchema = z
+  .object({
+    visualStyle: z
+      .string()
+      .describe(
+        "The primary artistic style for images (e.g., watercolor, pixel art, photorealistic)"
+      ),
+    atmosphere: z
+      .string()
+      .describe("The mood or emotional tone that should pervade all images"),
+    colorPalette: z
+      .string()
+      .describe("Key colors or color scheme that should appear consistently"),
+    settingDetails: z
+      .string()
+      .describe(
+        "Essential visual elements of the world that should appear regularly"
+      ),
+    characterStyle: z
+      .string()
+      .describe("How characters should be consistently depicted"),
+    artInfluences: z
+      .string()
+      .describe(
+        "Artists, art movements, or media styles that should influence the imagery"
+      ),
+  })
+  .describe(
+    "Visual styling instructions to maintain consistent aesthetics across all generated images"
+  );
+export type ImageInstructions = z.infer<typeof imageInstructionsSchema>;

@@ -1,6 +1,8 @@
 import { MIN_PLAYERS, MAX_PLAYERS } from "../config.js";
 import { z } from "zod";
-import { statValueEntrySchema } from "./stat.js";
+import { statValueEntrySchema, StatValueEntry } from "./stat.js";
+import { outcomeSchema, Outcome } from "./outcome.js";
+import { BeatHistory } from "./beat.js";
 
 // Create union type from range MIN_PLAYERS to MAX_PLAYERS
 type NumberRange<Start extends number, End extends number> =
@@ -149,3 +151,38 @@ export const characterSelectionPlanSchema = z.object({
 export type CharacterSelectionPlan = z.infer<
   typeof characterSelectionPlanSchema
 >;
+
+export const playerOptionsGenerationSchema = z.object({
+  outcomes: z
+    .array(outcomeSchema)
+    .describe(
+      "Individual outcomes that will define the ending of the story for this player. No intermediate outcomes, only elements of the ending. No shared outcomes (those are generated elsewhere)."
+    ),
+  possibleCharacterIdentities: z
+    .array(characterIdentitySchema)
+    .describe(
+      "Generate exactly 3 possible identities that the player can choose from."
+    ),
+  possibleCharacterBackgrounds: z
+    .array(characterBackgroundSchema)
+    .describe(
+      "Generate exactly 3 possible backgrounds that the player can choose from. Implement the background archetypes in the character selection plan."
+    ),
+});
+export type PlayerOptionsGeneration = z.infer<
+  typeof playerOptionsGenerationSchema
+>;
+
+// Direct type definition for PlayerState
+export type PlayerState = {
+  name: string;
+  pronouns: Pronouns;
+  appearance: string;
+  fluff: string;
+  outcomes: Outcome[];
+  statValues: StatValueEntry[];
+  knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
+  beatHistory: BeatHistory;
+  previousTypesOfThreads: string[];
+  characterSelected: boolean; // Whether the player has selected an identity and background
+};
