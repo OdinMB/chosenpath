@@ -8,6 +8,7 @@ import {
   PlayersTab,
   AiIterationForm,
   AiIterationModal,
+  MediaTab,
 } from "./";
 import { StoryInitializer } from "page/components/StoryInitializer";
 import {
@@ -69,6 +70,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
     handleImageFileChange,
+    handleImageInstructionsChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -98,6 +100,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Define tab navigation items
   const tabItems = [
     { id: "basic" as TabType, label: "Setup" },
+    { id: "media" as TabType, label: "Media" },
     { id: "guidelines" as TabType, label: "Guidelines" },
     { id: "elements" as TabType, label: "Elements" },
     { id: "outcomes" as TabType, label: "Outcomes" },
@@ -241,8 +244,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               setMaxTurnsMax={handleMaxTurnsMaxChange}
               tags={tags}
               handleTagsChange={handleTagsChange}
-              imageFile={formData.imageFile || ""}
-              setImageFile={handleImageFileChange}
               // Helper functions
               getMinPlayerOptions={getMinPlayerOptions}
               getMaxPlayerOptions={getMaxPlayerOptions}
@@ -252,6 +253,24 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               getGameModeValue={getGameModeValue}
               showOnWelcomeScreen={formData.showOnWelcomeScreen || false}
               setShowOnWelcomeScreen={handleShowOnWelcomeScreenChange}
+            />
+          )}
+
+          {activeTab === "media" && (
+            <MediaTab
+              imageFile={formData.imageFile || ""}
+              setImageFile={handleImageFileChange}
+              imageInstructions={
+                formData.imageInstructions || {
+                  visualStyle: "",
+                  atmosphere: "",
+                  colorPalette: "",
+                  settingDetails: "",
+                  characterStyle: "",
+                  artInfluences: "",
+                }
+              }
+              setImageInstructions={handleImageInstructionsChange}
             />
           )}
 

@@ -11,6 +11,7 @@ import {
   StatValueEntry,
   StoryElement,
   Outcome,
+  ImageInstructions,
 } from "core/types";
 import { Logger } from "shared/logger";
 import { MAX_PLAYERS } from "core/config";
@@ -22,6 +23,7 @@ import { useTabs } from "components/ui/useTabs";
 // Define the TabType type
 export type TabType =
   | "basic"
+  | "media"
   | "guidelines"
   | "elements"
   | "outcomes"
@@ -289,6 +291,26 @@ export function useTemplateForm({
       characterSelectionIntroduction: updatedIntro,
     }));
 
+  // Handle image instructions
+  const handleImageInstructionsChange = (
+    updates: Partial<ImageInstructions>
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      imageInstructions: {
+        ...(prev.imageInstructions || {
+          visualStyle: "",
+          atmosphere: "",
+          colorPalette: "",
+          settingDetails: "",
+          characterStyle: "",
+          artInfluences: "",
+        }),
+        ...updates,
+      },
+    }));
+  };
+
   // Return all the handlers and state needed by the UI component
   return {
     // Core state
@@ -334,6 +356,7 @@ export function useTemplateForm({
     handleCharacterSelectionIntroductionChange,
     handlePublicationStatusChange,
     handleShowOnWelcomeScreenChange,
+    handleImageInstructionsChange,
     // Helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,

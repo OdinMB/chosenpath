@@ -22,8 +22,6 @@ interface BasicInfoTabProps {
   handleTagsChange: (tags: string[]) => void;
   showOnWelcomeScreen: boolean;
   setShowOnWelcomeScreen: (show: boolean) => void;
-  imageFile: string;
-  setImageFile: (imageFile: string) => void;
   // Helper functions
   getMinPlayerOptions: () => number[];
   getMaxPlayerOptions: () => number[];
@@ -51,8 +49,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   handleTagsChange,
   showOnWelcomeScreen,
   setShowOnWelcomeScreen,
-  imageFile,
-  setImageFile,
   // Helper functions
   getMinPlayerOptions,
   getMaxPlayerOptions,
@@ -236,45 +232,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
         </div>
       </div>
 
-      {/* Image input. Temporary solution. */}
-      <div className="flex items-center gap-2">
-        <span className="font-semibold w-20">Image</span>
-        <InfoIcon
-          tooltipText="Image filenames should be in the public/test folder"
-          position="top"
-          className="mr-2 mt-1"
-        />
-        <Input
-          id="story-image"
-          name="story-image"
-          className="flex-1"
-          value={imageFile}
-          onChange={(e) => setImageFile(e.target.value)}
-          placeholder="Image filename (e.g. castle-1-3.jpg)"
-        />
-      </div>
-
-      {/* Show on welcome screen checkbox */}
-      <div className="flex items-center gap-2 mt-2">
-        <Checkbox
-          id="show-on-welcome"
-          checked={showOnWelcomeScreen}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setShowOnWelcomeScreen(e.target.checked)
-          }
-        />
-        <label
-          htmlFor="show-on-welcome"
-          className="font-semibold text-gray-700 flex items-center"
-        >
-          Show on welcome screen
-        </label>
-        <InfoIcon
-          tooltipText="Featured templates will appear on the welcome screen carousel"
-          position="right"
-          className="ml-1 mt-1"
-        />
-      </div>
       {/* Tags section */}
       <div className="space-y-2">
         <div className="flex items-center mb-2">
@@ -313,6 +270,23 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             expandedByDefault={true}
           />
         </div>
+      </div>
+
+      {/* Show on welcome screen */}
+      <div className="flex items-center mt-4">
+        <Checkbox
+          id="welcome-screen"
+          checked={showOnWelcomeScreen}
+          onChange={(e) => setShowOnWelcomeScreen(e.target.checked)}
+        />
+        <label htmlFor="welcome-screen" className="ml-2 text-sm">
+          Show on welcome screen
+        </label>
+        <InfoIcon
+          tooltipText="When selected, this template will be shown on the welcome screen"
+          position="right"
+          className="ml-2"
+        />
       </div>
     </div>
   );
