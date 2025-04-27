@@ -6,25 +6,31 @@ import { API_CONFIG } from "core/config";
 interface StoryImageProps {
   image: Image;
   alt: string;
-  templateId?: string;
+  sourceId?: string;
   className?: string;
   fallbackSrc?: string;
   objectPosition?: string;
   responsivePosition?: boolean;
   mobileOffset?: string;
   desktopOffset?: string;
+  caption?: string;
+  withinText?: boolean;
+  float?: "left" | "right";
 }
 
 export const StoryImage: React.FC<StoryImageProps> = ({
   image,
   alt,
-  templateId,
+  sourceId,
   className = "",
   fallbackSrc,
   objectPosition = "center",
   responsivePosition = false,
   mobileOffset = "5%",
   desktopOffset = "5%",
+  caption,
+  withinText = false,
+  float = "left",
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -55,17 +61,17 @@ export const StoryImage: React.FC<StoryImageProps> = ({
       const baseUrl = API_CONFIG.DEFAULT_API_URL;
 
       // For template images
-      if (image.source === "template" && templateId) {
-        return `${baseUrl}/images/templates/${templateId}${
+      if (image.source === "template" && sourceId) {
+        return `${baseUrl}/images/templates/${sourceId}${
           image.subDirectory ? `/${image.subDirectory}` : ""
         }/${image.id}.${image.fileType}?t=${Date.now()}`;
       }
 
       // For story generated images
-      if (image.source === "story") {
-        return `${baseUrl}/images/stories/${
-          image.subDirectory ? `${image.subDirectory}/` : ""
-        }${image.id}.${image.fileType}?t=${Date.now()}`;
+      if (image.source === "story" && sourceId) {
+        return `${baseUrl}/images/stories/${sourceId}${
+          image.subDirectory ? `/${image.subDirectory}` : ""
+        }/${image.id}.${image.fileType}?t=${Date.now()}`;
       }
 
       return fallbackSrc || "";
@@ -73,7 +79,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
 
     const imagePath = constructImagePath();
     setSrc(imagePath);
-  }, [image, templateId, fallbackSrc]);
+  }, [image, sourceId, fallbackSrc]);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -86,6 +92,60 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     if (fallbackSrc) {
       setSrc(fallbackSrc);
     }
+  };
+
+  // Determine what caption to display - use the provided caption or fall back to image description
+  const displayCaption = caption || image?.description;
+
+  // Determine if we need to wrap the component for text flow
+  const renderContent = () => {
+    const imageContent = (
+      <div className={`relative ${className}`}>
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+            <Icons.Spinner className="w-10 h-10 text-primary-500" />
+          </div>
+        )}
+        {hasError && !fallbackSrc && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+            <Icons.Error className="w-10 h-10 text-red-500" />
+          </div>
+        )}
+        <div className="overflow-hidden rounded-lg">
+          {src && (
+            <img
+              src={src}
+              alt={alt}
+              className={`w-full h-full object-cover ${
+                isLoading ? "opacity-0" : "opacity-100"
+              }`}
+              style={{ objectPosition: calculatedPosition }}
+              onLoad={handleLoad}
+              onError={handleError}
+            />
+          )}
+        </div>
+        {displayCaption && (
+          <div className="text-sm text-center mt-2 px-2 text-primary-600 italic">
+            {displayCaption}
+          </div>
+        )}
+      </div>
+    );
+
+    if (withinText) {
+      return (
+        <div
+          className={`w-full mx-auto my-2 md:float-${float} md:${
+            float === "left" ? "mr" : "ml"
+          }-6 md:w-1/2 lg:w-1/3`}
+        >
+          {imageContent}
+        </div>
+      );
+    }
+
+    return imageContent;
   };
 
   if (!image) {
@@ -122,30 +182,5 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     );
   }
 
-  return (
-    <div className={`relative ${className}`}>
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <Icons.Spinner className="w-10 h-10 text-primary-500" />
-        </div>
-      )}
-      {hasError && !fallbackSrc && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <Icons.Error className="w-10 h-10 text-red-500" />
-        </div>
-      )}
-      {src && (
-        <img
-          src={src}
-          alt={alt}
-          className={`w-full h-full object-cover ${
-            isLoading ? "opacity-0" : "opacity-100"
-          }`}
-          style={{ objectPosition: calculatedPosition }}
-          onLoad={handleLoad}
-          onError={handleError}
-        />
-      )}
-    </div>
-  );
+  return renderContent();
 };

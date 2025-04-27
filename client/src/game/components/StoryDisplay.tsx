@@ -14,6 +14,14 @@ import {
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
 } from "core/config";
 import { LoadingSpinner, PrimaryButton, ColoredBox } from "components/ui";
+import { StoryImage } from "shared/components/StoryImage";
+import {
+  IMAGE_PLACEHOLDER_REGEX,
+  parseImagePlaceholder,
+  createImageFromPlaceholder,
+  findImageInLibrary,
+} from "../utils/imageUtils";
+import { ClientStoryState } from "core/types";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -455,7 +463,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     );
   };
 
-  // Render function for the current beat content or loading state
+  // Regular render beat content function
   const renderBeatContent = () => {
     // Check if we're showing a placeholder for the next beat
     if (showNextBeatPlaceholder && displayedBeatIndex === beatHistory.length) {
@@ -488,13 +496,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
           <div className="narrative-container relative">
             <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
-              {React.createElement(
-                ReactMarkdown as ComponentType<{
-                  children: string;
-                  breaks?: boolean;
-                }>,
-                { breaks: true, children: currentBeat.text }
-              )}
+              {renderBeatTextWithImages(currentBeat.text, storyState)}
             </div>
           </div>
 
@@ -536,6 +538,123 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }
 
     return null;
+  };
+
+  // Function to render beat text with embedded images
+  const renderBeatTextWithImages = (
+    text: string,
+    storyState: ClientStoryState
+  ) => {
+    // Fix potential encoding issues by normalizing the text
+    text = text.normalize();
+
+    const stateManager = new ClientStateManager();
+    const hasImages = stateManager.hasStoryImages(storyState);
+
+    // If no images in story state, just render the markdown
+    if (!hasImages) {
+      return React.createElement(
+        ReactMarkdown as ComponentType<{
+          children: string;
+          breaks?: boolean;
+        }>,
+        { breaks: true, children: text }
+      );
+    }
+
+    // Check if text contains image placeholders
+    const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
+
+    // If no matches found, use standard markdown
+    if (!matches) {
+      return React.createElement(
+        ReactMarkdown as ComponentType<{
+          children: string;
+          breaks?: boolean;
+        }>,
+        { breaks: true, children: text }
+      );
+    }
+
+    // Split the text at image placeholders
+    const segments = text.split(IMAGE_PLACEHOLDER_REGEX);
+
+    // We now have alternating segments of text and image placeholders
+    const elements: React.ReactNode[] = [];
+
+    // Add first text segment if it exists
+    if (segments[0]) {
+      elements.push(
+        React.createElement(
+          ReactMarkdown as ComponentType<{
+            children: string;
+            breaks?: boolean;
+          }>,
+          {
+            key: `text-0`,
+            breaks: true,
+            children: segments[0],
+          }
+        )
+      );
+    }
+
+    // Process each match and add alternating text segments
+    matches.forEach((match, index) => {
+      // Process the image placeholder
+      const attributes = parseImagePlaceholder(match);
+      const imageObj = createImageFromPlaceholder(attributes);
+
+      // Look for the image in the library if available
+      const libraryImage = imageObj
+        ? findImageInLibrary(imageObj.id, storyState)
+        : undefined;
+
+      const finalImage = libraryImage || imageObj;
+
+      // Add the image element if we have a valid image
+      if (finalImage) {
+        elements.push(
+          <StoryImage
+            key={`img-${index}`}
+            image={finalImage}
+            alt={finalImage.description || ""}
+            sourceId={storyState.templateId}
+            className="rounded-lg overflow-hidden"
+            responsivePosition={true}
+            caption={finalImage.description || ""}
+            withinText={true}
+            float={(attributes.float as "left" | "right") || "left"}
+          />
+        );
+      } else {
+        console.log("No image found for", match);
+      }
+
+      // Add the next text segment if it exists
+      if (segments[index + 1]) {
+        elements.push(
+          React.createElement(
+            ReactMarkdown as ComponentType<{
+              children: string;
+              breaks?: boolean;
+            }>,
+            {
+              key: `text-${index + 1}`,
+              breaks: true,
+              children: segments[index + 1],
+            }
+          )
+        );
+      }
+
+      // Add a clearfix div at the end to ensure proper content flow after all content
+      if (index === matches.length - 1) {
+        elements.push(<div key="final-clearfix" className="clear-both"></div>);
+      }
+    });
+
+    return <>{elements}</>;
   };
 
   if (!storyState || !playerState) {
