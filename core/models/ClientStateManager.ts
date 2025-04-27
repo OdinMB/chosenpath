@@ -29,7 +29,7 @@ export class ClientStateManager {
     // Create a deep copy to avoid mutating the original state
     let filteredState = JSON.parse(JSON.stringify(state));
 
-    // Only include the specific player's data
+    // Filter the current player's data
     let playerData = filteredState.players[playerSlot];
     // Filter out outcomes if they exist
     if (playerData.outcomes) {
@@ -64,7 +64,27 @@ export class ClientStateManager {
         return filteredBeat;
       });
     }
-    filteredState.players = { [playerSlot]: playerData };
+
+    // Create a filtered players object with limited data for other players
+    const filteredPlayers: Record<PlayerSlot, any> = {
+      [playerSlot]: playerData,
+    };
+
+    // Include limited data for other players
+    Object.entries(state.players).forEach(([slot, player]) => {
+      if (slot !== playerSlot) {
+        filteredPlayers[slot as PlayerSlot] = {
+          name: player.name,
+          pronouns: player.pronouns,
+          appearance: player.appearance,
+          fluff: player.fluff,
+          identityChoice: player.identityChoice,
+          backgroundChoice: player.backgroundChoice,
+        };
+      }
+    });
+
+    filteredState.players = filteredPlayers;
 
     // Filter out hidden player stats and certain stat attributes
     filteredState.playerStats = filteredState.playerStats
@@ -92,7 +112,6 @@ export class ClientStateManager {
     return {
       templateId: filteredState.templateId,
       title: filteredState.title,
-      numberOfPlayers: Object.keys(state.players).length,
       gameMode: filteredState.gameMode,
       sharedStats: filteredState.sharedStats,
       sharedStatValues: filteredState.sharedStatValues,
@@ -141,5 +160,13 @@ export class ClientStateManager {
     const hasGenerateImages = !!state.generateImages;
 
     return hasTemplateId || hasGenerateImages;
+  }
+
+  getNumberOfPlayers(state: StoryState | ClientStoryState): number {
+    return Object.keys(state.players).length;
+  }
+
+  hasPendingPlayers(state: ClientStoryState): boolean {
+    return state.pendingPlayers && Object.keys(state.pendingPlayers).length > 0;
   }
 }

@@ -20,8 +20,8 @@ import {
   checkRateLimit,
   incrementRateLimit,
   getClientIP,
-} from "../shared/rateLimiter.js";
-import { Logger } from "../shared/logger.js";
+} from "shared/rateLimiter.js";
+import { Logger } from "shared/logger.js";
 
 export class GameWebSocketServer {
   private io: Server;

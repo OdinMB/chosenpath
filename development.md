@@ -52,7 +52,7 @@ Text, English, Multiplayer > other stuff
 
 # TECHNICALITIES
 
-- 1: Track story elements that a player has NOT been introduced to yet
+- 1: Track story elements that a player has NOT been introduced to yet (don't show in ClientState)
 - 2: refactor templateRoutes -> route + AdminTemplateService + shared TemplateService
 - Retry mechanism for queue actions
 - Make sure that there are only 3 backgrounds per player / 3 options per beat

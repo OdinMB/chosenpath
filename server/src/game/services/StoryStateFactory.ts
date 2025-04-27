@@ -99,6 +99,7 @@ export function createEmptyPlayerState(outcomes: any[] = []) {
     knownStoryElements: [],
     beatHistory: [],
     previousTypesOfThreads: [],
-    characterSelected: false,
+    identityChoice: -1,
+    backgroundChoice: -1,
   };
 }

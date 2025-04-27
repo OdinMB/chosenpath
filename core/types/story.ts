@@ -226,7 +226,6 @@ export type ClientStoryState = {
   characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;
   images: ImageLibrary;
-  numberOfPlayers: number;
   pendingPlayers: PlayerSlot[];
   gameOver: boolean;
 };

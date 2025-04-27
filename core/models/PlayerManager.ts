@@ -112,7 +112,10 @@ export class PlayerManager {
 
     // Return players who haven't selected a character yet
     return Object.entries(state.players)
-      .filter(([_, player]) => !player.characterSelected)
+      .filter(
+        ([_, player]) =>
+          player.identityChoice === -1 || player.backgroundChoice === -1
+      )
       .map(([slot]) => slot as PlayerSlot);
   }
 
@@ -122,7 +125,9 @@ export class PlayerManager {
   areAllCharactersSelected(state: StoryState): boolean {
     const playerSlots = this.getPlayerSlots(state);
     return playerSlots.every(
-      (slot) => state.players[slot]?.characterSelected === true
+      (slot) =>
+        state.players[slot]?.identityChoice > -1 &&
+        state.players[slot]?.backgroundChoice > -1
     );
   }
 
@@ -265,11 +270,13 @@ export class PlayerManager {
   /**
    * Update a player with character selection information
    */
-  updatePlayerCharacter(
+  setCharacterSelection(
     state: StoryState,
     playerSlot: PlayerSlot,
     identity: any,
-    background: any
+    background: any,
+    identityChoice: number,
+    backgroundChoice: number
   ): StoryState {
     const player = this.getPlayer(state, playerSlot);
     if (!player) {
@@ -285,7 +292,9 @@ export class PlayerManager {
       appearance: identity.appearance,
       fluff: replacePronounPlaceholders(background.fluffTemplate, identity),
       statValues: background.initialPlayerStatValues,
-      characterSelected: true,
+      identityChoice: identityChoice,
+      backgroundChoice: backgroundChoice,
+      // characterSelected: true,
     };
 
     // Update the players object with the updated player

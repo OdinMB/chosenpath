@@ -8,6 +8,9 @@ import { ClientStat, StatValue, StatValueEntry } from "core/types";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
 import { LoadingSpinner, PrimaryButton, Icons } from "components/ui";
+import { StoryImage } from "shared/components/StoryImage";
+import { createPlayerIdentityImage } from "../utils/imageUtils";
+import { ClientStateManager } from "core/models/ClientStateManager";
 
 interface Props {
   onExitGame: () => void;
@@ -114,6 +117,7 @@ export function GameLayout({
   const [showStats, setShowStats] = useState(false);
   const [showFluff, setShowFluff] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const stateManager = new ClientStateManager();
 
   if (!storyState) return null;
 
@@ -121,11 +125,16 @@ export function GameLayout({
   const playerSlot = Object.keys(storyState.players)[0];
   const currentPlayer = storyState.players[playerSlot];
 
+  // Check if the story has images
+  const hasImages = stateManager.hasStoryImages(storyState);
+
   // Character selection mode is active if:
   // 1. Character selection is not completed globally AND
   // 2. The current player hasn't selected a character yet
   const isCharacterSelectionMode =
-    !storyState.characterSelectionCompleted && !currentPlayer.characterSelected;
+    !storyState.characterSelectionCompleted &&
+    (currentPlayer.identityChoice === -1 ||
+      currentPlayer.backgroundChoice === -1);
 
   const handleMainContentClick = () => {
     // Only collapse sidebar on small screens
@@ -169,14 +178,14 @@ export function GameLayout({
         <aside className={sidebarClassName}>
           <div className="flex-grow"></div>
 
-          {storyState.numberOfPlayers > 1 && (
+          {stateManager.getNumberOfPlayers(storyState) > 1 && (
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-primary mb-2 text-center">
                 Players Status
               </h3>
               <PendingPlayers
                 pendingPlayers={storyState.pendingPlayers}
-                numberOfPlayers={storyState.numberOfPlayers}
+                numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
                 currentPlayer={playerSlot}
               />
             </div>
@@ -236,32 +245,58 @@ export function GameLayout({
       return "";
     };
 
+    // Create player identity image if needed
+    let playerIdentityImage = undefined;
+    if (hasImages && player.identityChoice >= 0) {
+      playerIdentityImage = createPlayerIdentityImage(
+        storyState,
+        playerSlot,
+        player.identityChoice
+      );
+    }
+
     return (
       <aside className={sidebarClassName}>
         <section className="mb-3 pb-2">
-          <div className="flex items-center justify-center gap-2">
-            <h2 className="text-xl font-semibold text-primary mb-1">
-              {player.name}
-            </h2>
-            <button
-              onClick={() => setShowFluff(!showFluff)}
-              className="text-primary-500 hover:text-primary-700"
-              aria-label={
-                showFluff
-                  ? "Hide character description"
-                  : "Show character description"
-              }
-            >
-              <Icons.ChevronDown
-                className={`w-4 h-4 transform transition-transform ${
-                  showFluff ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+          <div className="flex items-center justify-start">
+            {playerIdentityImage && (
+              <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 mr-3">
+                <StoryImage
+                  image={playerIdentityImage}
+                  alt={`${player.name}`}
+                  templateId={storyState.templateId}
+                  className="w-full h-full"
+                  responsivePosition={true}
+                  desktopOffset="5%"
+                  mobileOffset="5%"
+                />
+              </div>
+            )}
+            <div className="flex-grow text-center">
+              <h2 className="text-xl font-semibold text-primary mb-1 flex items-center justify-center gap-2">
+                {player.name}
+                <button
+                  onClick={() => setShowFluff(!showFluff)}
+                  className="text-primary-500 hover:text-primary-700"
+                  aria-label={
+                    showFluff
+                      ? "Hide character description"
+                      : "Show character description"
+                  }
+                >
+                  <Icons.ChevronDown
+                    className={`w-4 h-4 transform transition-transform ${
+                      showFluff ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </h2>
+              <p className="text-primary-600">
+                {player.pronouns.personal}/{player.pronouns.object}
+              </p>
+            </div>
           </div>
-          <p className="text-primary-600 text-center">
-            {player.pronouns.personal}/{player.pronouns.object}
-          </p>
+
           {showFluff && (
             <div className="bg-white rounded-lg p-3 mt-4 border border-primary-100 shadow-md">
               <p className="text-primary-600 text-sm">
@@ -281,7 +316,7 @@ export function GameLayout({
         <div className="mt-8">
           <PendingPlayers
             pendingPlayers={storyState.pendingPlayers}
-            numberOfPlayers={storyState.numberOfPlayers}
+            numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
             currentPlayer={playerSlot}
           />
         </div>
@@ -325,11 +360,13 @@ export function GameLayout({
 
               <LoadingSpinner size="large" message="" />
 
-              {storyState.numberOfPlayers > 1 && (
+              {stateManager.getNumberOfPlayers(storyState) > 1 && (
                 <div className="mt-8 w-full max-w-md">
                   <PendingPlayers
                     pendingPlayers={storyState.pendingPlayers}
-                    numberOfPlayers={storyState.numberOfPlayers}
+                    numberOfPlayers={stateManager.getNumberOfPlayers(
+                      storyState
+                    )}
                     currentPlayer={playerSlot}
                   />
                 </div>

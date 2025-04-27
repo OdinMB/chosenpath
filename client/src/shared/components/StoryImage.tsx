@@ -23,7 +23,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   fallbackSrc,
   objectPosition = "center",
   responsivePosition = false,
-  mobileOffset = "15%",
+  mobileOffset = "5%",
   desktopOffset = "5%",
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);

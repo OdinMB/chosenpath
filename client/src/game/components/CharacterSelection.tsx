@@ -57,7 +57,8 @@ export function CharacterSelection({
 
   // Check if the current player has already selected a character
   const currentPlayer = storyState.players[playerSlot];
-  const hasSelectedCharacter = currentPlayer?.characterSelected === true;
+  const hasSelectedCharacter =
+    currentPlayer?.identityChoice > -1 && currentPlayer?.backgroundChoice > -1;
 
   // Check if the story has images
   const hasImages = stateManager.hasStoryImages(storyState);

@@ -7,6 +7,7 @@ import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { BeatFeedback } from "./feedback/BeatFeedback";
 import { PendingPlayers } from "./PendingPlayers.js";
 import type { ChallengeOption, ResolutionDetails } from "core/types";
+import { ClientStateManager } from "core/models/ClientStateManager";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
   POINTS_FOR_MIXED_RESOLUTION,
@@ -418,10 +419,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     // Get player slot to show pending players
     const playerSlot = Object.keys(storyState.players)[0];
 
+    const stateManager = new ClientStateManager();
+
     // Check if there are any pending players
-    const hasPendingPlayers =
-      storyState.pendingPlayers &&
-      Object.keys(storyState.pendingPlayers).length > 0;
+    const hasPendingPlayers = stateManager.hasPendingPlayers(storyState);
 
     return (
       <>
@@ -444,7 +445,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             <div className="mt-8 w-full max-w-md">
               <PendingPlayers
                 pendingPlayers={storyState.pendingPlayers}
-                numberOfPlayers={storyState.numberOfPlayers}
+                numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
                 currentPlayer={playerSlot}
               />
             </div>

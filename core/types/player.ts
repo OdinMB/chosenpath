@@ -184,5 +184,6 @@ export type PlayerState = {
   knownStoryElements: string[]; // ids of story elements that have already been introduced to the player
   beatHistory: BeatHistory;
   previousTypesOfThreads: string[];
-  characterSelected: boolean; // Whether the player has selected an identity and background
+  identityChoice: number;
+  backgroundChoice: number;
 };

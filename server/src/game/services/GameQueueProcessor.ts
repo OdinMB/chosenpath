@@ -253,7 +253,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
       // Generate images if needed
       if (
-        finalStory.includesImages() &&
+        finalStory.getState().generateImages &&
         Object.keys(beatsNeedingImages).length > 0
       ) {
         console.log("[GameQueueProcessor] Generating images for beats");
@@ -394,10 +394,12 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     }
 
     // Update the player's character information
-    let updatedStory = story.updatePlayerCharacter(
+    let updatedStory = story.setCharacterSelection(
       playerSlot,
       selectedIdentity,
-      selectedBackground
+      selectedBackground,
+      identityIndex,
+      backgroundIndex
     );
 
     // Store and broadcast the updated state

@@ -351,16 +351,20 @@ export class Story {
     return new Story(updatedState);
   }
 
-  updatePlayerCharacter(
+  setCharacterSelection(
     playerSlot: PlayerSlot,
     identity: any,
-    background: any
+    background: any,
+    identityChoice: number,
+    backgroundChoice: number
   ) {
-    const updatedState = this.playerManager.updatePlayerCharacter(
+    const updatedState = this.playerManager.setCharacterSelection(
       this.state,
       playerSlot,
       identity,
-      background
+      background,
+      identityChoice,
+      backgroundChoice
     );
     return new Story(updatedState);
   }
