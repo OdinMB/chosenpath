@@ -340,6 +340,7 @@ export class AIImageGenerator {
           // Add placeholder to image library
           const placeholderImage: Image = {
             id: imageId,
+            fileType: "jpeg",
             description: `Image for: ${beat.text.substring(0, 50)}...`,
             status: "generating",
             source: "story",

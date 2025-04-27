@@ -32,9 +32,11 @@ export type ImageStatus = "ready" | "generating" | "failed";
 
 export type Image = {
   id: string;
+  fileType: "jpeg" | "png";
   source: ImageSource;
-  description: string;
   status: ImageStatus;
+  subDirectory?: string;
+  description?: string;
 };
 
 export type ImageLibrary = Image[];

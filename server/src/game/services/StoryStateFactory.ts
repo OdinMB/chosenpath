@@ -1,9 +1,6 @@
-import {
-  PlayerCount,
-  PlayerSlot,
-  StoryState,
-  StoryTemplate,
-} from "core/types/index.js";
+import { PlayerSlot, StoryState, StoryTemplate } from "core/types/index.js";
+import { Image } from "core/types/image.js";
+import { loadTemplateImages } from "shared/storageUtils.js";
 
 /**
  * Creates a story state from a template with the given parameters
@@ -38,7 +35,7 @@ export function createStoryStateFromTemplate(
     characterSelectionOptions: {},
     characterSelectionIntroduction: template.characterSelectionIntroduction,
     generateImages: false, // Template-based stories don't use image generation
-    images: [],
+    images: loadTemplateImages(template.id),
     playerCodes,
   };
 

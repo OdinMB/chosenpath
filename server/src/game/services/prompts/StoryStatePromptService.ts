@@ -180,7 +180,12 @@ ${modeDescriptions[story.getGameMode()]}
         ? "No images yet."
         : story
             .getImages()
-            .map((image) => `- ${image.id}: ${image.description}`)
+            .map(
+              (image) =>
+                `- ${image.id} (${image.source})${
+                  image.description ? `: ${image.description}` : ""
+                }`
+            )
             .join("\n"),
       "",
     ].join("\n");

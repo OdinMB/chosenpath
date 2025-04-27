@@ -3,6 +3,7 @@ import { STORAGE_PATHS } from "../config.js";
 import fs from "fs/promises";
 import fsSync from "fs";
 import JSZip from "jszip";
+import { Image } from "core/types/image.js";
 
 /**
  * Gets the appropriate fully-resolved storage path based on the current environment
@@ -361,5 +362,52 @@ export async function addDirectoryToZip(
       const fileData = await fs.readFile(sourcePath);
       zip.file(entryPath, fileData);
     }
+  }
+}
+
+/**
+ * Loads image files from a template's images directory
+ * @param templateId - The template ID
+ * @returns Array of objects with image information
+ */
+export function loadTemplateImages(templateId: string): Array<Image> {
+  try {
+    // Get the template directory
+    const templateDir = path.join(
+      getStoragePath("templates"),
+      templateId,
+      "images"
+    );
+    const imageExtensions = [".jpeg", ".png"];
+
+    // Check if directory exists
+    if (!fsSync.existsSync(templateDir)) {
+      console.log(`Template images directory not found: ${templateDir}`);
+      return [];
+    }
+
+    // Get files from directory
+    const files = fsSync
+      .readdirSync(templateDir)
+      .filter((file) =>
+        imageExtensions.includes(path.extname(file).toLowerCase())
+      );
+
+    // Map files to image objects
+    const images = files.map(
+      (file) =>
+        ({
+          id: path.parse(file).name, // Use filename without extension as ID
+          fileType: path.extname(file).slice(1).toLowerCase() as "jpeg" | "png",
+          source: "template" as const,
+          status: "ready" as const,
+        } as Image)
+    );
+
+    console.log(`Loaded ${images.length} images from template ${templateId}`);
+    return images;
+  } catch (error) {
+    console.error("Error loading template images:", error);
+    return []; // Return empty array if there's an error
   }
 }
