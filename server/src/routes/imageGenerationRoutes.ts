@@ -1,12 +1,13 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { aiImageGenerator } from "../game/services/AIImageGenerator.js";
+import { aiImageGenerator } from "game/services/AIImageGenerator.js";
 import { Logger } from "shared/logger.js";
 import {
+  IMAGE_QUALITIES,
   ResponseStatus,
   GenerateElementImageRequest,
   GenerateImageResponse,
-} from "core/types/api.js";
+} from "core/types/index.js";
 
 const router = express.Router();
 
@@ -36,7 +37,7 @@ router.post("/image-generation/template/element", async (req, res) => {
     }
 
     // Generate a unique ID for the image
-    const imageId = uuidv4();
+    const imageId = elementId || uuidv4();
 
     // Generate the image
     const imagePath = await aiImageGenerator.generateImageForTemplate(
@@ -44,9 +45,9 @@ router.post("/image-generation/template/element", async (req, res) => {
       templateId,
       appearance,
       imageInstructions,
-      undefined, // No references for now
+      undefined, // No image references
       size,
-      quality
+      quality || IMAGE_QUALITIES.HIGH
     );
 
     // Return success response

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Checkbox, TextArea, PrimaryButton, Icons } from "components/ui";
 import { TemplateIterationSections } from "core/types";
 
@@ -8,16 +8,46 @@ interface AiIterationFormProps {
     sections: TemplateIterationSections[]
   ) => Promise<void>;
   isLoading: boolean;
+  templateId?: string; // Optional templateId for persisting state per template
 }
+
+// Storage key for persisting form state
+const STORAGE_PREFIX = "template_iteration_form";
 
 export const AiIterationForm: React.FC<AiIterationFormProps> = ({
   onSubmit,
   isLoading,
+  templateId,
 }) => {
-  const [feedback, setFeedback] = useState("");
+  // Generate a storage key specific to this template if available
+  const storageKey = templateId
+    ? `${STORAGE_PREFIX}_${templateId}`
+    : STORAGE_PREFIX;
+
+  // Initialize state from localStorage or defaults
+  const [feedback, setFeedback] = useState(() => {
+    const saved = localStorage.getItem(`${storageKey}_feedback`);
+    return saved || "";
+  });
+
   const [selectedSections, setSelectedSections] = useState<
     TemplateIterationSections[]
-  >([]);
+  >(() => {
+    const saved = localStorage.getItem(`${storageKey}_sections`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Update localStorage when form values change
+  useEffect(() => {
+    localStorage.setItem(`${storageKey}_feedback`, feedback);
+  }, [feedback, storageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      `${storageKey}_sections`,
+      JSON.stringify(selectedSections)
+    );
+  }, [selectedSections, storageKey]);
 
   const handleSectionToggle = (section: TemplateIterationSections) => {
     setSelectedSections((prev) => {
@@ -114,6 +144,19 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 className="ml-2 text-sm text-gray-700"
               >
                 Players
+              </label>
+            </div>
+            <div className="flex items-center">
+              <Checkbox
+                id="media-section"
+                checked={selectedSections.includes("media")}
+                onChange={() => handleSectionToggle("media")}
+              />
+              <label
+                htmlFor="media-section"
+                className="ml-2 text-sm text-gray-700"
+              >
+                Media
               </label>
             </div>
           </div>

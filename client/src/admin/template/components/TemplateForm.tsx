@@ -146,6 +146,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           data.characterSelectionIntroduction
         );
       }
+    } else if (sectionKey === "media" && data.imageInstructions) {
+      handleImageInstructionsChange(data.imageInstructions);
     }
 
     // Delete the section from the iteration state and modal
@@ -176,6 +178,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         <AiIterationForm
           onSubmit={handleAiIterationSubmit}
           isLoading={isLoading}
+          templateId={formData.id}
         />
       </div>
     );

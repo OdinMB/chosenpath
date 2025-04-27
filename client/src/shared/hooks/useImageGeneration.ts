@@ -52,7 +52,7 @@ export function useImageGeneration(): UseImageGenerationResult {
       const payload: GenerateElementImageRequest = {
         templateId,
         elementId: element.id,
-        appearance: element.appearance,
+        appearance: element.name + "\n" + element.appearance,
         imageInstructions,
         size,
         quality,

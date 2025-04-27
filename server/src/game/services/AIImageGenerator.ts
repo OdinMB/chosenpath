@@ -62,7 +62,7 @@ export class AIImageGenerator {
     prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
     prompt += `==========\n${elementAppearance}\n==========`;
     if (imageInstructions) {
-      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n==========\n`;
+      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n`;
 
       // Format the ImageInstructions object into a readable string
       Object.entries(imageInstructions).forEach(([key, value]) => {
@@ -70,8 +70,6 @@ export class AIImageGenerator {
           prompt += `${key}: ${value}\n`;
         }
       });
-
-      prompt += `==========`;
     }
     return prompt;
   }

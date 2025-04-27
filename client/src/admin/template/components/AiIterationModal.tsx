@@ -13,6 +13,7 @@ import {
   OutcomesTab,
   StatsTab,
   PlayersTab,
+  MediaTab,
 } from "./";
 import { Logger } from "shared/logger";
 
@@ -21,7 +22,8 @@ type ModalTabType =
   | "storyElements"
   | "sharedOutcomes"
   | "stats"
-  | "players";
+  | "players"
+  | "media";
 
 interface AiIterationModalProps {
   isOpen: boolean;
@@ -80,6 +82,10 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
 
   if (iterationData.characterSelectionIntroduction || iterationData.player1) {
     tabs.push({ id: "players", label: "Players" });
+  }
+
+  if (iterationData.imageInstructions) {
+    tabs.push({ id: "media", label: "Media" });
   }
 
   // Set active tab to first tab if we have tabs and the currently active tab doesn't exist
@@ -250,6 +256,30 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
                   iterationData.characterSelectionIntroduction
                 }
                 onCharacterSelectionIntroductionChange={() => {}}
+                readOnly={true}
+              />
+            </div>
+          )}
+
+          {activeTab === "media" && iterationData.imageInstructions && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Image Instructions</h3>
+                <PrimaryButton
+                  onClick={() => {
+                    Logger.UI.log("Accepting media updates");
+                    onAcceptSection("media", iterationData);
+                  }}
+                  leftIcon={<Icons.Check className="h-4 w-4" />}
+                >
+                  Accept Image Instructions
+                </PrimaryButton>
+              </div>
+              <MediaTab
+                imageFile=""
+                setImageFile={() => {}}
+                imageInstructions={iterationData.imageInstructions}
+                setImageInstructions={() => {}}
                 readOnly={true}
               />
             </div>
