@@ -54,6 +54,36 @@ export class AIImageGenerator {
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
 
+  public async generateCoverImageForTemplate(
+    templateId: string,
+    coverPrompt: string,
+    imageInstructions?: ImageInstructions,
+    size?: ImageSize,
+    quality?: ImageQuality
+  ): Promise<string> {
+    // Create the full prompt combining cover prompt with image instructions
+    let prompt = `Generate a cover image for a story with the following description:\n\n${coverPrompt}`;
+
+    if (imageInstructions) {
+      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
+        imageInstructions
+      )}`;
+    }
+
+    Logger.Story.log("Generating cover imag");
+
+    // Generate the image
+    const imageBuffer = await this.generateImage(
+      prompt,
+      undefined, // No references
+      size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers
+      quality || IMAGE_QUALITIES.HIGH // Default to high quality for covers
+    );
+
+    // Save the image with 'cover' as the ID
+    return this.saveImageToTemplate("cover", templateId, imageBuffer);
+  }
+
   public getImagePrompt(
     elementAppearance: string,
     imageInstructions?: ImageInstructions
@@ -62,15 +92,37 @@ export class AIImageGenerator {
     prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
     prompt += `==========\n${elementAppearance}\n==========`;
     if (imageInstructions) {
-      prompt += `\n\nConsider the following general guidelines for images in this story:\n\n`;
-
-      // Format the ImageInstructions object into a readable string
-      Object.entries(imageInstructions).forEach(([key, value]) => {
-        if (value) {
-          prompt += `${key}: ${value}\n`;
-        }
-      });
+      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
+        imageInstructions
+      )}`;
     }
+    return prompt;
+  }
+
+  private getPromptSectionFromImageInstructions(
+    imageInstructions: ImageInstructions
+  ): string {
+    let prompt = "Consider the following guidelines:\n\n";
+
+    // Format each instruction with its key
+    const instructionMap: Record<string, string> = {
+      visualStyle: "Visual Style",
+      atmosphere: "Atmosphere",
+      colorPalette: "Color Palette",
+      settingDetails: "Setting Details",
+      characterStyle: "Character Style",
+      artInfluences: "Art Influences",
+    };
+
+    // Add each non-empty instruction to the formatted string
+    Object.entries(imageInstructions).forEach(([key, value]) => {
+      // Skip the coverPrompt itself since we're already using it
+      if (key !== "coverPrompt" && value) {
+        const label = instructionMap[key] || key;
+        prompt += `${label}: ${value}\n`;
+      }
+    });
+
     return prompt;
   }
 
@@ -139,7 +191,7 @@ export class AIImageGenerator {
   private async loadReferenceImages(
     references: ImageReference[]
   ): Promise<any[]> {
-    const templatesBasePath = getStoragePath("library");
+    const templatesBasePath = getStoragePath("templates");
     const storiesBasePath = getStoragePath("stories");
 
     const referenceImages: any[] = [];
@@ -182,17 +234,22 @@ export class AIImageGenerator {
     try {
       const fileName = `${imageId}.jpeg`;
       // Get the template directory path using storageUtils
-      const templatesBasePath = getStoragePath("library");
+      const templatesBasePath = getStoragePath("templates");
       // Create the template-specific directory if it doesn't exist
       const templateDir = path.join(templatesBasePath, templateId, "images");
       if (!fs.existsSync(templateDir)) {
         fs.mkdirSync(templateDir, { recursive: true });
+        Logger.Story.log(`Created template images directory: ${templateDir}`);
       }
       // Save the image
       const filePath = path.normalize(path.join(templateDir, fileName));
       fs.writeFileSync(filePath, imageBuffer);
-      Logger.Story.log(`Saved image ${imageId} to template: ${templateId}`);
-      return filePath;
+      Logger.Story.log(
+        `Saved image ${imageId} to template: ${templateId} at path: ${filePath}`
+      );
+
+      // Return the access path with the correct route pattern /images/templates/:templateId/:path(*)
+      return `/images/templates/${templateId}/${fileName}`;
     } catch (error) {
       Logger.Story.error(
         `Error saving image ${imageId} to template: ${templateId}`,

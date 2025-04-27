@@ -276,8 +276,6 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
                 </PrimaryButton>
               </div>
               <MediaTab
-                imageFile=""
-                setImageFile={() => {}}
                 imageInstructions={iterationData.imageInstructions}
                 setImageInstructions={() => {}}
                 readOnly={true}

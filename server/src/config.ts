@@ -13,13 +13,13 @@ const parseCorsOrigins = (origins: string): string[] => {
 export const STORAGE_PATHS = {
   development: {
     stories: "../data/stories",
-    library: "../data/templates",
+    templates: "../data/templates",
     mocks: "../data/mocks",
     temp: "../data/temp",
   },
   production: {
     stories: "/data/stories",
-    library: "/data/templates",
+    templates: "/data/templates",
     mocks: "/data/mocks",
     temp: "/data/temp",
   },

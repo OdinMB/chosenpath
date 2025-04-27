@@ -1,72 +1,48 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { Logger } from "shared/logger.js";
-import {
-  getStoragePath,
-  getStorageFilePath,
-  storageFileExists,
-} from "shared/storageUtils.js";
+import { getStorageFilePath, storageFileExists } from "shared/storageUtils.js";
 import { sendError, sendNotFound } from "shared/responseUtils.js";
 
 const imageRouter = express.Router();
 
 // Debug middleware to log all image requests
 imageRouter.use((req, res, next) => {
-  console.log(`[IMAGE-DEBUG] Request received: ${req.method} ${req.path}`);
-  console.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
-  console.log(`[IMAGE-DEBUG] Headers: ${JSON.stringify(req.headers, null, 2)}`);
+  // console.log(`[IMAGE-DEBUG] Request received: ${req.method} ${req.path}`);
+  Logger.Route.log(`[IMAGE-DEBUG] Full URL: ${req.originalUrl}`);
+  // console.log(`[IMAGE-DEBUG] Headers: ${JSON.stringify(req.headers, null, 2)}`);
   next();
 });
 
-// Serve template images
-imageRouter.get("/templates/:templateId/:filename", async (req, res) => {
-  const { templateId, filename } = req.params;
+// Use a more flexible route pattern with an optional path parameter
+// Changed to /templates/:templateId/:path(*) to work with /images prefix
+imageRouter.get("/templates/:templateId/:path(*)", async (req, res) => {
+  const { templateId, path: filePath } = req.params;
   const requestId = req.query.requestId as string;
 
   try {
-    // Log more detailed information for debugging
-    console.log(`[IMAGE-DEBUG] Serving image: ${templateId}/${filename}`);
-    Logger.Route.log(`Serving image: ${templateId}/${filename}`);
-
     // Validate input to prevent directory traversal attacks
-    if (templateId.includes("..") || filename.includes("..")) {
+    if (templateId.includes("..") || filePath.includes("..")) {
       Logger.Route.error(
-        `Invalid path parameters detected: ${templateId}/${filename}`
+        `Invalid path parameters detected: ${templateId}/${filePath}`
       );
       return sendError(res, "Invalid request", 400, requestId);
     }
 
-    // Construct subpath to the image
-    const subPath = path.join(templateId, "images", filename);
+    // For cover.jpeg in the root, we need to look in the images subdirectory
+    let subPath = path.join(templateId, "images", filePath);
 
     // Check if file exists
-    if (!storageFileExists("library", subPath)) {
-      // Add extra logging for debugging file path issues
-      const imagePath = getStorageFilePath("library", subPath);
-      console.log(`[IMAGE-DEBUG] Image not found at: ${imagePath}`);
+    let fileExists = storageFileExists("templates", subPath);
+    let imagePath = getStorageFilePath("templates", subPath);
 
-      // Check the template directory exists
-      const templatesBasePath = getStoragePath("library");
-      const templateDirPath = path.join(templatesBasePath, templateId);
-      console.log(`[IMAGE-DEBUG] Template directory: ${templateDirPath}`);
-      console.log(
-        `[IMAGE-DEBUG] Template directory exists: ${fs.existsSync(
-          templateDirPath
-        )}`
-      );
-
-      if (fs.existsSync(templateDirPath)) {
-        // List files in template directory for debugging
-        console.log(
-          `[IMAGE-DEBUG] Files in template directory:`,
-          fs.readdirSync(templateDirPath)
-        );
-      }
-
-      Logger.Route.error(`Image not found: ${templateId}/${filename}`);
+    if (!fileExists) {
+      Logger.Route.error(`Template image not found: ${templateId}/${filePath}`);
       return sendNotFound(res, "Image not found", requestId);
     }
+
+    // Get the filename from the path
+    const filename = path.basename(filePath);
 
     // Check file extension for basic security
     const ext = path.extname(filename).toLowerCase();
@@ -89,24 +65,31 @@ imageRouter.get("/templates/:templateId/:filename", async (req, res) => {
 
     res.setHeader("Content-Type", contentTypes[ext]);
 
-    // Set cache control headers (cache for 1 day)
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    // Set cache control headers (cache for 1 day, but make it refreshable with query param)
+    const timeParam = req.query.t;
+    if (timeParam) {
+      // If using a timestamp param, use a shorter cache time
+      res.setHeader("Cache-Control", "public, max-age=60"); // 1 minute
+    } else {
+      res.setHeader("Cache-Control", "public, max-age=86400"); // 1 day
+    }
 
-    // Get the full file path and send the file
-    const imagePath = getStorageFilePath("library", subPath);
-    console.log(`[IMAGE-DEBUG] Sending file: ${imagePath}`);
+    // Send the file
     res.sendFile(imagePath, (err) => {
       if (err) {
-        console.log(`[IMAGE-DEBUG] Error sending file: ${err.message}`);
+        Logger.Route.error(
+          `[IMAGE-DEBUG] Error sending template image file: ${err.message}`
+        );
         sendError(res, "Failed to serve image", 500, requestId, err);
       } else {
-        console.log(`[IMAGE-DEBUG] File sent successfully: ${imagePath}`);
+        Logger.Route.log(
+          `[IMAGE-DEBUG] Template image file sent successfully: ${imagePath}`
+        );
       }
     });
   } catch (error) {
-    console.log(`[IMAGE-DEBUG] Error in image route: ${error}`);
     Logger.Route.error(
-      `Error serving template image: ${templateId}/${filename}`,
+      `Error serving template image: ${templateId}/${filePath}`,
       error
     );
     sendError(res, "Failed to serve image", 500, requestId, error);
@@ -116,9 +99,6 @@ imageRouter.get("/templates/:templateId/:filename", async (req, res) => {
 // Catch-all for invalid image routes
 imageRouter.use((req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
-  console.log(
-    `[IMAGE-DEBUG] Invalid route handler triggered: ${req.originalUrl}`
-  );
   Logger.Route.error(`Invalid image request: ${req.method} ${req.originalUrl}`);
 
   // For image requests, return a valid image response with a generic "not found" image
@@ -133,7 +113,7 @@ imageRouter.use((req, res) => {
 
 // Add a test route to verify proxy
 imageRouter.get("/test", (req, res) => {
-  console.log("[IMAGE-DEBUG] Test route accessed");
+  Logger.Route.log("[IMAGE-DEBUG] Test route accessed");
   res.send("Image server is working correctly!");
 });
 

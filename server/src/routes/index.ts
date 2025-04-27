@@ -8,16 +8,17 @@ import { sendNotFound } from "shared/responseUtils.js";
 
 const router = express.Router();
 
-// Mount the image routes for direct API access
+// Mount routes in order of specificity (most specific first)
+
+// Mount the image routes first to ensure they handle image requests before templateRoutes
+// The full path for accessing images will be /images/templates/:templateId/:path(*)
 router.use("/images", imageRouter);
 
-// Use image generation routes - Register before template routes to avoid conflicts
+// Use image generation routes
 router.use(imageGenerationRoutes);
 
-// Use template routes
+// Template and story routes come after image routes to avoid conflicts
 router.use(templateRoutes);
-
-// Use story routes
 router.use(storyRoutes);
 
 // Catch-all 404 handler

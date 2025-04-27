@@ -69,7 +69,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handlePublicationStatusChange,
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
-    handleImageFileChange,
     handleImageInstructionsChange,
     // New helper functions
     getMinPlayerOptions,
@@ -261,8 +260,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
           {activeTab === "media" && (
             <MediaTab
-              imageFile={formData.imageFile || ""}
-              setImageFile={handleImageFileChange}
+              templateId={formData.id}
               imageInstructions={
                 formData.imageInstructions || {
                   visualStyle: "",
@@ -271,6 +269,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                   settingDetails: "",
                   characterStyle: "",
                   artInfluences: "",
+                  coverPrompt: "",
                 }
               }
               setImageInstructions={handleImageInstructionsChange}

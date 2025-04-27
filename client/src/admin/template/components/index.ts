@@ -11,6 +11,7 @@ export { PlayerIdentityEditor } from "./PlayerIdentityEditor";
 export { PlayerEditor } from "./PlayerEditor";
 export { BasicInfoTab } from "./BasicInfoTab";
 export { MediaTab } from "./MediaTab";
+export { CoverImageEditor } from "./CoverImageEditor";
 export { StatsTab } from "./StatsTab";
 export { StoryElementsTab } from "./StoryElementsTab";
 export { OutcomesTab } from "./OutcomesTab";

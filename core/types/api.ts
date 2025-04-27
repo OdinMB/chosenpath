@@ -19,6 +19,17 @@ export interface GenerateElementImageRequest extends ClientRequest {
 }
 
 /**
+ * Image generation request for a template cover
+ */
+export interface GenerateCoverImageRequest extends ClientRequest {
+  templateId: string;
+  coverPrompt: string;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
+
+/**
  * Response for a successful image generation
  */
 export interface GenerateImageResponse {

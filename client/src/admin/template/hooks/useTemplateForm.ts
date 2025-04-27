@@ -305,6 +305,7 @@ export function useTemplateForm({
           settingDetails: "",
           characterStyle: "",
           artInfluences: "",
+          coverPrompt: "",
         }),
         ...updates,
       },

@@ -67,8 +67,13 @@ export const imageInstructionsSchema = z
       .describe(
         "Artists, art movements, or media styles that should influence the imagery"
       ),
+    coverPrompt: z
+      .string()
+      .describe(
+        "Prompt for generating the cover image. Will be submitted in addition to the other instructions."
+      ),
   })
   .describe(
-    "Visual styling instructions to maintain consistent aesthetics across all generated images"
+    "Visual styling instructions to maintain consistent aesthetics across all generated images. Will be added to all image generation prompts. Must still be flexible enough to generate all images for the story."
   );
 export type ImageInstructions = z.infer<typeof imageInstructionsSchema>;

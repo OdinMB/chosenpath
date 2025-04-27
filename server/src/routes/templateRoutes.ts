@@ -149,7 +149,7 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
     const zip = new JSZip();
 
     // Get the templates directory
-    const templatesBasePath = getStoragePath("library");
+    const templatesBasePath = getStoragePath("templates");
 
     // Check if directory exists
     if (!fsSync.existsSync(templatesBasePath)) {
@@ -250,7 +250,7 @@ router.get("/admin/templates/:id/assets", verifyAdmin, async (req, res) => {
     }
 
     // Get template directory path
-    const templatesBasePath = getStoragePath("library");
+    const templatesBasePath = getStoragePath("templates");
     const templateDir = path.join(templatesBasePath, id);
 
     // Check if directory exists
@@ -475,7 +475,7 @@ router.post(
       }
 
       // Get the template directory path
-      const templatesBasePath = getStoragePath("library");
+      const templatesBasePath = getStoragePath("templates");
       const templateDir = path.join(templatesBasePath, id);
 
       // Create target directory including any subdirectories
@@ -565,7 +565,7 @@ router.post(
       }
 
       // Get the template directory path
-      const templatesBasePath = getStoragePath("library");
+      const templatesBasePath = getStoragePath("templates");
       const templateDir = path.join(templatesBasePath, id);
 
       // Ensure the template directory exists

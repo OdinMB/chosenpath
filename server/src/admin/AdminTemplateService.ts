@@ -44,7 +44,7 @@ export class AdminTemplateService {
 
   constructor() {
     // Get the appropriate storage path using the utility function
-    this.storagePath = getStoragePath("library");
+    this.storagePath = getStoragePath("templates");
     this.initializeStorage();
     this.aiStoryGenerator = new AIStoryGenerator();
   }

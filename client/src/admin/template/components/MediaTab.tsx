@@ -1,18 +1,17 @@
 import React from "react";
 import { ImageInstructions } from "core/types";
-import { TextArea, InfoIcon, Input } from "components/ui";
+import { TextArea, InfoIcon } from "components/ui";
+import { CoverImageEditor } from "./CoverImageEditor";
 
 interface MediaTabProps {
-  imageFile: string;
-  setImageFile: (imageFile: string) => void;
+  templateId?: string;
   imageInstructions: ImageInstructions;
   setImageInstructions: (updates: Partial<ImageInstructions>) => void;
   readOnly?: boolean;
 }
 
 export const MediaTab: React.FC<MediaTabProps> = ({
-  imageFile,
-  setImageFile,
+  templateId = "",
   imageInstructions = {
     visualStyle: "",
     atmosphere: "",
@@ -20,6 +19,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
     settingDetails: "",
     characterStyle: "",
     artInfluences: "",
+    coverPrompt: "",
   },
   setImageInstructions,
   readOnly = false,
@@ -34,26 +34,19 @@ export const MediaTab: React.FC<MediaTabProps> = ({
     });
   };
 
+  const handleCoverPromptChange = (coverPrompt: string) => {
+    handleInstructionChange("coverPrompt", coverPrompt);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Cover Image */}
-      <div className="flex flex-col gap-2 mb-4">
-        <div className="flex items-center gap-2">
-          <label htmlFor="cover-image" className="font-semibold">
-            Cover Image
-          </label>
-          <InfoIcon
-            tooltipText="URL or path for the cover image displayed on the template card"
-            position="right"
-          />
-        </div>
-        <Input
-          id="cover-image"
-          name="cover-image"
-          placeholder="Enter image URL or path"
-          value={imageFile}
-          onChange={(e) => setImageFile(e.target.value)}
-          disabled={readOnly}
+      {/* Cover Image Editor */}
+      <div className="mb-6">
+        <CoverImageEditor
+          templateId={templateId}
+          imageInstructions={imageInstructions}
+          onUpdateCoverPrompt={handleCoverPromptChange}
+          readOnly={readOnly}
         />
       </div>
 

@@ -8,6 +8,7 @@ import {
 } from "core/types";
 import {
   GenerateElementImageRequest,
+  GenerateCoverImageRequest,
   GenerateImageResponse,
   ResponseStatus,
   SuccessResponse,
@@ -18,6 +19,9 @@ interface UseImageGenerationResult {
   generateImageForElement: (
     params: GenerateElementImageParams
   ) => Promise<GenerateImageResponse | null>;
+  generateCoverImage: (
+    params: GenerateCoverImageParams
+  ) => Promise<GenerateImageResponse | null>;
   isGenerating: boolean;
   error: string | null;
 }
@@ -25,6 +29,14 @@ interface UseImageGenerationResult {
 interface GenerateElementImageParams {
   templateId: string;
   element: StoryElement;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
+
+interface GenerateCoverImageParams {
+  templateId: string;
+  coverPrompt: string;
   imageInstructions?: ImageInstructions;
   size?: ImageSize;
   quality?: ImageQuality;
@@ -114,8 +126,93 @@ export function useImageGeneration(): UseImageGenerationResult {
     }
   };
 
+  const generateCoverImage = async (
+    params: GenerateCoverImageParams
+  ): Promise<GenerateImageResponse | null> => {
+    const { templateId, coverPrompt, imageInstructions, size, quality } =
+      params;
+
+    console.log("useImageGeneration: Starting cover image generation", {
+      templateId,
+      coverPrompt,
+    });
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      // Prepare the request payload
+      const payload: GenerateCoverImageRequest = {
+        templateId,
+        coverPrompt,
+        imageInstructions,
+        size,
+        quality,
+      };
+
+      console.log(
+        "Sending cover image generation request with payload:",
+        payload
+      );
+
+      // Use the API_CONFIG.DEFAULT_API_URL for the endpoint
+      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/image-generation/template/cover`;
+      console.log("Request URL:", apiUrl);
+
+      // Make the API request
+      const response = await axios.post<SuccessResponse<GenerateImageResponse>>(
+        apiUrl,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }
+      );
+
+      console.log("Cover image generation response:", response.data);
+
+      // Handle successful response
+      if (response.data.status === ResponseStatus.SUCCESS) {
+        console.log(
+          "Cover image generated successfully for template",
+          templateId
+        );
+        return response.data.data;
+      }
+
+      throw new Error("Failed to generate cover image");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error occurred";
+
+      setError(errorMessage);
+      console.error("Cover image generation failed:", errorMessage);
+
+      if (axios.isAxiosError(err)) {
+        console.error("Axios error details:", {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          headers: err.response?.headers,
+          config: {
+            url: err.config?.url,
+            method: err.config?.method,
+            data: err.config?.data,
+          },
+        });
+      }
+
+      return null;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return {
     generateImageForElement,
+    generateCoverImage,
     isGenerating,
     error,
   };
