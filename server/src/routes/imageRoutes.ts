@@ -53,34 +53,28 @@ imageRouter.get("/templates/:templateId/:path(*)", async (req, res) => {
       return sendError(res, "Invalid file type", 400, requestId);
     }
 
-    // Set appropriate content type
-    const contentTypes: Record<string, string> = {
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".png": "image/png",
-      ".gif": "image/gif",
-      ".webp": "image/webp",
-      ".svg": "image/svg+xml",
+    // Determine appropriate max-age based on query params
+    const timeParam = req.query.t;
+    const maxAge = timeParam ? 60 * 1000 : 86400 * 1000; // 1 minute or 1 day in ms
+
+    // Use sendFile options to set appropriate headers
+    const options = {
+      maxAge: maxAge,
+      headers: {
+        "Cache-Control": `public, max-age=${maxAge / 1000}`,
+      },
     };
 
-    res.setHeader("Content-Type", contentTypes[ext]);
-
-    // Set cache control headers (cache for 1 day, but make it refreshable with query param)
-    const timeParam = req.query.t;
-    if (timeParam) {
-      // If using a timestamp param, use a shorter cache time
-      res.setHeader("Cache-Control", "public, max-age=60"); // 1 minute
-    } else {
-      res.setHeader("Cache-Control", "public, max-age=86400"); // 1 day
-    }
-
-    // Send the file
-    res.sendFile(imagePath, (err) => {
+    // Send the file with options
+    res.sendFile(imagePath, options, (err) => {
       if (err) {
         Logger.Route.error(
           `[IMAGE-DEBUG] Error sending template image file: ${err.message}`
         );
-        sendError(res, "Failed to serve image", 500, requestId, err);
+        // Check if headers were already sent before attempting to send an error response
+        if (!res.headersSent) {
+          sendError(res, "Failed to serve image", 500, requestId, err);
+        }
       } else {
         Logger.Route.log(
           `[IMAGE-DEBUG] Template image file sent successfully: ${imagePath}`
