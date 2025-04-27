@@ -46,31 +46,37 @@ export const imageInstructionsSchema = z
     visualStyle: z
       .string()
       .describe(
-        "The primary artistic style for images (e.g., watercolor, pixel art, photorealistic)"
+        "The primary artistic style for images in this visual novel. Depending on the story, safe options could be anime, semi-realistic, digital illustration, fantasy illustration, graphic novel, Pixar, etc. Can also be experimental if it fits the story, lik watercolor or pixel art."
       ),
     atmosphere: z
       .string()
-      .describe("The mood or emotional tone that should pervade all images"),
+      .describe(
+        "1 sentence: the mood or emotional tone that should pervade all images"
+      ),
     colorPalette: z
       .string()
-      .describe("Key colors or color scheme that should appear consistently"),
+      .describe(
+        "A few words: A rough tendency for the color palette of the images. Examples: 'neon colors', 'somewhat muted', 'sepia tone', etc."
+      ),
     settingDetails: z
       .string()
       .describe(
-        "Essential visual elements of the world that should appear regularly"
+        "A few short elements. NOT a list of specific elements, but rather a description of visual motifs in the world. Examples: how magical effects look like, general architectural style, etc."
       ),
     characterStyle: z
       .string()
-      .describe("How characters should be consistently depicted"),
+      .describe(
+        "A few concise pointers. How characters should be consistently depicted."
+      ),
     artInfluences: z
       .string()
       .describe(
-        "Artists, art movements, or media styles that should influence the imagery"
+        "A few words: Art movements or media styles that should influence the imagery. Don't mention specific artists or studios."
       ),
     coverPrompt: z
       .string()
       .describe(
-        "Prompt for generating the cover image. Will be submitted in addition to the other instructions."
+        "Prompt for generating the cover image. Focus on the elements that should be included in the cover image. Stylistic instructions will be added by the system based on the attributes above."
       ),
   })
   .describe(

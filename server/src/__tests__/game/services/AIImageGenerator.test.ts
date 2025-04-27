@@ -16,7 +16,7 @@ const TEMPLATE_ID = "22b80460-e916-4ed2-a81a-a7e2d4940748";
 // Debug utility to check environment
 function checkEnvironment() {
   // Use getStoragePath to get the library path and then add the template ID
-  const templateDir = path.join(getStoragePath("library"), TEMPLATE_ID);
+  const templateDir = path.join(getStoragePath("templates"), TEMPLATE_ID);
   console.log("Template directory exists:", fs.existsSync(templateDir));
   if (!fs.existsSync(templateDir)) {
     try {
@@ -77,7 +77,7 @@ describe("AIImageGenerator", function () {
 
       // Verify the file is in the correct directory
       const templatePath = path.join(
-        getStoragePath("library"),
+        getStoragePath("templates"),
         TEMPLATE_ID,
         "images"
       );
