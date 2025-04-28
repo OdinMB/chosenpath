@@ -2,10 +2,8 @@ Smaller commits!
 
 # NEXT
 
+- Special treatment for [image] tags with id = playerslot
 - Can't reconnect after disconnect
-
-- 20: Images for title, player identities, story elements (for templates initially)
-  https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
 
 - 3: Add "what you're looking for" filters above carousel and in library (preset filters)
   - Enjoy fiction (Crime, Fantasy, etc.)
@@ -19,6 +17,7 @@ Smaller commits!
 Text, English, Multiplayer > other stuff
 
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
+- 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
 - 3: Stat attribute for personal stats: initial value or part of player background?
 - 1: if not first beat in a thread: don't reestablish scene; go directly into action

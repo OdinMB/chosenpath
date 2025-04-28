@@ -402,6 +402,10 @@ export class Story {
     return this.imageManager.getImages(this.state);
   }
 
+  hasImages(): boolean {
+    return this.state.images.length > 0;
+  }
+
   addImage(image: any) {
     const updatedState = this.imageManager.addImage(this.state, image);
     return new Story(updatedState);
@@ -412,15 +416,6 @@ export class Story {
       this.state,
       imageId,
       updates
-    );
-    return new Story(updatedState);
-  }
-
-  setCurrentBeatImage(playerSlot: PlayerSlot, imageId: string) {
-    const updatedState = this.imageManager.setCurrentBeatImage(
-      this.state,
-      playerSlot,
-      imageId
     );
     return new Story(updatedState);
   }

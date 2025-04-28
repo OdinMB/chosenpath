@@ -324,6 +324,7 @@ export class AIImageGenerator {
     }
   }
 
+  // ToDo: Needs new system
   async generateImagesForBeats(
     story: Story,
     beatsNeedingImages: BeatsNeedingImages
@@ -359,7 +360,7 @@ export class AIImageGenerator {
             status: "complete",
           });
 
-          updatedStory = updatedStory.setCurrentBeatImage(playerSlot, imageId);
+          // updatedStory = updatedStory.setCurrentBeatImage(playerSlot, imageId);
         } catch (error) {
           Logger.Story.error("Failed to generate image for beat:", error);
         }

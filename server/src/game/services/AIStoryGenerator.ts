@@ -340,9 +340,8 @@ export class AIStoryGenerator {
 
           updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
 
-          if (!beatData.imageId || beatData.imageId === "") {
-            beatsNeedingImages[playerSlot] = beat;
-          }
+          // ToDo: needs new method for creating images
+          // beatsNeedingImages[playerSlot] = beat;
         } else {
           throw new Error(
             `Player ${playerSlot} not found in story. This should never happen.`

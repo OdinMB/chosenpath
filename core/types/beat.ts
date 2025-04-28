@@ -192,6 +192,7 @@ export const beatGenerationSchema = z.object({
         "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
+        "- If there is an image library with relevant images, add 1-2 image tags to the beat text. Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
     ),
@@ -199,11 +200,6 @@ export const beatGenerationSchema = z.object({
     .string()
     .describe(
       "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[insert player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [insert player name] that [specific thing]'."
-    ),
-  imageId: z
-    .string()
-    .describe(
-      "Id of an image from the existing list of images. Leave empty if no image is available or fitting. Leave empty if you want the game app to generate a new image for this beat."
     ),
   options: z
     .array(

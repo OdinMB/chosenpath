@@ -614,15 +614,16 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
       // Add the image element if we have a valid image
       if (finalImage) {
+        console.log("Rendering image with attributes:", attributes);
         elements.push(
           <StoryImage
             key={`img-${index}`}
             image={finalImage}
-            alt={finalImage.description || ""}
+            alt={finalImage.description || attributes.desc || ""}
             sourceId={storyState.templateId}
             className="rounded-lg overflow-hidden"
             responsivePosition={true}
-            caption={finalImage.description || ""}
+            caption={attributes.desc || finalImage.description || ""}
             withinText={true}
             float={(attributes.float as "left" | "right") || "left"}
           />

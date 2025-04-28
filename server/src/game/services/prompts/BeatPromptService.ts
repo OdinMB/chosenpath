@@ -331,9 +331,20 @@ Example: If the player decided to organize a vote, describe what they do, how th
 --- Players will see the options below the beat text. Talking about them in the beat text is redundant.
 --- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'
 
-Images (optional)
-If you want to generate an image for a beat, leave the imageId field empty.
-If you want to use an existing image, specify its ID.
+Images
+${
+  story.hasImages()
+    ? "You can include image tags in the beat text to show images from the story's image library:\n" +
+      "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in.\n" +
+      "- Parameters:\n" +
+      "--- id: the id of the image from the story's image library. Image ids correspond to story elements.\n" +
+      "--- source: 'template' or 'story' (as per image library)\n" +
+      "--- desc: a caption that will be displayed below the image. Provide at least the name of the element that the image depicts.\n" +
+      "--- float (optional): 'left', 'right' (default is 'left')\n" +
+      "- Example: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'\n" +
+      "- Try to add 1-2 images per beat.\n"
+    : "This story does not support images. Do not use them in the beat text."
+}
 ${
   story.getCurrentBeatType() !== "ending"
     ? this.createOptionInstructions(story)

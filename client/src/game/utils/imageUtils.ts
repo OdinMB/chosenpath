@@ -38,6 +38,16 @@ export function parseImagePlaceholder(
 ): Record<string, string> {
   const attributes: Record<string, string> = {};
 
+  // Helper function to process and clean description text
+  const processDescription = (desc: string): string => {
+    // Replace escape sequences
+    return desc
+      .replace(/\\"/g, '"') // Replace \" with "
+      .replace(/\\n/g, "\n") // Replace \n with newline
+      .replace(/\\t/g, "\t") // Replace \t with tab
+      .trim();
+  };
+
   try {
     // First, clean up the text by removing newlines and extra spaces
     const cleanText = placeholderText
@@ -58,17 +68,28 @@ export function parseImagePlaceholder(
       attributes.source = sourceMatch[1];
     }
 
-    // Extract other attributes if present
-    const descMatch = cleanText.match(/desc="([^"]+)"|desc=([^\s]+)/);
-    if (descMatch) {
-      attributes.desc = descMatch[1] || descMatch[2];
+    // Extract description attribute - handle all types of quotes
+    // Try to find desc="..." pattern with any quote type
+    const descQuotePattern = /desc=(?:"|"|")(.*?)(?:"|"|")/;
+    const descQuotedMatch = cleanText.match(descQuotePattern);
+
+    if (descQuotedMatch && descQuotedMatch[1]) {
+      attributes.desc = processDescription(descQuotedMatch[1]);
+    } else {
+      // Then try for unquoted desc=text
+      const descUnquotedMatch = cleanText.match(/desc=([^\s]+)/);
+      if (descUnquotedMatch && descUnquotedMatch[1]) {
+        attributes.desc = processDescription(descUnquotedMatch[1]);
+      }
     }
 
+    // Extract fileType attribute
     const fileTypeMatch = cleanText.match(/fileType=([^\s]+)/);
     if (fileTypeMatch && fileTypeMatch[1]) {
       attributes.fileType = fileTypeMatch[1];
     }
 
+    // Extract subDir attribute
     const subDirMatch = cleanText.match(/subDir=([^\s]+)/);
     if (subDirMatch && subDirMatch[1]) {
       attributes.subDir = subDirMatch[1];
@@ -79,6 +100,10 @@ export function parseImagePlaceholder(
     if (floatMatch && floatMatch[1]) {
       attributes.float = floatMatch[1];
     }
+
+    // Log the extracted attributes for debugging
+    console.log("Image placeholder text:", placeholderText);
+    console.log("Extracted attributes:", attributes);
   } catch (error) {
     console.error("Error parsing image placeholder:", error);
   }
