@@ -1,4 +1,4 @@
-/// <reference types="mocha" />
+import { describe, it } from "mocha";
 import { aiImageGenerator } from "game/services/AIImageGenerator.js";
 import { expect } from "chai";
 import fs from "fs";

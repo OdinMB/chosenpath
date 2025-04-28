@@ -21,9 +21,10 @@
     "strictFunctionTypes": true,
     "noImplicitAny": false,
     "noImplicitThis": false,
-    "alwaysStrict": false
+    "alwaysStrict": false,
+    "types": ["node", "mocha", "chai"]
   },
   "references": [{ "path": "../core" }],
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/**/*.test.ts"],
   "exclude": ["node_modules", "dist"]
 }
