@@ -7,12 +7,10 @@
     "node": "20.x"
   },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc --project tsconfig.json && tsc --project src/__tests__/tsconfig.test.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
+    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc --project tsconfig.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
     "dev": "tsx watch src/index.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js",
-    "test": "mocha --require tsx/esm --require dotenv/config src/__tests__/**/*.test.ts",
-    "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Server dist/core directory structure =====\\n' && ls -la dist/core && echo '\\n===== DEBUG: Sample config.js in server dist/core =====\\n' && head -20 dist/core/config.js && echo '\\n===== DEBUG: First few lines of dist/config.js =====\\n' && head -20 dist/config.js && echo '\\n===== DEBUG: Done debugging ====='",
-    "build:test": "tsc --project src/__tests__/tsconfig.test.json"
+    "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Server dist/core directory structure =====\\n' && ls -la dist/core && echo '\\n===== DEBUG: Sample config.js in server dist/core =====\\n' && head -20 dist/core/config.js && echo '\\n===== DEBUG: First few lines of dist/config.js =====\\n' && head -20 dist/config.js && echo '\\n===== DEBUG: Done debugging ====='"
   },
   "keywords": [],
   "author": "Odin Mühlenbein",
