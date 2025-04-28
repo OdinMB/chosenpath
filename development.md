@@ -14,20 +14,20 @@ Smaller commits!
   - Have fun with a kid
   - Vent on reality (Satire)
 
-- 10: More (multiplayer) templates
-
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
 
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
+- 3: Stat attribute for personal stats: initial value or part of player background?
+- 10: More (multiplayer) templates
+
 - 2: For each option: 1-2 pieces of text that are displayed in waiting view (character's past experiences relevant to the situation displayed next to char image? Just a stream of thought reflection on that moment?)
 - 4: waiting screen: relevant story element with image and facts that players can flip through
 - 4: List of world lore quotes that are generated at story creation and shown in a carousel.
 
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
-- 3: Stat attribute for personal stats: initial value or part of player background?
 - 1: if not first beat in a thread: don't reestablish scene; go directly into action
 
 - 20: Streaming text

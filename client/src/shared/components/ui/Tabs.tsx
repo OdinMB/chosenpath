@@ -27,18 +27,14 @@ export const Tabs = <T extends string>({
     }[size];
 
     if (variant === "underline") {
-      return `${baseStyles} ${sizeStyles} border-b-2 ${
-        isActive
-          ? "border-secondary text-secondary"
-          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+      return `${baseStyles} ${sizeStyles} ${
+        isActive ? "text-secondary" : "text-gray-500 hover:text-gray-700"
       }`;
     }
 
     if (variant === "bordered") {
-      return `${baseStyles} ${sizeStyles} border-b-2 ${
-        isActive
-          ? "border-indigo-500 text-indigo-600"
-          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+      return `${baseStyles} ${sizeStyles} ${
+        isActive ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"
       }`;
     }
 
@@ -51,33 +47,32 @@ export const Tabs = <T extends string>({
   };
 
   return (
-    <div
-      className={
-        variant === "underline" || variant === "bordered"
-          ? "border-b border-gray-200 w-full"
-          : "w-full"
-      }
-    >
-      <nav
-        className={
-          variant === "underline" || variant === "bordered"
-            ? "-mb-px flex w-full overflow-x-auto scrollbar-hide"
-            : "flex w-full overflow-x-auto scrollbar-hide"
-        }
-      >
-        <div className="flex min-w-full md:min-w-0 space-x-1 pb-1">
+    <div className="w-full">
+      <nav className="flex w-full overflow-x-auto scrollbar-hide">
+        <div className="flex min-w-full md:min-w-0 space-x-1">
           {items.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`${getTabStyles(activeTab === tab.id)} flex-shrink-0`}
-              onClick={() => onTabChange(tab.id)}
-            >
-              {tab.label}
-            </button>
+            <div key={tab.id} className="relative">
+              <button
+                type="button"
+                className={`${getTabStyles(
+                  activeTab === tab.id
+                )} flex-shrink-0`}
+                onClick={() => onTabChange(tab.id)}
+              >
+                {tab.label}
+              </button>
+              {activeTab === tab.id && (
+                <div
+                  className={`absolute bottom-[-1px] left-0 right-0 h-[3px] ${
+                    variant === "bordered" ? "bg-indigo-500" : "bg-secondary"
+                  } z-10`}
+                />
+              )}
+            </div>
           ))}
         </div>
       </nav>
+      <div className="h-[1px] w-full bg-gray-200 -mt-px"></div>
     </div>
   );
 };
