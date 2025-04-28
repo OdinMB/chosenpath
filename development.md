@@ -2,25 +2,30 @@ Smaller commits!
 
 # NEXT
 
-- Special treatment for [image] tags with id = playerslot
-- Can't reconnect after disconnect
+- 2: Special treatment for [image] tags with id = playerslot
+- 1: sort/filter stories and templates
 
-- 3: Add "what you're looking for" filters above carousel and in library (preset filters)
+- 7: Generating images during the story (using reference images)
+
+- 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
+
   - Enjoy fiction (Crime, Fantasy, etc.)
   - Pretend to be (Slice of Life)
   - Have fun with a kid
   - Vent on reality (Satire)
-- 10: More multiplayer templates
+
+- 10: More (multiplayer) templates
 
 # BETTER EXPERIENCE
 
-Text, English, Multiplayer > other stuff
+Focus: Text/Images, English, Multiplayer
 
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
 - 3: Stat attribute for personal stats: initial value or part of player background?
 - 1: if not first beat in a thread: don't reestablish scene; go directly into action
+
 - 20: Streaming text
 - 5: higher degree of direct interaction between players in joint threads
 
@@ -40,14 +45,14 @@ Text, English, Multiplayer > other stuff
 
 # SERIOUS PROJECT
 
-- 2: Save form state for AI iterations; sort stories and templates by column; filter both
-- 10 User accounts (DB, Login, Manage codes/games)
-- 5 Credits system for generating stories
-- 15 Stripe integration
-- 5 See pending players, current beat, etc. of active games
-- 15 System to view/navigate save files
-- 30 Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
-- 20 Use React routing for frontend
+- 1: export stories
+- 10: User accounts (DB, Login, Manage codes/games)
+- 5: Credits system for generating stories
+- 15: Stripe integration
+- 5: See pending players, current beat, etc. of active games
+- 15: System to view/navigate save files
+- 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
+- 20: Use React routing for frontend
 
 # TECHNICALITIES
 

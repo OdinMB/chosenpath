@@ -20,7 +20,7 @@ import {
   parseImagePlaceholder,
   createImageFromPlaceholder,
   findImageInLibrary,
-} from "../utils/imageUtils";
+} from "shared/utils/imageUtils";
 import { ClientStoryState } from "core/types";
 
 interface StoryDisplayProps {
@@ -576,86 +576,110 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       );
     }
 
-    // Split the text at image placeholders
-    const segments = text.split(IMAGE_PLACEHOLDER_REGEX);
+    // First, render all images and store them with their positions
+    const imageElements: Array<{
+      position: number;
+      element: React.ReactNode;
+      placeholder: string;
+    }> = [];
 
-    // We now have alternating segments of text and image placeholders
-    const elements: React.ReactNode[] = [];
-
-    // Add first text segment if it exists
-    if (segments[0]) {
-      elements.push(
-        React.createElement(
-          ReactMarkdown as ComponentType<{
-            children: string;
-            breaks?: boolean;
-          }>,
-          {
-            key: `text-0`,
-            breaks: true,
-            children: segments[0],
-          }
-        )
-      );
-    }
-
-    // Process each match and add alternating text segments
     matches.forEach((match, index) => {
-      // Process the image placeholder
       const attributes = parseImagePlaceholder(match);
       const imageObj = createImageFromPlaceholder(attributes);
-
-      // Look for the image in the library if available
       const libraryImage = imageObj
         ? findImageInLibrary(imageObj.id, storyState)
         : undefined;
-
       const finalImage = libraryImage || imageObj;
 
-      // Add the image element if we have a valid image
       if (finalImage) {
         console.log("Rendering image with attributes:", attributes);
-        elements.push(
-          <StoryImage
-            key={`img-${index}`}
-            image={finalImage}
-            alt={finalImage.description || attributes.desc || ""}
-            sourceId={storyState.templateId}
-            className="rounded-lg overflow-hidden"
-            responsivePosition={true}
-            caption={attributes.desc || finalImage.description || ""}
-            withinText={true}
-            float={(attributes.float as "left" | "right") || "left"}
-          />
-        );
+        imageElements.push({
+          position: text.indexOf(match),
+          placeholder: match,
+          element: (
+            <StoryImage
+              key={`img-${index}`}
+              image={finalImage}
+              alt={finalImage.description || attributes.desc || ""}
+              sourceId={storyState.templateId}
+              className="rounded-lg overflow-hidden"
+              responsivePosition={true}
+              caption={attributes.desc || finalImage.description || ""}
+              withinText={true}
+              float={(attributes.float as "left" | "right") || "left"}
+            />
+          ),
+        });
       } else {
         console.log("No image found for", match);
       }
+    });
 
-      // Add the next text segment if it exists
-      if (segments[index + 1]) {
-        elements.push(
-          React.createElement(
-            ReactMarkdown as ComponentType<{
-              children: string;
-              breaks?: boolean;
-            }>,
-            {
-              key: `text-${index + 1}`,
-              breaks: true,
-              children: segments[index + 1],
-            }
-          )
-        );
+    // Sort images by their position in the text
+    imageElements.sort((a, b) => a.position - b.position);
+
+    // Split text into segments at image positions while preserving the original text
+    const segments: Array<{
+      type: "text" | "image";
+      content: string | React.ReactNode;
+    }> = [];
+    let lastIndex = 0;
+
+    imageElements.forEach(({ position, element, placeholder }) => {
+      // Add text segment before the image
+      if (position > lastIndex) {
+        segments.push({
+          type: "text",
+          content: text.slice(lastIndex, position),
+        });
       }
+      // Add the image
+      segments.push({
+        type: "image",
+        content: element,
+      });
+      lastIndex = position + placeholder.length;
+    });
 
-      // Add a clearfix div at the end to ensure proper content flow after all content
-      if (index === matches.length - 1) {
-        elements.push(<div key="final-clearfix" className="clear-both"></div>);
+    // Add remaining text after last image
+    if (lastIndex < text.length) {
+      segments.push({
+        type: "text",
+        content: text.slice(lastIndex),
+      });
+    }
+
+    // Render segments
+    const elements = segments.map((segment, index) => {
+      if (segment.type === "text") {
+        return React.createElement(
+          ReactMarkdown as ComponentType<{
+            children: string;
+            components?: Record<
+              string,
+              React.ComponentType<{ children: React.ReactNode }>
+            >;
+          }>,
+          {
+            key: `text-${index}`,
+            children: segment.content as string,
+            components: {
+              p: ({ children }) => (
+                <p className="mb-4 text-base md:text-lg">{children}</p>
+              ),
+            },
+          }
+        );
+      } else {
+        return segment.content;
       }
     });
 
-    return <>{elements}</>;
+    return (
+      <div className="relative narrative-text [&>*]:mb-4 last:[&>*]:mb-0">
+        {elements}
+      </div>
+    );
   };
 
   if (!storyState || !playerState) {

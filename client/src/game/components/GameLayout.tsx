@@ -9,7 +9,7 @@ import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
 import { LoadingSpinner, PrimaryButton, Icons } from "components/ui";
 import { StoryImage } from "shared/components/StoryImage";
-import { createPlayerIdentityImage } from "../utils/imageUtils";
+import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 import { ClientStateManager } from "core/models/ClientStateManager";
 
 interface Props {

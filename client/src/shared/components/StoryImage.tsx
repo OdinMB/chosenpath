@@ -136,11 +136,13 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     );
 
     if (withinText) {
+      // Calculate float-related classes
+      const floatClasses =
+        float === "right" ? "md:float-right md:ml-6" : "md:float-left md:mr-6";
+
       return (
         <div
-          className={`w-full mx-auto my-2 md:float-${float} md:${
-            float === "left" ? "mr" : "ml"
-          }-6 md:w-1/2 lg:w-1/3`}
+          className={`w-full mx-auto my-2 ${floatClasses} md:w-1/2 lg:w-1/3 relative`}
         >
           {imageContent}
         </div>
