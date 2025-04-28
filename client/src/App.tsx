@@ -189,10 +189,17 @@ function App() {
       return;
     }
 
-    // Once we're done connecting, go to welcome if we don't have a state to restore
-    if (viewState === "CONNECTING" && !storyState) {
-      Logger.App.log("Connection complete, transitioning to WELCOME");
-      loggedSetViewState("WELCOME");
+    // Once we're done connecting, check if we have a story state to restore
+    if (viewState === "CONNECTING") {
+      if (storyState) {
+        Logger.App.log(
+          "Connection complete with story state, transitioning to GAME"
+        );
+        loggedSetViewState("GAME");
+      } else {
+        Logger.App.log("Connection complete, transitioning to WELCOME");
+        loggedSetViewState("WELCOME");
+      }
       return;
     }
 
