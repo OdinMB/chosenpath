@@ -48,10 +48,12 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   }, []);
 
   // Determine the appropriate object position
+  // According to MDN: object-position takes x y coordinates
+  // Default is "50% 50%" (center center)
   const calculatedPosition = responsivePosition
     ? isMobile
-      ? `center ${mobileOffset}`
-      : `center ${desktopOffset}`
+      ? `50% ${mobileOffset}`
+      : `50% ${desktopOffset}`
     : objectPosition;
 
   useEffect(() => {

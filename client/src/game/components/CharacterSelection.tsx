@@ -107,10 +107,10 @@ export function CharacterSelection({
                 image={characterImage}
                 alt={`${identity.name}`}
                 sourceId={storyState.templateId}
-                className="w-full h-full"
+                className="w-full h-full max-w-[350px]"
                 responsivePosition={true}
-                desktopOffset="5%"
-                mobileOffset="15%"
+                desktopOffset="50%"
+                mobileOffset="-40px"
               />
             </div>
           )}
