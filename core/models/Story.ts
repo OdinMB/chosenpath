@@ -57,6 +57,10 @@ export class Story {
     return this.state;
   }
 
+  isBasedOnTemplate(): boolean {
+    return this.state.templateId !== undefined;
+  }
+
   getTitle(): string {
     return this.state.title;
   }

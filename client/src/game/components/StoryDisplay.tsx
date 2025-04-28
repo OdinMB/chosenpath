@@ -20,8 +20,9 @@ import {
   parseImagePlaceholder,
   createImageFromPlaceholder,
   findImageInLibrary,
+  createPlayerIdentityImage,
 } from "shared/utils/imageUtils";
-import { ClientStoryState } from "core/types";
+import { ClientStoryState, PlayerSlot, ImageSource } from "core/types";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -587,11 +588,34 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     matches.forEach((match, index) => {
       const attributes = parseImagePlaceholder(match);
-      const imageObj = createImageFromPlaceholder(attributes);
-      const libraryImage = imageObj
-        ? findImageInLibrary(imageObj.id, storyState)
-        : undefined;
-      const finalImage = libraryImage || imageObj;
+
+      // Check if the image id is a player slot (e.g., player1, player2)
+      const playerSlotMatch =
+        attributes.id && attributes.id.match(/^(player\d+)$/);
+
+      let finalImage;
+
+      if (playerSlotMatch && playerSlotId) {
+        // If the image id is a player slot and we have the player's identity choice
+        const playerSlot = playerSlotMatch[1] as PlayerSlot;
+        const player = storyState.players[playerSlot];
+
+        if (player && player.identityChoice !== undefined) {
+          // Create a player identity image using the player's choice
+          finalImage = createPlayerIdentityImage(
+            playerSlot,
+            player.identityChoice,
+            (attributes.source as ImageSource) || "template"
+          );
+        }
+      } else {
+        // Handle regular (non-player) images
+        const imageObj = createImageFromPlaceholder(attributes);
+        const libraryImage = imageObj
+          ? findImageInLibrary(imageObj.id, storyState)
+          : undefined;
+        finalImage = libraryImage || imageObj;
+      }
 
       if (finalImage) {
         console.log("Rendering image with attributes:", attributes);

@@ -174,21 +174,29 @@ ${modeDescriptions[story.getGameMode()]}
   private static createImageLibrarySection(story: Story): string {
     if (!story.includesImages()) return "";
 
-    return [
-      "IMAGE LIBRARY:",
-      story.getImages().length === 0
-        ? "No images yet."
-        : story
-            .getImages()
-            .map(
-              (image) =>
-                `- ${image.id} (${image.source})${
-                  image.description ? `: ${image.description}` : ""
-                }`
-            )
-            .join("\n"),
-      "",
-    ].join("\n");
+    let text = "IMAGE LIBRARY:";
+    if (!story.hasImages()) {
+      text += "No images yet.";
+    } else {
+      text += story
+        .getImages()
+        .map(
+          (image) =>
+            `- ${image.id} (${image.source})${
+              image.description ? `: ${image.description}` : ""
+            }`
+        )
+        .join("\n");
+      text +=
+        "\nFor images of player characters, use ids player1, player2, etc. and source ";
+      if (story.isBasedOnTemplate()) {
+        text += "template";
+      } else {
+        text += "story";
+      }
+    }
+
+    return text;
   }
 
   private static formatStatValue(stat: { type?: string; value?: any }): string {

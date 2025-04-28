@@ -1,28 +1,33 @@
 /**
  * Utility functions for working with images
  */
-import { ClientStoryState, PlayerSlot } from "core/types";
-import { Image, ImageStatus } from "core/types/image";
+import {
+  ClientStoryState,
+  Image,
+  ImageStatus,
+  ImageSource,
+  PlayerSlot,
+} from "core/types";
 
 /**
  * Creates an image object for use with the StoryImage component
- * @param storyState The current story state
- * @param playerSlot The player slot
+ * @param playerSlot The player slot (e.g., "player1", "player2")
  * @param identityChoice The chosen identity index
+ * @param imageSource The source of the image (template or story)
  * @returns Image object compatible with StoryImage component
  */
 export function createPlayerIdentityImage(
-  storyState: ClientStoryState,
   playerSlot: PlayerSlot,
-  identityChoice: number
+  identityChoice: number,
+  imageSource: ImageSource
 ): Image {
   return {
     id: `${playerSlot}_${identityChoice}`,
     fileType: "jpeg",
     subDirectory: "players",
-    source: storyState.templateId ? "template" : "story",
+    source: imageSource,
     status: "ready" as ImageStatus,
-  };
+  } as Image;
 }
 
 /**

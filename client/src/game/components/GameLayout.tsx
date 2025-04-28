@@ -249,9 +249,9 @@ export function GameLayout({
     let playerIdentityImage = undefined;
     if (storyIncludesImages && player.identityChoice >= 0) {
       playerIdentityImage = createPlayerIdentityImage(
-        storyState,
         playerSlot,
-        player.identityChoice
+        player.identityChoice,
+        storyState.templateId ? "template" : "story"
       );
     }
 

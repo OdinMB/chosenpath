@@ -41,7 +41,7 @@ export const config = {
 } as const;
 
 // OpenAI model settings
-export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1";
+export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1-mini";
 export const TEXT_MODEL_REASONING_EFFORT =
   process.env.TEXT_MODEL_REASONING_EFFORT || "medium";
 export const TEXT_MODEL_TEMPERATURE = process.env.TEXT_MODEL_TEMPERATURE || 0.3;

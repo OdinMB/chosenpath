@@ -335,14 +335,20 @@ Images
 ${
   story.hasImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
-      "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in.\n" +
+      "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in. No image tags at the end of the beat text.\n" +
       "- Parameters:\n" +
       "--- id: the id of the image from the story's image library. Image ids correspond to story elements.\n" +
       "--- source: 'template' or 'story' (as per image library)\n" +
       "--- desc: a caption that will be displayed below the image. Provide at least the name of the element that the image depicts.\n" +
       "--- float (optional): 'left', 'right' (default is 'left')\n" +
       "- Example: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'\n" +
-      "- Try to add 1-2 images per beat.\n"
+      "- For player characters, use ids player1, player2, etc. and source " +
+      (story.isBasedOnTemplate() ? "template" : "story") +
+      ".\n" +
+      "- Try to add 1-2 images per beat. 3 are already too many.\n" +
+      (story.isFirstBeat()
+        ? "- In this first beat of the story, include an image of the player character that this beat is for, plus an image of some other story element.\n"
+        : "")
     : "This story does not support images. Do not use them in the beat text."
 }
 ${

@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- 2: Special treatment for [image] tags with id = playerslot
 - 1: sort/filter stories and templates
+- 1: click image: admin + game, only non-mobile: nice modal
 
 - 7: Generating images during the story (using reference images)
 
@@ -21,6 +21,10 @@ Smaller commits!
 Focus: Text/Images, English, Multiplayer
 
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
+- 2: For each option: 1-2 pieces of text that are displayed in waiting view (character's past experiences relevant to the situation displayed next to char image? Just a stream of thought reflection on that moment?)
+- 4: waiting screen: relevant story element with image and facts that players can flip through
+- 4: List of world lore quotes that are generated at story creation and shown in a carousel.
+
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
 - 3: Stat attribute for personal stats: initial value or part of player background?
