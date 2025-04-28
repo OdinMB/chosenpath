@@ -352,7 +352,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
   // Helper function to render a previous beat's choice using the PreviousChoiceVisualizer
   const renderPreviousChoice = (
     prevBeatIndex: number,
-    animateRoll: boolean = false
+    animateRoll: boolean = false,
+    forceExpanded: boolean = false
   ) => {
     if (prevBeatIndex < 0 || prevBeatIndex >= beatHistory.length) return null;
 
@@ -381,6 +382,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         resolution={prevBeat.resolution || undefined}
         resolutionDetails={resolutionDetails}
         animateRoll={animateRoll}
+        forceExpanded={forceExpanded}
       />
     );
   };
@@ -435,7 +437,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     return (
       <>
         {/* Show the previous beat's choice with animation if it was a challenge */}
-        {renderPreviousChoice(prevBeatIndex, isChallengeBeat)}
+        {renderPreviousChoice(prevBeatIndex, isChallengeBeat, true)}
 
         {/* New cleaner loading view instead of skeleton */}
         <div className="flex flex-col items-center justify-center h-full min-h-[40vh] mt-8">

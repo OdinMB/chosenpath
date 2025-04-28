@@ -18,13 +18,20 @@ interface PreviousChoiceVisualizerProps {
   resolution?: Resolution;
   resolutionDetails?: ResolutionDetails;
   animateRoll?: boolean;
+  forceExpanded?: boolean;
 }
 
 export const PreviousChoiceVisualizer: React.FC<
   PreviousChoiceVisualizerProps
-> = ({ choice, resolution, resolutionDetails, animateRoll = false }) => {
-  // Always start with collapsed state
-  const [expanded, setExpanded] = useState(false);
+> = ({
+  choice,
+  resolution,
+  resolutionDetails,
+  animateRoll = false,
+  forceExpanded = false,
+}) => {
+  // Start with expanded state based on forceExpanded prop
+  const [expanded, setExpanded] = useState(forceExpanded);
   const [isAnimating, setIsAnimating] = useState(animateRoll);
   const [showEmoji, setShowEmoji] = useState(!animateRoll);
   const [currentEmoji, setCurrentEmoji] = useState<string>("😐");
@@ -39,6 +46,11 @@ export const PreviousChoiceVisualizer: React.FC<
   const animationStartTime = useRef<number | null>(null);
   const animationCompletedRef = useRef(false);
   const animationDuration = 6000; // 6 seconds total
+
+  // Update expanded state when forceExpanded prop changes
+  useEffect(() => {
+    setExpanded(forceExpanded);
+  }, [forceExpanded]);
 
   // Calculate the final emoji based on resolution
   const getFinalEmoji = useCallback(() => {
@@ -61,8 +73,10 @@ export const PreviousChoiceVisualizer: React.FC<
       animationStartTime.current = null;
       animationCompletedRef.current = false;
 
-      // Ensure collapsed state when animation starts
-      setExpanded(false);
+      // Ensure expanded state during animation if forceExpanded is true
+      if (forceExpanded) {
+        setExpanded(true);
+      }
 
       // Clear any existing timeouts and animations
       if (animationTimeoutRef.current) {
@@ -216,7 +230,10 @@ export const PreviousChoiceVisualizer: React.FC<
         }
         setAnimatingMarker(false);
 
-        // Don't auto-expand after animation completes
+        // Don't auto-collapse after animation if forceExpanded is true
+        if (!forceExpanded) {
+          setExpanded(false);
+        }
       }, 6000); // Match animation duration
     } else {
       setIsAnimating(false);
@@ -241,7 +258,14 @@ export const PreviousChoiceVisualizer: React.FC<
         animationRef.current = null;
       }
     };
-  }, [animateRoll, isChallenge, resolution, resolutionDetails, getFinalEmoji]);
+  }, [
+    animateRoll,
+    isChallenge,
+    resolution,
+    resolutionDetails,
+    getFinalEmoji,
+    forceExpanded,
+  ]);
 
   // Get emoji based on resolution or exploration
   const getIconContent = () => {
