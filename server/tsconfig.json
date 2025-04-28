@@ -22,7 +22,8 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "alwaysStrict": false,
-    "types": ["node"]
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "./src/__tests__"]
   },
   "references": [{ "path": "../core" }],
   "include": ["src/**/*", "src/**/*.test.ts", "src/__tests__/*.d.ts"],

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "mocha", "chai"],
+    "typeRoots": ["../../node_modules/@types"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["./**/*.test.ts", "./**/*.d.ts"]
+}
