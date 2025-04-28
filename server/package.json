@@ -18,6 +18,7 @@
   "dependencies": {
     "@langchain/openai": "^0.4.3",
     "@types/multer": "^1.4.12",
+    "@types/node": "^20.0.0",
     "@types/socket.io": "^3.0.1",
     "core": "file:../core",
     "cors": "^2.8.5",
@@ -37,7 +38,6 @@
     "@types/express": "^4.17.21",
     "@types/jszip": "^3.4.1",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
     "chai": "^4.5.0",
     "mocha": "^10.8.2",

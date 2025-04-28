@@ -23,7 +23,9 @@
     "noImplicitThis": false,
     "alwaysStrict": false,
     "types": ["node"],
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": ["../node_modules/@types", "./node_modules/@types"],
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext"
   },
   "references": [{ "path": "../core" }],
   "include": ["src/**/*"],
