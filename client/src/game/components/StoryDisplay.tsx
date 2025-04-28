@@ -549,10 +549,10 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     text = text.normalize();
 
     const stateManager = new ClientStateManager();
-    const hasImages = stateManager.hasStoryImages(storyState);
+    const storyIncludesImages = stateManager.includesImages(storyState);
 
     // If no images in story state, just render the markdown
-    if (!hasImages) {
+    if (!storyIncludesImages) {
       return React.createElement(
         ReactMarkdown as ComponentType<{
           children: string;

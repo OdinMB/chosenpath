@@ -128,7 +128,7 @@ export class Story {
   }
 
   includesImages(): boolean {
-    return !!this.state.templateId || this.state.generateImages;
+    return this.hasImages() || this.state.generateImages;
   }
 
   isFirstBeat(): boolean {

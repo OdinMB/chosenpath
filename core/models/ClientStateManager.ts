@@ -149,17 +149,12 @@ export class ClientStateManager {
     return clientStat as ClientStat;
   }
 
-  /**
-   * Check if the story has images based on templateId or generateImages flag
-   */
-  hasStoryImages(state: StoryState | ClientStoryState): boolean {
-    // Check if the story has a templateId
-    const hasTemplateId = !!state.templateId && state.templateId.trim() !== "";
+  includesImages(state: StoryState | ClientStoryState): boolean {
+    return this.hasImages(state) || state.generateImages;
+  }
 
-    // Check if the story has the generateImages flag set to true
-    const hasGenerateImages = !!state.generateImages;
-
-    return hasTemplateId || hasGenerateImages;
+  hasImages(state: StoryState | ClientStoryState): boolean {
+    return state.images && state.images.length > 0;
   }
 
   getNumberOfPlayers(state: StoryState | ClientStoryState): number {

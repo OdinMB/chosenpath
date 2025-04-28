@@ -61,7 +61,7 @@ export function CharacterSelection({
     currentPlayer?.identityChoice > -1 && currentPlayer?.backgroundChoice > -1;
 
   // Check if the story has images
-  const hasImages = stateManager.hasStoryImages(storyState);
+  const storyIncludesImages = stateManager.includesImages(storyState);
 
   if (!options) return null;
 
@@ -79,9 +79,9 @@ export function CharacterSelection({
 
   const renderIdentityCard = (identity: CharacterIdentity, index: number) => {
     // Create image object if the story has images
-    let characterImage: ImageType | undefined;
-    if (hasImages && storyState.templateId) {
-      console.log("story has images", hasImages);
+    let characterImage: ImageType | undefined = undefined;
+    if (storyIncludesImages && storyState.templateId) {
+      // console.log("story includes images", storyIncludesImages);
       characterImage = {
         id: `${playerSlot}_${index}`,
         fileType: "jpeg",

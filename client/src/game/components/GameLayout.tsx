@@ -126,7 +126,7 @@ export function GameLayout({
   const currentPlayer = storyState.players[playerSlot];
 
   // Check if the story has images
-  const hasImages = stateManager.hasStoryImages(storyState);
+  const storyIncludesImages = stateManager.includesImages(storyState);
 
   // Character selection mode is active if:
   // 1. Character selection is not completed globally AND
@@ -247,7 +247,7 @@ export function GameLayout({
 
     // Create player identity image if needed
     let playerIdentityImage = undefined;
-    if (hasImages && player.identityChoice >= 0) {
+    if (storyIncludesImages && player.identityChoice >= 0) {
       playerIdentityImage = createPlayerIdentityImage(
         storyState,
         playerSlot,
