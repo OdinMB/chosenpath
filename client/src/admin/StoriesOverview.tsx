@@ -3,6 +3,11 @@ import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
 import { sendTrackedRequest } from "shared/utils/requestUtils";
 import { SuccessResponse } from "core/types";
+import {
+  SortableTable,
+  useTableFilterSort,
+  ColumnOption,
+} from "shared/components";
 
 type StoryListItem = {
   id: string;
@@ -114,6 +119,78 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     });
   };
 
+  const tableColumns: ColumnOption<StoryListItem>[] = [
+    {
+      key: "title",
+      label: "Title",
+      filterable: true,
+      render: (story) => (
+        <div>
+          <span className={story.error ? "text-tertiary" : "font-medium"}>
+            {story.title}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "playerCount",
+      label: "Players",
+      filterable: true,
+      className: "py-3 px-4 text-left hidden md:table-cell",
+    },
+    {
+      key: "currentBeat",
+      label: "Beat",
+      render: (story) => (
+        <>
+          {story.characterSelectionCompleted ? story.currentBeat || 1 : 0} /{" "}
+          {story.maxTurns}
+        </>
+      ),
+    },
+    {
+      key: "createdAt",
+      label: "Created",
+      className: "py-3 px-4 text-left hidden md:table-cell",
+      render: (story) => formatDate(story.createdAt || story.updatedAt),
+    },
+    {
+      key: "updatedAt",
+      label: "Updated",
+      render: (story) => formatDate(story.updatedAt),
+    },
+    {
+      key: "id" as keyof StoryListItem,
+      label: "Actions",
+      sortable: false,
+      filterable: false,
+      render: (story) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => openDeleteDialog(story.id)}
+            className="text-tertiary hover:text-tertiary-700 transition-colors"
+            title="Delete story"
+          >
+            <Icons.Trash className="h-5 w-5" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const {
+    filteredAndSortedData: filteredStories,
+    sortConfig,
+    filters,
+    requestSort,
+    addFilter,
+    removeFilter,
+    clearFilters,
+  } = useTableFilterSort({
+    data: stories,
+    initialSort: { key: "updatedAt", direction: "desc" },
+  });
+
   return (
     <div className="bg-gray-50 pt-4 rounded-lg">
       <div className="flex justify-between items-center mb-6">
@@ -145,75 +222,18 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
         cancelText="Cancel"
       />
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-t-2 border-b-2 border-secondary rounded-full animate-spin"></div>
-        </div>
-      ) : stories.length === 0 ? (
-        <div className="text-center py-12 text-primary-500">
-          No stories found.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-lg overflow-hidden shadow">
-            <thead className="bg-gray-100 text-primary-800">
-              <tr>
-                <th className="py-3 px-4 text-left">Title</th>
-                <th className="py-3 px-4 text-left hidden md:table-cell">
-                  Players
-                </th>
-                <th className="py-3 px-4 text-left">Beat</th>
-                <th className="py-3 px-4 text-left hidden md:table-cell">
-                  Created
-                </th>
-                <th className="py-3 px-4 text-left">Updated</th>
-                <th className="py-3 px-4 text-left">
-                  <span className="hidden md:inline">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {stories.map((story) => (
-                <tr key={story.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    {story.error ? (
-                      <span className="text-tertiary">{story.title}</span>
-                    ) : (
-                      <div>
-                        <span className="font-medium">{story.title}</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 hidden md:table-cell">
-                    {story.playerCount}
-                  </td>
-                  <td className="py-3 px-4">
-                    {story.characterSelectionCompleted
-                      ? story.currentBeat || 1
-                      : 0}{" "}
-                    / {story.maxTurns}
-                  </td>
-                  <td className="py-3 px-4 hidden md:table-cell">
-                    {formatDate(story.createdAt || story.updatedAt)}
-                  </td>
-                  <td className="py-3 px-4">{formatDate(story.updatedAt)}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => openDeleteDialog(story.id)}
-                        className="text-tertiary hover:text-tertiary-700 transition-colors"
-                        title="Delete story"
-                      >
-                        <Icons.Trash className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <SortableTable
+        data={filteredStories}
+        columns={tableColumns}
+        filters={filters}
+        sortConfig={sortConfig}
+        onSort={requestSort}
+        onFilter={addFilter}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
+        isLoading={isLoading}
+        emptyMessage="No stories found."
+      />
     </div>
   );
 };

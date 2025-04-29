@@ -4,6 +4,11 @@ import { StoryTemplate, PublicationStatus } from "core/types";
 import { ShareLink } from "components/ShareLink";
 import { sortTagsByCategory } from "shared/tagCategories.js";
 import { useTemplateLibrary } from "./hooks/useTemplateLibrary.js";
+import {
+  SortableTable,
+  useTableFilterSort,
+  ColumnOption,
+} from "shared/components";
 
 type TemplateLibraryProps = {
   token: string;
@@ -53,6 +58,140 @@ export const TemplateLibrary = ({
         return "bg-gray-100 text-gray-700";
     }
   };
+
+  const tableColumns: ColumnOption<StoryTemplate>[] = [
+    {
+      key: "title",
+      label: "Title",
+      filterable: true,
+      render: (template) => (
+        <div>
+          <span className="font-medium">{template.title}</span>
+        </div>
+      ),
+    },
+    {
+      key: "publicationStatus",
+      label: "Status",
+      filterable: true,
+      render: (template) => (
+        <span
+          className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+            template.publicationStatus
+          )}`}
+        >
+          <span className="md:hidden">
+            {template.publicationStatus.substring(0, 5)}
+          </span>
+          <span className="hidden md:inline">{template.publicationStatus}</span>
+        </span>
+      ),
+    },
+    {
+      key: "tags",
+      label: "Tags",
+      filterable: true,
+      sortable: false,
+      className: "py-3 px-4 text-left hidden xl:table-cell",
+      render: (template) => (
+        <div className="flex flex-wrap gap-1">
+          {template.tags && template.tags.length > 0 ? (
+            sortTagsByCategory(template.tags).map((tag, index) => (
+              <span
+                key={index}
+                className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-md"
+              >
+                {tag}
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400 text-sm">None</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "playerCountMin",
+      label: "Players",
+      className: "py-3 px-4 text-left hidden md:table-cell",
+      render: (template) => (
+        <>
+          {template.playerCountMin === template.playerCountMax
+            ? template.playerCountMin
+            : `${template.playerCountMin} - ${template.playerCountMax}`}
+        </>
+      ),
+    },
+    {
+      key: "maxTurnsMin",
+      label: "Length",
+      className: "py-3 px-4 text-left hidden lg:table-cell",
+      render: (template) => (
+        <>
+          {template.maxTurnsMin === template.maxTurnsMax
+            ? `${template.maxTurnsMin}`
+            : `${template.maxTurnsMin} - ${template.maxTurnsMax}`}
+        </>
+      ),
+    },
+    {
+      key: "updatedAt",
+      label: "Updated",
+      className: "py-3 px-4 text-left hidden md:table-cell",
+      render: (template) => (
+        <span className="whitespace-nowrap">
+          {formatDate(template.updatedAt)}
+        </span>
+      ),
+    },
+    {
+      key: "id" as keyof StoryTemplate,
+      label: "Actions",
+      sortable: false,
+      filterable: false,
+      render: (template) => (
+        <div className="flex space-x-3">
+          <button
+            onClick={() => onEdit(template)}
+            className="text-secondary hover:text-secondary-700 transition-colors"
+            title="Edit template"
+          >
+            <Icons.Edit className="h-5 w-5" />
+          </button>
+          {template.publicationStatus === PublicationStatus.Published && (
+            <ShareLink templateId={template.id} />
+          )}
+          <button
+            onClick={() => handleExportTemplate(template)}
+            className="text-secondary hover:text-secondary-700 transition-colors"
+            title="Export template"
+          >
+            <Icons.Export className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => openDeleteDialog(template.id)}
+            className="text-tertiary hover:text-tertiary-700 transition-colors"
+            title="Delete template"
+          >
+            <Icons.Trash className="h-5 w-5" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const {
+    filteredAndSortedData: filteredTemplates,
+    sortConfig,
+    filters,
+    requestSort,
+    addFilter,
+    removeFilter,
+    clearFilters,
+  } = useTableFilterSort({
+    data: templates,
+    initialSort: { key: "updatedAt", direction: "desc" },
+  });
 
   useEffect(() => {
     loadTemplates();
@@ -202,131 +341,29 @@ Proceeding will import or update all templates in the collection. Continue?`
         cancelText="Cancel"
       />
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-t-2 border-b-2 border-secondary rounded-full animate-spin"></div>
-        </div>
-      ) : templates.length === 0 ? (
-        <div className="text-center py-12 text-primary-500">
-          <p>No story templates found.</p>
-          <PrimaryButton
-            onClick={onCreateNew}
-            className="mt-4"
-            leftIcon={<Icons.Plus className="h-4 w-4" />}
-          >
-            Create Your First Template
-          </PrimaryButton>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-lg overflow-hidden shadow">
-            <thead className="bg-gray-100 text-primary-800">
-              <tr>
-                <th className="py-3 px-4 text-left">Title</th>
-                <th className="py-3 px-4 text-left">Status</th>
-                <th className="hidden xl:table-cell py-3 px-4 text-left">
-                  Tags
-                </th>
-                <th className="hidden md:table-cell py-3 px-4 text-left">
-                  Players
-                </th>
-                <th className="hidden lg:table-cell py-3 px-4 text-left">
-                  Length
-                </th>
-                <th className="hidden md:table-cell py-3 px-4 text-left">
-                  Updated
-                </th>
-                <th className="py-3 px-4 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {templates.map((template) => (
-                <tr key={template.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <div>
-                      <span className="font-medium">{template.title}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
-                        template.publicationStatus
-                      )}`}
-                    >
-                      <span className="md:hidden">
-                        {template.publicationStatus.substring(0, 5)}
-                      </span>
-                      <span className="hidden md:inline">
-                        {template.publicationStatus}
-                      </span>
-                    </span>
-                  </td>
-                  <td className="hidden xl:table-cell py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {template.tags && template.tags.length > 0 ? (
-                        sortTagsByCategory(template.tags).map((tag, index) => (
-                          <span
-                            key={index}
-                            className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-md"
-                          >
-                            {tag}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-400 text-sm">None</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="hidden md:table-cell py-3 px-4">
-                    {template.playerCountMin === template.playerCountMax
-                      ? template.playerCountMin
-                      : `${template.playerCountMin} - ${template.playerCountMax}`}
-                  </td>
-                  <td className="hidden lg:table-cell py-3 px-4">
-                    {template.maxTurnsMin === template.maxTurnsMax
-                      ? `${template.maxTurnsMin}`
-                      : `${template.maxTurnsMin} - ${template.maxTurnsMax}`}
-                  </td>
-                  <td className="hidden md:table-cell py-3 px-4">
-                    <span className="whitespace-nowrap">
-                      {formatDate(template.updatedAt)}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => onEdit(template)}
-                        className="text-secondary hover:text-secondary-700 transition-colors"
-                        title="Edit template"
-                      >
-                        <Icons.Edit className="h-5 w-5" />
-                      </button>
-                      {template.publicationStatus ===
-                        PublicationStatus.Published && (
-                        <ShareLink templateId={template.id} />
-                      )}
-                      <button
-                        onClick={() => handleExportTemplate(template)}
-                        className="text-secondary hover:text-secondary-700 transition-colors"
-                        title="Export template"
-                      >
-                        <Icons.Export className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => openDeleteDialog(template.id)}
-                        className="text-tertiary hover:text-tertiary-700 transition-colors"
-                        title="Delete template"
-                      >
-                        <Icons.Trash className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <SortableTable
+        data={filteredTemplates}
+        columns={tableColumns}
+        filters={filters}
+        sortConfig={sortConfig}
+        onSort={requestSort}
+        onFilter={addFilter}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
+        isLoading={isLoading}
+        emptyMessage={
+          <div>
+            <p>No story templates found.</p>
+            <PrimaryButton
+              onClick={onCreateNew}
+              className="mt-4"
+              leftIcon={<Icons.Plus className="h-4 w-4" />}
+            >
+              Create Your First Template
+            </PrimaryButton>
+          </div>
+        }
+      />
     </div>
   );
 };
