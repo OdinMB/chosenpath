@@ -2,17 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: click image: admin + game, only non-mobile: nice modal
-
-- 7: Generating images during the story (using reference images)
-
-- 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
-
-  - Enjoy fiction (Crime, Fantasy, etc.)
-  - Pretend to be (Slice of Life)
-  - Have fun with a kid
-  - Vent on reality (Satire)
-
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
@@ -20,10 +9,19 @@ Focus: Text/Images, English, Multiplayer
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
 - 3: Stat attribute for personal stats: initial value or part of player background?
 - 10: More (multiplayer) templates
+- 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
 
-- 2: For each option: 1-2 pieces of text that are displayed in waiting view (character's past experiences relevant to the situation displayed next to char image? Just a stream of thought reflection on that moment?)
+  - Enjoy fiction (Crime, Fantasy, etc.)
+  - Pretend to be (Slice of Life)
+  - Have fun with a kid
+  - Vent on reality (Satire)
+
+- 2: For each option: 1-2 pieces of text that are displayed in waiting view (character's past experiences relevant to the situation displayed next to char image? Just a stream of thought around the current moment?)
 - 4: waiting screen: relevant story element with image and facts that players can flip through
+- 4: system for
 - 4: List of world lore quotes that are generated at story creation and shown in a carousel.
+
+- 7: Generating images during the story (using reference images)
 
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
@@ -50,6 +48,7 @@ Focus: Text/Images, English, Multiplayer
 
 - 1: export stories
 - 10: User accounts (DB, Login, Manage codes/games)
+- 5: admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration
 - 5: See pending players, current beat, etc. of active games

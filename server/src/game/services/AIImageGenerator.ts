@@ -164,6 +164,7 @@ export class AIImageGenerator {
         prompt += `${label}: ${value}\n`;
       }
     });
+    prompt += `\nText: Don't include any title or caption texts in the image.`;
 
     return prompt;
   }

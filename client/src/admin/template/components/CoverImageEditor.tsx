@@ -1,9 +1,14 @@
 import React, { useState } from "react";
 import { TextArea, PrimaryButton } from "components/ui";
 import { Icons } from "components/ui/Icons";
-import { ImageInstructions, IMAGE_SIZES, IMAGE_QUALITIES } from "core/types";
+import {
+  ImageInstructions,
+  IMAGE_SIZES,
+  IMAGE_QUALITIES,
+  Image,
+} from "core/types";
 import { useImageGeneration } from "shared/hooks/useImageGeneration";
-import { ImageWithPlaceholder } from "shared/components/ui/ImageWithPlaceholder";
+import { StoryImage } from "shared/components/StoryImage";
 
 interface CoverImageEditorProps {
   templateId: string;
@@ -20,7 +25,14 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
 }) => {
   const { generateCoverImage, isGenerating, error } = useImageGeneration();
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
-  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
+
+  // Create cover image object for StoryImage
+  const coverImage: Image = {
+    id: "cover",
+    fileType: "jpeg",
+    source: "template",
+    status: localIsGenerating ? "generating" : "ready",
+  };
 
   const handleGenerateCoverImage = async () => {
     if (!templateId || !imageInstructions.coverPrompt) return;
@@ -38,9 +50,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
       });
 
       console.log("Cover image generated:", result);
-
-      // Force a refresh of the image by updating the key
-      setImageRefreshKey(Date.now());
     } catch (err) {
       console.error("Error generating cover image:", err);
     } finally {
@@ -52,24 +61,22 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row gap-6">
-        {/* Cover Image Preview - Made smaller */}
+        {/* Cover Image Preview */}
         <div className="w-full md:w-1/3 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image</h3>
-          <ImageWithPlaceholder
-            templateId={templateId}
-            imagePath="cover.jpeg"
-            alt="Cover"
-            height="280px"
-            className="w-full"
-            placeholderText="No cover image"
-            placeholderSubtext="Generate one using the prompt"
-            isLoading={localIsGenerating}
-            refreshKey={imageRefreshKey}
-            borderRadius="rounded-md"
-          />
+          <div className="aspect-[2/3] rounded-md overflow-hidden max-w-[240px] w-full mx-auto">
+            <StoryImage
+              image={coverImage}
+              alt="Cover Image"
+              sourceId={templateId}
+              className="w-full h-full object-cover"
+              responsivePosition={false}
+              objectPosition="center"
+            />
+          </div>
         </div>
 
-        {/* Cover Prompt Input - Moved lower and reorganized */}
+        {/* Cover Prompt Input */}
         <div className="w-full md:w-2/3 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image Prompt</h3>
           <div className="flex flex-col">
@@ -91,7 +98,7 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
 
             {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
 
-            {/* Generate Button - Centered */}
+            {/* Generate Button */}
             <div className="flex justify-center">
               <PrimaryButton
                 onClick={handleGenerateCoverImage}

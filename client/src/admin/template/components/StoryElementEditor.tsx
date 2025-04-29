@@ -1,10 +1,15 @@
 import React, { useState } from "react";
-import { StoryElement, ImageInstructions } from "core/types";
+import {
+  StoryElement,
+  ImageInstructions,
+  Image,
+  ImageStatus,
+} from "core/types";
 import { Input, TextArea } from "components/ui";
 import { ArrayField, ExpandableItem } from "components";
-import { useImageGeneration } from "../../../shared/hooks/useImageGeneration";
-import { Icons } from "../../../shared/components/ui/Icons";
-import { ImageWithPlaceholder } from "../../../shared/components/ui/ImageWithPlaceholder";
+import { useImageGeneration } from "shared/hooks/useImageGeneration";
+import { Icons } from "shared/components/ui/Icons";
+import { StoryImage } from "shared/components/StoryImage";
 
 interface StoryElementEditorProps {
   element: StoryElement;
@@ -30,8 +35,8 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   imageInstructions,
 }) => {
   const { generateImageForElement } = useImageGeneration();
-  const [localIsGenerating, setLocalIsGenerating] = useState(false);
-  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
+  const [imageStatus, setImageStatus] = useState<ImageStatus>("ready");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerateImage = async (e?: React.MouseEvent) => {
     if (e) {
@@ -55,8 +60,9 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
     );
 
     try {
-      // Set local loading state
-      setLocalIsGenerating(true);
+      // Set loading states
+      setIsGenerating(true);
+      setImageStatus("generating");
 
       const result = await generateImageForElement({
         templateId,
@@ -66,15 +72,51 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
 
       console.log("Image generation completed:", result);
 
-      // Force a refresh of the image by updating the key
-      setImageRefreshKey(Date.now());
+      if (result) {
+        setImageStatus("ready");
+      } else {
+        setImageStatus("failed");
+      }
     } catch (error) {
       console.error("Error in handleGenerateImage:", error);
+      setImageStatus("failed");
     } finally {
       // Reset loading state
-      setLocalIsGenerating(false);
+      setIsGenerating(false);
     }
   };
+
+  // Create element image object for StoryImage
+  const elementImage: Image = {
+    id: element.id,
+    fileType: "jpeg",
+    source: "template",
+    status: isGenerating ? "generating" : imageStatus,
+  };
+
+  // Create element image for the collapsed view
+  const elementImageComponent = (
+    <div className="relative">
+      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+        <StoryImage
+          image={elementImage}
+          alt={element.name || "Element"}
+          sourceId={templateId}
+          className="w-full h-full object-cover"
+          responsivePosition={false}
+          objectPosition="center center"
+        />
+      </div>
+    </div>
+  );
+
+  // Create combined description that includes both role and instructions
+  const elementDescription = (
+    <div>
+      {element.role && <div className="mb-1">{element.role}</div>}
+      {element.instructions && <div>{element.instructions}</div>}
+    </div>
+  );
 
   const renderElementForm = (
     data: StoryElement,
@@ -173,36 +215,13 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
     );
   };
 
-  // Create element image for the collapsed view
-  const elementImage = (
-    <ImageWithPlaceholder
-      templateId={templateId}
-      imagePath={`${element.id}.jpeg`}
-      alt={element.name || "Element"}
-      height="80px"
-      width="80px"
-      iconOnly={true}
-      iconSize="h-6 w-6"
-      isLoading={localIsGenerating}
-      refreshKey={imageRefreshKey}
-    />
-  );
-
-  // Create combined description that includes both role and instructions
-  const elementDescription = (
-    <div>
-      {element.role && <div className="mb-1">{element.role}</div>}
-      {element.instructions && <div>{element.instructions}</div>}
-    </div>
-  );
-
   return (
     <ExpandableItem
       key={element.id}
       id={element.id}
       title={element.name || "Unnamed Element"}
       description={elementDescription}
-      image={elementImage}
+      image={elementImageComponent}
       data={element}
       editingSet={editingElements}
       setEditing={setEditingElements}
@@ -213,22 +232,22 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       readOnly={readOnly}
       actionIcons={[
         {
-          icon: localIsGenerating ? (
+          icon: isGenerating ? (
             <Icons.Spinner className="h-5 w-5" />
           ) : (
             <Icons.CreateImage className="h-5 w-5" />
           ),
           onClick: handleGenerateImage,
           className: `text-blue-500 hover:text-blue-700 ${
-            localIsGenerating ? "text-blue-500" : ""
+            isGenerating ? "text-blue-500" : ""
           }`,
           ariaLabel: `Generate image for ${element.name}`,
           title: element.appearance
-            ? localIsGenerating
+            ? isGenerating
               ? "Generating image..."
               : "Generate an image based on the element's appearance"
             : "Element must have an appearance description to generate an image",
-          disabled: localIsGenerating || !element.appearance || !templateId,
+          disabled: isGenerating || !element.appearance || !templateId,
         },
       ]}
     />

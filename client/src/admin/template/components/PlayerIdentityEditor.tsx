@@ -1,10 +1,16 @@
 import React, { useState } from "react";
 import { ExpandableItem } from "components";
 import { Input, Select } from "components/ui";
-import { CharacterIdentity, ImageInstructions } from "core/types";
-import { Icons } from "../../../shared/components/ui/Icons";
-import { ImageWithPlaceholder } from "../../../shared/components/ui/ImageWithPlaceholder";
-import { useImageGeneration } from "../../../shared/hooks/useImageGeneration";
+import {
+  CharacterIdentity,
+  ImageInstructions,
+  Image,
+  ImageStatus,
+} from "core/types";
+import { Icons } from "shared/components/ui/Icons";
+import { StoryImage } from "shared/components/StoryImage";
+import { useImageGeneration } from "shared/hooks/useImageGeneration";
+import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 
 interface PlayerIdentityEditorProps {
   identity: CharacterIdentity;
@@ -41,9 +47,9 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   templateId,
   imageInstructions,
 }) => {
-  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
   const { generateImageForPlayer, isGenerating: isGeneratingImage } =
     useImageGeneration();
+  const [imageStatus, setImageStatus] = useState<ImageStatus>("ready");
 
   const handleGenerateImage = async (e?: React.MouseEvent) => {
     if (e) {
@@ -60,6 +66,8 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
     }
 
     try {
+      setImageStatus("generating");
+
       const result = await generateImageForPlayer({
         templateId,
         playerSlot,
@@ -70,11 +78,13 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
 
       if (result) {
         console.log("Player image generation completed:", result);
-        // Force image refresh
-        setImageRefreshKey(Date.now());
+        setImageStatus("ready");
+      } else {
+        setImageStatus("failed");
       }
     } catch (error) {
       console.error("Error generating player image:", error);
+      setImageStatus("failed");
     }
   };
 
@@ -151,19 +161,24 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   );
 
   // Create character image for the collapsed view
+  const playerImage: Image = {
+    ...createPlayerIdentityImage(playerSlot, index, "template"),
+    status: isGeneratingImage ? "generating" : imageStatus,
+  };
+
   const identityImage = (
-    <ImageWithPlaceholder
-      templateId={templateId}
-      imagePath={`players/${playerSlot}_${index}.jpeg`}
-      alt={identity.name || `Character ${index + 1}`}
-      height="80px"
-      width="80px"
-      iconOnly={true}
-      iconSize="h-6 w-6"
-      isLoading={isGeneratingImage}
-      refreshKey={imageRefreshKey}
-      borderRadius="rounded-full" // Make character images round
-    />
+    <div className="relative">
+      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+        <StoryImage
+          image={playerImage}
+          alt={identity.name || `Character ${index + 1}`}
+          sourceId={templateId}
+          className="w-full h-full"
+          responsivePosition={false}
+          objectPosition="center center"
+        />
+      </div>
+    </div>
   );
 
   return (
@@ -191,13 +206,13 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
           className: `text-blue-500 hover:text-blue-700 ${
             isGeneratingImage ? "text-blue-500" : ""
           }`,
-          ariaLabel: `Generate image for ${
+          ariaLabel: `Generate new image for ${
             identity.name || `Identity ${index + 1}`
           }`,
           title: identity.appearance
             ? isGeneratingImage
               ? "Generating image..."
-              : "Generate an image based on the character's appearance"
+              : "Generate a new image based on the character's appearance"
             : "Character must have an appearance description to generate an image",
           disabled: isGeneratingImage || !identity.appearance || !templateId,
         },
