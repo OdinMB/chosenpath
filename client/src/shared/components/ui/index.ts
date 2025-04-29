@@ -5,6 +5,7 @@ export { Icons } from "./Icons";
 export { InfoIcon } from "./InfoIcon";
 export { Input } from "./Input";
 export { LoadingSpinner } from "./LoadingSpinner";
+export { Modal } from "./Modal";
 export { Notification } from "./Notification";
 export { PrimaryButton } from "./PrimaryButton";
 export { Select } from "./Select";

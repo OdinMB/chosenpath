@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: sort/filter stories and templates
 - 1: click image: admin + game, only non-mobile: nice modal
 
 - 7: Generating images during the story (using reference images)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Image } from "core/types/image";
-import { Icons } from "./ui/Icons";
+import { Icons, Modal } from "./ui";
 import { API_CONFIG } from "core/config";
 
 interface StoryImageProps {
@@ -36,6 +36,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   const [hasError, setHasError] = useState<boolean>(false);
   const [src, setSrc] = useState<string>("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Handle responsive screen size detection
   useEffect(() => {
@@ -96,6 +97,12 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     }
   };
 
+  const handleImageClick = () => {
+    if (!isMobile && image?.status === "ready") {
+      setIsModalOpen(true);
+    }
+  };
+
   // Determine what caption to display - use the provided caption or fall back to image description
   const displayCaption = caption || image?.description;
 
@@ -113,7 +120,12 @@ export const StoryImage: React.FC<StoryImageProps> = ({
             <Icons.Error className="w-10 h-10 text-red-500" />
           </div>
         )}
-        <div className="overflow-hidden rounded-lg">
+        <div
+          className={`overflow-hidden rounded-lg ${
+            !isMobile && image?.status === "ready" ? "cursor-pointer" : ""
+          }`}
+          onClick={handleImageClick}
+        >
           {src && (
             <img
               src={src}
@@ -186,5 +198,33 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     );
   }
 
-  return renderContent();
+  return (
+    <>
+      {renderContent()}
+
+      {/* Image Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        width="2xl"
+        className="max-h-[90vh]"
+        fullScreen={true}
+      >
+        <div className="flex flex-col items-center">
+          {src && (
+            <img
+              src={src}
+              alt={alt}
+              className="max-h-[70vh] w-auto object-contain rounded-lg"
+            />
+          )}
+          {displayCaption && (
+            <div className="text-center mt-4 text-primary-600 italic">
+              {displayCaption}
+            </div>
+          )}
+        </div>
+      </Modal>
+    </>
+  );
 };

@@ -1,5 +1,6 @@
 import React, { ReactNode } from "react";
 import { PrimaryButton } from "./";
+import { Modal } from "./Modal";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -23,39 +24,29 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="relative bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-        <h3 className="text-lg font-semibold text-primary mb-2">{title}</h3>
-        <div className="text-primary-800 mb-6 whitespace-pre-line">
-          {typeof message === "string" ? (
-            <FormattedMessage content={message} />
-          ) : (
-            message
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <PrimaryButton onClick={onClose} variant="outline" leftBorder={false}>
-            {cancelText}
-          </PrimaryButton>
-          <PrimaryButton
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          >
-            {confirmText}
-          </PrimaryButton>
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} width="md">
+      <div className="text-primary-800 mb-6 whitespace-pre-line">
+        {typeof message === "string" ? (
+          <FormattedMessage content={message} />
+        ) : (
+          message
+        )}
       </div>
-    </div>
+
+      <div className="flex justify-end gap-3">
+        <PrimaryButton onClick={onClose} variant="outline" leftBorder={false}>
+          {cancelText}
+        </PrimaryButton>
+        <PrimaryButton
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+        >
+          {confirmText}
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 }
 

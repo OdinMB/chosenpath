@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { PrimaryButton, Icons, Tabs, useTabs } from "components/ui";
+import { PrimaryButton, Icons, Tabs, useTabs, Modal } from "components/ui";
 import {
   PlayerOptionsGeneration,
   PlayerSlot,
@@ -107,191 +107,173 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
-      />
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="AI Generated Updates"
+      width="5xl"
+      className="max-h-[90vh] overflow-y-auto"
+    >
+      <div className="mb-4 text-sm text-gray-600">
+        Review the AI-generated updates below. You can accept each section
+        individually.
+      </div>
 
-      {/* Modal */}
-      <div className="relative bg-white rounded-lg p-6 max-w-5xl w-full mx-4 my-8 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">AI Generated Updates</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-            aria-label="Close"
-          >
-            <Icons.Close className="h-6 w-6" />
-          </button>
-        </div>
+      {/* Tab navigation */}
+      {tabs.length > 1 && (
+        <Tabs
+          items={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          variant="bordered"
+        />
+      )}
 
-        <div className="mb-4 text-sm text-gray-600">
-          Review the AI-generated updates below. You can accept each section
-          individually.
-        </div>
-
-        {/* Tab navigation */}
-        {tabs.length > 1 && (
-          <Tabs
-            items={tabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            variant="bordered"
-          />
+      {/* Content based on active tab */}
+      <div className="mt-6 bg-gray-50 p-4 rounded-md">
+        {activeTab === "guidelines" && iterationData.guidelines && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Guidelines</h3>
+              <PrimaryButton
+                onClick={() => onAcceptSection("guidelines", iterationData)}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Guidelines
+              </PrimaryButton>
+            </div>
+            <GuidelinesEditor
+              guidelines={iterationData.guidelines}
+              readOnly={true}
+            />
+          </div>
         )}
 
-        {/* Content based on active tab */}
-        <div className="mt-6 bg-gray-50 p-4 rounded-md">
-          {activeTab === "guidelines" && iterationData.guidelines && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Guidelines</h3>
-                <PrimaryButton
-                  onClick={() => onAcceptSection("guidelines", iterationData)}
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Guidelines
-                </PrimaryButton>
-              </div>
-              <GuidelinesEditor
-                guidelines={iterationData.guidelines}
-                readOnly={true}
-              />
+        {activeTab === "storyElements" && iterationData.storyElements && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Story Elements</h3>
+              <PrimaryButton
+                onClick={() => onAcceptSection("storyElements", iterationData)}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Elements
+              </PrimaryButton>
             </div>
-          )}
+            <StoryElementsTab
+              elements={iterationData.storyElements}
+              onChange={() => {}}
+              readOnly={true}
+              templateId={iterationData.id}
+            />
+          </div>
+        )}
 
-          {activeTab === "storyElements" && iterationData.storyElements && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Story Elements</h3>
-                <PrimaryButton
-                  onClick={() =>
-                    onAcceptSection("storyElements", iterationData)
-                  }
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Elements
-                </PrimaryButton>
-              </div>
-              <StoryElementsTab
-                elements={iterationData.storyElements}
-                onChange={() => {}}
-                readOnly={true}
-                templateId={iterationData.id}
-              />
+        {activeTab === "sharedOutcomes" && iterationData.sharedOutcomes && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Shared Outcomes</h3>
+              <PrimaryButton
+                onClick={() => onAcceptSection("sharedOutcomes", iterationData)}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Outcomes
+              </PrimaryButton>
             </div>
-          )}
+            <OutcomesTab
+              outcomes={iterationData.sharedOutcomes}
+              onChange={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
 
-          {activeTab === "sharedOutcomes" && iterationData.sharedOutcomes && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Shared Outcomes</h3>
-                <PrimaryButton
-                  onClick={() =>
-                    onAcceptSection("sharedOutcomes", iterationData)
-                  }
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Outcomes
-                </PrimaryButton>
-              </div>
-              <OutcomesTab
-                outcomes={iterationData.sharedOutcomes}
-                onChange={() => {}}
-                readOnly={true}
-              />
+        {activeTab === "stats" && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Stats</h3>
+              <PrimaryButton
+                onClick={() => {
+                  onAcceptSection("stats", iterationData);
+                }}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Stats
+              </PrimaryButton>
             </div>
-          )}
+            <StatsTab
+              statGroups={iterationData.statGroups || []}
+              sharedStats={iterationData.sharedStats || []}
+              playerStats={
+                iterationData.playerStats || getEffectivePlayerStats()
+              }
+              initialSharedStatValues={
+                iterationData.initialSharedStatValues || []
+              }
+              playerOptions={playerOptions}
+              onChange={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
 
-          {activeTab === "stats" && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Stats</h3>
-                <PrimaryButton
-                  onClick={() => {
-                    onAcceptSection("stats", iterationData);
-                  }}
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Stats
-                </PrimaryButton>
-              </div>
-              <StatsTab
-                statGroups={iterationData.statGroups || []}
-                sharedStats={iterationData.sharedStats || []}
-                playerStats={
-                  iterationData.playerStats || getEffectivePlayerStats()
-                }
-                initialSharedStatValues={
-                  iterationData.initialSharedStatValues || []
-                }
-                playerOptions={playerOptions}
-                onChange={() => {}}
-                readOnly={true}
-              />
+        {activeTab === "players" && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Player Options</h3>
+              <PrimaryButton
+                onClick={() => {
+                  Logger.UI.log("Accepting player updates");
+                  onAcceptSection("players", iterationData);
+                }}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Player Options
+              </PrimaryButton>
             </div>
-          )}
+            <PlayersTab
+              playerOptions={playerOptions}
+              onChange={() => {}}
+              playerStats={getEffectivePlayerStats()}
+              templateId={iterationData.id || ""}
+              imageInstructions={iterationData.imageInstructions}
+              characterSelectionIntroduction={
+                iterationData.characterSelectionIntroduction
+              }
+              onCharacterSelectionIntroductionChange={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
 
-          {activeTab === "players" && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Player Options</h3>
-                <PrimaryButton
-                  onClick={() => {
-                    Logger.UI.log("Accepting player updates");
-                    onAcceptSection("players", iterationData);
-                  }}
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Player Options
-                </PrimaryButton>
-              </div>
-              <PlayersTab
-                playerOptions={playerOptions}
-                onChange={() => {}}
-                playerStats={getEffectivePlayerStats()}
-                templateId={iterationData.id || ""}
-                imageInstructions={iterationData.imageInstructions}
-                characterSelectionIntroduction={
-                  iterationData.characterSelectionIntroduction
-                }
-                onCharacterSelectionIntroductionChange={() => {}}
-                readOnly={true}
-              />
+        {activeTab === "media" && iterationData.imageInstructions && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Image Instructions</h3>
+              <PrimaryButton
+                onClick={() => {
+                  Logger.UI.log("Accepting media updates");
+                  onAcceptSection("media", iterationData);
+                }}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Image Instructions
+              </PrimaryButton>
             </div>
-          )}
-
-          {activeTab === "media" && iterationData.imageInstructions && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Image Instructions</h3>
-                <PrimaryButton
-                  onClick={() => {
-                    Logger.UI.log("Accepting media updates");
-                    onAcceptSection("media", iterationData);
-                  }}
-                  leftIcon={<Icons.Check className="h-4 w-4" />}
-                >
-                  Accept Image Instructions
-                </PrimaryButton>
-              </div>
-              <MediaTab
-                imageInstructions={iterationData.imageInstructions}
-                setImageInstructions={() => {}}
-                readOnly={true}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end mt-6">
-          <PrimaryButton onClick={onClose} variant="outline" leftBorder={false}>
-            Close
-          </PrimaryButton>
-        </div>
+            <MediaTab
+              imageInstructions={iterationData.imageInstructions}
+              setImageInstructions={() => {}}
+              readOnly={true}
+            />
+          </div>
+        )}
       </div>
-    </div>
+
+      <div className="flex justify-end mt-6">
+        <PrimaryButton onClick={onClose} variant="outline" leftBorder={false}>
+          Close
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 };
