@@ -256,7 +256,11 @@ export function useImageGeneration(): UseImageGenerationResult {
         identityIndex,
         // Include character name in appearance for better results
         appearance: identity.name
-          ? `${identity.name}: ${identity.appearance}`
+          ? `${identity.name}${
+              identity.pronouns.personal
+                ? ` (${identity.pronouns.personal}/${identity.pronouns.object})`
+                : ""
+            }: ${identity.appearance}`
           : identity.appearance,
         imageInstructions,
         size,

@@ -41,6 +41,13 @@ export const config = {
 } as const;
 
 // OpenAI model settings
+export const GENERATION_MODEL_NAME =
+  process.env.GENERATION_MODEL_NAME || "gpt-4.1";
+export const GENERATION_MODEL_REASONING_EFFORT =
+  process.env.GENERATION_MODEL_REASONING_EFFORT || "medium";
+export const GENERATION_MODEL_TEMPERATURE =
+  process.env.GENERATION_MODEL_TEMPERATURE || 0.3;
+
 export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1-mini";
 export const TEXT_MODEL_REASONING_EFFORT =
   process.env.TEXT_MODEL_REASONING_EFFORT || "medium";
@@ -51,7 +58,6 @@ export const IMAGE_QUERY_MODEL_NAME =
 export const IMAGE_QUERY_MODEL_TEMPERATURE =
   process.env.IMAGE_QUERY_MODEL_TEMPERATURE || 0.1;
 
-// Content filter model settings
 export const CONTENT_FILTER_MODEL_NAME =
   process.env.CONTENT_FILTER_MODEL_NAME || "gpt-4.1-mini";
 export const CONTENT_FILTER_MODEL_TEMPERATURE =

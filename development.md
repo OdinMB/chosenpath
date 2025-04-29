@@ -8,7 +8,7 @@ Focus: Text/Images, English, Multiplayer
 
 - 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
 - 3: Stat attribute for personal stats: initial value or part of player background?
-- 10: More (multiplayer) templates
+- 10: More (multiplayer) templates (try to make 1-3 players work)
 - 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
 
   - Enjoy fiction (Crime, Fantasy, etc.)
