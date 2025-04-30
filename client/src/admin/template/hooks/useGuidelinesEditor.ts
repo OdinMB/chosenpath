@@ -20,6 +20,7 @@ export function useGuidelinesEditor({
     conflicts: guidelines?.conflicts || [],
     decisions: guidelines?.decisions || [],
     typesOfThreads: guidelines?.typesOfThreads || [],
+    switchAndThreadInstructions: guidelines?.switchAndThreadInstructions || [],
   });
 
   // Update state when guidelines change
@@ -31,6 +32,8 @@ export function useGuidelinesEditor({
       conflicts: guidelines?.conflicts || [],
       decisions: guidelines?.decisions || [],
       typesOfThreads: guidelines?.typesOfThreads || [],
+      switchAndThreadInstructions:
+        guidelines?.switchAndThreadInstructions || [],
     });
   }, [
     guidelines?.world,
@@ -39,6 +42,7 @@ export function useGuidelinesEditor({
     guidelines?.conflicts,
     guidelines?.decisions,
     guidelines?.typesOfThreads,
+    guidelines?.switchAndThreadInstructions,
   ]);
 
   // Helper to update state and notify parent
@@ -73,6 +77,8 @@ export function useGuidelinesEditor({
   const setDecisions = (value: string[]) => updateField("decisions", value);
   const setTypesOfThreads = (value: string[]) =>
     updateField("typesOfThreads", value);
+  const setSwitchAndThreadInstructions = (value: string[]) =>
+    updateField("switchAndThreadInstructions", value);
 
   // Field adapter for ArrayField component
   const handleArrayFieldChange = (
@@ -102,6 +108,10 @@ export function useGuidelinesEditor({
       const updatedArray = [...state.typesOfThreads];
       updatedArray[index] = value;
       setTypesOfThreads(updatedArray);
+    } else if (setter === setSwitchAndThreadInstructions) {
+      const updatedArray = [...state.switchAndThreadInstructions];
+      updatedArray[index] = value;
+      setSwitchAndThreadInstructions(updatedArray);
     }
   };
 
@@ -118,6 +128,11 @@ export function useGuidelinesEditor({
       setDecisions([...state.decisions, ""]);
     } else if (setter === setTypesOfThreads) {
       setTypesOfThreads([...state.typesOfThreads, ""]);
+    } else if (setter === setSwitchAndThreadInstructions) {
+      setSwitchAndThreadInstructions([
+        ...state.switchAndThreadInstructions,
+        "",
+      ]);
     }
   };
 
@@ -137,6 +152,10 @@ export function useGuidelinesEditor({
       setDecisions(state.decisions.filter((_, i) => i !== index));
     } else if (setter === setTypesOfThreads) {
       setTypesOfThreads(state.typesOfThreads.filter((_, i) => i !== index));
+    } else if (setter === setSwitchAndThreadInstructions) {
+      setSwitchAndThreadInstructions(
+        state.switchAndThreadInstructions.filter((_, i) => i !== index)
+      );
     }
   };
 
@@ -157,6 +176,7 @@ export function useGuidelinesEditor({
     setConflicts,
     setDecisions,
     setTypesOfThreads,
+    setSwitchAndThreadInstructions,
     handleArrayFieldChange,
     handleAddArrayItem,
     handleRemoveArrayItem,

@@ -61,7 +61,7 @@ export class StorySetupPromptService {
 
   private static getCreationModeInstructions(iterativeMode: boolean): string {
     if (iterativeMode) {
-      return `We already have a setup for an interactive fiction game. Adjust parts of that setup based on user feedback that is provided below.\n\n`;
+      return `We already have a setup for an interactive fiction game. Adjust parts of that setup based on user feedback that is provided below. If you don't change an element of the existing story setup or actively want to delete it, assume that it should stay exactly as it is.\n\n`;
     } else {
       return `Create a setup for an interactive fiction game based on a user prompt that is provided below.\n\n`;
     }

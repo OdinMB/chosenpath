@@ -22,12 +22,14 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
     conflicts,
     decisions,
     typesOfThreads,
+    switchAndThreadInstructions,
     setWorld,
     setRules,
     setTone,
     setConflicts,
     setDecisions,
     setTypesOfThreads,
+    setSwitchAndThreadInstructions,
   } = useGuidelinesEditor({
     guidelines,
     onChange,
@@ -104,6 +106,16 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
         onChange={setTypesOfThreads}
         placeholder="Add a thread type"
         emptyPlaceholder="Click + to add thread types"
+        readOnly={readOnly}
+      />
+
+      <ArrayField
+        title="Switch and Thread Instructions"
+        tooltipText="Instructions for how switches and threads should be handled, both narratively and mechanically"
+        items={switchAndThreadInstructions}
+        onChange={setSwitchAndThreadInstructions}
+        placeholder="Add a switch/thread instruction"
+        emptyPlaceholder="Click + to add switch and thread instructions"
         readOnly={readOnly}
       />
     </div>

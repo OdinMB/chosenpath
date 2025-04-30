@@ -19,6 +19,7 @@ export interface SectionConfig {
   threadConfigurationForSwitches?: boolean;
   threadConfigurationForThreadBeats?: boolean;
   threadConfigurationForSwitchBeats?: boolean;
+  switchAndThreadInstructions?: boolean;
 }
 
 export class StoryStatePromptService {
@@ -78,6 +79,9 @@ export class StoryStatePromptService {
     if (sections.switchWithDecisionsConfiguration) {
       promptSections.push(this.getSwitchConfiguration(story, true));
     }
+    if (sections.switchAndThreadInstructions) {
+      promptSections.push(this.createSwitchAndThreadInstructionsSection(story));
+    }
 
     return promptSections.filter(Boolean).join("\n");
   }
@@ -113,11 +117,6 @@ ${modeDescriptions[story.getGameMode()]}
         : "",
       guidelines.decisions
         ? `- Types of decisions that players will make: ${guidelines.decisions.join(
-            ", "
-          )}`
-        : "",
-      guidelines.typesOfThreads
-        ? `- Types of threads that should be considered for the story (if and when appropriate): ${guidelines.typesOfThreads.join(
             ", "
           )}`
         : "",
@@ -300,74 +299,80 @@ ${modeDescriptions[story.getGameMode()]}
   ): string {
     const state = story.getState();
 
-    return Object.entries(story.getPlayers())
-      .map(([slot, playerState]) => {
-        const beatHistorySection = this.createBeatHistorySection(
-          playerState.beatHistory
-        );
-        const separator = "#####################################";
-
-        const playerSections = [
-          separator,
-          `######## PLAYER ID: ${slot} ########`,
-          separator,
-          "",
-          `${playerState.name} (${playerState.pronouns.personal}/${playerState.pronouns.possessive})`,
-          playerState.appearance + " " + playerState.fluff,
-          "",
-        ];
-
-        // Include previous thread types if requested
-        if (sections?.previousThreads) {
-          playerSections.push(
-            "PREVIOUS THREAD TYPES (to be avoided for upcoming threads):\n- ",
-            playerState.previousTypesOfThreads?.length
-              ? playerState.previousTypesOfThreads.join("\n- ")
-              : "None",
-            ""
+    return (
+      "\n" +
+      Object.entries(story.getPlayers())
+        .map(([slot, playerState]) => {
+          const beatHistorySection = this.createBeatHistorySection(
+            playerState.beatHistory
           );
-        }
+          const separator = "#####################################";
 
-        // Only include character stats if the stats setting is true
-        if (sections?.stats) {
+          const playerSections = [
+            separator,
+            `######## PLAYER ID: ${slot} ########`,
+            separator,
+            "",
+            `${playerState.name} (${playerState.pronouns.personal}/${playerState.pronouns.possessive})`,
+            playerState.appearance + " " + playerState.fluff,
+            "",
+          ];
+
+          // Include previous thread types if requested
+          if (sections?.previousThreads) {
+            playerSections.push(
+              "PREVIOUS THREAD TYPES (to be avoided for upcoming threads):\n- ",
+              playerState.previousTypesOfThreads?.length
+                ? playerState.previousTypesOfThreads.join("\n- ")
+                : "None",
+              ""
+            );
+          }
+
+          // Only include character stats if the stats setting is true
+          if (sections?.stats) {
+            playerSections.push(
+              "CHARACTER STAT VALUES:",
+              playerState.statValues
+                .map((statValue) => {
+                  const statDef = state.playerStats.find(
+                    (s) => s.id === statValue.statId
+                  );
+                  if (!statDef)
+                    return `- ${statValue.statId}: ${statValue.value} (definition not found)`;
+                  return `- ${statDef.name.toUpperCase()} (${
+                    statDef.id
+                  }): ${this.formatStatValue({
+                    type: statDef.type,
+                    value: statValue.value,
+                  })}`;
+                })
+                .join("\n"),
+              ""
+            );
+          }
+
+          // Only include outcomes if the setting is true
+          if (sections?.outcomes) {
+            playerSections.push(
+              "OUTCOMES that will define this character's story ending:",
+              this.createOutcomesListSection(playerState.outcomes),
+              ""
+            );
+          }
+
           playerSections.push(
-            "CHARACTER STAT VALUES:",
-            playerState.statValues
-              .map((statValue) => {
-                const statDef = state.playerStats.find(
-                  (s) => s.id === statValue.statId
-                );
-                if (!statDef)
-                  return `- ${statValue.statId}: ${statValue.value} (definition not found)`;
-                return `- ${statDef.name.toUpperCase()}: ${this.formatStatValue(
-                  { type: statDef.type, value: statValue.value }
-                )}`;
-              })
-              .join("\n"),
-            ""
+            "STORY ELEMENTS THAT THIS CHARACTER HAS BEEN INTRODUCED TO: ",
+            playerState.knownStoryElements.join(", "),
+            "",
+            "BEAT HISTORY:",
+            beatHistorySection
           );
-        }
 
-        // Only include outcomes if the setting is true
-        if (sections?.outcomes) {
-          playerSections.push(
-            "OUTCOMES that will define this character's story ending:",
-            this.createOutcomesListSection(playerState.outcomes),
-            ""
-          );
-        }
-
-        playerSections.push(
-          "STORY ELEMENTS THAT THIS CHARACTER HAS BEEN INTRODUCED TO: ",
-          playerState.knownStoryElements.join(", "),
-          "",
-          "BEAT HISTORY:",
-          beatHistorySection
-        );
-
-        return playerSections.join("\n");
-      })
-      .join("\n\n" + "=".repeat(80) + "\n\n");
+          return playerSections.join("\n");
+        })
+        .join("\n\n" + "=".repeat(80) + "\n\n")
+    );
   }
 
   private static createBeatHistorySection(beatHistory: any[]): string {
@@ -894,5 +899,21 @@ ${modeDescriptions[story.getGameMode()]}
     );
 
     return sections.join("\n");
+  }
+
+  private static createSwitchAndThreadInstructionsSection(
+    story: Story
+  ): string {
+    return [
+      "SPECIAL SWITCH/THREAD INSTRUCTIONS:",
+      story.getGuidelines().typesOfThreads
+        ? `- Types of threads that are a good fit for the story (if and when appropriate): ${story
+            .getGuidelines()
+            .typesOfThreads.join(", ")}`
+        : "",
+      story.getGuidelines().switchAndThreadInstructions
+        ? `- ${story.getGuidelines().switchAndThreadInstructions.join("\n- ")}`
+        : "",
+    ].join("\n");
   }
 }

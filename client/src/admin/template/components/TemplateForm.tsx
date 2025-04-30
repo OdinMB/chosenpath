@@ -53,6 +53,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     setConflicts,
     setDecisions,
     setTypesOfThreads,
+    setSwitchAndThreadInstructions,
     // Field handlers
     handleTitleChange,
     handleTeaserChange,
@@ -124,6 +125,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       setConflicts(guidelines.conflicts || []);
       setDecisions(guidelines.decisions || []);
       setTypesOfThreads(guidelines.typesOfThreads || []);
+      setSwitchAndThreadInstructions(
+        guidelines.switchAndThreadInstructions || []
+      );
     } else if (sectionKey === "storyElements" && data.storyElements) {
       handleStoryElementsChange(data.storyElements as StoryElement[]);
     } else if (sectionKey === "sharedOutcomes" && data.sharedOutcomes) {
@@ -286,6 +290,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                   conflicts: [],
                   decisions: [],
                   typesOfThreads: [],
+                  switchAndThreadInstructions: [],
                 }
               }
               onChange={(updates) => {
@@ -298,6 +303,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     conflicts,
                     decisions,
                     typesOfThreads,
+                    switchAndThreadInstructions,
                   } = updates.guidelines;
                   if (world !== undefined) setWorld(world);
                   if (rules !== undefined) setRules(rules);
@@ -306,6 +312,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                   if (decisions !== undefined) setDecisions(decisions);
                   if (typesOfThreads !== undefined)
                     setTypesOfThreads(typesOfThreads);
+                  if (switchAndThreadInstructions !== undefined)
+                    setSwitchAndThreadInstructions(switchAndThreadInstructions);
                 }
               }}
             />

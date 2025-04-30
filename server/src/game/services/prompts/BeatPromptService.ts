@@ -21,8 +21,12 @@ export class BeatPromptService {
   private static getSectionsForContext(story: Story): SectionConfig {
     return {
       switchConfiguration: story.getCurrentBeatType() === "switch",
+      // switch and thread instructions can include instructions for stat changes after threads
+      switchAndThreadInstructions: story.getCurrentBeatType() === "switch",
+      // thread configuration for thread beats
       threadConfigurationForThreadBeats:
         story.getCurrentBeatType() === "thread",
+      // previous thread to continue from
       threadConfigurationForSwitchBeats:
         (story.getCurrentBeatType() === "switch" ||
           story.getCurrentBeatType() === "ending") &&
@@ -40,10 +44,9 @@ export class BeatPromptService {
     const prompt =
       this.createContextSection(story) +
       "\n" +
-      "======= CURRENT GAME STATE =======\n\n" +
-      StoryStatePromptService.createStoryStatePrompt(story, sections) +
-      "\n\n" +
       this.createInstructionsSection(story) +
+      "\n\n======= CURRENT GAME STATE =======\n\n" +
+      StoryStatePromptService.createStoryStatePrompt(story, sections) +
       "\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,

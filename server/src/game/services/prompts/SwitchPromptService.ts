@@ -18,6 +18,7 @@ export class SwitchPromptService {
     players: true,
     previousThreads: true,
     storyProgress: true,
+    switchAndThreadInstructions: true,
   } as const;
 
   private static readonly SECTIONS_PREVIOUS_THREAD: SectionConfig = {
@@ -28,13 +29,12 @@ export class SwitchPromptService {
     const prompt =
       this.createContextSection() +
       "\n" +
-      "======= CURRENT GAME STATE =======\n" +
+      this.createInstructionsSection(story) +
+      "\n\n======= CURRENT GAME STATE =======\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,
         this.SECTIONS_GAME_STATE
       ) +
-      "\n\n" +
-      this.createInstructionsSection(story) +
       // Only show the previous thread if this is not the opening switch
       (story.getCurrentTurn() > 1
         ? "\n\n" +
@@ -172,6 +172,8 @@ The relevant questions are:
 Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
 `;
     }
+    instructions +=
+      "\nAlso consider the SWITCH/THREAD INSTRUCTIONS that are specific to this story.\n";
 
     return instructions;
   }

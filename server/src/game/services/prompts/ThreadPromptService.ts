@@ -16,6 +16,9 @@ export class ThreadPromptService {
     players: true,
     previousThreads: true,
     // storyProgress: true,
+    // Actually, the switch/thread instructions are only needed for
+    // switches (for designing the next threads) and switch beats (for stat changes after threads)
+    switchAndThreadInstructions: true,
   } as const;
 
   private static readonly SECTIONS_SWITCH: SectionConfig = {
@@ -26,13 +29,13 @@ export class ThreadPromptService {
     const prompt =
       this.createContextSection() +
       "\n\n" +
-      "======= CURRENT GAME STATE =======\n" +
-      StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
-      "\n\n" +
       this.createInstructionsSection(story) +
       "\n\n" +
       "#".repeat(100) +
-      "\n\nRemember: these are just examples. The thread (or set of threads) that you will be creating now must be fully custimized to work for the current story\n\n" +
+      "\n\nRemember: these are just examples. The thread (or set of threads) that you will be creating now must be fully custimized to work for the current story" +
+      "\n\n======= CURRENT GAME STATE =======\n" +
+      StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
+      "\n\n" +
       StoryStatePromptService.createStoryStatePrompt(
         story,
         this.SECTIONS_SWITCH
@@ -253,6 +256,9 @@ The beat is not about succeeding or failing, but about exploring Alex's characte
 Question: Choosing a Career: What does Alex ultimately prioritize when forced to choose?
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
+
+    instructions +=
+      "\nAlso consider the SWITCH/THREAD INSTRUCTIONS below that are specific to this story.\n";
 
     return instructions;
   }

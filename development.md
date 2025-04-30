@@ -6,7 +6,6 @@ Smaller commits!
 
 Focus: Text/Images, English, Multiplayer
 
-- 2: Setup: instructions for switches/threads (to be shown for switch/thread generation)
 - 3: Stat attribute for personal stats: initial value or part of player background?
 - 10: More (multiplayer) templates (try to make 1-3 players work)
 - 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
@@ -27,7 +26,6 @@ Focus: Text/Images, English, Multiplayer
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
 - 1: if not first beat in a thread: don't reestablish scene; go directly into action
 
-- 20: Streaming text
 - 5: higher degree of direct interaction between players in joint threads
 
 - 5: Attach facts to players
@@ -43,6 +41,7 @@ Focus: Text/Images, English, Multiplayer
 - 5: Difficulty level (affecting base points)
 - 10: creation/template setting: jokers to see risky/safe or even modifiers
 - 20: Music (OpenAI's new API?)
+- 20: Streaming text
 
 # SERIOUS PROJECT
 

@@ -185,6 +185,11 @@ export const threadSchema = z.object({
 });
 
 export const threadAnalysisSchema = z.object({
+  relevantSwitchAndThreadInstructions: z
+    .string()
+    .describe(
+      "Switch/thread instructions that are specific to this story and relevant for generating this thread or set of threads (if any)"
+    ),
   coordinationPatternSummary: z
     .string()
     .describe(

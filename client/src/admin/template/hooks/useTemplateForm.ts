@@ -93,6 +93,7 @@ export function useTemplateForm({
     handleAddArrayItem,
     handleRemoveArrayItem,
     updateGuidelines,
+    setSwitchAndThreadInstructions,
   } = useGuidelinesEditor({
     guidelines: formData.guidelines,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
@@ -336,6 +337,7 @@ export function useTemplateForm({
     setConflicts,
     setDecisions,
     setTypesOfThreads,
+    setSwitchAndThreadInstructions,
     setTags: handleTagsChange,
     // Handlers for BasicInfoTab
     handleAddTag,

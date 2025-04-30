@@ -52,6 +52,11 @@ export const switchSchema = z.object({
     .describe(
       "List of previous thread types that the players have been involved in. We want to avoid these for the upcoming thread to avoid repetition."
     ),
+  relevantSwitchAndThreadInstructions: z
+    .string()
+    .describe(
+      "Switch/thread instructions that are specific to this story and relevant in the current situation, if any"
+    ),
   outcomeId: z
     .string()
     .describe(

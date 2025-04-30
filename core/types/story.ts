@@ -89,6 +89,11 @@ export const guidelinesSchema = z
       .describe(
         "6-8 types of threads that fit the story. For example: witness interview, car chase, romantic date, physical fight, etc."
       ),
+    switchAndThreadInstructions: z
+      .array(z.string())
+      .describe(
+        "Special rules that dictate how switches and threads should be structured or behave throughout the story. These instructions influence story progression and may include time rules, resource consumption patterns, thread availability conditions, and special thread unlocking mechanics. Examples: each thread represents at least one day of story time; players lose 5% rations after each thread; thread types should alternate between action and dialogue; players must face a specific challenge every N threads; certain types of threads should be 2 beats long; etc. Generate 0-3 instructions. (Not every story needs these instructions.)"
+      ),
   })
   .describe("Story guidelines and parameters");
 export type Guidelines = z.infer<typeof guidelinesSchema>;
