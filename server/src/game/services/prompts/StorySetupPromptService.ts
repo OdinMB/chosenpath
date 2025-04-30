@@ -178,20 +178,18 @@ are used to group stats in the UI. Both character and shared stats can be groupe
 - Examples: Character/Empire/Politics (for building a mafia empire), Detective/Investigation/Contacts (for a mystery story), Character/Ship/Crew (for a space opera)
 
 Stat guidelines
-- In general, favor string and string[] over numbers
+- In general, favor string and string[] stats over numbers and percentages.
 --- Exception: countable things whose management is central to the story (gold)
 --- Exception: percentages/opposites for aspects that must be managed often and granularly (health, fuel)
 - Use the distribution of stats to shape the focus of the story.
 --- Example: In a space opera, having three percentage stats for relationships with crew members means that the story will focus heavily on these relationships. If you add a stat 'Crew Morale' (string[]), the focus of the story will be elsewhere.
 - Use a variety of stat types.
 --- Example for a teenage wizard story: string[] for friends, string for love interest, string[] for mastered spells, string for repuatation at school, percentage for academic performance, and number for pocket money.
-- If players are of the same type (e.g. all are time-traveling spies), use the same character stats for all players.
---- Exception: Stats for relationships or individual side quests can be different for each player.
---- Values for stats should of course be different for each player. This can include lists of items or skills.
 - If a stat should be the same for all players, use a shared stat.
 --- Example: If the players are all on the same ship, the ship's fuel level is the same for all players.
 --- Example: If players maintain a relationship to an NPC as a group, use a shared stat for that relationship. If only one specific player has a relationship with that NPC, use a character stat.
 - Use the isVisible attribute to hide stats that the player shouldn't see.
+- For player stats, the default partOfPlayerBackgrounds attribute is true. Set to false if a player stat should be the same for all player backgrounds. Examples: Health should be "unscathed" or Status should be "Neonate" at the beginning of the story no matter which background the player chooses.
 - The player must immediately know what the stat is for.
 --- If you can't convey the stat's meaning and function in the stat's name, don't create that stat.
 - Stat names must be specific and mustn't include any placeholders.

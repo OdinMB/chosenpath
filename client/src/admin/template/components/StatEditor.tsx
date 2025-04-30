@@ -1,20 +1,16 @@
 import React from "react";
 import { PrimaryButton, Icons, Input, Checkbox } from "components/ui";
 import { ArrayField } from "components";
-import { Stat, StatValueEntry } from "core/types";
+import { Stat } from "core/types";
 import { StatValueInput } from "./StatValueInput";
 import { useStatEditor } from "../hooks/useStatEditor";
+import { ConfirmDialog } from "components/ui/ConfirmDialog";
 
 interface StatEditorProps {
   stat: Stat;
   index: number;
   type: "shared" | "player";
   statGroups: string[];
-  initialValue?: StatValueEntry["value"];
-  onUpdateInitialValue?: (
-    statId: string,
-    value: number | string | string[]
-  ) => void;
   onUpdateStat: (
     type: "shared" | "player",
     index: number,
@@ -30,8 +26,6 @@ export const StatEditor: React.FC<StatEditorProps> = ({
   index,
   type,
   statGroups,
-  initialValue,
-  onUpdateInitialValue,
   onUpdateStat,
   onRemoveStat,
   setEditingStats,
@@ -39,18 +33,21 @@ export const StatEditor: React.FC<StatEditorProps> = ({
 }) => {
   const {
     localStat,
-    localInitialValue,
-    setLocalInitialValue,
     handleSave,
     updateStatField,
     handleRemoveStat,
     handleClose,
+    showDeleteConfirm,
+    setShowDeleteConfirm,
+    performRemoveStat,
+    showPartOfBackgroundsConfirm,
+    handleConfirmPartOfBackgroundsChange,
+    handleCancelPartOfBackgroundsChange,
+    pendingPartOfBackgroundsValue,
   } = useStatEditor({
     stat,
     index,
     type,
-    initialValue,
-    onUpdateInitialValue,
     onUpdateStat,
     onRemoveStat,
     setEditingStats,
@@ -140,13 +137,17 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 const newType = e.target.value as Stat["type"];
                 updateStatField("type", newType);
                 // Reset initial value based on type
-                if (type === "shared") {
+                if (
+                  type === "shared" ||
+                  (type === "player" &&
+                    localStat.partOfPlayerBackgrounds === false)
+                ) {
                   if (newType === "string") {
-                    setLocalInitialValue("");
+                    updateStatField("initialValue", "");
                   } else if (newType === "string[]") {
-                    setLocalInitialValue([]);
+                    updateStatField("initialValue", []);
                   } else {
-                    setLocalInitialValue(50);
+                    updateStatField("initialValue", 50);
                   }
                 }
               }}
@@ -160,12 +161,21 @@ export const StatEditor: React.FC<StatEditorProps> = ({
             </select>
           </div>
 
-          {type === "shared" && (
+          {(type === "shared" ||
+            (type === "player" &&
+              localStat.partOfPlayerBackgrounds === false)) && (
             <div className="flex items-center gap-2">
               <StatValueInput
                 statType={localStat.type}
-                value={localInitialValue}
-                onChange={(value) => setLocalInitialValue(value)}
+                value={
+                  localStat.initialValue ||
+                  (localStat.type === "string"
+                    ? ""
+                    : localStat.type === "string[]"
+                    ? []
+                    : 50)
+                }
+                onChange={(value) => updateStatField("initialValue", value)}
                 placeholder="Enter initial value"
                 className="flex-1"
                 label="Initial Value"
@@ -212,6 +222,28 @@ export const StatEditor: React.FC<StatEditorProps> = ({
                 Visible to players
               </label>
             </div>
+
+            {type === "player" && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`stat-background-${stat.id}`}
+                  name={`stat-background-${stat.id}`}
+                  checked={
+                    localStat.partOfPlayerBackgrounds !== false ? true : false
+                  }
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    updateStatField("partOfPlayerBackgrounds", e.target.checked)
+                  }
+                  disabled={readOnly}
+                />
+                <label
+                  htmlFor={`stat-background-${stat.id}`}
+                  className="font-semibold"
+                >
+                  Part of player backgrounds
+                </label>
+              </div>
+            )}
 
             <ArrayField
               title="Narrative Implications"
@@ -312,7 +344,12 @@ export const StatEditor: React.FC<StatEditorProps> = ({
           )}
           {!readOnly && (
             <button
-              onClick={handleRemoveStat}
+              onClick={() => {
+                console.log(
+                  `Delete button clicked for ${localStat.name} (type=${type})`
+                );
+                handleRemoveStat();
+              }}
               className="text-tertiary hover:text-tertiary-700"
               aria-label="Remove stat"
             >
@@ -339,6 +376,39 @@ export const StatEditor: React.FC<StatEditorProps> = ({
           </PrimaryButton>
         )}
       </div>
+
+      {/* Confirmation Dialog for Player Stat Deletion */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          console.log("Closing delete confirmation dialog");
+          setShowDeleteConfirm(false);
+        }}
+        onConfirm={() => {
+          console.log("Confirmed deletion");
+          performRemoveStat();
+          setShowDeleteConfirm(false);
+        }}
+        title={`Delete ${localStat.name}`}
+        message={`This will remove the stat ${localStat.name} from all character backgrounds. This cannot be undone. Do you want to continue?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      {/* Confirmation Dialog for Part of Backgrounds Change */}
+      <ConfirmDialog
+        isOpen={showPartOfBackgroundsConfirm}
+        onClose={handleCancelPartOfBackgroundsChange}
+        onConfirm={handleConfirmPartOfBackgroundsChange}
+        title={`Change Background Status`}
+        message={
+          pendingPartOfBackgroundsValue
+            ? `This will add ${localStat.name} to all character backgrounds with default values. Do you want to continue?`
+            : `This will remove ${localStat.name} from all character backgrounds. This action cannot be undone. Do you want to continue?`
+        }
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

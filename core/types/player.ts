@@ -104,7 +104,7 @@ export const characterBackgroundSchema = z
     initialPlayerStatValues: z
       .array(statValueEntrySchema)
       .describe(
-        "Initial stat values for player stats for this background. Provide an initial value for each player stat. Array of {statId, value} objects."
+        "Initial stat values for player stats for this background. Provide an initial value for each player stat whose partOfPlayerBackgrounds attribute is set to true. Array of {statId, value} objects."
       ),
   })
   .describe(

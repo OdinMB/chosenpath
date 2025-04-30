@@ -1,5 +1,5 @@
 import { InfoIcon, PrimaryButton, Icons } from "components/ui";
-import { Stat, StatValueEntry } from "core/types";
+import { Stat } from "core/types";
 import { StatListItem } from "./StatListItem";
 import { StatEditor } from "./StatEditor";
 
@@ -12,11 +12,6 @@ interface StatListSectionProps {
   statGroups: string[];
   type: "shared" | "player";
   editingStats: Set<string>;
-  initialValues?: StatValueEntry[];
-  onUpdateInitialValue?: (
-    statId: string,
-    value: number | string | string[]
-  ) => void;
   onAddStat: (type: "shared" | "player") => void;
   onUpdateStat: (
     type: "shared" | "player",
@@ -38,8 +33,6 @@ export function StatListSection({
   statGroups,
   type,
   editingStats,
-  initialValues,
-  onUpdateInitialValue,
   onAddStat,
   onUpdateStat,
   onRemoveStat,
@@ -79,15 +72,17 @@ export function StatListSection({
           ></PrimaryButton>
         )}
       </div>
+
       {statGroups.length === 0 ? (
         <p className="text-gray-500">Add at least one stat group first</p>
       ) : (
         stats.map((stat, index) => {
           const isEditing = editingStats.has(stat.id);
+
           return (
             <div
               key={stat.id}
-              className={`overflow-hidden mb-2 ${
+              className={`overflow-hidden ${
                 isEditing ? "border border-border rounded-md" : ""
               }`}
             >
@@ -101,13 +96,6 @@ export function StatListSection({
                     onRemoveStat={onRemoveStat}
                     setEditingStats={setEditingStats}
                     statGroups={statGroups}
-                    initialValue={
-                      type === "shared"
-                        ? initialValues?.find((v) => v.statId === stat.id)
-                            ?.value
-                        : undefined
-                    }
-                    onUpdateInitialValue={onUpdateInitialValue}
                     readOnly={readOnly}
                   />
                 </>

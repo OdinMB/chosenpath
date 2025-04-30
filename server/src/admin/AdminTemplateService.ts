@@ -104,7 +104,6 @@ export class AdminTemplateService {
       sharedOutcomes: baseTemplate.sharedOutcomes || [],
       statGroups: baseTemplate.statGroups || ["General"],
       sharedStats: baseTemplate.sharedStats || [],
-      initialSharedStatValues: baseTemplate.initialSharedStatValues || [],
       playerStats: baseTemplate.playerStats || [],
       characterSelectionIntroduction:
         baseTemplate.characterSelectionIntroduction || {
@@ -369,7 +368,6 @@ export class AdminTemplateService {
         storyElements: initialState.storyElements,
         sharedOutcomes: initialState.sharedOutcomes,
         sharedStats: initialState.sharedStats,
-        initialSharedStatValues: initialState.sharedStatValues,
         playerStats: initialState.playerStats,
         characterSelectionIntroduction:
           initialState.characterSelectionIntroduction,

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Icons } from "components/ui";
 import { Stat } from "core/types";
 import { ConfirmDialog } from "components/ui/ConfirmDialog";
+import { ExpandableItem } from "components";
 
 interface StatListItemProps {
   stat: Stat;
@@ -22,14 +23,36 @@ export const StatListItem: React.FC<StatListItemProps> = ({
   onDelete,
   readOnly = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
 
-  const handleToggleExpand = () => {
-    if (!isExpanded) {
-      onEdit(stat.id);
+  // Format value for display
+  const formatValue = (value: number | string | string[]) => {
+    if (value === undefined || value === null) return "";
+    if (Array.isArray(value)) return value.join(", ");
+    return value.toString();
+  };
+
+  // Generate description with group, type, and initial value
+  const generateDescription = () => {
+    const parts = [];
+
+    if (stat.group) {
+      parts.push(stat.group);
     }
-    setIsExpanded(!isExpanded);
+
+    if (stat.type) {
+      parts.push(stat.type.slice(0, 1).toUpperCase() + stat.type.slice(1));
+    }
+
+    if (
+      (type === "shared" ||
+        (type === "player" && stat.partOfPlayerBackgrounds === false)) &&
+      stat.initialValue !== undefined
+    ) {
+      parts.push(`${formatValue(stat.initialValue)}`);
+    }
+
+    return parts.join(" - ");
   };
 
   const handleConvertClick = () => {
@@ -51,71 +74,61 @@ export const StatListItem: React.FC<StatListItemProps> = ({
       ? "Converting this shared stat to a player stat means you'll need to define initial values for each character background in the Players tab. Do you want to continue?"
       : "Converting this player stat to a shared stat will delete this stat from all character backgrounds. This cannot be undone. Do you want to continue?";
 
+  const actionIcons = !readOnly
+    ? [
+        {
+          icon: <Icons.SwitchHorizontal className="h-5 w-5" />,
+          onClick: handleConvertClick,
+          title: `Convert to ${type === "shared" ? "player" : "shared"} stat`,
+          className: "text-blue-500 hover:text-blue-700",
+          ariaLabel: `Convert ${stat.name} to ${
+            type === "shared" ? "player" : "shared"
+          } stat`,
+        },
+      ]
+    : [];
+
+  const statTitle = (
+    <div className="flex items-center">
+      <span
+        className={`w-2 h-2 rounded-full mr-2 ${
+          type === "shared" ? "bg-blue-500" : "bg-green-500"
+        }`}
+        title={
+          type === "shared"
+            ? "Shared stat (applies to all players)"
+            : "Player stat (unique to each player)"
+        }
+      ></span>
+      <span className="font-medium">{stat.name}</span>
+      {type === "player" && stat.partOfPlayerBackgrounds === false && (
+        <span className="ml-2 text-xs text-gray-500 italic">
+          Not part of backgrounds
+        </span>
+      )}
+    </div>
+  );
+
+  // Unlike PlayerBackgroundEditor which handles in-place editing with forms,
+  // StatListItem delegates editing to a separate StatEditor component controlled by parent.
+  // We just use ExpandableItem for the list item UI consistency.
+  const renderEmptyForm = () => <div />;
+
   return (
     <>
-      <div className="bg-white p-4 rounded-lg shadow mb-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <span
-            className={`w-2 h-2 rounded-full mr-2 ${
-              type === "shared" ? "bg-blue-500" : "bg-green-500"
-            }`}
-            title={
-              type === "shared"
-                ? "Shared stat (applies to all players)"
-                : "Player stat (unique to each player)"
-            }
-          ></span>
-          <span className="font-medium">{stat.name}</span>
-        </div>
-        <div className="flex gap-2">
-          {!readOnly && (
-            <>
-              <button
-                onClick={() => onEdit(stat.id)}
-                className="text-secondary hover:text-secondary-700"
-                aria-label={`Edit ${stat.name}`}
-              >
-                <Icons.Edit className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleConvertClick}
-                className="text-blue-500 hover:text-blue-700"
-                aria-label={`Convert ${stat.name} to ${
-                  type === "shared" ? "player" : "shared"
-                } stat`}
-                title={`Convert to ${
-                  type === "shared" ? "player" : "shared"
-                } stat`}
-              >
-                <Icons.SwitchHorizontal className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => onDelete(type, index)}
-                className="text-tertiary hover:text-tertiary-700"
-                aria-label={`Remove ${stat.name}`}
-              >
-                <Icons.Trash className="h-5 w-5" />
-              </button>
-            </>
-          )}
-          {readOnly && (
-            <button
-              onClick={handleToggleExpand}
-              className="text-secondary hover:text-secondary-700"
-              aria-label={
-                isExpanded ? `Collapse ${stat.name}` : `View ${stat.name}`
-              }
-              title={isExpanded ? "Collapse details" : "View details"}
-            >
-              {isExpanded ? (
-                <Icons.ChevronUp className="h-5 w-5" />
-              ) : (
-                <Icons.ChevronDown className="h-5 w-5" />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
+      <ExpandableItem
+        id={stat.id}
+        title={statTitle}
+        data={stat}
+        editingSet={new Set()} // Always empty since we don't edit in-place
+        setEditing={() => onEdit(stat.id)} // Tell parent to edit this stat
+        onDelete={() => onDelete(type, index)}
+        onSave={() => {}} // No-op since we don't handle saving here
+        renderEditForm={renderEmptyForm}
+        description={generateDescription()}
+        readOnly={readOnly}
+        actionIcons={actionIcons}
+      />
 
       {/* Confirm Dialog for stat conversion */}
       <ConfirmDialog

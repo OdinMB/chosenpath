@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  Stat,
-  StatValueEntry,
-  PlayerSlot,
-  PlayerOptionsGeneration,
-} from "core/types";
+import { Stat, PlayerSlot, PlayerOptionsGeneration } from "core/types";
 import { useStatEditorHelpers } from "../hooks/useStatEditor";
 import { StatGroupEditor } from "./StatGroupEditor";
 import { StatListSection } from "./StatListSection";
@@ -13,13 +8,11 @@ type StatsTabProps = {
   statGroups: string[];
   sharedStats: Stat[];
   playerStats: Stat[];
-  initialSharedStatValues: StatValueEntry[];
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
   onChange?: (updates: {
     statGroups?: string[];
     sharedStats?: Stat[];
     playerStats?: Stat[];
-    initialSharedStatValues?: StatValueEntry[];
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => void;
   readOnly?: boolean;
@@ -29,7 +22,6 @@ export const StatsTab = ({
   statGroups,
   sharedStats,
   playerStats,
-  initialSharedStatValues,
   playerOptions,
   onChange,
   readOnly = false,
@@ -42,13 +34,11 @@ export const StatsTab = ({
     handleAddStat,
     handleUpdateStat,
     handleRemoveStat,
-    handleUpdateInitialValue,
     handleConvertStat,
   } = useStatEditorHelpers({
     statGroups,
     sharedStats,
     playerStats,
-    initialSharedStatValues,
     playerOptions,
     editingStats,
     onChange,
@@ -82,8 +72,6 @@ export const StatsTab = ({
         statGroups={statGroups}
         type="shared"
         editingStats={editingStats}
-        initialValues={initialSharedStatValues}
-        onUpdateInitialValue={handleUpdateInitialValue}
         onAddStat={handleAddStat}
         onUpdateStat={handleUpdateStat}
         onRemoveStat={handleRemoveStat}

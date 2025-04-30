@@ -7,6 +7,7 @@ import {
   Resolution,
   ResolutionDetails,
   Thread,
+  StatValueEntry,
 } from "../types/index.js";
 import { replacePronounPlaceholders } from "../utils/playerUtils.js";
 
@@ -284,6 +285,20 @@ export class PlayerManager {
       return state;
     }
 
+    // Initial player stats: background stats + player stats that are not part of backgrounds
+    let initialStatValues = background.initialPlayerStatValues;
+    initialStatValues.push(
+      ...state.playerStats
+        .filter((stat) => stat.partOfPlayerBackgrounds === false)
+        .map(
+          (stat) =>
+            ({
+              statId: stat.id,
+              value: stat.initialValue,
+            } as StatValueEntry)
+        )
+    );
+
     // Update player with selected character information
     const updatedPlayer = {
       ...player,
@@ -291,10 +306,9 @@ export class PlayerManager {
       pronouns: identity.pronouns,
       appearance: identity.appearance,
       fluff: replacePronounPlaceholders(background.fluffTemplate, identity),
-      statValues: background.initialPlayerStatValues,
+      statValues: initialStatValues,
       identityChoice: identityChoice,
       backgroundChoice: backgroundChoice,
-      // characterSelected: true,
     };
 
     // Update the players object with the updated player

@@ -73,6 +73,11 @@ export const statSchema = z
           "- for percentage stats: 'Can regain 10% energy by resting instead of taking decisive action'\n" +
           "Don't provide any options to gain this stat as a reward for a momentary disadvantage if the stat represents a large, long-term aspect of the story (tension between factions on a 4-step scale, special powers, etc.)"
       ),
+    canBeChangedInBeatResolutions: z
+      .boolean()
+      .describe(
+        "Whether this stat can be changed in beat resolutions within threads. If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly and where changes are not particularly impactful. If false, the stat can only be changed after threads are resolved. Set to false for stats where a change would be very noticeable and/or have a long-term effect (important world stats, special powers or relationships, etc.) These larger changes should only happen after a relevant thread is resolved."
+      ),
     narrativeImplications: z
       .array(z.string())
       .describe(
@@ -93,11 +98,6 @@ export const statSchema = z
           "- For opposites stats: Shifting the balance (e.g., 'Choosing self-interest options shifts Loyalty|Ambition toward Ambition by 10-15%').\n" +
           "Stat changes after resolved threads can be noticeable and meaningful. Changes after unfavorable resolutions can be real setbacks."
       ),
-    canBeChangedInBeatResolutions: z
-      .boolean()
-      .describe(
-        "Whether this stat can be changed in beat resolutions within threads. If true, small changes can be made to the stat at any point in the story, not just after threads are resolved. Good for stats that are tracked often and granularly and where changes are not particularly impactful. If false, the stat can only be changed after threads are resolved. Set to false for stats where a change would be very noticeable and/or have a long-term effect (important world stats, special powers or relationships, etc.) These larger changes should only happen after a relevant thread is resolved."
-      ),
     isVisible: z
       .boolean()
       .describe(
@@ -105,6 +105,15 @@ export const statSchema = z
           "- Set to false for hidden mechanics, story flags, or future reveals.\n" +
           "- Set to true for stats that players should be aware of and manage."
       ),
+    partOfPlayerBackgrounds: z
+      .boolean()
+      .describe(
+        "Only relevant for player stats. If true, the stat is part of players' backgrounds, with initial values depending on which background the player chooses.\n" +
+          "Set to false if the player stat should always have the same initial value no matter the background that the player chooses."
+      ),
+    initialValue: statValueSchema.describe(
+      "Initial stat value. Only relevant for shared stats and player stats with partOfPlayerBackgrounds set to false. (Player stats with partOfPlayerBackgrounds set to true will have the initial values defined by the character background that the player chooses.)"
+    ),
     tooltip: z
       .string()
       .describe(

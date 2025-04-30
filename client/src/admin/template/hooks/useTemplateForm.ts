@@ -8,7 +8,6 @@ import {
   CharacterSelectionIntroduction,
   PlayerOptionsGeneration,
   Stat,
-  StatValueEntry,
   StoryElement,
   Outcome,
   ImageInstructions,
@@ -247,7 +246,6 @@ export function useTemplateForm({
     statGroups?: string[];
     sharedStats?: Stat[];
     playerStats?: Stat[];
-    initialSharedStatValues?: StatValueEntry[];
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => {
     setFormData((prev: StoryTemplate) => ({
@@ -255,8 +253,6 @@ export function useTemplateForm({
       statGroups: updates.statGroups || prev.statGroups,
       sharedStats: updates.sharedStats || prev.sharedStats,
       playerStats: updates.playerStats || prev.playerStats,
-      initialSharedStatValues:
-        updates.initialSharedStatValues || prev.initialSharedStatValues,
       ...(updates.playerOptions || {}),
     }));
   };

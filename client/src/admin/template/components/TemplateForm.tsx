@@ -137,7 +137,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         statGroups: data.statGroups,
         sharedStats: data.sharedStats,
         playerStats: data.playerStats,
-        initialSharedStatValues: data.initialSharedStatValues,
       });
     } else if (sectionKey === "players") {
       if (data.player1) {
@@ -340,7 +339,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               statGroups={formData.statGroups || []}
               sharedStats={formData.sharedStats || []}
               playerStats={formData.playerStats || []}
-              initialSharedStatValues={formData.initialSharedStatValues || []}
               playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
               onChange={handleStatsChange}
             />

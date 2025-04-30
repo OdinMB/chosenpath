@@ -40,7 +40,6 @@ export function createDefaultTemplate(): StoryTemplate {
     sharedOutcomes: [],
     statGroups: [],
     sharedStats: [],
-    initialSharedStatValues: [],
     playerStats: [],
     characterSelectionIntroduction: {
       title: "",

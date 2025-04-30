@@ -74,8 +74,7 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
   if (
     iterationData.statGroups ||
     iterationData.sharedStats ||
-    iterationData.playerStats ||
-    iterationData.initialSharedStatValues
+    iterationData.playerStats
   ) {
     tabs.push({ id: "stats", label: "Stats" });
   }
@@ -206,9 +205,6 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               sharedStats={iterationData.sharedStats || []}
               playerStats={
                 iterationData.playerStats || getEffectivePlayerStats()
-              }
-              initialSharedStatValues={
-                iterationData.initialSharedStatValues || []
               }
               playerOptions={playerOptions}
               onChange={() => {}}

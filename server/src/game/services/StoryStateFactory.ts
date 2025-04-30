@@ -15,6 +15,11 @@ export function createStoryStateFromTemplate(
   maxTurns: number,
   playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
 ): StoryState {
+  let sharedStatValues = template.sharedStats.map((stat) => ({
+    statId: stat.id,
+    value: stat.initialValue,
+  }));
+
   // Start with basic story state structure
   const storyState: StoryState = {
     templateId: template.id,
@@ -26,7 +31,7 @@ export function createStoryStateFromTemplate(
     worldFacts: [],
     sharedOutcomes: template.sharedOutcomes || [],
     sharedStats: template.sharedStats || [],
-    sharedStatValues: template.initialSharedStatValues || [],
+    sharedStatValues: sharedStatValues || [],
     playerStats: template.playerStats || [],
     players: {},
     storyPhases: [],

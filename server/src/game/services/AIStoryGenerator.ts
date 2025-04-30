@@ -13,6 +13,7 @@ import type {
   PlayerCount,
   BeatsNeedingImages,
   GameMode,
+  StatValueEntry,
 } from "core/types/index.js";
 import {
   createStorySetupSchema,
@@ -82,6 +83,14 @@ export class AIStoryGenerator {
 
     const players = this.createPlayersFromSetup(setup, playerCount);
 
+    const sharedStatValues = setup.sharedStats.map(
+      (stat) =>
+        ({
+          statId: stat.id,
+          value: stat.initialValue,
+        } as StatValueEntry)
+    );
+
     const initialState: StoryState = {
       title: setup.title,
       imageInstructions: setup.imageInstructions,
@@ -91,7 +100,7 @@ export class AIStoryGenerator {
       worldFacts: [],
       sharedOutcomes: setup.sharedOutcomes,
       sharedStats: setup.sharedStats,
-      sharedStatValues: setup.initialSharedStatValues,
+      sharedStatValues: sharedStatValues,
       playerStats: setup.playerStats,
       players,
       storyPhases: [],
