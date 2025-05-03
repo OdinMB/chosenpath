@@ -2,7 +2,8 @@ import { StoryTemplate } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { PrimaryButton, Icons } from "components/ui";
 import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Modal } from "shared/components/ui";
 
 type LibraryBrowserProps = {
   onSelectTemplate: (template: StoryTemplate) => void;
@@ -10,6 +11,71 @@ type LibraryBrowserProps = {
   initialSelectedTag?: string | null; // For backward compatibility
   initialSelectedTags?: string[]; // New prop for multiple tags
 };
+
+// Simple share modal component
+function ShareFilterModal({
+  isOpen,
+  onClose,
+  shareUrl,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  shareUrl: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Share Filtered Library"
+      width="md"
+    >
+      <div className="mb-4">
+        <div className="flex items-stretch">
+          <input
+            type="text"
+            value={shareUrl}
+            readOnly
+            className="flex-1 p-2 border border-r-0 rounded-l-md text-sm bg-gray-50"
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+          />
+          <PrimaryButton
+            onClick={handleCopy}
+            variant="outline"
+            leftBorder={false}
+            className="rounded-l-none"
+            aria-label="Copy to clipboard"
+            type="button"
+            rightIcon={
+              copied ? (
+                <Icons.Check className="w-5 h-5" />
+              ) : (
+                <Icons.Copy className="w-5 h-5" />
+              )
+            }
+          />
+        </div>
+      </div>
+
+      {copied && (
+        <div className="text-green-600 text-sm flex items-center">
+          <Icons.Check className="w-4 h-4 mr-1" />
+          Copied to clipboard!
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 export function LibraryBrowser({
   onSelectTemplate,
@@ -34,6 +100,10 @@ export function LibraryBrowser({
     getAvailablePlayerCounts,
   } = useLibraryBrowser();
 
+  // State for Share Modal
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+
   // Set initial tags when the component mounts
   useEffect(() => {
     // First check for multiple tags
@@ -53,6 +123,28 @@ export function LibraryBrowser({
 
   // Get available player counts
   const availablePlayerCounts = getAvailablePlayerCounts();
+
+  // Generate share URL with current filter configuration
+  const getShareUrl = () => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const params = new URLSearchParams();
+
+    if (selectedTags.length > 0) {
+      params.set("tags", selectedTags.join(","));
+    }
+
+    if (playerCountFilter !== null) {
+      params.set("players", playerCountFilter.toString());
+    }
+
+    return `${baseUrl}?${params.toString()}`;
+  };
+
+  // Handle share button click
+  const handleShare = () => {
+    setShareUrl(getShareUrl());
+    setIsShareModalOpen(true);
+  };
 
   // Render text-based filter UI
   const renderFilters = () => {
@@ -215,24 +307,39 @@ export function LibraryBrowser({
         <div className="w-full flex justify-start lg:justify-center">
           <h1 className="text-2xl font-bold text-primary-800">Story Library</h1>
         </div>
-        <PrimaryButton
-          onClick={() => {
-            // Clear URL parameters before going back
-            window.history.replaceState(
-              {},
-              document.title,
-              window.location.pathname
-            );
-            onBack();
-          }}
-          size="sm"
-          variant="outline"
-          leftBorder={false}
-          className="flex items-center gap-1 absolute right-0"
-        >
-          <Icons.ArrowLeft className="w-4 h-4" />
-          Back
-        </PrimaryButton>
+        <div className="flex items-center gap-2 absolute right-0">
+          {/* Share button - only visible when filters are active */}
+          {hasActiveFilters && (
+            <PrimaryButton
+              onClick={handleShare}
+              size="sm"
+              variant="outline"
+              leftBorder={false}
+              className="flex items-center gap-1 h-[32px]"
+              aria-label="Share current filters"
+              title="Share current filters"
+              leftIcon={<Icons.Share className="w-4 h-4" />}
+            />
+          )}
+          <PrimaryButton
+            onClick={() => {
+              // Clear URL parameters before going back
+              window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname
+              );
+              onBack();
+            }}
+            size="sm"
+            variant="outline"
+            leftBorder={false}
+            className="flex items-center gap-1 h-[32px]"
+          >
+            <Icons.ArrowLeft className="w-4 h-4" />
+            Back
+          </PrimaryButton>
+        </div>
       </div>
 
       {/* Text-based filters */}
@@ -269,6 +376,13 @@ export function LibraryBrowser({
           ))}
         </div>
       )}
+
+      {/* Share modal */}
+      <ShareFilterModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        shareUrl={shareUrl}
+      />
     </div>
   );
 }
