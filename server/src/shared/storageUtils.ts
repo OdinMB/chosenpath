@@ -3,7 +3,7 @@ import { STORAGE_PATHS } from "../config.js";
 import fs from "fs/promises";
 import fsSync from "fs";
 import JSZip from "jszip";
-import { Image } from "core/types/image.js";
+import { ImageStoryState } from "core/types/index.js";
 
 /**
  * Gets the appropriate fully-resolved storage path based on the current environment
@@ -370,7 +370,7 @@ export async function addDirectoryToZip(
  * @param templateId - The template ID
  * @returns Array of objects with image information
  */
-export function loadTemplateImages(templateId: string): Array<Image> {
+export function loadTemplateImages(templateId: string): Array<ImageStoryState> {
   try {
     // Get the template directory
     const templateDir = path.join(
@@ -398,10 +398,9 @@ export function loadTemplateImages(templateId: string): Array<Image> {
       (file) =>
         ({
           id: path.parse(file).name, // Use filename without extension as ID
-          fileType: path.extname(file).slice(1).toLowerCase() as "jpeg" | "png",
           source: "template" as const,
-          status: "ready" as const,
-        } as Image)
+          description: "",
+        } as ImageStoryState)
     );
 
     console.log(`Loaded ${images.length} images from template ${templateId}`);
