@@ -19,7 +19,8 @@ export type ImageSize = (typeof IMAGE_SIZES)[keyof typeof IMAGE_SIZES];
 export type ImageQuality =
   (typeof IMAGE_QUALITIES)[keyof typeof IMAGE_QUALITIES];
 
-export type ImageSource = "template" | "story";
+export const imageSourceSchema = z.enum(["template", "story"]);
+export type ImageSource = z.infer<typeof imageSourceSchema>;
 
 export type ImageReference = {
   id: string;

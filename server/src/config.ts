@@ -43,10 +43,13 @@ export const config = {
 // OpenAI model settings
 export const GENERATION_MODEL_NAME =
   process.env.GENERATION_MODEL_NAME || "gpt-4.1";
-export const GENERATION_MODEL_REASONING_EFFORT =
-  process.env.GENERATION_MODEL_REASONING_EFFORT || "medium";
 export const GENERATION_MODEL_TEMPERATURE =
   process.env.GENERATION_MODEL_TEMPERATURE || 0.3;
+
+export const SWITCH_THREAD_MODEL_NAME =
+  process.env.SWITCH_THREAD_MODEL_NAME || "gpt-4.1";
+export const SWITCH_THREAD_MODEL_TEMPERATURE =
+  process.env.SWITCH_THREAD_MODEL_TEMPERATURE || 0.1;
 
 export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1-mini";
 export const TEXT_MODEL_REASONING_EFFORT =

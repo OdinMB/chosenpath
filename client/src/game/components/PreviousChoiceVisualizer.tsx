@@ -573,13 +573,14 @@ export const PreviousChoiceVisualizer: React.FC<
                   </div>
 
                   {/* Info row with Risk, Resource Type, and Points */}
-                  <div className="flex items-center gap-4 flex-wrap text-sm">
+                  <div className="flex items-center gap-2 flex-wrap text-sm">
                     <div className="inline-flex items-center">
                       <span className="font-semibold text-primary">Risk:</span>
                       <span className="text-primary ml-1">
                         {getRiskDisplayText(choice.riskType)}
                       </span>
                       <InfoIcon
+                        className="ml-1 mt-1"
                         tooltipText={formatRiskDistribution(choice.riskType)}
                       />
                     </div>
@@ -587,9 +588,10 @@ export const PreviousChoiceVisualizer: React.FC<
                     {choice.resourceType && choice.resourceType !== "normal" ? (
                       <div className="inline-flex items-center">
                         <span className="font-semibold text-primary capitalize">
-                          {choice.resourceType}:
+                          {choice.resourceType}
                         </span>
                         <InfoIcon
+                          className="ml-1 mt-1"
                           tooltipText={getResourceTypeInfo(choice.resourceType)}
                         />
                       </div>
@@ -606,6 +608,7 @@ export const PreviousChoiceVisualizer: React.FC<
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
                               <InfoIcon
+                                className="ml-1 mt-1"
                                 tooltipText={formatPointBreakdown()}
                                 contentClassName="max-w-[400px]"
                               />

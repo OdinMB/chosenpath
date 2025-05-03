@@ -39,6 +39,8 @@ import {
   GENERATION_MODEL_TEMPERATURE,
   TEXT_MODEL_NAME,
   TEXT_MODEL_TEMPERATURE,
+  SWITCH_THREAD_MODEL_NAME,
+  SWITCH_THREAD_MODEL_TEMPERATURE,
 } from "server/config.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
@@ -49,6 +51,7 @@ dotenv.config();
 
 export class AIStoryGenerator {
   private textModel: ChatOpenAI;
+  private switchThreadModel: ChatOpenAI;
   private generationModel: ChatOpenAI;
 
   constructor() {
@@ -59,6 +62,11 @@ export class AIStoryGenerator {
     this.textModel = new ChatOpenAI({
       modelName: TEXT_MODEL_NAME as string,
       temperature: TEXT_MODEL_TEMPERATURE as number,
+    });
+
+    this.switchThreadModel = new ChatOpenAI({
+      modelName: SWITCH_THREAD_MODEL_NAME as string,
+      temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
     });
 
     this.generationModel = new ChatOpenAI({
@@ -227,7 +235,7 @@ export class AIStoryGenerator {
     const schema = createSwitchAnalysisSchema(
       Object.keys(story.getPlayers()).length as PlayerCount
     );
-    const structuredModel = this.textModel.withStructuredOutput(schema);
+    const structuredModel = this.switchThreadModel.withStructuredOutput(schema);
     const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
@@ -248,7 +256,7 @@ export class AIStoryGenerator {
 
   async generateThreads(story: Story): Promise<Story> {
     const schema = threadAnalysisSchema;
-    const structuredModel = this.textModel.withStructuredOutput(schema);
+    const structuredModel = this.switchThreadModel.withStructuredOutput(schema);
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;

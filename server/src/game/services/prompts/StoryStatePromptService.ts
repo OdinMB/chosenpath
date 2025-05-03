@@ -173,6 +173,7 @@ ${modeDescriptions[story.getGameMode()]}
   private static createImageLibrarySection(story: Story): string {
     if (!story.includesImages()) return "";
 
+    let imageSource = story.isBasedOnTemplate() ? "template" : "story";
     let text = "IMAGE LIBRARY:";
     if (!story.hasImages()) {
       text += "No images yet.";
@@ -187,12 +188,17 @@ ${modeDescriptions[story.getGameMode()]}
         )
         .join("\n");
       text +=
-        "\nFor images of player characters, use ids player1, player2, etc. and source ";
-      if (story.isBasedOnTemplate()) {
-        text += "template";
-      } else {
-        text += "story";
+        "\nFor images of player characters, use ids player1, player2, etc. and source " +
+        imageSource +
+        ".";
+      if (!story.isFirstBeat()) {
+        text +=
+          " A player's own image should only be used in interlude snippets. Show other players' images in beats with other players.";
       }
+      text +=
+        "\nFor the story's cover image, use imageId = 'cover' and source " +
+        imageSource +
+        ".";
     }
 
     return text;

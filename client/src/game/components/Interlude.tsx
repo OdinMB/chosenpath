@@ -1,0 +1,161 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { ColoredBox, Icons } from "components/ui";
+import { StoryImage } from "shared/components/StoryImage";
+import { Image, ImageSource } from "core/types";
+
+interface InterludeItem {
+  imageId: string;
+  imageSource: "template" | "story" | "none";
+  text: string;
+}
+
+interface InterludeProps {
+  interludes: InterludeItem[];
+  templateId?: string;
+  storyId?: string;
+  isBasedOnTemplate: boolean;
+}
+
+export const Interlude: React.FC<InterludeProps> = ({
+  interludes,
+  templateId,
+  storyId,
+  isBasedOnTemplate,
+}) => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handlePrev = useCallback(() => {
+    if (interludes.length <= 1 || isTransitioning) return;
+
+    setIsTransitioning(true);
+    setCurrentSlide((prev) => (prev === 0 ? interludes.length - 1 : prev - 1));
+
+    // Reset transition state after animation completes
+    setTimeout(() => setIsTransitioning(false), 500);
+  }, [interludes.length, isTransitioning]);
+
+  const handleNext = useCallback(() => {
+    if (interludes.length <= 1 || isTransitioning) return;
+
+    setIsTransitioning(true);
+    setCurrentSlide((prev) => (prev === interludes.length - 1 ? 0 : prev + 1));
+
+    // Reset transition state after animation completes
+    setTimeout(() => setIsTransitioning(false), 500);
+  }, [interludes.length, isTransitioning]);
+
+  // Auto-advance carousel every 8 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleNext();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [handleNext]);
+
+  if (!interludes.length) {
+    return null;
+  }
+
+  const currentInterlude = interludes[currentSlide];
+
+  // Get the appropriate source ID for the image
+  const sourceId =
+    currentInterlude.imageSource === "template"
+      ? templateId
+      : currentInterlude.imageSource === "story"
+      ? storyId
+      : undefined;
+
+  // Create a default image object if no image is specified
+  const getImageObject = (): Image => {
+    if (currentInterlude.imageId && currentInterlude.imageSource !== "none") {
+      return {
+        id: currentInterlude.imageId || "cover",
+        status: "ready",
+        source: currentInterlude.imageSource as ImageSource,
+        fileType: "jpeg",
+      };
+    }
+
+    // Default to cover image if based on template, or no image otherwise
+    if (isBasedOnTemplate) {
+      return {
+        id: "cover",
+        status: "ready",
+        source: "template",
+        fileType: "jpeg",
+      };
+    }
+
+    return {
+      id: "",
+      status: "failed",
+      source: "template",
+      fileType: "jpeg",
+    };
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <ColoredBox leftBorder={false} className="p-4 w-full">
+        <div className="flex flex-col items-center">
+          {/* Image */}
+          <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden">
+            <StoryImage
+              image={getImageObject()}
+              alt={currentInterlude.text}
+              sourceId={sourceId}
+              mobileOffset="20%"
+              desktopOffset="70px"
+              className="rounded-lg h-48 w-auto object-contain"
+            />
+          </div>
+
+          {/* Text */}
+          <div className="text-center text-primary">
+            <p className="italic">{currentInterlude.text}</p>
+          </div>
+
+          {/* Navigation controls */}
+          {interludes.length > 100 && (
+            <div className="flex items-center justify-center w-full mt-4">
+              <button
+                onClick={handlePrev}
+                className="p-1 rounded-full mr-2 text-primary-500 hover:text-primary-700 disabled:text-gray-300"
+                disabled={isTransitioning}
+                aria-label="Previous interlude"
+              >
+                <Icons.ArrowLeft className="w-6 h-6" />
+              </button>
+
+              {/* Indicator dots */}
+              <div className="flex space-x-2">
+                {interludes.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full ${
+                      index === currentSlide
+                        ? "bg-primary-500"
+                        : "bg-primary-200"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={handleNext}
+                className="p-1 rounded-full ml-2 text-primary-500 hover:text-primary-700 disabled:text-gray-300"
+                disabled={isTransitioning}
+                aria-label="Next interlude"
+              >
+                <Icons.ArrowRight className="w-6 h-6" />
+              </button>
+            </div>
+          )}
+        </div>
+      </ColoredBox>
+    </div>
+  );
+};

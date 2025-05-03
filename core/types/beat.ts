@@ -175,6 +175,18 @@ export const beatPlanSchema = z.object({
     ),
 });
 
+const interludeSchema = z.object({
+  imageId: z
+    .string()
+    .describe(
+      "Id of the image to be shown in the interlude. Must be listed in the image library. Leave empty if no image exists for this interlude."
+    ),
+  imageSource: z
+    .enum(["template", "story", "none"])
+    .describe("Source of the image."),
+  text: z.string().describe("1-2 sentences of flavor text."),
+});
+
 export const beatGenerationSchema = z.object({
   plan: beatPlanSchema,
   title: z
@@ -192,7 +204,7 @@ export const beatGenerationSchema = z.object({
         "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Address the player character directly ('You' instead of the name of the character).\n" +
-        "- If there is an image library with relevant images, add 1-2 image tags to the beat text (3 are already too many). Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. For player characters, use ids player1, player2, etc. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
+        "- If there is an image library with relevant images, add 1 or ideally 2 image tags to the beat text (3 are already too many). Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. For player characters, use ids player1, player2, etc. Don't use player images in beats for the player themselves. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
     ),
@@ -210,6 +222,11 @@ export const beatGenerationSchema = z.object({
     )
     .describe(
       "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options."
+    ),
+  interludes: z
+    .array(interludeSchema)
+    .describe(
+      'Will be shown to the player while the new beat is being generated.\n- 1 fact about a story element that is relevant in the beat (imageId = story element id)\nA thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\na general detail about the world (imageId = "cover").'
     ),
 });
 

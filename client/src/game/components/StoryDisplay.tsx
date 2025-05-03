@@ -23,6 +23,7 @@ import {
   createPlayerIdentityImage,
 } from "shared/utils/imageUtils";
 import { ClientStoryState, PlayerSlot, ImageSource } from "core/types";
+import { Interlude } from "./Interlude";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -440,11 +441,20 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         {/* Show the previous beat's choice with animation if it was a challenge */}
         {renderPreviousChoice(prevBeatIndex, isChallengeBeat, true)}
 
+        {/* Show interludes from the previous beat if available */}
+        {prevBeat.interludes && prevBeat.interludes.length > 0 && (
+          <Interlude
+            interludes={prevBeat.interludes}
+            templateId={storyState.templateId}
+            isBasedOnTemplate={storyState.templateId !== undefined}
+          />
+        )}
+
         {/* New cleaner loading view instead of skeleton */}
-        <div className="flex flex-col items-center justify-center h-full min-h-[40vh] mt-8">
+        <div className="items-center justify-center p-4">
           {/* Show "Writing the story..." only when there are no pending players */}
           {!hasPendingPlayers && (
-            <h1 className="text-2xl font-bold mb-6 text-primary">
+            <h1 className="text-2xl font-bold mb-6 text-primary self-center text-center hidden">
               Writing the story...
             </h1>
           )}
@@ -453,7 +463,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
           {/* Only show pending players list when there are actually pending players */}
           {hasPendingPlayers && (
-            <div className="mt-8 w-full max-w-md">
+            <div className="mt-4 w-full max-w-md">
               <PendingPlayers
                 pendingPlayers={storyState.pendingPlayers}
                 numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}

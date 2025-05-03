@@ -2,22 +2,19 @@ Smaller commits!
 
 # NEXT
 
-- 2: For each option: 1-2 pieces of text that are displayed in waiting view (character's past experiences relevant to the situation displayed next to char image? Just a stream of thought around the current moment?)
-- 4: waiting screen: relevant story element with image and facts that players can flip through
-- 4: system for choosing the most appropriate downtime killer
-- 4: List of world lore quotes that are generated at story creation and shown in a carousel.
-
-# BETTER EXPERIENCE
-
-Focus: Text/Images, English, Multiplayer
-
-- 10: More (multiplayer) templates (try to make 1-3 players work)
+- 1: Fix Interludes not displaying player images
 - 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
 
   - Enjoy fiction (Crime, Fantasy, etc.)
   - Pretend to be (Slice of Life)
   - Have fun with a kid
   - Vent on reality (Satire)
+
+# BETTER EXPERIENCE
+
+Focus: Text/Images, English, Multiplayer
+
+- 10: More (multiplayer) templates (try to make 1-3 players work)
 
 - 7: Generating images during the story (using reference images)
 
