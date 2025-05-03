@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { ColoredBox, Icons } from "components/ui";
 import { StoryImage } from "shared/components/StoryImage";
 import { ImageReference } from "core/types";
+
+// Import useSwipe hook
+import { useSwipe } from "page/hooks/useTemplateCarousel";
 
 export interface InterludeItem {
   imageReference?: ImageReference;
@@ -15,6 +18,7 @@ interface InterludeProps {
 export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const interludeRef = useRef<HTMLDivElement>(null);
 
   const handlePrev = useCallback(() => {
     if (
@@ -48,14 +52,20 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
     setTimeout(() => setIsTransitioning(false), 500);
   }, [interludes, isTransitioning]);
 
-  // Auto-advance carousel every 8 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      handleNext();
-    }, 6500);
+  // Add swipe gesture support
+  useSwipe(interludeRef, {
+    onSwipeLeft: handleNext,
+    onSwipeRight: handlePrev,
+  });
 
-    return () => clearInterval(interval);
-  }, [handleNext]);
+  // Auto-advance carousel every 8 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     handleNext();
+  //   }, 6500);
+
+  //   return () => clearInterval(interval);
+  // }, [handleNext]);
 
   if (!interludes || !Array.isArray(interludes) || interludes.length === 0) {
     return null;
@@ -73,7 +83,10 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
   return (
     <div className="max-w-2xl mx-auto">
       <ColoredBox leftBorder={false} className="p-4 w-full">
-        <div className="flex flex-col items-center">
+        <div
+          ref={interludeRef}
+          className="flex flex-col items-center touch-pan-x"
+        >
           {/* Image */}
           {currentInterlude.imageReference && (
             <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden rounded-lg">
@@ -93,7 +106,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
           </div>
 
           {/* Navigation controls */}
-          {Array.isArray(interludes) && interludes.length > 100 && (
+          {Array.isArray(interludes) && interludes.length > 1 && (
             <div className="flex items-center justify-center w-full mt-4">
               <button
                 onClick={handlePrev}
