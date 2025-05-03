@@ -679,6 +679,10 @@ function App() {
               }}
               initialSelectedTag={selectedCategoryTag}
               initialSelectedTags={selectedCategoryTags}
+              onCreateStory={() => {
+                resetStoryCreationState();
+                loggedSetViewState("SETUP");
+              }}
             />
           </>
         );

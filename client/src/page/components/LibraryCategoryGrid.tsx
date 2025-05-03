@@ -17,7 +17,7 @@ export function LibraryCategoryGrid({
     },
     {
       id: "kids",
-      title: "Have Fun with Kids",
+      title: "Read with Kids",
       image: "/category-kids.jpeg",
       tag: "Kids",
     },

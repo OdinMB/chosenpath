@@ -60,10 +60,12 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
         >
           {templates.map((template) => (
             <div key={template.id} className="w-full flex-shrink-0">
-              <TemplateCard
-                template={template}
-                onPlay={() => onPlay(template)}
-              />
+              <div className="h-full">
+                <TemplateCard
+                  template={template}
+                  onPlay={() => onPlay(template)}
+                />
+              </div>
             </div>
           ))}
         </div>

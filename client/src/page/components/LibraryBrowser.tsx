@@ -2,14 +2,17 @@ import { StoryTemplate } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { PrimaryButton, Icons } from "components/ui";
 import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Modal } from "shared/components/ui";
+import { CreateYourOwnCard } from "./CreateYourOwnCard";
+import { NoMatchesCard } from "./NoMatchesCard";
 
 type LibraryBrowserProps = {
   onSelectTemplate: (template: StoryTemplate) => void;
   onBack: () => void;
   initialSelectedTag?: string | null; // For backward compatibility
   initialSelectedTags?: string[]; // New prop for multiple tags
+  onCreateStory?: () => void; // New prop for creating a custom story
 };
 
 // Simple share modal component
@@ -82,6 +85,7 @@ export function LibraryBrowser({
   onBack,
   initialSelectedTag = null,
   initialSelectedTags = [],
+  onCreateStory,
 }: LibraryBrowserProps) {
   const {
     filteredTemplates,
@@ -301,6 +305,43 @@ export function LibraryBrowser({
     );
   };
 
+  // Shuffle the templates and position the create card
+  const shuffledAndPositionedItems = useMemo(() => {
+    if (isLoading || error || !filteredTemplates.length) return [];
+
+    // Create a copy and shuffle the templates
+    const shuffled = [...filteredTemplates].sort(() => Math.random() - 0.5);
+
+    // Create the final arrangement with JSX elements, using a pattern to ensure equal height
+    const result = shuffled.map((template) => (
+      <div key={template.id} className="flex">
+        <TemplateCard
+          template={template}
+          onPlay={() => onSelectTemplate(template)}
+          className="flex-1 h-full"
+        />
+      </div>
+    ));
+
+    // Position the "Create your own" card
+    if (onCreateStory) {
+      const createYourOwnCard = (
+        <div key="create-your-own" className="flex">
+          <CreateYourOwnCard
+            onCreateStory={onCreateStory}
+            className="flex-1 h-full"
+          />
+        </div>
+      );
+
+      // Position as 4th item or last if fewer than 4 items
+      const position = Math.min(3, result.length);
+      result.splice(position, 0, createYourOwnCard);
+    }
+
+    return result;
+  }, [filteredTemplates, isLoading, error, onCreateStory, onSelectTemplate]);
+
   return (
     <div className="max-w-4xl mx-auto p-4 font-lora">
       <div className="flex justify-between items-center mb-6 relative">
@@ -353,27 +394,13 @@ export function LibraryBrowser({
       ) : error ? (
         <div className="text-center py-6 text-tertiary">{error}</div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="text-center py-12 text-primary-600">
-          <p className="mb-4">No templates match your current filters.</p>
-          <PrimaryButton
-            onClick={clearFilters}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-          >
-            Clear Filters
-          </PrimaryButton>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {onCreateStory && <CreateYourOwnCard onCreateStory={onCreateStory} />}
+          <NoMatchesCard onClearFilters={clearFilters} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredTemplates.map((template) => (
-            <div key={template.id}>
-              <TemplateCard
-                template={template}
-                onPlay={() => onSelectTemplate(template)}
-              />
-            </div>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          {shuffledAndPositionedItems}
         </div>
       )}
 

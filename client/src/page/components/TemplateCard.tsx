@@ -75,11 +75,12 @@ export const TemplateCard = ({
     <div
       className={`w-full bg-white rounded-lg border border-primary-100 overflow-hidden ${className}`}
     >
-      <div className="flex">
+      <div className="flex h-full">
         <div
           className={`relative ${
             size === "large" ? "w-24" : "w-20"
           } overflow-hidden flex-shrink-0 bg-gray-100`}
+          style={{ minHeight: size === "large" ? "150px" : "120px" }}
         >
           {coverImage ? (
             <div
@@ -109,7 +110,7 @@ export const TemplateCard = ({
           )}
         </div>
 
-        <div className="w-full p-4">
+        <div className="w-full p-4 flex flex-col h-full">
           <div className="flex justify-between items-center mb-2">
             <h3 className={`${sizeClasses.title} text-primary-800`}>
               {template.title}
@@ -146,9 +147,12 @@ export const TemplateCard = ({
             {template.teaser}
           </p>
 
+          {/* Flex spacer */}
+          <div className="flex-grow"></div>
+
           {/* Tags */}
           {sortedTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 mt-auto">
               {sortedTags.map((tag, index) => (
                 <span
                   key={index}
