@@ -637,7 +637,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               key={`img-${index}`}
               image={finalImage}
               alt={finalImage.description || attributes.desc || ""}
-              sourceId={storyState.templateId}
               className="rounded-lg overflow-hidden"
               responsivePosition={true}
               caption={attributes.desc || finalImage.description || ""}

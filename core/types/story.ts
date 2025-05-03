@@ -4,13 +4,7 @@ import {
   ImageInstructions,
   imageInstructionsSchema,
 } from "./image.js";
-import {
-  statSchema,
-  Stat,
-  ClientStat,
-  statValueEntrySchema,
-  StatValueEntry,
-} from "./stat.js";
+import { statSchema, Stat, ClientStat, StatValueEntry } from "./stat.js";
 import { outcomeSchema, Outcome } from "./outcome.js";
 import {
   PLAYER_SLOTS,
@@ -182,6 +176,7 @@ export type StoryPhase = SwitchAnalysis | ThreadAnalysis;
 
 // Direct type definition for StoryState
 export type StoryState = {
+  id: string;
   templateId?: string;
   title: string;
   imageInstructions: ImageInstructions;
@@ -209,6 +204,7 @@ export type StoryState = {
 
 // Direct type definition for ClientStoryState
 export type ClientStoryState = {
+  id: string;
   templateId?: string;
   title: string;
   gameMode: GameMode;

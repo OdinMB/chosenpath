@@ -108,6 +108,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
     // Create initial state
     const storyState = await this.aiStoryGenerator.createInitialState(
+      gameId,
       prompt,
       generateImages,
       playerCount,
@@ -152,6 +153,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
       // Convert template to story state using the factory function
       const storyState = createStoryStateFromTemplate(
+        gameId,
         template,
         maxTurns,
         playerCodes

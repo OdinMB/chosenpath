@@ -76,6 +76,7 @@ export class AIStoryGenerator {
   }
 
   public async createInitialState(
+    gameId: string,
     prompt: string,
     generateImages: boolean,
     playerCount: PlayerCount,
@@ -100,6 +101,7 @@ export class AIStoryGenerator {
     );
 
     const initialState: StoryState = {
+      id: gameId,
       title: setup.title,
       imageInstructions: setup.imageInstructions,
       gameMode,

@@ -110,6 +110,7 @@ export class ClientStateManager {
 
     // Return only the properties needed for the client
     return {
+      id: filteredState.id,
       templateId: filteredState.templateId,
       title: filteredState.title,
       gameMode: filteredState.gameMode,

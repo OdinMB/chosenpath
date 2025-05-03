@@ -337,9 +337,13 @@ export class AdminTemplateService {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
 
+      // Create an ID for the new template
+      const id = uuidv4();
+
       // Generate the initial state which includes all necessary data
       const setupGenerator = this.aiStoryGenerator;
       const initialState = await setupGenerator.createInitialState(
+        id,
         prompt,
         generateImages,
         playerCount,
@@ -348,8 +352,6 @@ export class AdminTemplateService {
       );
 
       // Convert story state to template
-      // Create an ID for the new template
-      const id = uuidv4();
 
       // Extract player options from the state
       const playerOptions: Record<string, PlayerOptionsGeneration> = {};

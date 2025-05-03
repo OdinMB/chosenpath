@@ -1,9 +1,9 @@
 import { PlayerSlot, StoryState, StoryTemplate } from "core/types/index.js";
-import { Image } from "core/types/image.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
 
 /**
  * Creates a story state from a template with the given parameters
+ * @param gameId The ID of the story
  * @param template The template to convert
  * @param playerCount The number of players
  * @param maxTurns The maximum number of turns
@@ -11,6 +11,7 @@ import { loadTemplateImages } from "shared/storageUtils.js";
  * @returns A complete StoryState ready to be used in a Story instance
  */
 export function createStoryStateFromTemplate(
+  gameId: string,
   template: StoryTemplate,
   maxTurns: number,
   playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
@@ -22,6 +23,7 @@ export function createStoryStateFromTemplate(
 
   // Start with basic story state structure
   const storyState: StoryState = {
+    id: gameId,
     templateId: template.id,
     title: template.title,
     imageInstructions: template.imageInstructions,
