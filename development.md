@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: Fix Interludes not displaying player images
 - 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
 
   - Enjoy fiction (Crime, Fantasy, etc.)
@@ -18,6 +17,7 @@ Focus: Text/Images, English, Multiplayer
 
 - 7: Generating images during the story (using reference images)
 
+- 1: percentage stats at 0%: name not visible
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
 - 1: if not first beat in a thread: don't reestablish scene; go directly into action

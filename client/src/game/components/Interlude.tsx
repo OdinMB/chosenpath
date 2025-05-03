@@ -17,24 +17,24 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const handlePrev = useCallback(() => {
-    if (interludes.length <= 1 || isTransitioning) return;
+    if (!interludes || interludes.length <= 1 || isTransitioning) return;
 
     setIsTransitioning(true);
     setCurrentSlide((prev) => (prev === 0 ? interludes.length - 1 : prev - 1));
 
     // Reset transition state after animation completes
     setTimeout(() => setIsTransitioning(false), 500);
-  }, [interludes.length, isTransitioning]);
+  }, [interludes, isTransitioning]);
 
   const handleNext = useCallback(() => {
-    if (interludes.length <= 1 || isTransitioning) return;
+    if (!interludes || interludes.length <= 1 || isTransitioning) return;
 
     setIsTransitioning(true);
     setCurrentSlide((prev) => (prev === interludes.length - 1 ? 0 : prev + 1));
 
     // Reset transition state after animation completes
     setTimeout(() => setIsTransitioning(false), 500);
-  }, [interludes.length, isTransitioning]);
+  }, [interludes, isTransitioning]);
 
   // Auto-advance carousel every 8 seconds
   useEffect(() => {
@@ -45,7 +45,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
     return () => clearInterval(interval);
   }, [handleNext]);
 
-  if (!interludes.length) {
+  if (!interludes || interludes.length === 0) {
     return null;
   }
 
