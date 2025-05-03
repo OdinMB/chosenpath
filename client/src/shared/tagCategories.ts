@@ -30,6 +30,7 @@ export const TAG_CATEGORIES: TagCategory[] = [
       "Contemplative",
       "Cozy",
       "Dark",
+      "Hopeful",
       "Humorous",
       "Steamy",
       "Surreal",

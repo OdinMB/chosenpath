@@ -163,7 +163,9 @@ export function CharacterSelection({
                 (s) => s.id === statValueEntry.statId
               );
 
-              if (!statDef) return null;
+              // Don't display stat if it doesn't exist or if partOfPlayerBackgrounds is false
+              if (!statDef || statDef.partOfPlayerBackgrounds === false)
+                return null;
 
               return (
                 <div

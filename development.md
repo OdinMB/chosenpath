@@ -2,13 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 3: Add "what you're looking for" filters above carousel and in library (preset filters) in combination with singleplayer/multiplayer switch
-
-  - Enjoy fiction (Crime, Fantasy, etc.)
-  - Pretend to be (Slice of Life)
-  - Have fun with a kid
-  - Vent on reality (Satire)
-
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
