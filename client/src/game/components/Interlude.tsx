@@ -40,7 +40,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       handleNext();
-    }, 5000);
+    }, 6500);
 
     return () => clearInterval(interval);
   }, [handleNext]);
@@ -57,13 +57,13 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
         <div className="flex flex-col items-center">
           {/* Image */}
           {currentInterlude.imageReference && (
-            <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden">
+            <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden rounded-lg">
               <StoryImage
                 image={currentInterlude.imageReference}
                 alt={currentInterlude.text}
-                mobileOffset="20%"
-                desktopOffset="70px"
-                className="rounded-lg h-48 w-auto object-contain"
+                responsivePosition={true}
+                mobileOffset="5%"
+                desktopOffset="14%"
               />
             </div>
           )}

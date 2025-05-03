@@ -46,14 +46,34 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Determine the appropriate object position
-  // According to MDN: object-position takes x y coordinates
-  // Default is "50% 50%" (center center)
-  const calculatedPosition = responsivePosition
-    ? isMobile
-      ? `50% ${mobileOffset}`
-      : `50% ${desktopOffset}`
-    : objectPosition;
+  // Parse the offset percentage
+  const getOffsetValue = (offsetStr: string) => {
+    // Remove the % sign and convert to number
+    return parseFloat(offsetStr.replace("%", "")) / 100;
+  };
+
+  // Calculate the transform value based on offset
+  const getTransformValue = () => {
+    if (!responsivePosition) {
+      // Use objectPosition for non-responsive positioning
+      return "none";
+    }
+
+    const offsetStr = isMobile ? mobileOffset : desktopOffset;
+    const offsetValue = getOffsetValue(offsetStr);
+
+    // This will move the image up by the offset percentage of its height
+    return `translateY(-${offsetValue * 100}%)`;
+  };
+
+  // Calculate the style for the image
+  const imageStyle = {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    transform: getTransformValue(),
+    objectPosition: responsivePosition ? "50% 0%" : objectPosition,
+  };
 
   useEffect(() => {
     if (!image) return;
@@ -131,7 +151,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
               className={`w-full h-full object-cover ${
                 isLoading ? "opacity-0" : "opacity-100"
               }`}
-              style={{ objectPosition: calculatedPosition }}
+              style={imageStyle}
               onLoad={handleLoad}
               onError={handleError}
             />

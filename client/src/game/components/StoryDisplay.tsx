@@ -625,8 +625,6 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               key={`img-${index}`}
               image={finalImage}
               alt={finalImage.description || ""}
-              className="rounded-lg overflow-hidden"
-              responsivePosition={true}
               caption={finalImage.description || ""}
               withinText={true}
               float={(imagePlaceholder.float as "left" | "right") || "left"}

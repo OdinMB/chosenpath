@@ -267,8 +267,8 @@ export function GameLayout({
                   alt={`${player.name}`}
                   className="w-full h-full"
                   responsivePosition={true}
-                  desktopOffset="5%"
-                  mobileOffset="5%"
+                  desktopOffset="4%"
+                  mobileOffset="4%"
                 />
               </div>
             )}

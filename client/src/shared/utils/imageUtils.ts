@@ -23,14 +23,16 @@ export function createPlayerIdentityImage(
   playerSlot: PlayerSlot,
   identityChoice: number,
   imageSource: ImageSource,
-  sourceId: string
+  sourceId: string,
+  description?: string
 ): ImageUI {
   return {
     id: `${playerSlot}_${identityChoice}`,
-    fileType: "jpeg",
-    subDirectory: "players",
     source: imageSource,
+    subDirectory: "players",
     sourceId: sourceId,
+    description: description || "",
+    fileType: "jpeg",
     status: "ready" as ImageStatus,
   } as ImageUI;
 }
@@ -177,7 +179,8 @@ export function createImageFromPlaceholder(
       placeholder.id as PlayerSlot,
       playerIdentity,
       placeholder.source as ImageSource,
-      sourceId
+      sourceId,
+      placeholder.desc
     );
   }
 
@@ -187,8 +190,9 @@ export function createImageFromPlaceholder(
     source: placeholder.source as "template" | "story",
     sourceId: sourceId || undefined,
     subDirectory: undefined,
-    description: placeholder.desc || "",
+    description: placeholder.desc,
     fileType: (placeholder.fileType || "jpeg") as "jpeg" | "png",
+    status: "ready" as ImageStatus,
   } as ImageUI;
 
   return image;

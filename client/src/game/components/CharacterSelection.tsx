@@ -108,8 +108,8 @@ export function CharacterSelection({
                 alt={`${identity.name}`}
                 className="w-full h-full max-w-[350px]"
                 responsivePosition={true}
-                desktopOffset="50%"
-                mobileOffset="-40px"
+                desktopOffset="4%"
+                mobileOffset="4%"
               />
             </div>
           )}
