@@ -2,14 +2,18 @@ import { useState } from "react";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import { StoredCodeSetsList, OrDivider } from "./components";
+import {
+  StoredCodeSetsList,
+  OrDivider,
+  LibraryCategoryGrid,
+} from "./components";
 import { hasCodeSets } from "shared/utils/codeSetUtils.js";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;
   onNewStory: () => void;
   onSelectTemplate?: (template: StoryTemplate) => void;
-  onBrowseLibrary?: () => void;
+  onBrowseLibrary?: (categoryTag?: string) => void;
 }
 
 export function Page({
@@ -37,8 +41,14 @@ export function Page({
     }
   };
 
+  const handleBrowseWithCategory = (categoryTag?: string) => {
+    if (onBrowseLibrary) {
+      onBrowseLibrary(categoryTag);
+    }
+  };
+
   return (
-    <div className="max-w-md mx-auto p-6 font-lora">
+    <div className="max-w-md mx-auto p-4 font-lora">
       <div className="mb-8 text-primary-800">
         <p className="mb-2">
           Dive into immersive stories. Play alone or invite friends to shape the
@@ -68,11 +78,9 @@ export function Page({
 
         <OrDivider />
 
-        {/* Browse Library */}
+        {/* Browse Library with Categories */}
         {onBrowseLibrary && (
-          <PrimaryButton onClick={onBrowseLibrary} fullWidth size="lg">
-            Browse Our Library
-          </PrimaryButton>
+          <LibraryCategoryGrid onBrowseLibrary={handleBrowseWithCategory} />
         )}
 
         <OrDivider />
@@ -108,7 +116,7 @@ export function Page({
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
         <p className="mb-2">
           Looking for collaborators. Are you a writer, storyteller, designer, or
-          world simulation architect? Reach out!
+          world builder? Reach out!
         </p>
 
         <div className="flex items-center gap-2 mb-1">

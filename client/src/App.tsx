@@ -56,6 +56,12 @@ function App() {
   const [selectedTemplate, setSelectedTemplate] =
     useState<StoryTemplate | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
+  const [selectedCategoryTag, setSelectedCategoryTag] = useState<string | null>(
+    null
+  );
+  const [selectedCategoryTags, setSelectedCategoryTags] = useState<string[]>(
+    []
+  );
 
   // Replace templateConfigPending with a more general story creation status
   const storyCreationStatus = useRef<StoryCreationType>("NONE");
@@ -86,6 +92,9 @@ function App() {
     },
     [viewState]
   );
+
+  // Add a check to see if we came from URL parameters
+  const [cameFromUrlParams, setCameFromUrlParams] = useState(false);
 
   // Function to load a template by ID
   const loadTemplateById = useCallback(
@@ -140,7 +149,7 @@ function App() {
     [playerCodeKey, setIsLoading, setPlayerCode]
   );
 
-  // Check for shared template URL pattern on load
+  // Check for shared template URL pattern and query params on load
   useEffect(() => {
     const checkForSharedTemplate = async () => {
       const path = window.location.pathname;
@@ -174,11 +183,55 @@ function App() {
       }
     };
 
+    // Check for direct library tags in URL
+    const checkForLibraryFilters = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tagsParam = urlParams.get("tags");
+
+      if (tagsParam) {
+        const tagList = tagsParam
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+
+        if (tagList.length > 0) {
+          Logger.App.log(
+            `Found direct library tags in URL: ${tagList.join(", ")}`
+          );
+
+          // Clear URL parameters but keep the path
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+
+          // Mark that we came from URL params to ensure we can navigate away
+          setCameFromUrlParams(true);
+
+          setSelectedCategoryTags(tagList);
+          loggedSetViewState("LIBRARY");
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     if (!isConnecting && viewState === "WELCOME") {
-      checkForSharedTemplate();
-      checkForJoinCode();
+      // First check for library filters - if found, we navigate directly to library
+      if (!checkForLibraryFilters()) {
+        checkForSharedTemplate();
+        checkForJoinCode();
+      }
     }
-  }, [isConnecting, viewState, loadTemplateById, handleCodeSubmit]);
+  }, [
+    isConnecting,
+    viewState,
+    loadTemplateById,
+    handleCodeSubmit,
+    loggedSetViewState,
+  ]);
 
   useEffect(() => {
     // If we need to show connecting screen
@@ -424,9 +477,22 @@ function App() {
     gameService.selectCharacter(identityIndex, backgroundIndex);
   };
 
-  // template-based, called by WelcomeScreen
-  const handleBrowseLibrary = () => {
-    Logger.App.log("handleBrowseLibrary called, navigating to library view");
+  // template-based, called by WelcomeScreen with optional category tag
+  const handleBrowseLibrary = (categoryTag?: string) => {
+    Logger.App.log("handleBrowseLibrary called, navigating to library view", {
+      categoryTag,
+    });
+
+    // Store the category tag(s)
+    if (categoryTag) {
+      setSelectedCategoryTag(categoryTag);
+      setSelectedCategoryTags(categoryTag ? [categoryTag] : []);
+    } else {
+      setSelectedCategoryTag(null);
+      setSelectedCategoryTags([]);
+    }
+
+    // Navigate to the library view
     loggedSetViewState("LIBRARY");
   };
 
@@ -586,15 +652,33 @@ function App() {
               <AppTitle
                 size="large"
                 onClick={() => {
+                  // Clear URL parameters before going back, just like the Back button
+                  window.history.replaceState(
+                    {},
+                    document.title,
+                    window.location.pathname
+                  );
                   loggedSetViewState("WELCOME");
+                  // Reset the flag if we came from URL params
+                  if (cameFromUrlParams) {
+                    setCameFromUrlParams(false);
+                  }
                 }}
               />
             </div>
             <LibraryBrowser
               onSelectTemplate={handleSelectTemplate}
               onBack={() => {
+                // If we came from URL params, we should be able to navigate back
+                // without special handling since URL params are already cleared
                 loggedSetViewState("WELCOME");
+                // Reset the flag since we've navigated away
+                if (cameFromUrlParams) {
+                  setCameFromUrlParams(false);
+                }
               }}
+              initialSelectedTag={selectedCategoryTag}
+              initialSelectedTags={selectedCategoryTags}
             />
           </>
         );

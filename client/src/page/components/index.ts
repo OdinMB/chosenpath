@@ -6,3 +6,5 @@ export { StoryInitializer } from "./StoryInitializer";
 export { TemplateCard } from "./TemplateCard";
 export { TemplateCarousel } from "./TemplateCarousel";
 export { TemplateConfigurator } from "./TemplateConfigurator";
+export { CategoryTile } from "./CategoryTile";
+export { LibraryCategoryGrid } from "./LibraryCategoryGrid";
