@@ -6,7 +6,11 @@ import { BeatHistory } from "./BeatHistory";
 import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { BeatFeedback } from "./feedback/BeatFeedback";
 import { PendingPlayers } from "./PendingPlayers.js";
-import type { ChallengeOption, ResolutionDetails } from "core/types";
+import type {
+  ChallengeOption,
+  ResolutionDetails,
+  ImagePlaceholder,
+} from "core/types";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
@@ -19,11 +23,9 @@ import {
   IMAGE_PLACEHOLDER_REGEX,
   parseImagePlaceholder,
   createImageFromPlaceholder,
-  findImageInLibrary,
-  createPlayerIdentityImage,
 } from "shared/utils/imageUtils";
-import { ClientStoryState, PlayerSlot, ImageSource } from "core/types";
-import { Interlude } from "./Interlude";
+import { ClientStoryState } from "core/types";
+import { Interlude, InterludeItem } from "./Interlude";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -431,10 +433,25 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     // Get player slot to show pending players
     const playerSlot = Object.keys(storyState.players)[0];
 
-    const stateManager = new ClientStateManager();
-
     // Check if there are any pending players
+    const stateManager = new ClientStateManager();
     const hasPendingPlayers = stateManager.hasPendingPlayers(storyState);
+
+    const interludesWithImageReferences = prevBeat.interludes.map(
+      (interlude) => {
+        const interludeImagePlaceholder = {
+          id: interlude.imageId,
+          source: interlude.imageSource,
+        } as ImagePlaceholder;
+        return {
+          imageReference: createImageFromPlaceholder(
+            interludeImagePlaceholder,
+            storyState
+          ),
+          text: interlude.text,
+        } as InterludeItem;
+      }
+    );
 
     return (
       <>
@@ -443,11 +460,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
         {/* Show interludes from the previous beat if available */}
         {prevBeat.interludes && prevBeat.interludes.length > 0 && (
-          <Interlude
-            interludes={prevBeat.interludes}
-            templateId={storyState.templateId}
-            isBasedOnTemplate={storyState.templateId !== undefined}
-          />
+          <Interlude interludes={interludesWithImageReferences} />
         )}
 
         {/* New cleaner loading view instead of skeleton */}
@@ -597,38 +610,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }> = [];
 
     matches.forEach((match, index) => {
-      const attributes = parseImagePlaceholder(match);
-
-      // Check if the image id is a player slot (e.g., player1, player2)
-      const playerSlotMatch =
-        attributes.id && attributes.id.match(/^(player\d+)$/);
-
-      let finalImage;
-
-      if (playerSlotMatch && playerSlotId) {
-        // If the image id is a player slot and we have the player's identity choice
-        const playerSlot = playerSlotMatch[1] as PlayerSlot;
-        const player = storyState.players[playerSlot];
-
-        if (player && player.identityChoice !== undefined) {
-          // Create a player identity image using the player's choice
-          finalImage = createPlayerIdentityImage(
-            playerSlot,
-            player.identityChoice,
-            (attributes.source as ImageSource) || "template"
-          );
-        }
-      } else {
-        // Handle regular (non-player) images
-        const imageObj = createImageFromPlaceholder(attributes);
-        const libraryImage = imageObj
-          ? findImageInLibrary(imageObj.id, storyState)
-          : undefined;
-        finalImage = libraryImage || imageObj;
-      }
-
+      const imagePlaceholder = parseImagePlaceholder(match);
+      const finalImage = createImageFromPlaceholder(
+        imagePlaceholder,
+        storyState
+      );
       if (finalImage) {
-        console.log("Rendering image with attributes:", attributes);
+        console.log("Rendering image with attributes:", imagePlaceholder);
         imageElements.push({
           position: text.indexOf(match),
           placeholder: match,
@@ -636,12 +624,12 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
             <StoryImage
               key={`img-${index}`}
               image={finalImage}
-              alt={finalImage.description || attributes.desc || ""}
+              alt={finalImage.description || ""}
               className="rounded-lg overflow-hidden"
               responsivePosition={true}
-              caption={attributes.desc || finalImage.description || ""}
+              caption={finalImage.description || ""}
               withinText={true}
-              float={(attributes.float as "left" | "right") || "left"}
+              float={(imagePlaceholder.float as "left" | "right") || "left"}
             />
           ),
         });

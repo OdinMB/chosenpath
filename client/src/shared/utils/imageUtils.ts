@@ -3,7 +3,9 @@
  */
 import {
   ClientStoryState,
-  Image,
+  ImageUI,
+  ImagePlaceholder,
+  ImageStoryState,
   ImageStatus,
   ImageSource,
   PlayerSlot,
@@ -14,20 +16,23 @@ import {
  * @param playerSlot The player slot (e.g., "player1", "player2")
  * @param identityChoice The chosen identity index
  * @param imageSource The source of the image (template or story)
+ * @param sourceId The source ID (template ID or story ID)
  * @returns Image object compatible with StoryImage component
  */
 export function createPlayerIdentityImage(
   playerSlot: PlayerSlot,
   identityChoice: number,
-  imageSource: ImageSource
-): Image {
+  imageSource: ImageSource,
+  sourceId: string
+): ImageUI {
   return {
     id: `${playerSlot}_${identityChoice}`,
     fileType: "jpeg",
     subDirectory: "players",
     source: imageSource,
+    sourceId: sourceId,
     status: "ready" as ImageStatus,
-  } as Image;
+  } as ImageUI;
 }
 
 /**
@@ -43,8 +48,15 @@ export const IMAGE_PLACEHOLDER_REGEX = /\[image.*?\]/gs;
  */
 export function parseImagePlaceholder(
   placeholderText: string
-): Record<string, string> {
-  const attributes: Record<string, string> = {};
+): ImagePlaceholder {
+  const placeholder: ImagePlaceholder = {
+    id: "",
+    source: "template",
+    desc: "",
+    fileType: "jpeg",
+    subDir: "",
+    float: "left",
+  };
 
   // Helper function to process and clean description text
   const processDescription = (desc: string): string => {
@@ -67,13 +79,13 @@ export function parseImagePlaceholder(
     // Extract id attribute - required
     const idMatch = cleanText.match(/id=([^\s]+)/);
     if (idMatch && idMatch[1]) {
-      attributes.id = idMatch[1];
+      placeholder.id = idMatch[1];
     }
 
     // Extract source attribute - required
     const sourceMatch = cleanText.match(/source=([^\s]+)/);
     if (sourceMatch && sourceMatch[1]) {
-      attributes.source = sourceMatch[1];
+      placeholder.source = sourceMatch[1] as ImageSource;
     }
 
     // Extract description attribute - handle all types of quotes
@@ -82,56 +94,57 @@ export function parseImagePlaceholder(
     const descQuotedMatch = cleanText.match(descQuotePattern);
 
     if (descQuotedMatch && descQuotedMatch[1]) {
-      attributes.desc = processDescription(descQuotedMatch[1]);
+      placeholder.desc = processDescription(descQuotedMatch[1]);
     } else {
       // Then try for unquoted desc=text
       const descUnquotedMatch = cleanText.match(/desc=([^\s]+)/);
       if (descUnquotedMatch && descUnquotedMatch[1]) {
-        attributes.desc = processDescription(descUnquotedMatch[1]);
+        placeholder.desc = processDescription(descUnquotedMatch[1]);
       }
     }
 
     // Extract fileType attribute
     const fileTypeMatch = cleanText.match(/fileType=([^\s]+)/);
     if (fileTypeMatch && fileTypeMatch[1]) {
-      attributes.fileType = fileTypeMatch[1];
+      placeholder.fileType = fileTypeMatch[1] as "jpeg" | "png";
     }
 
     // Extract subDir attribute
     const subDirMatch = cleanText.match(/subDir=([^\s]+)/);
     if (subDirMatch && subDirMatch[1]) {
-      attributes.subDir = subDirMatch[1];
+      placeholder.subDir = subDirMatch[1];
     }
 
     // Extract float attribute (left or right)
     const floatMatch = cleanText.match(/float=([^\s]+)/);
     if (floatMatch && floatMatch[1]) {
-      attributes.float = floatMatch[1];
+      placeholder.float = floatMatch[1] as "left" | "right";
     }
 
     // Log the extracted attributes for debugging
     console.log("Image placeholder text:", placeholderText);
-    console.log("Extracted attributes:", attributes);
+    console.log("Extracted attributes:", placeholder);
   } catch (error) {
     console.error("Error parsing image placeholder:", error);
   }
 
   // Check if we have minimum required attributes
-  if (!attributes.id && !attributes.source) {
+  if (!placeholder.id && !placeholder.source) {
     // Try the fallback approach with a different pattern
     try {
       // Look for id= and source= anywhere in the text
       const idMatch = placeholderText.match(/id=([a-zA-Z0-9_]+)/);
       const sourceMatch = placeholderText.match(/source=([a-zA-Z0-9_]+)/);
 
-      if (idMatch && idMatch[1]) attributes.id = idMatch[1];
-      if (sourceMatch && sourceMatch[1]) attributes.source = sourceMatch[1];
+      if (idMatch && idMatch[1]) placeholder.id = idMatch[1];
+      if (sourceMatch && sourceMatch[1])
+        placeholder.source = sourceMatch[1] as ImageSource;
     } catch (e) {
       console.error("Fallback parsing failed:", e);
     }
   }
 
-  return attributes;
+  return placeholder;
 }
 
 /**
@@ -140,23 +153,43 @@ export function parseImagePlaceholder(
  * @returns An Image object for use with StoryImage component
  */
 export function createImageFromPlaceholder(
-  attributes: Record<string, string>
-): Image | null {
+  placeholder: ImagePlaceholder,
+  storyState: ClientStoryState
+): ImageUI | null {
   // Check for required attributes
-  if (!attributes.id || !attributes.source) {
-    console.error("Image placeholder missing required attributes:", attributes);
+  if (!placeholder.id || !placeholder.source) {
+    console.error(
+      "Image placeholder missing required attributes:",
+      placeholder
+    );
     return null;
+  }
+
+  const sourceId = storyState.templateId
+    ? storyState.templateId
+    : storyState.id;
+
+  // player images get special treatment
+  if (placeholder.id.startsWith("player")) {
+    const playerIdentity =
+      storyState.players[placeholder.id as PlayerSlot].identityChoice;
+    return createPlayerIdentityImage(
+      placeholder.id as PlayerSlot,
+      playerIdentity,
+      placeholder.source as ImageSource,
+      sourceId
+    );
   }
 
   // Create the image object
   const image = {
-    id: attributes.id,
-    fileType: (attributes.fileType || "jpeg") as "jpeg" | "png",
-    source: attributes.source as "template" | "story",
-    subDirectory: attributes.subDir || undefined,
-    status: attributes.status as ImageStatus,
-    description: attributes.desc || "",
-  };
+    id: placeholder.id,
+    source: placeholder.source as "template" | "story",
+    sourceId: sourceId || undefined,
+    subDirectory: undefined,
+    description: placeholder.desc || "",
+    fileType: (placeholder.fileType || "jpeg") as "jpeg" | "png",
+  } as ImageUI;
 
   return image;
 }
@@ -170,7 +203,7 @@ export function createImageFromPlaceholder(
 export function findImageInLibrary(
   imageId: string,
   storyState: ClientStoryState
-): Image | undefined {
+): ImageStoryState | undefined {
   if (!storyState.images || !Array.isArray(storyState.images)) {
     return undefined;
   }

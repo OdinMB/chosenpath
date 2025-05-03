@@ -4,7 +4,7 @@ import {
   CharacterIdentity,
   CharacterBackground,
   PlayerOptionsGeneration,
-  Image as ImageType,
+  ImageUI,
 } from "core/types";
 import { CharacterCard } from "./CharacterCard";
 import { StatDisplay } from "./StatDisplay";
@@ -12,6 +12,7 @@ import { replacePronounPlaceholders } from "core/utils/playerUtils";
 import { PrimaryButton } from "components/ui";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { StoryImage } from "shared/components/StoryImage";
+import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -79,16 +80,15 @@ export function CharacterSelection({
 
   const renderIdentityCard = (identity: CharacterIdentity, index: number) => {
     // Create image object if the story has images
-    let characterImage: ImageType | undefined = undefined;
+    let characterImage: ImageUI | undefined = undefined;
     if (storyIncludesImages && storyState.templateId) {
       // console.log("story includes images", storyIncludesImages);
-      characterImage = {
-        id: `${playerSlot}_${index}`,
-        fileType: "jpeg",
-        subDirectory: "players",
-        source: "template",
-        status: "ready",
-      };
+      characterImage = createPlayerIdentityImage(
+        playerSlot,
+        index,
+        storyState.templateId ? "template" : "story",
+        storyState.templateId ? storyState.templateId : storyState.id
+      );
     }
 
     return (
@@ -106,7 +106,6 @@ export function CharacterSelection({
               <StoryImage
                 image={characterImage}
                 alt={`${identity.name}`}
-                sourceId={storyState.templateId}
                 className="w-full h-full max-w-[350px]"
                 responsivePosition={true}
                 desktopOffset="50%"

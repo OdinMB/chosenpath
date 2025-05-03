@@ -5,7 +5,7 @@ import {
   ImageInstructions,
   IMAGE_SIZES,
   IMAGE_QUALITIES,
-  Image,
+  ImageUI,
 } from "core/types";
 import { useImageGeneration } from "shared/hooks/useImageGeneration";
 import { StoryImage } from "shared/components/StoryImage";
@@ -27,10 +27,11 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
 
   // Create cover image object for StoryImage
-  const coverImage: Image = {
+  const coverImage: ImageUI = {
     id: "cover",
     fileType: "jpeg",
     source: "template",
+    sourceId: templateId,
     status: localIsGenerating ? "generating" : "ready",
   };
 
@@ -68,7 +69,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
             <StoryImage
               image={coverImage}
               alt="Cover Image"
-              sourceId={templateId}
               className="w-full h-full object-cover"
               responsivePosition={false}
               objectPosition="center"

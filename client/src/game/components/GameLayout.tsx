@@ -251,7 +251,8 @@ export function GameLayout({
       playerIdentityImage = createPlayerIdentityImage(
         playerSlot,
         player.identityChoice,
-        storyState.templateId ? "template" : "story"
+        storyState.templateId ? "template" : "story",
+        storyState.templateId ? storyState.templateId : storyState.id
       );
     }
 
@@ -264,7 +265,6 @@ export function GameLayout({
                 <StoryImage
                   image={playerIdentityImage}
                   alt={`${player.name}`}
-                  sourceId={storyState.templateId}
                   className="w-full h-full"
                   responsivePosition={true}
                   desktopOffset="5%"

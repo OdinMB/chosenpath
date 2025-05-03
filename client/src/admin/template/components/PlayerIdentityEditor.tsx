@@ -4,7 +4,7 @@ import { Input, Select } from "components/ui";
 import {
   CharacterIdentity,
   ImageInstructions,
-  Image,
+  ImageUI,
   ImageStatus,
 } from "core/types";
 import { Icons } from "shared/components/ui/Icons";
@@ -161,8 +161,8 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   );
 
   // Create character image for the collapsed view
-  const playerImage: Image = {
-    ...createPlayerIdentityImage(playerSlot, index, "template"),
+  const playerImage: ImageUI = {
+    ...createPlayerIdentityImage(playerSlot, index, "template", templateId),
     status: isGeneratingImage ? "generating" : imageStatus,
   };
 
@@ -172,7 +172,6 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
         <StoryImage
           image={playerImage}
           alt={identity.name || `Character ${index + 1}`}
-          sourceId={templateId}
           className="w-full h-full"
           responsivePosition={false}
           objectPosition="center center"

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   StoryElement,
   ImageInstructions,
-  Image,
+  ImageUI,
   ImageStatus,
 } from "core/types";
 import { Input, TextArea } from "components/ui";
@@ -87,10 +87,11 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   };
 
   // Create element image object for StoryImage
-  const elementImage: Image = {
+  const elementImage: ImageUI = {
     id: element.id,
     fileType: "jpeg",
     source: "template",
+    sourceId: templateId,
     status: isGenerating ? "generating" : imageStatus,
   };
 
@@ -101,7 +102,6 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
         <StoryImage
           image={elementImage}
           alt={element.name || "Element"}
-          sourceId={templateId}
           className="w-full h-full object-cover"
           responsivePosition={false}
           objectPosition="center center"

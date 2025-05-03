@@ -1,4 +1,9 @@
-import { Beat, StoryState, Image, PlayerSlot } from "../types/index.js";
+import {
+  Beat,
+  StoryState,
+  ImageStoryState,
+  PlayerSlot,
+} from "../types/index.js";
 
 /**
  * Manages all image-related operations for Story class
@@ -11,14 +16,14 @@ export class ImageManager {
   /**
    * Get all images from the story
    */
-  getImages(state: StoryState): Image[] {
+  getImages(state: StoryState): ImageStoryState[] {
     return state.images;
   }
 
   /**
    * Add a new image to the story
    */
-  addImage(state: StoryState, image: Image): StoryState {
+  addImage(state: StoryState, image: ImageStoryState): StoryState {
     return {
       ...state,
       images: [...state.images, image],
@@ -31,11 +36,11 @@ export class ImageManager {
   updateImage(
     state: StoryState,
     imageId: string,
-    updates: Partial<Image>
+    updates: Partial<ImageStoryState>
   ): StoryState {
     return {
       ...state,
-      images: state.images.map((image: Image) =>
+      images: state.images.map((image: ImageStoryState) =>
         image.id === imageId
           ? {
               ...image,

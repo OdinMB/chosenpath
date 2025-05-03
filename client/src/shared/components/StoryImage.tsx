@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { Image } from "core/types/image";
+import { ImageUI } from "core/types/image";
 import { Icons, Modal } from "./ui";
 import { API_CONFIG } from "core/config";
 
 interface StoryImageProps {
-  image: Image;
+  image: ImageUI;
   alt: string;
-  sourceId?: string;
   className?: string;
   fallbackSrc?: string;
   objectPosition?: string;
@@ -21,7 +20,6 @@ interface StoryImageProps {
 export const StoryImage: React.FC<StoryImageProps> = ({
   image,
   alt,
-  sourceId,
   className = "",
   fallbackSrc,
   objectPosition = "center",
@@ -58,21 +56,21 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     : objectPosition;
 
   useEffect(() => {
-    if (!image || image.status !== "ready") return;
+    if (!image) return;
 
     const constructImagePath = () => {
       const baseUrl = API_CONFIG.DEFAULT_API_URL;
 
       // For template images
-      if (image.source === "template" && sourceId) {
-        return `${baseUrl}/images/templates/${sourceId}${
+      if (image.source === "template" && image.sourceId) {
+        return `${baseUrl}/images/templates/${image.sourceId}${
           image.subDirectory ? `/${image.subDirectory}` : ""
         }/${image.id}.${image.fileType}?t=${Date.now()}`;
       }
 
       // For story generated images
-      if (image.source === "story" && sourceId) {
-        return `${baseUrl}/images/stories/${sourceId}${
+      if (image.source === "story" && image.sourceId) {
+        return `${baseUrl}/images/stories/${image.sourceId}${
           image.subDirectory ? `/${image.subDirectory}` : ""
         }/${image.id}.${image.fileType}?t=${Date.now()}`;
       }
@@ -82,7 +80,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
 
     const imagePath = constructImagePath();
     setSrc(imagePath);
-  }, [image, sourceId, fallbackSrc]);
+  }, [image, fallbackSrc]);
 
   const handleLoad = () => {
     setIsLoading(false);

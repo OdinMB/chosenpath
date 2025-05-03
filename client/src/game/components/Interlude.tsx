@@ -1,27 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ColoredBox, Icons } from "components/ui";
 import { StoryImage } from "shared/components/StoryImage";
-import { Image, ImageSource } from "core/types";
+import { ImageReference } from "core/types";
 
-interface InterludeItem {
-  imageId: string;
-  imageSource: "template" | "story" | "none";
+export interface InterludeItem {
+  imageReference?: ImageReference;
   text: string;
 }
 
 interface InterludeProps {
   interludes: InterludeItem[];
-  templateId?: string;
-  storyId?: string;
-  isBasedOnTemplate: boolean;
 }
 
-export const Interlude: React.FC<InterludeProps> = ({
-  interludes,
-  templateId,
-  storyId,
-  isBasedOnTemplate,
-}) => {
+export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -60,58 +51,22 @@ export const Interlude: React.FC<InterludeProps> = ({
 
   const currentInterlude = interludes[currentSlide];
 
-  // Get the appropriate source ID for the image
-  const sourceId =
-    currentInterlude.imageSource === "template"
-      ? templateId
-      : currentInterlude.imageSource === "story"
-      ? storyId
-      : undefined;
-
-  // Create a default image object if no image is specified
-  const getImageObject = (): Image => {
-    if (currentInterlude.imageId && currentInterlude.imageSource !== "none") {
-      return {
-        id: currentInterlude.imageId || "cover",
-        status: "ready",
-        source: currentInterlude.imageSource as ImageSource,
-        fileType: "jpeg",
-      };
-    }
-
-    // Default to cover image if based on template, or no image otherwise
-    if (isBasedOnTemplate) {
-      return {
-        id: "cover",
-        status: "ready",
-        source: "template",
-        fileType: "jpeg",
-      };
-    }
-
-    return {
-      id: "",
-      status: "failed",
-      source: "template",
-      fileType: "jpeg",
-    };
-  };
-
   return (
     <div className="max-w-2xl mx-auto">
       <ColoredBox leftBorder={false} className="p-4 w-full">
         <div className="flex flex-col items-center">
           {/* Image */}
-          <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden">
-            <StoryImage
-              image={getImageObject()}
-              alt={currentInterlude.text}
-              sourceId={sourceId}
-              mobileOffset="20%"
-              desktopOffset="70px"
-              className="rounded-lg h-48 w-auto object-contain"
-            />
-          </div>
+          {currentInterlude.imageReference && (
+            <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden">
+              <StoryImage
+                image={currentInterlude.imageReference}
+                alt={currentInterlude.text}
+                mobileOffset="20%"
+                desktopOffset="70px"
+                className="rounded-lg h-48 w-auto object-contain"
+              />
+            </div>
+          )}
 
           {/* Text */}
           <div className="text-center text-primary">

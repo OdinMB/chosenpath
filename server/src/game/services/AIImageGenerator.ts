@@ -6,7 +6,7 @@ import type {
 } from "openai/resources/images";
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
-  Image,
+  ImageStoryState,
   ImageReference,
   BeatsNeedingImages,
   ImageSize,
@@ -340,11 +340,9 @@ export class AIImageGenerator {
           const imageId = uuidv4();
 
           // Add placeholder to image library
-          const placeholderImage: Image = {
+          const placeholderImage: ImageStoryState = {
             id: imageId,
-            fileType: "jpeg",
             description: `Image for: ${beat.text.substring(0, 50)}...`,
-            status: "generating",
             source: "story",
           };
           updatedStory = updatedStory.addImage(placeholderImage);

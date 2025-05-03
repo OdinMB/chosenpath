@@ -22,25 +22,37 @@ export type ImageQuality =
 export const imageSourceSchema = z.enum(["template", "story"]);
 export type ImageSource = z.infer<typeof imageSourceSchema>;
 
+// Pointing to a file in the storage
 export type ImageReference = {
   id: string;
   source: ImageSource;
   sourceId: string; // templateId or storyId
+  subDirectory?: string;
+  fileType: "jpeg" | "png";
 };
 
-// Types used by the application
+// Images displayed in the UI
 export type ImageStatus = "ready" | "generating" | "failed";
-
-export type Image = {
-  id: string;
-  fileType: "jpeg" | "png";
-  source: ImageSource;
-  status: ImageStatus;
-  subDirectory?: string;
+export type ImageUI = ImageReference & {
+  status?: ImageStatus;
   description?: string;
 };
 
-export type ImageLibrary = Image[];
+export type ImagePlaceholder = {
+  id: string;
+  source: ImageSource;
+  desc?: string;
+  fileType?: "jpeg" | "png";
+  subDir?: string;
+  float?: "left" | "right";
+};
+
+export type ImageStoryState = {
+  id: string;
+  source: ImageSource;
+  description?: string;
+};
+export type ImageLibrary = ImageStoryState[];
 
 export type BeatsNeedingImages = Record<string, Beat>;
 
