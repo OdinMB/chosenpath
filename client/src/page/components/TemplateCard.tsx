@@ -82,21 +82,27 @@ export const TemplateCard = ({
           } overflow-hidden flex-shrink-0 bg-gray-100`}
         >
           {coverImage ? (
-            <img
-              src={coverImage}
-              alt={`${template.title} cover`}
-              className={`absolute h-full ${
-                size === "large" ? "w-24" : "w-20"
-              } object-cover object-center transition-opacity duration-300 ${
-                imageLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-            />
+            <div
+              onClick={() => onPlay(template)}
+              className="w-full h-full cursor-pointer"
+            >
+              <img
+                src={coverImage}
+                alt={`${template.title} cover`}
+                className={`absolute h-full ${
+                  size === "large" ? "w-24" : "w-20"
+                } object-cover object-center transition-all duration-500 hover:scale-110 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+              />
+            </div>
           ) : (
             // Placeholder when no image is available
             <div
-              className={`flex items-center justify-center h-full w-full text-gray-400`}
+              onClick={() => onPlay(template)}
+              className={`flex items-center justify-center h-full w-full text-gray-400 cursor-pointer`}
             >
               <Icons.Image className="h-8 w-8" />
             </div>

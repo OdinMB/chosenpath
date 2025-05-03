@@ -25,6 +25,33 @@ export const PlayerBackgroundEditor: React.FC<PlayerBackgroundEditorProps> = ({
   playerStats,
   readOnly = false,
 }) => {
+  // Filter player stats to only include those marked as part of player backgrounds
+  const eligiblePlayerStats = playerStats.filter(
+    (stat) => stat.partOfPlayerBackgrounds !== false
+  );
+
+  // Filter background initialPlayerStatValues to only include eligible stats
+  React.useEffect(() => {
+    // Skip if in read-only mode
+    if (readOnly) return;
+
+    // Filter out stat values for stats that shouldn't be part of backgrounds
+    const eligibleStatIds = eligiblePlayerStats.map((stat) => stat.id);
+    const filteredStatValues = background.initialPlayerStatValues.filter(
+      (statValue) => eligibleStatIds.includes(statValue.statId)
+    );
+
+    // If values were removed, update the background
+    if (
+      filteredStatValues.length !== background.initialPlayerStatValues.length
+    ) {
+      onUpdate(index, {
+        ...background,
+        initialPlayerStatValues: filteredStatValues,
+      });
+    }
+  }, [background, eligiblePlayerStats, index, onUpdate, readOnly]);
+
   const renderBackgroundForm = (
     data: CharacterBackground,
     onChange: (updatedData: CharacterBackground) => void
@@ -66,7 +93,9 @@ export const PlayerBackgroundEditor: React.FC<PlayerBackgroundEditorProps> = ({
             />
           </div>
           {data.initialPlayerStatValues.map((statValue, statIndex) => {
-            const stat = playerStats.find((s) => s.id === statValue.statId);
+            const stat = eligiblePlayerStats.find(
+              (s) => s.id === statValue.statId
+            );
             if (!stat) return null;
 
             return (

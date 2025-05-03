@@ -573,7 +573,7 @@ export const PreviousChoiceVisualizer: React.FC<
                   </div>
 
                   {/* Info row with Risk, Resource Type, and Points */}
-                  <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <div className="flex items-center gap-2 md:gap-6 flex-wrap text-sm">
                     <div className="inline-flex items-center">
                       <span className="font-semibold text-primary">Risk:</span>
                       <span className="text-primary ml-1">

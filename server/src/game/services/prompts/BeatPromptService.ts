@@ -363,7 +363,7 @@ ${
 Interludes
 are little snippets of image and text that the player sees while the next beat is being generated.
 Create a total of exactly 3 interludes.
-- Create 1 interlude with a stream of consciousness of the character for whom this beat is written. As always: show don't tell. First person, specific associations, emotions, and unfinished thoughts -- not a polished monologue or a third person summary. (imageId = player slot)
+- Create 1 interlude with a stream of consciousness of the player character for whom this beat is written. As always: show don't tell. First person, specific associations, emotions, and unfinished thoughts -- not a polished monologue or a third person summary. (imageId = player slot) Only do this for the player character; the thoughts of other characters are not known to the player.
 - Create 1-2 interludes based on story elements (location, NPC, item, etc.) that is relevant to the beat (imageId = story element id).
 - Create 0-1 interlude that gives a general detail about the world (imageId = "cover").
 `;

@@ -119,28 +119,30 @@ export function usePlayerEditor(
 
   // Create an empty background with all player stats
   const createEmptyBackground = (): CharacterBackground => {
-    const initialPlayerStatValues = playerStats.map((stat) => {
-      let initialValue: number | string | string[];
+    const initialPlayerStatValues = playerStats
+      .filter((stat) => stat.partOfPlayerBackgrounds !== false)
+      .map((stat) => {
+        let initialValue: number | string | string[];
 
-      switch (stat.type) {
-        case "string":
-          initialValue = "";
-          break;
-        case "string[]":
-          initialValue = [];
-          break;
-        case "number":
-        case "percentage":
-        case "opposites":
-        default:
-          initialValue = 50;
-      }
+        switch (stat.type) {
+          case "string":
+            initialValue = "";
+            break;
+          case "string[]":
+            initialValue = [];
+            break;
+          case "number":
+          case "percentage":
+          case "opposites":
+          default:
+            initialValue = 50;
+        }
 
-      return {
-        statId: stat.id,
-        value: initialValue,
-      };
-    });
+        return {
+          statId: stat.id,
+          value: initialValue,
+        };
+      });
 
     return {
       title: "",

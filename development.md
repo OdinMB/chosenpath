@@ -10,6 +10,8 @@ Focus: Text/Images, English, Multiplayer
 
 - 7: Generating images during the story (using reference images)
 
+- 4: for templates: additional images that are not attached to a story element
+
 - 1: percentage stats at 0%: name not visible
 - 2: add support and examples for 1-beat threads
 - 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
