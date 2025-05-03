@@ -12,12 +12,18 @@ interface InterludeProps {
   interludes: InterludeItem[];
 }
 
-export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
+export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const handlePrev = useCallback(() => {
-    if (!interludes || interludes.length <= 1 || isTransitioning) return;
+    if (
+      !interludes ||
+      !Array.isArray(interludes) ||
+      interludes.length <= 1 ||
+      isTransitioning
+    )
+      return;
 
     setIsTransitioning(true);
     setCurrentSlide((prev) => (prev === 0 ? interludes.length - 1 : prev - 1));
@@ -27,7 +33,13 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
   }, [interludes, isTransitioning]);
 
   const handleNext = useCallback(() => {
-    if (!interludes || interludes.length <= 1 || isTransitioning) return;
+    if (
+      !interludes ||
+      !Array.isArray(interludes) ||
+      interludes.length <= 1 ||
+      isTransitioning
+    )
+      return;
 
     setIsTransitioning(true);
     setCurrentSlide((prev) => (prev === interludes.length - 1 ? 0 : prev + 1));
@@ -45,11 +57,18 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
     return () => clearInterval(interval);
   }, [handleNext]);
 
-  if (!interludes || interludes.length === 0) {
+  if (!interludes || !Array.isArray(interludes) || interludes.length === 0) {
     return null;
   }
 
-  const currentInterlude = interludes[currentSlide];
+  // Make sure currentSlide is within bounds
+  const validCurrentSlide = Math.min(currentSlide, interludes.length - 1);
+  const currentInterlude = interludes[validCurrentSlide];
+
+  // Ensure we have a valid currentInterlude
+  if (!currentInterlude) {
+    return null;
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -60,7 +79,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
             <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden rounded-lg">
               <StoryImage
                 image={currentInterlude.imageReference}
-                alt={currentInterlude.text}
+                alt={currentInterlude.text || ""}
                 responsivePosition={true}
                 mobileOffset="5%"
                 desktopOffset="14%"
@@ -70,11 +89,11 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
 
           {/* Text */}
           <div className="text-center text-primary">
-            <p className="italic">{currentInterlude.text}</p>
+            <p className="italic">{currentInterlude.text || ""}</p>
           </div>
 
           {/* Navigation controls */}
-          {interludes.length > 100 && (
+          {Array.isArray(interludes) && interludes.length > 100 && (
             <div className="flex items-center justify-center w-full mt-4">
               <button
                 onClick={handlePrev}
@@ -91,7 +110,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes }) => {
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full ${
-                      index === currentSlide
+                      index === validCurrentSlide
                         ? "bg-primary-500"
                         : "bg-primary-200"
                     }`}

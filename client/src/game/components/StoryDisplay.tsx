@@ -437,21 +437,23 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     const stateManager = new ClientStateManager();
     const hasPendingPlayers = stateManager.hasPendingPlayers(storyState);
 
-    const interludesWithImageReferences = prevBeat.interludes.map(
-      (interlude) => {
-        const interludeImagePlaceholder = {
-          id: interlude.imageId,
-          source: interlude.imageSource,
-        } as ImagePlaceholder;
-        return {
-          imageReference: createImageFromPlaceholder(
-            interludeImagePlaceholder,
-            storyState
-          ),
-          text: interlude.text,
-        } as InterludeItem;
-      }
-    );
+    // Ensure prevBeat.interludes exists and is an array before mapping
+    const interludesWithImageReferences =
+      prevBeat.interludes && Array.isArray(prevBeat.interludes)
+        ? prevBeat.interludes.map((interlude) => {
+            const interludeImagePlaceholder = {
+              id: interlude.imageId,
+              source: interlude.imageSource,
+            } as ImagePlaceholder;
+            return {
+              imageReference: createImageFromPlaceholder(
+                interludeImagePlaceholder,
+                storyState
+              ),
+              text: interlude.text,
+            } as InterludeItem;
+          })
+        : [];
 
     return (
       <>
@@ -459,9 +461,11 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         {renderPreviousChoice(prevBeatIndex, isChallengeBeat, true)}
 
         {/* Show interludes from the previous beat if available */}
-        {prevBeat.interludes && prevBeat.interludes.length > 0 && (
-          <Interlude interludes={interludesWithImageReferences} />
-        )}
+        {prevBeat.interludes &&
+          Array.isArray(prevBeat.interludes) &&
+          prevBeat.interludes.length > 0 && (
+            <Interlude interludes={interludesWithImageReferences} />
+          )}
 
         {/* New cleaner loading view instead of skeleton */}
         <div className="items-center justify-center p-4">
@@ -659,7 +663,12 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         type: "image",
         content: element,
       });
-      lastIndex = position + placeholder.length;
+      // Ensure placeholder.length exists before using it
+      if (placeholder) {
+        lastIndex = position + placeholder.length;
+      } else {
+        lastIndex = position + 1; // Fallback if placeholder is undefined
+      }
     });
 
     // Add remaining text after last image

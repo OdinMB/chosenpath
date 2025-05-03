@@ -8,24 +8,29 @@ interface BeatHistoryProps {
 }
 
 export function BeatHistory({
-  currentBeatIndex,
-  totalBeats,
-  pendingBeat,
+  currentBeatIndex = 0,
+  totalBeats = 0,
+  pendingBeat = false,
   onBeatChange,
 }: BeatHistoryProps) {
+  // Ensure we have valid numbers
+  const safeCurrentBeatIndex =
+    typeof currentBeatIndex === "number" ? currentBeatIndex : 0;
+  const safeTotalBeats = typeof totalBeats === "number" ? totalBeats : 0;
+
   // Total count including pending beat
-  const displayTotalBeats = pendingBeat ? totalBeats + 1 : totalBeats;
+  const displayTotalBeats = pendingBeat ? safeTotalBeats + 1 : safeTotalBeats;
 
   // Determine if previous/next buttons should be visible
-  const showPreviousButton = currentBeatIndex > 0;
-  const showNextButton = currentBeatIndex < displayTotalBeats - 1;
+  const showPreviousButton = safeCurrentBeatIndex > 0;
+  const showNextButton = safeCurrentBeatIndex < displayTotalBeats - 1;
 
   return (
     <div className="py-2">
       <div className="flex items-center justify-center space-x-4">
         {showPreviousButton ? (
           <button
-            onClick={() => onBeatChange(currentBeatIndex - 1)}
+            onClick={() => onBeatChange(safeCurrentBeatIndex - 1)}
             className={`p-2 rounded-lg transition-colors ${"text-primary-600 hover:bg-primary-50"}`}
             aria-label="Previous beat"
           >
@@ -37,12 +42,12 @@ export function BeatHistory({
         )}
 
         <span className="text-sm text-primary-600">
-          Beat {currentBeatIndex + 1} of {displayTotalBeats}
+          Beat {safeCurrentBeatIndex + 1} of {displayTotalBeats}
         </span>
 
         {showNextButton ? (
           <button
-            onClick={() => onBeatChange(currentBeatIndex + 1)}
+            onClick={() => onBeatChange(safeCurrentBeatIndex + 1)}
             className={`p-2 rounded-lg transition-colors ${"text-primary-600 hover:bg-primary-50"}`}
             aria-label="Next beat"
           >

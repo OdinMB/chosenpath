@@ -16,6 +16,9 @@ interface StatDisplayProps {
 export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
   const [stat1, stat2] = type === "opposites" ? name.split("|") : ["", ""];
 
+  // Add safety check for string array type
+  const safeStringArray = Array.isArray(value) ? value : [];
+
   switch (type) {
     case "percentage":
       return (
@@ -106,11 +109,11 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
           >
             <div className="mb-1 text-primary">{name}:</div>
           </Tooltip>
-          {(value as string[]).length === 0 ? (
+          {!Array.isArray(value) || safeStringArray.length === 0 ? (
             <span className="text-primary-500 ml-2">None</span>
           ) : (
             <div className="flex flex-wrap gap-1.5">
-              {(value as string[]).map((item, index) => (
+              {safeStringArray.map((item, index) => (
                 <span
                   key={index}
                   className="bg-white text-primary px-3 py-1 rounded border border-primary-100 shadow-sm text-base font-medium"
