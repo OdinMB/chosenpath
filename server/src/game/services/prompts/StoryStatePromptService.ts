@@ -411,8 +411,7 @@ ${modeDescriptions[story.getGameMode()]}
           choiceSection = `\n  Chosen option: ${choiceText}${resourceTypeIndicator}${resultText}`;
         }
 
-        return `- Beat ${index + 1}: ${beat.title}
-  Summary: ${beat.summary}${choiceSection}`;
+        return `- Beat ${index + 1}: ${beat.summary}${choiceSection}`;
       })
       .join("\n");
   }
@@ -648,7 +647,7 @@ ${modeDescriptions[story.getGameMode()]}
     );
 
     // Combine the beat progression overview with the beat texts
-    return `\nDon't offer any options that are similar to the ones that were already offered (both chosen and not chosen).\n\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
+    return `\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}\n\nDon't offer any options that are similar to the ones that were already offered (both chosen and not chosen).`;
   }
 
   /**

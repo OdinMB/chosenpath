@@ -8,6 +8,7 @@ import {
   addIntroductionOfStoryElementSchema,
   newMilestoneSchema,
 } from "./change.js";
+import { dynamicStoryImageSchema } from "./image.js";
 import { Resolution } from "./thread.js";
 
 export const OPTION_RISK_TYPES = ["normal", "safe", "risky"] as const;
@@ -178,6 +179,11 @@ export const beatPlanSchema = z.object({
     .describe(
       "Considerations for designing the options for this beat. Can be either a detailed object with considerations or a simple string for special cases like 'as in the topic switch configuration' or 'ending'."
     ),
+  imagesToBeGenerated: z
+    .union([z.string(), dynamicStoryImageSchema])
+    .describe(
+      "Image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images."
+    ),
 });
 
 const interludeSchema = z.object({
@@ -204,15 +210,20 @@ export const beatGenerationSchema = z.object({
     .describe(
       "Main narrative text for one particular player.\n" +
         "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
-        "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
         "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
         "- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options. Don't define or narrate the resolution of the beat. (That will happen in the next round, based on players' choices.)\n" +
+        "- Use present tense.\n" +
         "- Address the player character for whom this beat is written directly ('You' instead of the name of the character). Refer to other player characters by their name or in third person.\n" +
-        "- If there is an image library with images that are relevant to this beat, add 1 or ideally 2 image tags to the beat text (3 are already too many). Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
+        "- If the story includes images, add 1 or ideally 2 image tags to the beat text (3 are already too many).\n" +
+        "--- Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'.\n" +
+        "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
+        "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
+        "--- In addition to the image library, you can also use images that you requested to be generated for this beat in the beat plan. The source of these images in 'story'.\n" +
+        "--- If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
-        "- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
+        "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
     ),
   summary: z
     .string()

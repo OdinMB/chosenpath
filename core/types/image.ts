@@ -98,3 +98,18 @@ export const imageInstructionsSchema = z
     "Visual styling instructions to maintain consistent aesthetics across all generated images. Will be added to all image generation prompts. Must still be flexible enough to generate all images for the story."
   );
 export type ImageInstructions = z.infer<typeof imageInstructionsSchema>;
+
+export const dynamicStoryImageSchema = z.object({
+  caption: z.string().describe("A caption for the dynamic image."),
+  id: z.string().describe("The ID of the dynamic image."),
+  referenceImageIds: z
+    .array(z.string())
+    .describe(
+      "The IDs of the images to use as references for the dynamic image. Leave empty if no reference image is needed."
+    ),
+  prompt: z
+    .string()
+    .describe(
+      "A prompt for the dynamic image. Will be submitted to the LLM in addition to general image generation instructions for this story and the reference images (if any). No need to include instructions for overall aesthetics, just describe what's in the image."
+    ),
+});
