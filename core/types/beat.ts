@@ -90,6 +90,11 @@ const optionChallengeSchema = z
 export const beatTypeSchema = z.enum(["intro", "switch", "thread", "ending"]);
 
 export const beatPlanSchema = z.object({
+  forPlayer: z
+    .string()
+    .describe(
+      "Player slot and name of the player for whom this beat is written. Example: player2 - Jessica Parker."
+    ),
   developmentsToNarrate: z
     .string()
     .describe(
@@ -123,7 +128,7 @@ export const beatPlanSchema = z.object({
   showDontTell: z
     .array(z.string())
     .describe(
-      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. Concrete actions, direct speech."
+      "List of points that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. Concrete actions, direct speech. Remember: don't define the resolution of this step in the thread progression. That will happen in the next round, based on players' choices in this beat."
     ),
   newIntroductionsOfStoryElements: z
     .array(addIntroductionOfStoryElementSchema)
@@ -156,7 +161,7 @@ export const beatPlanSchema = z.object({
         previousOptionsToAvoid: z
           .array(z.string())
           .describe(
-            "Relevant options that were already offered to the player in previous beats in this thread. Make sure that the options for this beat are meaningfully different from these previous options. Just bullet points. Focus on the gist of it. Good: 'sacrifice X', 'watch other guests', etc."
+            "Relevant options that were already offered to the player in previous beats in this thread so we can avoid repeating them. Just concise bullet points. Good: 'sacrifice rations', 'use power X', 'watch other guests', etc."
           ),
         statsAffectingOptions: z
           .string()
@@ -197,14 +202,15 @@ export const beatGenerationSchema = z.object({
   text: z
     .string()
     .describe(
-      "Main narrative text for this player.\n" +
+      "Main narrative text for one particular player.\n" +
         "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
         "- Use present tense.\n" +
         "- Start exactly where the previous beat for this player ended.\n" +
         "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
         "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
-        "- Address the player character directly ('You' instead of the name of the character).\n" +
-        "- If there is an image library with relevant images, add 1 or ideally 2 image tags to the beat text (3 are already too many). Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. For player characters, use ids player1, player2, etc. Don't use player images in beats for the player themselves. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
+        "- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options. Don't define or narrate the resolution of the beat. (That will happen in the next round, based on players' choices.)\n" +
+        "- Address the player character for whom this beat is written directly ('You' instead of the name of the character). Refer to other player characters by their name or in third person.\n" +
+        "- If there is an image library with images that are relevant to this beat, add 1 or ideally 2 image tags to the beat text (3 are already too many). Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'. Add the tags at the beginning of the paragraph that you want to show the image in. For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat. If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
     ),
@@ -221,7 +227,7 @@ export const beatGenerationSchema = z.object({
       ])
     )
     .describe(
-      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options."
+      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options. Don't repeat similar options to what this player was offered before in the same thread."
     ),
   interludes: z
     .array(interludeSchema)

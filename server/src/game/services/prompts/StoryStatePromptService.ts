@@ -648,7 +648,7 @@ ${modeDescriptions[story.getGameMode()]}
     );
 
     // Combine the beat progression overview with the beat texts
-    return `\nFor the remainder of this thread, don't offer any options that are similar to the ones that were already offered (both chosen and not chosen).\n\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
+    return `\nDon't offer any options that are similar to the ones that were already offered (both chosen and not chosen).\n\nBeat progression:\n${beatProgressionOverview}\n\n${playerBeatTexts}`;
   }
 
   /**
@@ -739,7 +739,9 @@ ${modeDescriptions[story.getGameMode()]}
 
     // Start with the chosen option
     const result = [`CHOSEN OPTION: ${resourceType}${chosenOption.text}`];
-    result.push("NOT CHOSEN:");
+    result.push(
+      "NOT CHOSEN (ignore for storytelling purposes; only mentioned so you can avoid offering similar options in this new beat to prevent repetition):"
+    );
 
     // Add non-chosen options
     beat.options.forEach((option, index) => {
@@ -769,9 +771,11 @@ ${modeDescriptions[story.getGameMode()]}
         // Determine if this is the current or previous beat
         let beatStatus = "";
         if (index === beatsCompleted) {
-          beatStatus = " (CURRENT BEAT)";
+          beatStatus =
+            " (CURRENT BEAT, resolution will be determined after this beat based on players' choices)";
         } else if (index === beatsCompleted - 1) {
-          beatStatus = " (PREVIOUS BEAT)";
+          beatStatus =
+            " (PREVIOUS BEAT, resolution was determined and must now be narrated)";
         }
 
         // Get resolution text if available

@@ -2,13 +2,13 @@ Smaller commits!
 
 # NEXT
 
+- 7: Generating images during the story (using reference images)
+
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
 
 - 10: More (multiplayer) templates (try to make 1-3 players work)
-
-- 7: Generating images during the story (using reference images)
 
 - 4: for templates: additional images that are not attached to a story element
 
@@ -32,6 +32,7 @@ Focus: Text/Images, English, Multiplayer
 - 10: Resolution animation elements (thread, group)
 - 5: Setting to deactivate the resolution animations
 - 5: Difficulty level (affecting base points)
+- 10: Create story based on kids' drawings
 - 10: creation/template setting: jokers to see risky/safe or even modifiers
 - 20: Music (OpenAI's new API?)
 - 20: Streaming text

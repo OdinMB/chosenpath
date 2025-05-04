@@ -125,8 +125,8 @@ ${
   story.isFirstBeat()
     ? "Since this is the beginning of the story, there are no changes to the story state. Just return an empty list."
     : "STAT CHANGES\n" +
-      "- If a player chose a sacrifice option to gain a higher chance of success, that player should lose whatever was sacrificed.\n" +
-      "- If a player chose a reward option and accepted a lower chance of success, that player should gain their reward.\n" +
+      "- If a player chose a sacrifice option to gain a higher chance of success, that player (or the group) should lose whatever was sacrificed.\n" +
+      "- If a player chose a reward option and accepted a lower chance of success, that player (or the group) should gain their reward.\n" +
       "- If you want to replace an item in a string[] stat, apply both a removeElement and addElement change.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
@@ -190,16 +190,13 @@ ${
       (story.getCurrentThreadBeatsCompleted() + 1) +
       "/" +
       story.getCurrentThreadDuration() +
-      " of the current thread (or set of threads)." +
-      (story.getCurrentThreadBeatsCompleted() === 0
-        ? " Set up the situation and introduce the first step in the thread progression."
-        : "") +
-      "\n" +
+      " of the current thread (or set of threads).\n" +
+      "The current step in the thread progression poses a question that should be answered in this beat. Example: 'How does the group get past the troll?' Here's how this is supposed to work: In the text for this beat, establish the scene that poses the question to the players, like the troll blocking the path. At the end of the beat, the players get options for dealing with the troll. If and how they get past the troll will be decided only AFTER the players made their choices. Your current job for this step in the thread progression is only to lead up to the player options, WITHOUT defining the resolution of the step.\n" +
       (story.getCurrentThreadBeatsCompleted() + 1 ==
       story.getCurrentThreadDuration()
-        ? "- This is the last beat of the thread. Make sure that after this round of player decisions, you can resolve each thread.\n"
-        : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread should only be answered on the last beat.\n" +
-          "--- Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player should not be able to acquire the artifact in the first or second beat.\n")
+        ? "- This is the last beat of the thread. Remember that the resolution of the overall thread will only be determined AFTER this beat, based on players' choices in this beat. Don't define or narrate the resolution of the thread. (That will happen in the next round, based on players' choices.)\n"
+        : "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread overall will be resolved should only be answered after the players' decisions in the last step of the thread.\n" +
+          "--- Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player will not gain or permanently lose the chance to gain the artifact in steps 1 and 2.\n")
 }
 ${
   story.isMultiplayer()
@@ -240,7 +237,7 @@ ${
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
           "\n- Don't use options that are similar to options that the player had in previous beats in this thread." +
-          "\n--- Example: If the player had the option " +
+          "\n--- Example: If in a previous beat in this thread the player had the option to use a special ability, don't offer that option again." +
           "\n- Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? These options will apply a large malus to success chances." +
           "\n--- Only offer reward options for stats that allow for rewards in their stat definitions." +
           "\n--- Example: An energy stat might specify that it can be used as a reward when the player chooses to rest instead of focusing on the thread's goal." +
@@ -315,13 +312,17 @@ Example: If the player decided to organize a vote, describe what they do, how th
     } 
 - Show, don't tell.
 --- Use the list of 'show don't tell' instructions that you generated in the plan for the beat.
---- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.
+--- Right now, the most common failure mode for bad responses is that they don't follow the principle of 'show don't tell'. It's important that you don't make this mistake.${
+      story.getCurrentBeatType() === "thread"
+        ? "\n- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options that will address the question posed in the current step of the thread progression."
+        : ""
+    }
 - Use direct speech
 --- Both for the player characters and the NPCs.
 --- Give characters a voice. Don't just say 'you absorb the cryptic wisdom imparted by X'. Spell out the actual words that the character says.
 - Address the player directly (with 'You' in the second person)${
       story.isMultiplayer()
-        ? "\n--- Only address the player that will see this beat directly. Other players in the same thread should be referenced by name or with third person pronouns.\n"
+        ? "\n--- Only address the player for whom a beat is written directly. Other players in the same thread should be referenced by name or with third person pronouns.\n"
         : ""
     }
 - Don't break the fourth wall
@@ -376,7 +377,7 @@ Options
 - Make sure that the beat implements the current ${story.getCurrentBeatType()} configuration.${
       story.getCurrentBeatType() === "thread"
         ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n" +
-          "--- Avoid offering options that are similar to options that were already offered to the player in previous beats in this thread.\n"
+          "--- Avoid offering options that are similar to options that were already offered to the player during this thread.\n"
         : story.getCurrentBeatType() === "switch"
         ? "--- Don't offer options for the upcoming thread that are similar to the previous threads."
         : ""
