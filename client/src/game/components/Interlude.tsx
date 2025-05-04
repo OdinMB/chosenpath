@@ -82,7 +82,7 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <ColoredBox leftBorder={false} className="p-4 w-full">
+      <ColoredBox colorType="grey" leftBorder={false} className="p-4 w-full">
         <div
           ref={interludeRef}
           className="flex flex-col items-center touch-pan-x"

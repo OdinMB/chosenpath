@@ -183,11 +183,13 @@ export function GameLayout({
               <h3 className="text-lg font-semibold text-primary mb-2 text-center">
                 Players Status
               </h3>
-              <PendingPlayers
-                pendingPlayers={storyState.pendingPlayers}
-                numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
-                currentPlayer={playerSlot}
-              />
+              <div>
+                <PendingPlayers
+                  pendingPlayers={storyState.pendingPlayers}
+                  numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
+                  currentPlayer={playerSlot}
+                />
+              </div>
             </div>
           )}
 
@@ -313,7 +315,7 @@ export function GameLayout({
           />
         </section>
 
-        <div className="mt-8">
+        <div className="mt-8 w-full">
           <PendingPlayers
             pendingPlayers={storyState.pendingPlayers}
             numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
@@ -361,7 +363,7 @@ export function GameLayout({
               <LoadingSpinner size="large" message="" />
 
               {stateManager.getNumberOfPlayers(storyState) > 1 && (
-                <div className="mt-8 w-full max-w-md">
+                <div className="mt-8 w-full max-w-md flex justify-center">
                   <PendingPlayers
                     pendingPlayers={storyState.pendingPlayers}
                     numberOfPlayers={stateManager.getNumberOfPlayers(

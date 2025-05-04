@@ -6,7 +6,7 @@ type ColoredBoxBaseProps = {
   children: React.ReactNode;
   isActive?: boolean;
   leftBorder?: boolean;
-  colorType?: "primary" | "secondary" | "tertiary" | "accent";
+  colorType?: "primary" | "secondary" | "tertiary" | "accent" | "grey";
   className?: string;
   disabled?: boolean;
 };
@@ -48,6 +48,8 @@ export function ColoredBox<T extends ElementType = "div">({
         return `${borderClass} border-tertiary-800 hover:enabled:border-tertiary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
       } else if (colorType === "accent") {
         return `${borderClass} border-accent-800 hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+      } else if (colorType === "grey") {
+        return `${borderClass} border-primary-100 hover:enabled:border-primary-200 hover:enabled:shadow-lg hover:enabled:translate-x-1`;
       }
     }
 
@@ -60,6 +62,8 @@ export function ColoredBox<T extends ElementType = "div">({
       return `${borderClass} border-tertiary`;
     } else if (colorType === "accent") {
       return `${borderClass} border-accent`;
+    } else if (colorType === "grey") {
+      return `${borderClass} border-primary-100`;
     }
 
     // Fallback to secondary

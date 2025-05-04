@@ -480,12 +480,14 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
           {/* Only show pending players list when there are actually pending players */}
           {hasPendingPlayers && (
-            <div className="mt-4 w-full max-w-md">
-              <PendingPlayers
-                pendingPlayers={storyState.pendingPlayers}
-                numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
-                currentPlayer={playerSlot}
-              />
+            <div className="mt-4 flex justify-center">
+              <div className="inline-block">
+                <PendingPlayers
+                  pendingPlayers={storyState.pendingPlayers}
+                  numberOfPlayers={stateManager.getNumberOfPlayers(storyState)}
+                  currentPlayer={playerSlot}
+                />
+              </div>
             </div>
           )}
         </div>

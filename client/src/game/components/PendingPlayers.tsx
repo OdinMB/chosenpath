@@ -41,20 +41,22 @@ export function PendingPlayers({
           <span className="text-sm font-medium text-primary mr-2">
             Waiting for
           </span>
-          {pendingPlayers.map((slot) => (
-            <span
-              key={slot}
-              className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded border ${
-                slot === currentPlayer
-                  ? "border-l-4 border-secondary bg-white text-primary shadow-sm"
-                  : "border border-primary-100 bg-white text-primary-700 shadow-sm"
-              }`}
-            >
-              {slot === currentPlayer
-                ? "You"
-                : `Player ${slot.replace("player", "")}`}
-            </span>
-          ))}
+          <div className="flex flex-wrap gap-1.5">
+            {pendingPlayers.map((slot) => (
+              <span
+                key={slot}
+                className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded border ${
+                  slot === currentPlayer
+                    ? "border-l-4 border-secondary bg-white text-primary shadow-sm"
+                    : "border border-primary-100 bg-white text-primary-700 shadow-sm"
+                }`}
+              >
+                {slot === currentPlayer
+                  ? "You"
+                  : `Player ${slot.replace("player", "")}`}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>
