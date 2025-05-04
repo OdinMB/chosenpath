@@ -3,13 +3,17 @@ import { v4 as uuidv4 } from "uuid";
 import { aiImageGenerator } from "game/services/AIImageGenerator.js";
 import { Logger } from "shared/logger.js";
 import {
-  IMAGE_QUALITIES,
   IMAGE_SIZES,
   ResponseStatus,
   GenerateElementImageRequest,
   GenerateCoverImageRequest,
   GenerateImageResponse,
 } from "core/types/index.js";
+import {
+  IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
+} from "config.js";
 
 const router = express.Router();
 
@@ -49,7 +53,7 @@ router.post("/image-generation/template/element", async (req, res) => {
       imageInstructions,
       undefined, // No image references
       size,
-      quality || IMAGE_QUALITIES.HIGH
+      quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY
     );
 
     // Return success response
@@ -113,7 +117,7 @@ router.post("/image-generation/template/player", async (req, res) => {
       appearance,
       imageInstructions,
       size || IMAGE_SIZES.PORTRAIT,
-      quality || IMAGE_QUALITIES.HIGH
+      quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY
     );
 
     // Return success response
@@ -166,7 +170,7 @@ router.post("/image-generation/template/cover", async (req, res) => {
       coverPrompt,
       imageInstructions,
       size || IMAGE_SIZES.PORTRAIT,
-      quality || IMAGE_QUALITIES.HIGH
+      quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
     );
 
     // Return success response

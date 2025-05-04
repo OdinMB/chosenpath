@@ -84,7 +84,7 @@ export class AIImageGenerator {
       prompt,
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
-      quality || IMAGE_QUALITIES.HIGH // Default to high quality for player images
+      quality || IMAGE_QUALITIES.LOW // Default to low (security measure)
     );
 
     // Save the image in template/images/players directory
@@ -119,7 +119,7 @@ export class AIImageGenerator {
       prompt,
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers
-      quality || IMAGE_QUALITIES.HIGH // Default to high quality for covers
+      quality || IMAGE_QUALITIES.LOW // Default to high quality for covers
     );
 
     // Save the image with 'cover' as the ID

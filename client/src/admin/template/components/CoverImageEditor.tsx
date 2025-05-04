@@ -1,12 +1,7 @@
 import React, { useState } from "react";
 import { TextArea, PrimaryButton } from "components/ui";
 import { Icons } from "components/ui/Icons";
-import {
-  ImageInstructions,
-  IMAGE_SIZES,
-  IMAGE_QUALITIES,
-  ImageUI,
-} from "core/types";
+import { ImageInstructions, ImageUI } from "core/types";
 import { useImageGeneration } from "shared/hooks/useImageGeneration";
 import { StoryImage } from "shared/components/StoryImage";
 
@@ -46,8 +41,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
         templateId,
         coverPrompt: imageInstructions.coverPrompt,
         imageInstructions,
-        size: IMAGE_SIZES.PORTRAIT,
-        quality: IMAGE_QUALITIES.HIGH,
       });
 
       console.log("Cover image generated:", result);
