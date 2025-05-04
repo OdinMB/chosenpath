@@ -14,6 +14,7 @@ export function createStoryStateFromTemplate(
   gameId: string,
   template: StoryTemplate,
   maxTurns: number,
+  generateImages: boolean,
   playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
 ): StoryState {
   let sharedStatValues = template.sharedStats.map((stat) => ({
@@ -41,7 +42,7 @@ export function createStoryStateFromTemplate(
     characterSelectionCompleted: false,
     characterSelectionOptions: {},
     characterSelectionIntroduction: template.characterSelectionIntroduction,
-    generateImages: false, // Template-based stories don't use image generation
+    generateImages: generateImages,
     images: loadTemplateImages(template.id),
     playerCodes,
   };

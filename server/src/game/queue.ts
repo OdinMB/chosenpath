@@ -37,6 +37,7 @@ export interface GameOperations {
       template: StoryTemplate;
       playerCount: PlayerCount;
       maxTurns: number;
+      generateImages: boolean;
       playerCodes: Record<PlayerSlot, string>;
       originalSocket: Socket;
     };

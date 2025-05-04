@@ -203,7 +203,7 @@ export const beatGenerationSchema = z.object({
   imageRequest: z
     .union([z.string(), imageRequestSchema])
     .describe(
-      "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images."
+      "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images or if a fitting and very specific image is already available in the image library (e.g. a character investigating magic glyphs, not just a generic image of the character)."
     ),
   text: z
     .string()

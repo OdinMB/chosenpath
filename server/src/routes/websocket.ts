@@ -343,6 +343,7 @@ export class GameWebSocketServer {
           templateId: string;
           playerCount: number;
           maxTurns: number;
+          generateImages: boolean;
           requestId?: string;
         }) => {
           try {
@@ -364,7 +365,8 @@ export class GameWebSocketServer {
               socket,
               data.templateId,
               data.playerCount as PlayerCount,
-              data.maxTurns
+              data.maxTurns,
+              data.generateImages
             );
 
             // Send immediate success response that the request was accepted

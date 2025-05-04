@@ -100,7 +100,11 @@ export const imageInstructionsSchema = z
 export type ImageInstructions = z.infer<typeof imageInstructionsSchema>;
 
 export const imageRequestSchema = z.object({
-  caption: z.string().describe("A caption for the dynamic image."),
+  caption: z
+    .string()
+    .describe(
+      "A caption for the dynamic image. Keep it short and try to formulate it in a way that allows reusing the image for other beats later on."
+    ),
   id: z.string().describe("The ID of the dynamic image."),
   referenceImageIds: z
     .array(z.string())

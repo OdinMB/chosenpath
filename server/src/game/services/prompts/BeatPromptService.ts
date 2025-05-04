@@ -266,6 +266,17 @@ Title: ${
           ")' after the title to indicate the beat number of the current thread."
     }
 
+Request new images
+${
+  story.generatesImages()
+    ? "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.)\n" +
+      "Only skip this step if a fitting and very specific image is already available in the image library, like a character investigating magic glyphs, not just a generic image of the character."
+    : "This story does not allow image generation. Do not request any new images." +
+      story.hasImages()
+    ? " You can use the existing images in the image library, though."
+    : ""
+}
+
 Text
 - The first paragraph must
 --- continue exactly where the previous beat for this player ended
@@ -335,7 +346,7 @@ Example: If the player decided to organize a vote, describe what they do, how th
 --- Players will see the options below the beat text. Talking about them in the beat text is redundant.
 --- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'
 
-Images
+Image tags
 ${
   story.hasImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +

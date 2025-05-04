@@ -350,7 +350,8 @@ export class GameHandler {
     socket: Socket,
     templateId: string,
     playerCount: PlayerCount,
-    maxTurns: number
+    maxTurns: number,
+    generateImages: boolean
   ): Promise<void> {
     try {
       console.log(
@@ -419,6 +420,7 @@ export class GameHandler {
             template,
             playerCount,
             maxTurns,
+            generateImages,
             playerCodes,
             originalSocket: socket,
           },

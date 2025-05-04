@@ -419,6 +419,7 @@ function App() {
     templateId: string;
     playerCount: number;
     maxTurns: number;
+    generateImages: boolean;
   }) => {
     Logger.App.log("handleConfigureTemplate called with options:", options);
 
@@ -428,7 +429,8 @@ function App() {
     gameService.initializeFromTemplate(
       options.templateId,
       options.playerCount,
-      options.maxTurns
+      options.maxTurns,
+      options.generateImages
     );
 
     // Set the template pending flag to prevent premature state transitions

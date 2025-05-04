@@ -45,7 +45,8 @@ class GameService {
   initializeFromTemplate(
     templateId: string,
     playerCount: number,
-    maxTurns: number
+    maxTurns: number,
+    generateImages: boolean
   ) {
     const sessionId = wsService.getSessionId();
     if (!sessionId) {
@@ -64,6 +65,7 @@ class GameService {
       templateId,
       playerCount,
       maxTurns,
+      generateImages,
     });
 
     wsService.sendMessage({
@@ -72,6 +74,7 @@ class GameService {
       templateId,
       playerCount,
       maxTurns,
+      generateImages,
     });
   }
 

@@ -142,8 +142,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     if (operation.type !== "initializeStoryFromTemplate") return;
 
     const { gameId, input } = operation;
-    const { template, playerCount, maxTurns, playerCodes, originalSocket } =
-      input;
+    const {
+      template,
+      playerCount,
+      maxTurns,
+      generateImages,
+      playerCodes,
+      originalSocket,
+    } = input;
 
     try {
       console.log(
@@ -156,6 +162,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         gameId,
         template,
         maxTurns,
+        generateImages,
         playerCodes
       );
 

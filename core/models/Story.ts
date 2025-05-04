@@ -408,6 +408,10 @@ export class Story {
     return this.hasImages() || this.state.generateImages;
   }
 
+  generatesImages(): boolean {
+    return this.state.generateImages;
+  }
+
   getImages() {
     return this.imageManager.getImages(this.state);
   }
