@@ -1,8 +1,7 @@
 import {
-  Beat,
   StoryState,
   ImageStoryState,
-  PlayerSlot,
+  ImageInstructions,
 } from "../types/index.js";
 
 /**
@@ -51,33 +50,7 @@ export class ImageManager {
     };
   }
 
-  /**
-   * Set the image for a player's current beat
-   */
-  setCurrentBeatImage(
-    state: StoryState,
-    playerSlot: PlayerSlot,
-    imageId: string
-  ): StoryState {
-    const player = state.players[playerSlot];
-    if (!player) return state;
-
-    const currentTurn = player.beatHistory.length;
-    if (currentTurn <= 0) return state;
-
-    return {
-      ...state,
-      players: {
-        ...state.players,
-        [playerSlot]: {
-          ...player,
-          beatHistory: player.beatHistory.map((beat: Beat, index: number) =>
-            index === player.beatHistory.length - 1
-              ? { ...beat, imageId }
-              : beat
-          ),
-        },
-      },
-    };
+  getImageInstructions(state: StoryState): ImageInstructions {
+    return state.imageInstructions;
   }
 }

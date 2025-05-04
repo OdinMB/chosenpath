@@ -4,6 +4,8 @@ import {
   GameMode,
   GameModes,
   Guidelines,
+  ImageInstructions,
+  ImageStoryState,
   StoryPhase,
   PlayerCount,
   PlayerSlot,
@@ -50,6 +52,10 @@ export class Story {
       ...this.state,
       ...updatedState,
     });
+  }
+
+  getId(): string {
+    return this.state.id;
   }
 
   // Story metadata getters
@@ -129,10 +135,6 @@ export class Story {
 
   getSharedStats(): Stat[] {
     return this.state.sharedStats;
-  }
-
-  includesImages(): boolean {
-    return this.hasImages() || this.state.generateImages;
   }
 
   isFirstBeat(): boolean {
@@ -402,6 +404,10 @@ export class Story {
   }
 
   // Image forwarding methods
+  includesImages(): boolean {
+    return this.hasImages() || this.state.generateImages;
+  }
+
   getImages() {
     return this.imageManager.getImages(this.state);
   }
@@ -410,18 +416,22 @@ export class Story {
     return this.state.images.length > 0;
   }
 
-  addImage(image: any) {
+  addImage(image: ImageStoryState) {
     const updatedState = this.imageManager.addImage(this.state, image);
     return new Story(updatedState);
   }
 
-  updateImage(imageId: string, updates: any) {
+  updateImage(imageId: string, updates: Partial<ImageStoryState>) {
     const updatedState = this.imageManager.updateImage(
       this.state,
       imageId,
       updates
     );
     return new Story(updatedState);
+  }
+
+  getImageInstructions(): ImageInstructions {
+    return this.imageManager.getImageInstructions(this.state);
   }
 
   // Client state forwarding

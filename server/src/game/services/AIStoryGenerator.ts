@@ -8,6 +8,7 @@ import type {
   Beat,
   BeatGeneration,
   SetOfBeatGenerationSchema,
+  ImageRequest,
   SwitchAnalysis,
   ThreadAnalysis,
   PlayerCount,
@@ -303,16 +304,16 @@ export class AIStoryGenerator {
 
   async generateBeats(
     story: Story
-  ): Promise<[Story, Change[], BeatsNeedingImages]> {
+  ): Promise<[Story, Change[], ImageRequest[]]> {
     try {
       const response = await this.generateBeatsResponse(story);
-      const [updatedStory, beatsNeedingImages] = this.processBeatsResponse(
+      const [updatedStory, imageRequests] = this.processBeatsResponse(
         story,
         response
       );
       const mergedChanges = this.mergeChanges(response);
 
-      return [updatedStory, mergedChanges, beatsNeedingImages];
+      return [updatedStory, mergedChanges, imageRequests];
     } catch (error) {
       Logger.Story.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
@@ -352,9 +353,9 @@ export class AIStoryGenerator {
   private processBeatsResponse(
     story: Story,
     response: SetOfBeatGenerationSchema
-  ): [Story, BeatsNeedingImages] {
+  ): [Story, ImageRequest[]] {
     let updatedStory = story.clone();
-    const beatsNeedingImages: BeatsNeedingImages = {};
+    const imageRequests: ImageRequest[] = [];
 
     Object.entries(response).forEach(([key, value]) => {
       if (this.isPlayerBeat(key)) {
@@ -370,8 +371,11 @@ export class AIStoryGenerator {
 
           updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
 
-          // ToDo: needs new method for creating images
-          // beatsNeedingImages[playerSlot] = beat;
+          // If the imageRequest is an object, add it to the imageRequests array
+          // (Could be an empty string to indicate that no image is needed)
+          if (beat.imageRequest && typeof beat.imageRequest === "object") {
+            imageRequests.push(beat.imageRequest);
+          }
         } else {
           throw new Error(
             `Player ${playerSlot} not found in story. This should never happen.`
@@ -380,7 +384,7 @@ export class AIStoryGenerator {
       }
     });
 
-    return [updatedStory, beatsNeedingImages];
+    return [updatedStory, imageRequests];
   }
 
   private isPlayerBeat(key: string): boolean {

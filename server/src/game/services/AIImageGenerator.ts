@@ -8,10 +8,11 @@ import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
   ImageStoryState,
   ImageReference,
-  BeatsNeedingImages,
+  ImageRequest,
   ImageSize,
   ImageQuality,
   ImageInstructions,
+  ImageSource,
 } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 import {
@@ -127,12 +128,12 @@ export class AIImageGenerator {
   }
 
   public getImagePrompt(
-    elementAppearance: string,
+    description: string,
     imageInstructions?: ImageInstructions
   ) {
     let prompt: string = "";
-    prompt += `Generate an image that can accompany the following story element in a story book\n\n`;
-    prompt += `==========\n${elementAppearance}\n==========`;
+    prompt += `Generate an image that can accompany the following scene or story element in a story book\n\n`;
+    prompt += `==========\n${description}\n==========`;
     if (imageInstructions) {
       prompt += `\n\n${this.getPromptSectionFromImageInstructions(
         imageInstructions
@@ -183,7 +184,7 @@ export class AIImageGenerator {
         prompt,
         moderation: "low",
         n: 1,
-        quality: quality || IMAGE_QUALITIES.MEDIUM,
+        quality: quality || IMAGE_QUALITIES.LOW, // low for security
         output_format: "jpeg",
         output_compression: IMAGE_GENERATION_OUTPUT_COMPRESSION,
         size: size || IMAGE_SIZES.AUTO,
@@ -269,46 +270,84 @@ export class AIImageGenerator {
     return referenceImages;
   }
 
-  private async saveImageToTemplate(
+  private async saveImageToFile(
     imageId: string,
-    templateId: string,
+    source: ImageSource,
+    sourceId: string, // templateId or storyId
     imageBuffer: Buffer,
     subDir?: string
   ): Promise<string> {
     try {
+      let sourceURLString: string;
+      if (source === "template") {
+        sourceURLString = "templates";
+      } else if (source === "story") {
+        sourceURLString = "stories";
+      } else {
+        throw new Error("Invalid source");
+      }
+
       const fileName = `${imageId.replace(/\//g, "_")}.jpeg`;
       // Get the template directory path using storageUtils
-      const templatesBasePath = getStoragePath("templates");
+      const sourceBasePath =
+        source === "template"
+          ? getStoragePath("templates")
+          : getStoragePath("stories");
+
       // Create the template-specific directory if it doesn't exist
       const storageDir = path.join(
-        templatesBasePath,
-        templateId,
+        sourceBasePath,
+        sourceId,
         "images",
         subDir || ""
       );
       if (!fs.existsSync(storageDir)) {
         fs.mkdirSync(storageDir, { recursive: true });
-        Logger.Story.log(`Created template images directory: ${storageDir}`);
+        Logger.Story.log(`Created ${source} images directory: ${storageDir}`);
       }
 
       // Save the image
       const filePath = path.normalize(path.join(storageDir, fileName));
       fs.writeFileSync(filePath, imageBuffer);
       Logger.Story.log(
-        `Saved image ${imageId} to template: ${templateId} at path: ${filePath}`
+        `Saved image ${imageId} to ${source}: ${sourceId} at path: ${filePath}`
       );
 
-      // Return the access path with the correct route pattern /images/templates/:templateId/:path(*)
-      return `/images/templates/${templateId}/${
+      // Return the access path with the correct route pattern /images/[templates/stories]/:sourceId/:path(*)
+      return `/images/${sourceURLString}/${sourceId}/${
         subDir ? `${subDir}/` : ""
       }${fileName}`;
     } catch (error) {
       Logger.Story.error(
-        `Error saving image ${imageId} to template: ${templateId}`,
+        `Error saving image ${imageId} to ${source}: ${sourceId}`,
         error
       );
       throw error;
     }
+  }
+
+  private async saveImageToTemplate(
+    imageId: string,
+    templateId: string,
+    imageBuffer: Buffer,
+    subDir?: string
+  ): Promise<string> {
+    return this.saveImageToFile(
+      imageId,
+      "template",
+      templateId,
+      imageBuffer,
+      subDir
+    );
+  }
+
+  private async saveImageToStory(
+    imageId: string,
+    storyId: string,
+    imageBuffer: Buffer,
+    subDir?: string
+  ): Promise<string> {
+    return this.saveImageToFile(imageId, "story", storyId, imageBuffer, subDir);
   }
 
   private async saveImageToTemp(imageBuffer: Buffer): Promise<string> {
@@ -328,43 +367,39 @@ export class AIImageGenerator {
   // ToDo: Needs new system
   async generateImagesForBeats(
     story: Story,
-    beatsNeedingImages: BeatsNeedingImages
+    imageRequests: ImageRequest[]
   ): Promise<Story> {
     let updatedStory = story;
 
     // Generate images in parallel
-    const imagePromises = Object.entries(beatsNeedingImages).map(
-      async ([playerSlot, beat]) => {
-        try {
-          // Create image ID
-          const imageId = uuidv4();
+    const imagePromises = imageRequests.map(async (imageRequest) => {
+      try {
+        // ToDo: reference images
+        const imageReferences: ImageReference[] = [];
 
-          // Add placeholder to image library
-          const placeholderImage: ImageStoryState = {
-            id: imageId,
-            description: `Image for: ${beat.text.substring(0, 50)}...`,
-            source: "story",
-          };
-          updatedStory = updatedStory.addImage(placeholderImage);
+        const prompt = this.getImagePrompt(
+          imageRequest.prompt,
+          story.getImageInstructions()
+        );
+        const imageBuffer = await this.generateImage(prompt, imageReferences);
 
-          // Generate actual image
-          const imagePath = await this.generateImage(
-            `Digital art illustration for a story book. The image is supposed to accompany the following text:\n\n${beat.text}. `
-          );
+        const imagePath = await this.saveImageToStory(
+          imageRequest.id,
+          story.getId(),
+          imageBuffer
+        );
 
-          updatedStory = updatedStory.updateImage(imageId, {
-            url: imagePath, // We're storing local path as URL for now
-            prompt: beat.text,
-            description: `Image for: ${beat.text.substring(0, 50)}...`,
-            status: "complete",
-          });
+        const imageStoryState: ImageStoryState = {
+          id: imageRequest.id,
+          source: "story",
+          description: imageRequest.caption,
+        };
 
-          // updatedStory = updatedStory.setCurrentBeatImage(playerSlot, imageId);
-        } catch (error) {
-          Logger.Story.error("Failed to generate image for beat:", error);
-        }
+        updatedStory = updatedStory.addImage(imageStoryState);
+      } catch (error) {
+        Logger.Story.error("Failed to generate image for beat:", error);
       }
-    );
+    });
 
     await Promise.all(imagePromises);
 

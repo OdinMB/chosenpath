@@ -99,7 +99,7 @@ export const imageInstructionsSchema = z
   );
 export type ImageInstructions = z.infer<typeof imageInstructionsSchema>;
 
-export const dynamicStoryImageSchema = z.object({
+export const imageRequestSchema = z.object({
   caption: z.string().describe("A caption for the dynamic image."),
   id: z.string().describe("The ID of the dynamic image."),
   referenceImageIds: z
@@ -113,3 +113,4 @@ export const dynamicStoryImageSchema = z.object({
       "A prompt for the dynamic image. Will be submitted to the LLM in addition to general image generation instructions for this story and the reference images (if any). No need to include instructions for overall aesthetics, just describe what's in the image."
     ),
 });
+export type ImageRequest = z.infer<typeof imageRequestSchema>;

@@ -243,7 +243,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         `[GameQueueProcessor] Current turn: ${updatedStory.getCurrentTurn()}`
       );
 
-      const [nextStory, changes, beatsNeedingImages] =
+      const [nextStory, changes, imageRequests] =
         await this.aiStoryGenerator.generateBeats(updatedStory);
 
       // Apply changes using ChangeService directly
@@ -254,14 +254,11 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       await this.updateAndBroadcastStory(gameId, finalStory);
 
       // Generate images if needed
-      if (
-        finalStory.getState().generateImages &&
-        Object.keys(beatsNeedingImages).length > 0
-      ) {
+      if (finalStory.getState().generateImages && imageRequests.length > 0) {
         console.log("[GameQueueProcessor] Generating images for beats");
         finalStory = await this.aiImageGenerator.generateImagesForBeats(
           finalStory,
-          beatsNeedingImages
+          imageRequests
         );
 
         // Store and broadcast the updated state with images

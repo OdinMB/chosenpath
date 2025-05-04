@@ -8,7 +8,7 @@ import {
   addIntroductionOfStoryElementSchema,
   newMilestoneSchema,
 } from "./change.js";
-import { dynamicStoryImageSchema } from "./image.js";
+import { imageRequestSchema } from "./image.js";
 import { Resolution } from "./thread.js";
 
 export const OPTION_RISK_TYPES = ["normal", "safe", "risky"] as const;
@@ -179,11 +179,6 @@ export const beatPlanSchema = z.object({
     .describe(
       "Considerations for designing the options for this beat. Can be either a detailed object with considerations or a simple string for special cases like 'as in the topic switch configuration' or 'ending'."
     ),
-  imagesToBeGenerated: z
-    .union([z.string(), dynamicStoryImageSchema])
-    .describe(
-      "Image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images."
-    ),
 });
 
 const interludeSchema = z.object({
@@ -204,6 +199,11 @@ export const beatGenerationSchema = z.object({
     .string()
     .describe(
       "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'. If it's the ending, simple 'The End'."
+    ),
+  imageRequest: z
+    .union([z.string(), imageRequestSchema])
+    .describe(
+      "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images."
     ),
   text: z
     .string()
