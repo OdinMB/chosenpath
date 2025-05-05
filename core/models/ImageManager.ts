@@ -62,7 +62,7 @@ export class ImageManager {
   getImageReferenceFromImageId(
     state: StoryState,
     imageId: string
-  ): ImageReference {
+  ): ImageReference | undefined {
     if (imageId.startsWith("player")) {
       return this.getImageReferenceFromPlayerSlot(state, imageId);
     }
@@ -72,7 +72,8 @@ export class ImageManager {
       imageId
     );
     if (!imageStoryState) {
-      throw new Error(`Image not found: ${imageId}`);
+      console.error(`Image not found: ${imageId}`);
+      return;
     }
     const sourceId =
       imageStoryState.source === "template" ? state.templateId : state.id;

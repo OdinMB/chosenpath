@@ -113,7 +113,7 @@ export const imageRequestSchema = z.object({
   referenceImageIds: z
     .array(z.string())
     .describe(
-      "The IDs of the images to use as references for the dynamic image. Leave empty if no reference image is needed (e.g. for a close-up of a new story element). Only include images with characters or elements that the AI needs to generate the new image. Remember that each image reference costs money."
+      "The IDs of the images to use as references for the dynamic image. Leave empty if no reference image is needed (e.g. for a close-up of a new story element). Only use existing images from the image library. Remember that story elements don't necessarily have an image with the same id. Only include images with characters or elements that the AI needs to generate the new image. Remember that each image reference costs money."
     ),
   prompt: z
     .string()

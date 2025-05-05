@@ -380,10 +380,9 @@ export class AIImageGenerator {
     // Generate images in parallel
     const imagePromises = imageRequests.map(async (imageRequest) => {
       try {
-        const imageReferences: ImageReference[] =
-          imageRequest.referenceImageIds.map((id) =>
-            story.getImageReferenceFromImageId(id)
-          );
+        const imageReferences: ImageReference[] = imageRequest.referenceImageIds
+          .map((id) => story.getImageReferenceFromImageId(id))
+          .filter((ref): ref is ImageReference => ref !== undefined);
 
         const prompt = this.getImagePrompt(
           imageRequest.prompt,

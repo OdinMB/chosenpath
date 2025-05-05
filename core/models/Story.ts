@@ -446,7 +446,7 @@ export class Story {
     return this.imageManager.getImageInstructions(this.state);
   }
 
-  getImageReferenceFromImageId(imageId: string): ImageReference {
+  getImageReferenceFromImageId(imageId: string): ImageReference | undefined {
     return this.imageManager.getImageReferenceFromImageId(this.state, imageId);
   }
 

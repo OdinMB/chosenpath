@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 7: Generating images during the story (using reference images)
+- 2: Generate images for AI-generated stories
 
 # BETTER EXPERIENCE
 
