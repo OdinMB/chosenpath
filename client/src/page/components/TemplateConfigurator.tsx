@@ -4,7 +4,6 @@ import { PrimaryButton, Icons } from "components/ui";
 import { useSession } from "shared/useSession";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
-import { isDevelopment } from "core/config";
 
 interface TemplateConfiguratorProps {
   template: StoryTemplate;
@@ -33,8 +32,7 @@ export function TemplateConfigurator({
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
-  const hasConfigurableSettings =
-    needsPlayerConfig || needsTurnsConfig || isDevelopment;
+  const hasConfigurableSettings = needsPlayerConfig || needsTurnsConfig || true;
 
   // Monitor if the story initialization operation is pending
   useEffect(() => {
@@ -153,25 +151,23 @@ export function TemplateConfigurator({
                 </div>
               )}
 
-              {/* Images Checkbox - Only in development mode */}
-              {isDevelopment && (
-                <div className="items-center flex">
-                  <input
-                    id="generate-images"
-                    type="checkbox"
-                    checked={generateImages}
-                    onChange={(e) => setGenerateImages(e.target.checked)}
-                    className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-                    disabled={isLoading}
-                  />
-                  <label
-                    htmlFor="generate-images"
-                    className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
-                  >
-                    Generate additional custom images for this story
-                  </label>
-                </div>
-              )}
+              {/* Images Checkbox */}
+              <div className="items-center flex">
+                <input
+                  id="generate-images"
+                  type="checkbox"
+                  checked={generateImages}
+                  onChange={(e) => setGenerateImages(e.target.checked)}
+                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                  disabled={isLoading}
+                />
+                <label
+                  htmlFor="generate-images"
+                  className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
+                >
+                  Generate additional custom images for this story
+                </label>
+              </div>
             </div>
           )}
 
