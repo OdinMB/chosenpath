@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  ResolutionDetails,
-  DEFAULT_DISTRIBUTION,
-  SAFE_DISTRIBUTION,
-  RISKY_DISTRIBUTION,
-  Resolution,
-} from "core/types";
+import React, { useState, useEffect } from "react";
+import { ResolutionDetails, Resolution } from "core/types";
 import { Tooltip, InfoIcon, ColoredBox, Icons } from "components/ui";
+import { useEmojiAnimation } from "game/hooks/useEmojiAnimation";
+import { useMarkerAnimation } from "game/hooks/useMarkerAnimation";
+import { useChoiceFormatting } from "game/hooks/useChoiceFormatting";
 
 interface PreviousChoiceVisualizerProps {
   choice: {
@@ -30,242 +27,55 @@ export const PreviousChoiceVisualizer: React.FC<
   animateRoll = false,
   forceExpanded = false,
 }) => {
-  // Start with expanded state based on forceExpanded prop
-  const [expanded, setExpanded] = useState(forceExpanded);
-  const [isAnimating, setIsAnimating] = useState(animateRoll);
-  const [showEmoji, setShowEmoji] = useState(!animateRoll);
-  const [currentEmoji, setCurrentEmoji] = useState<string>("😐");
-  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const emojiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isChallenge = choice.optionType === "challenge";
 
-  // Animation state for the marker
-  const [animatingMarker, setAnimatingMarker] = useState(animateRoll);
-  const [currentMarkerPosition, setCurrentMarkerPosition] = useState(50);
-  const animationRef = useRef<number | null>(null);
-  const animationStartTime = useRef<number | null>(null);
-  const animationCompletedRef = useRef(false);
-  const animationDuration = 6000; // 6 seconds total
+  // Expanded state management (previously in useExpandCollapse)
+  const [expanded, setExpanded] = useState(forceExpanded);
 
   // Update expanded state when forceExpanded prop changes
   useEffect(() => {
     setExpanded(forceExpanded);
   }, [forceExpanded]);
 
-  // Calculate the final emoji based on resolution
-  const getFinalEmoji = useCallback(() => {
-    if (!resolution) return "😐";
-    return resolution === "favorable"
-      ? "😀"
-      : resolution === "mixed"
-      ? "😐"
-      : "🙁";
-  }, [resolution]);
-
-  // Set up animation when component mounts or when animateRoll changes
+  // Set animation completion handler
   useEffect(() => {
-    if (animateRoll && isChallenge && resolution) {
-      // Reset animation state
-      setIsAnimating(true);
-      setShowEmoji(false);
-      setAnimatingMarker(true);
-      setCurrentMarkerPosition(50);
-      animationStartTime.current = null;
-      animationCompletedRef.current = false;
-
+    if (animateRoll && isChallenge) {
       // Ensure expanded state during animation if forceExpanded is true
       if (forceExpanded) {
         setExpanded(true);
       }
 
-      // Clear any existing timeouts and animations
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-
-      if (emojiIntervalRef.current) {
-        clearInterval(emojiIntervalRef.current);
-      }
-
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-
-      // Define the marker animation function inside the effect
-      const animateMarkerInEffect = (timestamp: number) => {
-        if (animationCompletedRef.current || !resolutionDetails?.roll) {
-          return;
-        }
-
-        if (!animationStartTime.current) {
-          animationStartTime.current = timestamp;
-        }
-
-        const elapsed = timestamp - animationStartTime.current;
-        const progress = Math.min(elapsed / animationDuration, 1);
-        const targetRoll = resolutionDetails.roll;
-
-        // Handle normal animation progress
-        if (progress < 0.95) {
-          // Phase 1 (0-50%): Go back and forth between ends twice
-          if (progress < 0.5) {
-            // Creates 4 full sweeps (2 complete cycles) in the first 50% of animation time
-            const fullSweepPosition =
-              50 + 50 * Math.sin((4 * Math.PI * progress) / 0.5);
-            setCurrentMarkerPosition(fullSweepPosition);
-          }
-          // Phase 2 (50-80%): Oscillate around the final position with decreasing amplitude
-          else if (progress < 0.8) {
-            const phaseProgress = (progress - 0.5) / 0.3; // Normalized progress for this phase
-
-            // Start with large oscillations that gradually decrease
-            const frequency = 6 + 3 * phaseProgress; // Gentler frequency increase
-            const amplitude = 40 * (1 - phaseProgress); // Decrease amplitude over time
-
-            const oscillation =
-              amplitude * Math.sin(frequency * Math.PI * phaseProgress);
-            const convergence =
-              50 + (targetRoll - 50) * (0.4 + 0.6 * phaseProgress);
-
-            setCurrentMarkerPosition(convergence + oscillation);
-          }
-          // Phase 3 (80-95%): Settle gently on final position
-          else if (progress < 0.95) {
-            const phaseProgress = (progress - 0.8) / 0.15;
-
-            // Gentler final oscillations with lower frequency
-            const smallAmplitude = 5 * (1 - phaseProgress);
-            const gentleOscillation =
-              smallAmplitude * Math.sin(3 * Math.PI * phaseProgress);
-
-            setCurrentMarkerPosition(targetRoll + gentleOscillation);
-          }
-
-          // Request next animation frame
-          animationRef.current = requestAnimationFrame(animateMarkerInEffect);
-        } else {
-          // Animation complete
-          setCurrentMarkerPosition(targetRoll);
-          setAnimatingMarker(false);
-          animationCompletedRef.current = true;
-
-          if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-            animationRef.current = null;
-          }
-        }
-      };
-
-      // Start marker animation
-      if (resolutionDetails?.roll !== undefined) {
-        animationRef.current = requestAnimationFrame(animateMarkerInEffect);
-      }
-
-      // Start a very simple emoji cycling animation
-      const emojis = ["😀", "😐", "🙁"];
-      let emojiIndex = 0;
-
-      // Get the final emoji once to ensure consistent value
-      const finalEmoji = getFinalEmoji();
-
-      // Simple cycling with faster speed at start, slower at end
-      const initialSpeed = 60; // Very fast cycling (reduced from 100)
-      const endSpeed = 800; // Slow at the end
-      const speedIncrement = 30; // Smaller increment for smoother transition
-      let currentSpeed = initialSpeed;
-      const animationEndTime = Date.now() + 6000; // Total animation time (6s)
-
-      // Function to update emoji
-      const updateEmoji = () => {
-        const timeRemaining = animationEndTime - Date.now();
-
-        // If we're getting close to the end (remaining time < 2000ms, about 3 emoji cycles)
-        // and we're currently showing the final emoji, stop and keep this emoji
-        if (timeRemaining < 2000 && emojis[emojiIndex] === finalEmoji) {
-          setCurrentEmoji(finalEmoji);
-          return; // Exit early to stop the cycle and keep the final emoji
-        }
-
-        // If we're very close to the end (remaining time < 800ms, about 1 cycle)
-        // ensure we show the final emoji next
-        if (timeRemaining < 800) {
-          // Find index of final emoji
-          const finalIndex = emojis.indexOf(finalEmoji);
-          if (finalIndex !== -1) {
-            emojiIndex = finalIndex;
-          }
-        }
-
-        // Update the emoji
-        setCurrentEmoji(emojis[emojiIndex]);
-
-        // Move to next emoji
-        emojiIndex = (emojiIndex + 1) % emojis.length;
-
-        // Gradually slow down
-        currentSpeed = Math.min(currentSpeed + speedIncrement, endSpeed);
-
-        // Schedule next update with increasing delay
-        emojiIntervalRef.current = setTimeout(updateEmoji, currentSpeed);
-      };
-
-      // Start cycling
-      updateEmoji();
-
-      // Set a timeout to show the final emoji after animation
-      animationTimeoutRef.current = setTimeout(() => {
-        // Clean up the interval
-        if (emojiIntervalRef.current) {
-          clearTimeout(emojiIntervalRef.current);
-          emojiIntervalRef.current = null;
-        }
-
-        setIsAnimating(false);
-        setShowEmoji(true);
-        setCurrentEmoji(finalEmoji);
-
-        // Make sure marker animation is complete
-        if (resolutionDetails?.roll !== undefined) {
-          setCurrentMarkerPosition(resolutionDetails.roll);
-        }
-        setAnimatingMarker(false);
-
-        // Don't auto-collapse after animation if forceExpanded is true
+      // Set a timeout to collapse after animation if not forceExpanded
+      const timeoutId = setTimeout(() => {
         if (!forceExpanded) {
           setExpanded(false);
         }
       }, 6000); // Match animation duration
-    } else {
-      setIsAnimating(false);
-      setShowEmoji(true);
-      setCurrentEmoji(getFinalEmoji());
-      setAnimatingMarker(false);
-      if (resolutionDetails?.roll !== undefined) {
-        setCurrentMarkerPosition(resolutionDetails.roll);
-      }
-    }
 
-    return () => {
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-      if (emojiIntervalRef.current) {
-        clearTimeout(emojiIntervalRef.current);
-        emojiIntervalRef.current = null;
-      }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-    };
-  }, [
+      return () => clearTimeout(timeoutId);
+    }
+  }, [animateRoll, isChallenge, forceExpanded]);
+
+  // Use custom hooks to manage state and animations
+  const { isAnimating, showEmoji, currentEmoji } = useEmojiAnimation({
     animateRoll,
-    isChallenge,
     resolution,
-    resolutionDetails,
-    getFinalEmoji,
+    isChallenge,
     forceExpanded,
-  ]);
+  });
+
+  const { animatingMarker, currentMarkerPosition } = useMarkerAnimation({
+    animateRoll,
+    resolutionDetails,
+    isChallenge,
+  });
+
+  const {
+    formatRiskDistribution,
+    getResourceTypeInfo,
+    getColor,
+    getRiskDisplayText,
+  } = useChoiceFormatting();
 
   // Get emoji based on resolution or exploration
   const getIconContent = () => {
@@ -308,60 +118,6 @@ export const PreviousChoiceVisualizer: React.FC<
 
     // Fallback
     return <div className="w-8 h-8"></div>;
-  };
-
-  // Format risk distribution for tooltip text
-  const formatRiskDistribution = (riskType?: string): string => {
-    switch (riskType) {
-      case "normal":
-        return `😀 ${DEFAULT_DISTRIBUTION.favorable}% | 😐 ${DEFAULT_DISTRIBUTION.mixed}% | 🙁 ${DEFAULT_DISTRIBUTION.unfavorable}%`;
-      case "safe":
-        return `😀 ${SAFE_DISTRIBUTION.favorable}% | 😐 ${SAFE_DISTRIBUTION.mixed}% | 🙁 ${SAFE_DISTRIBUTION.unfavorable}%`;
-      case "risky":
-        return `😀 ${RISKY_DISTRIBUTION.favorable}% | 😐 ${RISKY_DISTRIBUTION.mixed}% | 🙁 ${RISKY_DISTRIBUTION.unfavorable}%`;
-      default:
-        return "Unknown risk type";
-    }
-  };
-
-  // Get resource type info as string
-  const getResourceTypeInfo = (resourceType?: string): string => {
-    switch (resourceType) {
-      case "sacrifice":
-        return "You paid a price to gain an edge.";
-      case "reward":
-        return "You chased a reward, which made things harder.";
-      default:
-        return "Standard option with no special effects.";
-    }
-  };
-
-  // Get color for an outcome type
-  const getColor = (outcome: string): string => {
-    switch (outcome) {
-      case "favorable":
-        return "bg-tertiary-800";
-      case "mixed":
-        return "bg-tertiary-600";
-      case "unfavorable":
-        return "bg-tertiary-400";
-      default:
-        return "bg-primary-200";
-    }
-  };
-
-  // Convert risk type to display text
-  const getRiskDisplayText = (riskType?: string): string => {
-    switch (riskType) {
-      case "risky":
-        return "High";
-      case "normal":
-        return "Balanced";
-      case "safe":
-        return "Low";
-      default:
-        return "Unknown";
-    }
   };
 
   // Bar segment with tooltip
@@ -631,12 +387,11 @@ export const PreviousChoiceVisualizer: React.FC<
                           {resolutionDetails.readablePointModifiers &&
                             resolutionDetails.readablePointModifiers.length >
                               0 && (
-                              <div>
-                                <InfoIcon
-                                  tooltipText={formatPointBreakdown()}
-                                  contentClassName="max-w-[400px]"
-                                />
-                              </div>
+                              <InfoIcon
+                                className="ml-1 mt-1"
+                                tooltipText={formatPointBreakdown()}
+                                contentClassName="max-w-[400px]"
+                              />
                             )}
                         </div>
                       )}
