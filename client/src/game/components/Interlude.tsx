@@ -102,7 +102,13 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
 
           {/* Text */}
           <div className="text-center text-primary">
-            <p className="italic">{currentInterlude.text || ""}</p>
+            <p
+              className={`italic ${
+                !currentInterlude.imageReference ? "text-lg md:text-xl" : ""
+              }`}
+            >
+              {currentInterlude.text || ""}
+            </p>
           </div>
 
           {/* Navigation controls */}

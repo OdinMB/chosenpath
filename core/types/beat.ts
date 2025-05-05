@@ -185,11 +185,11 @@ const interludeSchema = z.object({
   imageId: z
     .string()
     .describe(
-      "Id of the image to be shown in the interlude. Must be listed in the image library. Leave empty if no image exists for this interlude."
+      "Id of the image to be shown in the interlude. Must be listed in the image library. Leave empty if images are disabled for this story or if no image exists for this interlude."
     ),
   imageSource: z
     .enum(["template", "story", "none"])
-    .describe("Source of the image."),
+    .describe("Source of the image. If 'none', no image is shown."),
   text: z.string().describe("1-2 sentences of flavor text."),
 });
 
@@ -268,7 +268,7 @@ export const createSetOfBeatGenerationSchema = (
     statChanges: z
       .array(statChangeSchema)
       .describe(
-        "List of stat changes based on players' decisions in the previous beat that will be applied to the story state. Include stat sacrifices and rewards for sacrifice and reward options. If this is the first set of beats, just return an empty list."
+        "List of stat changes based on players' decisions in and the resolutions of the previous set of beats. Include stat sacrifices and rewards if players chose these types of options. If an entire thread was just resolved, remember to check all stat's 'adjustments after threads' parameters (more meaningful changes to stats might be warrented). If this is the first beat of the story, just return an empty list."
       ),
     ...(canAddMilestones
       ? {

@@ -130,13 +130,14 @@ ${
       "- If you want to replace an item in a string[] stat, apply both a removeElement and addElement change.\n" +
       (story.getCurrentBeatType() === "switch" ||
       story.getCurrentBeatType() === "ending"
-        ? "- The previous thread (or set of threads) was just resolved, so some meaningful stat changes might be warrented.\n" +
+        ? "\nTHREAD RESOLUTION\n" +
+          "- The previous thread (or set of threads) was just resolved, so some meaningful stat changes might be warrented.\n" +
           "- Consider what was at stake in the previous thread and the thread's resolution.\n" +
           "- Stats define how they should be adjusted after threads. Consider the 'Adjustments after threads' parameter in the stat definitions.\n" +
-          "- When a thread is resolved, all stats can change, not just the ones that are marked as 'can be changed in beat resolutions'.\n" +
+          "- Because it's the end of a thread, all stats can change, not just the ones that are marked as 'can be changed in beat resolutions'.\n" +
           "\nNEW MILESTONES: To resolve the previous set of threads, for each outcome associated with these resolved threads, add a milestone based on the thread's resolution with a newMilestone change.\n" +
           "- Take the threads' resolution text as a baseline. Adjust it based on the thread's narrative text to make the new milestone more specific. Example: if the thread's general resolution is 'The council's decision heavily favors progress', based on the thread's narrative, the new milestone could be 'Threatened by the Furious Four, the council has no choice but to approve the new railroad.'\n"
-        : "- For beat resolutions, only stats that are marked as 'can always be adjusted' can be changed. Even then, keep the changes minor.\n")
+        : "- Only stats that are marked as 'can always be adjusted' can be changed (except for rewards and sacrifices). Even then, keep the changes minor.\n")
 }${
       story.isMultiplayer()
         ? "\n\n3. MULTIPLAYER COORDINATION\n\n" +
@@ -376,11 +377,24 @@ ${
 }
 
 Interludes
-are little snippets of image and text that the player sees while the next beat is being generated.
+are little snippets of image (optional) and text (required) that the player sees while the next beat is being generated.
 Create a total of exactly 3 interludes.
-- Create 1 interlude with a stream of consciousness of the player character for whom this beat is written. As always: show don't tell. First person, specific associations, emotions, and unfinished thoughts -- not a polished monologue or a third person summary. (imageId = player slot) Only do this for the player character; the thoughts of other characters are not known to the player.
-- Create 1-2 interludes based on story elements (location, NPC, item, etc.) that is relevant to the beat (imageId = story element id).
-- Create 0-1 interlude that gives a general detail about the world (imageId = "cover").
+- Create 1 interlude with a stream of consciousness of the player character for whom this beat is written. As always: show don't tell. First person, specific associations, emotions, and unfinished thoughts -- not a polished monologue or a third person summary. ${
+      story.includesImages() ? "(imageId = player slot) " : ""
+    }Only do this for the player character; the thoughts of other characters are not known to the player.
+- Create 1-2 interludes based on story elements (location, NPC, item, etc.) that is relevant to the beat${
+      story.includesImages() ? " (imageId = story element id)" : ""
+    }.
+- Create 0-1 interlude that gives a general detail about the world${
+      story.includesImages()
+        ? ' (any available imageId or = "cover" for the story\'s cover image)'
+        : ""
+    }.
+${
+  story.includesImages()
+    ? "Only use images that are available in the image library (or no image at all)."
+    : "This story does not include images, so focus on creating vivid text descriptions for your interludes."
+}
 `;
   }
 

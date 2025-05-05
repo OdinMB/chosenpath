@@ -10,7 +10,6 @@ import type {
   ChallengeOption,
   ResolutionDetails,
   ImagePlaceholder,
-  ImageUI,
 } from "core/types";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import {
@@ -19,12 +18,8 @@ import {
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
 } from "core/config";
 import { LoadingSpinner, PrimaryButton, ColoredBox } from "components/ui";
-import { StoryImage } from "shared/components/StoryImage";
-import {
-  IMAGE_PLACEHOLDER_REGEX,
-  parseImagePlaceholder,
-  createImageFromPlaceholder,
-} from "shared/utils/imageUtils";
+import { createImageFromPlaceholder } from "shared/utils/imageUtils";
+import { processStoryText } from "shared/utils/storyTextProcessor";
 import { ClientStoryState } from "core/types";
 import { Interlude, InterludeItem } from "./Interlude";
 
@@ -446,17 +441,29 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     const interludesWithImageReferences =
       prevBeat.interludes && Array.isArray(prevBeat.interludes)
         ? prevBeat.interludes.map((interlude) => {
-            const interludeImagePlaceholder = {
-              id: interlude.imageId,
-              source: interlude.imageSource,
-            } as ImagePlaceholder;
-            return {
-              imageReference: createImageFromPlaceholder(
+            const item: InterludeItem = { text: interlude.text };
+
+            if (
+              interlude.imageId &&
+              interlude.imageSource &&
+              interlude.imageSource !== "none"
+            ) {
+              const interludeImagePlaceholder = {
+                id: interlude.imageId,
+                source: interlude.imageSource,
+              } as ImagePlaceholder;
+
+              const image = createImageFromPlaceholder(
                 interludeImagePlaceholder,
                 storyState
-              ),
-              text: interlude.text,
-            } as InterludeItem;
+              );
+
+              if (image) {
+                item.imageReference = image;
+              }
+            }
+
+            return item;
           })
         : [];
 
@@ -599,151 +606,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       );
     }
 
-    // Check if text contains image placeholders
-    const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
-
-    // If no matches found, use standard markdown
-    if (!matches) {
-      return React.createElement(
-        ReactMarkdown as ComponentType<{
-          children: string;
-          breaks?: boolean;
-        }>,
-        { breaks: true, children: text }
-      );
-    }
-
-    // Count paragraphs in the text
-    const paragraphs = text.split(/\n\s*\n/);
-
-    // Only apply spacing logic if we have at least 3 paragraphs and 2 images
-    const shouldApplyImageSpacing =
-      paragraphs.length >= 3 && matches.length >= 2;
-
-    // First, locate all paragraphs and their positions
-    const paragraphPositions: { start: number; end: number }[] = [];
-    let currentPos = 0;
-
-    paragraphs.forEach((paragraph) => {
-      const start = text.indexOf(paragraph, currentPos);
-      const end = start + paragraph.length;
-      paragraphPositions.push({ start, end });
-      currentPos = end;
-    });
-
-    // First, render all images and store them with their positions
-    const imageElements: Array<{
-      position: number;
-      element: React.ReactNode;
-      placeholder: string;
-      paragraphIndex: number; // Which paragraph this image belongs to
-    }> = [];
-
-    matches.forEach((match, index) => {
-      const imagePlaceholder: ImagePlaceholder = parseImagePlaceholder(match);
-      const finalImage: ImageUI | null = createImageFromPlaceholder(
-        imagePlaceholder,
-        storyState
-      );
-      if (finalImage) {
-        const position = text.indexOf(match);
-
-        // Determine which paragraph this image belongs to
-        let paragraphIndex = 0;
-        for (let i = 0; i < paragraphPositions.length; i++) {
-          if (
-            position >= paragraphPositions[i].start &&
-            position <= paragraphPositions[i].end
-          ) {
-            paragraphIndex = i;
-            break;
-          }
-        }
-
-        console.log("Rendering image:", finalImage);
-        imageElements.push({
-          position,
-          placeholder: match,
-          paragraphIndex,
-          element: (
-            <StoryImage
-              key={`img-${index}`}
-              image={finalImage}
-              alt={finalImage.description || ""}
-              caption={finalImage.description || ""}
-              withinText={true}
-              float={(imagePlaceholder.float as "left" | "right") || "left"}
-            />
-          ),
-        });
-      } else {
-        console.log("No image found for", match);
-      }
-    });
-
-    // Sort images by their position in the text
-    imageElements.sort((a, b) => a.position - b.position);
-
-    // If we need to apply spacing and have enough images and paragraphs
-    if (shouldApplyImageSpacing) {
-      // Check if any consecutive images are too close together (less than 2 paragraphs apart)
-      for (let i = 1; i < imageElements.length; i++) {
-        const prevImage = imageElements[i - 1];
-        const currentImage = imageElements[i];
-
-        // If images are in the same paragraph or only one paragraph apart
-        if (currentImage.paragraphIndex - prevImage.paragraphIndex < 2) {
-          // Find a better position (at least 2 paragraphs away from the previous image)
-          const targetParagraph = prevImage.paragraphIndex + 2;
-
-          // Only reposition if we have a paragraph to move to
-          if (targetParagraph < paragraphPositions.length) {
-            // Find position after the target paragraph
-            const newPosition = paragraphPositions[targetParagraph].end - 1;
-            currentImage.position = newPosition;
-          }
-        }
-      }
-
-      // Re-sort images after repositioning
-      imageElements.sort((a, b) => a.position - b.position);
-    }
-
-    // Split text into segments at image positions while preserving the original text
-    const segments: Array<{
-      type: "text" | "image";
-      content: string | React.ReactNode;
-    }> = [];
-    let lastIndex = 0;
-
-    imageElements.forEach(({ position, element, placeholder }) => {
-      // Add text segment before the image
-      if (position > lastIndex) {
-        segments.push({
-          type: "text",
-          content: text.slice(lastIndex, position),
-        });
-      }
-      // Add the image
-      segments.push({
-        type: "image",
-        content: element,
-      });
-      // Ensure placeholder.length exists before using it
-      if (placeholder) {
-        lastIndex = position + placeholder.length;
-      } else {
-        lastIndex = position + 1; // Fallback if placeholder is undefined
-      }
-    });
-
-    // Add remaining text after last image
-    if (lastIndex < text.length) {
-      segments.push({
-        type: "text",
-        content: text.slice(lastIndex),
-      });
-    }
+    // Process the text to handle images
+    const segments = processStoryText(text, storyState);
 
     // Render segments
     const elements = segments.map((segment, index) => {
@@ -755,6 +619,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
               string,
               React.ComponentType<{ children: React.ReactNode }>
             >;
+            breaks?: boolean;
           }>,
           {
             key: `text-${index}`,
@@ -764,6 +629,8 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
                 <p className="mb-4 text-base md:text-lg">{children}</p>
               ),
             },
+            // Enable line breaks for proper paragraph rendering
+            breaks: true,
           }
         );
       } else {

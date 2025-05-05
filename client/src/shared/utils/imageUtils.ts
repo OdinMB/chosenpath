@@ -124,8 +124,8 @@ export function parseImagePlaceholder(
     }
 
     // Log the extracted attributes for debugging
-    console.log("Image placeholder text:", placeholderText);
-    console.log("Extracted attributes:", placeholder);
+    // console.log("Image placeholder text:", placeholderText);
+    // console.log("Extracted attributes:", placeholder);
   } catch (error) {
     console.error("Error parsing image placeholder:", error);
   }
