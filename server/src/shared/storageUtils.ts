@@ -40,6 +40,128 @@ async function ensureDirExists(dirPath: string): Promise<void> {
 }
 
 /**
+ * Gets the story directory path for a specific story
+ * @param storyId - The story ID
+ * @returns The full path to the story directory
+ */
+export function getStoryDirectoryPath(storyId: string): string {
+  const storiesBasePath = getStoragePath("stories");
+  return path.join(storiesBasePath, storyId);
+}
+
+/**
+ * Gets the story file path for a specific story
+ * @param storyId - The story ID
+ * @returns The full path to the story.json file
+ */
+export function getStoryFilePath(storyId: string): string {
+  return path.join(getStoryDirectoryPath(storyId), "story.json");
+}
+
+/**
+ * Gets the images directory path for a specific story
+ * @param storyId - The story ID
+ * @returns The full path to the story's images directory
+ */
+export function getStoryImagesDirectoryPath(storyId: string): string {
+  return path.join(getStoryDirectoryPath(storyId), "images");
+}
+
+/**
+ * Ensures a story directory structure exists, creating directories if needed
+ * @param storyId - The story ID
+ * @returns The full path to the created story directory
+ */
+export async function ensureStoryDirectoryStructure(
+  storyId: string
+): Promise<string> {
+  const storyDirPath = getStoryDirectoryPath(storyId);
+  const imagesDirPath = getStoryImagesDirectoryPath(storyId);
+
+  await ensureDirExists(storyDirPath);
+  await ensureDirExists(imagesDirPath);
+
+  return storyDirPath;
+}
+
+/**
+ * Reads a story file from storage
+ * @param storyId - The story ID
+ * @returns The file contents as a string
+ */
+export async function readStoryFile(storyId: string): Promise<string> {
+  const filePath = getStoryFilePath(storyId);
+
+  try {
+    return await fs.readFile(filePath, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw error; // Story file doesn't exist
+    }
+    throw error;
+  }
+}
+
+/**
+ * Writes a story file to storage, creating the directory structure if it doesn't exist
+ * @param storyId - The story ID
+ * @param data - The data to write
+ */
+export async function writeStoryFile(
+  storyId: string,
+  data: string
+): Promise<void> {
+  await ensureStoryDirectoryStructure(storyId);
+  const filePath = getStoryFilePath(storyId);
+
+  try {
+    await fs.writeFile(filePath, data);
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * List all story directories in storage
+ * @returns Array of story IDs
+ */
+export async function listStoryDirectories(): Promise<string[]> {
+  const dirPath = getStoragePath("stories");
+
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // Directory doesn't exist, create it
+      await ensureDirExists(dirPath);
+      // Return empty array as the directory was just created
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Deletes a story directory and all its contents
+ * @param storyId - The story ID to delete
+ */
+export async function deleteStoryDirectory(storyId: string): Promise<void> {
+  const dirPath = getStoryDirectoryPath(storyId);
+
+  try {
+    await fs.rm(dirPath, { recursive: true, force: true });
+  } catch (error) {
+    // If directory doesn't exist, don't treat it as an error
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+/**
  * Reads a file from storage, creating the directory if it doesn't exist
  * @param pathType - The type of storage path ('stories' or 'mocks')
  * @param fileName - The file name to read
@@ -407,6 +529,48 @@ export function loadTemplateImages(templateId: string): Array<ImageStoryState> {
     return images;
   } catch (error) {
     console.error("Error loading template images:", error);
+    return []; // Return empty array if there's an error
+  }
+}
+
+/**
+ * Loads image files from a story's images directory
+ * @param storyId - The story ID
+ * @returns Array of objects with image information
+ */
+export function loadStoryImages(storyId: string): Array<ImageStoryState> {
+  try {
+    // Get the story images directory
+    const imagesDir = getStoryImagesDirectoryPath(storyId);
+    const imageExtensions = [".jpeg", ".jpg", ".png"];
+
+    // Check if directory exists
+    if (!fsSync.existsSync(imagesDir)) {
+      console.log(`Story images directory not found: ${imagesDir}`);
+      return [];
+    }
+
+    // Get files from directory
+    const files = fsSync
+      .readdirSync(imagesDir)
+      .filter((file) =>
+        imageExtensions.includes(path.extname(file).toLowerCase())
+      );
+
+    // Map files to image objects
+    const images = files.map(
+      (file) =>
+        ({
+          id: path.parse(file).name, // Use filename without extension as ID
+          source: "story" as const,
+          description: "",
+        } as ImageStoryState)
+    );
+
+    console.log(`Loaded ${images.length} images from story ${storyId}`);
+    return images;
+  } catch (error) {
+    console.error("Error loading story images:", error);
     return []; // Return empty array if there's an error
   }
 }

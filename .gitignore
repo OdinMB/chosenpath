@@ -41,7 +41,7 @@ data/story_checkpoints/**
 # Exclude story mocks (local development only)
 data/mocks/**
 # Exclude story JSON files but keep directory structure
-data/stories/*.json
+data/stories/**
 data/templates/**
 
 

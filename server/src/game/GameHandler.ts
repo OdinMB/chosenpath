@@ -8,6 +8,7 @@ import { MAX_TURNS, MIN_TURNS } from "core/config.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
 import { randomUUID } from "crypto";
 import type { OperationErrorEvent } from "./queue.js";
+import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import type {
   StoryCodesNotification,
   StoryReadyNotification,
@@ -247,6 +248,9 @@ export class GameHandler {
       const gameId = randomUUID();
       const playerCodes = this.generatePlayerCodes(playerCount);
 
+      // Create story directory structure
+      await ensureStoryDirectoryStructure(gameId);
+
       // Register game session and codes
       console.log("[GameHandler] Registering game session and codes");
       connectionManager.createGameSession(gameId);
@@ -384,6 +388,9 @@ export class GameHandler {
 
       const gameId = randomUUID();
       const playerCodes = this.generatePlayerCodes(playerCount);
+
+      // Create story directory structure
+      await ensureStoryDirectoryStructure(gameId);
 
       // Register game session and codes
       console.log("[GameHandler] Registering game session and codes");

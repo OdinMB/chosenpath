@@ -193,7 +193,7 @@ ${modeDescriptions[story.getGameMode()]}
         ".";
       if (!story.isFirstBeat()) {
         text +=
-          " A player's own image should only be used in interlude snippets. Show other players' images in beats with other players.";
+          " Don't use a player's own image in beats for that player (except for interludes). Do show other players' images in beats with other players, though.";
       }
       text +=
         "\nFor the story's cover image, use imageId = 'cover' and source " +

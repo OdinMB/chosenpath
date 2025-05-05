@@ -10,6 +10,7 @@ import type {
   ChallengeOption,
   ResolutionDetails,
   ImagePlaceholder,
+  ImageUI,
 } from "core/types";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import {
@@ -616,13 +617,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }> = [];
 
     matches.forEach((match, index) => {
-      const imagePlaceholder = parseImagePlaceholder(match);
-      const finalImage = createImageFromPlaceholder(
+      const imagePlaceholder: ImagePlaceholder = parseImagePlaceholder(match);
+      const finalImage: ImageUI | null = createImageFromPlaceholder(
         imagePlaceholder,
         storyState
       );
       if (finalImage) {
-        console.log("Rendering image with attributes:", imagePlaceholder);
+        console.log("Rendering image:", finalImage);
         imageElements.push({
           position: text.indexOf(match),
           placeholder: match,

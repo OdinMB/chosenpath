@@ -1,12 +1,15 @@
 import { storyRepository } from "shared/StoryRepository.js";
 import {
   readStorageFile,
-  listStorageFiles,
+  listStoryDirectories,
   getStorageFileStats,
+  readStoryFile,
+  getStoryFilePath,
 } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { Story } from "core/models/Story.js";
 import path from "path";
+import fs from "fs/promises";
 
 export type StoryInfo = {
   id: string;
@@ -29,25 +32,24 @@ export class AdminStoryService {
   async getStoriesList(): Promise<StoryInfo[]> {
     try {
       Logger.AdminService.log("Loading list of stories");
-      const files = await listStorageFiles("stories");
-      const storyFiles = files.filter((file) => file.endsWith(".json"));
-      Logger.AdminService.log(`Found ${storyFiles.length} story files`);
+      const storyIds = await listStoryDirectories();
+      Logger.AdminService.log(`Found ${storyIds.length} story directories`);
 
       // Get basic info for each story
       const storiesInfo = await Promise.all(
-        storyFiles.map(async (file) => {
+        storyIds.map(async (storyId) => {
           try {
-            const storyId = path.parse(file).name;
             Logger.AdminService.log(`Loading metadata for story: ${storyId}`);
 
-            const data = await readStorageFile("stories", file);
+            const data = await readStoryFile(storyId);
             const storyData = JSON.parse(data);
 
             // Create a Story instance to leverage its methods
             const story = Story.create(storyData);
 
             // Get file stats for last modified time
-            const fileStats = await getStorageFileStats("stories", file);
+            const storyFilePath = getStoryFilePath(storyId);
+            const fileStats = await fs.stat(storyFilePath);
 
             // Return story info with ID directly using Story methods
             return {
@@ -66,12 +68,9 @@ export class AdminStoryService {
               templateId: story.getState().templateId,
             };
           } catch (error) {
-            Logger.AdminService.error(
-              `Error loading story file: ${file}`,
-              error
-            );
+            Logger.AdminService.error(`Error loading story: ${storyId}`, error);
             return {
-              id: path.parse(file).name,
+              id: storyId,
               title: "Error loading story",
               error: (error as Error).message,
               currentBeat: 0,

@@ -6,6 +6,7 @@ import {
   Guidelines,
   ImageInstructions,
   ImageStoryState,
+  ImageReference,
   StoryPhase,
   PlayerCount,
   PlayerSlot,
@@ -54,13 +55,16 @@ export class Story {
     });
   }
 
+  getState(): StoryState {
+    return this.state;
+  }
+
   getId(): string {
     return this.state.id;
   }
 
-  // Story metadata getters
-  getState(): StoryState {
-    return this.state;
+  getTemplateId(): string | undefined {
+    return this.state.templateId;
   }
 
   isBasedOnTemplate(): boolean {
@@ -416,6 +420,10 @@ export class Story {
     return this.imageManager.getImages(this.state);
   }
 
+  getImage(imageId: string) {
+    return this.imageManager.getImage(this.state, imageId);
+  }
+
   hasImages(): boolean {
     return this.state.images.length > 0;
   }
@@ -436,6 +444,10 @@ export class Story {
 
   getImageInstructions(): ImageInstructions {
     return this.imageManager.getImageInstructions(this.state);
+  }
+
+  getImageReferenceFromImageId(imageId: string): ImageReference {
+    return this.imageManager.getImageReferenceFromImageId(this.state, imageId);
   }
 
   // Client state forwarding

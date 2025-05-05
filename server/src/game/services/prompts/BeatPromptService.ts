@@ -266,11 +266,14 @@ Title: ${
           ")' after the title to indicate the beat number of the current thread."
     }
 
-Request new images
+Request new image (optional)
 ${
   story.generatesImages()
     ? "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.)\n" +
-      "Only skip this step if a fitting and very specific image is already available in the image library, like a character investigating magic glyphs, not just a generic image of the character."
+      "Only provide references to images with characters or elements that are needed to generate the new image. Remember that each reference costs money (for the LLM to process).\n" +
+      "If you generate an image, choose an id that is not already used in the image library.\n" +
+      "Skip this step if a fitting image is already available in the image library. If a character is analyzing magic glyphs, request a new image and don't just show the generic character image. If we already have an image of a flock of birds, don't generate a new one just because the weather has changed.\n" +
+      "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag."
     : "This story does not allow image generation. Do not request any new images." +
       story.hasImages()
     ? " You can use the existing images in the image library, though."
@@ -413,8 +416,8 @@ ${
 }
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
 --- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.
---- You can only generate no or exactly 1 sacrifice/reward option per beat. The rest of the options must be normal.
---- Formulate the option with flavor in mind. Bad: 'Take a bold risk, sacrificing 10% emotional stability for a higher chance of catching his attention (-10% emotional stability).'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
+--- You can only generate either 0 or 1 sacrifice/reward option (total) per beat. The rest of the options must be normal.
+--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
 ${
   story.getCurrentBeatType() === "thread"
     ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +

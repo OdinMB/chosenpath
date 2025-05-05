@@ -168,7 +168,7 @@ export function TemplateConfigurator({
                     htmlFor="generate-images"
                     className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
                   >
-                    With dynamic images
+                    Generate additional custom images for this story
                   </label>
                 </div>
               )}

@@ -103,18 +103,22 @@ export const imageRequestSchema = z.object({
   caption: z
     .string()
     .describe(
-      "A caption for the dynamic image. Keep it short and try to formulate it in a way that allows reusing the image for other beats later on."
+      "Caption for the image. Up to six words. Focus on the elements in the picture so we can reuse the image in a later beat."
     ),
-  id: z.string().describe("The ID of the dynamic image."),
+  id: z
+    .string()
+    .describe(
+      "The ID of the dynamic image. Don't override existing ids of images that are already in the image library of this story."
+    ),
   referenceImageIds: z
     .array(z.string())
     .describe(
-      "The IDs of the images to use as references for the dynamic image. Leave empty if no reference image is needed."
+      "The IDs of the images to use as references for the dynamic image. Leave empty if no reference image is needed (e.g. for a close-up of a new story element). Only include images with characters or elements that the AI needs to generate the new image. Remember that each image reference costs money."
     ),
   prompt: z
     .string()
     .describe(
-      "A prompt for the dynamic image. Will be submitted to the LLM in addition to general image generation instructions for this story and the reference images (if any). No need to include instructions for overall aesthetics, just describe what's in the image."
+      "A prompt to generate the dynamic image. Will be submitted to the LLM in addition to general image generation instructions for this story and the reference images (if any). No need to include instructions for overall aesthetics, just describe what's in the image."
     ),
 });
 export type ImageRequest = z.infer<typeof imageRequestSchema>;

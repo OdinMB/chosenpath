@@ -18,6 +18,10 @@ import { Story } from "core/models/Story.js";
 import {
   IMAGE_GENERATION_MODEL,
   IMAGE_GENERATION_OUTPUT_COMPRESSION,
+  IMAGE_GENERATION_BEAT_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
 } from "server/config.js";
 import fs from "fs";
 import path from "path";
@@ -50,7 +54,7 @@ export class AIImageGenerator {
       prompt,
       references,
       size,
-      quality
+      quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY
     );
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
@@ -85,7 +89,7 @@ export class AIImageGenerator {
       prompt,
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
-      quality || IMAGE_QUALITIES.LOW // Default to low (security measure)
+      quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY
     );
 
     // Save the image in template/images/players directory
@@ -120,7 +124,7 @@ export class AIImageGenerator {
       prompt,
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers
-      quality || IMAGE_QUALITIES.LOW // Default to high quality for covers
+      quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
     );
 
     // Save the image with 'cover' as the ID
@@ -195,7 +199,7 @@ export class AIImageGenerator {
       let withReferences: boolean = false;
       if (references && references.length > 0) {
         referenceImages = await this.loadReferenceImages(references);
-        withReferences = referenceImages.length > 0;
+        withReferences = true;
       }
 
       let imageResponse: any;
@@ -204,11 +208,13 @@ export class AIImageGenerator {
           ...baseParams,
           image: referenceImages,
         } as ImageEditParams;
+        Logger.Story.log("Generating image with references");
         imageResponse = await this.openai.images.edit(imageParams);
       } else {
         const imageParams = {
           ...baseParams,
         } as ImageGenerateParams;
+        Logger.Story.log("Generating image without references");
         imageResponse = await this.openai.images.generate(imageParams);
       }
 
@@ -228,8 +234,7 @@ export class AIImageGenerator {
 
   /**
    * Loads reference images for image generation
-   * @param templateId - The ID of the template
-   * @param imageIds - Array of image IDs to use as references
+   * @param references: Array of ImageReference objects
    * @returns Array of OpenAI-compatible File objects
    */
   private async loadReferenceImages(
@@ -242,7 +247,12 @@ export class AIImageGenerator {
     for (const reference of references) {
       const imageBaseDir =
         reference.source === "template" ? templatesBasePath : storiesBasePath;
-      const imageDir = path.join(imageBaseDir, reference.sourceId);
+      const imageDir = path.join(
+        imageBaseDir,
+        reference.sourceId,
+        "images",
+        reference.subDirectory || ""
+      );
       const imagePath = path.join(imageDir, `${reference.id}.jpeg`);
 
       // Check if the file exists
@@ -251,19 +261,15 @@ export class AIImageGenerator {
           const stream = fs.createReadStream(imagePath);
           const file = await toFile(stream, null, { type: "image/jpeg" });
           referenceImages.push(file);
-          Logger.Story.log(
-            `Loaded reference image: ${reference.id} in ${reference.source}-${reference.sourceId}`
-          );
+          Logger.Story.log(`Loaded reference image: ${imagePath}`);
         } catch (error) {
           Logger.Story.error(
-            `Reference image found but failed to load: ${reference.id} in ${reference.source}-${reference.sourceId}:`,
+            `Reference image found but failed to load: ${imagePath}`,
             error
           );
         }
       } else {
-        Logger.Story.warn(
-          `Reference image not found: ${reference.id} in ${reference.source}-${reference.sourceId}`
-        );
+        Logger.Story.warn(`Reference image not found: ${imagePath}`);
       }
     }
 
@@ -374,14 +380,21 @@ export class AIImageGenerator {
     // Generate images in parallel
     const imagePromises = imageRequests.map(async (imageRequest) => {
       try {
-        // ToDo: reference images
-        const imageReferences: ImageReference[] = [];
+        const imageReferences: ImageReference[] =
+          imageRequest.referenceImageIds.map((id) =>
+            story.getImageReferenceFromImageId(id)
+          );
 
         const prompt = this.getImagePrompt(
           imageRequest.prompt,
           story.getImageInstructions()
         );
-        const imageBuffer = await this.generateImage(prompt, imageReferences);
+        const imageBuffer = await this.generateImage(
+          prompt,
+          imageReferences,
+          undefined,
+          IMAGE_GENERATION_BEAT_QUALITY
+        );
 
         const imagePath = await this.saveImageToStory(
           imageRequest.id,

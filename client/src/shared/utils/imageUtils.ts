@@ -167,9 +167,18 @@ export function createImageFromPlaceholder(
     return null;
   }
 
-  const sourceId = storyState.templateId
-    ? storyState.templateId
-    : storyState.id;
+  if (placeholder.source !== "story" && placeholder.source !== "template") {
+    console.error("Invalid image source:", placeholder.source);
+    return null;
+  }
+
+  const sourceId =
+    placeholder.source === "template" ? storyState.templateId : storyState.id;
+
+  if (!sourceId) {
+    console.error("Invalid " + placeholder.source + " ID:", sourceId);
+    return null;
+  }
 
   // player images get special treatment
   if (placeholder.id.startsWith("player")) {

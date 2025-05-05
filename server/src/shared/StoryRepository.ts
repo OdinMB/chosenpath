@@ -3,12 +3,19 @@ import { connectionManager } from "shared/ConnectionManager.js";
 import type { StoryState, PlayerSlot } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 import { Logger } from "shared/logger.js";
+import fs from "fs/promises";
+import fsSync from "fs";
 import {
   readStorageFile,
   writeStorageFile,
-  listStorageFiles,
-  deleteStorageFile,
   getStorageFileStats,
+  readStoryFile,
+  writeStoryFile,
+  listStoryDirectories,
+  deleteStoryDirectory,
+  getStoryFilePath,
+  getStoryDirectoryPath,
+  getStoragePath,
 } from "./storageUtils.js";
 
 export class StoryRepository {
@@ -39,7 +46,7 @@ export class StoryRepository {
 
     // If not in memory, try loading from file
     try {
-      const data = await readStorageFile("stories", `${storyId}.json`);
+      const data = await readStoryFile(storyId);
       const state = JSON.parse(data) as StoryState;
 
       Logger.StoryRepository.log("Successfully loaded state from file");
@@ -100,12 +107,8 @@ export class StoryRepository {
     // Update memory cache
     this.storyStates.set(storyId, storyCopy);
 
-    // Write to file using the utility function
-    await writeStorageFile(
-      "stories",
-      `${storyId}.json`,
-      JSON.stringify(state, null, 2)
-    );
+    // Write to file using the new utility function
+    await writeStoryFile(storyId, JSON.stringify(state, null, 2));
   }
 
   async deleteStory(storyId: string): Promise<void> {
@@ -113,8 +116,8 @@ export class StoryRepository {
       // Remove from memory cache
       this.storyStates.delete(storyId);
 
-      // Remove file using the utility function
-      await deleteStorageFile("stories", `${storyId}.json`);
+      // Remove directory using the utility function
+      await deleteStoryDirectory(storyId);
 
       Logger.StoryRepository.log("Successfully deleted state:", storyId);
     } catch (error) {
@@ -126,23 +129,29 @@ export class StoryRepository {
   // Helper method to clean up completed or abandoned stories
   async cleanupStories(): Promise<void> {
     try {
-      const files = await listStorageFiles("stories");
+      const storyIds = await listStoryDirectories();
 
-      for (const file of files) {
-        if (!file.endsWith(".json")) continue;
-
-        const storyId = path.parse(file).name;
+      for (const storyId of storyIds) {
         const activePlayers = connectionManager.getActivePlayersInGame(storyId);
 
         // If no active players and story is old, delete it
         if (activePlayers.length === 0) {
-          const stats = await getStorageFileStats("stories", file);
-          const ageInHours =
-            (Date.now() - Number(stats.mtimeMs)) / (1000 * 60 * 60);
+          try {
+            const filePath = getStoryFilePath(storyId);
+            const stats = await fs.stat(filePath);
+            const ageInHours =
+              (Date.now() - Number(stats.mtimeMs)) / (1000 * 60 * 60);
 
-          if (ageInHours > 72) {
-            // Delete stories older than 72 hours
-            await this.deleteStory(storyId);
+            if (ageInHours > 120) {
+              // Delete stories older than 72 hours
+              await this.deleteStory(storyId);
+            }
+          } catch (statError) {
+            // Skip if we can't get stats (file might not exist)
+            Logger.StoryRepository.error(
+              `Error getting stats for story ${storyId}:`,
+              statError
+            );
           }
         }
       }
@@ -173,15 +182,12 @@ export class StoryRepository {
   // Add this method to load all existing stories on startup
   async loadExistingStories(): Promise<void> {
     try {
-      const files = await listStorageFiles("stories");
+      const storyIds = await listStoryDirectories();
       Logger.StoryRepository.log("Loading existing stories...");
 
-      for (const file of files) {
-        if (!file.endsWith(".json")) continue;
-
-        const storyId = path.parse(file).name;
+      for (const storyId of storyIds) {
         try {
-          const data = await readStorageFile("stories", file);
+          const data = await readStoryFile(storyId);
           const state = JSON.parse(data) as StoryState;
           const story = new Story(state);
           this.storyStates.set(storyId, story);
@@ -214,19 +220,32 @@ export class StoryRepository {
     Logger.StoryRepository.log("Searching for state with code:", code);
 
     try {
-      const files = await listStorageFiles("stories");
+      // Try memory cache first
+      for (const [storyId, story] of this.storyStates.entries()) {
+        const stateData = story.getState();
+        if (
+          stateData.playerCodes &&
+          Object.values(stateData.playerCodes).some((c) => c === code)
+        ) {
+          Logger.StoryRepository.log("Found code in memory cache:", storyId);
+          return {
+            storyId,
+            story: new Story(JSON.parse(JSON.stringify(story.getState()))),
+          };
+        }
+      }
+
+      // If not in memory, search on disk
+      const storyIds = await listStoryDirectories();
       Logger.StoryRepository.log(
-        "Searching through ",
-        files.length,
-        " story files"
+        "Searching through",
+        storyIds.length,
+        "story directories"
       );
 
-      for (const file of files) {
-        if (!file.endsWith(".json")) continue;
-
-        const storyId = path.parse(file).name;
+      for (const storyId of storyIds) {
         try {
-          const data = await readStorageFile("stories", file);
+          const data = await readStoryFile(storyId);
           const state = JSON.parse(data) as StoryState;
           const story = new Story(state);
 
@@ -242,7 +261,10 @@ export class StoryRepository {
             this.storyStates.set(storyId, story);
             Logger.StoryRepository.log("Cached found state in memory");
 
-            return { storyId, story };
+            return {
+              storyId,
+              story: new Story(JSON.parse(JSON.stringify(state))),
+            };
           }
         } catch (error) {
           Logger.StoryRepository.error(

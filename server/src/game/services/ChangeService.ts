@@ -293,12 +293,21 @@ export class ChangeService {
       case "addElement":
         if (statDef.type === "string[]") {
           const currentValue = statValue.value as string[];
+          if (!currentValue || !Array.isArray(currentValue)) {
+            // statValue.value can be undefined for empty arrays. In that case:
+            return {
+              ...statValue,
+              value: [change.value as string],
+            };
+          }
+          // Only add the new element if it's not already in the array
           if (!currentValue.includes(change.value as string)) {
             return {
               ...statValue,
               value: [...currentValue, change.value as string],
             };
           }
+          // If the element is already in the array, don't change anything
           return statValue;
         }
         break;

@@ -15,6 +15,7 @@ import { storyRepository } from "shared/StoryRepository.js";
 import { connectionManager } from "shared/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { createStoryStateFromTemplate } from "./StoryStateFactory.js";
+import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 
 export interface QueueEvents {
@@ -85,7 +86,10 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     gameId: string,
     story: Story
   ): Promise<void> {
-    // First store the updated story in the repository
+    // Ensure the story directory structure exists
+    await ensureStoryDirectoryStructure(gameId);
+
+    // Store the updated story in the repository
     await storyRepository.storeStory(gameId, story);
 
     // Then broadcast the update to all connected clients

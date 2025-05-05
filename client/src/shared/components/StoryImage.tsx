@@ -135,7 +135,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
         )}
         {hasError && !fallbackSrc && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
-            <Icons.Error className="w-10 h-10 text-red-500" />
+            <Icons.Spinner className="w-10 h-10 text-primary-500" />
           </div>
         )}
         <div
@@ -210,8 +210,8 @@ export const StoryImage: React.FC<StoryImageProps> = ({
       <div
         className={`flex items-center justify-center bg-gray-100 ${className}`}
       >
-        <Icons.Error className="w-10 h-10 text-red-500" />
-        <span className="sr-only">Failed to generate image</span>
+        <Icons.Spinner className="w-10 h-10 text-primary-500" />
+        <span className="sr-only">Loading image...</span>
       </div>
     );
   }

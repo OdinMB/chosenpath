@@ -169,10 +169,10 @@ export const beatPlanSchema = z.object({
           .describe(
             "Which stats and their current values (both individual and shared) should affect which options are available to the player narratively? Example: If the player is strong and using strength makes sense in the beat, include an option that uses strength. If a player has a gold stat that can be used to bribe NPCs, add a corresponding option when dealing with NPCs."
           ),
-        opportunityForSacrificesOrRewards: z
+        upToOneSacrificeOrRewardOption: z
           .string()
           .describe(
-            "Are there any stats that can be sacrificed (spent) in exchange for a higher chance of success that seem relevant for this beat? Any stats that can be gained as a reward for choosing an option with lower chance of success that seem relevant for this beat? Describe how these mechanics can be used in this beat or 'None' if there are no relevant opportunities."
+            "Based on the stats' options to sacrifice and options to gain as reward attributes, would a sacrifice or reward option be sensible and interesting for this beat? If so, describe exactly one sacrifice or reward option (total) that you want to include in this beat. Otherwise, simply say 'None'. (Many beats are better without any sacrifice or reward options.)"
           ),
       }),
     ])
@@ -203,7 +203,7 @@ export const beatGenerationSchema = z.object({
   imageRequest: z
     .union([z.string(), imageRequestSchema])
     .describe(
-      "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Leave empty if this story does not include images or if a fitting and very specific image is already available in the image library (e.g. a character investigating magic glyphs, not just a generic image of the character)."
+      "Optional: Request a new image depicting a key moment in this beat if no fitting image is already available in the image library. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Images requested for this beat must be used in this beat."
     ),
   text: z
     .string()
@@ -220,7 +220,7 @@ export const beatGenerationSchema = z.object({
         "--- Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'.\n" +
         "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
         "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
-        "--- In addition to the image library, you can also use images that you requested to be generated for this beat in the beat plan. The source of these images in 'story'.\n" +
+        "--- If you requested an image to be generated for this beat, you must use it in this beat. The source of requested images is 'story'.\n" +
         "--- If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
@@ -243,7 +243,7 @@ export const beatGenerationSchema = z.object({
   interludes: z
     .array(interludeSchema)
     .describe(
-      'Will be shown to the player while the new beat is being generated.\n- 1 fact about a story element that is relevant in the beat (imageId = story element id)\nA thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\na general detail about the world (imageId = "cover").'
+      'Will be shown to the player while the new beat is being generated.\n- 1 fact about a story element that is relevant in the beat (imageId = story element id)\nA thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\na general detail about the world (imageId = "cover"). You can use the image that you requested for this beat in the beat plan for an interlude.'
     ),
 });
 

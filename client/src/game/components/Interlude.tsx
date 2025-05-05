@@ -89,13 +89,13 @@ export const Interlude: React.FC<InterludeProps> = ({ interludes = [] }) => {
         >
           {/* Image */}
           {currentInterlude.imageReference && (
-            <div className="w-full mb-4 max-h-48 flex justify-center overflow-hidden rounded-lg">
+            <div className="w-full mb-4 max-h-48 md:max-h-64 lg:max-h-80 flex justify-center overflow-hidden rounded-lg">
               <StoryImage
                 image={currentInterlude.imageReference}
                 alt={currentInterlude.text || ""}
                 responsivePosition={true}
                 mobileOffset="5%"
-                desktopOffset="14%"
+                desktopOffset="8%"
               />
             </div>
           )}
