@@ -203,7 +203,7 @@ export const beatGenerationSchema = z.object({
   imageRequest: z
     .union([z.string(), imageRequestSchema])
     .describe(
-      "Optional: Request a new image depicting a key moment in this beat if no fitting image is already available in the image library. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Images requested for this beat must be used in this beat."
+      "Optional: Request a new image depicting a key moment in this beat if no fitting image is already available in the image library. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Images requested for this beat must be used in this beat. The source of the new image is 'story'."
     ),
   text: z
     .string()
@@ -220,7 +220,7 @@ export const beatGenerationSchema = z.object({
         "--- Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'.\n" +
         "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
         "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
-        "--- If you requested an image to be generated for this beat, you must use it in this beat. The source of requested images is 'story'. Use it relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
+        "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
         "--- If there is no image library or if there are no relevant images, don't add any image tags.\n" +
         "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
         "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"

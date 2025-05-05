@@ -370,7 +370,6 @@ export class AIImageGenerator {
     }
   }
 
-  // ToDo: Needs new system
   async generateImagesForBeats(
     story: Story,
     imageRequests: ImageRequest[]
@@ -380,9 +379,21 @@ export class AIImageGenerator {
     // Generate images in parallel
     const imagePromises = imageRequests.map(async (imageRequest) => {
       try {
-        const imageReferences: ImageReference[] = imageRequest.referenceImageIds
-          .map((id) => story.getImageReferenceFromImageId(id))
-          .filter((ref): ref is ImageReference => ref !== undefined);
+        // Collect available reference images, log warnings for any missing ones
+        const imageReferences: ImageReference[] = [];
+
+        if (imageRequest.referenceImageIds.length > 0) {
+          for (const id of imageRequest.referenceImageIds) {
+            const ref = story.getImageReferenceFromImageId(id);
+            if (ref) {
+              imageReferences.push(ref);
+            } else {
+              Logger.Story.warn(
+                `Reference image with ID '${id}' not found, continuing without it`
+              );
+            }
+          }
+        }
 
         const prompt = this.getImagePrompt(
           imageRequest.prompt,
@@ -390,7 +401,7 @@ export class AIImageGenerator {
         );
         const imageBuffer = await this.generateImage(
           prompt,
-          imageReferences,
+          imageReferences.length > 0 ? imageReferences : undefined,
           undefined,
           IMAGE_GENERATION_BEAT_QUALITY
         );

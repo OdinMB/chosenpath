@@ -320,7 +320,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     // Show options if no choice has been confirmed by the server
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 relative">
+        {/* Add a clear separator above the options */}
+        <div className="clear-both w-full h-1"></div>
         <div className="mt-6 space-y-3 max-w-2xl mx-auto">
           {currentBeat.options.map((option, index) => (
             <PrimaryButton
@@ -403,7 +405,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     if (choiceIndex === -1 || !beat || !beat.options) return null;
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 relative">
+        {/* Add a clear separator above the locked-in choice */}
+        <div className="clear-both w-full h-1"></div>
         <div className="mt-6 max-w-2xl mx-auto">
           <ColoredBox colorType="tertiary" className="p-4 text-lg">
             <div className="flex items-start">
@@ -609,11 +613,30 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
       );
     }
 
+    // Count paragraphs in the text
+    const paragraphs = text.split(/\n\s*\n/);
+
+    // Only apply spacing logic if we have at least 3 paragraphs and 2 images
+    const shouldApplyImageSpacing =
+      paragraphs.length >= 3 && matches.length >= 2;
+
+    // First, locate all paragraphs and their positions
+    const paragraphPositions: { start: number; end: number }[] = [];
+    let currentPos = 0;
+
+    paragraphs.forEach((paragraph) => {
+      const start = text.indexOf(paragraph, currentPos);
+      const end = start + paragraph.length;
+      paragraphPositions.push({ start, end });
+      currentPos = end;
+    });
+
     // First, render all images and store them with their positions
     const imageElements: Array<{
       position: number;
       element: React.ReactNode;
       placeholder: string;
+      paragraphIndex: number; // Which paragraph this image belongs to
     }> = [];
 
     matches.forEach((match, index) => {
@@ -623,10 +646,25 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         storyState
       );
       if (finalImage) {
+        const position = text.indexOf(match);
+
+        // Determine which paragraph this image belongs to
+        let paragraphIndex = 0;
+        for (let i = 0; i < paragraphPositions.length; i++) {
+          if (
+            position >= paragraphPositions[i].start &&
+            position <= paragraphPositions[i].end
+          ) {
+            paragraphIndex = i;
+            break;
+          }
+        }
+
         console.log("Rendering image:", finalImage);
         imageElements.push({
-          position: text.indexOf(match),
+          position,
           placeholder: match,
+          paragraphIndex,
           element: (
             <StoryImage
               key={`img-${index}`}
@@ -645,6 +683,31 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
     // Sort images by their position in the text
     imageElements.sort((a, b) => a.position - b.position);
+
+    // If we need to apply spacing and have enough images and paragraphs
+    if (shouldApplyImageSpacing) {
+      // Check if any consecutive images are too close together (less than 2 paragraphs apart)
+      for (let i = 1; i < imageElements.length; i++) {
+        const prevImage = imageElements[i - 1];
+        const currentImage = imageElements[i];
+
+        // If images are in the same paragraph or only one paragraph apart
+        if (currentImage.paragraphIndex - prevImage.paragraphIndex < 2) {
+          // Find a better position (at least 2 paragraphs away from the previous image)
+          const targetParagraph = prevImage.paragraphIndex + 2;
+
+          // Only reposition if we have a paragraph to move to
+          if (targetParagraph < paragraphPositions.length) {
+            // Find position after the target paragraph
+            const newPosition = paragraphPositions[targetParagraph].end - 1;
+            currentImage.position = newPosition;
+          }
+        }
+      }
+
+      // Re-sort images after repositioning
+      imageElements.sort((a, b) => a.position - b.position);
+    }
 
     // Split text into segments at image positions while preserving the original text
     const segments: Array<{

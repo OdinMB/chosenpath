@@ -35,6 +35,11 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   const [src, setSrc] = useState<string>("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imageAspectRatio, setImageAspectRatio] = useState<
+    "portrait" | "landscape" | "square"
+  >("portrait");
+  const [actualImageLoaded, setActualImageLoaded] =
+    useState<HTMLImageElement | null>(null);
 
   // Handle responsive screen size detection
   useEffect(() => {
@@ -45,6 +50,22 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Determine aspect ratio based on image metadata or actual loaded dimensions
+  useEffect(() => {
+    if (actualImageLoaded) {
+      const width = actualImageLoaded.naturalWidth;
+      const height = actualImageLoaded.naturalHeight;
+
+      if (width > height * 1.2) {
+        setImageAspectRatio("landscape");
+      } else if (height > width * 1.2) {
+        setImageAspectRatio("portrait");
+      } else {
+        setImageAspectRatio("square");
+      }
+    }
+  }, [actualImageLoaded]);
 
   // Parse the offset percentage
   const getOffsetValue = (offsetStr: string) => {
@@ -102,7 +123,8 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     setSrc(imagePath);
   }, [image, fallbackSrc]);
 
-  const handleLoad = () => {
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    setActualImageLoaded(e.currentTarget);
     setIsLoading(false);
     setHasError(false);
   };
@@ -123,6 +145,28 @@ export const StoryImage: React.FC<StoryImageProps> = ({
 
   // Determine what caption to display - use the provided caption or fall back to image description
   const displayCaption = caption || image?.description;
+
+  // Get responsive width classes based on aspect ratio
+  const getResponsiveWidthClasses = () => {
+    if (!withinText) return ""; // Only apply special width handling for images within text
+
+    // On mobile, always full width
+    const baseClasses = "w-full mx-auto my-2";
+
+    // Calculate float-related classes
+    const floatClasses =
+      float === "right" ? "md:float-right md:ml-6" : "md:float-left md:mr-6";
+
+    // Different widths based on aspect ratio for larger screens
+    if (imageAspectRatio === "landscape") {
+      return `${baseClasses} ${floatClasses} md:w-3/5 lg:w-1/2`;
+    } else if (imageAspectRatio === "square") {
+      return `${baseClasses} ${floatClasses} md:w-2/5 lg:w-1/3`;
+    } else {
+      // portrait
+      return `${baseClasses} ${floatClasses} md:w-1/3 lg:w-1/4`;
+    }
+  };
 
   // Determine if we need to wrap the component for text flow
   const renderContent = () => {
@@ -166,17 +210,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     );
 
     if (withinText) {
-      // Calculate float-related classes
-      const floatClasses =
-        float === "right" ? "md:float-right md:ml-6" : "md:float-left md:mr-6";
-
-      return (
-        <div
-          className={`w-full mx-auto my-2 ${floatClasses} md:w-1/2 lg:w-1/3 relative`}
-        >
-          {imageContent}
-        </div>
-      );
+      return <div className={getResponsiveWidthClasses()}>{imageContent}</div>;
     }
 
     return imageContent;
