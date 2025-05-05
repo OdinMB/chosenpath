@@ -273,7 +273,7 @@ ${
       "Only provide references to images with characters or elements that are needed to generate the new image. Remember that each reference costs money (for the LLM to process).\n" +
       "If you generate an image, choose an id that is not already used in the image library.\n" +
       "Skip this step if a fitting image is already available in the image library. If a character is analyzing magic glyphs, request a new image and don't just show the generic character image. If we already have an image of a flock of birds, don't generate a new one just because the weather has changed.\n" +
-      "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag."
+      "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag. Use the new image relatively late in the beat text. (That way, we buy some time for the image generation to finish.)"
     : "This story does not allow image generation. Do not request any new images." +
       story.hasImages()
     ? " You can use the existing images in the image library, though."
