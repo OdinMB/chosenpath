@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { API_BASE_URL } from "shared/config";
+import { API_CONFIG } from "core/config";
 import { ResponseStatus } from "core/types/api";
 
 export function useNewsletter() {
@@ -7,7 +7,10 @@ export function useNewsletter() {
 
   const handleSubscribe = async (email: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
+      // In development, use the proxy; in production, use the full API URL
+      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/newsletter/subscribe`;
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
