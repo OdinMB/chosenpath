@@ -29,7 +29,26 @@ export function NewsletterModal({
       setSuccess(true);
       setEmail("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to subscribe");
+      let errorMessage =
+        err instanceof Error ? err.message : "Failed to subscribe";
+
+      // Show more user-friendly messages for common errors
+      if (errorMessage.includes("already subscribed")) {
+        setSuccess(true); // Still show success screen for already subscribed users
+        return;
+      } else if (
+        errorMessage.toLowerCase().includes("network") ||
+        errorMessage.includes("fetch")
+      ) {
+        errorMessage =
+          "Network error. Please check your connection and try again.";
+      } else if (errorMessage.includes("400")) {
+        errorMessage = "Invalid email address. Please check and try again.";
+      } else if (errorMessage.includes("500")) {
+        errorMessage = "Server error. Please try again later.";
+      }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
