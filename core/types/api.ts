@@ -51,6 +51,20 @@ export interface GenerateImageResponse {
 }
 
 /**
+ * Newsletter subscription request
+ */
+export interface NewsletterSubscriptionRequest extends ClientRequest {
+  email: string;
+}
+
+/**
+ * Newsletter subscription response
+ */
+export interface NewsletterSubscriptionResponse {
+  message: string;
+}
+
+/**
  * Standardized response status types for all API requests
  */
 export enum ResponseStatus {

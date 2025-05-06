@@ -6,6 +6,9 @@ import { useEffect, useState, useMemo } from "react";
 import { Modal } from "shared/components/ui";
 import { CreateYourOwnCard } from "./CreateYourOwnCard";
 import { NoMatchesCard } from "./NoMatchesCard";
+import { useNewsletter } from "shared/hooks/useNewsletter";
+import { NewsletterModal } from "shared/components";
+import { NewsletterCard } from "./NewsletterCard";
 
 type LibraryBrowserProps = {
   onSelectTemplate: (template: StoryTemplate) => void;
@@ -107,6 +110,14 @@ export function LibraryBrowser({
   // State for Share Modal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+
+  // Newsletter setup
+  const {
+    isNewsletterModalOpen,
+    openNewsletterModal,
+    closeNewsletterModal,
+    handleSubscribe,
+  } = useNewsletter();
 
   // Set initial tags when the component mounts
   useEffect(() => {
@@ -339,14 +350,33 @@ export function LibraryBrowser({
       result.splice(position, 0, createYourOwnCard);
     }
 
+    // Add the newsletter card as the last item
+    const newsletterCard = (
+      <div key="newsletter" className="flex">
+        <NewsletterCard
+          onOpenNewsletter={openNewsletterModal}
+          className="flex-1 h-full"
+        />
+      </div>
+    );
+
+    result.push(newsletterCard);
+
     return result;
-  }, [filteredTemplates, isLoading, error, onCreateStory, onSelectTemplate]);
+  }, [
+    filteredTemplates,
+    isLoading,
+    error,
+    onCreateStory,
+    onSelectTemplate,
+    openNewsletterModal,
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto p-4 font-lora">
       <div className="flex justify-between items-center mb-6 relative">
         <div className="w-full flex justify-start lg:justify-center">
-          <h1 className="text-2xl font-bold text-primary-800">Story Library</h1>
+          <h1 className="text-2xl font-bold text-primary-800">Library</h1>
         </div>
         <div className="flex items-center gap-2 absolute right-0">
           {/* Share button - only visible when filters are active */}
@@ -394,9 +424,20 @@ export function LibraryBrowser({
       ) : error ? (
         <div className="text-center py-6 text-tertiary">{error}</div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {onCreateStory && <CreateYourOwnCard onCreateStory={onCreateStory} />}
-          <NoMatchesCard onClearFilters={clearFilters} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          {onCreateStory && (
+            <CreateYourOwnCard
+              onCreateStory={onCreateStory}
+              className="h-full"
+            />
+          )}
+          <NoMatchesCard onClearFilters={clearFilters} className="h-full" />
+          <div className="md:col-span-2">
+            <NewsletterCard
+              onOpenNewsletter={openNewsletterModal}
+              className="h-full"
+            />
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
@@ -409,6 +450,13 @@ export function LibraryBrowser({
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         shareUrl={shareUrl}
+      />
+
+      {/* Newsletter Modal */}
+      <NewsletterModal
+        isOpen={isNewsletterModalOpen}
+        onClose={closeNewsletterModal}
+        onSubmit={handleSubscribe}
       />
     </div>
   );

@@ -8,6 +8,8 @@ import {
   LibraryCategoryGrid,
 } from "./components";
 import { hasCodeSets } from "shared/utils/codeSetUtils.js";
+import { useNewsletter } from "shared/hooks/useNewsletter";
+import { NewsletterButton, NewsletterModal } from "shared/components";
 
 interface PageProps {
   onCodeSubmit: (code: string) => void;
@@ -23,6 +25,12 @@ export function Page({
   onBrowseLibrary,
 }: PageProps) {
   const [code, setCode] = useState("");
+  const {
+    isNewsletterModalOpen,
+    openNewsletterModal,
+    closeNewsletterModal,
+    handleSubscribe,
+  } = useNewsletter();
   const hasStoredCodeSets = hasCodeSets();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,7 +121,18 @@ export function Page({
         <TemplateCarousel onPlay={handleSelectTemplate} />
       </div>
 
+      {/* Newsletter Modal */}
+      <NewsletterModal
+        isOpen={isNewsletterModalOpen}
+        onClose={closeNewsletterModal}
+        onSubmit={handleSubscribe}
+      />
+
       <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
+        <div className="mb-4 flex items-center">
+          <NewsletterButton onClick={openNewsletterModal} />
+        </div>
+
         <p className="mb-2">
           Looking for collaborators. Are you a writer, storyteller, designer, or
           world builder? Reach out!
