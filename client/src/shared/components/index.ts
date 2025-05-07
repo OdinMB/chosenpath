@@ -2,6 +2,7 @@ export { AppTitle } from "./AppTitle";
 export { ArrayField } from "./ArrayField";
 export { ContentModerationNotification } from "./ContentModerationNotification";
 export { ExpandableItem } from "./ExpandableItem";
+export { ImageCard } from "./ImageCard";
 export { PlayerCode } from "./PlayerCode";
 export { RateLimitNotification } from "./RateLimitNotification";
 export { ShareLink } from "./ShareLink";

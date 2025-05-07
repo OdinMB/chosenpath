@@ -62,6 +62,7 @@ function App() {
   const [selectedCategoryTags, setSelectedCategoryTags] = useState<string[]>(
     []
   );
+  const [isTemplateBasedStory, setIsTemplateBasedStory] = useState(false);
 
   // Replace templateConfigPending with a more general story creation status
   const storyCreationStatus = useRef<StoryCreationType>("NONE");
@@ -359,6 +360,7 @@ function App() {
     setSelectedTemplate(null);
     setTransientStoryCodes(null);
     setStoryReady(false);
+    setIsTemplateBasedStory(false);
     storyCreationStatus.current = "NONE";
   };
 
@@ -375,6 +377,7 @@ function App() {
     setIsLoading(true);
 
     storyCreationStatus.current = "PREMISE";
+    setIsTemplateBasedStory(false);
 
     gameService.initializeStory(
       options.prompt,
@@ -406,6 +409,7 @@ function App() {
     resetStoryCreationState();
 
     storyCreationStatus.current = "TEMPLATE";
+    setIsTemplateBasedStory(true);
 
     // Set the selected template first
     setSelectedTemplate(template);
@@ -436,6 +440,7 @@ function App() {
     // Set the template pending flag to prevent premature state transitions
     // until we receive the story codes
     storyCreationStatus.current = "TEMPLATE";
+    setIsTemplateBasedStory(true);
   };
 
   const handleExitGame = () => {
@@ -446,6 +451,7 @@ function App() {
     setSessionId(null);
     setPlayerCode(null);
     localStorage.removeItem(playerCodeKey);
+    setIsTemplateBasedStory(false);
     loggedSetViewState("WELCOME");
   };
 
@@ -611,26 +617,38 @@ function App() {
           Logger.App.log("Story initialization still running in background");
         }
 
-        // Reset template pending flag since we're now showing codes
+        // Update template flag based on current status
         if (isFromTemplate) {
+          setIsTemplateBasedStory(true);
+        }
+
+        // Reset creation status when we're now showing codes
+        if (storyCreationStatus.current !== "NONE") {
           storyCreationStatus.current = "NONE";
         }
 
         return (
           <>
             <div className="max-w-2xl mx-auto p-4 md:p-6">
-              <AppTitle size="large" />
+              <AppTitle
+                size="large"
+                onClick={() => {
+                  loggedSetViewState("WELCOME");
+                }}
+              />
             </div>
             <PlayerCodes
               codes={transientStoryCodes}
-              onBack={() => {
-                loggedSetViewState("WELCOME");
-              }}
               onCodeSubmit={handleCodeSubmit}
               storyReady={storyReady}
               onGoToWelcome={() => {
                 loggedSetViewState("WELCOME");
               }}
+              template={
+                isTemplateBasedStory && selectedTemplate
+                  ? selectedTemplate
+                  : undefined
+              }
             />
           </>
         );

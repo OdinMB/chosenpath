@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
 import { StoryTemplate } from "core/types";
 import { PrimaryButton } from "components/ui";
 import { sortTagsByCategory } from "shared/tagCategories";
-import { API_CONFIG } from "core/config";
-import { Icons } from "../../shared/components/ui/Icons";
+import { ImageCard } from "shared/components";
 
 type TemplateCardProps = {
   template: StoryTemplate;
@@ -20,9 +18,6 @@ export const TemplateCard = ({
   size = "default",
   className = "",
 }: TemplateCardProps) => {
-  const [coverImage, setCoverImage] = useState<string | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-
   // Sort tags by category
   const sortedTags = template.tags ? sortTagsByCategory(template.tags) : [];
 
@@ -34,137 +29,64 @@ export const TemplateCard = ({
     tag: size === "large" ? "text-sm px-3 py-1" : "text-xs px-2 py-0.5",
   };
 
-  // Try to load the template cover image
-  useEffect(() => {
-    const loadCoverImage = async () => {
-      if (!template.id) return;
-
-      // Use a timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const coverImageUrl = `${API_CONFIG.DEFAULT_API_URL}/images/templates/${template.id}/cover.jpeg?t=${timestamp}`;
-
-      try {
-        // Check if the image exists
-        const response = await fetch(coverImageUrl, { method: "HEAD" });
-        if (response.ok) {
-          setCoverImage(coverImageUrl);
-        } else {
-          setCoverImage(null);
-        }
-      } catch (err) {
-        console.error("Error checking template cover image:", err);
-        setCoverImage(null);
-      }
-    };
-
-    loadCoverImage();
-  }, [template.id]);
-
-  // Handle image load success
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-
-  // Handle image load error
-  const handleImageError = () => {
-    setImageLoaded(false);
-    setCoverImage(null);
-  };
-
   return (
-    <div
-      className={`w-full bg-white rounded-lg border border-primary-100 overflow-hidden ${className}`}
+    <ImageCard
+      sourceId={template.id}
+      title={template.title}
+      size={size}
+      onClick={() => onPlay(template)}
+      className={className}
     >
-      <div className="flex h-full">
-        <div
-          className={`relative ${
-            size === "large" ? "w-24" : "w-20"
-          } overflow-hidden flex-shrink-0 bg-gray-100`}
-          style={{ minHeight: size === "large" ? "150px" : "120px" }}
-        >
-          {coverImage ? (
-            <div
-              onClick={() => onPlay(template)}
-              className="w-full h-full cursor-pointer"
-            >
-              <img
-                src={coverImage}
-                alt={`${template.title} cover`}
-                className={`absolute h-full ${
-                  size === "large" ? "w-24" : "w-20"
-                } object-cover object-center transition-all duration-500 hover:scale-110 ${
-                  imageLoaded ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            </div>
-          ) : (
-            // Placeholder when no image is available
-            <div
-              onClick={() => onPlay(template)}
-              className={`flex items-center justify-center h-full w-full text-gray-400 cursor-pointer`}
-            >
-              <Icons.Image className="h-8 w-8" />
-            </div>
-          )}
-        </div>
+      <div className="flex justify-between items-center mb-2">
+        <h3 className={`${sizeClasses.title} text-primary-800`}>
+          {template.title}
+        </h3>
+        {showPlayButton && (
+          <PrimaryButton onClick={() => onPlay(template)} className="ml-4">
+            Play
+          </PrimaryButton>
+        )}
+      </div>
 
-        <div className="w-full p-4 flex flex-col h-full">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className={`${sizeClasses.title} text-primary-800`}>
-              {template.title}
-            </h3>
-            {showPlayButton && (
-              <PrimaryButton onClick={() => onPlay(template)} className="ml-4">
-                Play
-              </PrimaryButton>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex flex-col gap-1 text-primary-500 mb-4">
-            <div className="flex items-center gap-8">
-              <span className={`${sizeClasses.info} font-semibold`}>
-                {template.playerCountMin === template.playerCountMax
-                  ? `${template.playerCountMin} player${
-                      template.playerCountMin > 1 ? "s" : ""
-                    }`
-                  : `${template.playerCountMin}-${template.playerCountMax} players`}
-              </span>
-              <span className={`${sizeClasses.info} font-semibold`}>
-                {template.maxTurnsMin === template.maxTurnsMax
-                  ? `${template.maxTurnsMin} turns`
-                  : `${template.maxTurnsMin}-${template.maxTurnsMax} turns`}
-              </span>
-            </div>
-          </div>
-
-          {/* Teaser */}
-          <p
-            className={`${sizeClasses.teaser} text-primary-600 mb-4 line-clamp-3`}
-          >
-            {template.teaser}
-          </p>
-
-          {/* Flex spacer */}
-          <div className="flex-grow"></div>
-
-          {/* Tags */}
-          {sortedTags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-auto">
-              {sortedTags.map((tag, index) => (
-                <span
-                  key={index}
-                  className={`inline-block ${sizeClasses.tag} bg-primary-50 text-primary-700 rounded-md`}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+      {/* Info */}
+      <div className="flex flex-col gap-1 text-primary-500 mb-4">
+        <div className="flex items-center gap-8">
+          <span className={`${sizeClasses.info} font-semibold`}>
+            {template.playerCountMin === template.playerCountMax
+              ? `${template.playerCountMin} player${
+                  template.playerCountMin > 1 ? "s" : ""
+                }`
+              : `${template.playerCountMin}-${template.playerCountMax} players`}
+          </span>
+          <span className={`${sizeClasses.info} font-semibold`}>
+            {template.maxTurnsMin === template.maxTurnsMax
+              ? `${template.maxTurnsMin} turns`
+              : `${template.maxTurnsMin}-${template.maxTurnsMax} turns`}
+          </span>
         </div>
       </div>
-    </div>
+
+      {/* Teaser */}
+      <p className={`${sizeClasses.teaser} text-primary-600 mb-4 line-clamp-3`}>
+        {template.teaser}
+      </p>
+
+      {/* Flex spacer */}
+      <div className="flex-grow"></div>
+
+      {/* Tags */}
+      {sortedTags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-auto">
+          {sortedTags.map((tag, index) => (
+            <span
+              key={index}
+              className={`inline-block ${sizeClasses.tag} bg-primary-50 text-primary-700 rounded-md`}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </ImageCard>
   );
 };

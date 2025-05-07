@@ -10,6 +10,7 @@ import {
   ImageSource,
   PlayerSlot,
 } from "core/types";
+import { API_CONFIG } from "core/config";
 
 /**
  * Creates an image object for use with the StoryImage component
@@ -35,6 +36,34 @@ export function createPlayerIdentityImage(
     fileType: "jpeg",
     status: "ready" as ImageStatus,
   } as ImageUI;
+}
+
+/**
+ * Loads a template cover image
+ * @param templateId The ID of the template
+ * @returns Promise that resolves to the cover image URL if it exists, null otherwise
+ */
+export async function loadTemplateCoverImage(
+  templateId: string
+): Promise<string | null> {
+  if (!templateId) return null;
+
+  // Use a timestamp to prevent caching
+  const timestamp = new Date().getTime();
+  const coverImageUrl = `${API_CONFIG.DEFAULT_API_URL}/images/templates/${templateId}/cover.jpeg?t=${timestamp}`;
+
+  try {
+    // Check if the image exists
+    const response = await fetch(coverImageUrl, { method: "HEAD" });
+    if (response.ok) {
+      return coverImageUrl;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    console.error("Error checking template cover image:", err);
+    return null;
+  }
 }
 
 /**
