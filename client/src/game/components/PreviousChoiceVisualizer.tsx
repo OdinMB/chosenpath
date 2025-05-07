@@ -167,17 +167,14 @@ export const PreviousChoiceVisualizer: React.FC<
 
   // Format the point modifiers into a readable component
   const formatPointBreakdown = (): React.ReactNode => {
-    if (
-      !resolutionDetails?.readablePointModifiers ||
-      resolutionDetails.readablePointModifiers.length === 0
-    ) {
-      return null;
+    if (!resolutionDetails?.points) {
+      return "No points awarded";
     }
 
     return (
       <div className="text-left w-full">
         <div className="space-y-2">
-          {resolutionDetails.readablePointModifiers.map(
+          {resolutionDetails.readablePointModifiers?.map(
             ([name, value], index) => (
               <div key={index} className="flex justify-between text-sm">
                 <span className="mr-3">{name}</span>
@@ -188,6 +185,21 @@ export const PreviousChoiceVisualizer: React.FC<
                 </span>
               </div>
             )
+          ) || (
+            <div className="flex justify-between text-sm">
+              <span className="mr-3">Base points</span>
+              <span
+                className={
+                  resolutionDetails.points >= 0
+                    ? "text-emerald-600"
+                    : "text-red-600"
+                }
+              >
+                {resolutionDetails.points > 0
+                  ? `+${resolutionDetails.points}`
+                  : resolutionDetails.points}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -360,15 +372,11 @@ export const PreviousChoiceVisualizer: React.FC<
                           <span className="text-primary ml-1">
                             {resolutionDetails.points}
                           </span>
-                          {resolutionDetails.readablePointModifiers &&
-                            resolutionDetails.readablePointModifiers.length >
-                              0 && (
-                              <InfoIcon
-                                className="ml-1 mt-1"
-                                tooltipText={formatPointBreakdown()}
-                                contentClassName="max-w-[400px]"
-                              />
-                            )}
+                          <InfoIcon
+                            className="ml-1 mt-1"
+                            tooltipText={formatPointBreakdown()}
+                            contentClassName="max-w-[400px]"
+                          />
                         </div>
                       )
                     )}
@@ -384,15 +392,11 @@ export const PreviousChoiceVisualizer: React.FC<
                           <span className="text-primary ml-1">
                             {resolutionDetails.points}
                           </span>
-                          {resolutionDetails.readablePointModifiers &&
-                            resolutionDetails.readablePointModifiers.length >
-                              0 && (
-                              <InfoIcon
-                                className="ml-1 mt-1"
-                                tooltipText={formatPointBreakdown()}
-                                contentClassName="max-w-[400px]"
-                              />
-                            )}
+                          <InfoIcon
+                            className="ml-1 mt-1"
+                            tooltipText={formatPointBreakdown()}
+                            contentClassName="max-w-[400px]"
+                          />
                         </div>
                       )}
                   </div>

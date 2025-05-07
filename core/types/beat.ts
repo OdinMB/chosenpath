@@ -243,7 +243,7 @@ export const beatGenerationSchema = z.object({
   interludes: z
     .array(interludeSchema)
     .describe(
-      'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Imply interesting details about the characters or the world without spelling them out. Make the player wonder what\'s going on.'
+      'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Hint at interesting details without spelling them out. Make the player wonder what else is going on in the world. (Example: "The Guild Hall is across the dry canal" makes the player wonder: Why is the canal dry?)\n- If images are disabled for this story, only create the first interlude.'
     ),
 });
 
