@@ -124,7 +124,7 @@ export const beatPlanSchema = z.object({
   showDontTellPreviousDecision: z
     .string()
     .describe(
-      "The action or actions that the player decided to do at the end of the previous beat, plus a short instruction on how to make sure that these actions are narrated based on the principle of 'show don't tell'. Concrete descriptions, direct speech. (The resolution that this decision will lead to has already been determined, but the action itself must still be narrated.)"
+      "The action that the player decided to do at the end of the previous beat, plus a short instruction on how to make sure that these actions are narrated based on the principle of 'show don't tell'. Concrete descriptions of the character carrying out the action, direct speech if they decided to speak. (The resolution of the decision has already been determined, but the action itself must still be narrated.)"
     ),
   showDontTell: z
     .array(z.string())

@@ -11,7 +11,7 @@ dotenv.config();
 
 const contentFilterSchema = z.object({
   isAppropriate: z.boolean(),
-  reason: z.string().optional(),
+  reason: z.string(),
 });
 
 export class ContentFilterService {

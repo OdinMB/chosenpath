@@ -38,7 +38,7 @@ export class StorySetupPromptService {
     const setupPrompt =
       this.getCreationModeInstructions(iterationMode) +
       "Guidelines for story setups:\n\n" +
-      this.getGuidelinesInstructions +
+      this.getGuidelinesInstructions() +
       this.getInventoryInstructions(sections, playerCount > 1) +
       this.getOutcomesInstructions(sections, playerCount > 1) +
       this.getStoryElementsInstructions(sections) +

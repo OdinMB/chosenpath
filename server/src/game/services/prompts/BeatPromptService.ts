@@ -214,7 +214,7 @@ ${gameWorldInstructions}
 
 How to make sure that the text follows the principle of 'Show Don't Tell'?
 Create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
-The first item must always be the players performing the actions that they chose in the previous beat and how these actions play out. Concrete actions, direct speech.${
+The first item must always be the players performing the actions that they chose in the previous beat and how these actions play out. Concrete descriptions of the characters carrying out the actions; always direct speech if they decided to speak.${
       story.isMultiplayer() && story.isFirstBeat()
         ? "\nSince this is the first beat of a multiplayer story, introduce the characters of the other players."
         : ""
