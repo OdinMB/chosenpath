@@ -4,7 +4,7 @@ import { BeatFeedback } from "./feedback/BeatFeedback";
 import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
 import { LoadingSpinner, PrimaryButton, ColoredBox } from "components/ui";
 import { ClientStoryState, Beat, BeatOption } from "core/types";
-import { processStoryText } from "shared/utils/storyTextProcessor";
+import { processStoryText } from "client/game/utils/storyTextProcessor";
 import { enhanceResolutionDetails } from "../utils/resolutionUtils";
 
 interface BeatContentProps {

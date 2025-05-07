@@ -38,6 +38,7 @@ export class StorySetupPromptService {
     const setupPrompt =
       this.getCreationModeInstructions(iterationMode) +
       "Guidelines for story setups:\n\n" +
+      this.getGuidelinesInstructions +
       this.getInventoryInstructions(sections, playerCount > 1) +
       this.getOutcomesInstructions(sections, playerCount > 1) +
       this.getStoryElementsInstructions(sections) +
@@ -65,6 +66,29 @@ export class StorySetupPromptService {
     } else {
       return `Create a setup for an interactive fiction game based on a user prompt that is provided below.\n\n`;
     }
+  }
+
+  private static getGuidelinesInstructions(): string {
+    return `Inclusivity and diversity
+Our goal is two-fold: generate a convincing story, and use this opportunity to defy biases and stereotypes.
+We value inclusivity and diverse representation more highly than an 'accurate' or representation of reality or conforming to readers' expectations within fictional worlds.
+
+Specifically:
+- The cast of characters should be highly diverse across the following dimensions: Culture, Race, Gender, Age, Sexual orientation, Disability, etc.
+- Characters should defy stereotypes that come with their cultural, racial, gender, etc. identities.
+--- Woman are allowed to be dominant, angry, aggressive, strong, visionary, etc.
+--- Men are allowed to be sensitive, caring, empathetic, joyful, etc.
+--- Black people tend to be in leadership positions, and nations with predomintantly black populations can be dominant world powers.
+--- Etc.
+- If romance is part of the story, a character's gender should never rule out who they can fall in love with.
+- Characters' preferred pronouns are always respected (even in a Wild West story in the 1800s).
+
+Only deviate from this if the story's premise absolutely requires it. For example, if a story is about the struggles of an LGBTQ+ identity, these struggles should of course include stereotypes that come with that identity.
+
+Weave these points into the story setup
+- Include them in the guidelines that will define the setting, tone, and structure of the story. Do this in a flavorful way that suits the story. Don't just copy the points above.
+- Apply these points to player identities/backgrounds and NPCs
+\n`;
   }
 
   private static getInventoryInstructions(

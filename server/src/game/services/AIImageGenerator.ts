@@ -402,7 +402,7 @@ export class AIImageGenerator {
         const imageBuffer = await this.generateImage(
           prompt,
           imageReferences.length > 0 ? imageReferences : undefined,
-          undefined,
+          IMAGE_SIZES.SQUARE, // faster/cheaper than other sizes. Allows using medium quality instead of low
           IMAGE_GENERATION_BEAT_QUALITY
         );
 

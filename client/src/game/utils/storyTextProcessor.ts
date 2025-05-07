@@ -4,7 +4,7 @@ import {
   IMAGE_PLACEHOLDER_REGEX,
   parseImagePlaceholder,
   createImageFromPlaceholder,
-} from "./imageUtils";
+} from "shared/utils/imageUtils.js";
 import { StoryImage } from "shared/components/StoryImage";
 
 // Types used within the utility
@@ -133,14 +133,20 @@ export function processStoryText(
         prevImage.paragraphIndex !== undefined &&
         currentImage.paragraphIndex !== undefined
       ) {
-        // If images are in the same paragraph or only one paragraph apart
-        if (currentImage.paragraphIndex - prevImage.paragraphIndex < 2) {
-          // Find a better position - just one paragraph after the current one
-          // This is more conservative than before, only moving to the next paragraph
-          const targetParagraph = currentImage.paragraphIndex + 1;
+        // Calculate paragraph gap between consecutive images
+        const paragraphGap =
+          currentImage.paragraphIndex - prevImage.paragraphIndex;
 
-          // Only reposition if we have a paragraph to move to
-          if (targetParagraph < paragraphPositions.length) {
+        // Only reposition if images would appear in adjacent paragraphs or the same paragraph
+        if (paragraphGap < 2) {
+          // Calculate target paragraph to ensure at least 1 full paragraph between images
+          const targetParagraph = prevImage.paragraphIndex + 2;
+
+          // Only reposition if the target paragraph exists and would increase spacing
+          if (
+            targetParagraph < paragraphPositions.length &&
+            targetParagraph > currentImage.paragraphIndex
+          ) {
             // Create a new placeholder at the target location
             // Start of the target paragraph is usually better than end
             currentImage.targetPosition =
@@ -150,7 +156,7 @@ export function processStoryText(
             currentImage.originalPosition = currentImage.position;
 
             console.log(
-              `Repositioning image from paragraph ${currentImage.paragraphIndex} to ${targetParagraph}`
+              `Repositioning image from paragraph ${currentImage.paragraphIndex} to ${targetParagraph} to ensure at least 1 paragraph between images`
             );
           }
         }

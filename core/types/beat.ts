@@ -114,7 +114,7 @@ export const beatPlanSchema = z.object({
   worldBuilding: z
     .string()
     .describe(
-      "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Don't create duplicate story elements or facts."
+      "Decide how you want to flesh out the game world to make it more immersive. List new story elements that you want to add to the story state. Check if you should add a new story element to the story state that are likely to be used in later beats. List new details about existing story elements that you want to introduce in this beat. Don't create duplicate story elements or facts. Plan a detail that makes the player curious about a detail in the world without spelling out what's going on."
     ),
   newGameElements: z
     .array(newStoryElementSchema)
@@ -243,7 +243,7 @@ export const beatGenerationSchema = z.object({
   interludes: z
     .array(interludeSchema)
     .describe(
-      'Will be shown to the player while the new beat is being generated.\n- 1 fact about a story element that is relevant in the beat (imageId = story element id)\nA thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\na general detail about the world (imageId = "cover"). You can use the image that you requested for this beat in the beat plan for an interlude.'
+      'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Imply interesting details about the characters or the world without spelling them out. Make the player wonder what\'s going on.'
     ),
 });
 

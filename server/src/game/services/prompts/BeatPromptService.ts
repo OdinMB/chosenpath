@@ -390,6 +390,9 @@ Create a total of exactly 3 interludes.
         ? ' (any available imageId or = "cover" for the story\'s cover image)'
         : ""
     }.
+Use interludes to make players curious about the world. Imply interesting details instead of spelling them out. Examples:
+- "The Guild Hall is right behind the dry canal." (Why is the canal dry?)
+- "The dream distillery is surrounded by scaffolding." (What's a dream distillery?)
 ${
   story.includesImages()
     ? "Only use images that are available in the image library (or no image at all)."
@@ -487,6 +490,7 @@ Find a good balance between introducing the overall setup of the story, introduc
 --- Try to link new facts to story elements (using their id). Only use 'world' if the fact doesn't fit anywhere else.
 --- Aim for adding 3 or more new facts per switch and per step in a thread. These are the details that make the world come to life. By recording them, we ensure consistency in future beats.
 --- Example categories for new facts: appearance (NPCs, items), history (NPCs, locations), quirks (NPCs), functionality (items), interactions (NPCs, locations), mood (locations), etc.
+- Plan a hint about a detail in the world that makes the player curious without spelling out what's going on. (Similar to the interlude, see below.)
 ${
   story.isMultiplayer()
     ? "--- If several players are in the same switch or thread, you only need to add new facts to the story state once. (You can add new facts to the story state once per switch or thread.)\n"
