@@ -71,6 +71,12 @@ export const usePreviousChoiceVisualizer = ({
   const [startEmojiAnimation, setStartEmojiAnimation] = useState(false);
   const [startMarkerAnimation, setStartMarkerAnimation] = useState(false);
 
+  // Track previous state to prevent infinite loops
+  const prevAnimateRollRef = useRef(animateRoll);
+  const prevIsChallengeRef = useRef(isChallenge);
+  const prevResolutionDetailsRef = useRef(resolutionDetails);
+  const animationStartedRef = useRef(false);
+
   // Get emoji animation state from its hook
   const {
     isAnimating: isEmojiAnimating,
@@ -125,24 +131,42 @@ export const usePreviousChoiceVisualizer = ({
         mixed: 34,
         unfavorable: 33,
       },
+      visibleModifiers,
+      isPointsTransitioning,
     });
 
   // Reset animation states when animateRoll changes
   useEffect(() => {
-    if (!animateRoll) {
-      // If not animating, show the final state
-      setAnimationPhase("complete");
-      setStartEmojiAnimation(false);
-      setStartMarkerAnimation(false);
-      setVisibleModifiers(resolutionDetails?.readablePointModifiers || []);
-      setIsModifierAnimating(false);
-    } else if (isChallenge) {
-      // Start with modifiers phase
-      setAnimationPhase("modifiers");
-      setStartEmojiAnimation(false);
-      setStartMarkerAnimation(false);
-      setVisibleModifiers([]);
-      setIsModifierAnimating(true);
+    // Check if we need to update state based on props changing
+    const animateRollChanged = prevAnimateRollRef.current !== animateRoll;
+    const isChallengeChanged = prevIsChallengeRef.current !== isChallenge;
+    const resolutionDetailsChanged =
+      prevResolutionDetailsRef.current !== resolutionDetails;
+
+    // Only update if there's an actual change that matters
+    if (animateRollChanged || isChallengeChanged || resolutionDetailsChanged) {
+      // Update refs with current values
+      prevAnimateRollRef.current = animateRoll;
+      prevIsChallengeRef.current = isChallenge;
+      prevResolutionDetailsRef.current = resolutionDetails;
+
+      if (!animateRoll) {
+        // If not animating, show the final state
+        setAnimationPhase("complete");
+        setStartEmojiAnimation(false);
+        setStartMarkerAnimation(false);
+        setVisibleModifiers(resolutionDetails?.readablePointModifiers || []);
+        setIsModifierAnimating(false);
+        animationStartedRef.current = false;
+      } else if (isChallenge && !animationStartedRef.current) {
+        // Start with modifiers phase, but only if not already started
+        setAnimationPhase("modifiers");
+        setStartEmojiAnimation(false);
+        setStartMarkerAnimation(false);
+        setVisibleModifiers([]);
+        setIsModifierAnimating(true);
+        animationStartedRef.current = true;
+      }
     }
   }, [animateRoll, isChallenge, resolutionDetails]);
 
@@ -179,8 +203,19 @@ export const usePreviousChoiceVisualizer = ({
     setVisibleModifiers([]);
     setIsModifierAnimating(true);
 
-    // Animate modifiers one by one
-    const modifiers = resolutionDetails.readablePointModifiers || [];
+    // Get modifiers and rearrange them to ensure "Previous beat" comes first if present
+    const modifiers = [...(resolutionDetails.readablePointModifiers || [])];
+
+    // Find the index of the "Previous beat" modifier, if it exists
+    const previousBeatIndex = modifiers.findIndex(
+      ([name]) => name === "Previous beat"
+    );
+
+    // If "Previous beat" modifier exists, move it to the beginning
+    if (previousBeatIndex > 0) {
+      const previousBeatModifier = modifiers.splice(previousBeatIndex, 1)[0];
+      modifiers.unshift(previousBeatModifier);
+    }
 
     // Longer delay between modifiers - at least 800ms, or distribute evenly
     const delayBetweenModifiers = Math.max(

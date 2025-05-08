@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ResolutionDetails, Resolution } from "core/types";
 import { Tooltip, InfoIcon, ColoredBox, Icons } from "components/ui";
 import { usePreviousChoiceVisualizer } from "game/hooks/usePreviousChoiceVisualizer";
@@ -31,27 +31,53 @@ export const PreviousChoiceVisualizer: React.FC<
   // Expanded state management
   const [expanded, setExpanded] = useState(forceExpanded);
 
+  // Track previous props to prevent unnecessary re-renders
+  const prevForceExpandedRef = useRef(forceExpanded);
+  const prevAnimateRollRef = useRef(animateRoll);
+  const prevIsChallengeRef = useRef(isChallenge);
+  const timeoutSetRef = useRef(false);
+
   // Update expanded state when forceExpanded prop changes
   useEffect(() => {
-    setExpanded(forceExpanded);
+    if (prevForceExpandedRef.current !== forceExpanded) {
+      prevForceExpandedRef.current = forceExpanded;
+      setExpanded(forceExpanded);
+    }
   }, [forceExpanded]);
 
   // Set animation completion handler
   useEffect(() => {
-    if (animateRoll && isChallenge) {
-      // Ensure expanded state during animation if forceExpanded is true
-      if (forceExpanded) {
-        setExpanded(true);
+    // Only act if there's an actual change in the props
+    const animateRollChanged = prevAnimateRollRef.current !== animateRoll;
+    const isChallengeChanged = prevIsChallengeRef.current !== isChallenge;
+
+    if (animateRollChanged || isChallengeChanged || !timeoutSetRef.current) {
+      // Update our refs
+      prevAnimateRollRef.current = animateRoll;
+      prevIsChallengeRef.current = isChallenge;
+
+      // Clear any existing timeout
+      if (timeoutSetRef.current) {
+        timeoutSetRef.current = false;
       }
 
-      // Set a timeout to collapse after animation if not forceExpanded
-      const timeoutId = setTimeout(() => {
-        if (!forceExpanded) {
-          setExpanded(false);
+      if (animateRoll && isChallenge) {
+        // Ensure expanded state during animation if forceExpanded is true
+        if (forceExpanded) {
+          setExpanded(true);
         }
-      }, 7500); // Match total animation duration (4000 + 3500)
 
-      return () => clearTimeout(timeoutId);
+        // Set a timeout to collapse after animation if not forceExpanded
+        const timeoutId = setTimeout(() => {
+          if (!forceExpanded) {
+            setExpanded(false);
+          }
+          timeoutSetRef.current = false;
+        }, 7500); // Match total animation duration (4000 + 3500)
+
+        timeoutSetRef.current = true;
+        return () => clearTimeout(timeoutId);
+      }
     }
   }, [animateRoll, isChallenge, forceExpanded]);
 
@@ -79,10 +105,18 @@ export const PreviousChoiceVisualizer: React.FC<
     choice,
   });
 
+  // Track previous animation phase for logging
+  const prevAnimationPhaseRef = useRef(animationPhase);
+
   // Log animation phase changes to console
   useEffect(() => {
-    if (animateRoll && isChallenge) {
+    if (
+      animateRoll &&
+      isChallenge &&
+      prevAnimationPhaseRef.current !== animationPhase
+    ) {
       console.log(`Animation phase: ${animationPhase}`);
+      prevAnimationPhaseRef.current = animationPhase;
     }
   }, [animationPhase, animateRoll, isChallenge]);
 

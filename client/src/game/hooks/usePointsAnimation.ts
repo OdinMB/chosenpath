@@ -39,6 +39,20 @@ export const usePointsAnimation = ({
   // Ref to track the previous visible modifiers count
   const prevVisibleCountRef = useRef(0);
   const prevTargetValueRef = useRef(0);
+  const prevModifiersRef = useRef<Array<[string, number]>>([]);
+  const prevVisibleModifiersRef = useRef<Array<[string, number]>>([]);
+  const prevIsAnimatingRef = useRef(isAnimating);
+  const prevFinalTotalRef = useRef(finalTotal);
+  const hasInitializedRef = useRef(false);
+  const visibleModifiersProcessedRef = useRef(false);
+
+  // Ref to track the current total to avoid dependency cycle
+  const currentTotalRef = useRef(currentTotal);
+
+  // Update ref when state changes
+  useEffect(() => {
+    currentTotalRef.current = currentTotal;
+  }, [currentTotal]);
 
   // Animation timeout
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,7 +71,8 @@ export const usePointsAnimation = ({
         cancelAnimationFrame(countAnimationFrameRef.current);
       }
 
-      const startValue = currentTotal;
+      // Use ref value instead of state to avoid dependency cycle
+      const startValue = currentTotalRef.current;
       const startTime = Date.now();
       const endTime = startTime + duration;
       const range = targetValue - startValue;
@@ -98,25 +113,37 @@ export const usePointsAnimation = ({
       // Start the animation
       countAnimationFrameRef.current = requestAnimationFrame(updateCount);
     },
-    [currentTotal, setCurrentTotal, setIsComplete, setIsTransitioning]
+    [] // Empty dependency array to avoid infinite loop
   );
 
   // Initialize and reset state based on animation flag
   useEffect(() => {
-    if (!isAnimating) {
-      // If not animating, show final state
-      setCurrentTotal(finalTotal);
-      setIsComplete(true);
-      setIsTransitioning(false);
-      return;
-    }
+    // Check if there's an actual change in props
+    const isAnimatingChanged = prevIsAnimatingRef.current !== isAnimating;
+    const finalTotalChanged = prevFinalTotalRef.current !== finalTotal;
 
-    // Reset state when animation starts
-    setCurrentTotal(0);
-    setIsComplete(false);
-    setIsTransitioning(false);
-    prevVisibleCountRef.current = 0;
-    prevTargetValueRef.current = 0;
+    if (isAnimatingChanged || finalTotalChanged || !hasInitializedRef.current) {
+      // Update refs
+      prevIsAnimatingRef.current = isAnimating;
+      prevFinalTotalRef.current = finalTotal;
+      hasInitializedRef.current = true;
+
+      if (!isAnimating) {
+        // If not animating, show final state
+        setCurrentTotal(finalTotal);
+        setIsComplete(true);
+        setIsTransitioning(false);
+        return;
+      }
+
+      // Reset state when animation starts
+      setCurrentTotal(0);
+      setIsComplete(false);
+      setIsTransitioning(false);
+      prevVisibleCountRef.current = 0;
+      prevTargetValueRef.current = 0;
+      visibleModifiersProcessedRef.current = false;
+    }
   }, [isAnimating, finalTotal]);
 
   // Clean up on unmount
@@ -136,17 +163,44 @@ export const usePointsAnimation = ({
     };
   }, []);
 
+  // Detect actual changes in modifiers arrays
+  const haveModifiersChanged = useCallback(() => {
+    // Different length = definitely changed
+    if (
+      prevModifiersRef.current.length !== modifiers.length ||
+      prevVisibleModifiersRef.current.length !== visibleModifiers.length
+    ) {
+      return true;
+    }
+
+    // For visibleModifiers, just check length since we're only adding elements
+    const visibleModifiersChanged =
+      visibleModifiers.length > prevVisibleCountRef.current;
+
+    // Update refs
+    prevModifiersRef.current = modifiers;
+    prevVisibleModifiersRef.current = visibleModifiers;
+
+    return visibleModifiersChanged;
+  }, [modifiers, visibleModifiers]);
+
   // Update total when visible modifiers change
   useEffect(() => {
     // If not animating or no modifiers, reset to final total
     if (!isAnimating || modifiers.length === 0) {
-      setCurrentTotal(finalTotal);
-      setIsComplete(true);
+      if (currentTotal !== finalTotal) {
+        setCurrentTotal(finalTotal);
+        setIsComplete(true);
+      }
       return;
     }
 
-    // If new modifiers were added
-    if (visibleModifiers.length > prevVisibleCountRef.current) {
+    // Check if modifiers have actually changed and haven't been processed yet
+    if (
+      !visibleModifiersProcessedRef.current &&
+      haveModifiersChanged() &&
+      visibleModifiers.length > prevVisibleCountRef.current
+    ) {
       // Calculate current running total of visible modifiers
       const currentSum = visibleModifiers.reduce(
         (sum, [, value]) => sum + value,
@@ -165,6 +219,9 @@ export const usePointsAnimation = ({
 
       // For the final modifier, apply value change and styling simultaneously
       if (isFinalModifier) {
+        // Mark these modifiers as processed to prevent duplicate animations
+        visibleModifiersProcessedRef.current = true;
+
         // Longer delay before final value to ensure it's visible
         animationTimeoutRef.current = setTimeout(() => {
           // Animate to the final value with a faster speed for the final animation
@@ -179,16 +236,18 @@ export const usePointsAnimation = ({
 
       // Update the previous target value
       prevTargetValueRef.current = currentSum;
-    }
 
-    // Update prev count ref
-    prevVisibleCountRef.current = visibleModifiers.length;
+      // Update ref to current count
+      prevVisibleCountRef.current = visibleModifiers.length;
+    }
   }, [
     visibleModifiers,
     modifiers,
     isAnimating,
     finalTotal,
     animateCountToValue,
+    currentTotal,
+    haveModifiersChanged,
   ]);
 
   return {
