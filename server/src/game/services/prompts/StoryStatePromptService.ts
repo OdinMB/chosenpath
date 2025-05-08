@@ -222,7 +222,8 @@ ${modeDescriptions[story.getGameMode()]}
   private static formatStatDisplay(
     stat: Stat,
     statValue: StatValueEntry | undefined,
-    detailed: boolean = true
+    detailed: boolean = true,
+    showAdjustmentsAfterThreads: boolean = true
   ): string {
     const formattedValue = statValue
       ? this.formatStatValue({ type: stat.type, value: statValue.value })
@@ -260,11 +261,12 @@ ${modeDescriptions[story.getGameMode()]}
       stat.optionsToGainAsReward && stat.optionsToGainAsReward !== "None"
         ? `\n  - As a reward: ${stat.optionsToGainAsReward}`
         : "";
-    const adjustmentsAfterThreads = stat.adjustmentsAfterThreads?.length
-      ? `\n  - Adjustments after threads: ${stat.adjustmentsAfterThreads.join(
-          ", "
-        )}`
-      : "";
+    const adjustmentsAfterThreads =
+      stat.adjustmentsAfterThreads?.length && showAdjustmentsAfterThreads
+        ? `\n  - Adjustments after threads: ${stat.adjustmentsAfterThreads.join(
+            ", "
+          )}`
+        : "";
     const canBeChangedInBeatResolutions = stat.canBeChangedInBeatResolutions
       ? `\n  - Can be adjusted anytime`
       : "\n  - Can only be changed when a thread gets resolved or through sacrifice/reward options";
@@ -319,7 +321,7 @@ ${modeDescriptions[story.getGameMode()]}
             `######## PLAYER ID: ${slot} ########`,
             separator,
             "",
-            `${playerState.name} (${playerState.pronouns.personal}/${playerState.pronouns.possessive})`,
+            `${playerState.name} (${playerState.pronouns.personal}/${playerState.pronouns.object})`,
             playerState.appearance + " " + playerState.fluff,
             "",
           ];
@@ -882,6 +884,7 @@ ${modeDescriptions[story.getGameMode()]}
     const sharedStatValues = state.sharedStatValues;
     const playerStats = state.playerStats;
 
+    const showAdjustmentsAfterThreads = story.getCurrentBeatType() === "switch";
     const sections: string[] = [];
 
     // Shared stats with values
@@ -892,7 +895,12 @@ ${modeDescriptions[story.getGameMode()]}
           const statValue = sharedStatValues.find(
             (sv) => sv.statId === stat.id
           );
-          return this.formatStatDisplay(stat, statValue, detailed);
+          return this.formatStatDisplay(
+            stat,
+            statValue,
+            detailed,
+            showAdjustmentsAfterThreads
+          );
         })
         .join("\n\n"),
       ""
@@ -902,7 +910,14 @@ ${modeDescriptions[story.getGameMode()]}
     sections.push(
       "PLAYER STAT DEFINITIONS:",
       playerStats
-        .map((stat) => this.formatStatDisplay(stat, undefined, detailed))
+        .map((stat) =>
+          this.formatStatDisplay(
+            stat,
+            undefined,
+            detailed,
+            showAdjustmentsAfterThreads
+          )
+        )
         .join("\n\n"),
       ""
     );

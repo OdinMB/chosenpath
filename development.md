@@ -15,8 +15,6 @@ Focus: Text/Images, English, Multiplayer
 
 - 1: percentage stats at 0%: name not visible
 - 2: add support and examples for 1-beat threads
-- 1: formatStatDisplay: Only show adjustmentsAfterThreads on switch beats
-- 1: if not first beat in a thread: don't reestablish scene; go directly into action
 
 - 10: system for triggering events / twists / etc. at certain points during the story
 
@@ -59,10 +57,8 @@ Focus: Text/Images, English, Multiplayer
 - Make sure that there are only 3 backgrounds per player / 3 options per beat
 - Check if ids actually exist when changes are proposed by the AI (e.g. outcome ID)
 - Separate ui from business logic in client for game/page
-- adjust scope of story setup based on the number of beats
 - for generation + iteration: generate a stats = Stat[] attribute where Stat includes a "shared" vs. "player" attribute. That way, the whole zod stuff doesn't have to be sent to the servers twice.
 - Move newMilestone changes to switch generation (away from beat generation)?
-- Allow shared outcomes only in multiplayer games?
 - Add setup and deployment instructions
 
 # NOTES
