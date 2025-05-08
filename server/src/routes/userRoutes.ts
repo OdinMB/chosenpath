@@ -5,14 +5,15 @@ import {
   logoutUser,
   updatePassword,
 } from "../users/userService.js";
-import { authenticate } from "../users/authMiddleware.js";
-import { Logger } from "../shared/logger.js";
+import { authenticate } from "users/authMiddleware.js";
+import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
   sendError,
   sendBadRequest,
   sendUnauthorized,
-} from "../shared/responseUtils.js";
+  sendRateLimited,
+} from "shared/responseUtils.js";
 import {
   RegisterUserRequest,
   LoginUserRequest,
@@ -23,7 +24,8 @@ import {
   getUserStoryCodes,
   associateStoryCode,
   getUserStories,
-} from "../users/userStoryService.js";
+} from "users/userStoryService.js";
+import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
 
 const router = express.Router();
 
@@ -220,10 +222,31 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
     );
   }
 
+  // Apply rate limiting
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const rateLimitStatus = checkRateLimit(ip, "associate_story_code");
+
+  if (rateLimitStatus.isLimited) {
+    return sendRateLimited(
+      res,
+      {
+        action: "associate_story_code",
+        timeRemaining: rateLimitStatus.timeRemaining,
+        maxRequests: rateLimitStatus.maxRequests,
+        windowMs: rateLimitStatus.windowMs,
+        requestsRemaining: rateLimitStatus.requestsRemaining,
+      },
+      requestId
+    );
+  }
+
   try {
     if (!req.user) {
       return sendUnauthorized(res, "Authentication required", requestId);
     }
+
+    // Increment rate limit
+    incrementRateLimit(ip, "associate_story_code");
 
     const association = await associateStoryCode(
       req.user.id,

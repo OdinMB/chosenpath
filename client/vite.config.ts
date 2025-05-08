@@ -17,7 +17,7 @@ const config = {
       components: path.resolve(__dirname, "./src/shared/components"),
       game: path.resolve(__dirname, "./src/game"),
       page: path.resolve(__dirname, "./src/page"),
-      user: path.resolve(__dirname, "./src/user"),
+      users: path.resolve(__dirname, "./src/users"),
     },
     extensions: [".ts", ".js", ".jsx", ".tsx", ".json"],
   },
