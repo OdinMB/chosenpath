@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { LoadingSpinner } from "components/ui";
 import { PendingPlayers } from "./PendingPlayers";
 import { PreviousChoiceVisualizer } from "./PreviousChoiceVisualizer";
@@ -17,24 +17,36 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
   storyState,
   previousBeat,
 }) => {
-  if (!storyState || !previousBeat || previousBeat.choice === -1) return null;
+  // Check if we have valid data to work with
+  const isValidData = storyState && previousBeat && previousBeat.choice !== -1;
 
-  // Check if this was a challenge beat that should animate
-  const selectedOption = previousBeat.options[previousBeat.choice];
+  // Get selected option and check if it's a challenge beat
+  const selectedOption = isValidData
+    ? previousBeat.options[previousBeat.choice]
+    : undefined;
   const isChallengeBeat = selectedOption?.optionType === "challenge";
 
   // Enhance resolution details with readable point modifiers if this is a challenge beat
-  const enhancedResolutionDetails =
-    isChallengeBeat &&
-    previousBeat.resolutionDetails &&
-    selectedOption.optionType === "challenge"
-      ? enhanceResolutionDetails(
-          previousBeat.resolutionDetails,
-          selectedOption,
-          1, // We're only dealing with a single previousBeat
-          [previousBeat] // We only need this beat for context
-        )
-      : previousBeat.resolutionDetails;
+  const enhancedResolutionDetails = useMemo(() => {
+    if (
+      isValidData &&
+      isChallengeBeat &&
+      previousBeat.resolutionDetails &&
+      selectedOption &&
+      selectedOption.optionType === "challenge"
+    ) {
+      return enhanceResolutionDetails(
+        previousBeat.resolutionDetails,
+        selectedOption,
+        1, // We're only dealing with a single previousBeat
+        [previousBeat] // We only need this beat for context
+      );
+    }
+    return isValidData ? previousBeat.resolutionDetails : undefined;
+  }, [isValidData, previousBeat, selectedOption, isChallengeBeat]);
+
+  // If we don't have valid data or no selected option, return null
+  if (!isValidData || !selectedOption) return null;
 
   // Get player slot to show pending players
   const playerSlot = Object.keys(storyState.players)[0];

@@ -64,13 +64,20 @@ export const PreviousChoiceVisualizer: React.FC<
     currentMarkerPosition,
     visibleModifiers,
     isModifierAnimating,
+    animationPhase,
   } = usePreviousChoiceVisualizer({
     animateRoll,
     resolution,
     resolutionDetails,
     isChallenge,
-    forceExpanded,
   });
+
+  // Log animation phase changes to console
+  useEffect(() => {
+    if (animateRoll && isChallenge) {
+      console.log(`Animation phase: ${animationPhase}`);
+    }
+  }, [animationPhase, animateRoll, isChallenge]);
 
   const {
     formatRiskDistribution,
@@ -95,6 +102,11 @@ export const PreviousChoiceVisualizer: React.FC<
     // For challenge beats
     if (!resolution) {
       return <div className="w-8 h-8"></div>;
+    }
+
+    // If in modifiers phase, reserve space but don't show emoji
+    if (animationPhase === "modifiers") {
+      return <div className="w-12 h-12"></div>;
     }
 
     // If animating, show the current emoji in the animation sequence (without tooltip)
@@ -276,7 +288,7 @@ export const PreviousChoiceVisualizer: React.FC<
             {isChallenge && resolutionDetails && resolution && (
               <div className="mt-3">
                 <div className="max-w-md mx-auto">
-                  {/* Distribution bar */}
+                  {/* Distribution bar - always visible */}
                   <div className="relative h-5 rounded-lg overflow-hidden shadow-inner flex z-0 w-full mb-2">
                     {/* Favorable segment */}
                     {resolutionDetails.distribution.favorable > 0 && (
@@ -319,54 +331,55 @@ export const PreviousChoiceVisualizer: React.FC<
                       />
                     )}
 
-                    {/* Cursor for roll position */}
-                    {resolutionDetails.roll !== undefined && (
-                      <div
-                        className="absolute"
-                        style={{
-                          left: `${
-                            isMarkerAnimating
-                              ? currentMarkerPosition
-                              : resolutionDetails.roll
-                          }%`,
-                          height: "calc(100% + 8px)",
-                          top: "-4px", // Extend 4px above
-                          width: "1.5px",
-                          backgroundColor: "black",
-                          transform: "translateX(-0.75px)",
-                          zIndex: 5,
-                          pointerEvents: "none",
-                          transition: isMarkerAnimating
-                            ? "none"
-                            : "left 0.3s ease-out",
-                        }}
-                      >
-                        {/* Top horizontal line of cursor */}
+                    {/* Cursor for roll position - hide during modifiers phase */}
+                    {resolutionDetails.roll !== undefined &&
+                      animationPhase !== "modifiers" && (
                         <div
-                          className="absolute top-0 bg-black"
+                          className="absolute"
                           style={{
-                            width: "3px",
-                            height: "1.5px",
-                            left: "-0.75px",
+                            left: `${
+                              isMarkerAnimating
+                                ? currentMarkerPosition
+                                : resolutionDetails.roll
+                            }%`,
+                            height: "calc(100% + 8px)",
+                            top: "-4px", // Extend 4px above
+                            width: "1.5px",
+                            backgroundColor: "black",
+                            transform: "translateX(-0.75px)",
+                            zIndex: 5,
                             pointerEvents: "none",
+                            transition: isMarkerAnimating
+                              ? "none"
+                              : "left 0.3s ease-out",
                           }}
-                        ></div>
+                        >
+                          {/* Top horizontal line of cursor */}
+                          <div
+                            className="absolute top-0 bg-black"
+                            style={{
+                              width: "3px",
+                              height: "1.5px",
+                              left: "-0.75px",
+                              pointerEvents: "none",
+                            }}
+                          ></div>
 
-                        {/* Bottom horizontal line of cursor */}
-                        <div
-                          className="absolute bottom-0 bg-black"
-                          style={{
-                            width: "3px",
-                            height: "1.5px",
-                            left: "-0.75px",
-                            pointerEvents: "none",
-                          }}
-                        ></div>
-                      </div>
-                    )}
+                          {/* Bottom horizontal line of cursor */}
+                          <div
+                            className="absolute bottom-0 bg-black"
+                            style={{
+                              width: "3px",
+                              height: "1.5px",
+                              left: "-0.75px",
+                              pointerEvents: "none",
+                            }}
+                          ></div>
+                        </div>
+                      )}
                   </div>
 
-                  {/* Info row with Risk, Resource Type, and Points */}
+                  {/* Info row with Risk, Resource Type, and Points - always visible */}
                   <div className="flex items-center gap-2 md:gap-6 flex-wrap text-sm mb-3">
                     <div className="inline-flex items-center">
                       <span className="font-semibold text-primary">Risk:</span>
