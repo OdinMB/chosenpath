@@ -224,19 +224,19 @@ export const PreviousChoiceVisualizer: React.FC<
   const renderModifierTag = (name: string, value: number) => (
     <div
       className={`
-        inline-flex items-center px-3 py-1.5 mr-3 mb-2 rounded-full text-sm
+        inline-flex items-center px-2 py-1 mr-2 mb-1 rounded text-sm
+        bg-white border shadow-sm animate-fadeIn transition-all duration-300
         ${
           value >= 0
-            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-            : "bg-red-100 text-red-800 border border-red-300"
+            ? "text-emerald-800 border-emerald-200"
+            : "text-red-800 border-red-200"
         }
-        shadow-sm animate-fadeIn transition-all duration-300
       `}
     >
       <span className="mr-1.5 font-medium">{name}</span>
       <span
         className={`font-bold ${
-          value >= 0 ? "text-emerald-700" : "text-red-700"
+          value >= 0 ? "text-emerald-600" : "text-red-600"
         }`}
       >
         {value >= 0 ? `+${value}` : value}
@@ -427,18 +427,22 @@ export const PreviousChoiceVisualizer: React.FC<
                         </div>
                       )}
                   </div>
+                </div>
 
-                  {/* Animated modifier tags */}
-                  {(isModifierAnimating || visibleModifiers.length > 0) && (
-                    <div className="flex flex-wrap mt-4 mb-1">
+                {/* Animated modifier tags */}
+                {(isModifierAnimating || visibleModifiers.length > 0) && (
+                  <div className="flex flex-wrap mt-2 mb-0">
+                    {/* Add the same container used for emoji to ensure alignment */}
+                    <div className="hidden md:block w-14 items-center justify-center"></div>
+                    <div className="flex flex-wrap">
                       {visibleModifiers.map(([name, value], index) => (
                         <React.Fragment key={index}>
                           {renderModifierTag(name, value)}
                         </React.Fragment>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </>
