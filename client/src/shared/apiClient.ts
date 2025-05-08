@@ -67,6 +67,11 @@ apiClient.interceptors.request.use(
 // Add response interceptor to handle common response tasks
 apiClient.interceptors.response.use(
   (response) => {
+    // Log all server responses
+    Logger.API?.info?.(
+      `Response from ${response.config.url}: ${response.status} ${response.statusText}`
+    );
+
     // Check if the response is a valid API response
     if (
       response.data &&
@@ -74,6 +79,15 @@ apiClient.interceptors.response.use(
       "status" in response.data
     ) {
       const apiResponse = response.data as BaseServerResponse;
+
+      // Log the API response status and data structure
+      Logger.API?.debug?.(
+        `API Response status: ${apiResponse.status}, Data: ${JSON.stringify(
+          apiResponse
+        ).substring(0, 500)}${
+          JSON.stringify(apiResponse).length > 500 ? "..." : ""
+        }`
+      );
 
       // Check for errors in the response
       if (
@@ -93,11 +107,26 @@ apiClient.interceptors.response.use(
           data: response.data.data,
         };
       }
+    } else {
+      // Log non-standard responses
+      Logger.API?.debug?.(
+        `Non-standard response structure: ${typeof response.data}`
+      );
     }
 
     return response;
   },
   (error) => {
+    // Log error responses
+    Logger.API?.error?.(`API Error: ${error.message}`);
+    if (error.response) {
+      Logger.API?.error?.(
+        `Status: ${error.response.status}, URL: ${
+          error.config?.url || "unknown"
+        }`
+      );
+    }
+
     // For errors, extract the error message from API response
     if (error.response?.data?.errorMessage) {
       error.message = error.response.data.errorMessage;
