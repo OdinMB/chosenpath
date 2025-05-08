@@ -38,7 +38,7 @@ export async function initializeDatabase() {
     // Enable foreign keys
     await db.exec("PRAGMA foreign_keys = ON");
 
-    // Create users table
+    // Create or update users table
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -52,7 +52,7 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Create sessions table
+    // Create or update sessions table
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
@@ -64,7 +64,7 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Create stories table for story metadata
+    // Create or update stories table for story metadata
     await db.exec(`
       CREATE TABLE IF NOT EXISTS stories (
         id TEXT PRIMARY KEY,
@@ -79,20 +79,24 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Create user_story_codes table to associate users with story codes
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS user_story_codes (
-        userId TEXT NOT NULL,
-        storyId TEXT NOT NULL,
-        playerSlot TEXT NOT NULL,
-        code TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        lastPlayedAt INTEGER NOT NULL,
-        PRIMARY KEY (userId, storyId, playerSlot),
-        FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE,
-        FOREIGN KEY (storyId) REFERENCES stories (id) ON DELETE CASCADE
-      )
-    `);
+    // Check if story_players table exists
+    const storyPlayersExists = await tableExists("story_players");
+
+    if (!storyPlayersExists) {
+      // Create new story_players table
+      await db.exec(`
+        CREATE TABLE story_players (
+          storyId TEXT NOT NULL,
+          playerSlot TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          userId TEXT,
+          lastPlayedAt INTEGER,
+          PRIMARY KEY (storyId, playerSlot),
+          FOREIGN KEY (storyId) REFERENCES stories (id) ON DELETE CASCADE,
+          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE SET NULL
+        )
+      `);
+    }
 
     // Create indexes for better performance
     await db.exec(`
@@ -101,9 +105,8 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions (userId);
       CREATE INDEX IF NOT EXISTS idx_sessions_expiresAt ON sessions (expiresAt);
       CREATE INDEX IF NOT EXISTS idx_stories_creatorId ON stories (creatorId);
-      CREATE INDEX IF NOT EXISTS idx_user_story_codes_userId ON user_story_codes (userId);
-      CREATE INDEX IF NOT EXISTS idx_user_story_codes_storyId ON user_story_codes (storyId);
-      CREATE INDEX IF NOT EXISTS idx_user_story_codes_code ON user_story_codes (code);
+      CREATE INDEX IF NOT EXISTS idx_story_players_code ON story_players (code);
+      CREATE INDEX IF NOT EXISTS idx_story_players_userId ON story_players (userId);
     `);
 
     Logger.DB.log("Database initialized successfully");
@@ -111,6 +114,22 @@ export async function initializeDatabase() {
   } catch (error) {
     Logger.DB.error("Failed to initialize database", error);
     throw error;
+  }
+}
+
+/**
+ * Check if a table exists in the database
+ */
+async function tableExists(tableName: string): Promise<boolean> {
+  try {
+    const result = await db.get(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+      tableName
+    );
+    return !!result;
+  } catch (error) {
+    Logger.DB.error(`Failed to check if table ${tableName} exists`, error);
+    return false;
   }
 }
 

@@ -24,6 +24,7 @@ import {
   getUserStoryCodes,
   associateStoryCode,
   getUserStories,
+  getStoriesWithUser,
 } from "users/userStoryService.js";
 import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
 
@@ -282,6 +283,30 @@ router.get("/users/stories", authenticate(), async (req, res) => {
     return sendSuccess(res, { stories }, requestId);
   } catch (error) {
     Logger.Route.error("Failed to get user stories", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to get stories";
+
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
+
+/**
+ * Get stories where the user is a player (not necessarily the creator)
+ * GET /users/player-stories
+ */
+router.get("/users/player-stories", authenticate(), async (req, res) => {
+  const requestId = (req.query.requestId as string) || "unknown";
+
+  try {
+    if (!req.user) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const stories = await getStoriesWithUser(req.user.id);
+    return sendSuccess(res, { stories }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to get user player stories", error);
 
     const errorMessage =
       error instanceof Error ? error.message : "Failed to get stories";

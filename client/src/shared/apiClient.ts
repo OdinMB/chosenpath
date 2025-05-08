@@ -188,6 +188,13 @@ export const userStoriesApi = {
   getUserStories: () => {
     return apiClient.get<UserStoriesResponse>("/users/stories");
   },
+
+  /**
+   * Get all stories where the current user is a player (has a code)
+   */
+  getPlayerStories: () => {
+    return apiClient.get<UserStoriesResponse>("/users/player-stories");
+  },
 };
 
 // Admin API functions that use an explicit admin token

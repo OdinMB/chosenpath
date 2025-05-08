@@ -13,10 +13,12 @@ export async function getUserStoryCodes(
 
     const codes = await db.all<UserStoryCodeAssociation[]>(
       `SELECT 
-        userId, storyId, playerSlot, code, createdAt, lastPlayedAt 
-       FROM user_story_codes 
-       WHERE userId = ?
-       ORDER BY lastPlayedAt DESC`,
+        ? as userId, sp.storyId, sp.playerSlot, sp.code, s.createdAt, sp.lastPlayedAt 
+       FROM story_players sp
+       JOIN stories s ON sp.storyId = s.id
+       WHERE sp.userId = ?
+       ORDER BY sp.lastPlayedAt DESC`,
+      userId,
       userId
     );
 
@@ -24,6 +26,26 @@ export async function getUserStoryCodes(
   } catch (error) {
     Logger.Route.error(`Failed to get story codes for user ${userId}`, error);
     throw new Error("Failed to retrieve user story codes");
+  }
+}
+
+/**
+ * Get story player details by code
+ */
+export async function getStoryPlayerByCode(code: string) {
+  try {
+    const db = getDb();
+
+    return await db.get(
+      `SELECT sp.storyId, sp.playerSlot, sp.code, sp.userId, s.createdAt, sp.lastPlayedAt
+       FROM story_players sp
+       JOIN stories s ON sp.storyId = s.id
+       WHERE sp.code = ?`,
+      code
+    );
+  } catch (error) {
+    Logger.Route.error(`Failed to get story player for code ${code}`, error);
+    throw new Error("Failed to retrieve story player information");
   }
 }
 
@@ -41,7 +63,11 @@ export async function associateStoryCode(
     const now = Date.now();
 
     // Check if story exists first
-    const story = await db.get("SELECT id FROM stories WHERE id = ?", storyId);
+    const story = await db.get(
+      "SELECT id, createdAt FROM stories WHERE id = ?",
+      storyId
+    );
+    let storyCreatedAt = now;
 
     if (!story) {
       // Insert story metadata record with minimal information
@@ -57,39 +83,36 @@ export async function associateStoryCode(
         true,
         null
       );
+    } else {
+      storyCreatedAt = story.createdAt;
     }
 
-    // Check if association already exists
-    const existing = await db.get(
-      `SELECT userId FROM user_story_codes 
-       WHERE userId = ? AND storyId = ? AND playerSlot = ?`,
-      userId,
-      storyId,
-      playerSlot
+    // Check if player record already exists
+    const existingPlayer = await db.get(
+      `SELECT code FROM story_players WHERE code = ?`,
+      code
     );
 
-    if (existing) {
-      // Update existing association
+    if (existingPlayer) {
+      // Update existing player record
       await db.run(
-        `UPDATE user_story_codes 
-         SET lastPlayedAt = ? 
-         WHERE userId = ? AND storyId = ? AND playerSlot = ?`,
-        now,
+        `UPDATE story_players
+         SET userId = ?, lastPlayedAt = ?
+         WHERE code = ?`,
         userId,
-        storyId,
-        playerSlot
+        now,
+        code
       );
     } else {
-      // Create new association
+      // Create new player record
       await db.run(
-        `INSERT INTO user_story_codes 
-         (userId, storyId, playerSlot, code, createdAt, lastPlayedAt)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        userId,
+        `INSERT INTO story_players
+         (storyId, playerSlot, code, userId, lastPlayedAt)
+         VALUES (?, ?, ?, ?, ?)`,
         storyId,
         playerSlot,
         code,
-        now,
+        userId,
         now
       );
     }
@@ -100,7 +123,7 @@ export async function associateStoryCode(
       storyId,
       playerSlot,
       code,
-      createdAt: now,
+      createdAt: storyCreatedAt,
       lastPlayedAt: now,
     };
   } catch (error) {
@@ -136,6 +159,32 @@ export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
 }
 
 /**
+ * Get stories where the user is a player
+ */
+export async function getStoriesWithUser(
+  userId: string
+): Promise<StoryMetadata[]> {
+  try {
+    const db = getDb();
+
+    const stories = await db.all<StoryMetadata[]>(
+      `SELECT DISTINCT
+        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
+       FROM stories s
+       JOIN story_players sp ON s.id = sp.storyId
+       WHERE sp.userId = ?
+       ORDER BY sp.lastPlayedAt DESC`,
+      userId
+    );
+
+    return stories || [];
+  } catch (error) {
+    Logger.Route.error(`Failed to get stories with user ${userId}`, error);
+    throw new Error("Failed to retrieve stories with user");
+  }
+}
+
+/**
  * Update the last played time for a user's story code
  */
 export async function updateLastPlayedTime(
@@ -147,14 +196,15 @@ export async function updateLastPlayedTime(
     const db = getDb();
     const now = Date.now();
 
+    // Update the story_players record
     await db.run(
-      `UPDATE user_story_codes 
+      `UPDATE story_players 
        SET lastPlayedAt = ? 
-       WHERE userId = ? AND storyId = ? AND playerSlot = ?`,
+       WHERE storyId = ? AND playerSlot = ? AND userId = ?`,
       now,
-      userId,
       storyId,
-      playerSlot
+      playerSlot,
+      userId
     );
   } catch (error) {
     Logger.Route.error(
