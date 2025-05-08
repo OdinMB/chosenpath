@@ -3,7 +3,8 @@ import { ImageCard } from "./ImageCard";
 import { ImageReference } from "core/types/image";
 
 interface CoverCardProps {
-  sourceId: string; // Template ID
+  sourceId?: string; // Template or Story ID (optional)
+  source?: "template" | "story"; // Type of the source
   title: string;
   size?: "default" | "large";
   onClick?: () => void;
@@ -12,31 +13,33 @@ interface CoverCardProps {
 }
 
 /**
- * A specialized card component for displaying template cover images.
- * It simplifies the ImageCard API by only requiring a template ID instead of a full ImageReference.
+ * A specialized card component for displaying template or story cover images.
+ * It simplifies the ImageCard API by only requiring a source type and ID instead of a full ImageReference.
  */
 export const CoverCard: React.FC<CoverCardProps> = ({
   sourceId,
+  source = "template",
   title,
   size = "default",
   onClick,
   children,
   className = "",
 }) => {
-  // Create the image reference for a template cover image
-  const templateCoverRef: ImageReference = useMemo(
-    () => ({
+  // Create the image reference for a cover image if sourceId is provided
+  const coverImageRef: ImageReference | undefined = useMemo(() => {
+    if (!sourceId) return undefined;
+
+    return {
       id: "cover",
-      source: "template",
+      source: source,
       sourceId: sourceId,
       fileType: "jpeg",
-    }),
-    [sourceId]
-  );
+    };
+  }, [sourceId, source]);
 
   return (
     <ImageCard
-      imageRef={templateCoverRef}
+      imageRef={coverImageRef}
       title={title}
       size={size}
       onClick={onClick}

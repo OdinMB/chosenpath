@@ -1,16 +1,16 @@
 import { useUserStories } from "../hooks";
 import { UserStoryCodeAssociation } from "core/types/api";
-import { PrimaryButton } from "shared/components/ui";
-import { PlayerCode } from "shared/components";
+import { StoryCard } from "shared/components/StoryCard";
 
 interface UserStoriesListProps {
   onCodeSelect?: (code: string) => void;
 }
 
 export function UserStoriesList({ onCodeSelect }: UserStoriesListProps) {
-  const { storyCodes, isLoadingCodes, error } = useUserStories();
+  const { storyCodes, stories, isLoadingCodes, isLoadingStories, error } =
+    useUserStories();
 
-  if (isLoadingCodes) {
+  if (isLoadingCodes || isLoadingStories) {
     return (
       <div className="flex justify-center p-4">
         <div className="animate-spin h-5 w-5 border-2 border-primary-500 rounded-full border-t-transparent"></div>
@@ -22,78 +22,43 @@ export function UserStoriesList({ onCodeSelect }: UserStoriesListProps) {
     return <div className="text-red-500 p-4 text-sm">{error}</div>;
   }
 
-  const handleCodeClick = (code: string) => {
-    if (onCodeSelect) {
+  const handlePlay = (_storyId: string, code?: string) => {
+    if (onCodeSelect && code) {
       onCodeSelect(code);
     }
   };
 
+  // Group story codes by storyId to show all players for each story
+  const storyCodesMap = new Map<string, UserStoryCodeAssociation[]>();
+  storyCodes.forEach((code) => {
+    if (!storyCodesMap.has(code.storyId)) {
+      storyCodesMap.set(code.storyId, []);
+    }
+    storyCodesMap.get(code.storyId)?.push(code);
+  });
+
   return (
     <div className="w-full">
-      {storyCodes.length === 0 ? (
+      {stories.length === 0 ? (
         <div className="text-gray-500 text-sm p-4">
           You don't have any active stories yet.
         </div>
       ) : (
         <div className="space-y-4">
-          {storyCodes.map((storyCode) => (
-            <StoryCodeItem
-              key={`${storyCode.storyId}-${storyCode.playerSlot}`}
-              storyCode={storyCode}
-              onCodeClick={handleCodeClick}
-            />
-          ))}
+          {stories.map((story) => {
+            const storyPlayers = storyCodesMap.get(story.id) || [];
+
+            return (
+              <StoryCard
+                key={story.id}
+                story={story}
+                players={storyPlayers}
+                onPlay={handlePlay}
+              />
+            );
+          })}
         </div>
       )}
-    </div>
-  );
-}
-
-interface StoryCodeItemProps {
-  storyCode: UserStoryCodeAssociation;
-  onCodeClick: (code: string) => void;
-}
-
-function StoryCodeItem({ storyCode, onCodeClick }: StoryCodeItemProps) {
-  const formatPlayerLabel = (slot: string) => {
-    // Convert "player1" to "Player 1"
-    const match = slot.match(/player(\d+)/i);
-    if (match && match[1]) {
-      return `Player ${match[1]}`;
-    }
-    return slot;
-  };
-
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString();
-  };
-
-  return (
-    <div className="border rounded-lg p-3 bg-white shadow-sm">
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="font-medium text-primary-700">
-            Story: {storyCode.storyId}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {formatPlayerLabel(storyCode.playerSlot)}
-          </div>
-          <div className="text-xs text-gray-500">
-            Last played: {formatDate(storyCode.lastPlayedAt)}
-          </div>
-
-          <div className="mt-2">
-            <PlayerCode code={storyCode.code} size="sm" />
-          </div>
-        </div>
-
-        <div>
-          <PrimaryButton size="sm" onClick={() => onCodeClick(storyCode.code)}>
-            Play
-          </PrimaryButton>
-        </div>
-      </div>
     </div>
   );
 }

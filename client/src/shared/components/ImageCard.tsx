@@ -4,7 +4,7 @@ import { ImageReference } from "core/types/image";
 import { constructImageUrl } from "shared/utils/imageUtils";
 
 interface ImageCardProps {
-  imageRef: ImageReference;
+  imageRef?: ImageReference;
   title: string;
   size?: "default" | "large";
   onClick?: () => void;
@@ -23,9 +23,12 @@ export const ImageCard = ({
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Load image from the image reference
+  // Load image from the image reference if available
   useEffect(() => {
-    if (!imageRef) return;
+    if (!imageRef) {
+      setImageSrc(null);
+      return;
+    }
 
     // Use the utility function to construct the image URL
     const imagePath = constructImageUrl(imageRef);

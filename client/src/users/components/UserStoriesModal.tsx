@@ -4,9 +4,11 @@ import { UserStoriesList } from "./UserStoriesList";
 import { useNavigate } from "react-router-dom";
 import { useUserStories } from "../hooks";
 import { useAuth } from "shared/useAuth";
+import { StoryCard } from "shared/components";
 import { PrimaryButton } from "shared/components/ui";
 import { StoredCodeSet } from "shared/SessionContext";
 import { getSortedCodeSets } from "shared/utils/codeSetUtils";
+import { StoryMetadata } from "core/types/api";
 
 interface UserStoriesModalProps {
   isOpen: boolean;
@@ -16,7 +18,8 @@ interface UserStoriesModalProps {
 export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { storyCodes, associateStoryCode } = useUserStories();
+  const { storyCodes, associateStoryCode, loadStoryCodes, loadStories } =
+    useUserStories();
   const [localCodeSets, setLocalCodeSets] = useState<StoredCodeSet[]>([]);
   const [associatingCode, setAssociatingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +28,14 @@ export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
   useEffect(() => {
     if (isOpen) {
       refreshLocalCodeSets();
+
+      // Refresh user stories when the modal opens
+      if (isAuthenticated) {
+        loadStoryCodes();
+        loadStories();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated, loadStoryCodes, loadStories]);
 
   // Filter local codes that aren't already in the user's database
   useEffect(() => {
@@ -110,45 +119,45 @@ export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
               account.
             </p>
 
-            {localCodeSets.map((codeSet) => (
-              <div
-                key={codeSet.timestamp}
-                className="border rounded-lg p-3 bg-white shadow-sm flex justify-between items-center"
-              >
-                <div>
-                  <div className="font-medium">
-                    {codeSet.title ||
-                      `Story from ${new Date(
-                        codeSet.timestamp
-                      ).toLocaleString()}`}
+            {localCodeSets.map((codeSet) => {
+              // Create a minimal story object from the code set
+              const storyId =
+                Object.values(codeSet.codes)[0]?.substring(0, 8) || "unknown";
+              const mockStory: StoryMetadata = {
+                id: storyId,
+                title: codeSet.title || `Story ${storyId}`,
+                createdAt: codeSet.timestamp,
+                updatedAt: codeSet.timestamp,
+                maxTurns: 10,
+                generateImages: true,
+                creatorId: "",
+              };
+
+              return (
+                <StoryCard
+                  key={codeSet.timestamp}
+                  story={mockStory}
+                  onPlay={() =>
+                    handleCodeSubmit(Object.values(codeSet.codes)[0])
+                  }
+                  className="bg-gray-50"
+                >
+                  <div className="mt-2 flex justify-end">
+                    <PrimaryButton
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAssociateCode(codeSet)}
+                      isLoading={
+                        associatingCode === Object.values(codeSet.codes)[0]
+                      }
+                      disabled={!!associatingCode}
+                    >
+                      Link to Account
+                    </PrimaryButton>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {Object.keys(codeSet.codes).length} codes
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <PrimaryButton
-                    size="sm"
-                    onClick={() =>
-                      handleCodeSubmit(Object.values(codeSet.codes)[0])
-                    }
-                  >
-                    Play
-                  </PrimaryButton>
-                  <PrimaryButton
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleAssociateCode(codeSet)}
-                    isLoading={
-                      associatingCode === Object.values(codeSet.codes)[0]
-                    }
-                    disabled={!!associatingCode}
-                  >
-                    Link to Account
-                  </PrimaryButton>
-                </div>
-              </div>
-            ))}
+                </StoryCard>
+              );
+            })}
           </div>
         )}
 
