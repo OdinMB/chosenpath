@@ -86,7 +86,7 @@ export const guidelinesSchema = z
     switchAndThreadInstructions: z
       .array(z.string())
       .describe(
-        "Special rules that dictate how switches and threads should be structured or behave throughout the story. These instructions influence story progression and may include time rules, resource consumption patterns, thread availability conditions, and special thread unlocking mechanics. Examples: each thread represents at least one day of story time; players lose 5% rations after each thread; thread types should alternate between action and dialogue; players must face a specific challenge every N threads; certain types of threads should be 2 beats long; etc. Generate 0-3 instructions. (Not every story needs these instructions.)"
+        "Instructions for switches and threads to manage the flow of the story. Can be used to: a) adjust certain stats after each thread (players lose 5% rations after each thread), b) define conditions for threads to happen ('after receiving a contract, jump immediately into the job with a flavor switch'), c) define the intended length of certain threads ('healing/repair threads should only be 2 beats long'), d) ensure diversity in thread types ('should alternate between action and social threads'). Generate 0-3 instructions. (Not every story needs these instructions.)"
       ),
   })
   .describe("Story guidelines and parameters");
