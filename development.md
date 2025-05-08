@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- 10: User accounts (DB, Login, Manage codes/games)
-- 4: migrate non-websocket api calls in client to use the new apiClient.ts
+- 5: User accounts (Manage codes/games)
+- 4: improve admin auth system
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 
