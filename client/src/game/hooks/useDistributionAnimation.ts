@@ -43,6 +43,12 @@ export const useDistributionAnimation = ({
   const prevVisibleModifiersCountRef = useRef(0);
   const prevPointsRef = useRef(0);
   const prevAnimationPhaseRef = useRef(animationPhase);
+  const visibleModifiersLengthRef = useRef(0);
+
+  // Use ref to avoid dependency cycles
+  useEffect(() => {
+    visibleModifiersLengthRef.current = visibleModifiers.length;
+  }, [visibleModifiers.length]);
 
   // Animation frame reference
   const animationFrameRef = useRef<number | null>(null);
@@ -50,16 +56,18 @@ export const useDistributionAnimation = ({
   const currentDistributionRef =
     useRef<ProbabilityDistribution>(currentDistribution);
 
-  // Helper function to check if modifiers have changed
-  const haveModifiersChanged = useCallback(() => {
-    // Check if the number of visible modifiers has changed
-    return visibleModifiers.length !== prevVisibleModifiersCountRef.current;
-  }, [visibleModifiers]);
-
   // Update ref when state changes
   useEffect(() => {
     currentDistributionRef.current = currentDistribution;
   }, [currentDistribution]);
+
+  // Helper function to check if modifiers have changed
+  const haveModifiersChanged = useCallback(() => {
+    // Check if the number of visible modifiers has changed
+    return (
+      visibleModifiersLengthRef.current !== prevVisibleModifiersCountRef.current
+    );
+  }, []);
 
   // Memoize the getInitialDistribution function
   const getInitialDistribution = useCallback(() => {
@@ -141,6 +149,19 @@ export const useDistributionAnimation = ({
     setCurrentDistribution(initialDistribution);
   }, [initialDistribution]);
 
+  // Store final distribution in a ref to avoid object equality issues
+  const finalDistributionRef = useRef(finalDistribution);
+  useEffect(() => {
+    // Only update if values actually changed
+    if (
+      finalDistributionRef.current.favorable !== finalDistribution.favorable ||
+      finalDistributionRef.current.mixed !== finalDistribution.mixed ||
+      finalDistributionRef.current.unfavorable !== finalDistribution.unfavorable
+    ) {
+      finalDistributionRef.current = finalDistribution;
+    }
+  }, [finalDistribution]);
+
   // Animate the distribution based on points transition
   useEffect(() => {
     // Check for actual changes that need processing
@@ -158,7 +179,7 @@ export const useDistributionAnimation = ({
 
     // Don't animate if in complete phase - use final distribution
     if (animationPhase === "complete") {
-      setCurrentDistribution(finalDistribution);
+      setCurrentDistribution(finalDistributionRef.current);
       return;
     }
 
@@ -178,7 +199,6 @@ export const useDistributionAnimation = ({
     isPointsTransitioning,
     animationPhase,
     riskType,
-    finalDistribution,
     animateToDistribution,
   ]);
 
@@ -186,17 +206,18 @@ export const useDistributionAnimation = ({
   useEffect(() => {
     const modifiersChanged = haveModifiersChanged();
 
-    prevAnimationPhaseRef.current = animationPhase;
-
     // Skip if we're in complete phase and should show final distribution
     if (animationPhase === "complete") {
-      setCurrentDistribution(finalDistribution);
+      setCurrentDistribution(finalDistributionRef.current);
       setIsDistributionAnimating(false);
       return;
     }
 
     // Skip if we're in modifiers phase but no modifiers are shown yet - show base distribution
-    if (animationPhase === "modifiers" && visibleModifiers.length === 0) {
+    if (
+      animationPhase === "modifiers" &&
+      visibleModifiersLengthRef.current === 0
+    ) {
       setCurrentDistribution(initialDistribution);
       setIsDistributionAnimating(false);
       return;
@@ -204,7 +225,7 @@ export const useDistributionAnimation = ({
 
     // Check if new modifiers were added
     if (modifiersChanged) {
-      prevVisibleModifiersCountRef.current = visibleModifiers.length;
+      prevVisibleModifiersCountRef.current = visibleModifiersLengthRef.current;
 
       // For the final modifier, we'll animate as part of the points transition in the other effect
       if (!isPointsTransitioning) {
@@ -219,11 +240,10 @@ export const useDistributionAnimation = ({
       }
     }
   }, [
-    visibleModifiers,
+    visibleModifiers.length,
     currentPoints,
     animationPhase,
     riskType,
-    finalDistribution,
     initialDistribution,
     isPointsTransitioning,
     animateToDistribution,
@@ -251,15 +271,9 @@ export const useDistributionAnimation = ({
       animateToDistribution(targetDistribution, 600);
     } else if (animationPhase === "complete") {
       // Animate to the final distribution
-      animateToDistribution(finalDistribution, 400);
+      animateToDistribution(finalDistributionRef.current, 400);
     }
-  }, [
-    animationPhase,
-    currentPoints,
-    riskType,
-    finalDistribution,
-    animateToDistribution,
-  ]);
+  }, [animationPhase, currentPoints, riskType, animateToDistribution]);
 
   // Clean up on unmount
   useEffect(() => {

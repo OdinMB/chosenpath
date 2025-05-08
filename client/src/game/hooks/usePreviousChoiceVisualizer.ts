@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Resolution, ResolutionDetails } from "core/types";
 import { ProbabilityDistribution } from "core/types/beat";
 import { useEmojiAnimation } from "./useEmojiAnimation";
@@ -10,6 +10,46 @@ import { useDistributionAnimation } from "./useDistributionAnimation";
 const MODIFIER_PHASE_DURATION = 4000; // 4 seconds for modifiers (increased from 2.5s)
 const ROLL_PHASE_DURATION = 3500; // 3.5 seconds for roll animations
 const TOTAL_ANIMATION_DURATION = MODIFIER_PHASE_DURATION + ROLL_PHASE_DURATION; // 7.5 seconds total
+
+// Helper function outside the component to adjust modifiers
+function adjustModifiersWithPreviousBeat(
+  readableModifiers: Array<[string, number]> = [],
+  totalPoints = 0
+): Array<[string, number]> {
+  // If no modifiers or totalPoints is 0, return empty array
+  if (readableModifiers.length === 0 || totalPoints === 0) {
+    return readableModifiers;
+  }
+
+  // Calculate sum of existing modifiers
+  const modifiersSum = readableModifiers.reduce(
+    (sum, [, value]) => sum + value,
+    0
+  );
+
+  // No adjustment needed if sum matches total
+  if (modifiersSum === totalPoints) {
+    return readableModifiers;
+  }
+
+  // Calculate difference for "Previous beat" modifier
+  const difference = totalPoints - modifiersSum;
+
+  // Check if "Previous beat" already exists
+  const previousBeatIndex = readableModifiers.findIndex(
+    ([name]) => name === "Previous beat"
+  );
+
+  if (previousBeatIndex >= 0) {
+    // Update existing "Previous beat" modifier
+    const result = [...readableModifiers];
+    result[previousBeatIndex] = ["Previous beat", difference];
+    return result;
+  } else {
+    // Add new "Previous beat" modifier at the beginning
+    return [["Previous beat", difference], ...readableModifiers];
+  }
+}
 
 interface UsePreviousChoiceVisualizerProps {
   animateRoll: boolean;
@@ -104,59 +144,34 @@ export const usePreviousChoiceVisualizer = ({
   const [isModifierAnimating, setIsModifierAnimating] = useState(false);
   const modifierTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  // Calculate if we need to add a "Previous beat" modifier
-  const getModifiersWithPreviousBeatAdjustment = (
-    readableModifiers: Array<[string, number]>,
-    totalPoints: number
-  ): Array<[string, number]> => {
-    // Calculate sum of existing modifiers
-    const modifiersSum = readableModifiers.reduce(
-      (sum, [, value]) => sum + value,
-      0
-    );
+  // Store adjusted modifiers in a ref to maintain stable reference
+  const adjustedModifiersRef = useRef<Array<[string, number]>>([]);
 
-    // Check if we need to add a "Previous beat" modifier
-    if (modifiersSum !== totalPoints) {
-      const difference = totalPoints - modifiersSum;
-      // Add "Previous beat" modifier with the difference value
-      const previousBeatIndex = readableModifiers.findIndex(
-        ([name]) => name === "Previous beat"
+  // Update adjusted modifiers when resolutionDetails changes
+  useEffect(() => {
+    if (resolutionDetails) {
+      const originalModifiers = resolutionDetails.readablePointModifiers || [];
+      const finalTotal = resolutionDetails.points || 0;
+      adjustedModifiersRef.current = adjustModifiersWithPreviousBeat(
+        originalModifiers,
+        finalTotal
       );
-
-      // If "Previous beat" already exists, update it
-      if (previousBeatIndex >= 0) {
-        const updatedModifiers = [...readableModifiers];
-        updatedModifiers[previousBeatIndex] = ["Previous beat", difference];
-        return updatedModifiers;
-      } else {
-        // Otherwise add a new "Previous beat" modifier at the beginning
-        return [["Previous beat", difference], ...readableModifiers];
-      }
+    } else {
+      adjustedModifiersRef.current = [];
     }
-
-    return readableModifiers;
-  };
+  }, [resolutionDetails]);
 
   // Get points animation state from its hook
-  const originalModifiers = resolutionDetails?.readablePointModifiers || [];
-  const finalTotal = resolutionDetails?.points || 0;
-
-  // Memoize the allModifiers calculation to prevent infinite rerenders
-  const allModifiers = useMemo(
-    () => getModifiersWithPreviousBeatAdjustment(originalModifiers, finalTotal),
-    [originalModifiers, finalTotal]
-  );
-
   const {
     currentTotal: currentPoints,
     isAnimating: isPointsAnimating,
     isComplete: isPointsComplete,
     isTransitioning: isPointsTransitioning,
   } = usePointsAnimation({
-    modifiers: allModifiers,
+    modifiers: adjustedModifiersRef.current,
     visibleModifiers,
     isAnimating: isModifierAnimating,
-    finalTotal,
+    finalTotal: resolutionDetails?.points || 0,
   });
 
   // Get distribution animation state from its hook
@@ -194,7 +209,7 @@ export const usePreviousChoiceVisualizer = ({
         setAnimationPhase("complete");
         setStartEmojiAnimation(false);
         setStartMarkerAnimation(false);
-        setVisibleModifiers(allModifiers);
+        setVisibleModifiers(adjustedModifiersRef.current);
         setIsModifierAnimating(false);
         animationStartedRef.current = false;
       } else if (isChallenge && !animationStartedRef.current) {
@@ -207,7 +222,7 @@ export const usePreviousChoiceVisualizer = ({
         animationStartedRef.current = true;
       }
     }
-  }, [animateRoll, isChallenge, resolutionDetails, allModifiers]);
+  }, [animateRoll, isChallenge, resolutionDetails]);
 
   // Handle phase transitions
   useEffect(() => {
@@ -242,8 +257,8 @@ export const usePreviousChoiceVisualizer = ({
     setVisibleModifiers([]);
     setIsModifierAnimating(true);
 
-    // Get modifiers with "Previous beat" adjustment
-    const modifiers = [...allModifiers];
+    // Get modifiers with adjusted "Previous beat" if needed
+    const modifiers = [...adjustedModifiersRef.current];
 
     // Longer delay between modifiers - at least 800ms, or distribute evenly
     const delayBetweenModifiers = Math.max(
@@ -284,13 +299,7 @@ export const usePreviousChoiceVisualizer = ({
       modifierTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
       modifierTimeoutsRef.current = [];
     };
-  }, [
-    animationPhase,
-    animateRoll,
-    isChallenge,
-    resolutionDetails,
-    allModifiers,
-  ]);
+  }, [animationPhase, animateRoll, isChallenge, resolutionDetails]);
 
   return {
     // Emoji animation
