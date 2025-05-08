@@ -1,20 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "shared/useAuth";
 import { PrimaryButton } from "shared/components/ui";
 
 interface RegisterFormProps {
   onSuccess?: () => void;
   onLoginClick?: () => void;
+  onError?: () => void;
+  showSuccessMessage?: boolean;
 }
 
-export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
+export function RegisterForm({
+  onSuccess,
+  onLoginClick,
+  onError,
+  showSuccessMessage = false,
+}: RegisterFormProps) {
   const { register, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [localSuccessMessage, setLocalSuccessMessage] = useState<string | null>(
+    null
+  );
+
+  // Clear error when component unmounts or when showSuccessMessage changes
+  useEffect(() => {
+    if (showSuccessMessage) {
+      setError(null);
+    }
+  }, [showSuccessMessage]);
+
+  // Determine whether to show success message from prop or local state
+  const successMessage = showSuccessMessage
+    ? "Registration successful! You can now log in."
+    : localSuccessMessage;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +45,12 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     if (!email || !username || !password || !confirmPassword) {
       setError("All fields are required");
       console.log("RegisterForm: Validation failed - missing fields");
+      if (onError) {
+        console.log(
+          "RegisterForm: Triggering onError callback for validation error"
+        );
+        onError();
+      }
       return;
     }
 
@@ -32,6 +59,12 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address");
       console.log("RegisterForm: Validation failed - invalid email format");
+      if (onError) {
+        console.log(
+          "RegisterForm: Triggering onError callback for validation error"
+        );
+        onError();
+      }
       return;
     }
 
@@ -39,6 +72,12 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     if (password.length < 8) {
       setError("Password must be at least 8 characters long");
       console.log("RegisterForm: Validation failed - password too short");
+      if (onError) {
+        console.log(
+          "RegisterForm: Triggering onError callback for validation error"
+        );
+        onError();
+      }
       return;
     }
 
@@ -46,6 +85,12 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       console.log("RegisterForm: Validation failed - passwords don't match");
+      if (onError) {
+        console.log(
+          "RegisterForm: Triggering onError callback for validation error"
+        );
+        onError();
+      }
       return;
     }
 
@@ -54,22 +99,32 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
       setError(null);
       await register(email, username, password);
       console.log("RegisterForm: Registration successful");
-      setSuccessMessage("Registration successful! You can now log in.");
+      setLocalSuccessMessage("Registration successful! You can now log in.");
 
-      // After a delay, switch to login view
-      setTimeout(() => {
-        if (onSuccess) {
-          console.log("RegisterForm: Triggering onSuccess callback");
-          onSuccess();
-        }
-      }, 2000);
+      if (onSuccess) {
+        console.log("RegisterForm: Triggering onSuccess callback");
+        onSuccess();
+      }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Registration failed";
       console.log("RegisterForm: Registration failed", errorMessage);
       setError(errorMessage);
+
+      if (onError) {
+        console.log(
+          "RegisterForm: Triggering onError callback for server error"
+        );
+        onError();
+      }
     }
   };
+
+  // Use combined success message for display
+  const displaySuccessMessage = successMessage;
+
+  // Determine if form should be disabled
+  const formDisabled = isLoading || !!displaySuccessMessage;
 
   return (
     <div className="p-4">
@@ -79,9 +134,9 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
         </div>
       )}
 
-      {successMessage && (
+      {displaySuccessMessage && (
         <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-          {successMessage}
+          {displaySuccessMessage}
         </div>
       )}
 
@@ -100,7 +155,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your email"
-            disabled={isLoading || !!successMessage}
+            disabled={formDisabled}
             required
           />
         </div>
@@ -119,7 +174,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Choose a username"
-            disabled={isLoading || !!successMessage}
+            disabled={formDisabled}
             required
           />
         </div>
@@ -138,7 +193,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Create a password (8+ characters)"
-            disabled={isLoading || !!successMessage}
+            disabled={formDisabled}
             required
           />
         </div>
@@ -157,7 +212,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Confirm your password"
-            disabled={isLoading || !!successMessage}
+            disabled={formDisabled}
             required
           />
         </div>
@@ -165,7 +220,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
         <div className="flex flex-col space-y-3">
           <PrimaryButton
             type="submit"
-            disabled={isLoading || !!successMessage}
+            disabled={formDisabled}
             isLoading={isLoading}
             fullWidth
           >
@@ -178,7 +233,9 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
             onClick={onLoginClick}
             disabled={isLoading}
           >
-            Already have an account?
+            {showSuccessMessage
+              ? "Continue to Login"
+              : "Already have an account?"}
           </button>
         </div>
       </form>

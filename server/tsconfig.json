@@ -12,7 +12,7 @@
       "admin/*": ["./admin/*"],
       "game/*": ["./game/*"],
       "page/*": ["./page/*"],
-      "user/*": ["./user/*"]
+      "users/*": ["./users/*"]
     },
     "strict": true,
     "strictNullChecks": true,
