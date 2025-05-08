@@ -9,6 +9,7 @@ import {
   ImageStatus,
   ImageSource,
   PlayerSlot,
+  ImageReference,
 } from "core/types";
 import { API_CONFIG } from "core/config";
 
@@ -39,6 +40,63 @@ export function createPlayerIdentityImage(
 }
 
 /**
+ * Constructs a URL for an image based on its reference
+ * @param imageRef The image reference
+ * @param preventCache Whether to add a timestamp to prevent caching (default: true)
+ * @returns The complete URL for the image
+ */
+export function constructImageUrl(
+  imageRef: ImageReference,
+  preventCache: boolean = true
+): string {
+  if (!imageRef || !imageRef.sourceId) return "";
+
+  const { id, source, sourceId, subDirectory, fileType } = imageRef;
+  const baseUrl = API_CONFIG.DEFAULT_API_URL;
+  const cacheParam = preventCache ? `?t=${Date.now()}` : "";
+
+  if (source === "template") {
+    return `${baseUrl}/images/templates/${sourceId}${
+      subDirectory ? `/${subDirectory}` : ""
+    }/${id}.${fileType}${cacheParam}`;
+  } else if (source === "story") {
+    return `${baseUrl}/images/stories/${sourceId}${
+      subDirectory ? `/${subDirectory}` : ""
+    }/${id}.${fileType}${cacheParam}`;
+  }
+
+  return "";
+}
+
+/**
+ * Loads an image based on its reference
+ * @param imageRef The image reference
+ * @param preventCache Whether to add a timestamp to prevent caching (default: true)
+ * @returns Promise that resolves to the image URL if it exists, null otherwise
+ */
+export async function loadImage(
+  imageRef: ImageReference,
+  preventCache: boolean = true
+): Promise<string | null> {
+  if (!imageRef || !imageRef.sourceId) return null;
+
+  const imageUrl = constructImageUrl(imageRef, preventCache);
+
+  try {
+    // Check if the image exists
+    const response = await fetch(imageUrl, { method: "HEAD" });
+    if (response.ok) {
+      return imageUrl;
+    } else {
+      return null;
+    }
+  } catch (err) {
+    console.error("Error checking image:", err);
+    return null;
+  }
+}
+
+/**
  * Loads a template cover image
  * @param templateId The ID of the template
  * @returns Promise that resolves to the cover image URL if it exists, null otherwise
@@ -48,22 +106,14 @@ export async function loadTemplateCoverImage(
 ): Promise<string | null> {
   if (!templateId) return null;
 
-  // Use a timestamp to prevent caching
-  const timestamp = new Date().getTime();
-  const coverImageUrl = `${API_CONFIG.DEFAULT_API_URL}/images/templates/${templateId}/cover.jpeg?t=${timestamp}`;
+  const coverImageRef: ImageReference = {
+    id: "cover",
+    source: "template",
+    sourceId: templateId,
+    fileType: "jpeg",
+  };
 
-  try {
-    // Check if the image exists
-    const response = await fetch(coverImageUrl, { method: "HEAD" });
-    if (response.ok) {
-      return coverImageUrl;
-    } else {
-      return null;
-    }
-  } catch (err) {
-    console.error("Error checking template cover image:", err);
-    return null;
-  }
+  return loadImage(coverImageRef);
 }
 
 /**

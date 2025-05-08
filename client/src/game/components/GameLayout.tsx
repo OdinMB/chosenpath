@@ -7,10 +7,12 @@ import { FeedbackModal } from "./feedback/FeedbackModal";
 import { ClientStat, StatValue, StatValueEntry } from "core/types";
 import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
-import { LoadingSpinner, PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton, Icons } from "components/ui";
 import { StoryImage } from "shared/components/StoryImage";
 import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 import { ClientStateManager } from "core/models/ClientStateManager";
+import { PlayerInterlude } from "./PlayerInterlude";
+import { LoadingSpinner } from "components/ui";
 
 interface Props {
   onExitGame: () => void;
@@ -356,11 +358,15 @@ export function GameLayout({
             // Show loading spinner when character selection is not completed globally
             // but the current player has already selected their character
             <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
-              <h1 className="text-2xl font-bold mb-6 text-primary">
-                Character Selected
-              </h1>
-
-              <LoadingSpinner size="large" message="" />
+              <PlayerInterlude
+                storyState={storyState}
+                className="mt-8 mb-4 sm:mb-8"
+              />
+              <LoadingSpinner
+                size="medium"
+                message="First story beat is being generated..."
+                messageSize="large"
+              />
 
               {stateManager.getNumberOfPlayers(storyState) > 1 && (
                 <div className="mt-8 w-full max-w-md flex justify-center">

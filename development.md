@@ -4,7 +4,6 @@ Smaller commits!
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
-- 2: have interludes when the first beat is being generated
 
 # BETTER EXPERIENCE
 

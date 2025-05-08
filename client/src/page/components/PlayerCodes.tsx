@@ -5,7 +5,7 @@ import { LoadingSpinner, PrimaryButton } from "components/ui";
 import { PlayerCode } from "shared/components";
 import { StoryTemplate } from "core/types";
 import { Icons } from "shared/components/ui/Icons";
-import { ImageCard } from "shared/components/ImageCard";
+import { CoverCard } from "shared/components/CoverCard";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;
@@ -63,7 +63,10 @@ export function PlayerCodes({
 
   const formatPlayerName = (slot: string) => {
     // Convert "player1" to "Player 1"
-    return slot.replace(/player(\d+)/, (_, num) => `Player ${num}`);
+    return slot.replace(
+      /player(\d+)/,
+      (_, num) => `Player ${num}${num == 1 ? " (You)" : ""}`
+    );
   };
 
   const isSinglePlayer = Object.keys(codes).length === 1;
@@ -201,14 +204,14 @@ export function PlayerCodes({
         {renderLikelyReadyWarning()}
 
         {template ? (
-          <ImageCard
+          <CoverCard
             sourceId={template.id}
             title={template.title}
             size="large"
             onClick={() => isReadyToJoin && onCodeSubmit(defaultCodeToUse)}
           >
             <CodesAndButtons />
-          </ImageCard>
+          </CoverCard>
         ) : (
           <div className="text-center">
             <CodesAndButtons />

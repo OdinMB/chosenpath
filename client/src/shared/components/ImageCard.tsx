@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { loadTemplateCoverImage } from "shared/utils/imageUtils";
 import { Icons } from "./ui/Icons";
+import { ImageReference } from "core/types/image";
+import { constructImageUrl } from "shared/utils/imageUtils";
 
 interface ImageCardProps {
-  sourceId: string;
+  imageRef: ImageReference;
   title: string;
   size?: "default" | "large";
   onClick?: () => void;
@@ -12,27 +13,24 @@ interface ImageCardProps {
 }
 
 export const ImageCard = ({
-  sourceId,
+  imageRef,
   title,
   size = "default",
   onClick,
   children,
   className = "",
 }: ImageCardProps) => {
-  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Try to load the template cover image
+  // Load image from the image reference
   useEffect(() => {
-    const fetchCoverImage = async () => {
-      const imageUrl = await loadTemplateCoverImage(sourceId);
-      setCoverImage(imageUrl);
-    };
+    if (!imageRef) return;
 
-    if (sourceId) {
-      fetchCoverImage();
-    }
-  }, [sourceId]);
+    // Use the utility function to construct the image URL
+    const imagePath = constructImageUrl(imageRef);
+    setImageSrc(imagePath);
+  }, [imageRef]);
 
   // Handle image load success
   const handleImageLoad = () => {
@@ -42,7 +40,7 @@ export const ImageCard = ({
   // Handle image load error
   const handleImageError = () => {
     setImageLoaded(false);
-    setCoverImage(null);
+    setImageSrc(null);
   };
 
   const imageContainerClass = size === "large" ? "w-24" : "w-20";
@@ -57,16 +55,15 @@ export const ImageCard = ({
           className={`relative ${imageContainerClass} overflow-hidden flex-shrink-0 bg-gray-100`}
           style={{ minHeight }}
         >
-          {coverImage ? (
+          {imageSrc ? (
             <div
               onClick={onClick}
               className={`w-full h-full ${onClick ? "cursor-pointer" : ""}`}
             >
               <img
-                src={coverImage}
-                alt={`${title} cover`}
-                className={`absolute h-full ${imageContainerClass} object-cover object-center transition-all duration-500 ${
-                  onClick ? "hover:scale-110" : ""
+                src={imageSrc}
+                alt={`${title}`}
+                className={`absolute h-full ${imageContainerClass} object-cover object-center transition-all duration-500 hover:scale-110
                 } ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                 onLoad={handleImageLoad}
                 onError={handleImageError}

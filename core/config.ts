@@ -10,6 +10,8 @@ export const isDevelopment =
 export const MOCK_STORIES_IN_DEVELOPMENT = false;
 export const MOCK_STORIES_DELAY_MS = 4 * 1000;
 
+// export const IMAGE_CACHE_ENABLED = isDevelopment ? false : true;
+
 // Story settings
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 3;

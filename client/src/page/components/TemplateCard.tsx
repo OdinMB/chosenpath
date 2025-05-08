@@ -1,7 +1,7 @@
 import { StoryTemplate } from "core/types";
 import { PrimaryButton } from "components/ui";
 import { sortTagsByCategory } from "shared/tagCategories";
-import { ImageCard } from "shared/components";
+import { CoverCard } from "shared/components";
 
 type TemplateCardProps = {
   template: StoryTemplate;
@@ -30,7 +30,7 @@ export const TemplateCard = ({
   };
 
   return (
-    <ImageCard
+    <CoverCard
       sourceId={template.id}
       title={template.title}
       size={size}
@@ -87,6 +87,6 @@ export const TemplateCard = ({
           ))}
         </div>
       )}
-    </ImageCard>
+    </CoverCard>
   );
 };

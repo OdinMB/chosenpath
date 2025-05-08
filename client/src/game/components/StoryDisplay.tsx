@@ -1,10 +1,11 @@
 import React from "react";
 import { useSession } from "shared/useSession";
 import { BeatHistory } from "./BeatHistory";
-import { LoadingSpinner } from "components/ui";
 import { BeatContent } from "./BeatContent";
 import { NextBeatPlaceholder } from "./NextBeatPlaceholder";
 import { useStoryBeatState } from "../hooks/useStoryBeatState";
+import { PlayerInterlude } from "./PlayerInterlude";
+import { LoadingSpinner } from "components/ui";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -84,17 +85,20 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     return null;
   }
 
-  // Loading state for initial beat
+  // Loading state for initial beat via PlayerInterlude
   if (beatHistory.length === 0) {
     if (!storyState.characterSelectionCompleted) {
       return null;
     }
-
     return (
-      <div className="story-display h-full min-h-[50vh] md:min-h-[70vh] flex items-center justify-center font-lora">
-        <div className="text-center">
+      <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
+        <PlayerInterlude
+          storyState={storyState}
+          className="mt-8 mb-4 sm:mb-8"
+        />
+        <div className="mt-2">
           <LoadingSpinner
-            size="large"
+            size="medium"
             message="First story beat is being generated..."
             messageSize="large"
           />

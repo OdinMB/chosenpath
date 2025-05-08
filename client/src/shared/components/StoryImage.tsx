@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ImageUI } from "core/types/image";
 import { Icons, Modal } from "./ui";
-import { API_CONFIG } from "core/config";
+import { constructImageUrl } from "shared/utils/imageUtils";
 
 interface StoryImageProps {
   image: ImageUI;
@@ -99,27 +99,8 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   useEffect(() => {
     if (!image) return;
 
-    const constructImagePath = () => {
-      const baseUrl = API_CONFIG.DEFAULT_API_URL;
-
-      // For template images
-      if (image.source === "template" && image.sourceId) {
-        return `${baseUrl}/images/templates/${image.sourceId}${
-          image.subDirectory ? `/${image.subDirectory}` : ""
-        }/${image.id}.${image.fileType}?t=${Date.now()}`;
-      }
-
-      // For story generated images
-      if (image.source === "story" && image.sourceId) {
-        return `${baseUrl}/images/stories/${image.sourceId}${
-          image.subDirectory ? `/${image.subDirectory}` : ""
-        }/${image.id}.${image.fileType}?t=${Date.now()}`;
-      }
-
-      return fallbackSrc || "";
-    };
-
-    const imagePath = constructImagePath();
+    // Use the utility function to construct the image URL
+    const imagePath = constructImageUrl(image) || fallbackSrc || "";
     setSrc(imagePath);
   }, [image, fallbackSrc]);
 
