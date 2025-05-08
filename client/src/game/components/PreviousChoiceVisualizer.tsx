@@ -68,11 +68,15 @@ export const PreviousChoiceVisualizer: React.FC<
     isPointsTransitioning,
     isPointsComplete,
     animationPhase,
+    currentDistribution,
+    // Unused but kept for debugging
+    // isDistributionAnimating,
   } = usePreviousChoiceVisualizer({
     animateRoll,
     resolution,
     resolutionDetails,
     isChallenge,
+    choice,
   });
 
   // Log animation phase changes to console
@@ -166,7 +170,11 @@ export const PreviousChoiceVisualizer: React.FC<
     return (
       <div
         className="h-full"
-        style={{ width: `${safeWidth}%`, minWidth: width > 0 ? "4px" : "0" }}
+        style={{
+          width: `${safeWidth}%`,
+          minWidth: width > 0 ? "4px" : "0",
+          transition: "width 400ms ease-out",
+        }}
       >
         <Tooltip
           content={`${emojiIcon} ${tooltipText}`}
@@ -291,42 +299,40 @@ export const PreviousChoiceVisualizer: React.FC<
                   {/* Distribution bar - always visible */}
                   <div className="relative h-5 rounded-lg overflow-hidden shadow-inner flex z-0 w-full mb-2">
                     {/* Favorable segment */}
-                    {resolutionDetails.distribution.favorable > 0 && (
+                    {currentDistribution.favorable > 0 && (
                       <BarSegment
-                        width={resolutionDetails.distribution.favorable}
+                        width={currentDistribution.favorable}
                         color={getColor("favorable")}
                         isHighlighted={resolution === "favorable"}
                         isLast={
-                          resolutionDetails.distribution.mixed === 0 &&
-                          resolutionDetails.distribution.unfavorable === 0
+                          currentDistribution.mixed === 0 &&
+                          currentDistribution.unfavorable === 0
                         }
-                        tooltipText={`${resolutionDetails.distribution.favorable}%`}
+                        tooltipText={`${currentDistribution.favorable}%`}
                         emojiIcon="😀"
                       />
                     )}
 
                     {/* Mixed segment */}
-                    {resolutionDetails.distribution.mixed > 0 && (
+                    {currentDistribution.mixed > 0 && (
                       <BarSegment
-                        width={resolutionDetails.distribution.mixed}
+                        width={currentDistribution.mixed}
                         color={getColor("mixed")}
                         isHighlighted={resolution === "mixed"}
-                        isLast={
-                          resolutionDetails.distribution.unfavorable === 0
-                        }
-                        tooltipText={`${resolutionDetails.distribution.mixed}%`}
+                        isLast={currentDistribution.unfavorable === 0}
+                        tooltipText={`${currentDistribution.mixed}%`}
                         emojiIcon="😐"
                       />
                     )}
 
                     {/* Unfavorable segment */}
-                    {resolutionDetails.distribution.unfavorable > 0 && (
+                    {currentDistribution.unfavorable > 0 && (
                       <BarSegment
-                        width={resolutionDetails.distribution.unfavorable}
+                        width={currentDistribution.unfavorable}
                         color={getColor("unfavorable")}
                         isHighlighted={resolution === "unfavorable"}
                         isLast={true}
-                        tooltipText={`${resolutionDetails.distribution.unfavorable}%`}
+                        tooltipText={`${currentDistribution.unfavorable}%`}
                         emojiIcon="🙁"
                       />
                     )}

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Resolution, ResolutionDetails } from "core/types";
+import { ProbabilityDistribution } from "core/types/beat";
 import { useEmojiAnimation } from "./useEmojiAnimation";
 import { useMarkerAnimation } from "./useMarkerAnimation";
 import { usePointsAnimation } from "./usePointsAnimation";
+import { useDistributionAnimation } from "./useDistributionAnimation";
 
 // Animation timing constants
 const MODIFIER_PHASE_DURATION = 4000; // 4 seconds for modifiers (increased from 2.5s)
@@ -14,6 +16,12 @@ interface UsePreviousChoiceVisualizerProps {
   resolution?: Resolution;
   resolutionDetails?: ResolutionDetails;
   isChallenge: boolean;
+  choice: {
+    text: string;
+    optionType: string;
+    resourceType?: string;
+    riskType?: string;
+  };
 }
 
 interface UsePreviousChoiceVisualizerResult {
@@ -36,6 +44,10 @@ interface UsePreviousChoiceVisualizerResult {
   isPointsComplete: boolean;
   isPointsTransitioning: boolean;
 
+  // Distribution animation
+  currentDistribution: ProbabilityDistribution;
+  isDistributionAnimating: boolean;
+
   // Overall animation state
   animationPhase: "modifiers" | "roll" | "complete";
 }
@@ -45,6 +57,7 @@ export const usePreviousChoiceVisualizer = ({
   resolution,
   resolutionDetails,
   isChallenge,
+  choice,
 }: UsePreviousChoiceVisualizerProps): UsePreviousChoiceVisualizerResult => {
   // Animation phases:
   // 1. modifiers - showing modifiers one by one
@@ -100,6 +113,19 @@ export const usePreviousChoiceVisualizer = ({
     isAnimating: isModifierAnimating,
     finalTotal,
   });
+
+  // Get distribution animation state from its hook
+  const { currentDistribution, isDistributionAnimating } =
+    useDistributionAnimation({
+      riskType: choice.riskType || "normal",
+      currentPoints,
+      animationPhase,
+      finalDistribution: resolutionDetails?.distribution || {
+        favorable: 33,
+        mixed: 34,
+        unfavorable: 33,
+      },
+    });
 
   // Reset animation states when animateRoll changes
   useEffect(() => {
@@ -216,6 +242,10 @@ export const usePreviousChoiceVisualizer = ({
     isPointsAnimating,
     isPointsComplete,
     isPointsTransitioning,
+
+    // Distribution animation
+    currentDistribution,
+    isDistributionAnimating,
 
     // Overall animation state
     animationPhase,
