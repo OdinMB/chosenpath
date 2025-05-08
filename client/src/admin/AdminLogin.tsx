@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { PrimaryButton, Icons } from "components/ui/index";
-import { sendTrackedRequest } from "shared/utils/requestUtils";
-import { SuccessResponse } from "core/types";
+import { adminApi } from "shared/apiClient";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;
@@ -18,23 +17,15 @@ export const AdminLogin = ({ onLogin }: AdminLoginProps) => {
     setIsLoading(true);
 
     try {
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ authenticated: boolean }>
-      >({
-        path: "/admin/auth",
-        method: "GET",
-        token: password,
+      // Use adminApi.get which properly handles admin authentication
+      await adminApi.get("/admin/auth", password, {
+        validateStatus: (status) => status >= 200 && status < 300,
       });
 
-      if (response.data.authenticated) {
-        onLogin(password);
-      } else {
-        setError("Authentication failed");
-      }
+      // If the request succeeded, authentication was successful
+      onLogin(password);
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Failed to connect to server"
-      );
+      setError(error instanceof Error ? error.message : "Invalid password");
     } finally {
       setIsLoading(false);
     }

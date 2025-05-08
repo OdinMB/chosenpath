@@ -4,8 +4,7 @@ import {
   GenerateTemplateRequest,
 } from "core/types/admin";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
-import { SuccessResponse } from "core/types/api";
+import { adminApi, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
 
 interface UseTemplateApiProps {
   token: string;
@@ -29,20 +28,16 @@ export function useTemplateApi({
         throw new Error("Template has no ID");
       }
 
-      const request: UpdateTemplateRequest = withRequestId({
+      const request: UpdateTemplateRequest = {
         id: template.id,
         template: template,
-      });
+      };
 
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ template: StoryTemplate }>,
-        UpdateTemplateRequest
-      >({
-        path: `/admin/templates/${template.id}`,
-        method: "PUT",
-        token,
-        body: request,
-      });
+      const response = await adminApi.put(
+        `/admin/templates/${template.id}`,
+        request,
+        token
+      );
 
       Logger.Admin.log("Template saved successfully", response);
 
@@ -89,23 +84,20 @@ export function useTemplateApi({
       const effectiveGameMode = gameMode;
 
       // First, call API to generate template content
-      const request: GenerateTemplateRequest = withRequestId({
+      const request: GenerateTemplateRequest = {
         prompt,
         playerCount: effectivePlayerCount,
         maxTurns: effectiveMaxTurns,
         gameMode: effectiveGameMode,
         generateImages: false,
-      });
+      };
 
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ template: StoryTemplate }>,
-        GenerateTemplateRequest
-      >({
-        path: `/admin/templates/generate`,
-        method: "POST",
+      const response = await adminApi.post(
+        `/admin/templates/generate`,
+        request,
         token,
-        body: request,
-      });
+        { timeout: LONG_OPERATION_TIMEOUT }
+      );
 
       const generatedTemplate = response.data.template;
 

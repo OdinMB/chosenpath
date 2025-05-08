@@ -15,8 +15,8 @@ import {
   TemplateConfigurator,
 } from "page/components";
 import { Logger } from "shared/logger";
-import { config } from "client/config";
 import { Header } from "shared/components";
+import { apiClient } from "shared/apiClient";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -107,16 +107,9 @@ function App() {
       Logger.App.log(`Loading template with ID: ${templateId}`);
 
       try {
-        const response = await fetch(
-          `${config.apiUrl}/templates/${templateId}`
-        );
+        const response = await apiClient.get(`/templates/${templateId}`);
+        const template = response.data.template;
 
-        if (!response.ok) {
-          throw new Error(`Failed to load template: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const template = data.data.template;
         Logger.App.log(`Successfully loaded template: ${template.title}`);
 
         // Set template and transition to template config view

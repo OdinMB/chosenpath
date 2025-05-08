@@ -1,12 +1,8 @@
 import { useState, useCallback } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
-import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
-import {
-  CreateTemplateRequest,
-  DeleteResponse,
-  SuccessResponse,
-} from "core/types";
+import { adminApi } from "shared/apiClient";
+import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../types/templateTypes";
 
@@ -28,13 +24,7 @@ export const useTemplateCore = (token: string) => {
     Logger.Admin.log("Loading story templates");
 
     try {
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ templates: StoryTemplate[] }>
-      >({
-        path: `/admin/templates`,
-        method: "GET",
-        token,
-      });
+      const response = await adminApi.get(`/admin/templates`, token);
 
       Logger.Admin.log(
         `Successfully loaded ${response.data.templates.length} story templates`
@@ -52,15 +42,12 @@ export const useTemplateCore = (token: string) => {
   const handleDeleteTemplate = async (templateId: string) => {
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
-      const request = withRequestId({
+      const request = {
         id: templateId,
-      });
+      };
 
-      await sendTrackedRequest<DeleteResponse>({
-        path: `/admin/templates/${templateId}`,
-        method: "DELETE",
-        token,
-        body: request,
+      await adminApi.delete(`/admin/templates/${templateId}`, token, {
+        data: request,
       });
 
       Logger.Admin.log(`Successfully deleted template: ${templateId}`);
@@ -77,19 +64,15 @@ export const useTemplateCore = (token: string) => {
     Logger.Admin.log(`Creating template: ${templateData.title}`);
     try {
       // Create template on server
-      const templateRequest: CreateTemplateRequest = withRequestId({
+      const templateRequest: CreateTemplateRequest = {
         template: templateData as Partial<StoryTemplate>,
-      });
+      };
 
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ template: StoryTemplate }>,
-        CreateTemplateRequest
-      >({
-        path: `/admin/templates`,
-        method: "POST",
-        token,
-        body: templateRequest,
-      });
+      const response = await adminApi.post(
+        `/admin/templates`,
+        templateRequest,
+        token
+      );
 
       Logger.Admin.log(
         `Successfully created template: ${response.data.template.title}`

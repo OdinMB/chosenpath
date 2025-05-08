@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest } from "shared/utils/requestUtils";
-import { SuccessResponse } from "core/types";
+import { adminApi } from "shared/apiClient";
 import {
   SortableTable,
   useTableFilterSort,
@@ -44,13 +43,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     Logger.Admin.log("Loading stories list");
 
     try {
-      const response = await sendTrackedRequest<
-        SuccessResponse<{ stories: StoryListItem[] }>
-      >({
-        path: "/admin/stories",
-        method: "GET",
-        token,
-      });
+      const response = await adminApi.get("/admin/stories", token);
 
       Logger.Admin.log(
         `Successfully loaded ${response.data.stories.length} stories`
@@ -90,11 +83,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
   const handleDeleteStory = async (storyId: string) => {
     Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
-      await sendTrackedRequest<SuccessResponse<{ success: boolean }>>({
-        path: `/admin/stories/${storyId}`,
-        method: "DELETE",
-        token,
-      });
+      await adminApi.delete(`/admin/stories/${storyId}`, token);
 
       Logger.Admin.log(`Successfully deleted story: ${storyId}`);
       // Refresh the list

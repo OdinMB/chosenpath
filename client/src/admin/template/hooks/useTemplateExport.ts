@@ -1,6 +1,6 @@
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { API_CONFIG } from "core/config";
+import { adminApi } from "shared/apiClient";
 
 // Interface for templateCore to use for loading state
 interface TemplateCore {
@@ -19,28 +19,16 @@ export const useTemplateExport = (
     templateCore.setError(null);
 
     try {
-      // Fetch the template with assets from the server
-      const assetsUrl = `${API_CONFIG.DEFAULT_API_URL}/admin/templates/${
-        template.id
-      }/assets?requestId=${crypto.randomUUID()}`;
-
-      const response = await fetch(assetsUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch template: ${response.statusText}`);
-      }
-
-      // Get the blob from the response
-      const blob = await response.blob();
+      // Use the adminApi.get method with the admin token
+      const response = await adminApi.get(
+        `/admin/templates/${template.id}/assets`,
+        token,
+        { responseType: "blob" }
+      );
 
       // Create a download link
       const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
+      link.href = URL.createObjectURL(response.data);
       link.download = `${template.title
         .replace(/\s+/g, "-")
         .toLowerCase()}.zip`;
@@ -67,28 +55,16 @@ export const useTemplateExport = (
     templateCore.setError(null);
 
     try {
-      // Fetch all templates with assets from the server
-      const assetsUrl = `${
-        API_CONFIG.DEFAULT_API_URL
-      }/admin/templates/all/assets?requestId=${crypto.randomUUID()}`;
-
-      const response = await fetch(assetsUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch templates: ${response.statusText}`);
-      }
-
-      // Get the blob from the response
-      const blob = await response.blob();
+      // Use the adminApi.get method with the admin token
+      const response = await adminApi.get(
+        "/admin/templates/all/assets",
+        token,
+        { responseType: "blob" }
+      );
 
       // Create a download link
       const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
+      link.href = URL.createObjectURL(response.data);
       link.download = `all-templates-${
         new Date().toISOString().split("T")[0]
       }.zip`;

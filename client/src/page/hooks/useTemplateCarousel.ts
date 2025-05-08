@@ -1,8 +1,7 @@
 import { useState, useEffect, RefObject } from "react";
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest } from "shared/utils/requestUtils";
-import { SuccessResponse } from "core/types/api";
+import { apiClient } from "shared/apiClient";
 
 type SwipeHandlers = {
   onSwipeLeft?: () => void;
@@ -73,13 +72,9 @@ export function useTemplateCarousel() {
 
       try {
         // Fetch templates from the API specifically for the welcome screen
-        const response = await sendTrackedRequest<
-          SuccessResponse<{ templates: StoryTemplate[] }>
-        >({
-          path: `/templates?forWelcomeScreen=true`,
-          method: "GET",
-          token: "", // Public endpoint doesn't need token
-        });
+        const response = await apiClient.get(
+          `/templates?forWelcomeScreen=true`
+        );
 
         Logger.App.log(
           `Loaded ${response.data.templates.length} templates for welcome screen`

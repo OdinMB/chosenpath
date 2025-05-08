@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
 import { groupTagsByCategories } from "shared/tagCategories";
-import { sendTrackedRequest } from "shared/utils/requestUtils";
-import { SuccessResponse } from "core/types/api";
+import { apiClient } from "shared/apiClient";
 
 export function useLibraryBrowser() {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -107,13 +106,7 @@ export function useLibraryBrowser() {
 
       try {
         // Fetch all published templates (not just for welcome screen)
-        const response = await sendTrackedRequest<
-          SuccessResponse<{ templates: StoryTemplate[] }>
-        >({
-          path: `/templates`,
-          method: "GET",
-          token: "", // Public endpoint doesn't need token
-        });
+        const response = await apiClient.get(`/templates`);
 
         Logger.App.log(
           `Loaded ${response.data.templates.length} templates for library`

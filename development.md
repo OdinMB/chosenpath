@@ -61,6 +61,7 @@ Focus: Text/Images, English, Multiplayer
 - for generation + iteration: generate a stats = Stat[] attribute where Stat includes a "shared" vs. "player" attribute. That way, the whole zod stuff doesn't have to be sent to the servers twice.
 - Move newMilestone changes to switch generation (away from beat generation)?
 - Add setup and deployment instructions
+- 1: zipTemplateUtils.ts still has a direct fetch command (instead of apiClient)
 
 # NOTES
 

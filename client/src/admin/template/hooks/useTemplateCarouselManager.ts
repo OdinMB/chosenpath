@@ -3,12 +3,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
-import {
-  TemplatesResponse,
-  UpdateTemplateRequest,
-  TemplateResponse,
-} from "core/types/admin";
+import { apiClient } from "shared/apiClient";
 
 export const useTemplateCarouselManager = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -23,11 +18,7 @@ export const useTemplateCarouselManager = (token: string) => {
       setError(null);
 
       try {
-        const response = await sendTrackedRequest<TemplatesResponse>({
-          path: `/admin/templates`,
-          method: "GET",
-          token,
-        });
+        const response = await apiClient.get("/admin/templates");
 
         // Filter for published templates marked for welcome screen
         const welcomeScreenTemplates = response.data.templates
@@ -83,24 +74,14 @@ export const useTemplateCarouselManager = (token: string) => {
       const updatePromises = templates.map(async (template, index) => {
         // Only update if order has changed
         if (template.order !== index) {
-          const request: UpdateTemplateRequest = withRequestId({
+          const request = {
             id: template.id,
             template: {
               order: index,
             },
-          });
+          };
 
-          const response = await sendTrackedRequest<
-            TemplateResponse,
-            UpdateTemplateRequest
-          >({
-            path: `/admin/templates/${template.id}`,
-            method: "PUT",
-            token,
-            body: request,
-          });
-
-          return response;
+          return apiClient.put(`/admin/templates/${template.id}`, request);
         }
         return { data: { template } };
       });

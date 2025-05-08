@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Logger } from "shared/logger";
-import { sendTrackedRequest, withRequestId } from "shared/utils/requestUtils";
+import { adminApi, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
 import {
   StoryTemplate,
   TemplateIterationRequest,
-  TemplateIterationResponse,
   TemplateIterationSections,
 } from "core/types";
 import { templateIterationSections } from "core/utils/templateIterationSections";
@@ -37,26 +36,23 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
       setError(null);
       setIsLoading(true);
 
-      // Create a request with the proper type and add requestId
-      const request: TemplateIterationRequest = withRequestId({
+      // Create a request with the proper type
+      const request: TemplateIterationRequest = {
         templateId: template.id,
         feedback,
         sections: sections as TemplateIterationSections[],
         gameMode: template.gameMode,
         playerCount: template.playerCountMax,
         maxTurns: template.maxTurnsMin,
-      });
+      };
 
-      // Make the API request with specific request and response types
-      const response = await sendTrackedRequest<
-        TemplateIterationResponse,
-        TemplateIterationRequest
-      >({
-        path: `/admin/templates/${template.id}/iterate`,
-        method: "POST",
+      // Make the API request with adminApi
+      const response = await adminApi.post(
+        `/admin/templates/${template.id}/iterate`,
+        request,
         token,
-        body: request,
-      });
+        { timeout: LONG_OPERATION_TIMEOUT }
+      );
 
       const templateUpdate: Partial<StoryTemplate> =
         response.data.templateUpdate;

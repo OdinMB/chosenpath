@@ -12,6 +12,7 @@ import {
   ImageReference,
 } from "core/types";
 import { API_CONFIG } from "core/config";
+import { apiClient } from "shared/apiClient";
 
 /**
  * Creates an image object for use with the StoryImage component
@@ -83,9 +84,9 @@ export async function loadImage(
   const imageUrl = constructImageUrl(imageRef, preventCache);
 
   try {
-    // Check if the image exists
-    const response = await fetch(imageUrl, { method: "HEAD" });
-    if (response.ok) {
+    // Check if the image exists using apiClient instead of fetch
+    const response = await apiClient.head(imageUrl);
+    if (response.status === 200) {
       return imageUrl;
     } else {
       return null;

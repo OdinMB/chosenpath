@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axios from "axios";
 import {
   StoryElement,
   ImageQuality,
@@ -12,10 +11,10 @@ import {
   GenerateCoverImageRequest,
   GeneratePlayerImageRequest,
   GenerateImageResponse,
-  ResponseStatus,
-  SuccessResponse,
 } from "core/types/api";
-import { API_CONFIG } from "core/config";
+import { apiClient, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+
+// Using longer timeout for image generation operations which can take significantly longer than normal API calls
 
 interface UseImageGenerationResult {
   generateImageForElement: (
@@ -87,53 +86,28 @@ export function useImageGeneration(): UseImageGenerationResult {
 
       console.log("Sending image generation request with payload:", payload);
 
-      // Use the API_CONFIG.DEFAULT_API_URL for the endpoint
-      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/image-generation/template/element`;
+      // Use the API endpoint
+      const apiUrl = `/image-generation/template/element`;
       console.log("Request URL:", apiUrl);
 
-      // Make the API request with explicit options to prevent any event propagation or redirects
-      const response = await axios.post<SuccessResponse<GenerateImageResponse>>(
-        apiUrl,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        }
-      );
+      // Make the API request using apiClient
+      const response = await apiClient.post(apiUrl, payload, {
+        timeout: LONG_OPERATION_TIMEOUT,
+      });
 
       console.log("Image generation response:", response.data);
       console.log("Response status:", response.status);
       console.log("Response headers:", response.headers);
 
-      // Handle successful response
-      if (response.data.status === ResponseStatus.SUCCESS) {
-        console.log("Image generated successfully for", element.name);
-        return response.data.data;
-      }
-
-      throw new Error("Failed to generate image");
+      // Handle successful response - apiClient already extracts the data property
+      return response.data;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
 
       setError(errorMessage);
       console.error("Image generation failed:", errorMessage);
-
-      if (axios.isAxiosError(err)) {
-        console.error("Axios error details:", {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          headers: err.response?.headers,
-          config: {
-            url: err.config?.url,
-            method: err.config?.method,
-            data: err.config?.data,
-          },
-        });
-      }
+      console.error("Error details:", err);
 
       return null;
     } finally {
@@ -170,54 +144,26 @@ export function useImageGeneration(): UseImageGenerationResult {
         payload
       );
 
-      // Use the API_CONFIG.DEFAULT_API_URL for the endpoint
-      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/image-generation/template/cover`;
+      // Use the API endpoint
+      const apiUrl = `/image-generation/template/cover`;
       console.log("Request URL:", apiUrl);
 
-      // Make the API request
-      const response = await axios.post<SuccessResponse<GenerateImageResponse>>(
-        apiUrl,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        }
-      );
+      // Make the API request using apiClient
+      const response = await apiClient.post(apiUrl, payload, {
+        timeout: LONG_OPERATION_TIMEOUT,
+      });
 
       console.log("Cover image generation response:", response.data);
 
-      // Handle successful response
-      if (response.data.status === ResponseStatus.SUCCESS) {
-        console.log(
-          "Cover image generated successfully for template",
-          templateId
-        );
-        return response.data.data;
-      }
-
-      throw new Error("Failed to generate cover image");
+      // Handle successful response - apiClient already extracts the data property
+      return response.data;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
 
       setError(errorMessage);
       console.error("Cover image generation failed:", errorMessage);
-
-      if (axios.isAxiosError(err)) {
-        console.error("Axios error details:", {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          headers: err.response?.headers,
-          config: {
-            url: err.config?.url,
-            method: err.config?.method,
-            data: err.config?.data,
-          },
-        });
-      }
+      console.error("Error details:", err);
 
       return null;
     } finally {
@@ -272,51 +218,26 @@ export function useImageGeneration(): UseImageGenerationResult {
         payload
       );
 
-      // Use the API_CONFIG.DEFAULT_API_URL for the endpoint
-      const apiUrl = `${API_CONFIG.DEFAULT_API_URL}/image-generation/template/player`;
+      // Use the API endpoint
+      const apiUrl = `/image-generation/template/player`;
       console.log("Request URL:", apiUrl);
 
-      // Make the API request
-      const response = await axios.post<SuccessResponse<GenerateImageResponse>>(
-        apiUrl,
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        }
-      );
+      // Make the API request using apiClient
+      const response = await apiClient.post(apiUrl, payload, {
+        timeout: LONG_OPERATION_TIMEOUT,
+      });
 
       console.log("Player image generation response:", response.data);
 
-      // Handle successful response
-      if (response.data.status === ResponseStatus.SUCCESS) {
-        console.log("Player image generated successfully for", playerSlot);
-        return response.data.data;
-      }
-
-      throw new Error("Failed to generate player image");
+      // Handle successful response - apiClient already extracts the data property
+      return response.data;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
 
       setError(errorMessage);
       console.error("Player image generation failed:", errorMessage);
-
-      if (axios.isAxiosError(err)) {
-        console.error("Axios error details:", {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          headers: err.response?.headers,
-          config: {
-            url: err.config?.url,
-            method: err.config?.method,
-            data: err.config?.data,
-          },
-        });
-      }
+      console.error("Error details:", err);
 
       return null;
     } finally {

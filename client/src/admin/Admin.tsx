@@ -8,11 +8,8 @@ import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoryTemplate } from "core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { Logger } from "shared/logger";
-import {
-  sendTrackedRequest,
-  withRequestId,
-} from "client/shared/utils/requestUtils.js";
-import { CreateTemplateRequest, TemplateResponse } from "core/types/admin";
+import { adminApi } from "shared/apiClient";
+import { CreateTemplateRequest } from "core/types/admin";
 
 type AdminTab =
   | "stories"
@@ -42,12 +39,7 @@ export const Admin = () => {
       // Validate token with the server
       const validateToken = async (token: string) => {
         try {
-          await sendTrackedRequest({
-            path: `/admin/auth`,
-            method: "GET",
-            token,
-          });
-
+          await adminApi.get(`/admin/auth`, token);
           setAuthToken(token);
           setIsAuthenticated(true);
         } catch {
@@ -76,19 +68,15 @@ export const Admin = () => {
       const defaultTemplate = createDefaultTemplate();
 
       // Create a new template record on the server first to get an ID
-      const createRequest: CreateTemplateRequest = withRequestId({
+      const createRequest: CreateTemplateRequest = {
         template: defaultTemplate,
-      });
+      };
 
-      const response = await sendTrackedRequest<
-        TemplateResponse,
-        CreateTemplateRequest
-      >({
-        path: `/admin/templates`,
-        method: "POST",
-        token: authToken,
-        body: createRequest,
-      });
+      const response = await adminApi.post<CreateTemplateRequest>(
+        `/admin/templates`,
+        createRequest,
+        authToken
+      );
 
       Logger.Admin.log(
         "New template created with ID:",
