@@ -48,6 +48,7 @@ Focus: Text/Images, English, Multiplayer
 - 15: Stripe integration
 - 5: See pending players, current beat, etc. of active games
 - 15: System to view/navigate save files
+- 7: system to add useful images generated in template-based stories to the template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
 - 20: Use React routing for frontend
 
