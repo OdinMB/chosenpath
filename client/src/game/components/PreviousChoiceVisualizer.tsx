@@ -194,20 +194,28 @@ export const PreviousChoiceVisualizer: React.FC<
     const isPositive = value >= 0;
     return (
       <span
-        className={`
-          ml-1 transition-all duration-500 
-          ${isPositive ? "text-emerald-600" : "text-red-600"}
-          ${isPointsTransitioning || isPointsComplete ? "font-bold" : ""}
-          ${isPointsTransitioning ? "text-lg" : ""}
-        `}
+        className="ml-1 relative flex items-center justify-end"
         style={{
-          minWidth: "24px",
-          display: "inline-block",
-          transform: isPointsTransitioning ? "scale(1.1)" : "scale(1)",
-          transition: "all 0.5s ease-in-out",
+          width: "36px", // Fixed width to prevent layout shifts
+          height: "24px", // Fixed height
         }}
       >
-        {value > 0 ? `+${value}` : value}
+        <span
+          className={`
+            absolute right-0
+            transition-all duration-500 
+            ${isPositive ? "text-emerald-600" : "text-red-600"}
+            ${isPointsTransitioning || isPointsComplete ? "font-bold" : ""}
+            ${isPointsTransitioning ? "text-lg" : ""}
+          `}
+          style={{
+            transformOrigin: "right center",
+            transform: isPointsTransitioning ? "scale(1.1)" : "scale(1)",
+            transition: "all 0.5s ease-in-out",
+          }}
+        >
+          {value > 0 ? `+${value}` : value}
+        </span>
       </span>
     );
   };

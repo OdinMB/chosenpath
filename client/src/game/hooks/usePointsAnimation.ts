@@ -91,12 +91,9 @@ export const usePointsAnimation = ({
         0
       );
 
-      // Animate the change but without transition effects for intermediate values
-      const animateChange = () => {
-        // Don't set isTransitioning for intermediate values
-        // Only update the current total
-        setCurrentTotal(currentSum);
-      };
+      // Check if this is the final modifier being added
+      const isFinalModifier =
+        visibleModifiers.length === modifiers.length && modifiers.length > 0;
 
       // Add a small delay to make the animation more visible
       if (animationTimeoutRef.current) {
@@ -104,34 +101,30 @@ export const usePointsAnimation = ({
         clearTimeout(animationTimeout);
       }
 
-      // Increased delay before updating the points to make the animation more noticeable
-      animationTimeoutRef.current = setTimeout(animateChange, 400);
+      // For the final modifier, apply value change and styling simultaneously
+      if (isFinalModifier) {
+        // Longer delay before final value to ensure it's visible
+        animationTimeoutRef.current = setTimeout(() => {
+          // Update to final value and apply styling effects in one step
+          setIsTransitioning(true);
+          setCurrentTotal(finalTotal);
+
+          // After the transition, set to complete state but keep the bold styling
+          transitionTimeoutRef.current = setTimeout(() => {
+            setIsComplete(true);
+            // Keep isTransitioning true to maintain bold styling
+          }, 800); // Longer duration for final transition
+        }, 500);
+      } else {
+        // Regular animation for non-final modifiers - just update the value
+        animationTimeoutRef.current = setTimeout(() => {
+          setCurrentTotal(currentSum);
+        }, 400);
+      }
     }
 
     // Update prev count ref
     prevVisibleCountRef.current = visibleModifiers.length;
-
-    // When we reach the final modifier, mark as complete after a delay
-    if (visibleModifiers.length === modifiers.length && modifiers.length > 0) {
-      if (animationTimeoutRef.current) {
-        const animationTimeout = animationTimeoutRef.current;
-        clearTimeout(animationTimeout);
-      }
-
-      // Longer delay before final value to ensure it's visible
-      animationTimeoutRef.current = setTimeout(() => {
-        // For the final value, set isTransitioning to true for the highlight effect
-        setIsTransitioning(true);
-        setCurrentTotal(finalTotal);
-
-        // After the transition, set to complete state but keep the bold styling
-        // by not resetting isTransitioning to false
-        transitionTimeoutRef.current = setTimeout(() => {
-          setIsComplete(true);
-          // Keep isTransitioning true to maintain bold styling
-        }, 800); // Longer duration for final transition
-      }, 500);
-    }
   }, [visibleModifiers, modifiers, isAnimating, finalTotal]);
 
   return {
