@@ -5,6 +5,7 @@ import { AdminLogin } from "./AdminLogin";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateForm } from "./template/components";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
+import { UsersOverview } from "./UsersOverview";
 import { StoryTemplate } from "core/types";
 import { createDefaultTemplate } from "./template/utils/templateFactory.js";
 import { Logger } from "shared/logger";
@@ -12,14 +13,15 @@ import { adminApi } from "shared/apiClient";
 import { CreateTemplateRequest } from "core/types/admin";
 
 type AdminTab =
-  | "stories"
-  | "library"
-  | "template-form"
+  | "templates"
   | "carousel"
+  | "stories"
+  | "users"
+  | "template-form"
   | "sample-template";
 
 export const Admin = () => {
-  const { activeTab, setActiveTab } = useTabs<AdminTab>("stories");
+  const { activeTab, setActiveTab } = useTabs<AdminTab>("templates");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] =
@@ -104,9 +106,10 @@ export const Admin = () => {
   };
 
   const tabItems = [
-    { id: "stories" as AdminTab, label: "Active Stories" },
-    { id: "library" as AdminTab, label: "Template Library" },
+    { id: "templates" as AdminTab, label: "Templates" },
     { id: "carousel" as AdminTab, label: "Template Carousel" },
+    { id: "stories" as AdminTab, label: "Stories" },
+    { id: "users" as AdminTab, label: "Users" },
   ];
 
   const renderAdminDashboard = () => {
@@ -146,15 +149,21 @@ export const Admin = () => {
             </div>
 
             {/* Content based on active tab */}
-            {activeTab === "stories" && <StoriesOverview token={authToken} />}
-
-            {activeTab === "library" && (
+            {activeTab === "templates" && (
               <TemplateLibrary
                 token={authToken}
                 onCreateNew={handleCreateTemplate}
                 onEdit={handleEditTemplate}
               />
             )}
+
+            {activeTab === "carousel" && (
+              <TemplateCarouselManager token={authToken} />
+            )}
+
+            {activeTab === "stories" && <StoriesOverview token={authToken} />}
+
+            {activeTab === "users" && <UsersOverview token={authToken} />}
 
             {activeTab === "template-form" && (
               <div>
@@ -166,10 +175,6 @@ export const Admin = () => {
                   setIsLoading={setIsFormLoading}
                 />
               </div>
-            )}
-
-            {activeTab === "carousel" && (
-              <TemplateCarouselManager token={authToken} />
             )}
           </div>
         </div>

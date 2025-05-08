@@ -5,6 +5,7 @@ import { imageRouter } from "./imageRoutes.js";
 import imageGenerationRoutes from "./imageGenerationRoutes.js";
 import newsletterRoutes from "./newsletterRoutes.js";
 import userRoutes from "./userRoutes.js";
+import adminUserRoutes from "./adminUserRoutes.js";
 import { Logger } from "shared/logger.js";
 import { sendNotFound } from "shared/responseUtils.js";
 
@@ -28,6 +29,9 @@ router.use(newsletterRoutes);
 
 // User authentication routes
 router.use(userRoutes);
+
+// Admin routes
+router.use(adminUserRoutes);
 
 // Catch-all 404 handler
 router.use((req, res) => {

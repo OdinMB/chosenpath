@@ -289,3 +289,61 @@ export async function cleanupExpiredSessions(): Promise<number> {
     return 0;
   }
 }
+
+/**
+ * Get all users with their public information
+ * Used for admin panels
+ */
+export async function getAllUsers(): Promise<PublicUser[]> {
+  const db = getDb();
+
+  try {
+    const users = await db.all<UserDB[]>(
+      "SELECT * FROM users ORDER BY createdAt DESC"
+    );
+
+    return users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    }));
+  } catch (error) {
+    Logger.DB.error("Failed to get all users", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a user by ID
+ * @param userId ID of the user to delete
+ * @returns boolean indicating success
+ */
+export async function deleteUserById(userId: string): Promise<boolean> {
+  const db = getDb();
+
+  try {
+    // First check if user exists
+    const user = await db.get<UserDB>("SELECT * FROM users WHERE id = ?", [
+      userId,
+    ]);
+
+    if (!user) {
+      return false;
+    }
+
+    // Delete user's sessions
+    await db.run("DELETE FROM sessions WHERE userId = ?", [userId]);
+
+    // Delete the user
+    const result = await db.run("DELETE FROM users WHERE id = ?", [userId]);
+
+    Logger.DB.log(`Deleted user: ${user.username} (${userId})`);
+
+    return result.changes ? result.changes > 0 : false;
+  } catch (error) {
+    Logger.DB.error(`Failed to delete user: ${userId}`, error);
+    throw error;
+  }
+}
