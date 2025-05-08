@@ -186,9 +186,9 @@ export function processStoryText(
           // Update working copy for next iteration
           imageToReposition.renderPosition = chosenOption.targetParagraph;
 
-          console.log(
-            `Repositioning image from paragraph ${originalImage.paragraphIndex} to ${chosenOption.targetParagraph} (${chosenOption.direction}) for proper spacing`
-          );
+          // console.log(
+          //   `Repositioning image from paragraph ${originalImage.paragraphIndex} to ${chosenOption.targetParagraph} (${chosenOption.direction}) for proper spacing`
+          // );
         }
       }
     }
