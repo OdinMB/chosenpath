@@ -31,6 +31,13 @@ export const LONG_OPERATION_TIMEOUT = 180000; // 3 minutes
 // Add request interceptor to include auth token in all requests
 apiClient.interceptors.request.use(
   (config) => {
+    // Log all requests
+    Logger.API?.info?.(
+      `Request: ${config.method?.toUpperCase() || "UNKNOWN"} ${
+        config.baseURL || ""
+      }${config.url || ""}`
+    );
+
     // Skip token from localStorage if adminAuth is true in config
     if (!(config as AdminRequestConfig).adminAuth) {
       const token = localStorage.getItem("authToken");
@@ -40,9 +47,9 @@ apiClient.interceptors.request.use(
     }
 
     // Add requestId to all requests
+    let requestId = uuidv4();
     if (config.method === "get") {
       // For GET requests, add requestId as query parameter
-      const requestId = uuidv4();
       const url = config.url || "";
       const separator = url.includes("?") ? "&" : "?";
       config.url = `${url}${separator}requestId=${requestId}`;
@@ -50,16 +57,39 @@ apiClient.interceptors.request.use(
       // For other requests, add requestId to request body if not present
       // Skip for FormData objects
       if (!(config.data instanceof FormData) && !("requestId" in config.data)) {
+        requestId = uuidv4();
         config.data = {
           ...config.data,
-          requestId: uuidv4(),
+          requestId,
         };
+      } else if (config.data instanceof FormData) {
+        // Don't modify FormData but we can log it
+        Logger.API?.debug?.("Request contains FormData");
       }
+    }
+
+    // Log request details including the generated requestId
+    Logger.API?.debug?.(
+      `Request details - ID: ${requestId}, Headers: ${JSON.stringify(
+        config.headers
+      )}`
+    );
+
+    // Log request payload for non-GET requests if it's not too large
+    if (config.data && config.method !== "get") {
+      const dataToLog =
+        config.data instanceof FormData
+          ? "[FormData]"
+          : JSON.stringify(config.data).substring(0, 500) +
+            (JSON.stringify(config.data).length > 500 ? "..." : "");
+      Logger.API?.debug?.(`Request payload: ${dataToLog}`);
     }
 
     return config;
   },
   (error) => {
+    // Log request errors
+    Logger.API?.error?.(`Request error: ${error.message}`);
     return Promise.reject(error);
   }
 );
