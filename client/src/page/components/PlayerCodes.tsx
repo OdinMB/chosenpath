@@ -51,12 +51,15 @@ export function PlayerCodes({
   const isReadyToJoin = storyReady || isLikelyReady;
 
   useEffect(() => {
+    // Don't start the timer if the story is already ready
+    if (isReadyToJoin) return;
+
     const interval = setInterval(() => {
       setTimeSinceLoad((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isReadyToJoin]);
 
   const formatPlayerName = (slot: string) => {
     // Convert "player1" to "Player 1"
