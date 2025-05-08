@@ -6,6 +6,7 @@ import { Interlude, InterludeItem } from "./Interlude";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { ClientStoryState, ImagePlaceholder, Beat } from "core/types";
 import { createImageFromPlaceholder } from "shared/utils/imageUtils";
+import { enhanceResolutionDetails } from "game/utils/resolutionUtils";
 
 interface NextBeatPlaceholderProps {
   storyState: ClientStoryState;
@@ -21,6 +22,19 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
   // Check if this was a challenge beat that should animate
   const selectedOption = previousBeat.options[previousBeat.choice];
   const isChallengeBeat = selectedOption?.optionType === "challenge";
+
+  // Enhance resolution details with readable point modifiers if this is a challenge beat
+  const enhancedResolutionDetails =
+    isChallengeBeat &&
+    previousBeat.resolutionDetails &&
+    selectedOption.optionType === "challenge"
+      ? enhanceResolutionDetails(
+          previousBeat.resolutionDetails,
+          selectedOption,
+          1, // We're only dealing with a single previousBeat
+          [previousBeat] // We only need this beat for context
+        )
+      : previousBeat.resolutionDetails;
 
   // Get player slot to show pending players
   const playerSlot = Object.keys(storyState.players)[0];
@@ -65,7 +79,7 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
       <PreviousChoiceVisualizer
         choice={selectedOption}
         resolution={previousBeat.resolution || undefined}
-        resolutionDetails={previousBeat.resolutionDetails}
+        resolutionDetails={enhancedResolutionDetails}
         animateRoll={isChallengeBeat}
         forceExpanded={true}
       />
