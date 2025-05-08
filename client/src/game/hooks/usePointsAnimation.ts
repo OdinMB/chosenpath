@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface UsePointsAnimationProps {
   modifiers: Array<[string, number]>;
@@ -38,10 +38,68 @@ export const usePointsAnimation = ({
 
   // Ref to track the previous visible modifiers count
   const prevVisibleCountRef = useRef(0);
+  const prevTargetValueRef = useRef(0);
 
   // Animation timeout
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countAnimationFrameRef = useRef<number | null>(null);
+
+  // Animate counting to target value - memoized with useCallback
+  const animateCountToValue = useCallback(
+    (
+      targetValue: number,
+      duration: number = 300,
+      isFinalValue: boolean = false
+    ) => {
+      // Cancel any ongoing count animation
+      if (countAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(countAnimationFrameRef.current);
+      }
+
+      const startValue = currentTotal;
+      const startTime = Date.now();
+      const endTime = startTime + duration;
+      const range = targetValue - startValue;
+
+      // For final value, apply transition effect immediately
+      if (isFinalValue) {
+        setIsTransitioning(true);
+      }
+
+      // Function to update count on each animation frame
+      const updateCount = () => {
+        const now = Date.now();
+        if (now >= endTime) {
+          // Animation complete
+          setCurrentTotal(targetValue);
+          if (isFinalValue) {
+            // After the transition, set to complete state but keep the bold styling
+            transitionTimeoutRef.current = setTimeout(() => {
+              setIsComplete(true);
+              // Keep isTransitioning true to maintain bold styling
+            }, 800); // Longer duration for final transition
+          }
+          countAnimationFrameRef.current = null;
+          return;
+        }
+
+        // Calculate progress from 0 to 1
+        const progress = (now - startTime) / duration;
+        // Apply slight easing
+        const easedProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+        // Calculate current count value
+        const currentValue = Math.round(startValue + range * easedProgress);
+
+        setCurrentTotal(currentValue);
+        countAnimationFrameRef.current = requestAnimationFrame(updateCount);
+      };
+
+      // Start the animation
+      countAnimationFrameRef.current = requestAnimationFrame(updateCount);
+    },
+    [currentTotal, setCurrentTotal, setIsComplete, setIsTransitioning]
+  );
 
   // Initialize and reset state based on animation flag
   useEffect(() => {
@@ -58,6 +116,7 @@ export const usePointsAnimation = ({
     setIsComplete(false);
     setIsTransitioning(false);
     prevVisibleCountRef.current = 0;
+    prevTargetValueRef.current = 0;
   }, [isAnimating, finalTotal]);
 
   // Clean up on unmount
@@ -70,6 +129,9 @@ export const usePointsAnimation = ({
       if (transitionTimeoutRef.current) {
         const transitionTimeout = transitionTimeoutRef.current;
         clearTimeout(transitionTimeout);
+      }
+      if (countAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(countAnimationFrameRef.current);
       }
     };
   }, []);
@@ -105,27 +167,29 @@ export const usePointsAnimation = ({
       if (isFinalModifier) {
         // Longer delay before final value to ensure it's visible
         animationTimeoutRef.current = setTimeout(() => {
-          // Update to final value and apply styling effects in one step
-          setIsTransitioning(true);
-          setCurrentTotal(finalTotal);
-
-          // After the transition, set to complete state but keep the bold styling
-          transitionTimeoutRef.current = setTimeout(() => {
-            setIsComplete(true);
-            // Keep isTransitioning true to maintain bold styling
-          }, 800); // Longer duration for final transition
+          // Animate to the final value with a faster speed for the final animation
+          animateCountToValue(finalTotal, 500, true);
         }, 500);
       } else {
-        // Regular animation for non-final modifiers - just update the value
+        // Regular animation for non-final modifiers - just update the value with counting
         animationTimeoutRef.current = setTimeout(() => {
-          setCurrentTotal(currentSum);
+          animateCountToValue(currentSum, 300, false);
         }, 400);
       }
+
+      // Update the previous target value
+      prevTargetValueRef.current = currentSum;
     }
 
     // Update prev count ref
     prevVisibleCountRef.current = visibleModifiers.length;
-  }, [visibleModifiers, modifiers, isAnimating, finalTotal]);
+  }, [
+    visibleModifiers,
+    modifiers,
+    isAnimating,
+    finalTotal,
+    animateCountToValue,
+  ]);
 
   return {
     currentTotal,
