@@ -9,6 +9,7 @@ const COLORS = {
   CONNECTION: "\x1b[35m", // Magenta (same as Story)
   ADMIN: "\x1b[33m", // Yellow for admin-related logs
   ROUTE: "\x1b[34m", // Blue for route-related logs
+  DB: "\x1b[36m", // Cyan for database-related logs
   DEFAULT: "\x1b[32m", // Green
 };
 
@@ -78,6 +79,7 @@ export const Logger = {
   Admin: createLogger("Admin", COLORS.ADMIN),
   AdminService: createLogger("AdminService", COLORS.ADMIN),
   Story: createLogger("Story", COLORS.STORY),
+  DB: createLogger("Database", COLORS.DB),
 
   // Factory method for other services
   forService(serviceName: string) {

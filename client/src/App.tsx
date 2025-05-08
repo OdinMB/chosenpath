@@ -16,6 +16,7 @@ import {
 } from "page/components";
 import { Logger } from "shared/logger";
 import { config } from "client/config";
+import { Header } from "shared/components";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -521,9 +522,7 @@ function App() {
       case "WELCOME":
         return (
           <>
-            <div className="max-w-md mx-auto pt-4">
-              <AppTitle size="large" />
-            </div>
+            <Header size="large" />
             <Page
               onCodeSubmit={handleCodeSubmit}
               onNewStory={handleNewStory}
@@ -537,14 +536,12 @@ function App() {
         Logger.App.log("in viewState SETUP, rendering StoryInitializer");
         return (
           <>
-            <div className="max-w-2xl mx-auto pt-4">
-              <AppTitle
-                size="large"
-                onClick={() => {
-                  loggedSetViewState("WELCOME");
-                }}
-              />
-            </div>
+            <Header
+              size="large"
+              onTitleClick={() => {
+                loggedSetViewState("WELCOME");
+              }}
+            />
             <StoryInitializer
               onSetup={handleStorySetup}
               onBack={() => {
@@ -579,14 +576,12 @@ function App() {
 
         return (
           <>
-            <div className="max-w-2xl mx-auto pt-4">
-              <AppTitle
-                size="large"
-                onClick={() => {
-                  loggedSetViewState("WELCOME");
-                }}
-              />
-            </div>
+            <Header
+              size="large"
+              onTitleClick={() => {
+                loggedSetViewState("WELCOME");
+              }}
+            />
             <TemplateConfigurator
               template={selectedTemplate}
               onBack={() => {
@@ -668,24 +663,22 @@ function App() {
       case "LIBRARY":
         return (
           <>
-            <div className="max-w-2xl mx-auto pt-4">
-              <AppTitle
-                size="large"
-                onClick={() => {
-                  // Clear URL parameters before going back, just like the Back button
-                  window.history.replaceState(
-                    {},
-                    document.title,
-                    window.location.pathname
-                  );
-                  loggedSetViewState("WELCOME");
-                  // Reset the flag if we came from URL params
-                  if (cameFromUrlParams) {
-                    setCameFromUrlParams(false);
-                  }
-                }}
-              />
-            </div>
+            <Header
+              size="large"
+              onTitleClick={() => {
+                // Clear URL parameters before going back, just like the Back button
+                window.history.replaceState(
+                  {},
+                  document.title,
+                  window.location.pathname
+                );
+                loggedSetViewState("WELCOME");
+                // Reset the flag if we came from URL params
+                if (cameFromUrlParams) {
+                  setCameFromUrlParams(false);
+                }
+              }}
+            />
             <LibraryBrowser
               onSelectTemplate={handleSelectTemplate}
               onBack={() => {

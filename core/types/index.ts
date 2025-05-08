@@ -8,6 +8,7 @@ export * from "./story.js";
 export * from "./storyElement.js";
 export * from "./switch.js";
 export * from "./thread.js";
+export * from "./user.js";
 
 export * from "./api.js";
 export * from "./admin.js";

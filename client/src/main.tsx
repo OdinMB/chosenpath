@@ -1,10 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import App from "./App";
+import App from "./App.tsx";
 import { SessionProvider } from "./shared/SessionProvider";
 import { Admin } from "./admin/Admin";
 import "./index.css";
+import { AuthProvider } from "./shared/AuthContext.tsx";
 
 // Use browser router with specific routes to avoid capturing image URLs
 const router = createBrowserRouter([
@@ -17,7 +18,9 @@ const router = createBrowserRouter([
     path: "*",
     element: (
       <SessionProvider>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </SessionProvider>
     ),
   },

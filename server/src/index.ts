@@ -5,73 +5,88 @@ import { config } from "./config.js";
 import { router } from "./routes/index.js";
 import { GameWebSocketServer } from "./routes/websocket.js";
 import { GameHandler } from "game/GameHandler.js";
+import { initializeDatabase, closeDatabase } from "./shared/db.js";
+import { cleanupExpiredSessions } from "./users/userService.js";
 
 async function startServer() {
-  const app = express();
+  try {
+    // Initialize database
+    await initializeDatabase();
+    console.log("[Server] Database initialized");
 
-  // Request logging middleware for debugging
-  app.use((req, res, next) => {
-    console.log(`[Server] ${req.method} ${req.url}`);
-    next();
-  });
+    // Schedule periodic cleanup of expired sessions (every hour)
+    setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
 
-  // Configure middleware with proper CORS for direct API access
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+    const app = express();
 
-        // Check if the origin is in the allowed list
-        if (config.corsOrigins.indexOf(origin) !== -1) {
-          return callback(null, true);
-        }
+    // Request logging middleware for debugging
+    app.use((req, res, next) => {
+      console.log(`[Server] ${req.method} ${req.url}`);
+      next();
+    });
 
-        console.log(`[CORS] Origin ${origin} rejected`);
-        callback(new Error("Not allowed by CORS"));
-      },
-      methods: ["GET", "POST", "PUT", "DELETE"],
-      credentials: true,
-    })
-  );
-  app.use(express.json());
+    // Configure middleware with proper CORS for direct API access
+    app.use(
+      cors({
+        origin: (origin, callback) => {
+          // Allow requests with no origin (like mobile apps or curl requests)
+          if (!origin) return callback(null, true);
 
-  // Regular API routes
-  app.use("", router);
+          // Check if the origin is in the allowed list
+          if (config.corsOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+          }
 
-  // Health check endpoint
-  app.get("/health", (_, res) => {
-    res.json({ status: "ok" });
-  });
-
-  app.set("trust proxy", true);
-  const server = http.createServer(app);
-
-  // Create a single GameHandler instance to be used by the WebSocket server
-  const gameHandler = new GameHandler();
-  console.log("[Server] Created GameHandler instance");
-
-  // Initialize WebSocket server with the GameHandler
-  const wsServer = new GameWebSocketServer(server, gameHandler);
-  console.log("[Server] Created WebSocket server with GameHandler");
-
-  // Start HTTP server
-  server.listen(config.port, () => {
-    console.log(
-      `[Server] HTTP/WebSocket server running on port ${config.port}`
+          console.log(`[CORS] Origin ${origin} rejected`);
+          callback(new Error("Not allowed by CORS"));
+        },
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true,
+      })
     );
-  });
+    app.use(express.json());
 
-  // Graceful shutdown
-  process.on("SIGTERM", () => {
-    console.log("[Server] SIGTERM received. Shutting down gracefully...");
-    wsServer.close(() => {
-      server.close(() => {
-        console.log("[Server] Server shut down complete");
-        process.exit(0);
+    // Regular API routes
+    app.use("", router);
+
+    // Health check endpoint
+    app.get("/health", (_, res) => {
+      res.json({ status: "ok" });
+    });
+
+    app.set("trust proxy", true);
+    const server = http.createServer(app);
+
+    // Create a single GameHandler instance to be used by the WebSocket server
+    const gameHandler = new GameHandler();
+    console.log("[Server] Created GameHandler instance");
+
+    // Initialize WebSocket server with the GameHandler
+    const wsServer = new GameWebSocketServer(server, gameHandler);
+    console.log("[Server] Created WebSocket server with GameHandler");
+
+    // Start HTTP server
+    server.listen(config.port, () => {
+      console.log(
+        `[Server] HTTP/WebSocket server running on port ${config.port}`
+      );
+    });
+
+    // Graceful shutdown
+    process.on("SIGTERM", () => {
+      console.log("[Server] SIGTERM received. Shutting down gracefully...");
+      wsServer.close(() => {
+        server.close(async () => {
+          await closeDatabase();
+          console.log("[Server] Server shut down complete");
+          process.exit(0);
+        });
       });
     });
-  });
+  } catch (error) {
+    console.error("[Server] Startup error:", error);
+    process.exit(1);
+  }
 }
 
 startServer().catch((error) => {

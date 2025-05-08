@@ -1,5 +1,6 @@
 import { RateLimitedAction, ContentModerationAction } from "../config.js";
 import { ImageQuality, ImageSize, ImageInstructions } from "./index.js";
+import { PublicUser } from "./user.js";
 
 // Base client request type
 export interface ClientRequest {
@@ -62,6 +63,48 @@ export interface NewsletterSubscriptionRequest extends ClientRequest {
  */
 export interface NewsletterSubscriptionResponse {
   message: string;
+}
+
+/**
+ * User registration request
+ */
+export interface RegisterUserRequest extends ClientRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+/**
+ * User login request
+ */
+export interface LoginUserRequest extends ClientRequest {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}
+
+/**
+ * User authentication response
+ */
+export interface AuthResponse {
+  user: PublicUser;
+  token: string;
+  expiresAt: number;
+}
+
+/**
+ * Password reset request
+ */
+export interface PasswordResetRequest extends ClientRequest {
+  email: string;
+}
+
+/**
+ * Password update request
+ */
+export interface PasswordUpdateRequest extends ClientRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 /**

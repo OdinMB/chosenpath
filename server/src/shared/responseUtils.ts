@@ -123,3 +123,14 @@ export function sendBadRequest(
 ): void {
   sendError(res, message, 400, requestId);
 }
+
+/**
+ * Create and send an unauthorized error response
+ */
+export function sendUnauthorized(
+  res: Response,
+  message: string,
+  requestId?: string
+): void {
+  sendError(res, message, 401, requestId);
+}

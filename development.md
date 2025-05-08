@@ -2,6 +2,8 @@ Smaller commits!
 
 # NEXT
 
+- 10: User accounts (DB, Login, Manage codes/games)
+- 4: migrate non-websocket api calls in client to use the new apiClient.ts
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 
@@ -39,7 +41,6 @@ Focus: Text/Images, English, Multiplayer
 # SERIOUS PROJECT
 
 - 1: export stories
-- 10: User accounts (DB, Login, Manage codes/games)
 - 5: admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration
