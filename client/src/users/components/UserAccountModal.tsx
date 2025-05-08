@@ -31,21 +31,13 @@ export function UserAccountModal({
 
     // Update view when modal opens (but not when it's already open)
     if (isOpen && !prevIsOpenRef.current) {
-      console.log(
-        `UserAccountModal: Modal opened, setting view to ${initialView}`
-      );
       setCurrentView(initialView);
     }
 
     prevIsOpenRef.current = isOpen;
   }, [isOpen, initialView]);
 
-  console.log(
-    `UserAccountModal: Rendering with isOpen=${isOpen}, currentView=${currentView}, initialView=${initialView}, registrationSuccess=${registrationSuccess}, hasError=${hasError}`
-  );
-
   const handleSuccess = () => {
-    console.log("UserAccountModal: handleSuccess called");
     onClose();
   };
 
@@ -91,6 +83,11 @@ export function UserAccountModal({
       showCloseButton={true}
       title={currentView === "login" ? "Login" : "Create Account"}
     >
+      {hasError && (
+        <div className="text-red-500 mb-4 text-sm">
+          There was an error with your request. Please try again.
+        </div>
+      )}
       {currentView === "login" ? (
         <LoginForm
           onSuccess={handleSuccess}

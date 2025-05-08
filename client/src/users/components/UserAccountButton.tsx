@@ -2,16 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks";
 import { PrimaryButton } from "shared/components/ui";
+import { UserStoriesModal } from "./UserStoriesModal";
 
 export function UserAccountButton() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const { openLoginModal, AccountModal } = useUserAccountModal();
+  const [isStoriesModalOpen, setIsStoriesModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  console.log(
-    `UserAccountButton: Rendering with isAuthenticated=${isAuthenticated}`
-  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -35,6 +33,15 @@ export function UserAccountButton() {
     await logout();
     setDropdownOpen(false);
     console.log("UserAccountButton: Logout completed");
+  };
+
+  const handleStoriesClick = () => {
+    setDropdownOpen(false);
+    setIsStoriesModalOpen(true);
+  };
+
+  const handleCloseStoriesModal = () => {
+    setIsStoriesModalOpen(false);
   };
 
   return (
@@ -70,6 +77,12 @@ export function UserAccountButton() {
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
             <button
+              onClick={handleStoriesClick}
+              className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              My Stories
+            </button>
+            <button
               onClick={handleLogout}
               className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
             >
@@ -80,6 +93,10 @@ export function UserAccountButton() {
       </div>
 
       <AccountModal />
+      <UserStoriesModal
+        isOpen={isStoriesModalOpen}
+        onClose={handleCloseStoriesModal}
+      />
     </>
   );
 }

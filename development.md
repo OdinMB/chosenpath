@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 5: User accounts (Manage codes/games)
+- 5: Users: manage codes/games
 - 4: improve admin auth system
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes

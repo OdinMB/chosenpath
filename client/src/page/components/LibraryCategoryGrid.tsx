@@ -16,10 +16,10 @@ export function LibraryCategoryGrid({
       tag: "Fiction",
     },
     {
-      id: "kids",
-      title: "Read with Kids",
-      image: "/category-kids.jpeg",
-      tag: "Kids",
+      id: "vent",
+      title: "Vent about Reality",
+      image: "/category-vent.jpeg",
+      tag: "Satire",
     },
     {
       id: "pretendtobe",
@@ -28,10 +28,10 @@ export function LibraryCategoryGrid({
       tag: "Pretend to be",
     },
     {
-      id: "vent",
-      title: "Vent about Reality",
-      image: "/category-vent.jpeg",
-      tag: "Satire",
+      id: "kids",
+      title: "Read with Kids",
+      image: "/category-kids.jpeg",
+      tag: "Kids",
     },
   ];
 

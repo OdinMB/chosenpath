@@ -64,12 +64,46 @@ export async function initializeDatabase() {
       )
     `);
 
+    // Create stories table for story metadata
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        templateId TEXT,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        maxTurns INTEGER NOT NULL,
+        generateImages BOOLEAN NOT NULL DEFAULT 1,
+        creatorId TEXT,
+        FOREIGN KEY (creatorId) REFERENCES users (id) ON DELETE SET NULL
+      )
+    `);
+
+    // Create user_story_codes table to associate users with story codes
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS user_story_codes (
+        userId TEXT NOT NULL,
+        storyId TEXT NOT NULL,
+        playerSlot TEXT NOT NULL,
+        code TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        lastPlayedAt INTEGER NOT NULL,
+        PRIMARY KEY (userId, storyId, playerSlot),
+        FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (storyId) REFERENCES stories (id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better performance
     await db.exec(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
       CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
       CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions (userId);
       CREATE INDEX IF NOT EXISTS idx_sessions_expiresAt ON sessions (expiresAt);
+      CREATE INDEX IF NOT EXISTS idx_stories_creatorId ON stories (creatorId);
+      CREATE INDEX IF NOT EXISTS idx_user_story_codes_userId ON user_story_codes (userId);
+      CREATE INDEX IF NOT EXISTS idx_user_story_codes_storyId ON user_story_codes (storyId);
+      CREATE INDEX IF NOT EXISTS idx_user_story_codes_code ON user_story_codes (code);
     `);
 
     Logger.DB.log("Database initialized successfully");

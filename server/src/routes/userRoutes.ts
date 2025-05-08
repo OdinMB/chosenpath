@@ -17,7 +17,13 @@ import {
   RegisterUserRequest,
   LoginUserRequest,
   PasswordUpdateRequest,
+  AssociateStoryCodeRequest,
 } from "core/types/api.js";
+import {
+  getUserStoryCodes,
+  associateStoryCode,
+  getUserStories,
+} from "../users/userStoryService.js";
 
 const router = express.Router();
 
@@ -169,6 +175,93 @@ router.post("/auth/password", authenticate(), async (req, res) => {
     if (errorMessage.includes("incorrect")) {
       return sendBadRequest(res, errorMessage, requestId);
     }
+
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
+
+/**
+ * Get story codes for the current user
+ * GET /users/story-codes
+ */
+router.get("/users/story-codes", authenticate(), async (req, res) => {
+  const requestId = (req.query.requestId as string) || "unknown";
+
+  try {
+    if (!req.user) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const storyCodes = await getUserStoryCodes(req.user.id);
+    return sendSuccess(res, { storyCodes }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to get user story codes", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to get story codes";
+
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
+
+/**
+ * Associate a story code with the current user
+ * POST /users/story-codes
+ */
+router.post("/users/story-codes", authenticate(), async (req, res) => {
+  const requestId = req.body?.requestId || "unknown";
+  const { storyId, playerSlot, code } = req.body as AssociateStoryCodeRequest;
+
+  if (!storyId || !playerSlot || !code) {
+    return sendBadRequest(
+      res,
+      "Story ID, player slot, and code are required",
+      requestId
+    );
+  }
+
+  try {
+    if (!req.user) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const association = await associateStoryCode(
+      req.user.id,
+      storyId,
+      playerSlot,
+      code
+    );
+
+    return sendSuccess(res, { storyCode: association }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to associate story code", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to associate story code";
+
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
+
+/**
+ * Get stories created by the current user
+ * GET /users/stories
+ */
+router.get("/users/stories", authenticate(), async (req, res) => {
+  const requestId = (req.query.requestId as string) || "unknown";
+
+  try {
+    if (!req.user) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const stories = await getUserStories(req.user.id);
+    return sendSuccess(res, { stories }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to get user stories", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to get stories";
 
     return sendError(res, errorMessage, 500, requestId);
   }

@@ -5,6 +5,9 @@ import {
   ResponseStatus,
   BaseServerResponse,
   ErrorResponse,
+  UserStoryCodesResponse,
+  UserStoriesResponse,
+  AssociateStoryCodeRequest,
 } from "core/types/api.js";
 import { Logger } from "./logger.js";
 
@@ -103,6 +106,30 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// User story API functions
+export const userStoriesApi = {
+  /**
+   * Get all story codes associated with the current user
+   */
+  getStoryCodes: () => {
+    return apiClient.get<UserStoryCodesResponse>("/users/story-codes");
+  },
+
+  /**
+   * Associate a story code with the current user
+   */
+  associateStoryCode: (data: AssociateStoryCodeRequest) => {
+    return apiClient.post("/users/story-codes", data);
+  },
+
+  /**
+   * Get all stories created by the current user
+   */
+  getUserStories: () => {
+    return apiClient.get<UserStoriesResponse>("/users/stories");
+  },
+};
 
 // Admin API functions that use an explicit admin token
 // These bypass the normal auth token from localStorage

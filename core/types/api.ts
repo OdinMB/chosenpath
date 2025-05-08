@@ -108,6 +108,55 @@ export interface PasswordUpdateRequest extends ClientRequest {
 }
 
 /**
+ * User story code association
+ */
+export interface UserStoryCodeAssociation {
+  userId: string;
+  storyId: string;
+  playerSlot: string;
+  code: string;
+  createdAt: number;
+  lastPlayedAt: number;
+}
+
+/**
+ * Request to associate a story code with a user
+ */
+export interface AssociateStoryCodeRequest extends ClientRequest {
+  storyId: string;
+  playerSlot: string;
+  code: string;
+}
+
+/**
+ * Response containing story codes associated with a user
+ */
+export interface UserStoryCodesResponse {
+  storyCodes: UserStoryCodeAssociation[];
+}
+
+/**
+ * Basic story metadata
+ */
+export interface StoryMetadata {
+  id: string;
+  title: string;
+  templateId?: string;
+  createdAt: number;
+  updatedAt: number;
+  maxTurns: number;
+  generateImages: boolean;
+  creatorId: string;
+}
+
+/**
+ * Response containing stories created by a user
+ */
+export interface UserStoriesResponse {
+  stories: StoryMetadata[];
+}
+
+/**
  * Standardized response status types for all API requests
  */
 export enum ResponseStatus {

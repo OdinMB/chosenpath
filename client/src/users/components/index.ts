@@ -1,4 +1,6 @@
 export * from "./LoginForm";
 export * from "./RegisterForm";
-export * from "./UserAccountModal";
 export * from "./UserAccountButton";
+export * from "./UserAccountModal";
+export * from "./UserStoriesList";
+export * from "./UserStoriesModal";
