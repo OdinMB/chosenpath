@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { Resolution, ResolutionDetails } from "core/types";
 import { useEmojiAnimation } from "./useEmojiAnimation";
 import { useMarkerAnimation } from "./useMarkerAnimation";
+import { usePointsAnimation } from "./usePointsAnimation";
 
 // Animation timing constants
-const MODIFIER_PHASE_DURATION = 2500; // 2.5 seconds for modifiers
+const MODIFIER_PHASE_DURATION = 4000; // 4 seconds for modifiers (increased from 2.5s)
 const ROLL_PHASE_DURATION = 3500; // 3.5 seconds for roll animations
-const TOTAL_ANIMATION_DURATION = MODIFIER_PHASE_DURATION + ROLL_PHASE_DURATION; // 6 seconds total
+const TOTAL_ANIMATION_DURATION = MODIFIER_PHASE_DURATION + ROLL_PHASE_DURATION; // 7.5 seconds total
 
 interface UsePreviousChoiceVisualizerProps {
   animateRoll: boolean;
@@ -28,6 +29,12 @@ interface UsePreviousChoiceVisualizerResult {
   // Modifier animation
   visibleModifiers: Array<[string, number]>;
   isModifierAnimating: boolean;
+
+  // Points animation
+  currentPoints: number;
+  isPointsAnimating: boolean;
+  isPointsComplete: boolean;
+  isPointsTransitioning: boolean;
 
   // Overall animation state
   animationPhase: "modifiers" | "roll" | "complete";
@@ -77,6 +84,22 @@ export const usePreviousChoiceVisualizer = ({
   >([]);
   const [isModifierAnimating, setIsModifierAnimating] = useState(false);
   const modifierTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  // Get points animation state from its hook
+  const allModifiers = resolutionDetails?.readablePointModifiers || [];
+  const finalTotal = resolutionDetails?.points || 0;
+
+  const {
+    currentTotal: currentPoints,
+    isAnimating: isPointsAnimating,
+    isComplete: isPointsComplete,
+    isTransitioning: isPointsTransitioning,
+  } = usePointsAnimation({
+    modifiers: allModifiers,
+    visibleModifiers,
+    isAnimating: isModifierAnimating,
+    finalTotal,
+  });
 
   // Reset animation states when animateRoll changes
   useEffect(() => {
@@ -132,11 +155,15 @@ export const usePreviousChoiceVisualizer = ({
 
     // Animate modifiers one by one
     const modifiers = resolutionDetails.readablePointModifiers || [];
-    const delayBetweenModifiers = Math.min(
-      500,
-      MODIFIER_PHASE_DURATION / (modifiers.length + 1)
-    ); // Dynamic timing based on number of modifiers
-    const startDelay = 200; // Start after a small initial delay
+
+    // Longer delay between modifiers - at least 800ms, or distribute evenly
+    const delayBetweenModifiers = Math.max(
+      800,
+      Math.floor((MODIFIER_PHASE_DURATION * 0.7) / modifiers.length)
+    );
+
+    // Longer initial delay to give the user time to see the starting state
+    const startDelay = 600; // 600ms initial delay (increased from 200ms)
 
     // Start the modifiers animation after a delay
     modifiers.forEach((modifier, index) => {
@@ -183,6 +210,12 @@ export const usePreviousChoiceVisualizer = ({
     // Modifier animation
     visibleModifiers,
     isModifierAnimating,
+
+    // Points animation
+    currentPoints,
+    isPointsAnimating,
+    isPointsComplete,
+    isPointsTransitioning,
 
     // Overall animation state
     animationPhase,

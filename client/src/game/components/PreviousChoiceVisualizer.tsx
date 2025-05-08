@@ -28,7 +28,7 @@ export const PreviousChoiceVisualizer: React.FC<
 }) => {
   const isChallenge = choice.optionType === "challenge";
 
-  // Expanded state management (previously in useExpandCollapse)
+  // Expanded state management
   const [expanded, setExpanded] = useState(forceExpanded);
 
   // Update expanded state when forceExpanded prop changes
@@ -49,7 +49,7 @@ export const PreviousChoiceVisualizer: React.FC<
         if (!forceExpanded) {
           setExpanded(false);
         }
-      }, 6000); // Match animation duration
+      }, 7500); // Match total animation duration (4000 + 3500)
 
       return () => clearTimeout(timeoutId);
     }
@@ -64,6 +64,9 @@ export const PreviousChoiceVisualizer: React.FC<
     currentMarkerPosition,
     visibleModifiers,
     isModifierAnimating,
+    currentPoints,
+    isPointsTransitioning,
+    isPointsComplete,
     animationPhase,
   } = usePreviousChoiceVisualizer({
     animateRoll,
@@ -186,44 +189,26 @@ export const PreviousChoiceVisualizer: React.FC<
     );
   };
 
-  // Format the point modifiers into a readable component
-  const formatPointBreakdown = (): React.ReactNode => {
-    if (!resolutionDetails?.points) {
-      return "No points awarded";
-    }
-
+  // Animated points value with color
+  const renderPointsValue = (value: number) => {
+    const isPositive = value >= 0;
     return (
-      <div className="text-left w-full">
-        <div className="space-y-2">
-          {resolutionDetails.readablePointModifiers?.map(
-            ([name, value], index) => (
-              <div key={index} className="flex justify-between text-sm">
-                <span className="mr-3">{name}</span>
-                <span
-                  className={value >= 0 ? "text-emerald-600" : "text-red-600"}
-                >
-                  {value > 0 ? `+${value}` : value}
-                </span>
-              </div>
-            )
-          ) || (
-            <div className="flex justify-between text-sm">
-              <span className="mr-3">Base points</span>
-              <span
-                className={
-                  resolutionDetails.points >= 0
-                    ? "text-emerald-600"
-                    : "text-red-600"
-                }
-              >
-                {resolutionDetails.points > 0
-                  ? `+${resolutionDetails.points}`
-                  : resolutionDetails.points}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+      <span
+        className={`
+          ml-1 transition-all duration-500 
+          ${isPositive ? "text-emerald-600" : "text-red-600"}
+          ${isPointsTransitioning || isPointsComplete ? "font-bold" : ""}
+          ${isPointsTransitioning ? "text-lg" : ""}
+        `}
+        style={{
+          minWidth: "24px",
+          display: "inline-block",
+          transform: isPointsTransitioning ? "scale(1.1)" : "scale(1)",
+          transition: "all 0.5s ease-in-out",
+        }}
+      >
+        {value > 0 ? `+${value}` : value}
+      </span>
     );
   };
 
@@ -413,16 +398,10 @@ export const PreviousChoiceVisualizer: React.FC<
                       resolutionDetails?.points !== undefined && (
                         <div className="inline-flex items-center">
                           <span className="font-semibold text-primary">
-                            {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
+                            {currentPoints >= 0 ? "Bonus" : "Malus"}:
                           </span>
-                          <span className="text-primary ml-1">
-                            {resolutionDetails.points}
-                          </span>
-                          <InfoIcon
-                            className="ml-1 mt-1"
-                            tooltipText={formatPointBreakdown()}
-                            contentClassName="max-w-[400px]"
-                          />
+                          {renderPointsValue(currentPoints)}
+                          {/* InfoIcon hidden as requested */}
                         </div>
                       )
                     )}
@@ -433,16 +412,10 @@ export const PreviousChoiceVisualizer: React.FC<
                       resolutionDetails?.points !== undefined && (
                         <div className="inline-flex items-center">
                           <span className="font-semibold text-primary">
-                            {resolutionDetails.points >= 0 ? "Bonus" : "Malus"}:
+                            {currentPoints >= 0 ? "Bonus" : "Malus"}:
                           </span>
-                          <span className="text-primary ml-1">
-                            {resolutionDetails.points}
-                          </span>
-                          <InfoIcon
-                            className="ml-1 mt-1"
-                            tooltipText={formatPointBreakdown()}
-                            contentClassName="max-w-[400px]"
-                          />
+                          {renderPointsValue(currentPoints)}
+                          {/* InfoIcon hidden as requested */}
                         </div>
                       )}
                   </div>
