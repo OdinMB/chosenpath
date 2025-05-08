@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useAuth } from "../../shared/AuthContext";
+import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks";
-import { PrimaryButton } from "../../shared/components/ui";
+import { PrimaryButton } from "shared/components/ui";
 
 export function UserAccountButton() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();

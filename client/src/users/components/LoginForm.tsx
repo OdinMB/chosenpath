@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useAuth } from "../../shared/AuthContext";
-import { PrimaryButton } from "../../shared/components/ui";
+import { useAuth } from "shared/useAuth";
+import { PrimaryButton } from "shared/components/ui";
 
 interface LoginFormProps {
   onSuccess?: () => void;
