@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ResolutionDetails, Resolution } from "core/types";
 import { Tooltip, InfoIcon, ColoredBox, Icons } from "components/ui";
-import { useEmojiAnimation } from "game/hooks/useEmojiAnimation";
-import { useMarkerAnimation } from "game/hooks/useMarkerAnimation";
+import { usePreviousChoiceVisualizer } from "game/hooks/usePreviousChoiceVisualizer";
 import { useChoiceFormatting } from "game/hooks/useChoiceFormatting";
 
 interface PreviousChoiceVisualizerProps {
@@ -56,18 +55,21 @@ export const PreviousChoiceVisualizer: React.FC<
     }
   }, [animateRoll, isChallenge, forceExpanded]);
 
-  // Use custom hooks to manage state and animations
-  const { isAnimating, showEmoji, currentEmoji } = useEmojiAnimation({
+  // Use the unified animation hook
+  const {
+    isEmojiAnimating,
+    showEmoji,
+    currentEmoji,
+    isMarkerAnimating,
+    currentMarkerPosition,
+    visibleModifiers,
+    isModifierAnimating,
+  } = usePreviousChoiceVisualizer({
     animateRoll,
     resolution,
-    isChallenge,
-    forceExpanded,
-  });
-
-  const { animatingMarker, currentMarkerPosition } = useMarkerAnimation({
-    animateRoll,
     resolutionDetails,
     isChallenge,
+    forceExpanded,
   });
 
   const {
@@ -96,7 +98,7 @@ export const PreviousChoiceVisualizer: React.FC<
     }
 
     // If animating, show the current emoji in the animation sequence (without tooltip)
-    if (isAnimating) {
+    if (isEmojiAnimating) {
       return <div className="text-3xl">{currentEmoji}</div>;
     }
 
@@ -206,6 +208,30 @@ export const PreviousChoiceVisualizer: React.FC<
     );
   };
 
+  // Render a modifier tag for the animation
+  const renderModifierTag = (name: string, value: number) => (
+    <div
+      className={`
+        inline-flex items-center px-3 py-1.5 mr-3 mb-2 rounded-full text-sm
+        ${
+          value >= 0
+            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+            : "bg-red-100 text-red-800 border border-red-300"
+        }
+        shadow-sm animate-fadeIn transition-all duration-300
+      `}
+    >
+      <span className="mr-1.5 font-medium">{name}</span>
+      <span
+        className={`font-bold ${
+          value >= 0 ? "text-emerald-700" : "text-red-700"
+        }`}
+      >
+        {value >= 0 ? `+${value}` : value}
+      </span>
+    </div>
+  );
+
   return (
     <div className="max-w-2xl mx-auto mb-4 flex justify-center">
       <ColoredBox
@@ -299,7 +325,7 @@ export const PreviousChoiceVisualizer: React.FC<
                         className="absolute"
                         style={{
                           left: `${
-                            animatingMarker
+                            isMarkerAnimating
                               ? currentMarkerPosition
                               : resolutionDetails.roll
                           }%`,
@@ -310,7 +336,7 @@ export const PreviousChoiceVisualizer: React.FC<
                           transform: "translateX(-0.75px)",
                           zIndex: 5,
                           pointerEvents: "none",
-                          transition: animatingMarker
+                          transition: isMarkerAnimating
                             ? "none"
                             : "left 0.3s ease-out",
                         }}
@@ -341,7 +367,7 @@ export const PreviousChoiceVisualizer: React.FC<
                   </div>
 
                   {/* Info row with Risk, Resource Type, and Points */}
-                  <div className="flex items-center gap-2 md:gap-6 flex-wrap text-sm">
+                  <div className="flex items-center gap-2 md:gap-6 flex-wrap text-sm mb-3">
                     <div className="inline-flex items-center">
                       <span className="font-semibold text-primary">Risk:</span>
                       <span className="text-primary ml-1">
@@ -400,6 +426,17 @@ export const PreviousChoiceVisualizer: React.FC<
                         </div>
                       )}
                   </div>
+
+                  {/* Animated modifier tags */}
+                  {(isModifierAnimating || visibleModifiers.length > 0) && (
+                    <div className="flex flex-wrap mt-4 mb-1">
+                      {visibleModifiers.map(([name, value], index) => (
+                        <React.Fragment key={index}>
+                          {renderModifierTag(name, value)}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
