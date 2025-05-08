@@ -53,6 +53,9 @@ export function UserAccountModal({
     console.log("UserAccountModal: Registration successful");
     setRegistrationSuccess(true);
     setHasError(false); // Clear any previous error state
+
+    // Automatically switch to login view on successful registration
+    setCurrentView("login");
   };
 
   const handleSwitchToLogin = () => {
@@ -92,6 +95,11 @@ export function UserAccountModal({
         <LoginForm
           onSuccess={handleSuccess}
           onRegisterClick={() => handleManualViewSwitch("register")}
+          registrationSuccessMessage={
+            registrationSuccess
+              ? "Registration successful! You can now log in."
+              : undefined
+          }
         />
       ) : (
         <RegisterForm

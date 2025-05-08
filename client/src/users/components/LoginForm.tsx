@@ -5,9 +5,14 @@ import { PrimaryButton } from "shared/components/ui";
 interface LoginFormProps {
   onSuccess?: () => void;
   onRegisterClick?: () => void;
+  registrationSuccessMessage?: string;
 }
 
-export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
+export function LoginForm({
+  onSuccess,
+  onRegisterClick,
+  registrationSuccessMessage,
+}: LoginFormProps) {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,6 +47,12 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
 
   return (
     <div className="p-4">
+      {registrationSuccessMessage && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          {registrationSuccessMessage}
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {error}
