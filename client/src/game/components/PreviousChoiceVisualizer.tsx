@@ -88,9 +88,16 @@ export const PreviousChoiceVisualizer: React.FC<
 
   // Get emoji based on resolution or exploration
   const getIconContent = () => {
+    // Create a consistent container size for all states
+    const emojiContainer = (content: React.ReactNode) => (
+      <div className="w-12 h-12 flex items-center justify-center">
+        {content}
+      </div>
+    );
+
     if (!isChallenge) {
       // Exploration beat - show fork in the road icon
-      return (
+      return emojiContainer(
         <Tooltip content="You chose a path" position="right">
           <div className="text-lg text-primary">
             <Icons.Fork className="w-10 h-10" />
@@ -101,17 +108,17 @@ export const PreviousChoiceVisualizer: React.FC<
 
     // For challenge beats
     if (!resolution) {
-      return <div className="w-8 h-8"></div>;
+      return emojiContainer(null);
     }
 
-    // If in modifiers phase, reserve space but don't show emoji
+    // If in modifiers phase, show empty container
     if (animationPhase === "modifiers") {
-      return <div className="w-12 h-12"></div>;
+      return emojiContainer(null);
     }
 
     // If animating, show the current emoji in the animation sequence (without tooltip)
     if (isEmojiAnimating) {
-      return <div className="text-3xl">{currentEmoji}</div>;
+      return emojiContainer(<div className="text-3xl">{currentEmoji}</div>);
     }
 
     // Show emoji after animation completes with tooltip
@@ -123,7 +130,7 @@ export const PreviousChoiceVisualizer: React.FC<
           ? "Results are mixed"
           : "Things don't go as planned";
 
-      return (
+      return emojiContainer(
         <Tooltip content={tooltip} position="right">
           <div className="text-3xl animate-fadeIn">{currentEmoji}</div>
         </Tooltip>
@@ -131,7 +138,7 @@ export const PreviousChoiceVisualizer: React.FC<
     }
 
     // Fallback
-    return <div className="w-8 h-8"></div>;
+    return emojiContainer(null);
   };
 
   // Bar segment with tooltip
@@ -457,7 +464,7 @@ export const PreviousChoiceVisualizer: React.FC<
         ) : (
           // Collapsed view with icon and expand button
           <>
-            <div className="flex-shrink-0 flex items-center justify-center w-12 h-12">
+            <div className="flex-shrink-0 flex items-center justify-center">
               {getIconContent()}
             </div>
 
