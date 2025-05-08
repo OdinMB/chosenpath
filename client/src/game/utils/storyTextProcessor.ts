@@ -120,45 +120,75 @@ export function processStoryText(
     .sort((a, b) => a.position - b.position);
 
   // Apply spacing rules if needed (avoid images being too close)
-  if (shouldApplyImageSpacing) {
-    // Find paragraph for each image (already done above)
+  if (shouldApplyImageSpacing && validImageElements.length >= 2) {
+    // Make a working copy of the image positions for planning purposes
+    const workingElements = validImageElements.map((img) => ({
+      ...img,
+      renderPosition: img.paragraphIndex,
+    }));
 
-    // Check if images are too close together and create target positions
-    for (let i = 1; i < validImageElements.length; i++) {
-      const prevImage = validImageElements[i - 1];
-      const currentImage = validImageElements[i];
+    // Identify and fix spacing issues one pair at a time
+    for (let i = 0; i < workingElements.length - 1; i++) {
+      const currentImage = workingElements[i];
+      const nextImage = workingElements[i + 1];
 
-      // Only reposition if we know which paragraphs they're in
-      if (
-        prevImage.paragraphIndex !== undefined &&
-        currentImage.paragraphIndex !== undefined
-      ) {
-        // Calculate paragraph gap between consecutive images
-        const paragraphGap =
-          currentImage.paragraphIndex - prevImage.paragraphIndex;
+      // Calculate paragraph gap between consecutive images
+      const paragraphGap =
+        nextImage.renderPosition! - currentImage.renderPosition!;
 
-        // Only reposition if images would appear in adjacent paragraphs or the same paragraph
-        if (paragraphGap < 2) {
-          // Calculate target paragraph to ensure at least 1 full paragraph between images
-          const targetParagraph = prevImage.paragraphIndex + 2;
+      // Only adjust if images are too close (less than 2 paragraphs apart)
+      if (paragraphGap < 2) {
+        // Calculate distance for each option
+        const moveNextForward = {
+          targetParagraph: currentImage.renderPosition! + 2,
+          distance: 2 - paragraphGap,
+        };
 
-          // Only reposition if the target paragraph exists and would increase spacing
-          if (
-            targetParagraph < paragraphPositions.length &&
-            targetParagraph > currentImage.paragraphIndex
-          ) {
-            // Create a new placeholder at the target location
-            // Start of the target paragraph is usually better than end
-            currentImage.targetPosition =
-              paragraphPositions[targetParagraph].start;
+        const moveCurrentBackward = {
+          targetParagraph: nextImage.renderPosition! - 2,
+          distance: 2 - paragraphGap,
+        };
 
-            // The original position will be used to remove the placeholder
-            currentImage.originalPosition = currentImage.position;
+        // Evaluate options based on feasibility and minimal movement
+        let chosenOption = null;
 
-            console.log(
-              `Repositioning image from paragraph ${currentImage.paragraphIndex} to ${targetParagraph} to ensure at least 1 paragraph between images`
-            );
+        // Option 1: Move next image forward
+        if (moveNextForward.targetParagraph < paragraphPositions.length) {
+          chosenOption = {
+            imageIndex: i + 1,
+            targetParagraph: moveNextForward.targetParagraph,
+            direction: "forward",
+          };
+        }
+
+        // Option 2: Move current image backward if it would be minimal
+        if (moveCurrentBackward.targetParagraph >= 0) {
+          // If no option chosen yet, or backward is minimal
+          if (!chosenOption) {
+            chosenOption = {
+              imageIndex: i,
+              targetParagraph: moveCurrentBackward.targetParagraph,
+              direction: "backward",
+            };
           }
+        }
+
+        // Apply the chosen repositioning
+        if (chosenOption) {
+          const imageToReposition = workingElements[chosenOption.imageIndex];
+          const originalImage = validImageElements[chosenOption.imageIndex];
+
+          // Set the target position for the actual image
+          originalImage.targetPosition =
+            paragraphPositions[chosenOption.targetParagraph].start;
+          originalImage.originalPosition = originalImage.position;
+
+          // Update working copy for next iteration
+          imageToReposition.renderPosition = chosenOption.targetParagraph;
+
+          console.log(
+            `Repositioning image from paragraph ${originalImage.paragraphIndex} to ${chosenOption.targetParagraph} (${chosenOption.direction}) for proper spacing`
+          );
         }
       }
     }
