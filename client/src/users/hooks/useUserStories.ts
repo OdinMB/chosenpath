@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { userStoriesApi } from "shared/apiClient";
 import { useAuth } from "shared/useAuth";
-import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
+import {
+  UserStoryCodeAssociation,
+  StoryMetadata,
+  ExtendedStoryMetadata,
+} from "core/types/api";
 import { Logger } from "shared/logger";
 
 export function useUserStories() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [storyCodes, setStoryCodes] = useState<UserStoryCodeAssociation[]>([]);
   const [stories, setStories] = useState<StoryMetadata[]>([]);
@@ -38,19 +42,77 @@ export function useUserStories() {
 
         Logger.App.log("Loading user story data...");
 
-        // First get all stories related to the user
+        // Get all stories related to the user
         const storiesResponse = await userStoriesApi.getAllUserStories();
         const userStories = storiesResponse.data.stories;
-        setStories(userStories);
 
-        // Get codes if needed
-        const codesResponse = await userStoriesApi.getStoryCodes();
-        const userCodes = codesResponse.data.storyCodes;
-        setStoryCodes(userCodes);
+        // Check if stories are extended with player data
+        const extendedStories = userStories as ExtendedStoryMetadata[];
+
+        // Extract player data if available
+        const extractedCodes: UserStoryCodeAssociation[] = [];
+        const hasPlayers =
+          extendedStories.length > 0 && "players" in extendedStories[0];
+
+        if (hasPlayers) {
+          // Current user ID
+          const currentUserId = user?.id || "";
+
+          // Convert player entries to code associations for backward compatibility
+          extendedStories.forEach((story) => {
+            if (story.players) {
+              // For each player entry, check if it should be included
+              story.players.forEach((player) => {
+                // Include all player entries for stories created by the user,
+                // or only those with a userId matching the current user for other stories
+                const isUserCreated = story.creatorId === currentUserId;
+                if (isUserCreated || player.userId === currentUserId) {
+                  extractedCodes.push({
+                    userId: player.userId || "", // Empty string for null userId
+                    storyId: player.storyId,
+                    playerSlot: player.playerSlot,
+                    code: player.code,
+                    createdAt: story.createdAt,
+                    lastPlayedAt: player.lastPlayedAt || story.updatedAt,
+                  });
+                }
+              });
+            }
+          });
+
+          setStoryCodes(extractedCodes);
+          Logger.App.log("Using players data from extended stories");
+        } else {
+          // If not extended, get codes separately
+          const codesResponse = await userStoriesApi.getStoryCodes();
+          const userCodes = codesResponse.data.storyCodes;
+          setStoryCodes(userCodes);
+        }
+
+        // Store the stories (remove players property for consistent typing)
+        const cleanStories: StoryMetadata[] = userStories.map((story) => {
+          // If this is an extended story, create a new object without the players property
+          if ("players" in story) {
+            // Manually create a new object with only the desired properties
+            return {
+              id: story.id,
+              title: story.title,
+              templateId: story.templateId,
+              createdAt: story.createdAt,
+              updatedAt: story.updatedAt,
+              maxTurns: story.maxTurns,
+              generateImages: story.generateImages,
+              creatorId: story.creatorId,
+            };
+          }
+          return story as StoryMetadata;
+        });
+
+        setStories(cleanStories);
 
         Logger.App.log("Loaded user story data", {
-          stories: userStories.length,
-          codes: userCodes.length,
+          stories: cleanStories.length,
+          codes: hasPlayers ? extractedCodes.length : "from separate API call",
         });
       } catch (err) {
         Logger.App.error("Failed to load user story data", err);
@@ -66,7 +128,7 @@ export function useUserStories() {
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticated, user]
   );
 
   // Associate a story code with the current user

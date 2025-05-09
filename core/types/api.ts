@@ -150,10 +150,28 @@ export interface StoryMetadata {
 }
 
 /**
+ * Story player entry information
+ */
+export interface StoryPlayerEntry {
+  storyId: string;
+  playerSlot: string;
+  code: string;
+  userId: string | null;
+  lastPlayedAt: number | null;
+}
+
+/**
+ * Extended story metadata that includes player entries
+ */
+export interface ExtendedStoryMetadata extends StoryMetadata {
+  players: StoryPlayerEntry[];
+}
+
+/**
  * Response containing stories created by a user
  */
 export interface UserStoriesResponse {
-  stories: StoryMetadata[];
+  stories: StoryMetadata[] | ExtendedStoryMetadata[];
 }
 
 /**

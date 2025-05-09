@@ -1,6 +1,11 @@
 import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
-import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api.js";
+import {
+  UserStoryCodeAssociation,
+  StoryMetadata,
+  ExtendedStoryMetadata,
+  StoryPlayerEntry,
+} from "core/types/api.js";
 
 /**
  * Get all story codes associated with a user
@@ -140,38 +145,122 @@ export async function associateStoryCode(
  */
 export async function getAllUserRelatedStories(
   userId: string
-): Promise<StoryMetadata[]> {
+): Promise<ExtendedStoryMetadata[]> {
   try {
     const db = getDb();
 
-    const stories = await db.all<StoryMetadata[]>(
+    // First, get stories where user is the creator
+    const createdStories = await db.all<StoryMetadata[]>(
       `SELECT DISTINCT
         s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
        FROM stories s
-       LEFT JOIN story_players sp ON s.id = sp.storyId
-       WHERE s.creatorId = ? OR sp.userId = ?
-       ORDER BY 
-        CASE 
-          WHEN sp.lastPlayedAt IS NOT NULL THEN sp.lastPlayedAt 
-          ELSE s.updatedAt 
-        END DESC`,
+       WHERE s.creatorId = ?`,
+      userId
+    );
+
+    // Then, get stories where the user is a player but not the creator
+    const playedStories = await db.all<StoryMetadata[]>(
+      `SELECT DISTINCT
+        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
+       FROM stories s
+       JOIN story_players sp ON s.id = sp.storyId
+       WHERE sp.userId = ? AND s.creatorId != ?
+       ORDER BY sp.lastPlayedAt DESC`,
       userId,
       userId
     );
 
+    // Combine the results
+    const stories = [...createdStories, ...playedStories];
+
+    // Create a map to track which stories the user created
+    const createdStoryIds = new Set(createdStories.map((s) => s.id));
+
+    // Create extended story objects with player info
+    const extendedStories: ExtendedStoryMetadata[] = [];
+
+    for (const story of stories) {
+      const isCreator = createdStoryIds.has(story.id);
+
+      // Get player entries for this story
+      let players: StoryPlayerEntry[];
+
+      if (isCreator) {
+        // For stories where user is creator, get ALL player entries
+        players = await db.all<StoryPlayerEntry[]>(
+          `SELECT 
+             storyId, playerSlot, code, userId, lastPlayedAt
+            FROM story_players
+            WHERE storyId = ?
+            ORDER BY playerSlot`,
+          story.id
+        );
+      } else {
+        // For stories where user is just a player, only get THEIR player entries
+        players = await db.all<StoryPlayerEntry[]>(
+          `SELECT 
+             storyId, playerSlot, code, userId, lastPlayedAt
+            FROM story_players
+            WHERE storyId = ? AND userId = ?
+            ORDER BY playerSlot`,
+          story.id,
+          userId
+        );
+      }
+
+      // Add to extended stories
+      extendedStories.push({
+        ...story,
+        players: players || [],
+      });
+    }
+
+    // Get all story IDs to fetch last played times for sorting
+    const allStoryIds = extendedStories.map((s) => s.id);
+
+    // Create a map of story ID to last played time
+    const lastPlayedMap: Record<string, number> = {};
+
+    // Only fetch last played times if there are stories
+    if (allStoryIds.length > 0) {
+      // Get the last played times for all stories
+      const lastPlayedTimes = await db.all(
+        `SELECT storyId, MAX(lastPlayedAt) as lastPlayed
+         FROM story_players
+         WHERE storyId IN (${allStoryIds.map(() => "?").join(",")})
+         GROUP BY storyId`,
+        ...allStoryIds
+      );
+
+      // Populate the map with results
+      for (const record of lastPlayedTimes) {
+        lastPlayedMap[record.storyId] = record.lastPlayed || 0;
+      }
+    }
+
+    // Sort all stories by last played time or updated time
+    extendedStories.sort((a, b) => {
+      const aLastPlayed = lastPlayedMap[a.id] || a.updatedAt;
+      const bLastPlayed = lastPlayedMap[b.id] || b.updatedAt;
+
+      // Sort in descending order (newest first)
+      return bLastPlayed - aLastPlayed;
+    });
+
     Logger.Route.log(
       `getAllUserRelatedStories for user ${userId}: Found ${
-        stories?.length || 0
+        extendedStories?.length || 0
       } stories`
     );
 
     // Log all story IDs for debugging
-    if (stories?.length > 0) {
-      const storyIds = stories.map((s) => s.id).join(", ");
+    if (extendedStories?.length > 0) {
+      const storyIds = extendedStories.map((s) => s.id).join(", ");
       Logger.Route.log(`Story IDs: ${storyIds}`);
+      Logger.Route.log(`Extended stories: ${JSON.stringify(extendedStories)}`);
     }
 
-    return stories || [];
+    return extendedStories;
   } catch (error) {
     Logger.Route.error(
       `Failed to get related stories for user ${userId}`,
