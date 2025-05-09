@@ -6,12 +6,23 @@ import { SessionProvider } from "./shared/SessionProvider";
 import { Admin } from "./admin/Admin";
 import "./index.css";
 import { AuthProvider } from "./shared/AuthContext.tsx";
+import { Users } from "./users/Users";
 
 // Use browser router with specific routes to avoid capturing image URLs
 const router = createBrowserRouter([
   {
     path: "/admin/*",
     element: <Admin />,
+  },
+  {
+    path: "/my-stories",
+    element: (
+      <SessionProvider>
+        <AuthProvider>
+          <Users />
+        </AuthProvider>
+      </SessionProvider>
+    ),
   },
   {
     // Exclude /images and /api paths from being captured by the router

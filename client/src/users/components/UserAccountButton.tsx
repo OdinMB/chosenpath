@@ -2,14 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks";
 import { PrimaryButton } from "shared/components/ui";
-import { UserStoriesModal } from "./UserStoriesModal";
+// import { useNavigate } from "react-router-dom";
 
 export function UserAccountButton() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const { openLoginModal, AccountModal } = useUserAccountModal();
-  const [isStoriesModalOpen, setIsStoriesModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // const navigate = useNavigate();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -36,12 +36,24 @@ export function UserAccountButton() {
   };
 
   const handleStoriesClick = () => {
-    setDropdownOpen(false);
-    setIsStoriesModalOpen(true);
-  };
+    console.log("UserAccountButton: Stories link clicked");
+    try {
+      setDropdownOpen(false);
+      console.log("UserAccountButton: About to navigate to /my-stories");
 
-  const handleCloseStoriesModal = () => {
-    setIsStoriesModalOpen(false);
+      // Try a different approach - use window.location directly
+      window.location.href = "/my-stories";
+
+      // The navigate function isn't triggering a UI change
+      // navigate("/my-stories");
+
+      console.log("UserAccountButton: Navigation function called");
+    } catch (error) {
+      console.error(
+        "UserAccountButton: Error navigating to stories page",
+        error
+      );
+    }
   };
 
   return (
@@ -93,10 +105,6 @@ export function UserAccountButton() {
       </div>
 
       <AccountModal />
-      <UserStoriesModal
-        isOpen={isStoriesModalOpen}
-        onClose={handleCloseStoriesModal}
-      />
     </>
   );
 }

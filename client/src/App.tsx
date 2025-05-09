@@ -17,6 +17,7 @@ import {
 import { Logger } from "shared/logger";
 import { Header } from "shared/components";
 import { apiClient } from "shared/apiClient";
+import { Users } from "./users/Users";
 
 // Add this type at the top with the imports
 type ViewState =
@@ -26,7 +27,8 @@ type ViewState =
   | "PLAYER_CODES"
   | "GAME"
   | "TEMPLATE_CONFIG"
-  | "LIBRARY";
+  | "LIBRARY"
+  | "USERS";
 
 // Define story creation types to unify handling
 type StoryCreationType = "PREMISE" | "TEMPLATE" | "NONE";
@@ -85,6 +87,45 @@ function App() {
   useEffect(() => {
     sessionStorage.setItem("tabId", tabId);
   }, [tabId]);
+
+  // Initial URL check - runs once when component mounts
+  useEffect(() => {
+    // Check if we're on the my-stories page
+    if (window.location.pathname === "/my-stories") {
+      Logger.App.log(
+        "Initial load detected /my-stories URL - setting Users view"
+      );
+      // Set viewState directly instead of using loggedSetViewState to avoid the extra render
+      setViewState("USERS");
+    }
+  }, []);
+
+  // Monitor URL changes for navigation to my-stories
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname;
+      Logger.App.log(`Location changed to: ${path}`);
+
+      if (path === "/my-stories" && viewState !== "USERS") {
+        Logger.App.log(
+          "URL changed to /my-stories - updating view state to USERS"
+        );
+        // Set viewState directly to avoid extra renders
+        setViewState("USERS");
+      }
+    };
+
+    // Set up the event listener
+    window.addEventListener("popstate", handleLocationChange);
+
+    // Also check once on initial mount
+    handleLocationChange();
+
+    // Clean up
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+    };
+  }, [viewState]);
 
   // Wrap loggedSetViewState in useCallback
   const loggedSetViewState = useCallback(
@@ -178,6 +219,20 @@ function App() {
       }
     };
 
+    // Check for user stories page
+    const checkForUsersPage = () => {
+      const path = window.location.pathname;
+      if (path === "/my-stories") {
+        Logger.App.log("Found my-stories in URL, navigating to users page");
+
+        // Navigate to users page without replacing the URL
+        // window.history.replaceState({}, document.title, "/");
+        loggedSetViewState("USERS");
+        return true;
+      }
+      return false;
+    };
+
     // Check for direct library tags in URL
     const checkForLibraryFilters = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -214,10 +269,13 @@ function App() {
     };
 
     if (!isConnecting && viewState === "WELCOME") {
-      // First check for library filters - if found, we navigate directly to library
-      if (!checkForLibraryFilters()) {
-        checkForSharedTemplate();
-        checkForJoinCode();
+      // First check for users page route
+      if (!checkForUsersPage()) {
+        // Then check for library filters
+        if (!checkForLibraryFilters()) {
+          checkForSharedTemplate();
+          checkForJoinCode();
+        }
       }
     }
   }, [
@@ -692,6 +750,9 @@ function App() {
             />
           </>
         );
+
+      case "USERS":
+        return <Users onTitleClick={() => loggedSetViewState("WELCOME")} />;
 
       default:
         return null;

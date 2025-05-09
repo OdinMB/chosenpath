@@ -1,3 +1,2 @@
-export * from "./useUserAccountModal";
+export * from "./useUserAccountModal.tsx";
 export * from "./useUserStories";
-export * from "./useUserStoriesModal.tsx";
