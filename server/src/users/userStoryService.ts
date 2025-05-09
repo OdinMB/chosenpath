@@ -136,6 +136,52 @@ export async function associateStoryCode(
 }
 
 /**
+ * Get all stories related to a user (both as creator and as player)
+ */
+export async function getAllUserRelatedStories(
+  userId: string
+): Promise<StoryMetadata[]> {
+  try {
+    const db = getDb();
+
+    const stories = await db.all<StoryMetadata[]>(
+      `SELECT DISTINCT
+        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
+       FROM stories s
+       LEFT JOIN story_players sp ON s.id = sp.storyId
+       WHERE s.creatorId = ? OR sp.userId = ?
+       ORDER BY 
+        CASE 
+          WHEN sp.lastPlayedAt IS NOT NULL THEN sp.lastPlayedAt 
+          ELSE s.updatedAt 
+        END DESC`,
+      userId,
+      userId
+    );
+
+    Logger.Route.log(
+      `getAllUserRelatedStories for user ${userId}: Found ${
+        stories?.length || 0
+      } stories`
+    );
+
+    // Log all story IDs for debugging
+    if (stories?.length > 0) {
+      const storyIds = stories.map((s) => s.id).join(", ");
+      Logger.Route.log(`Story IDs: ${storyIds}`);
+    }
+
+    return stories || [];
+  } catch (error) {
+    Logger.Route.error(
+      `Failed to get related stories for user ${userId}`,
+      error
+    );
+    throw new Error("Failed to retrieve user's related stories");
+  }
+}
+
+/**
  * Get all stories created by a user
  */
 export async function getUserStories(userId: string): Promise<StoryMetadata[]> {

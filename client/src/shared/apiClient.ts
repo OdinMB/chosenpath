@@ -99,7 +99,9 @@ apiClient.interceptors.response.use(
   (response) => {
     // Log all server responses
     Logger.API?.info?.(
-      `Response from ${response.config.url}: ${response.status} ${response.statusText}`
+      `Response from ${response.config.url}: ${response.status} ${
+        response.statusText
+      }: ${JSON.stringify(response.data).substring(0, 500)}`
     );
 
     // Check if the response is a valid API response
@@ -194,6 +196,13 @@ export const userStoriesApi = {
    */
   getPlayerStories: () => {
     return apiClient.get<UserStoriesResponse>("/users/player-stories");
+  },
+
+  /**
+   * Get all stories related to the current user (both as creator and player)
+   */
+  getAllUserStories: () => {
+    return apiClient.get<UserStoriesResponse>("/users/all-stories");
   },
 };
 

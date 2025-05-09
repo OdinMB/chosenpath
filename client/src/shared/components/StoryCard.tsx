@@ -1,7 +1,9 @@
 import { formatRelativeTime } from "../utils/timeUtils";
 import { CoverCard } from "./CoverCard";
-import { PrimaryButton } from "./ui";
+import { PrimaryButton, InfoIcon } from "./ui";
 import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
+import { PlayerCode } from "./PlayerCode";
+import { useAuth } from "shared/useAuth";
 
 type StoryCardProps = {
   story: StoryMetadata;
@@ -22,6 +24,8 @@ export const StoryCard = ({
   className = "",
   children,
 }: StoryCardProps) => {
+  const { user } = useAuth();
+
   // Size-based class mapping
   const sizeClasses = {
     title: size === "large" ? "text-xl" : "text-lg",
@@ -29,15 +33,21 @@ export const StoryCard = ({
   };
 
   // Get the user's player slot if available
-  const userPlayer = players.length > 0 ? players[0] : undefined;
+  const userPlayer = players.find((p) => p.userId === user?.id);
 
-  // Format the last played time
+  // Format timestamps for the tooltip
   const lastPlayedTime = userPlayer?.lastPlayedAt
     ? formatRelativeTime(userPlayer.lastPlayedAt)
-    : undefined;
-
-  // Format created time
+    : "Never played";
   const createdTime = formatRelativeTime(story.createdAt);
+
+  // Tooltip content with story info
+  const infoTooltip = (
+    <div className="space-y-1 p-1">
+      <p>Created: {createdTime}</p>
+      <p>Last played: {lastPlayedTime}</p>
+    </div>
+  );
 
   const handlePlay = () => {
     if (onPlay) {
@@ -45,10 +55,31 @@ export const StoryCard = ({
     }
   };
 
+  // Determine if we should show the image and what source to use
+  const shouldShowImage = story.generateImages === true || story.templateId;
+  const imageSource = story.templateId ? "template" : "story";
+  const imageSourceId = story.templateId || story.id;
+
+  // Determine which codes to show - if user is creator, show all; otherwise only show user's code
+  const isCreator = user?.id && story.creatorId === user.id;
+  const codesToShow = isCreator
+    ? players
+    : players.filter((p) => p.userId === user?.id);
+
+  // Function to get label for a player code
+  const getPlayerCodeLabel = (player: UserStoryCodeAssociation) => {
+    // User's own code
+    if (player.userId === user?.id) {
+      return "You";
+    }
+    // Other players' codes
+    return `Player ${player.playerSlot.replace("player", "")}`;
+  };
+
   return (
     <CoverCard
-      sourceId={story.id}
-      source="story"
+      sourceId={shouldShowImage ? imageSourceId : undefined}
+      source={imageSource}
       title={story.title}
       size={size}
       onClick={handlePlay}
@@ -67,43 +98,37 @@ export const StoryCard = ({
 
       {/* Info */}
       <div className="flex flex-col gap-1 text-primary-500 mb-3">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center">
           <span className={`${sizeClasses.info} font-semibold`}>
             {story.maxTurns} turns
           </span>
-          {story.templateId && (
-            <span className={`${sizeClasses.info}`}>Based on template</span>
-          )}
+          <InfoIcon
+            tooltipText={infoTooltip}
+            position="top"
+            className="ml-4 mt-1"
+          />
         </div>
       </div>
 
-      {/* Status */}
-      <div className="flex flex-col gap-2 text-gray-700">
-        {lastPlayedTime && (
-          <p className={`${sizeClasses.info}`}>Last played: {lastPlayedTime}</p>
-        )}
-        <p className={`${sizeClasses.info}`}>Created: {createdTime}</p>
-        {userPlayer && (
-          <p className={`${sizeClasses.info}`}>
-            You are Player {userPlayer.playerSlot.replace("player", "")}
-          </p>
-        )}
-      </div>
+      {/* Story Codes */}
+      {codesToShow.length > 0 && (
+        <div className="mt-3 flex flex-col gap-2">
+          {codesToShow.map((player) => (
+            <PlayerCode
+              key={player.code}
+              code={player.code}
+              size="sm"
+              label={getPlayerCodeLabel(player)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Optional children */}
       {children}
 
       {/* Flex spacer */}
       <div className="flex-grow"></div>
-
-      {/* Player count */}
-      {players.length > 0 && (
-        <div className="mt-auto pt-2">
-          <span className={`${sizeClasses.info} text-primary-700`}>
-            {players.length} active player{players.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-      )}
     </CoverCard>
   );
 };

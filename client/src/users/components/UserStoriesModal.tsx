@@ -9,6 +9,7 @@ import { PrimaryButton } from "shared/components/ui";
 import { StoredCodeSet } from "shared/SessionContext";
 import { getSortedCodeSets } from "shared/utils/codeSetUtils";
 import { StoryMetadata } from "core/types/api";
+import { Logger } from "shared/logger";
 
 interface UserStoriesModalProps {
   isOpen: boolean;
@@ -18,24 +19,24 @@ interface UserStoriesModalProps {
 export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { storyCodes, associateStoryCode, loadStoryCodes, loadStories } =
+  const { storyCodes, associateStoryCode, loadUserStoryData } =
     useUserStories();
   const [localCodeSets, setLocalCodeSets] = useState<StoredCodeSet[]>([]);
   const [associatingCode, setAssociatingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load local code sets when modal opens
+  // Load data when modal opens
   useEffect(() => {
     if (isOpen) {
+      Logger.App.log("UserStoriesModal opened - loading data");
       refreshLocalCodeSets();
 
       // Refresh user stories when the modal opens
       if (isAuthenticated) {
-        loadStoryCodes();
-        loadStories();
+        loadUserStoryData();
       }
     }
-  }, [isOpen, isAuthenticated, loadStoryCodes, loadStories]);
+  }, [isOpen, isAuthenticated, loadUserStoryData]);
 
   // Filter local codes that aren't already in the user's database
   useEffect(() => {
@@ -55,11 +56,18 @@ export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
       );
     });
 
+    Logger.App.log(
+      `Filtered local code sets: ${filteredSets.length} (total: ${
+        getSortedCodeSets().length
+      })`
+    );
     setLocalCodeSets(filteredSets);
   }, [storyCodes, isAuthenticated]);
 
   const refreshLocalCodeSets = () => {
-    setLocalCodeSets(getSortedCodeSets());
+    const sets = getSortedCodeSets();
+    Logger.App.log(`Refreshed local code sets: ${sets.length}`);
+    setLocalCodeSets(sets);
   };
 
   const handleCodeSubmit = useCallback(
@@ -115,8 +123,7 @@ export function UserStoriesModal({ isOpen, onClose }: UserStoriesModalProps) {
           <div className="space-y-3">
             <h3 className="font-medium text-primary-700">Local Stories</h3>
             <p className="text-sm text-gray-500 mb-2">
-              These stories are stored locally and are not yet linked to your
-              account.
+              Not yet linked to your account.
             </p>
 
             {localCodeSets.map((codeSet) => {

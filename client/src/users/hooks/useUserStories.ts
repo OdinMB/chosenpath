@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { userStoriesApi } from "shared/apiClient";
 import { useAuth } from "shared/useAuth";
 import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
@@ -6,51 +6,68 @@ import { Logger } from "shared/logger";
 
 export function useUserStories() {
   const { isAuthenticated } = useAuth();
-  const [isLoadingCodes, setIsLoadingCodes] = useState(false);
-  const [isLoadingStories, setIsLoadingStories] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [storyCodes, setStoryCodes] = useState<UserStoryCodeAssociation[]>([]);
   const [stories, setStories] = useState<StoryMetadata[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Load story codes associated with the current user
-  const loadStoryCodes = useCallback(async () => {
-    if (!isAuthenticated) {
-      setStoryCodes([]);
-      return;
-    }
+  // Use refs to track ongoing requests to prevent duplicate calls
+  const loadingRef = useRef(false);
+  const shouldReloadRef = useRef(false);
 
-    try {
-      setIsLoadingCodes(true);
-      setError(null);
-      const response = await userStoriesApi.getStoryCodes();
-      setStoryCodes(response.data.storyCodes);
-    } catch (err) {
-      Logger.App.error("Failed to load user story codes", err);
-      setError("Failed to load your story codes. Please try again later.");
-    } finally {
-      setIsLoadingCodes(false);
-    }
-  }, [isAuthenticated]);
+  // Load all user-related data in a single call
+  const loadUserStoryData = useCallback(
+    async (force = false) => {
+      // Skip if not authenticated
+      if (!isAuthenticated) {
+        setStoryCodes([]);
+        setStories([]);
+        return;
+      }
 
-  // Load stories created by the current user
-  const loadStories = useCallback(async () => {
-    if (!isAuthenticated) {
-      setStories([]);
-      return;
-    }
+      // Skip if already loading, but mark for reload after current load finishes
+      if (loadingRef.current && !force) {
+        shouldReloadRef.current = true;
+        return;
+      }
 
-    try {
-      setIsLoadingStories(true);
-      setError(null);
-      const response = await userStoriesApi.getUserStories();
-      setStories(response.data.stories);
-    } catch (err) {
-      Logger.App.error("Failed to load user stories", err);
-      setError("Failed to load your stories. Please try again later.");
-    } finally {
-      setIsLoadingStories(false);
-    }
-  }, [isAuthenticated]);
+      try {
+        setIsLoading(true);
+        loadingRef.current = true;
+        setError(null);
+
+        Logger.App.log("Loading user story data...");
+
+        // First get all stories related to the user
+        const storiesResponse = await userStoriesApi.getAllUserStories();
+        const userStories = storiesResponse.data.stories;
+        setStories(userStories);
+
+        // Get codes if needed
+        const codesResponse = await userStoriesApi.getStoryCodes();
+        const userCodes = codesResponse.data.storyCodes;
+        setStoryCodes(userCodes);
+
+        Logger.App.log("Loaded user story data", {
+          stories: userStories.length,
+          codes: userCodes.length,
+        });
+      } catch (err) {
+        Logger.App.error("Failed to load user story data", err);
+        setError("Failed to load your stories. Please try again later.");
+      } finally {
+        setIsLoading(false);
+        loadingRef.current = false;
+
+        // If a reload was requested while loading, do it now
+        if (shouldReloadRef.current) {
+          shouldReloadRef.current = false;
+          setTimeout(() => loadUserStoryData(true), 0);
+        }
+      }
+    },
+    [isAuthenticated]
+  );
 
   // Associate a story code with the current user
   const associateStoryCode = useCallback(
@@ -67,8 +84,8 @@ export function useUserStories() {
           code,
         });
 
-        // Reload story codes after association
-        await loadStoryCodes();
+        // Reload all story data after association
+        await loadUserStoryData(true);
 
         return response.data.storyCode;
       } catch (err) {
@@ -77,25 +94,24 @@ export function useUserStories() {
         return null;
       }
     },
-    [isAuthenticated, loadStoryCodes]
+    [isAuthenticated, loadUserStoryData]
   );
 
-  // Load story codes and stories when authentication changes
+  // Load story data when authentication changes
   useEffect(() => {
     if (isAuthenticated) {
-      loadStoryCodes();
-      loadStories();
+      loadUserStoryData();
     }
-  }, [isAuthenticated, loadStoryCodes, loadStories]);
+  }, [isAuthenticated, loadUserStoryData]);
 
   return {
     storyCodes,
     stories,
-    isLoadingCodes,
-    isLoadingStories,
+    isLoading,
     error,
-    loadStoryCodes,
-    loadStories,
+    loadUserStoryData,
+    loadStoryCodes: loadUserStoryData, // For backward compatibility
+    loadStories: loadUserStoryData, // For backward compatibility
     associateStoryCode,
   };
 }

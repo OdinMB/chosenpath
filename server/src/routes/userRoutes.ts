@@ -25,6 +25,7 @@ import {
   associateStoryCode,
   getUserStories,
   getStoriesWithUser,
+  getAllUserRelatedStories,
 } from "users/userStoryService.js";
 import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
 
@@ -262,6 +263,30 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
 
     const errorMessage =
       error instanceof Error ? error.message : "Failed to associate story code";
+
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
+
+/**
+ * Get all stories related to the current user (both as creator and player)
+ * GET /users/all-stories
+ */
+router.get("/users/all-stories", authenticate(), async (req, res) => {
+  const requestId = (req.query.requestId as string) || "unknown";
+
+  try {
+    if (!req.user) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const stories = await getAllUserRelatedStories(req.user.id);
+    return sendSuccess(res, { stories }, requestId);
+  } catch (error) {
+    Logger.Route.error("Failed to get all user related stories", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to get stories";
 
     return sendError(res, errorMessage, 500, requestId);
   }
