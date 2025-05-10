@@ -41,7 +41,7 @@ export function PlayerCodes({
     }
   }, [contentModeration, onGoToWelcome, codes]);
 
-  const FALLBACK_READY_TIME = 60; // in seconds
+  const FALLBACK_READY_TIME = 90; // in seconds
 
   // If the story isn't marked ready by the server after 60 seconds,
   // assume it's probably ready but we missed the notification
@@ -156,7 +156,7 @@ export function PlayerCodes({
     if (!isReadyToJoin) {
       return (
         <div className="mb-4 text-center">
-          <LoadingSpinner message="Creating your story. This should take less than a minute..." />
+          <LoadingSpinner message="Creating your story. This should take 60-90 seconds." />
         </div>
       );
     }

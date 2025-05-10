@@ -8,6 +8,7 @@ import { WithProviders } from "../shared/WithProviders";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { libraryLoader } from "../shared/libraryLoader";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
+import { StoryInitializer } from "./components/StoryInitializer";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -24,7 +25,7 @@ export const pageRoutes: RouteObject[] = [
     path: "/setup",
     element: (
       <WithProviders>
-        <div>Story Setup (Coming Soon)</div>
+        <StoryInitializer onBack={() => window.history.back()} />
       </WithProviders>
     ),
     id: "story-setup",
