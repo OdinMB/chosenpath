@@ -11,14 +11,11 @@ import {
 import { hasCodeSets } from "shared/utils/codeSetUtils.js";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterButton, NewsletterModal } from "shared/components";
-import { gameService } from "game/GameService";
-import { useSession } from "shared/useSession";
 import { Header } from "shared/components";
 
 // Page component refactored to use React Router
 export function Page() {
   const navigate = useNavigate();
-  const { setIsLoading } = useSession();
   const [code, setCode] = useState("");
   const {
     isNewsletterModalOpen,
@@ -30,9 +27,6 @@ export function Page() {
 
   // Handle code submission - now uses gameService directly
   const handleCodeSubmit = (code: string) => {
-    setIsLoading(true);
-    gameService.verifyCode(code);
-
     // Store the code in localStorage with a unique key for this session
     const tabId =
       sessionStorage.getItem("tabId") ||
