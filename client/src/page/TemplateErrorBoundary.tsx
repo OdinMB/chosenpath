@@ -1,6 +1,5 @@
 import { useRouteError, isRouteErrorResponse } from "react-router-dom";
 import { PrimaryButton } from "components/ui";
-import { Header } from "components/Header";
 
 export const TemplateErrorBoundary = () => {
   const error = useRouteError();

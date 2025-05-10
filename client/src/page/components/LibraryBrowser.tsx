@@ -8,7 +8,6 @@ import { NoMatchesCard } from "./NoMatchesCard";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterModal } from "shared/components";
 import { NewsletterCard } from "./NewsletterCard";
-import { Header } from "../../shared/components/Header";
 import { useNavigate, useLoaderData } from "react-router-dom";
 
 interface LibraryLoaderData {
@@ -452,7 +451,6 @@ export function LibraryBrowser() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header size="large" onTitleClick={() => navigate("/")} />
       <main className="flex-1">
         <div className="max-w-4xl mx-auto p-4 font-lora">
           <div className="flex justify-between items-center mb-6 relative">

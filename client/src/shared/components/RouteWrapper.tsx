@@ -1,6 +1,7 @@
 import React from "react";
-import { useNavigation } from "react-router-dom";
+import { useNavigation, useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { Header } from "./Header";
 
 interface RouteWrapperProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface RouteWrapperProps {
 export function RouteWrapper({ children }: RouteWrapperProps) {
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
+  const navigate = useNavigate();
 
   return (
     <>
@@ -17,6 +19,7 @@ export function RouteWrapper({ children }: RouteWrapperProps) {
           <LoadingSpinner size="large" />
         </div>
       )}
+      <Header size="large" onTitleClick={() => navigate("/")} />
       {children}
     </>
   );

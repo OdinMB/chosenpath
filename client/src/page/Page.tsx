@@ -11,7 +11,6 @@ import {
 import { hasCodeSets } from "shared/utils/codeSetUtils.js";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterButton, NewsletterModal } from "shared/components";
-import { Header } from "shared/components";
 
 // Page component refactored to use React Router
 export function Page() {
@@ -67,7 +66,6 @@ export function Page() {
 
   return (
     <>
-      <Header size="large" />
       <div className="max-w-md mx-auto p-4 font-lora">
         <div className="mb-8 text-primary-800">
           <p className="mb-2">
