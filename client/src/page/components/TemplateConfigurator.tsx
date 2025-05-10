@@ -1,65 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useNavigate, useLoaderData } from "react-router-dom";
 import { StoryTemplate, PlayerCount } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
-import { useSession } from "shared/useSession";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
+import { Logger } from "shared/logger";
 
-interface TemplateConfiguratorProps {
+interface TemplateConfigLoaderData {
   template: StoryTemplate;
-  onBack: () => void;
-  onConfigure: (options: {
-    templateId: string;
-    playerCount: PlayerCount;
-    maxTurns: number;
-    generateImages: boolean;
-  }) => void;
 }
 
-export function TemplateConfigurator({
-  template,
-  onBack,
-  onConfigure,
-}: TemplateConfiguratorProps) {
+export function TemplateConfigurator() {
+  const { template } = useLoaderData() as TemplateConfigLoaderData;
+  const navigate = useNavigate();
+
   const [playerCount, setPlayerCount] = useState<PlayerCount>(
     template.playerCountMin
   );
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { isRequestPending, isOperationRunning } = useSession();
 
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
   const hasConfigurableSettings = needsPlayerConfig || needsTurnsConfig || true;
 
-  // Monitor if the story initialization operation is pending
-  useEffect(() => {
-    const isPending =
-      isRequestPending("initialize_from_template") ||
-      isOperationRunning("initialize_story");
-
-    if (isPending && !isLoading) {
-      setIsLoading(true);
-    } else if (!isPending && isLoading) {
-      // This should not happen during normal flow, but helps prevent
-      // the UI from getting stuck in a loading state
-      console.log(
-        "Template initialization no longer pending, but still in loading state"
-      );
-    }
-  }, [isRequestPending, isOperationRunning, isLoading]);
+  const handleBack = () => {
+    navigate("/library");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    onConfigure({
+
+    // For now, just log the configuration options
+    Logger.App.log("Template configuration:", {
       templateId: template.id,
       playerCount,
       maxTurns,
       generateImages,
     });
+
+    // This would be where you initialize the story with the template
+    // But we're not implementing that part yet
+
+    // Navigate back to the library for now
+    navigate("/library");
   };
 
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,7 +162,7 @@ export function TemplateConfigurator({
             <PrimaryButton
               type="button"
               size="lg"
-              onClick={onBack}
+              onClick={handleBack}
               variant="outline"
               leftBorder={false}
               leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}

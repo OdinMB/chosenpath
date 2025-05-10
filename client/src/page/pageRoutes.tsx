@@ -1,11 +1,13 @@
 import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
 import { templateLoader } from "../shared/templateLoader";
+import { templateConfigLoader } from "../shared/templateConfigLoader";
 import { codeJoinLoader } from "../shared/codeJoinLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { WithProviders } from "../shared/WithProviders";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { libraryLoader } from "../shared/libraryLoader";
+import { TemplateConfigurator } from "./components/TemplateConfigurator";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -29,9 +31,10 @@ export const pageRoutes: RouteObject[] = [
   },
   {
     path: "/templates/:id/configure",
+    loader: templateConfigLoader,
     element: (
       <WithProviders>
-        <div>Template Config (Coming Soon)</div>
+        <TemplateConfigurator />
       </WithProviders>
     ),
     errorElement: <TemplateErrorBoundary />,
