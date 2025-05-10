@@ -59,9 +59,9 @@ export function Page() {
   // Navigate to library with optional category tag
   const handleBrowseWithCategory = (categoryTag?: string) => {
     if (categoryTag) {
-      navigate(`/templates?tags=${categoryTag}`);
+      navigate(`/library?tags=${categoryTag}`);
     } else {
-      navigate("/templates");
+      navigate("/library");
     }
   };
 

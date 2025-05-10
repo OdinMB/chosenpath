@@ -1,22 +1,22 @@
 import { StoryTemplate } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { PrimaryButton, Icons } from "components/ui";
-import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Modal } from "shared/components/ui";
 import { CreateYourOwnCard } from "./CreateYourOwnCard";
 import { NoMatchesCard } from "./NoMatchesCard";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterModal } from "shared/components";
 import { NewsletterCard } from "./NewsletterCard";
+import { Header } from "../../shared/components/Header";
+import { useNavigate, useLoaderData } from "react-router-dom";
 
-type LibraryBrowserProps = {
-  onSelectTemplate: (template: StoryTemplate) => void;
-  onBack: () => void;
-  initialSelectedTag?: string | null; // For backward compatibility
-  initialSelectedTags?: string[]; // New prop for multiple tags
-  onCreateStory?: () => void; // New prop for creating a custom story
-};
+interface LibraryLoaderData {
+  templates: StoryTemplate[];
+  tagCategories: Record<string, string[]>;
+  initialTags: string[];
+  initialPlayerCount: number | null;
+}
 
 // Simple share modal component
 function ShareFilterModal({
@@ -83,29 +83,21 @@ function ShareFilterModal({
   );
 }
 
-export function LibraryBrowser({
-  onSelectTemplate,
-  onBack,
-  initialSelectedTag = null,
-  initialSelectedTags = [],
-  onCreateStory,
-}: LibraryBrowserProps) {
-  const {
-    filteredTemplates,
-    isLoading,
-    error,
-    showFilters,
-    playerCountFilter,
-    selectedTags,
-    tagCategories,
-    setPlayerCountFilter,
-    handleTagToggle,
-    clearFilters,
-    toggleShowFilters,
-    setInitialTag,
-    setInitialTags,
-    getAvailablePlayerCounts,
-  } = useLibraryBrowser();
+export function LibraryBrowser() {
+  const navigate = useNavigate();
+  const { templates, tagCategories, initialTags, initialPlayerCount } =
+    useLoaderData() as LibraryLoaderData;
+
+  const [filteredTemplates, setFilteredTemplates] = useState<StoryTemplate[]>(
+    []
+  );
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filters
+  const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
+    initialPlayerCount
+  );
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags || []);
 
   // State for Share Modal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -119,17 +111,55 @@ export function LibraryBrowser({
     handleSubscribe,
   } = useNewsletter();
 
-  // Set initial tags when the component mounts
+  // Update URL with current filters
+  const updateUrlWithFilters = useCallback(() => {
+    const params = new URLSearchParams();
+
+    // Add tags parameter if tags are selected
+    if (selectedTags && selectedTags.length > 0) {
+      params.set("tags", selectedTags.join(","));
+    }
+
+    // Add player count parameter if set
+    if (playerCountFilter !== null) {
+      params.set("players", playerCountFilter.toString());
+    }
+
+    // Update URL without reloading the page
+    const newUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname;
+
+    window.history.replaceState({}, "", newUrl);
+  }, [selectedTags, playerCountFilter]);
+
+  // Apply filters when they change
   useEffect(() => {
-    // First check for multiple tags
-    if (initialSelectedTags && initialSelectedTags.length > 0) {
-      setInitialTags(initialSelectedTags);
+    let result = [...templates];
+
+    // Filter by player count
+    if (playerCountFilter !== null) {
+      result = result.filter(
+        (template) =>
+          playerCountFilter >= template.playerCountMin &&
+          playerCountFilter <= template.playerCountMax
+      );
     }
-    // For backward compatibility, also check for single tag
-    else if (initialSelectedTag) {
-      setInitialTag(initialSelectedTag);
+
+    // Filter by selected tags
+    if (selectedTags.length > 0) {
+      result = result.filter(
+        (template) =>
+          template.tags &&
+          selectedTags.every((tag) => template.tags.includes(tag))
+      );
     }
-  }, [initialSelectedTag, initialSelectedTags, setInitialTag, setInitialTags]);
+
+    setFilteredTemplates(result);
+
+    // Update URL when filters change, but only if we have active filters
+    updateUrlWithFilters();
+  }, [templates, playerCountFilter, selectedTags, updateUrlWithFilters]);
 
   // Calculate filter indicator and display
   const activeFilterCount =
@@ -137,7 +167,23 @@ export function LibraryBrowser({
   const hasActiveFilters = activeFilterCount > 0;
 
   // Get available player counts
-  const availablePlayerCounts = getAvailablePlayerCounts();
+  const getAvailablePlayerCounts = () => {
+    // Find min and max possible player counts from all templates
+    if (templates.length === 0)
+      return Array.from({ length: 10 }, (_, i) => i + 1);
+
+    const minCounts = templates.map((t) => t.playerCountMin);
+    const maxCounts = templates.map((t) => t.playerCountMax);
+
+    const minCount = Math.min(...minCounts);
+    const maxCount = Math.max(...maxCounts);
+
+    // Generate array of all possible player counts
+    return Array.from(
+      { length: maxCount - minCount + 1 },
+      (_, i) => i + minCount
+    );
+  };
 
   // Generate share URL with current filter configuration
   const getShareUrl = () => {
@@ -152,7 +198,7 @@ export function LibraryBrowser({
       params.set("players", playerCountFilter.toString());
     }
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}/library?${params.toString()}`;
   };
 
   // Handle share button click
@@ -160,6 +206,40 @@ export function LibraryBrowser({
     setShareUrl(getShareUrl());
     setIsShareModalOpen(true);
   };
+
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const clearFilters = () => {
+    setPlayerCountFilter(null);
+    setSelectedTags([]);
+    // Clear URL parameters when filters are cleared
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  const toggleShowFilters = () => {
+    setShowFilters((prev) => !prev);
+  };
+
+  const handleSelectTemplate = useCallback(
+    (template: StoryTemplate) => {
+      navigate(`/templates/${template.id}/play`);
+    },
+    [navigate]
+  );
+
+  const handleBack = () => {
+    // Clear URL parameters before going back
+    window.history.replaceState({}, document.title, window.location.pathname);
+    navigate("/");
+  };
+
+  const handleCreateStory = useCallback(() => {
+    navigate("/setup");
+  }, [navigate]);
 
   // Render text-based filter UI
   const renderFilters = () => {
@@ -232,7 +312,7 @@ export function LibraryBrowser({
                 <div>
                   <span className="text-sm text-primary-700 mr-2">Players</span>
                   <div className="inline-flex flex-wrap gap-1">
-                    {availablePlayerCounts.map((count) => (
+                    {getAvailablePlayerCounts().map((count) => (
                       <button
                         key={count}
                         onClick={() =>
@@ -318,7 +398,7 @@ export function LibraryBrowser({
 
   // Shuffle the templates and position the create card
   const shuffledAndPositionedItems = useMemo(() => {
-    if (isLoading || error || !filteredTemplates.length) return [];
+    if (!filteredTemplates.length) return [];
 
     // Create a copy and shuffle the templates
     const shuffled = [...filteredTemplates].sort(() => Math.random() - 0.5);
@@ -328,18 +408,18 @@ export function LibraryBrowser({
       <div key={template.id} className="flex">
         <TemplateCard
           template={template}
-          onPlay={() => onSelectTemplate(template)}
+          onPlay={() => handleSelectTemplate(template)}
           className="flex-1 h-full"
         />
       </div>
     ));
 
     // Position the "Create your own" card
-    if (onCreateStory) {
+    if (handleCreateStory) {
       const createYourOwnCard = (
         <div key="create-your-own" className="flex">
           <CreateYourOwnCard
-            onCreateStory={onCreateStory}
+            onCreateStory={handleCreateStory}
             className="flex-1 h-full"
           />
         </div>
@@ -365,99 +445,86 @@ export function LibraryBrowser({
     return result;
   }, [
     filteredTemplates,
-    isLoading,
-    error,
-    onCreateStory,
-    onSelectTemplate,
+    handleCreateStory,
+    handleSelectTemplate,
     openNewsletterModal,
   ]);
 
   return (
-    <div className="max-w-4xl mx-auto p-4 font-lora">
-      <div className="flex justify-between items-center mb-6 relative">
-        <div className="w-full flex justify-start lg:justify-center">
-          <h1 className="text-2xl font-bold text-primary-800">Library</h1>
-        </div>
-        <div className="flex items-center gap-2 absolute right-0">
-          {/* Share button - only visible when filters are active */}
-          {hasActiveFilters && (
-            <PrimaryButton
-              onClick={handleShare}
-              size="sm"
-              variant="outline"
-              leftBorder={false}
-              className="flex items-center gap-1 h-[32px]"
-              aria-label="Share current filters"
-              title="Share current filters"
-              leftIcon={<Icons.Share className="w-4 h-4" />}
-            />
-          )}
-          <PrimaryButton
-            onClick={() => {
-              // Clear URL parameters before going back
-              window.history.replaceState(
-                {},
-                document.title,
-                window.location.pathname
-              );
-              onBack();
-            }}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            className="flex items-center gap-1 h-[32px]"
-          >
-            <Icons.ArrowLeft className="w-4 h-4" />
-            Back
-          </PrimaryButton>
-        </div>
-      </div>
-
-      {/* Text-based filters */}
-      {renderFilters()}
-
-      {/* Templates grid */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="w-8 h-8 border-t-2 border-b-2 border-secondary rounded-full animate-spin"></div>
-        </div>
-      ) : error ? (
-        <div className="text-center py-6 text-tertiary">{error}</div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          {onCreateStory && (
-            <CreateYourOwnCard
-              onCreateStory={onCreateStory}
-              className="h-full"
-            />
-          )}
-          <NoMatchesCard onClearFilters={clearFilters} className="h-full" />
-          <div className="md:col-span-2">
-            <NewsletterCard
-              onOpenNewsletter={openNewsletterModal}
-              className="h-full"
-            />
+    <div className="flex flex-col min-h-screen">
+      <Header size="large" onTitleClick={() => navigate("/")} />
+      <main className="flex-1">
+        <div className="max-w-4xl mx-auto p-4 font-lora">
+          <div className="flex justify-between items-center mb-6 relative">
+            <div className="w-full flex justify-start lg:justify-center">
+              <h1 className="text-2xl font-bold text-primary-800">Library</h1>
+            </div>
+            <div className="flex items-center gap-2 absolute right-0">
+              {/* Share button - only visible when filters are active */}
+              {hasActiveFilters && (
+                <PrimaryButton
+                  onClick={handleShare}
+                  size="sm"
+                  variant="outline"
+                  leftBorder={false}
+                  className="flex items-center gap-1 h-[32px]"
+                  aria-label="Share current filters"
+                  title="Share current filters"
+                  leftIcon={<Icons.Share className="w-4 h-4" />}
+                />
+              )}
+              <PrimaryButton
+                onClick={handleBack}
+                size="sm"
+                variant="outline"
+                leftBorder={false}
+                className="flex items-center gap-1 h-[32px]"
+              >
+                <Icons.ArrowLeft className="w-4 h-4" />
+                Back
+              </PrimaryButton>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          {shuffledAndPositionedItems}
-        </div>
-      )}
 
-      {/* Share modal */}
-      <ShareFilterModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        shareUrl={shareUrl}
-      />
+          {/* Text-based filters */}
+          {renderFilters()}
 
-      {/* Newsletter Modal */}
-      <NewsletterModal
-        isOpen={isNewsletterModalOpen}
-        onClose={closeNewsletterModal}
-        onSubmit={handleSubscribe}
-      />
+          {/* Templates grid */}
+          {filteredTemplates.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+              <CreateYourOwnCard
+                onCreateStory={handleCreateStory}
+                className="h-full"
+              />
+              <NoMatchesCard onClearFilters={clearFilters} className="h-full" />
+              <div className="md:col-span-2">
+                <NewsletterCard
+                  onOpenNewsletter={openNewsletterModal}
+                  className="h-full"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+              {shuffledAndPositionedItems}
+            </div>
+          )}
+
+          {/* Share modal */}
+          <ShareFilterModal
+            isOpen={isShareModalOpen}
+            onClose={() => setIsShareModalOpen(false)}
+            shareUrl={shareUrl}
+          />
+
+          {/* Newsletter Modal */}
+          <NewsletterModal
+            isOpen={isNewsletterModalOpen}
+            onClose={closeNewsletterModal}
+            onSubmit={handleSubscribe}
+          />
+        </div>
+      </main>
     </div>
   );
 }

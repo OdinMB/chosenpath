@@ -4,6 +4,8 @@ import { templateLoader } from "../shared/templateLoader";
 import { codeJoinLoader } from "../shared/codeJoinLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { WithProviders } from "../shared/WithProviders";
+import { LibraryBrowser } from "./components/LibraryBrowser";
+import { libraryLoader } from "../shared/libraryLoader";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -36,10 +38,11 @@ export const pageRoutes: RouteObject[] = [
     id: "template-config",
   },
   {
-    path: "/templates",
+    path: "/library",
+    loader: libraryLoader,
     element: (
       <WithProviders>
-        <div>Library Browser (Coming Soon)</div>
+        <LibraryBrowser />
       </WithProviders>
     ),
     errorElement: <TemplateErrorBoundary />,
