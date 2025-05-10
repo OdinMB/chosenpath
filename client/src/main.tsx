@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import "./index.css";
@@ -6,6 +6,7 @@ import { pageRoutes } from "./page/pageRoutes";
 import { adminRoutes } from "./admin/adminRoutes";
 import { userRoutes } from "./users/usersRoutes";
 import { ErrorBoundary } from "./shared/components/ErrorBoundary";
+import { LoadingSpinner } from "./shared/components/LoadingSpinner";
 
 // Combine all routes
 const router = createBrowserRouter([
@@ -29,6 +30,8 @@ window.addEventListener("error", (event) => {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <Suspense fallback={<LoadingSpinner size="large" />}>
+      <RouterProvider router={router} />
+    </Suspense>
   </React.StrictMode>
 );
