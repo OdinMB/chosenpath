@@ -1,39 +1,22 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import App from "./App.tsx";
-import { SessionProvider } from "./shared/SessionProvider";
-import { Admin } from "./admin/Admin";
+import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import "./index.css";
-import { AuthProvider } from "./shared/AuthContext.tsx";
-import { Users } from "./users/Users";
+import { pageRoutes } from "./page/pageRoutes";
+import { adminRoutes } from "./admin/adminRoutes";
+import { userRoutes } from "./users/usersRoutes";
+import { ErrorBoundary } from "./shared/components/ErrorBoundary";
 
-// Use browser router with specific routes to avoid capturing image URLs
+// Combine all routes
 const router = createBrowserRouter([
+  ...pageRoutes,
+  ...adminRoutes,
+  ...userRoutes,
+  // Fallback route for 404s
   {
-    path: "/admin/*",
-    element: <Admin />,
-  },
-  {
-    path: "/my-stories",
-    element: (
-      <SessionProvider>
-        <AuthProvider>
-          <Users />
-        </AuthProvider>
-      </SessionProvider>
-    ),
-  },
-  {
-    // Exclude /images and /api paths from being captured by the router
     path: "*",
-    element: (
-      <SessionProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </SessionProvider>
-    ),
+    element: <ErrorBoundary type="not-found" />,
+    errorElement: <ErrorBoundary />,
   },
 ]);
 

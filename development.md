@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- Users: manage codes/games
-  - 
+- 10: react-dom
+- 3: story generation without websocket (only to be used in game part of application)
 - 4: improve admin auth system
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
@@ -41,8 +41,10 @@ Focus: Text/Images, English, Multiplayer
 
 # SERIOUS PROJECT
 
-- 1: export stories
-- 5: admin: iterate on existing images by using them as reference images (new action icon)
+- 10: Manage stories in DB
+- 1: Export stories
+- 2: Users: transfer local games to cloud (requires stories db)
+- 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration
 - 5: See pending players, current beat, etc. of active games
