@@ -1,17 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { PlayerCount, GameMode } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { Logger } from "shared/logger";
-import { storyApi } from "shared/apiClient";
 import { PlayerCodes } from "./PlayerCodes";
+import { storeCodeSet } from "shared/utils/codeSetUtils";
+import { useStoryCreation } from "page/hooks/useStoryCreation";
 
 interface StoryInitializerProps {
   onBack: () => void;
 }
 
 export function StoryInitializer({ onBack }: StoryInitializerProps) {
-  const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
   const [playerCount, setPlayerCount] = useState<PlayerCount>(2);
   const [maxTurns, setMaxTurns] = useState(10);
@@ -19,72 +18,42 @@ export function StoryInitializer({ onBack }: StoryInitializerProps) {
   const [gameMode, setGameMode] = useState<GameMode>(
     "collaborative" as GameMode
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [storyId, setStoryId] = useState<string | null>(null);
-  const [playerCodes, setPlayerCodes] = useState<Record<string, string> | null>(
-    null
-  );
-  const [storyReady, setStoryReady] = useState(false);
+
+  const {
+    isLoading,
+    storyId,
+    playerCodes,
+    storyReady,
+    createStory,
+    handleCodeSubmit,
+  } = useStoryCreation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     Logger.App.log("Starting story creation process");
 
     try {
-      Logger.App.log("Sending createStory request to server");
-      const response = await storyApi.createStory({
+      const { codes } = await createStory({
         prompt,
         playerCount,
         maxTurns,
         generateImages,
         gameMode,
       });
-      Logger.App.log(`Received story ID: ${response.data.storyId}`);
 
-      setStoryId(response.data.storyId);
-      setPlayerCodes(response.data.codes);
-      Logger.App.log("Received player codes, starting status polling");
-
-      // Start polling for story status
-      const checkStatus = async () => {
-        try {
-          Logger.App.log(`Checking status for story: ${response.data.storyId}`);
-          const status = await storyApi.checkStoryStatus(response.data.storyId);
-          if (status.data.status === "ready") {
-            Logger.App.log(`Story ${response.data.storyId} is ready`);
-            setStoryReady(true);
-          } else {
-            Logger.App.log(
-              `Story ${response.data.storyId} is still queued, will check again in 2s`
-            );
-            // Check again in 2 seconds
-            setTimeout(checkStatus, 2000);
-          }
-        } catch (error) {
-          Logger.App.error("Failed to check story status:", error);
-        }
-      };
-      checkStatus();
+      // Store codes in localStorage
+      storeCodeSet(codes, prompt.substring(0, 50) + "...", true);
+      Logger.App.log("Stored player codes in localStorage");
     } catch (error) {
       Logger.App.error("Failed to create story:", error);
       // TODO: Show error message to user
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
-    // Ensure the value is a valid PlayerCount
     setPlayerCount(value as PlayerCount);
     Logger.App.log(`Updated player count to: ${value}`);
-  };
-
-  const handleCodeSubmit = (code: string) => {
-    Logger.App.log(`Submitting code: ${code}`);
-    // Navigate to the game with the code
-    navigate(`/game/${code}`);
   };
 
   if (storyId && playerCodes) {

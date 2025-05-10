@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
-import { StoryTemplate, PlayerCount } from "core/types";
+import { PlayerCount } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
-import { storyApi } from "shared/apiClient";
 import { PlayerCodes } from "./PlayerCodes";
+import { storeCodeSet } from "shared/utils/codeSetUtils";
+import { useStoryCreation } from "page/hooks/useStoryCreation";
+import { StoryTemplate } from "core/types";
 
 interface TemplateConfigLoaderData {
   template: StoryTemplate;
@@ -15,88 +17,55 @@ interface TemplateConfigLoaderData {
 export function TemplateConfigurator() {
   const { template } = useLoaderData() as TemplateConfigLoaderData;
   const navigate = useNavigate();
-
   const [playerCount, setPlayerCount] = useState<PlayerCount>(
     template.playerCountMin
   );
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [storyId, setStoryId] = useState<string | null>(null);
-  const [playerCodes, setPlayerCodes] = useState<Record<string, string> | null>(
-    null
-  );
-  const [storyReady, setStoryReady] = useState(false);
+
+  const {
+    isLoading,
+    storyId,
+    playerCodes,
+    storyReady,
+    createStoryFromTemplate,
+    handleCodeSubmit,
+  } = useStoryCreation();
 
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
   const hasConfigurableSettings = needsPlayerConfig || needsTurnsConfig || true;
 
-  const handleBack = () => {
-    navigate("/library");
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    Logger.App.log(
-      `Starting template story creation for template: ${template.id}`
-    );
+    Logger.App.log("Starting template story creation process");
 
     try {
-      Logger.App.log("Sending createStoryFromTemplate request to server");
-      const response = await storyApi.createStoryFromTemplate({
+      const { codes } = await createStoryFromTemplate({
         templateId: template.id,
         playerCount,
         maxTurns,
         generateImages,
       });
-      Logger.App.log(`Received story ID: ${response.data.storyId}`);
 
-      setStoryId(response.data.storyId);
-      setPlayerCodes(response.data.codes);
-      Logger.App.log("Received player codes, starting status polling");
-
-      // Start polling for story status
-      const checkStatus = async () => {
-        try {
-          Logger.App.log(`Checking status for story: ${response.data.storyId}`);
-          const status = await storyApi.checkStoryStatus(response.data.storyId);
-          if (status.data.status === "ready") {
-            Logger.App.log(`Story ${response.data.storyId} is ready`);
-            setStoryReady(true);
-          } else {
-            Logger.App.log(
-              `Story ${response.data.storyId} is still queued, will check again in 2s`
-            );
-            // Check again in 2 seconds
-            setTimeout(checkStatus, 2000);
-          }
-        } catch (error) {
-          Logger.App.error("Failed to check story status:", error);
-        }
-      };
-      checkStatus();
+      // Store codes in localStorage
+      storeCodeSet(codes, `Template: ${template.id}`, true);
+      Logger.App.log("Stored player codes in localStorage");
     } catch (error) {
       Logger.App.error("Failed to create story from template:", error);
       // TODO: Show error message to user
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
-    // Ensure the value is a valid PlayerCount
     setPlayerCount(value as PlayerCount);
     Logger.App.log(`Updated player count to: ${value}`);
   };
 
-  const handleCodeSubmit = (code: string) => {
-    Logger.App.log(`Submitting code: ${code}`);
-    // Navigate to the game with the code
-    navigate(`/game/${code}`);
+  const handleBack = () => {
+    navigate("/library");
   };
 
   if (storyId && playerCodes) {
@@ -221,9 +190,10 @@ export function TemplateConfigurator() {
               variant="outline"
               leftBorder={false}
               leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
-            ></PrimaryButton>
+            >
+              Back
+            </PrimaryButton>
 
-            {/* This div wrapper prevents the ShareLink from accidentally submitting the form */}
             <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
               <ShareLink
                 templateId={template.id}
