@@ -226,7 +226,7 @@ export function LibraryBrowser() {
 
   const handleSelectTemplate = useCallback(
     (template: StoryTemplate) => {
-      navigate(`/templates/${template.id}/play`);
+      navigate(`/templates/${template.id}/configure`);
     },
     [navigate]
   );

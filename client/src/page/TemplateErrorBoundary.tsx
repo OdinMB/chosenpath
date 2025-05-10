@@ -1,5 +1,6 @@
 import { useRouteError, isRouteErrorResponse } from "react-router-dom";
 import { PrimaryButton } from "components/ui";
+import { Header } from "components/Header";
 
 export const TemplateErrorBoundary = () => {
   const error = useRouteError();
@@ -29,10 +30,10 @@ export const TemplateErrorBoundary = () => {
         <p className="text-primary-600 mb-6">{getErrorMessage()}</p>
         <div className="space-y-4">
           <PrimaryButton
-            onClick={() => (window.location.href = "/templates")}
+            onClick={() => (window.location.href = "/library")}
             fullWidth
           >
-            Browse Templates
+            Browse Library
           </PrimaryButton>
           <PrimaryButton
             onClick={() => (window.location.href = "/")}
