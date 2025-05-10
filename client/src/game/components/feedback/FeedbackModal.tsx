@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSession } from "shared/useSession";
+import { useGameSession } from "game/useGameSession";
 import { PrimaryButton, Icons, Modal } from "components/ui";
 // Types for feedback
 type FeedbackType = "story" | "general" | "issue" | "idea";
@@ -29,7 +29,7 @@ export function FeedbackModal({
   initialRating = null,
   storyText,
 }: FeedbackModalProps) {
-  const { storyState } = useSession();
+  const { storyState } = useGameSession();
 
   // State for feedback form
   const [type, setType] = useState<FeedbackType>(

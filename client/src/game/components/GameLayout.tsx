@@ -1,4 +1,4 @@
-import { useSession } from "shared/useSession";
+import { useGameSession } from "game/useGameSession";
 import { StatDisplay } from "./StatDisplay";
 import { StoryDisplay } from "./StoryDisplay";
 import { CharacterSelection } from "./CharacterSelection";
@@ -115,7 +115,7 @@ export function GameLayout({
   onChoiceSelected,
   onCharacterSelected,
 }: Props) {
-  const { storyState } = useSession();
+  const { storyState } = useGameSession();
   const [showStats, setShowStats] = useState(false);
   const [showFluff, setShowFluff] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);

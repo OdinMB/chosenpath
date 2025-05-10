@@ -1,5 +1,5 @@
 import React from "react";
-import { useSession } from "shared/useSession";
+import { useGameSession } from "game/useGameSession";
 import { BeatHistory } from "./BeatHistory";
 import { BeatContent } from "./BeatContent";
 import { NextBeatPlaceholder } from "./NextBeatPlaceholder";
@@ -12,7 +12,7 @@ interface StoryDisplayProps {
 }
 
 export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
-  const { storyState, isRequestPending } = useSession();
+  const { storyState, isRequestPending } = useGameSession();
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Use our custom hook for beat state management

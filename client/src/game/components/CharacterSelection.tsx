@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSession } from "shared/useSession";
+import { useGameSession } from "game/useGameSession";
 import {
   CharacterIdentity,
   CharacterBackground,
@@ -21,7 +21,7 @@ interface CharacterSelectionProps {
 export function CharacterSelection({
   onCharacterSelected,
 }: CharacterSelectionProps) {
-  const { storyState, isRequestPending, isOperationRunning } = useSession();
+  const { storyState, isRequestPending, isOperationRunning } = useGameSession();
   const [selectedIdentity, setSelectedIdentity] = useState<number | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<number | null>(
     null

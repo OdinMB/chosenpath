@@ -1,5 +1,5 @@
 import type { PlayerSlot } from "core/types";
-import { useSession } from "shared/useSession";
+import { useGameSession } from "game/useGameSession";
 
 interface PendingPlayersProps {
   pendingPlayers: PlayerSlot[];
@@ -12,7 +12,7 @@ export function PendingPlayers({
   currentPlayer,
   numberOfPlayers,
 }: PendingPlayersProps) {
-  const { storyState } = useSession();
+  const { storyState } = useGameSession();
   const isCharacterSelectionPhase =
     storyState && !storyState.characterSelectionCompleted;
 
