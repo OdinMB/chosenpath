@@ -14,20 +14,16 @@ import { Resolution } from "core/types/index.js";
 import { storyRepository } from "shared/StoryRepository.js";
 import { connectionManager } from "shared/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
-import { createStoryStateFromTemplate } from "./StoryStateFactory.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
   operationError: (event: OperationErrorEvent) => void;
-  storyInitialized: (event: { gameId: string; story: Story }) => void;
 }
 
 // Update GameOperation type in queue.js if needed, but for this file we'll extend it here
 export type GameOperationType =
-  | "initializeStory"
-  | "initializeStoryFromTemplate"
   | "moveStoryForward"
   | "recordChoice"
   | "recordCharacterSelection";
@@ -59,12 +55,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
   protected async processOperation(operation: GameOperation): Promise<void> {
     switch (operation.type) {
-      case "initializeStory":
-        await this.handleInitializeStory(operation);
-        break;
-      case "initializeStoryFromTemplate":
-        await this.handleInitializeStoryFromTemplate(operation);
-        break;
       case "moveStoryForward":
         await this.handleMoveStoryForward(operation);
         break;
@@ -94,104 +84,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
     // Then broadcast the update to all connected clients
     connectionManager.broadcastStoryUpdate(gameId, story);
-  }
-
-  private async handleInitializeStory(operation: GameOperation): Promise<void> {
-    if (operation.type !== "initializeStory") return;
-
-    const { gameId, input } = operation;
-    const {
-      prompt,
-      generateImages,
-      playerCount,
-      maxTurns,
-      gameMode,
-      playerCodes,
-      originalSocket,
-    } = input;
-
-    // Create initial state
-    const storyState = await this.aiStoryGenerator.createInitialState(
-      gameId,
-      prompt,
-      generateImages,
-      playerCount,
-      maxTurns,
-      gameMode
-    );
-
-    const story = Story.create(storyState);
-
-    // Add player codes to state
-    const storyWithCodes = story.clone({
-      playerCodes,
-    });
-
-    // Store and broadcast the story update
-    await this.updateAndBroadcastStory(gameId, storyWithCodes);
-
-    // Emit initialization events
-    Logger.Websocket.log(
-      `[GameQueueProcessor] Emitting story_ready_notification to client: ${originalSocket.id}`
-    );
-    originalSocket.emit("story_ready_notification", {
-      type: "story_ready_notification",
-      gameId,
-    });
-  }
-
-  private async handleInitializeStoryFromTemplate(
-    operation: GameOperation
-  ): Promise<void> {
-    if (operation.type !== "initializeStoryFromTemplate") return;
-
-    const { gameId, input } = operation;
-    const {
-      template,
-      playerCount,
-      maxTurns,
-      generateImages,
-      playerCodes,
-      originalSocket,
-    } = input;
-
-    try {
-      console.log(
-        "[GameQueueProcessor] Initializing story from template:",
-        template.id
-      );
-
-      // Convert template to story state using the factory function
-      const storyState = createStoryStateFromTemplate(
-        gameId,
-        template,
-        maxTurns,
-        generateImages,
-        playerCodes
-      );
-
-      // Create the story instance
-      const story = Story.create(storyState);
-
-      // Store and broadcast the story update
-      await this.updateAndBroadcastStory(gameId, story);
-
-      // Emit initialization events
-      Logger.Websocket.log(
-        `[GameQueueProcessor] Emitting story_ready_notification to client: ${originalSocket.id}`
-      );
-      originalSocket.emit("story_ready_notification", {
-        type: "story_ready_notification",
-        gameId,
-      });
-    } catch (error) {
-      console.error(
-        "[GameQueueProcessor] Failed to initialize story from template:",
-        error
-      );
-      // Rethrow to allow error handling
-      throw error;
-    }
   }
 
   private async handleMoveStoryForward(
@@ -512,5 +404,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     return updatedStory;
   }
 }
+
 // Create singleton instance
 export const gameQueueProcessor = new GameQueueProcessor();

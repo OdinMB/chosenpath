@@ -8,6 +8,9 @@ import {
   UserStoryCodesResponse,
   UserStoriesResponse,
   AssociateStoryCodeRequest,
+  CreateStoryRequest,
+  CreateStoryResponse,
+  CreateStoryFromTemplateRequest,
 } from "core/types/api.js";
 import { Logger } from "./logger.js";
 
@@ -319,6 +322,32 @@ const adminApi = {
     );
 
     return apiClient.post(url, formData, uploadConfig);
+  },
+};
+
+// Story creation API functions
+export const storyApi = {
+  /**
+   * Create a new story
+   */
+  createStory: (data: CreateStoryRequest) => {
+    return apiClient.post<CreateStoryResponse>("/stories", data);
+  },
+
+  /**
+   * Create a story from template
+   */
+  createStoryFromTemplate: (data: CreateStoryFromTemplateRequest) => {
+    return apiClient.post<CreateStoryResponse>("/stories/template", data);
+  },
+
+  /**
+   * Check story status
+   */
+  checkStoryStatus: (storyId: string) => {
+    return apiClient.get<{ status: "queued" | "ready" }>(
+      `/stories/${storyId}/status`
+    );
   },
 };
 

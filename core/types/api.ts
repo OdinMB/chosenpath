@@ -1,6 +1,7 @@
 import { RateLimitedAction, ContentModerationAction } from "../config.js";
 import { ImageQuality, ImageSize, ImageInstructions } from "./index.js";
 import { PublicUser } from "./user.js";
+import { GameMode } from "./story.js";
 
 // Base client request type
 export interface ClientRequest {
@@ -248,4 +249,34 @@ export interface ContentModerationResponse extends BaseServerResponse {
   message: string;
   promptSubmitted: string;
   moderationReason: string;
+}
+
+/**
+ * Request to create a new story
+ */
+export interface CreateStoryRequest extends ClientRequest {
+  prompt: string;
+  generateImages: boolean;
+  playerCount: number;
+  maxTurns: number;
+  gameMode: GameMode;
+}
+
+/**
+ * Request to create a story from a template
+ */
+export interface CreateStoryFromTemplateRequest extends ClientRequest {
+  templateId: string;
+  playerCount: number;
+  maxTurns: number;
+  generateImages: boolean;
+}
+
+/**
+ * Response containing story creation status and codes
+ */
+export interface CreateStoryResponse {
+  storyId: string;
+  codes: Record<string, string>;
+  status: "queued" | "ready";
 }

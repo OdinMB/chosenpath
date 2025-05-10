@@ -1,6 +1,5 @@
 import type { ClientStoryState } from "./story.js";
 import type { PlayerSlot } from "./player.js";
-import type { GameMode } from "./story.js";
 import {
   ResponseStatus,
   BaseServerResponse,
@@ -27,22 +26,6 @@ export interface JoinSessionMessage extends BaseClientMessage {
   sessionId: string;
 }
 
-export interface InitializeStoryMessage extends BaseClientMessage {
-  type: "initialize_story";
-  prompt: string;
-  generateImages: boolean;
-  playerCount: number;
-  storyBeats: number;
-  gameMode: GameMode;
-}
-
-export interface InitializeFromTemplateMessage extends BaseClientMessage {
-  type: "initialize_from_template";
-  templateId: string;
-  playerCount: number;
-  maxTurns: number;
-}
-
 export interface MakeChoiceMessage extends BaseClientMessage {
   type: "make_choice";
   optionIndex: number;
@@ -67,8 +50,6 @@ export interface ExitStoryMessage extends BaseClientMessage {
 export type WSClientMessage =
   | CreateSessionMessage
   | JoinSessionMessage
-  | InitializeStoryMessage
-  | InitializeFromTemplateMessage
   | MakeChoiceMessage
   | SelectCharacterMessage
   | VerifyCodeMessage
@@ -109,14 +90,6 @@ export interface CreateSessionResponse
 }
 
 /**
- * Initialize story response (acknowledges the request was queued)
- */
-export interface InitializeStoryResponse
-  extends WSSuccessResponse<Record<string, never>> {
-  type: "initialize_story_response";
-}
-
-/**
  * Make choice response (acknowledges the choice was queued)
  */
 export interface MakeChoiceResponse
@@ -150,7 +123,6 @@ export interface ExitStoryResponse
 
 export type WSServerResponse =
   | CreateSessionResponse
-  | InitializeStoryResponse
   | VerifyCodeResponse
   | SelectCharacterResponse
   | MakeChoiceResponse

@@ -5,6 +5,8 @@ import { PrimaryButton, Icons } from "components/ui";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
+import { storyApi } from "shared/apiClient";
+import { PlayerCodes } from "./PlayerCodes";
 
 interface TemplateConfigLoaderData {
   template: StoryTemplate;
@@ -20,6 +22,11 @@ export function TemplateConfigurator() {
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [storyId, setStoryId] = useState<string | null>(null);
+  const [playerCodes, setPlayerCodes] = useState<Record<string, string> | null>(
+    null
+  );
+  const [storyReady, setStoryReady] = useState(false);
 
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
@@ -30,30 +37,78 @@ export function TemplateConfigurator() {
     navigate("/library");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    Logger.App.log(
+      `Starting template story creation for template: ${template.id}`
+    );
 
-    // For now, just log the configuration options
-    Logger.App.log("Template configuration:", {
-      templateId: template.id,
-      playerCount,
-      maxTurns,
-      generateImages,
-    });
+    try {
+      Logger.App.log("Sending createStoryFromTemplate request to server");
+      const response = await storyApi.createStoryFromTemplate({
+        templateId: template.id,
+        playerCount,
+        maxTurns,
+        generateImages,
+      });
+      Logger.App.log(`Received story ID: ${response.data.storyId}`);
 
-    // This would be where you initialize the story with the template
-    // But we're not implementing that part yet
+      setStoryId(response.data.storyId);
+      setPlayerCodes(response.data.codes);
+      Logger.App.log("Received player codes, starting status polling");
 
-    // Navigate back to the library for now
-    navigate("/library");
+      // Start polling for story status
+      const checkStatus = async () => {
+        try {
+          Logger.App.log(`Checking status for story: ${response.data.storyId}`);
+          const status = await storyApi.checkStoryStatus(response.data.storyId);
+          if (status.data.status === "ready") {
+            Logger.App.log(`Story ${response.data.storyId} is ready`);
+            setStoryReady(true);
+          } else {
+            Logger.App.log(
+              `Story ${response.data.storyId} is still queued, will check again in 2s`
+            );
+            // Check again in 2 seconds
+            setTimeout(checkStatus, 2000);
+          }
+        } catch (error) {
+          Logger.App.error("Failed to check story status:", error);
+        }
+      };
+      checkStatus();
+    } catch (error) {
+      Logger.App.error("Failed to create story from template:", error);
+      // TODO: Show error message to user
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     // Ensure the value is a valid PlayerCount
     setPlayerCount(value as PlayerCount);
+    Logger.App.log(`Updated player count to: ${value}`);
   };
+
+  const handleCodeSubmit = (code: string) => {
+    Logger.App.log(`Submitting code: ${code}`);
+    // Navigate to the game with the code
+    navigate(`/game/${code}`);
+  };
+
+  if (storyId && playerCodes) {
+    return (
+      <PlayerCodes
+        codes={playerCodes}
+        onCodeSubmit={handleCodeSubmit}
+        storyReady={storyReady}
+        template={template}
+      />
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 font-lora">
