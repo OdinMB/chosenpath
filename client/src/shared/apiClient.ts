@@ -45,14 +45,13 @@ type TransformedApiClient = {
   head: (url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse>;
 };
 
-// Create axios instance with base configuration
+// Create axios instance with default config
 const axiosInstance = axios.create({
   baseURL: API_CONFIG.DEFAULT_API_URL,
-  timeout: 30000,
+  withCredentials: true, // Enable sending cookies
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // This ensures cookies are sent with requests
 });
 
 // Special timeout for AI operations that take longer
@@ -71,35 +70,14 @@ axiosInstance.interceptors.request.use(
     // Get CSRF token from cookie
     const csrfToken = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("_csrf="))
+      .find((row) => row.startsWith("XSRF-TOKEN="))
       ?.split("=")[1];
 
     console.log("[CSRF] Current cookies:", document.cookie);
     console.log("[CSRF] Found token:", csrfToken || "none");
 
-    // If no CSRF token is found, make a GET request to get one
-    if (!csrfToken) {
-      console.log("[CSRF] No token found, requesting new one");
-      try {
-        // Use a unique URL to avoid caching
-        const response = await axiosInstance.get(`/health?t=${Date.now()}`);
-        console.log("[CSRF] Health check response:", response);
-      } catch (error) {
-        console.error("[CSRF] Failed to get CSRF token:", error);
-      }
-    }
-
-    // Get the token again after potential refresh
-    const refreshedToken = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("_csrf="))
-      ?.split("=")[1];
-
-    console.log("[CSRF] Refreshed cookies:", document.cookie);
-    console.log("[CSRF] Refreshed token:", refreshedToken || "none");
-
-    if (refreshedToken) {
-      config.headers["X-CSRF-TOKEN"] = refreshedToken;
+    if (csrfToken) {
+      config.headers["X-CSRF-TOKEN"] = csrfToken;
       console.log("[CSRF] Request headers:", config.headers);
     } else {
       console.warn("[CSRF] No token available for request");
@@ -162,6 +140,11 @@ axiosInstance.interceptors.response.use(
         response.statusText
       }: ${JSON.stringify(response.data).substring(0, 500)}`
     );
+
+    // Skip API response handling for health check
+    if (response.config.url?.includes("/health")) {
+      return response;
+    }
 
     // Check if the response is a valid API response
     if (

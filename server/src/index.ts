@@ -57,7 +57,7 @@ async function startServer() {
           // Check if the origin domain is in the allowed list
           if (API_CONFIG.DEFAULT_CORS_ORIGIN.includes(originDomain)) {
             console.log(`[CORS] Origin ${origin} allowed`);
-            return callback(null, true);
+            return callback(null, origin); // Return the full origin
           }
 
           console.log(
@@ -76,53 +76,51 @@ async function startServer() {
     // Add cookie parser middleware
     app.use(cookieParser());
 
+    // Health check endpoint (before CSRF middleware)
+    app.get("/health", (_, res) => {
+      res.json({ status: "ok" });
+    });
+
     // Add CSRF protection
     app.use(
       csrf({
         cookie: {
-          key: "_csrf",
+          key: "XSRF-TOKEN",
           path: "/",
           httpOnly: false,
           secure: !isDevelopment,
-          sameSite: isDevelopment ? "lax" : "none",
-          domain: `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
+          sameSite: "lax", // Changed from 'none' to 'lax'
+          domain: isDevelopment
+            ? undefined
+            : `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
         },
         value: (req) => {
           // Check for token in header first
-          const token =
-            req.headers["x-csrf-token"] || req.headers["x-xsrf-token"];
+          const token = req.headers["x-csrf-token"];
           if (token) {
             return token;
           }
           // Fall back to cookie
-          return req.cookies["_csrf"];
+          return req.cookies["XSRF-TOKEN"];
         },
+        ignoreMethods: ["GET", "HEAD", "OPTIONS"],
       })
     );
 
     // Add CSRF token to all responses
     app.use((req: Request, res: Response, next: NextFunction) => {
-      console.log("[CSRF] Request headers:", req.headers);
-      console.log("[CSRF] Request cookies:", req.cookies);
-
-      // Only set the token if it doesn't exist
-      if (!req.cookies["_csrf"]) {
-        const token = req.csrfToken();
-        console.log("[CSRF] Setting new token:", token);
-        res.cookie("_csrf", token, {
-          secure: !isDevelopment,
-          sameSite: isDevelopment ? "lax" : "none",
-          path: "/",
-          httpOnly: false,
-          domain: `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
-        });
-      } else {
-        console.log("[CSRF] Existing token found:", req.cookies["_csrf"]);
-        console.log(
-          "[CSRF] CSRF token from header:",
-          req.headers["x-csrf-token"] || req.headers["x-xsrf-token"]
-        );
-      }
+      // Always set a new token
+      const token = req.csrfToken();
+      console.log("[CSRF] Setting token:", token);
+      res.cookie("XSRF-TOKEN", token, {
+        secure: !isDevelopment,
+        sameSite: "lax", // Changed from 'none' to 'lax'
+        path: "/",
+        httpOnly: false,
+        domain: isDevelopment
+          ? undefined
+          : `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
+      });
       next();
     });
 
@@ -150,11 +148,6 @@ async function startServer() {
 
     // Regular API routes
     app.use("", router);
-
-    // Health check endpoint
-    app.get("/health", (_, res) => {
-      res.json({ status: "ok" });
-    });
 
     app.set("trust proxy", true);
     const server = http.createServer(app);
