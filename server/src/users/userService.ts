@@ -49,12 +49,21 @@ export async function createUser(
     // Create user
     const userId = uuidv4();
     const now = Date.now();
+    const defaultRoleId = "role_user"; // Default role for new users
 
     await db.run(
       `INSERT INTO users (
-        id, email, username, passwordHash, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, email.toLowerCase(), username, passwordHash, now, now]
+        id, email, username, passwordHash, roleId, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        email.toLowerCase(),
+        username,
+        passwordHash,
+        defaultRoleId,
+        now,
+        now,
+      ]
     );
 
     Logger.DB.log(`Created new user: ${username} (${userId})`);
@@ -63,6 +72,7 @@ export async function createUser(
       id: userId,
       email,
       username,
+      roleId: defaultRoleId,
       createdAt: now,
     };
   } catch (error) {
@@ -135,6 +145,7 @@ export async function authenticateUser(
         id: user.id,
         email: user.email,
         username: user.username,
+        roleId: user.roleId,
         createdAt: user.createdAt,
       },
       token,
@@ -187,6 +198,7 @@ export async function verifyToken(token: string): Promise<PublicUser | null> {
       id: user.id,
       email: user.email,
       username: user.username,
+      roleId: user.roleId,
       createdAt: user.createdAt,
     };
   } catch (error) {
@@ -306,6 +318,7 @@ export async function getAllUsers(): Promise<PublicUser[]> {
       id: user.id,
       email: user.email,
       username: user.username,
+      roleId: user.roleId,
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
     }));

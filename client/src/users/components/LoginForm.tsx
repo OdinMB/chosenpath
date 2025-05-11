@@ -41,7 +41,7 @@ export function LoginForm({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       console.log("LoginForm: Login failed", errorMessage);
-      setError(errorMessage);
+      setError("Login failed");
     }
   };
 

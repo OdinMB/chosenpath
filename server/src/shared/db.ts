@@ -45,9 +45,9 @@ export async function initializeDatabase() {
         email TEXT UNIQUE NOT NULL,
         username TEXT UNIQUE NOT NULL,
         passwordHash TEXT NOT NULL,
+        roleId TEXT NOT NULL,
         rememberToken TEXT,
         lastLoginAt INTEGER,
-        roleId TEXT NOT NULL,
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL,
         FOREIGN KEY (roleId) REFERENCES roles (id)
