@@ -35,7 +35,7 @@ export const authApi = {
   /**
    * Get current user
    */
-  getCurrentUser: async (): Promise<PublicUser> => {
+  getCurrentUser: async (): Promise<PublicUser | null> => {
     const response = await apiClient.get<GetCurrentUserResponse["data"]>(
       "/auth/me"
     );

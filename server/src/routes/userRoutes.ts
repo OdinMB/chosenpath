@@ -5,7 +5,7 @@ import {
   logoutUser,
   updatePassword,
 } from "users/userService.js";
-import { verifyRegularUser } from "users/authMiddleware.js";
+import { verifyRegularUser, verifyUser } from "users/authMiddleware.js";
 import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
@@ -156,9 +156,9 @@ router.post("/auth/logout", verifyRegularUser(), async (req, res) => {
  * Get current user
  * GET /auth/me
  */
-router.get("/auth/me", verifyRegularUser(), (req, res) => {
+router.get("/auth/me", verifyUser({ required: false }), (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
-  return sendSuccess(res, { user: req.user }, requestId);
+  return sendSuccess(res, { user: req.user || null }, requestId);
 });
 
 /**

@@ -15,7 +15,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Check if user is already logged in on mount
   useEffect(() => {
-    console.log("AuthProvider: Checking auth status");
     checkAuthStatus();
   }, []);
 
@@ -24,12 +23,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log("AuthProvider: Checking auth status");
     setIsLoading(true);
     try {
-      const userData = await authApi.getCurrentUser();
-      console.log(
-        "AuthProvider: Successfully authenticated user",
-        userData.username
-      );
-      setUser(userData);
+      const response = await authApi.getCurrentUser();
+      if (response) {
+        console.log(
+          "AuthProvider: Successfully authenticated user",
+          response.username
+        );
+        setUser(response);
+      } else {
+        console.log("AuthProvider: No authenticated user");
+        setUser(null);
+      }
     } catch (error) {
       console.error("AuthProvider: Authentication check failed", error);
       setUser(null);
