@@ -36,9 +36,6 @@ export const config = {
     ? parseCorsOrigins(process.env.CORS_ORIGIN)
     : API_CONFIG.DEFAULT_CORS_ORIGIN,
   productionDomain: process.env.PRODUCTION_DOMAIN || API_CONFIG.DEFAULT_DOMAIN,
-
-  // Authentication
-  adminPassword: process.env.ADMIN_PASSWORD || "admin-dev-password",
 } as const;
 
 // OpenAI model settings

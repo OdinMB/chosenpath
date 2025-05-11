@@ -102,10 +102,19 @@ router.post("/auth/login", async (req, res) => {
   try {
     const result = await authenticateUser(email, password, rememberMe);
 
+    // Set HTTP-only cookie with the token
+    res.cookie("authToken", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      expires: new Date(result.expiresAt),
+      path: "/",
+    });
+
     // Increment rate limit after successful login
     incrementRateLimit(req, "login");
 
-    return sendSuccess(res, result, requestId);
+    return sendSuccess(res, { user: result.user }, requestId);
   } catch (error) {
     Logger.Route.warn(`Login failed for email: ${email}`);
 
@@ -121,7 +130,7 @@ router.post("/auth/login", async (req, res) => {
  */
 router.post("/auth/logout", authenticate(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
-  const token = req.token;
+  const token = req.cookies.authToken;
 
   if (!token) {
     return sendUnauthorized(res, "No active session", requestId);
@@ -129,6 +138,13 @@ router.post("/auth/logout", authenticate(), async (req, res) => {
 
   try {
     await logoutUser(token);
+    // Clear the auth cookie
+    res.clearCookie("authToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      path: "/",
+    });
     return sendSuccess(res, { message: "Logged out successfully" }, requestId);
   } catch (error) {
     Logger.Route.error("Logout failed", error);

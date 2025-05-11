@@ -15,16 +15,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Check if user is already logged in on mount
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      console.log(
-        "AuthProvider: Found token in localStorage, checking auth status"
-      );
-      checkAuthStatus();
-    } else {
-      console.log("AuthProvider: No token found in localStorage");
-      setIsLoading(false);
-    }
+    console.log("AuthProvider: Checking auth status");
+    checkAuthStatus();
   }, []);
 
   // Function to check current auth status
@@ -40,8 +32,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData);
     } catch (error) {
       console.error("AuthProvider: Authentication check failed", error);
-      // Clear invalid token
-      localStorage.removeItem("authToken");
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -57,15 +47,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log("AuthProvider: Login initiated", { email, rememberMe });
     setIsLoading(true);
     try {
-      const { token, user: userData } = await authApi.login({
+      const { user: userData } = await authApi.login({
         email,
         password,
         rememberMe,
       });
-
-      // Store token
-      localStorage.setItem("authToken", token);
-      console.log("AuthProvider: Token stored in localStorage");
 
       // Update user state
       setUser(userData);
@@ -89,8 +75,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("AuthProvider: Logout API call failed", error);
     } finally {
       // Always clean up local state even if API call fails
-      localStorage.removeItem("authToken");
-      console.log("AuthProvider: Token removed from localStorage");
       setUser(null);
       console.log("AuthProvider: User state cleared");
       setIsLoading(false);

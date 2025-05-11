@@ -52,12 +52,13 @@ const axiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // This ensures cookies are sent with requests
 });
 
 // Special timeout for AI operations that take longer
 export const LONG_OPERATION_TIMEOUT = 180000; // 3 minutes
 
-// Add request interceptor to include auth token in all requests
+// Add request interceptor to include auth token and CSRF token
 axiosInstance.interceptors.request.use(
   (config) => {
     // Log all requests
@@ -67,12 +68,14 @@ axiosInstance.interceptors.request.use(
       }${config.url || ""}`
     );
 
-    // Skip token from localStorage if adminAuth is true in config
-    if (!(config as AdminRequestConfig).adminAuth) {
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        config.headers["Authorization"] = `Bearer ${token}`;
-      }
+    // Get CSRF token from cookie
+    const csrfToken = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("XSRF-TOKEN="))
+      ?.split("=")[1];
+
+    if (csrfToken) {
+      config.headers["X-XSRF-TOKEN"] = csrfToken;
     }
 
     // Add requestId to all requests

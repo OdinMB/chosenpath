@@ -1,5 +1,5 @@
 import http from "http";
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import { router } from "./routes/index.js";
@@ -7,6 +7,17 @@ import { GameWebSocketServer } from "./routes/websocket.js";
 import { GameHandler } from "game/GameHandler.js";
 import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
+import csrf from "csurf";
+import cookieParser from "cookie-parser";
+
+// Extend Express Request type to include csrfToken
+declare global {
+  namespace Express {
+    interface Request {
+      csrfToken(): string;
+    }
+  }
+}
 
 async function startServer() {
   try {
@@ -44,6 +55,23 @@ async function startServer() {
         credentials: true,
       })
     );
+
+    // Add cookie parser middleware
+    app.use(cookieParser());
+
+    // Add CSRF protection
+    app.use(csrf({ cookie: true }));
+
+    // Add CSRF token to all responses
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      res.cookie("XSRF-TOKEN", req.csrfToken(), {
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "none",
+        path: "/",
+      });
+      next();
+    });
+
     app.use(express.json());
 
     // Regular API routes
