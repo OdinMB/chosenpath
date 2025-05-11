@@ -25,11 +25,11 @@ export async function libraryLoader({
   const playersParam = url.searchParams.get("players");
 
   // Log page visit with params for analytics
-  Logger.App.log(
-    `Visited ${isWelcomeScreen ? "welcome" : "library"} page with tags: ${
-      tagsParam || "none"
-    }, players: ${playersParam || "any"}`
-  );
+  // Logger.App.log(
+  //   `Visited ${isWelcomeScreen ? "welcome" : "library"} page with tags: ${
+  //     tagsParam || "none"
+  //   }, players: ${playersParam || "any"}`
+  // );
 
   try {
     // Fetch templates based on context

@@ -33,7 +33,7 @@
       "admin/*": ["src/admin/*"],
       "game/*": ["src/game/*"],
       "page/*": ["src/page/*"],
-      "user/*": ["src/user/*"]
+      "users/*": ["src/users/*"]
     }
   },
   "include": ["src/**/*"]

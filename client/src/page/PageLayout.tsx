@@ -1,12 +1,12 @@
 import { useNavigate, Outlet } from "react-router-dom";
-import { Header } from "../shared/components/Header";
+import { PageHeader } from "./components/PageHeader";
 
 export function PageLayout() {
   const navigate = useNavigate();
 
   return (
     <>
-      <Header size="large" onTitleClick={() => navigate("/")} />
+      <PageHeader onTitleClick={() => navigate("/")} />
       {/* @ts-expect-error - React Router's Outlet type definition issue */}
       <Outlet />
     </>

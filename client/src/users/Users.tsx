@@ -9,13 +9,8 @@ import { StoredCodeSet } from "shared/SessionContext";
 import { getSortedCodeSets } from "shared/utils/codeSetUtils";
 import { StoryMetadata } from "core/types/api";
 import { Logger } from "shared/logger";
-import { Header } from "shared/components";
 
-interface UsersProps {
-  onTitleClick?: () => void;
-}
-
-export function Users({ onTitleClick }: UsersProps) {
+export function Users() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { storyCodes, associateStoryCode, loadUserStoryData } =
@@ -98,25 +93,8 @@ export function Users({ onTitleClick }: UsersProps) {
     }
   };
 
-  const handleTitleClick = () => {
-    console.log("Users: Logo/title clicked");
-    if (onTitleClick) {
-      // If we came here via direct URL, update the browser history
-      if (window.location.pathname === "/my-stories") {
-        window.history.pushState({}, "", "/");
-      }
-      onTitleClick();
-    } else {
-      // Fallback to navigate home if no specific handler provided
-      console.log("Users: Navigating to home");
-      navigate("/");
-    }
-  };
-
   return (
     <>
-      <Header size="large" onTitleClick={handleTitleClick} />
-
       <div className="max-w-4xl mx-auto p-4 md:p-6 mt-8">
         <h1 className="text-2xl font-bold text-primary-700 mb-6">
           Your Stories

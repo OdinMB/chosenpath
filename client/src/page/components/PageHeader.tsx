@@ -1,12 +1,12 @@
-import { AppTitle } from "./AppTitle";
-import { UserAccountButton } from "../../users/components";
+import { AppTitle } from "shared/components/AppTitle";
+import { UserAccountButton } from "users/components/UserAccountButton";
 
-interface HeaderProps {
+interface PageHeaderProps {
   onTitleClick?: () => void;
   size?: "small" | "medium" | "large";
 }
 
-export function Header({ onTitleClick, size = "medium" }: HeaderProps) {
+export function PageHeader({ onTitleClick, size = "medium" }: PageHeaderProps) {
   return (
     <header className="px-4 pt-4 md:px-6">
       <div className="max-w-md mx-auto relative">

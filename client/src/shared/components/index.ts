@@ -1,7 +1,6 @@
 export { AppTitle } from "./AppTitle";
 export { ArrayField } from "./ArrayField";
 export { ExpandableItem } from "./ExpandableItem";
-export { Header } from "./Header";
 export { ImageCard } from "./ImageCard";
 export { CoverCard } from "./CoverCard";
 export { StoryCard } from "./StoryCard";
