@@ -9,6 +9,7 @@ import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
 import csrf from "csurf";
 import cookieParser from "cookie-parser";
+import crypto from "crypto";
 
 // Extend Express Request type to include csrfToken
 declare global {
@@ -17,6 +18,11 @@ declare global {
       csrfToken(): string;
     }
   }
+}
+
+// Generate CSRF token
+function generateCSRFToken() {
+  return crypto.randomBytes(32).toString("hex");
 }
 
 async function startServer() {
@@ -56,7 +62,7 @@ async function startServer() {
 
           // Check if the origin domain is in the allowed list
           if (API_CONFIG.DEFAULT_CORS_ORIGIN.includes(originDomain)) {
-            console.log(`[CORS] Origin ${origin} allowed`);
+            // console.log(`[CORS] Origin ${origin} allowed`);
             return callback(null, origin); // Return the full origin
           }
 
@@ -81,67 +87,54 @@ async function startServer() {
       res.json({ status: "ok" });
     });
 
-    // Add CSRF protection
-    app.use(
-      csrf({
-        cookie: {
-          key: "XSRF-TOKEN",
+    // Add CSRF token to all responses
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      // Get existing token from cookie
+      const existingToken = req.cookies["XSRF-TOKEN"];
+
+      // Only set a new token if one doesn't exist
+      if (!existingToken) {
+        const token = generateCSRFToken();
+        console.log("[CSRF] Setting new token:", token);
+        res.cookie("XSRF-TOKEN", token, {
+          secure: !isDevelopment,
+          sameSite: "lax",
           path: "/",
           httpOnly: false,
-          secure: !isDevelopment,
-          sameSite: "lax", // Changed from 'none' to 'lax'
           domain: isDevelopment
             ? undefined
             : `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
-        },
-        value: (req) => {
-          // Check for token in header first
-          const token = req.headers["x-csrf-token"];
-          if (token) {
-            return token;
-          }
-          // Fall back to cookie
-          return req.cookies["XSRF-TOKEN"];
-        },
-        ignoreMethods: ["GET", "HEAD", "OPTIONS"],
-      })
-    );
-
-    // Add CSRF token to all responses
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      // Always set a new token
-      const token = req.csrfToken();
-      console.log("[CSRF] Setting token:", token);
-      res.cookie("XSRF-TOKEN", token, {
-        secure: !isDevelopment,
-        sameSite: "lax", // Changed from 'none' to 'lax'
-        path: "/",
-        httpOnly: false,
-        domain: isDevelopment
-          ? undefined
-          : `.${API_CONFIG.DEFAULT_CORS_ORIGIN[0]}`,
-      });
+        });
+      }
       next();
     });
 
-    // Add error handler for CSRF errors
-    app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-      if (err.code === "EBADCSRFTOKEN") {
+    // Validate CSRF token
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      // Skip CSRF check for GET, HEAD, OPTIONS requests
+      if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+        return next();
+      }
+
+      const token = req.headers["x-csrf-token"];
+      const cookieToken = req.cookies["XSRF-TOKEN"];
+
+      if (!token || !cookieToken || token !== cookieToken) {
         console.log("[CSRF] Token validation failed");
         console.log("[CSRF] Request headers:", req.headers);
         console.log("[CSRF] Request cookies:", req.cookies);
-        console.log("[CSRF] Error details:", err);
+
         return res.status(403).json({
           status: "error",
           errorMessage: "Invalid CSRF token",
           details: {
             headers: req.headers,
             cookies: req.cookies,
-            error: err.message,
           },
         });
       }
-      next(err);
+
+      next();
     });
 
     app.use(express.json());

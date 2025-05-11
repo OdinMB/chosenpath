@@ -73,14 +73,10 @@ axiosInstance.interceptors.request.use(
       .find((row) => row.startsWith("XSRF-TOKEN="))
       ?.split("=")[1];
 
-    console.log("[CSRF] Current cookies:", document.cookie);
-    console.log("[CSRF] Found token:", csrfToken || "none");
-
-    if (csrfToken) {
+    // Only add CSRF token for non-GET requests
+    if (csrfToken && config.method !== "get") {
       config.headers["X-CSRF-TOKEN"] = csrfToken;
-      console.log("[CSRF] Request headers:", config.headers);
-    } else {
-      console.warn("[CSRF] No token available for request");
+      console.log("[CSRF] Using token:", csrfToken);
     }
 
     // Add requestId to all requests
@@ -250,7 +246,7 @@ axiosInstance.interceptors.response.use(
       } as ErrorResponse);
     }
   },
-  (error) => {
+  async (error) => {
     // Log error responses
     Logger.API?.error?.(`API Error: ${error.message}`);
     if (error.response) {
@@ -261,7 +257,42 @@ axiosInstance.interceptors.response.use(
       );
     }
 
-    // For errors, extract the error message from API response
+    // Handle CSRF token failures
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.errorMessage === "Invalid CSRF token"
+    ) {
+      console.log("[CSRF] Token validation failed, retrying request");
+
+      // Get the new token from the cookie
+      const cookies = document.cookie.split(";");
+      const csrfCookie = cookies.find((cookie) =>
+        cookie.trim().startsWith("XSRF-TOKEN=")
+      );
+      const newToken = csrfCookie ? csrfCookie.split("=")[1] : null;
+
+      if (newToken) {
+        console.log("[CSRF] Retrying with new token:", newToken);
+        // Update the request config with the new token
+        const config = {
+          ...error.config,
+          headers: {
+            ...error.config?.headers,
+            "X-CSRF-TOKEN": newToken,
+          },
+        };
+        // Retry the request
+        try {
+          const response = await axiosInstance(config);
+          return response;
+        } catch (retryError) {
+          console.error("[CSRF] Retry failed:", retryError);
+          // If retry fails, continue with normal error handling
+        }
+      }
+    }
+
+    // For other errors, extract the error message from API response
     const errorMessage = error.response?.data?.errorMessage || error.message;
 
     // Add notification for network/other errors
