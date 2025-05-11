@@ -12,8 +12,6 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
   const {
     templates,
     currentIndex,
-    isLoading,
-    error,
     isTransitioning,
     prevTemplate,
     nextTemplate,
@@ -28,18 +26,6 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
     onSwipeLeft: nextTemplate,
     onSwipeRight: prevTemplate,
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="w-8 h-8 border-t-2 border-b-2 border-secondary rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="text-center text-tertiary mb-4">{error}</div>;
-  }
 
   if (templates.length === 0) {
     return (

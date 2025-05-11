@@ -1,7 +1,6 @@
 import { useState, useEffect, RefObject } from "react";
 import { StoryTemplate } from "core/types";
-import { Logger } from "shared/logger";
-import { templateApi } from "shared/apiClient";
+import { useLoaderData } from "react-router-dom";
 
 type SwipeHandlers = {
   onSwipeLeft?: () => void;
@@ -56,38 +55,9 @@ export function useSwipe(
 }
 
 export function useTemplateCarousel() {
-  const [templates, setTemplates] = useState<StoryTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // From TemplateCarousel.tsx
+  const { templates } = useLoaderData() as { templates: StoryTemplate[] };
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-
-  // Fetch published templates
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Fetch templates from the API specifically for the welcome screen
-        const templates = await templateApi.getTemplates(true);
-
-        Logger.App.log(
-          `Loaded ${templates.length} templates for welcome screen`
-        );
-        setTemplates(templates);
-      } catch (error) {
-        Logger.App.error("Failed to load templates", error);
-        setError("Failed to load story templates");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTemplates();
-  }, []);
 
   // Move to the previous template
   const prevTemplate = () => {
@@ -134,8 +104,8 @@ export function useTemplateCarousel() {
     templates,
     currentTemplate,
     currentIndex,
-    isLoading,
-    error,
+    isLoading: false,
+    error: null,
     isTransitioning,
     prevTemplate,
     nextTemplate,

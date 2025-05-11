@@ -14,11 +14,13 @@ import { StoryInitializer } from "./components/StoryInitializer";
 export const pageRoutes: RouteObject[] = [
   {
     path: "/",
+    loader: libraryLoader,
     element: (
       <WithProviders>
         <Page />
       </WithProviders>
     ),
+    errorElement: <TemplateErrorBoundary />,
     id: "welcome",
   },
   {
