@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks";
 import { PrimaryButton } from "shared/components/ui";
-// import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { isDevelopment } from "client/config";
 
 export function UserAccountButton() {
@@ -10,7 +10,7 @@ export function UserAccountButton() {
   const { openLoginModal, AccountModal } = useUserAccountModal();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -41,17 +41,25 @@ export function UserAccountButton() {
     try {
       setDropdownOpen(false);
       console.log("UserAccountButton: About to navigate to /my-stories");
-
-      // Try a different approach - use window.location directly
-      window.location.href = "/my-stories";
-
-      // The navigate function isn't triggering a UI change
-      // navigate("/my-stories");
-
+      navigate("/my-stories");
       console.log("UserAccountButton: Navigation function called");
     } catch (error) {
       console.error(
         "UserAccountButton: Error navigating to stories page",
+        error
+      );
+    }
+  };
+
+  const handleAdminClick = () => {
+    console.log("UserAccountButton: Admin Dashboard link clicked");
+    try {
+      setDropdownOpen(false);
+      navigate("/admin");
+      console.log("UserAccountButton: Navigation to admin dashboard initiated");
+    } catch (error) {
+      console.error(
+        "UserAccountButton: Error navigating to admin dashboard",
         error
       );
     }
@@ -94,6 +102,14 @@ export function UserAccountButton() {
               <p className="text-xs font-medium">{user?.username}</p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
+            {user?.roleId === "role_admin" && (
+              <button
+                onClick={handleAdminClick}
+                className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                Admin Dashboard
+              </button>
+            )}
             <button
               onClick={handleStoriesClick}
               className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
