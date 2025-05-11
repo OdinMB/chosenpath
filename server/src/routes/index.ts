@@ -1,13 +1,18 @@
 import express from "express";
-import templateRoutes from "./templateRoutes.js";
-import storyRoutes from "./storyRoutes.js";
-import { imageRouter } from "./imageRoutes.js";
-import imageGenerationRoutes from "./imageGenerationRoutes.js";
-import newsletterRoutes from "./newsletterRoutes.js";
-import userRoutes from "./userRoutes.js";
-import adminUserRoutes from "./adminUserRoutes.js";
 import { Logger } from "shared/logger.js";
 import { sendNotFound } from "shared/responseUtils.js";
+
+import templateRoutes from "./templateRoutes.js";
+import storyRoutes from "./storyRoutes.js";
+import newsletterRoutes from "./newsletterRoutes.js";
+import userRoutes from "./userRoutes.js";
+
+import adminUserRoutes from "./adminUserRoutes.js";
+import adminStoryRoutes from "./adminStoryRoutes.js";
+import adminTemplateRoutes from "./adminTemplateRoutes.js";
+
+import { imageRouter } from "./imageRoutes.js";
+import imageGenerationRoutes from "./imageGenerationRoutes.js";
 
 const router = express.Router();
 
@@ -32,6 +37,8 @@ router.use(userRoutes);
 
 // Admin routes
 router.use(adminUserRoutes);
+router.use(adminStoryRoutes);
+router.use(adminTemplateRoutes);
 
 // Catch-all 404 handler
 router.use((req, res) => {

@@ -13,23 +13,31 @@ declare global {
   }
 }
 
+// Role constants
+const ROLES = {
+  ADMIN: "role_admin",
+  USER: "role_user",
+} as const;
+
+type Role = (typeof ROLES)[keyof typeof ROLES];
+
+interface AuthOptions {
+  required?: boolean;
+  roles?: Role[];
+}
+
 /**
- * Authentication middleware to protect routes
+ * Unified authentication and role verification middleware
  *
  * Usage:
- * - For required auth: app.use('/protected-route', authenticate())
- * - For optional auth: app.use('/public-route', authenticate({ required: false }))
+ * - For any authenticated user: app.use('/protected-route', verifyUser())
+ * - For admin only: app.use('/admin-route', verifyUser({ roles: [ROLES.ADMIN] }))
+ * - For optional auth: app.use('/public-route', verifyUser({ required: false }))
  */
-export function authenticate(
-  options: { required?: boolean } = { required: true }
-) {
+export function verifyUser(options: AuthOptions = { required: true }) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
-    const token =
-      authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.substring(7) // Remove 'Bearer ' prefix
-        : null;
+    // Extract token from cookie
+    const token = req.cookies.authToken;
 
     if (!token) {
       if (options.required) {
@@ -60,6 +68,18 @@ export function authenticate(
       req.user = user;
       req.token = token;
 
+      // Check role requirements if specified
+      if (options.roles && options.roles.length > 0) {
+        if (!options.roles.includes(user.roleId as Role)) {
+          Logger.Route.warn(`Role verification failed for user: ${user.id}`);
+          return res.status(403).json({
+            error: "Insufficient permissions",
+            requestId: req.body?.requestId || "unknown",
+          });
+        }
+        Logger.Route.log(`Role verification passed for user: ${user.id}`);
+      }
+
       next();
     } catch (error) {
       Logger.Route.error(`Authentication error`, error);
@@ -75,3 +95,7 @@ export function authenticate(
     }
   };
 }
+
+// Convenience functions for common use cases
+export const verifyAdmin = () => verifyUser({ roles: [ROLES.ADMIN] });
+export const verifyRegularUser = () => verifyUser({ roles: [ROLES.USER] });

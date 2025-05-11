@@ -4,12 +4,12 @@ Smaller commits!
 
 - 4: react-dom: refactor admin and users
 - 4: game websocket: refactor to work with new react-dom / request/response flow
-- 4: improve admin auth system
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 
-- 1: delete codes on any error (with deleteCodeSetsByContent(codes))
+- 1: delete codes on story generation any error (with deleteCodeSetsByContent(codes))
+- 5: protect image generation endpoints against abuse
 
 # BETTER EXPERIENCE
 

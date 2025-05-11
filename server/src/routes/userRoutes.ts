@@ -4,8 +4,8 @@ import {
   authenticateUser,
   logoutUser,
   updatePassword,
-} from "../users/userService.js";
-import { authenticate } from "users/authMiddleware.js";
+} from "users/userService.js";
+import { verifyRegularUser } from "users/authMiddleware.js";
 import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
@@ -128,7 +128,7 @@ router.post("/auth/login", async (req, res) => {
  * Logout user
  * POST /auth/logout
  */
-router.post("/auth/logout", authenticate(), async (req, res) => {
+router.post("/auth/logout", verifyRegularUser(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const token = req.cookies.authToken;
 
@@ -156,7 +156,7 @@ router.post("/auth/logout", authenticate(), async (req, res) => {
  * Get current user
  * GET /auth/me
  */
-router.get("/auth/me", authenticate(), (req, res) => {
+router.get("/auth/me", verifyRegularUser(), (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
   return sendSuccess(res, { user: req.user }, requestId);
 });
@@ -165,7 +165,7 @@ router.get("/auth/me", authenticate(), (req, res) => {
  * Update password
  * POST /auth/password
  */
-router.post("/auth/password", authenticate(), async (req, res) => {
+router.post("/auth/password", verifyRegularUser(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const { currentPassword, newPassword } = req.body as PasswordUpdateRequest;
 
@@ -214,7 +214,7 @@ router.post("/auth/password", authenticate(), async (req, res) => {
  * Get story codes for the current user
  * GET /users/story-codes
  */
-router.get("/users/story-codes", authenticate(), async (req, res) => {
+router.get("/users/story-codes", verifyRegularUser(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {
@@ -238,7 +238,7 @@ router.get("/users/story-codes", authenticate(), async (req, res) => {
  * Associate a story code with the current user
  * POST /users/story-codes
  */
-router.post("/users/story-codes", authenticate(), async (req, res) => {
+router.post("/users/story-codes", verifyRegularUser(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const { storyId, playerSlot, code } = req.body as AssociateStoryCodeRequest;
 
@@ -251,7 +251,6 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
   }
 
   // Apply rate limiting
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
   const rateLimitStatus = checkRateLimit(req, "associate_story_code");
 
   if (rateLimitStatus.isLimited) {
@@ -288,7 +287,7 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
  * Get all stories related to the current user (both as creator and player)
  * GET /users/all-stories
  */
-router.get("/users/all-stories", authenticate(), async (req, res) => {
+router.get("/users/all-stories", verifyRegularUser(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {
@@ -312,7 +311,7 @@ router.get("/users/all-stories", authenticate(), async (req, res) => {
  * Get stories created by the current user
  * GET /users/stories
  */
-router.get("/users/stories", authenticate(), async (req, res) => {
+router.get("/users/stories", verifyRegularUser(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {
@@ -336,7 +335,7 @@ router.get("/users/stories", authenticate(), async (req, res) => {
  * Get stories where the user is a player (not necessarily the creator)
  * GET /users/player-stories
  */
-router.get("/users/player-stories", authenticate(), async (req, res) => {
+router.get("/users/player-stories", verifyRegularUser(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {

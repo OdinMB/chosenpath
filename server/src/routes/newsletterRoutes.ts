@@ -1,11 +1,11 @@
 import express from "express";
-import { subscribeToNewsletter } from "../users/newsletterService.js";
-import { Logger } from "../shared/logger.js";
+import { subscribeToNewsletter } from "users/newsletterService.js";
+import { Logger } from "shared/logger.js";
 import {
   sendError,
   sendSuccess,
   sendBadRequest,
-} from "../shared/responseUtils.js";
+} from "shared/responseUtils.js";
 import {
   NewsletterSubscriptionRequest,
   NewsletterSubscriptionResponse,

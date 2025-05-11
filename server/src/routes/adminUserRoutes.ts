@@ -1,13 +1,8 @@
 import express from "express";
-import { getAllUsers, deleteUserById } from "../users/userService.js";
-import { verifyAdmin } from "./auth.js";
-import { Logger } from "../shared/logger.js";
-import {
-  sendSuccess,
-  sendError,
-  sendUnauthorized,
-  sendNotFound,
-} from "../shared/responseUtils.js";
+import { getAllUsers, deleteUserById } from "users/userService.js";
+import { verifyAdmin } from "users/authMiddleware.js";
+import { Logger } from "shared/logger.js";
+import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 
 const router = express.Router();
 
@@ -15,7 +10,7 @@ const router = express.Router();
  * Get all users
  * GET /admin/users
  */
-router.get("/admin/users", verifyAdmin, async (req, res) => {
+router.get("/admin/users", verifyAdmin(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {
@@ -37,7 +32,7 @@ router.get("/admin/users", verifyAdmin, async (req, res) => {
  * Delete a user
  * DELETE /admin/users/:userId
  */
-router.delete("/admin/users/:userId", verifyAdmin, async (req, res) => {
+router.delete("/admin/users/:userId", verifyAdmin(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
   const { userId } = req.params;
 
