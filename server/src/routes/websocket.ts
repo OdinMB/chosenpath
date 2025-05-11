@@ -2,14 +2,11 @@ import { Server, Socket } from "socket.io";
 import http from "http";
 import { GameHandler } from "game/GameHandler.js";
 import {
-  GameMode,
-  PlayerCount,
   ResponseStatus,
   StateUpdateNotification,
   VerifyCodeResponse,
   ErrorResponse,
 } from "core/types/index.js";
-import { config } from "server/config.js";
 import { connectionManager } from "../shared/ConnectionManager.js";
 import {
   RateLimitedAction,

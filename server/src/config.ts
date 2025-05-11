@@ -1,14 +1,13 @@
 import dotenv from "dotenv";
-import { API_CONFIG } from "core/config.js";
+import { getApiConfig } from "core/config.js";
 import { IMAGE_QUALITIES } from "core/types/image.js";
 
 // Load environment variables
 dotenv.config();
 
-// Parse comma-separated CORS origins into an array
-const parseCorsOrigins = (origins: string): string[] => {
-  return origins.split(",").map((origin) => origin.trim());
-};
+// Environment detection
+export const isDevelopment = process.env.NODE_ENV === "development";
+export const API_CONFIG = getApiConfig(isDevelopment);
 
 // Storage paths configuration
 export const STORAGE_PATHS = {
@@ -25,18 +24,6 @@ export const STORAGE_PATHS = {
     temp: "/data/temp",
   },
 };
-
-export const config = {
-  // Server settings
-  port: process.env.PORT || API_CONFIG.DEFAULT_PORT,
-  nodeEnv: process.env.NODE_ENV || "development",
-
-  // CORS and domain settings
-  corsOrigins: process.env.CORS_ORIGIN
-    ? parseCorsOrigins(process.env.CORS_ORIGIN)
-    : API_CONFIG.DEFAULT_CORS_ORIGIN,
-  productionDomain: process.env.PRODUCTION_DOMAIN || API_CONFIG.DEFAULT_DOMAIN,
-} as const;
 
 // OpenAI model settings
 export const GENERATION_MODEL_NAME =

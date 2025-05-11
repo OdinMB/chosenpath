@@ -3,7 +3,7 @@ import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks";
 import { PrimaryButton } from "shared/components/ui";
 // import { useNavigate } from "react-router-dom";
-import { isDevelopment } from "core/config";
+import { isDevelopment } from "client/config";
 
 export function UserAccountButton() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();

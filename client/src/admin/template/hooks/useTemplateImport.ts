@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
 import JSZip from "jszip";
-import { API_CONFIG } from "core/config";
+import { API_CONFIG } from "client/config";
 import {
   ImportDialogState,
   CollectionImportDialogState,

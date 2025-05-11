@@ -2,14 +2,14 @@ import sqlite3 from "sqlite3";
 import { open, Database } from "sqlite";
 import path from "path";
 import fs from "fs";
-import { config, STORAGE_PATHS } from "../config.js";
+import { isDevelopment } from "server/config.js";
+import { STORAGE_PATHS } from "server/config.js";
 import { Logger } from "./logger.js";
 
 // Get the appropriate storage path based on environment
-const storagePath =
-  config.nodeEnv === "production"
-    ? STORAGE_PATHS.production
-    : STORAGE_PATHS.development;
+const storagePath = isDevelopment
+  ? STORAGE_PATHS.development
+  : STORAGE_PATHS.production;
 
 // Create the data directory if it doesn't exist
 const dataDir = path.resolve(storagePath.temp, "..");

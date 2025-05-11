@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
-import { API_CONFIG } from "core/config";
+import { API_CONFIG } from "client/config";
 import {
   ResponseStatus,
   BaseServerResponse,
@@ -60,7 +60,7 @@ export const LONG_OPERATION_TIMEOUT = 180000; // 3 minutes
 
 // Add request interceptor to include auth token and CSRF token
 axiosInstance.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // Log all requests
     Logger.API?.info?.(
       `Request: ${config.method?.toUpperCase() || "UNKNOWN"} ${
@@ -71,11 +71,38 @@ axiosInstance.interceptors.request.use(
     // Get CSRF token from cookie
     const csrfToken = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("XSRF-TOKEN="))
+      .find((row) => row.startsWith("_csrf="))
       ?.split("=")[1];
 
-    if (csrfToken) {
-      config.headers["X-XSRF-TOKEN"] = csrfToken;
+    console.log("[CSRF] Current cookies:", document.cookie);
+    console.log("[CSRF] Found token:", csrfToken || "none");
+
+    // If no CSRF token is found, make a GET request to get one
+    if (!csrfToken) {
+      console.log("[CSRF] No token found, requesting new one");
+      try {
+        // Use a unique URL to avoid caching
+        const response = await axiosInstance.get(`/health?t=${Date.now()}`);
+        console.log("[CSRF] Health check response:", response);
+      } catch (error) {
+        console.error("[CSRF] Failed to get CSRF token:", error);
+      }
+    }
+
+    // Get the token again after potential refresh
+    const refreshedToken = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("_csrf="))
+      ?.split("=")[1];
+
+    console.log("[CSRF] Refreshed cookies:", document.cookie);
+    console.log("[CSRF] Refreshed token:", refreshedToken || "none");
+
+    if (refreshedToken) {
+      config.headers["X-CSRF-TOKEN"] = refreshedToken;
+      console.log("[CSRF] Request headers:", config.headers);
+    } else {
+      console.warn("[CSRF] No token available for request");
     }
 
     // Add requestId to all requests

@@ -1,11 +1,3 @@
-// Environment detection
-export const isDevelopment =
-  typeof process !== "undefined"
-    ? process.env.NODE_ENV === "development"
-    : typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1");
-
 // Only enable mocks in development environment
 export const MOCK_STORIES_IN_DEVELOPMENT = false;
 export const MOCK_STORIES_DELAY_MS = 4 * 1000;
@@ -106,20 +98,20 @@ export const GAME_SESSION_CONFIG = {
 };
 
 // API and server configuration
-export const API_CONFIG = {
-  // Default ports
-  DEFAULT_PORT: 3000,
+export function getApiConfig(isDevelopment: boolean) {
+  return {
+    // Default ports
+    DEFAULT_PORT: 3000,
 
-  // Default URLs
-  DEFAULT_API_URL: isDevelopment
-    ? "http://localhost:3000"
-    : "https://api.chosenpath.ai",
+    // Default URLs
+    DEFAULT_API_URL: isDevelopment
+      ? "http://localhost:3000"
+      : "https://api.chosenpath.ai",
 
-  // Default CORS origins
-  DEFAULT_CORS_ORIGIN: isDevelopment
-    ? ["http://localhost:5173"]
-    : ["https://chosenpath.ai"],
+    // Default CORS origins
+    DEFAULT_CORS_ORIGIN: isDevelopment ? ["localhost:5173"] : ["chosenpath.ai"],
 
-  // Default domain
-  DEFAULT_DOMAIN: "chosenpath.ai",
-};
+    // Default domain
+    DEFAULT_DOMAIN: "chosenpath.ai",
+  };
+}

@@ -11,7 +11,7 @@ import {
   PlayerSlot,
   ImageReference,
 } from "core/types";
-import { API_CONFIG } from "core/config";
+import { API_CONFIG } from "client/config";
 import { apiClient } from "shared/apiClient";
 
 /**
