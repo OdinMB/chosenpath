@@ -1,14 +1,14 @@
-interface AppTitleProps {
+interface AppLogoProps {
   className?: string;
   size?: "small" | "medium" | "large";
   onClick?: () => void;
 }
 
-export function AppTitle({
+export function AppLogo({
   className = "",
   size = "medium",
   onClick,
-}: AppTitleProps) {
+}: AppLogoProps) {
   // Size mappings for different screen sizes
   const sizeMappings = {
     small: "w-24 sm:w-32", // 96px, 128px

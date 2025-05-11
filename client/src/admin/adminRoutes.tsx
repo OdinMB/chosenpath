@@ -1,17 +1,21 @@
 import { RouteObject } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout.js";
-import { AdminLogin } from "./components/AdminLogin.js";
 import { UsersOverview } from "./users/UsersOverview";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoriesOverview } from "./stories/StoriesOverview.js";
 import { TemplateForm } from "./template/components";
+import { AdminRouteGuard } from "./components/AdminRouteGuard";
 
-// Define routes for the page section
+// Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
   {
     path: "/admin",
-    element: isAuthenticated ? <AdminLayout /> : <AdminLogin />,
+    element: (
+      <AdminRouteGuard>
+        <AdminLayout />
+      </AdminRouteGuard>
+    ),
     children: [
       {
         path: "users",

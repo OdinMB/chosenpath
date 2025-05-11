@@ -9,6 +9,8 @@ Smaller commits!
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 
+- 1: delete codes on any error (with deleteCodeSetsByContent(codes))
+
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer

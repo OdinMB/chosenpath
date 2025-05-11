@@ -1,4 +1,4 @@
-export { AppTitle } from "./AppTitle";
+export { AppLogo } from "./AppLogo";
 export { ArrayField } from "./ArrayField";
 export { ExpandableItem } from "./ExpandableItem";
 export { ImageCard } from "./ImageCard";

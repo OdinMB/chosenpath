@@ -32,6 +32,7 @@ export const RATE_LIMITED_ACTIONS = [
   "make_choice",
   "join_game",
   "associate_story_code",
+  "login",
 ] as const;
 export type RateLimitedAction = (typeof RATE_LIMITED_ACTIONS)[number];
 
@@ -71,6 +72,11 @@ export const RATE_LIMITS: Record<
   associate_story_code: {
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
     maxRequests: 10,
+  },
+  // Limit login attempts
+  login: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 5, // 5 attempts per 15 minutes
   },
 };
 

@@ -47,9 +47,53 @@ export async function initializeDatabase() {
         passwordHash TEXT NOT NULL,
         rememberToken TEXT,
         lastLoginAt INTEGER,
+        roleId TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        FOREIGN KEY (roleId) REFERENCES roles (id)
+      )
+    `);
+
+    // Create or update roles table
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS roles (
+        id TEXT PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL
       )
+    `);
+
+    // Create or update role_permissions table
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        roleId TEXT NOT NULL,
+        permission TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        PRIMARY KEY (roleId, permission),
+        FOREIGN KEY (roleId) REFERENCES roles (id) ON DELETE CASCADE
+      )
+    `);
+
+    // Insert default roles if they don't exist
+    await db.exec(`
+      INSERT OR IGNORE INTO roles (id, name, description, createdAt, updatedAt)
+      VALUES 
+        ('role_user', 'user', 'Regular user with basic permissions', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+        ('role_admin', 'admin', 'Administrator with full system access', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000)
+    `);
+
+    // Insert default permissions for roles
+    await db.exec(`
+      INSERT OR IGNORE INTO role_permissions (roleId, permission, createdAt)
+      VALUES 
+        ('role_user', 'user:read', strftime('%s', 'now') * 1000),
+        ('role_user', 'user:write', strftime('%s', 'now') * 1000),
+        ('role_admin', 'user:read', strftime('%s', 'now') * 1000),
+        ('role_admin', 'user:write', strftime('%s', 'now') * 1000),
+        ('role_admin', 'admin:read', strftime('%s', 'now') * 1000),
+        ('role_admin', 'admin:write', strftime('%s', 'now') * 1000)
     `);
 
     // Create or update sessions table

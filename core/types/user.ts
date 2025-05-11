@@ -3,12 +3,23 @@
  */
 
 /**
+ * Role information
+ */
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+/**
  * Base user interface with common properties
  */
 export interface User {
   id: string;
   email: string;
   username: string;
+  roleId: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -31,6 +42,7 @@ export interface PublicUser {
   id: string;
   username: string;
   email: string;
+  roleId: string;
   createdAt: number;
 }
 

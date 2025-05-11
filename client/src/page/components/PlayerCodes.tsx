@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { useSession } from "shared/useSession";
-import { deleteCodeSetsByContent } from "shared/utils/codeSetUtils";
 import { LoadingSpinner, PrimaryButton } from "components/ui";
 import { PlayerCode } from "shared/components";
 import { StoryTemplate } from "core/types";
@@ -23,23 +21,6 @@ export function PlayerCodes({
   template,
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
-  const { contentModeration } = useSession();
-
-  useEffect(() => {
-    if (
-      !!contentModeration &&
-      typeof contentModeration === "object" &&
-      "reason" in contentModeration
-    ) {
-      console.log(
-        "Received content moderation response. Deleting codes and leaving."
-      );
-      // delete codes from session and local storage
-      deleteCodeSetsByContent(codes);
-      // leave this view
-      onGoToWelcome?.();
-    }
-  }, [contentModeration, onGoToWelcome, codes]);
 
   const FALLBACK_READY_TIME = 90; // in seconds
 

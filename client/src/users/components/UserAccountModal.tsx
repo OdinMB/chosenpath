@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef } from "react";
 import { Modal } from "../../shared/components/ui/Modal";
-import { LoginForm } from "./LoginForm";
-import { RegisterForm } from "./RegisterForm";
+import { UserAccountPage } from "./UserAccountPage";
 
 interface UserAccountModalProps {
   isOpen: boolean;
@@ -14,102 +12,15 @@ export function UserAccountModal({
   onClose,
   initialView = "login",
 }: UserAccountModalProps) {
-  // Keep track of previous open state to detect when modal opens
-  const prevIsOpenRef = useRef(isOpen);
-  const [currentView, setCurrentView] = useState<"login" | "register">(
-    initialView
-  );
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // Reset states when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setRegistrationSuccess(false);
-      setHasError(false);
-    }
-
-    // Update view when modal opens (but not when it's already open)
-    if (isOpen && !prevIsOpenRef.current) {
-      setCurrentView(initialView);
-    }
-
-    prevIsOpenRef.current = isOpen;
-  }, [isOpen, initialView]);
-
-  const handleSuccess = () => {
-    onClose();
-  };
-
-  const handleRegisterSuccess = () => {
-    console.log("UserAccountModal: Registration successful");
-    setRegistrationSuccess(true);
-    setHasError(false); // Clear any previous error state
-
-    // Automatically switch to login view on successful registration
-    setCurrentView("login");
-  };
-
-  const handleSwitchToLogin = () => {
-    console.log("UserAccountModal: Switching to login view after registration");
-    setRegistrationSuccess(false);
-    setHasError(false);
-    setCurrentView("login");
-  };
-
-  const handleRegisterError = () => {
-    console.log(
-      "UserAccountModal: Registration error occurred, maintaining register view"
-    );
-    setHasError(true);
-
-    // Ensure we stay on the register view
-    if (currentView !== "register") {
-      setCurrentView("register");
-    }
-  };
-
-  const handleManualViewSwitch = (view: "login" | "register") => {
-    console.log(`UserAccountModal: Manually switching to ${view} view`);
-    setHasError(false); // Clear error state on manual view switch
-    setCurrentView(view);
-  };
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       width="md"
       showCloseButton={true}
-      title={currentView === "login" ? "Login" : "Create Account"}
+      title={initialView === "login" ? "Login" : "Create Account"}
     >
-      {hasError && (
-        <div className="text-red-500 mb-4 text-sm">
-          There was an error with your request. Please try again.
-        </div>
-      )}
-      {currentView === "login" ? (
-        <LoginForm
-          onSuccess={handleSuccess}
-          onRegisterClick={() => handleManualViewSwitch("register")}
-          registrationSuccessMessage={
-            registrationSuccess
-              ? "Registration successful! You can now log in."
-              : undefined
-          }
-        />
-      ) : (
-        <RegisterForm
-          onSuccess={handleRegisterSuccess}
-          onError={handleRegisterError}
-          showSuccessMessage={registrationSuccess}
-          onLoginClick={
-            registrationSuccess
-              ? handleSwitchToLogin
-              : () => handleManualViewSwitch("login")
-          }
-        />
-      )}
+      <UserAccountPage isInModal={true} onClose={onClose} />
     </Modal>
   );
 }

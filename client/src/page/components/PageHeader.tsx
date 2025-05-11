@@ -1,4 +1,4 @@
-import { AppTitle } from "shared/components/AppTitle";
+import { AppLogo } from "client/shared/components/AppLogo";
 import { UserAccountButton } from "users/components/UserAccountButton";
 
 interface PageHeaderProps {
@@ -15,7 +15,7 @@ export function PageHeader({ onTitleClick, size = "medium" }: PageHeaderProps) {
         </div>
 
         <div className="flex justify-center">
-          <AppTitle size={size} onClick={onTitleClick} />
+          <AppLogo size={size} onClick={onTitleClick} />
         </div>
       </div>
     </header>
