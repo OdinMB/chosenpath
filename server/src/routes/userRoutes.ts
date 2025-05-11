@@ -93,8 +93,18 @@ router.post("/auth/login", async (req, res) => {
     return sendBadRequest(res, "Email and password are required", requestId);
   }
 
+  // Check rate limit
+  const rateLimit = checkRateLimit(req, "login");
+  if (rateLimit.isLimited) {
+    return sendRateLimited(res, rateLimit, requestId);
+  }
+
   try {
     const result = await authenticateUser(email, password, rememberMe);
+
+    // Increment rate limit after successful login
+    incrementRateLimit(req, "login");
+
     return sendSuccess(res, result, requestId);
   } catch (error) {
     Logger.Route.warn(`Login failed for email: ${email}`);

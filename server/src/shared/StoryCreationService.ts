@@ -9,14 +9,7 @@ import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 import { Story } from "core/models/Story.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { storyRepository } from "./StoryRepository.js";
-import { ResponseStatus } from "core/types/api.js";
-import {
-  sendError,
-  sendRateLimited,
-  sendSuccess,
-  sendModerationBlocked,
-} from "./responseUtils.js";
-import { checkRateLimit, incrementRateLimit } from "./rateLimiter.js";
+import { sendSuccess, sendModerationBlocked } from "./responseUtils.js";
 import { Response } from "express";
 
 export class StoryCreationService {
