@@ -1,15 +1,17 @@
 import { RouteObject } from "react-router-dom";
-import { Admin } from "./Admin.js";
+import { AdminLayout } from "./components/AdminLayout.js";
+import { AdminLogin } from "./components/AdminLogin.js";
 import { UsersOverview } from "./users/UsersOverview";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
 import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
-import { StoriesOverview } from "./StoriesOverview";
+import { StoriesOverview } from "./stories/StoriesOverview.js";
 import { TemplateForm } from "./template/components";
 
+// Define routes for the page section
 export const adminRoutes: RouteObject[] = [
   {
     path: "/admin",
-    element: <Admin />,
+    element: isAuthenticated ? <AdminLayout /> : <AdminLogin />,
     children: [
       {
         path: "users",

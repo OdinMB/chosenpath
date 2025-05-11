@@ -5,7 +5,7 @@ import {
   findTemplateJsonInZip,
   parseTemplateFromZip,
 } from "core/utils/zipUtils.js";
-import { TemplateImportInfo } from "../types/templateTypes";
+import { TemplateImportInfo } from "../templateTypes";
 import {
   loadZipFile,
   processJsonTemplateFile,

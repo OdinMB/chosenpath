@@ -10,7 +10,7 @@ import {
   TemplateProcessing,
   TemplateCore,
   ImportSummary,
-} from "../types/templateTypes";
+} from "../templateTypes";
 import {
   importTemplateZip,
   createTemplateAssetsZip,

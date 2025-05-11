@@ -4,7 +4,7 @@ import { StoryTemplate } from "core/types";
 import { adminApi } from "admin/adminApi";
 import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
-import { DeleteDialogState } from "../types/templateTypes";
+import { DeleteDialogState } from "../templateTypes";
 
 // Type definitions have been moved to templateTypes.ts
 

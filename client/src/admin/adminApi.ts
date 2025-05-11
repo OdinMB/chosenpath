@@ -119,11 +119,3 @@ export const adminApi = {
     return apiClient.post(url, formData, uploadConfig);
   },
 };
-
-export const adminUsersApi = {
-  getUsers: async (): Promise<PublicUser[]> => {
-    return apiClient
-      .get<{ users: PublicUser[] }>(`/users`)
-      .then((response) => response.users);
-  },
-};
