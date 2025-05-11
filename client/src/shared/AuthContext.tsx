@@ -94,6 +94,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       console.log("AuthProvider: User state cleared");
       setIsLoading(false);
+      window.location.href = "/"; // full page reload
     }
   };
 
