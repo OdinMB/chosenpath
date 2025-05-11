@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PrimaryButton, Icons } from "components/ui/index";
-import { adminApi } from "shared/apiClient";
+import { adminApi } from "./adminApi";
 
 type AdminLoginProps = {
   onLogin: (token: string) => void;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
-import { adminApi } from "shared/apiClient";
+import { adminApi } from "./adminApi";
 import {
   SortableTable,
   useTableFilterSort,

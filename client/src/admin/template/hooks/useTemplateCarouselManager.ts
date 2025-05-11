@@ -3,7 +3,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
-import { adminApi } from "shared/apiClient";
+import { adminApi } from "admin/adminApi";
 
 export const useTemplateCarouselManager = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);

@@ -1,38 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
-import { PrimaryButton, Icons, Tabs, useTabs } from "components/ui";
-import { StoriesOverview } from "./StoriesOverview";
+import { useState, useEffect } from "react";
+import { PrimaryButton, Icons, Tabs } from "components/ui";
 import { AdminLogin } from "./AdminLogin";
-import { TemplateLibrary } from "./template/TemplateLibrary.js";
-import { TemplateForm } from "./template/components";
-import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
-import { UsersOverview } from "./UsersOverview";
-import { StoryTemplate } from "core/types";
-import { createDefaultTemplate } from "./template/utils/templateFactory.js";
-import { Logger } from "shared/logger";
-import { adminApi } from "shared/apiClient";
-import { CreateTemplateRequest } from "core/types/admin";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { adminApi } from "./adminApi";
 
-type AdminTab =
-  | "templates"
-  | "carousel"
-  | "stories"
-  | "users"
-  | "template-form"
-  | "sample-template";
+type AdminTab = "templates" | "carousel" | "stories" | "users";
 
 export const Admin = () => {
-  const { activeTab, setActiveTab } = useTabs<AdminTab>("templates");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] =
-    useState<StoryTemplate | null>(null);
-  const [isFormLoading, setIsFormLoading] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = () => {
     localStorage.removeItem("admin_token");
     setAuthToken(null);
     setIsAuthenticated(false);
-  }, []);
+  };
 
   // Check for existing auth token on component mount
   useEffect(() => {
@@ -51,58 +35,12 @@ export const Admin = () => {
 
       validateToken(savedToken);
     }
-  }, [handleLogout]);
+  }, []);
 
   const handleLogin = (token: string) => {
     localStorage.setItem("admin_token", token);
     setAuthToken(token);
     setIsAuthenticated(true);
-  };
-
-  const handleCreateTemplate = async () => {
-    if (!authToken) return;
-
-    Logger.Admin.log("Creating new template");
-    setIsFormLoading(true);
-
-    try {
-      // Create a default template
-      const defaultTemplate = createDefaultTemplate();
-
-      // Create a new template record on the server first to get an ID
-      const createRequest: CreateTemplateRequest = {
-        template: defaultTemplate,
-      };
-
-      const response = await adminApi.post<CreateTemplateRequest>(
-        `/admin/templates`,
-        createRequest,
-        authToken
-      );
-
-      Logger.Admin.log(
-        "New template created with ID:",
-        response.data.template.id
-      );
-
-      // Set the new template with its ID as the selected template
-      setSelectedTemplate(response.data.template);
-      setActiveTab("template-form");
-    } catch (error) {
-      Logger.Admin.error("Error creating new template:", error);
-    } finally {
-      setIsFormLoading(false);
-    }
-  };
-
-  const handleEditTemplate = (template: StoryTemplate) => {
-    setSelectedTemplate(template);
-    setActiveTab("template-form");
-  };
-
-  const handleTemplateFormSaved = (updatedTemplate: StoryTemplate) => {
-    // Update the selected template with the latest data and stay in edit view
-    setSelectedTemplate(updatedTemplate);
   };
 
   const tabItems = [
@@ -111,6 +49,15 @@ export const Admin = () => {
     { id: "stories" as AdminTab, label: "Stories" },
     { id: "users" as AdminTab, label: "Users" },
   ];
+
+  const getActiveTab = (): AdminTab => {
+    const path = location.pathname.split("/").pop() || "templates";
+    return path as AdminTab;
+  };
+
+  const handleTabChange = (tab: AdminTab) => {
+    navigate(`/admin/${tab}`);
+  };
 
   const renderAdminDashboard = () => {
     if (!authToken) return null;
@@ -142,40 +89,14 @@ export const Admin = () => {
             <div className="mb-6">
               <Tabs
                 items={tabItems}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
+                activeTab={getActiveTab()}
+                onTabChange={handleTabChange}
                 variant="underline"
               />
             </div>
 
-            {/* Content based on active tab */}
-            {activeTab === "templates" && (
-              <TemplateLibrary
-                token={authToken}
-                onCreateNew={handleCreateTemplate}
-                onEdit={handleEditTemplate}
-              />
-            )}
-
-            {activeTab === "carousel" && (
-              <TemplateCarouselManager token={authToken} />
-            )}
-
-            {activeTab === "stories" && <StoriesOverview token={authToken} />}
-
-            {activeTab === "users" && <UsersOverview token={authToken} />}
-
-            {activeTab === "template-form" && (
-              <div>
-                <TemplateForm
-                  template={selectedTemplate || createDefaultTemplate()}
-                  onSubmit={handleTemplateFormSaved}
-                  isLoading={isFormLoading}
-                  token={authToken}
-                  setIsLoading={setIsFormLoading}
-                />
-              </div>
-            )}
+            {/* Content based on active route */}
+            <Outlet context={{ token: authToken }} />
           </div>
         </div>
       </div>

@@ -48,3 +48,25 @@ export function formatRelativeTime(timestamp: number): string {
     day: "numeric",
   });
 }
+
+/**
+ * Format a timestamp to a detailed date string
+ * Format: "2025-04-07, 9:34pm"
+ */
+export function formatDate(timestamp?: number): string {
+  if (!timestamp) return "Never";
+
+  const date = new Date(timestamp);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  let hours = date.getHours();
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12;
+  hours = hours ? hours : 12; // Convert 0 to 12
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}, ${hours}:${minutes}${ampm}`;
+}

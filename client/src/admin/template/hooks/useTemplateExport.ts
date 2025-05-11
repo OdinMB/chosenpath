@@ -1,6 +1,6 @@
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { adminApi } from "shared/apiClient";
+import { adminApi } from "admin/adminApi";
 
 // Interface for templateCore to use for loading state
 interface TemplateCore {

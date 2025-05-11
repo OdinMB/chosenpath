@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Logger } from "shared/logger";
-import { adminApi, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+import { LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+import { adminApi } from "admin/adminApi";
 import {
   StoryTemplate,
   TemplateIterationRequest,

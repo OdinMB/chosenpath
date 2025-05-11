@@ -4,7 +4,8 @@ import {
   GenerateTemplateRequest,
 } from "core/types/admin";
 import { Logger } from "shared/logger";
-import { adminApi, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+import { LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+import { adminApi } from "admin/adminApi";
 
 interface UseTemplateApiProps {
   token: string;

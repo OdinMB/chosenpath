@@ -5,71 +5,57 @@ import { templateConfigLoader } from "./loaders/templateConfigLoader";
 import { codeJoinLoader } from "./loaders/codeJoinLoader";
 import { templateLoader } from "shared/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
-import { WithProviders } from "../shared/WithProviders";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
 import { StoryInitializer } from "./components/StoryInitializer";
+import { PageLayout } from "./PageLayout";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
   {
-    path: "/",
-    loader: libraryLoader,
-    element: (
-      <WithProviders>
-        <Page />
-      </WithProviders>
-    ),
-    errorElement: <TemplateErrorBoundary />,
-    id: "welcome",
-  },
-  {
-    path: "/setup",
-    element: (
-      <WithProviders>
-        <StoryInitializer onBack={() => window.history.back()} />
-      </WithProviders>
-    ),
-    id: "story-setup",
-  },
-  {
-    path: "/templates/:id/configure",
-    loader: templateConfigLoader,
-    element: (
-      <WithProviders>
-        <TemplateConfigurator />
-      </WithProviders>
-    ),
-    errorElement: <TemplateErrorBoundary />,
-    id: "template-config",
-  },
-  {
-    path: "/library",
-    loader: libraryLoader,
-    element: (
-      <WithProviders>
-        <LibraryBrowser />
-      </WithProviders>
-    ),
-    errorElement: <TemplateErrorBoundary />,
-    id: "library",
-  },
-  {
-    path: "/join/:code",
-    loader: codeJoinLoader,
-    element: (
-      <WithProviders>
-        <div>Player Codes (Coming Soon)</div>
-      </WithProviders>
-    ),
-    id: "player-codes",
-  },
-  // Special redirect route for shared templates
-  {
-    path: "/share/template/:id",
-    loader: templateLoader,
-    element: <div>Redirecting...</div>,
-    errorElement: <TemplateErrorBoundary />,
-    id: "shared-template",
+    element: <PageLayout />,
+    children: [
+      {
+        path: "/",
+        loader: libraryLoader,
+        element: <Page />,
+        id: "welcome",
+      },
+      {
+        path: "/setup",
+        element: <StoryInitializer onBack={() => window.history.back()} />,
+        id: "story-setup",
+      },
+      {
+        path: "/join/:code",
+        loader: codeJoinLoader,
+        element: <div>Player Codes (Coming Soon)</div>,
+        id: "player-codes",
+      },
+      // Group template-related routes under a shared error boundary
+      {
+        errorElement: <TemplateErrorBoundary />,
+        children: [
+          {
+            path: "/templates/:id/configure",
+            loader: templateConfigLoader,
+            element: <TemplateConfigurator />,
+            id: "template-config",
+          },
+          {
+            path: "/library",
+            loader: libraryLoader,
+            element: <LibraryBrowser />,
+            id: "library",
+          },
+          {
+            path: "/share/template/:id",
+            loader: templateLoader,
+            element: <div>Redirecting...</div>,
+            id: "shared-template",
+          },
+        ],
+      },
+    ],
   },
 ];

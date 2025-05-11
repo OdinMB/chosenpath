@@ -9,6 +9,8 @@ import { ErrorBoundary } from "./shared/components/ErrorBoundary";
 import { LoadingSpinner } from "./shared/components/LoadingSpinner";
 import { NotificationProvider } from "./shared/NotificationContext";
 import { NotificationDisplay } from "./shared/notifications/NotificationDisplay";
+import { SessionProvider } from "./shared/SessionProvider";
+import { AuthProvider } from "./shared/AuthContext";
 
 // Combine all routes
 const router = createBrowserRouter([
@@ -33,10 +35,14 @@ window.addEventListener("error", (event) => {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <NotificationProvider>
-      <Suspense fallback={<LoadingSpinner size="large" />}>
-        <RouterProvider router={router} />
-      </Suspense>
-      <NotificationDisplay />
+      <SessionProvider>
+        <AuthProvider>
+          <Suspense fallback={<LoadingSpinner size="large" />}>
+            <RouterProvider router={router} />
+          </Suspense>
+          <NotificationDisplay />
+        </AuthProvider>
+      </SessionProvider>
     </NotificationProvider>
   </React.StrictMode>
 );

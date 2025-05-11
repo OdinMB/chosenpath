@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
-import { adminApi } from "shared/apiClient";
+import { adminApi } from "admin/adminApi";
 import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../types/templateTypes";
