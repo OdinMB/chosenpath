@@ -15,7 +15,7 @@ import { AuthProvider } from "./shared/AuthContext";
 // Combine all routes
 const router = createBrowserRouter([
   ...pageRoutes,
-  ...adminRoutes,
+  // ...adminRoutes,
   ...userRoutes,
   // Fallback route for 404s
   {

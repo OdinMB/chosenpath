@@ -1,7 +1,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { PublicUser } from "core/types/user.js";
-import { apiClient } from "./apiClient";
 import { AuthContext } from "./AuthContextDefinition";
+import { authApi } from "./authApi";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -32,15 +32,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log("AuthProvider: Checking auth status");
     setIsLoading(true);
     try {
-      const response = await apiClient.get("/auth/me");
-      console.log("AuthProvider: Auth check response", response.data);
-      if (response.data?.user) {
-        console.log(
-          "AuthProvider: Successfully authenticated user",
-          response.data.user.username
-        );
-        setUser(response.data.user);
-      }
+      const userData = await authApi.getCurrentUser();
+      console.log(
+        "AuthProvider: Successfully authenticated user",
+        userData.username
+      );
+      setUser(userData);
     } catch (error) {
       console.error("AuthProvider: Authentication check failed", error);
       // Clear invalid token
@@ -52,18 +49,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   // Login function
-  const login = async (email: string, password: string, rememberMe = false) => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = false
+  ): Promise<void> => {
     console.log("AuthProvider: Login initiated", { email, rememberMe });
     setIsLoading(true);
     try {
-      const response = await apiClient.post("/auth/login", {
+      const { token, user: userData } = await authApi.login({
         email,
         password,
         rememberMe,
       });
-
-      console.log("AuthProvider: Login response received", response.data);
-      const { token, user: userData } = response.data;
 
       // Store token
       localStorage.setItem("authToken", token);
@@ -72,7 +70,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Update user state
       setUser(userData);
       console.log("AuthProvider: User state updated", userData.username);
-      return userData;
     } catch (error) {
       console.error("AuthProvider: Login failed", error);
       throw error;
@@ -86,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log("AuthProvider: Logout initiated");
     setIsLoading(true);
     try {
-      await apiClient.post("/auth/logout");
+      await authApi.logout();
       console.log("AuthProvider: Logout API call successful");
     } catch (error) {
       console.error("AuthProvider: Logout API call failed", error);
@@ -105,19 +102,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     email: string,
     username: string,
     password: string
-  ) => {
+  ): Promise<void> => {
     console.log("AuthProvider: Registration initiated", { email, username });
     setIsLoading(true);
     try {
-      const response = await apiClient.post("/auth/register", {
+      await authApi.register({
         email,
         username,
         password,
       });
 
-      console.log("AuthProvider: Registration successful", response.data);
-      // Registration successful, but user still needs to login
-      return response.data.user;
+      console.log("AuthProvider: Registration successful");
     } catch (error) {
       console.error("AuthProvider: Registration failed", error);
       throw error;

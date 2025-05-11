@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { RateLimitInfo, ContentModerationInfo } from "core/types";
 import { SessionContext, StoredCodeSet } from "./SessionContext.js";
 import {
   getStoredCodeSets,
@@ -9,11 +8,6 @@ import {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
-  const [contentModeration, setContentModeration] =
-    useState<ContentModerationInfo | null>(null);
-  const [storyReady, setStoryReady] = useState(false);
   const [storedCodeSets, setStoredCodeSets] = useState<StoredCodeSet[]>(
     getStoredCodeSets()
   );
@@ -31,29 +25,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setStoredCodeSets(getStoredCodeSets());
   }, []);
 
-  useEffect(() => {
-    if (rateLimit && rateLimit.timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setRateLimit(null);
-      }, rateLimit.timeRemaining);
-
-      return () => clearTimeout(timer);
-    }
-  }, [rateLimit]);
-
   const value = {
     sessionId,
     setSessionId,
     isLoading,
     setIsLoading,
-    storyReady,
-    setStoryReady,
-    error,
-    setError,
-    rateLimit,
-    setRateLimit,
-    contentModeration,
-    setContentModeration,
     storedCodeSets,
     refreshStoredCodeSets,
     deleteCodeSet: (timestamp: number) => {

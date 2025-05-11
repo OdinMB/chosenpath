@@ -85,23 +85,40 @@ export interface RegisterUserRequest extends ClientRequest {
   username: string;
   password: string;
 }
+
+export interface RegisterUserResponse extends SuccessResponse<PublicUser> {}
+
 export interface LoginUserRequest extends ClientRequest {
   email: string;
   password: string;
   rememberMe?: boolean;
 }
+
 export interface AuthResponse {
   user: PublicUser;
   token: string;
   expiresAt: number;
 }
+
+export interface LoginUserResponse extends SuccessResponse<AuthResponse> {}
+
+export interface GetCurrentUserResponse
+  extends SuccessResponse<{ user: PublicUser }> {}
+
+export interface LogoutUserResponse
+  extends SuccessResponse<{ message: string }> {}
+
 export interface PasswordResetRequest extends ClientRequest {
   email: string;
 }
+
 export interface PasswordUpdateRequest extends ClientRequest {
   currentPassword: string;
   newPassword: string;
 }
+
+export interface PasswordUpdateResponse
+  extends SuccessResponse<{ message: string }> {}
 
 /**
  * Newsletter
