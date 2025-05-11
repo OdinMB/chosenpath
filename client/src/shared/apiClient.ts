@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { v4 as uuidv4 } from "uuid";
-import { API_CONFIG } from "core/config.js";
+import { API_CONFIG } from "core/config";
 import {
   ResponseStatus,
   BaseServerResponse,
@@ -11,8 +11,15 @@ import {
   CreateStoryRequest,
   CreateStoryResponse,
   CreateStoryFromTemplateRequest,
-} from "core/types/api.js";
-import { Logger } from "./logger.js";
+  RateLimitedResponse,
+  ModerationBlockedResponse,
+} from "core/types/api";
+import { Logger } from "./logger";
+import {
+  ModerationNotification,
+  RateLimitNotification,
+} from "./notifications/notifications";
+import { notificationService } from "./notifications/notificationService";
 
 // Extend axios request config to include adminAuth property
 interface AdminRequestConfig extends AxiosRequestConfig {
@@ -124,32 +131,88 @@ apiClient.interceptors.response.use(
         }`
       );
 
-      // Check for errors in the response
-      if (
-        apiResponse.status === ResponseStatus.ERROR ||
-        apiResponse.status === ResponseStatus.INVALID
-      ) {
-        const errorResp = apiResponse as unknown as ErrorResponse;
-        Logger.API?.error?.(`Error in response: ${errorResp.errorMessage}`);
-        return Promise.reject(errorResp);
-      }
+      // Handle different response statuses
+      switch (apiResponse.status) {
+        case ResponseStatus.SUCCESS:
+          // For success responses, extract the data property from API response
+          return {
+            ...response,
+            data: response.data.data,
+          };
 
-      // Handle successful responses
-      if (apiResponse.status === ResponseStatus.SUCCESS) {
-        // For success responses, extract the data property from API response
-        return {
-          ...response,
-          data: response.data.data,
-        };
+        case ResponseStatus.MODERATION_BLOCKED: {
+          const moderationError = apiResponse as ModerationBlockedResponse;
+          notificationService.addNotification({
+            type: "error",
+            title: "Content Moderation",
+            message: "Your content was flagged by our moderation system.",
+            reason: moderationError.moderation.reason,
+            autoClose: false,
+          } as ModerationNotification);
+          return Promise.reject(apiResponse);
+        }
+
+        case ResponseStatus.RATE_LIMITED: {
+          const rateLimitError = apiResponse as RateLimitedResponse;
+          notificationService.addNotification({
+            type: "warning",
+            title: "Rate Limit Exceeded",
+            message: "You've reached the maximum number of requests.",
+            timeRemaining: rateLimitError.rateLimit.timeRemaining,
+            autoClose: false,
+          } as RateLimitNotification);
+          return Promise.reject(apiResponse);
+        }
+
+        case ResponseStatus.ERROR:
+        case ResponseStatus.INVALID: {
+          const errorResponse = apiResponse as ErrorResponse;
+          notificationService.addNotification({
+            type: "error",
+            title: "Error",
+            message:
+              errorResponse.errorMessage || "An unexpected error occurred.",
+            duration: 5000,
+          });
+          return Promise.reject(apiResponse);
+        }
+
+        default: {
+          // Add notification for unknown status
+          notificationService.addNotification({
+            type: "error",
+            title: "Error",
+            message: "An unexpected error occurred.",
+            duration: 5000,
+          });
+          return Promise.reject({
+            status: ResponseStatus.ERROR,
+            errorMessage: "Unknown response status",
+            requestId: apiResponse.requestId,
+            timestamp: apiResponse.timestamp,
+          } as ErrorResponse);
+        }
       }
     } else {
       // Log non-standard responses
       Logger.API?.debug?.(
         `Non-standard response structure: ${typeof response.data}`
       );
+      // Add notification for invalid response format
+      notificationService.addNotification({
+        type: "error",
+        title: "Error",
+        message: "Invalid response format",
+        duration: 5000,
+      });
+      // For non-standard responses, reject with a generic error
+      return Promise.reject({
+        status: ResponseStatus.ERROR,
+        errorMessage: "Invalid response format",
+        requestId: uuidv4(),
+        timestamp: Date.now(),
+      } as ErrorResponse);
     }
-
-    return response;
   },
   (error) => {
     // Log error responses
@@ -163,9 +226,15 @@ apiClient.interceptors.response.use(
     }
 
     // For errors, extract the error message from API response
-    if (error.response?.data?.errorMessage) {
-      error.message = error.response.data.errorMessage;
-    }
+    const errorMessage = error.response?.data?.errorMessage || error.message;
+
+    // Add notification for network/other errors
+    notificationService.addNotification({
+      type: "error",
+      title: "Error",
+      message: errorMessage || "An unexpected error occurred.",
+      duration: 5000,
+    });
 
     return Promise.reject(error);
   }

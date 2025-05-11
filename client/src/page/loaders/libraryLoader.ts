@@ -1,8 +1,8 @@
 import { LoaderFunctionArgs } from "react-router-dom";
-import { Logger } from "./logger";
-import { apiClient } from "./apiClient";
+import { Logger } from "../../shared/logger";
+import { apiClient } from "../../shared/apiClient";
 import { StoryTemplate } from "core/types";
-import { groupTagsByCategories } from "./tagCategories";
+import { groupTagsByCategories } from "../../shared/tagCategories";
 
 interface LibraryLoaderData {
   templates: StoryTemplate[];

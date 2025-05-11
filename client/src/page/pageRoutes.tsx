@@ -1,12 +1,12 @@
 import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
-import { templateLoader } from "../shared/templateLoader";
-import { templateConfigLoader } from "../shared/templateConfigLoader";
-import { codeJoinLoader } from "../shared/codeJoinLoader";
+import { libraryLoader } from "./loaders/libraryLoader";
+import { templateConfigLoader } from "./loaders/templateConfigLoader";
+import { codeJoinLoader } from "./loaders/codeJoinLoader";
+import { templateLoader } from "shared/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { WithProviders } from "../shared/WithProviders";
 import { LibraryBrowser } from "./components/LibraryBrowser";
-import { libraryLoader } from "../shared/libraryLoader";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
 import { StoryInitializer } from "./components/StoryInitializer";
 

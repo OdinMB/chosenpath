@@ -3,8 +3,8 @@ import { useSession } from "shared/useSession";
 import { wsService } from "shared/WebSocketService";
 import { GameLayout } from "game/components/GameLayout";
 import { gameService } from "game/GameService";
-import { RateLimitNotification } from "components/RateLimitNotification";
-import { ContentModerationNotification } from "shared/components/ContentModerationNotification";
+import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
+import { ContentModerationNotification } from "client/shared/notifications/ContentModerationNotification";
 import { Logger } from "shared/logger";
 
 // Game-related view states

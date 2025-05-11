@@ -9,6 +9,15 @@ import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 import { Story } from "core/models/Story.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { storyRepository } from "./StoryRepository.js";
+import { ResponseStatus } from "core/types/api.js";
+import {
+  sendError,
+  sendRateLimited,
+  sendSuccess,
+  sendModerationBlocked,
+} from "./responseUtils.js";
+import { checkRateLimit, incrementRateLimit } from "./rateLimiter.js";
+import { Response } from "express";
 
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
@@ -42,8 +51,9 @@ export class StoryCreationService {
     generateImages: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
-    gameMode: GameMode
-  ): Promise<{ storyId: string; codes: Record<string, string> }> {
+    gameMode: GameMode,
+    res: Response
+  ): Promise<void> {
     Logger.Route.log(
       `Creating new story with prompt: "${prompt.substring(0, 50)}..."`
     );
@@ -51,10 +61,13 @@ export class StoryCreationService {
     // Check if the prompt contains inappropriate content
     const contentCheck = await this.contentFilter.isAppropriatePrompt(prompt);
     if (!contentCheck.isAppropriate) {
-      Logger.Route.error(
-        `Content moderation failed for prompt: ${contentCheck.reason}`
-      );
-      throw new Error(`Content moderation failed: ${contentCheck.reason}`);
+      const moderationInfo = {
+        action: "initialize_story" as const,
+        reason: contentCheck.reason || "Inappropriate content detected",
+        prompt,
+      };
+      sendModerationBlocked(res, moderationInfo);
+      return;
     }
 
     const storyId = randomUUID();
@@ -91,7 +104,11 @@ export class StoryCreationService {
     });
 
     Logger.Route.log(`Returning codes immediately for story: ${storyId}`);
-    return { storyId, codes: playerCodes };
+    sendSuccess(res, {
+      storyId,
+      codes: playerCodes,
+      status: "queued",
+    });
   }
 
   private async generateStoryState(
@@ -137,8 +154,9 @@ export class StoryCreationService {
     templateId: string,
     playerCount: PlayerCount,
     maxTurns: number,
-    generateImages: boolean
-  ): Promise<{ storyId: string; codes: Record<string, string> }> {
+    generateImages: boolean,
+    res: Response
+  ): Promise<void> {
     Logger.Route.log(`Creating story from template: ${templateId}`);
 
     // Fetch the template from the library
@@ -197,7 +215,11 @@ export class StoryCreationService {
     await storyRepository.storeStory(storyId, story);
     Logger.Route.log(`Successfully stored template-based story: ${storyId}`);
 
-    return { storyId, codes: playerCodes };
+    sendSuccess(res, {
+      storyId,
+      codes: playerCodes,
+      status: "ready",
+    });
   }
 
   async checkStoryStatus(storyId: string): Promise<"queued" | "ready"> {

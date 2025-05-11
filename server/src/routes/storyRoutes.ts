@@ -1,17 +1,23 @@
-import express from "express";
+import { Router, Request } from "express";
 import { Logger } from "shared/logger.js";
-import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
+import {
+  sendSuccess,
+  sendError,
+  sendNotFound,
+  sendRateLimited,
+} from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
 import { DeleteStoryRequest } from "core/types/index.js";
 import { verifyAdmin } from "./auth.js";
 import { storyCreationService } from "shared/StoryCreationService.js";
+import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
 import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
 } from "core/types/api.js";
 import { PlayerCount } from "core/types/index.js";
 
-const router = express.Router();
+const router = Router();
 
 // Auth check route
 router.get("/admin/auth", verifyAdmin, (req, res) => {
@@ -20,25 +26,36 @@ router.get("/admin/auth", verifyAdmin, (req, res) => {
 });
 
 // Create a new story
-router.post("/stories", async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
-
+router.post("/stories", async (req: Request, res) => {
   try {
-    const createRequest = req.body as CreateStoryRequest;
-    Logger.Route.log("Creating new story");
+    const requestId = req.body?.requestId || "unknown";
+    // Check rate limit
+    const rateLimit = checkRateLimit(req, "initialize_story");
+    if (rateLimit.isLimited) {
+      sendRateLimited(res, rateLimit, requestId);
+      return;
+    }
 
-    const { storyId, codes } = await storyCreationService.createStory(
-      createRequest.prompt,
-      createRequest.generateImages,
-      createRequest.playerCount as PlayerCount,
-      createRequest.maxTurns,
-      createRequest.gameMode
+    // Increment rate limit after successful creation
+    incrementRateLimit(req, "initialize_story");
+
+    const { prompt, playerCount, maxTurns, generateImages, gameMode } =
+      req.body as CreateStoryRequest;
+
+    await storyCreationService.createStory(
+      prompt,
+      generateImages,
+      playerCount as PlayerCount,
+      maxTurns,
+      gameMode,
+      res
     );
-
-    sendSuccess(res, { storyId, codes, status: "queued" }, requestId);
   } catch (error) {
-    Logger.Route.error("Failed to create story", error);
-    sendError(res, "Failed to create story", 500, requestId, error);
+    Logger.Route.error("Failed to create story:", error);
+    res.status(500).json({
+      error: "Failed to create story",
+      type: "ServerError",
+    });
   }
 });
 
@@ -47,27 +64,29 @@ router.post("/stories/template", async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
 
   try {
+    // Check rate limit
+    const rateLimit = checkRateLimit(req, "initialize_story");
+    if (rateLimit.isLimited) {
+      sendRateLimited(res, rateLimit, requestId);
+      return;
+    }
+
     const createRequest = req.body as CreateStoryFromTemplateRequest;
     Logger.Route.log("Creating story from template");
 
-    const { storyId, codes } =
-      await storyCreationService.createStoryFromTemplate(
-        createRequest.templateId,
-        createRequest.playerCount as PlayerCount,
-        createRequest.maxTurns,
-        createRequest.generateImages
-      );
+    await storyCreationService.createStoryFromTemplate(
+      createRequest.templateId,
+      createRequest.playerCount as PlayerCount,
+      createRequest.maxTurns,
+      createRequest.generateImages,
+      res
+    );
 
-    sendSuccess(res, { storyId, codes, status: "queued" }, requestId);
+    // Increment rate limit after successful creation
+    incrementRateLimit(req, "initialize_story");
   } catch (error) {
     Logger.Route.error("Failed to create story from template", error);
-    sendError(
-      res,
-      "Failed to create story from template",
-      500,
-      requestId,
-      error
-    );
+    sendError(res, "Failed to create story", 500, requestId, error);
   }
 });
 

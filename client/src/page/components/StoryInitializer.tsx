@@ -3,23 +3,24 @@ import { PlayerCount, GameMode, GameModes } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
-import { storeCodeSet } from "shared/utils/codeSetUtils";
-import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
+import { useNavigate } from "react-router-dom";
+import { useStoryCreation } from "page/hooks/useStoryCreation";
+import { notificationService } from "shared/notifications/notificationService";
 
 interface StoryInitializerProps {
   onBack: () => void;
 }
 
-export function StoryInitializer({ onBack }: StoryInitializerProps) {
+export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
   const [prompt, setPrompt] = useState("");
   const [playerCount, setPlayerCount] = useState<PlayerCount>(MIN_PLAYERS);
-  const [maxTurns] = useState(DEFAULT_TURNS);
   const [generateImages, setGenerateImages] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>(GameModes.Cooperative);
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
+  const navigate = useNavigate();
 
   const {
     isLoading,
@@ -136,23 +137,23 @@ export function StoryInitializer({ onBack }: StoryInitializerProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    Logger.App.log("Starting story creation process");
 
     try {
-      const { codes } = await createStory({
+      await createStory({
         prompt,
         playerCount,
-        maxTurns,
+        maxTurns: DEFAULT_TURNS,
         generateImages,
         gameMode,
       });
 
-      // Store codes in localStorage
-      storeCodeSet(codes, prompt.substring(0, 50) + "...", true);
-      Logger.App.log("Stored player codes in localStorage");
+      // Handle successful response
+      if (storyId) {
+        navigate(`/story/${storyId}`);
+      }
     } catch (error) {
-      Logger.App.error("Failed to create story:", error);
-      // TODO: Show error message to user
+      console.error(error);
+      notificationService.addErrorNotification();
     }
   };
 
@@ -288,8 +289,10 @@ export function StoryInitializer({ onBack }: StoryInitializerProps) {
             disabled={isLoading}
             required
           />
+        </div>
 
-          {/* Images Checkbox */}
+        {/* Images Box */}
+        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
           <div className="items-center flex">
             <input
               id="generate-images"
@@ -324,7 +327,6 @@ export function StoryInitializer({ onBack }: StoryInitializerProps) {
             type="submit"
             size="lg"
             disabled={isLoading}
-            isLoading={isLoading}
             fullWidth
             className="font-semibold text-lg"
           >
@@ -334,4 +336,4 @@ export function StoryInitializer({ onBack }: StoryInitializerProps) {
       </form>
     </div>
   );
-}
+};

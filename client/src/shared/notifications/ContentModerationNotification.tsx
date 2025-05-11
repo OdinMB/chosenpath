@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { ContentModerationInfo } from "core/types";
-import { Notification } from "./ui";
+import { Notification } from "../components/ui";
 
 interface ContentModerationNotificationProps {
   contentModeration: ContentModerationInfo;
@@ -19,25 +19,7 @@ export const ContentModerationNotification = memo(
         return <p>Your content was flagged by our moderation system.</p>;
       }
 
-      const { reason, action } = contentModeration;
-
-      if (action === "initialize_story") {
-        return (
-          <>
-            <p>
-              We couldn't create your story because the prompt contains content
-              that doesn't meet our community guidelines.
-            </p>
-            <p className="mt-3 font-semibold">Reason:</p>
-            <p className="mt-1 italic">{reason}</p>
-            <p className="mt-3">
-              Please try again with a different prompt. We don't allow content
-              that includes explicit adult themes, violence, abuse, or other
-              harmful content.
-            </p>
-          </>
-        );
-      }
+      const { reason } = contentModeration;
 
       return (
         <>

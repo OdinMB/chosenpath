@@ -9,6 +9,9 @@ import { PlayerCodes } from "./PlayerCodes";
 import { storeCodeSet } from "shared/utils/codeSetUtils";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { StoryTemplate } from "core/types";
+import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
+import { ResponseStatus, RateLimitedResponse } from "core/types/api";
+import { notificationService } from "shared/notifications/notificationService";
 
 interface TemplateConfigLoaderData {
   template: StoryTemplate;
@@ -22,6 +25,9 @@ export function TemplateConfigurator() {
   );
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
+  const [rateLimit, setRateLimit] = useState<
+    RateLimitedResponse["rateLimit"] | null
+  >(null);
 
   const {
     isLoading,
@@ -42,19 +48,22 @@ export function TemplateConfigurator() {
     Logger.App.log("Starting template story creation process");
 
     try {
-      const { codes } = await createStoryFromTemplate({
+      const response = await createStoryFromTemplate({
         templateId: template.id,
         playerCount,
         maxTurns,
         generateImages,
       });
 
-      // Store codes in localStorage
-      storeCodeSet(codes, `Template: ${template.id}`, true);
-      Logger.App.log("Stored player codes in localStorage");
+      if (response.status === ResponseStatus.SUCCESS) {
+        const { codes } = response.data;
+        // Store codes in localStorage
+        storeCodeSet(codes, `Template: ${template.id}`, true);
+        Logger.App.log("Stored player codes in localStorage");
+      }
     } catch (error) {
-      Logger.App.error("Failed to create story from template:", error);
-      // TODO: Show error message to user
+      console.error(error);
+      notificationService.addErrorNotification();
     }
   };
 
@@ -82,6 +91,13 @@ export function TemplateConfigurator() {
   return (
     <div className="p-4 md:p-6 font-lora">
       <div className="max-w-2xl mx-auto">
+        {rateLimit && (
+          <RateLimitNotification
+            rateLimit={rateLimit}
+            onTimeout={() => setRateLimit(null)}
+            className="mb-6"
+          />
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="mb-6">
             <TemplateCard

@@ -6,6 +6,8 @@ import {
   SuccessResponse,
   RateLimitedResponse,
   RateLimitInfo,
+  ContentModerationInfo,
+  ModerationBlockedResponse,
 } from "core/types/api.js";
 import { Logger } from "shared/logger.js";
 
@@ -133,4 +135,29 @@ export function sendUnauthorized(
   requestId?: string
 ): void {
   sendError(res, message, 401, requestId);
+}
+
+/**
+ * Create and send a content moderation response
+ */
+export function sendModerationBlocked(
+  res: Response,
+  moderation: ContentModerationInfo,
+  requestId?: string
+): void {
+  const id = requestId || uuidv4();
+  const path = getRequestPath(res);
+  const response: ModerationBlockedResponse = {
+    status: ResponseStatus.MODERATION_BLOCKED,
+    requestId: id,
+    timestamp: Date.now(),
+    moderation,
+  };
+
+  // Log moderation response
+  Logger.Route.log(
+    `Content moderation blocked [${id}] - Reason: ${moderation.reason} - ${path}`
+  );
+
+  res.status(400).json(response);
 }

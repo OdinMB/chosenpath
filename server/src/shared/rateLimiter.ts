@@ -1,6 +1,9 @@
 // Rate limiter implementation for limiting access to API endpoints
 import { RateLimitedAction, RATE_LIMITS } from "core/config.js";
+import { RateLimitInfo } from "core/types/api.js";
 import { Socket } from "socket.io";
+import { Logger } from "shared/logger.js";
+import { Request } from "express";
 
 // RateLimitRecord tracks requests for a specific IP and action
 interface RateLimitRecord {
@@ -52,72 +55,90 @@ setInterval(() => {
 
 /**
  * Check if a request is rate limited
- * @param ip The IP address to check
+ * @param req The Express request object
  * @param action The action type (MAKE_CHOICE or NEW_STORY)
  * @returns Object with isLimited flag and timeRemaining in ms
  */
 export function checkRateLimit(
-  ip: string,
+  req: Request,
   action: RateLimitedAction
-): {
-  isLimited: boolean;
-  timeRemaining: number;
-  requestsRemaining: number;
-  maxRequests: number;
-  windowMs: number;
-} {
-  // Normalize the IP address
-  ip = normalizeIP(ip);
+): RateLimitInfo {
+  // Extract IP from request
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const normalizedIp = normalizeIP(ip);
 
   const now = Date.now();
   const limitConfig = RATE_LIMITS[action];
 
   // Initialize rate limit records for this IP if they don't exist
-  if (!rateLimits[ip]) {
-    rateLimits[ip] = {};
+  if (!rateLimits[normalizedIp]) {
+    rateLimits[normalizedIp] = {};
   }
 
   // Initialize or reset record if expired
-  if (!rateLimits[ip][action] || rateLimits[ip][action].resetAt < now) {
-    rateLimits[ip][action] = {
+  if (
+    !rateLimits[normalizedIp][action] ||
+    rateLimits[normalizedIp][action].resetAt < now
+  ) {
+    rateLimits[normalizedIp][action] = {
       count: 0,
       resetAt: now + limitConfig.windowMs,
     };
   }
 
   // Get current record
-  const record = rateLimits[ip][action];
+  const record = rateLimits[normalizedIp][action];
 
   // Calculate requests remaining and time remaining
   const requestsRemaining = Math.max(0, limitConfig.maxRequests - record.count);
   const timeRemaining = Math.max(0, record.resetAt - now);
 
-  return {
+  const result = {
     isLimited: record.count >= limitConfig.maxRequests,
     timeRemaining,
     requestsRemaining,
     maxRequests: limitConfig.maxRequests,
     windowMs: limitConfig.windowMs,
   };
+
+  Logger.Route.log(
+    `[RateLimiter] Rate limit status for ${normalizedIp} - ${action}: ` +
+      `Limited: ${result.isLimited}, ` +
+      `Remaining: ${result.requestsRemaining}/${result.maxRequests}, ` +
+      `Time left: ${Math.ceil(result.timeRemaining / 1000)}s`
+  );
+
+  return result;
 }
 
 /**
  * Increment the request count for an IP and action
- * @param ip The IP address
+ * @param req The Express request object
  * @param action The action type (MAKE_CHOICE or NEW_STORY)
  */
 export function incrementRateLimit(
-  ip: string,
+  req: Request,
   action: RateLimitedAction
 ): void {
-  // Normalize the IP address
-  ip = normalizeIP(ip);
+  // Extract IP from request
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const normalizedIp = normalizeIP(ip);
+  Logger.Route.log(
+    `[RateLimiter] Incrementing rate limit for ${normalizedIp} - ${action}`
+  );
 
-  const limitStatus = checkRateLimit(ip, action);
+  const limitStatus = checkRateLimit(req, action);
 
   // If not already limited, increment the count
   if (!limitStatus.isLimited) {
-    rateLimits[ip][action].count += 1;
+    rateLimits[normalizedIp][action].count += 1;
+    Logger.Route.log(
+      `[RateLimiter] Incremented rate limit for ${normalizedIp} - ${action}: ${rateLimits[normalizedIp][action].count}/${limitStatus.maxRequests}`
+    );
+  } else {
+    Logger.Route.log(
+      `[RateLimiter] Rate limit already exceeded for ${normalizedIp} - ${action}, not incrementing`
+    );
   }
 }
 
@@ -135,6 +156,7 @@ export function getRateLimitInfo(ip: string): Record<
   }
 > {
   ip = normalizeIP(ip);
+  Logger.Route.log(`[RateLimiter] Getting rate limit info for ${ip}`);
 
   const result: Record<RateLimitedAction, any> = {} as any;
   const now = Date.now();
@@ -150,12 +172,21 @@ export function getRateLimitInfo(ip: string): Record<
         maxRequests: limitConfig.maxRequests,
         resetsAt: record.resetAt,
       };
+      Logger.Route.log(
+        `[RateLimiter] Rate limit info for ${ip} - ${action}: ` +
+          `Remaining: ${result[action].requestsRemaining}/${result[action].maxRequests}, ` +
+          `Resets at: ${new Date(result[action].resetsAt).toISOString()}`
+      );
     } else {
       result[action] = {
         requestsRemaining: limitConfig.maxRequests,
         maxRequests: limitConfig.maxRequests,
         resetsAt: now + limitConfig.windowMs,
       };
+      Logger.Route.log(
+        `[RateLimiter] No active rate limit for ${ip} - ${action}, ` +
+          `Available: ${result[action].maxRequests} requests`
+      );
     }
   }
 
@@ -166,6 +197,7 @@ export function getRateLimitInfo(ip: string): Record<
  * Get the rate limit configuration
  */
 export function getRateLimitConfig() {
+  Logger.Route.log("[RateLimiter] Getting rate limit configuration");
   return { ...RATE_LIMITS };
 }
 

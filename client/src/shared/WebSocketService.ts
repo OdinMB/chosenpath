@@ -7,14 +7,11 @@ import {
   GameErrorNotification,
   RateLimitInfo,
   StoryReadyNotification,
-  ContentModerationResponse,
   WSSuccessResponse,
   WSErrorResponse,
   WSRateLimitedResponse,
-  ContentModerationInfo,
 } from "core/types";
 import { SOCKET_CONFIG } from "core/config";
-import { ContentModerationAction } from "core/config";
 import type { ClientStoryState } from "core/types";
 import { Logger } from "shared/logger";
 import { config } from "client/config";
@@ -31,8 +28,7 @@ type WSMessage = {
 type ServerResponse =
   | WSSuccessResponse<Record<string, unknown>>
   | WSErrorResponse
-  | WSRateLimitedResponse
-  | ContentModerationResponse;
+  | WSRateLimitedResponse;
 
 // Helper functions to create properly typed WSServerMessage objects
 function createRateLimitedMessage(rateLimit: RateLimitInfo): WSServerMessage {
@@ -101,30 +97,6 @@ function createSuccessResponse(type: string, data: unknown): WSServerMessage {
     data: data,
     requestId: generateRequestId(),
     timestamp: Date.now(),
-  } as unknown as WSServerMessage;
-}
-
-// Helper function to create a content moderation error message
-function createContentModerationMessage(
-  reason: string,
-  prompt: string,
-  operationType?: string
-): WSServerMessage {
-  const contentModeration: ContentModerationInfo = {
-    action: (operationType === "initialize_story"
-      ? "initialize_story"
-      : "initialize_story") as ContentModerationAction,
-    reason,
-    prompt,
-  };
-
-  return {
-    type: "content_moderation",
-    contentModeration,
-    message: `Inappropriate content: ${reason}`,
-    promptSubmitted: prompt,
-    moderationReason: reason,
-    operationType: operationType || "content_filter",
   } as unknown as WSServerMessage;
 }
 
@@ -396,7 +368,7 @@ export class WebSocketService {
     this.socket.on("response", (data: ServerResponse) => {
       Logger.WebSocket.log("[WebSocketService] Response received:", data);
 
-      if (!data.type || !data.status) {
+      if (!data.status) {
         Logger.WebSocket.warn(
           "[WebSocketService] Received malformed response:",
           data
@@ -418,35 +390,6 @@ export class WebSocketService {
         const handler = this.messageHandlers.get("rate_limited");
         if (handler) {
           handler(createRateLimitedMessage(data.rateLimit));
-        }
-        return;
-      }
-
-      // Handle content moderation responses
-      if (data.status === ResponseStatus.CONTENT_MODERATION) {
-        const moderationData = data as ContentModerationResponse;
-        Logger.WebSocket.log(
-          "[WebSocketService] Content moderation failed:",
-          moderationData.message
-        );
-
-        // Clear any background operations for story initialization
-        if (this.isOperationRunning("initialize_story")) {
-          Logger.WebSocket.log(
-            "[WebSocketService] Clearing initialize_story background operation after content moderation failure"
-          );
-          this.removeBackgroundOperation("initialize_story");
-        }
-
-        // Create a content moderation message
-        const handler = this.messageHandlers.get("content_moderation");
-        if (handler) {
-          const moderationMessage = createContentModerationMessage(
-            moderationData.moderationReason,
-            moderationData.promptSubmitted,
-            requestType
-          );
-          handler(moderationMessage);
         }
         return;
       }

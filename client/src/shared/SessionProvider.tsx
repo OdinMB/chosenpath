@@ -2,10 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { RateLimitInfo, ContentModerationInfo } from "core/types";
 import { SessionContext, StoredCodeSet } from "./SessionContext.js";
 import {
-  storeCodeSet,
   getStoredCodeSets,
   deleteStoredCodeSet,
-  updateStoredSetWithCode,
 } from "./utils/codeSetUtils.js";
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {

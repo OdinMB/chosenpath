@@ -226,20 +226,10 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
 
   // Apply rate limiting
   const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const rateLimitStatus = checkRateLimit(ip, "associate_story_code");
+  const rateLimitStatus = checkRateLimit(req, "associate_story_code");
 
   if (rateLimitStatus.isLimited) {
-    return sendRateLimited(
-      res,
-      {
-        action: "associate_story_code",
-        timeRemaining: rateLimitStatus.timeRemaining,
-        maxRequests: rateLimitStatus.maxRequests,
-        windowMs: rateLimitStatus.windowMs,
-        requestsRemaining: rateLimitStatus.requestsRemaining,
-      },
-      requestId
-    );
+    return sendRateLimited(res, rateLimitStatus, requestId);
   }
 
   try {
@@ -248,7 +238,7 @@ router.post("/users/story-codes", authenticate(), async (req, res) => {
     }
 
     // Increment rate limit
-    incrementRateLimit(ip, "associate_story_code");
+    incrementRateLimit(req, "associate_story_code");
 
     const association = await associateStoryCode(
       req.user.id,

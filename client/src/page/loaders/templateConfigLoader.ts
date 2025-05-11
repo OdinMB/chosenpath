@@ -1,6 +1,6 @@
 import { LoaderFunction } from "react-router-dom";
-import { apiClient } from "./apiClient";
-import { Logger } from "./logger";
+import { apiClient } from "shared/apiClient";
+import { Logger } from "shared/logger";
 
 /**
  * Loader for the template configuration page
