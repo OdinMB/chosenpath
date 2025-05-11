@@ -1,14 +1,11 @@
 import { storyRepository } from "shared/StoryRepository.js";
 import {
-  readStorageFile,
   listStoryDirectories,
-  getStorageFileStats,
   readStoryFile,
   getStoryFilePath,
 } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { Story } from "core/models/Story.js";
-import path from "path";
 import fs from "fs/promises";
 
 export type StoryInfo = {

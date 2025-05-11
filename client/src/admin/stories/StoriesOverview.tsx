@@ -1,33 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useLoaderData } from "react-router-dom";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
-import { adminApi } from "../adminApi";
+import { adminStoryApi } from "admin/adminApi";
 import {
   SortableTable,
   useTableFilterSort,
   ColumnOption,
 } from "shared/components";
+import { StoriesListItem } from "core/types";
+import { formatDate } from "shared/utils/timeUtils";
 
-type StoryListItem = {
-  id: string;
-  title: string;
-  updatedAt: string;
-  createdAt?: string;
-  gameMode: string;
-  playerCount: number;
-  characterSelectionCompleted: boolean;
-  maxTurns: number;
-  error?: string;
-  currentBeat?: number;
-};
 
-type StoriesOverviewProps = {
-  token: string;
-};
-
-export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
-  const [stories, setStories] = useState<StoryListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export const StoriesOverview = () => {
+  const stories = useLoaderData() as StoriesListItem[];
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -37,57 +23,14 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     storyId: "",
   });
 
-  const loadStories = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    Logger.Admin.log("Loading stories list");
-
-    try {
-      const response = await adminApi.get("/admin/stories", token);
-
-      Logger.Admin.log(
-        `Successfully loaded ${response.data.stories.length} stories`
-      );
-      setStories(response.data.stories);
-    } catch (error) {
-      Logger.Admin.error("Failed to load stories", error);
-      setError("Failed to load stories. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    loadStories();
-  }, [loadStories]);
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Unknown";
-
-    const date = new Date(dateString);
-
-    // Format: "2025-04-07, 9:34pm"
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    let hours = date.getHours();
-    const ampm = hours >= 12 ? "pm" : "am";
-    hours = hours % 12;
-    hours = hours ? hours : 12; // Convert 0 to 12
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-
-    return `${year}-${month}-${day}, ${hours}:${minutes}${ampm}`;
-  };
-
   const handleDeleteStory = async (storyId: string) => {
     Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
-      await adminApi.delete(`/admin/stories/${storyId}`, token);
+      await adminStoryApi.deleteStory(storyId);
 
       Logger.Admin.log(`Successfully deleted story: ${storyId}`);
-      // Refresh the list
-      loadStories();
+      // Refresh the page to get updated data
+      window.location.reload();
     } catch (error) {
       Logger.Admin.error(`Error deleting story: ${storyId}`, error);
       setError("Failed to delete story. Please try again.");
@@ -108,7 +51,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
     });
   };
 
-  const tableColumns: ColumnOption<StoryListItem>[] = [
+  const tableColumns: ColumnOption<StoriesListItem>[] = [
     {
       key: "title",
       label: "Title",
@@ -132,7 +75,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
       label: "Beat",
       render: (story) => (
         <>
-          {story.characterSelectionCompleted ? story.currentBeat || 1 : 0} /{" "}
+          {story.characterSelectionCompleted ? story.currentBeat || 1} /{" "}
           {story.maxTurns}
         </>
       ),
@@ -149,7 +92,7 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
       render: (story) => formatDate(story.updatedAt),
     },
     {
-      key: "id" as keyof StoryListItem,
+      key: "id" as keyof StoriesListItem,
       label: "Actions",
       sortable: false,
       filterable: false,
@@ -185,12 +128,11 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-secondary">Stored Stories</h2>
         <PrimaryButton
-          onClick={loadStories}
+          onClick={() => window.location.reload()}
           variant="outline"
           leftBorder={false}
-          disabled={isLoading}
           leftIcon={<Icons.Refresh className="h-4 w-4" />}
-        ></PrimaryButton>
+        />
       </div>
 
       {error && (
@@ -220,7 +162,6 @@ export const StoriesOverview = ({ token }: StoriesOverviewProps) => {
         onFilter={addFilter}
         onRemoveFilter={removeFilter}
         onClearFilters={clearFilters}
-        isLoading={isLoading}
         emptyMessage="No stories found."
       />
     </div>

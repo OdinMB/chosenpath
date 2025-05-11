@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Icons } from "./Icons";
-import { API_CONFIG } from "core/config";
+import { API_CONFIG } from "client/config";
 
 interface ImageWithPlaceholderProps {
   /** Image source URL or path suffix */

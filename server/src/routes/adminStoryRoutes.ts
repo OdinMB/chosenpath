@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Logger } from "shared/logger.js";
 import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
-import { DeleteStoryRequest } from "core/types/index.js";
+import { DeleteStoryRequest } from "core/types/adminApi.js";
 import { verifyAdmin } from "users/authMiddleware.js";
 const router = Router();
 

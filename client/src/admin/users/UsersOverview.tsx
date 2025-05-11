@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
-import { adminApi } from "../adminApi";
+import { adminUsersApi } from "admin/adminApi";
 import {
   SortableTable,
   useTableFilterSort,
@@ -30,7 +30,7 @@ export const UsersOverview = () => {
       const token = localStorage.getItem("admin_token");
       if (!token) throw new Error("Not authenticated");
 
-      await adminApi.delete(`/admin/users/${userId}`, token);
+      await adminUsersApi.deleteUser(userId);
 
       Logger.Admin.log(`Successfully deleted user: ${userId}`);
       // Update the local state
