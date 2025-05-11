@@ -5,7 +5,7 @@ import { storyApi } from "shared/apiClient";
 import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
-  CreateStoryResponse,
+  CreateStoryInfo,
 } from "core/types/api";
 
 export function useStoryCreation() {
@@ -19,16 +19,14 @@ export function useStoryCreation() {
 
   const createStory = async (
     data: CreateStoryRequest
-  ): Promise<CreateStoryResponse> => {
+  ): Promise<CreateStoryInfo> => {
     setIsLoading(true);
     Logger.App.log("Starting story creation process");
 
     try {
       Logger.App.log("Sending createStory request to server");
-      const response = await storyApi.createStory(data);
-      const responseData = response.data as CreateStoryResponse;
+      const storyData = (await storyApi.createStory(data)) as CreateStoryInfo;
 
-      const storyData = responseData.data;
       Logger.App.log(`Received story ID: ${storyData.storyId}`);
 
       setStoryId(storyData.storyId);
@@ -40,7 +38,7 @@ export function useStoryCreation() {
         try {
           Logger.App.log(`Checking status for story: ${storyData.storyId}`);
           const status = await storyApi.checkStoryStatus(storyData.storyId);
-          if (status.data.status === "ready") {
+          if (status.status === "ready") {
             Logger.App.log(`Story ${storyData.storyId} is ready`);
             setStoryReady(true);
           } else {
@@ -55,7 +53,7 @@ export function useStoryCreation() {
       };
       checkStatus();
 
-      return responseData;
+      return storyData;
     } catch (error) {
       Logger.App.error("Failed to create story:", error);
       throw error; // Let the centralized error handler deal with it
@@ -66,33 +64,32 @@ export function useStoryCreation() {
 
   const createStoryFromTemplate = async (
     data: CreateStoryFromTemplateRequest
-  ): Promise<CreateStoryResponse> => {
+  ): Promise<CreateStoryInfo> => {
     setIsLoading(true);
     Logger.App.log("Starting template story creation process");
 
     try {
       Logger.App.log("Sending createStoryFromTemplate request to server");
       const response = await storyApi.createStoryFromTemplate(data);
-      const responseData = response.data as CreateStoryResponse;
+      Logger.App.log("Received response from server. responseData: ", response);
 
-      const storyData = responseData.data;
-      Logger.App.log(`Received story ID: ${storyData.storyId}`);
+      Logger.App.log(`Received story ID: ${response.storyId}`);
 
-      setStoryId(storyData.storyId);
-      setPlayerCodes(storyData.codes);
+      setStoryId(response.storyId);
+      setPlayerCodes(response.codes);
       Logger.App.log("Received player codes, starting status polling");
 
       // Start polling for story status
       const checkStatus = async () => {
         try {
-          Logger.App.log(`Checking status for story: ${storyData.storyId}`);
-          const status = await storyApi.checkStoryStatus(storyData.storyId);
-          if (status.data.status === "ready") {
-            Logger.App.log(`Story ${storyData.storyId} is ready`);
+          Logger.App.log(`Checking status for story: ${response.storyId}`);
+          const status = await storyApi.checkStoryStatus(response.storyId);
+          if (status.status === "ready") {
+            Logger.App.log(`Story ${response.storyId} is ready`);
             setStoryReady(true);
           } else {
             Logger.App.log(
-              `Story ${storyData.storyId} is still queued, will check again in 2s`
+              `Story ${response.storyId} is still queued, will check again in 2s`
             );
             setTimeout(checkStatus, 2000);
           }
@@ -102,7 +99,7 @@ export function useStoryCreation() {
       };
       checkStatus();
 
-      return responseData;
+      return response;
     } catch (error) {
       Logger.App.error("Failed to create story from template:", error);
       throw error; // Let the centralized error handler deal with it

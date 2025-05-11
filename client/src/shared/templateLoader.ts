@@ -1,5 +1,5 @@
 import { LoaderFunction, redirect } from "react-router-dom";
-import { apiClient } from "shared/apiClient";
+import { templateApi } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
 /**
@@ -18,8 +18,7 @@ export const templateLoader: LoaderFunction = async ({ params }) => {
     Logger.App.log(`Loading shared template with ID: ${templateId}`);
 
     // Fetch the template
-    const response = await apiClient.get(`/templates/${templateId}`);
-    const template = response.data.template;
+    const template = await templateApi.getTemplate(templateId);
 
     if (!template) {
       throw new Error("Template not found");

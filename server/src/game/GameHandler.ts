@@ -1,23 +1,17 @@
 import type { Socket } from "socket.io";
 import type { Story } from "core/models/Story.js";
-import { isValidPlayerCount, getPlayerSlots } from "core/utils/playerUtils.js";
-import type { PlayerCount, PlayerSlot, GameMode } from "core/types/index.js";
+import { getPlayerSlots } from "core/utils/playerUtils.js";
+import type { PlayerCount, PlayerSlot } from "core/types/index.js";
 import { StoryRepository } from "shared/StoryRepository.js";
 import { connectionManager } from "shared/ConnectionManager.js";
-import { MAX_TURNS, MIN_TURNS } from "core/config.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
-import { randomUUID } from "crypto";
 import type { OperationErrorEvent } from "./queue.js";
-import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import type {
-  StoryCodesNotification,
   StoryReadyNotification,
   SelectCharacterResponse,
   MakeChoiceResponse,
   WSErrorResponse,
 } from "core/types/websocket.js";
-import { ContentModerationResponse, ResponseStatus } from "core/types/api.js";
-import { AdminTemplateService } from "server/admin/AdminTemplateService.js";
 import { Logger } from "shared/logger.js";
 import { ContentFilterService } from "./services/ContentFilterService.js";
 
@@ -32,25 +26,14 @@ export class GameHandler {
     string,
     { resolve: () => void; codes: Record<PlayerSlot, string>; socketId: string }
   >();
-  private storyInitializedHandler: (event: any) => void;
   private operationErrorHandler: (event: any) => void;
-  private contentFilter: ContentFilterService;
 
   constructor() {
     this.storyRepository = StoryRepository.getInstance();
-    this.contentFilter = new ContentFilterService();
     console.log("[GameHandler] Creating game handler instance");
 
     // Create bound handlers for events
-    this.storyInitializedHandler = this.handleStoryInitialized.bind(this);
     this.operationErrorHandler = this.handleOperationError.bind(this);
-
-    // Add event listeners for queue processor events - only once per instance
-    gameQueueProcessor.events.on(
-      "storyInitialized",
-      this.storyInitializedHandler
-    );
-    gameQueueProcessor.events.on("operationError", this.operationErrorHandler);
   }
 
   public registerSocket(socket: Socket): void {
@@ -468,11 +451,6 @@ export class GameHandler {
   public dispose(): void {
     console.log("[GameHandler] Disposing GameHandler instance");
 
-    // Remove event listeners
-    gameQueueProcessor.events.off(
-      "storyInitialized",
-      this.storyInitializedHandler
-    );
     gameQueueProcessor.events.off("operationError", this.operationErrorHandler);
 
     // Clear all maps

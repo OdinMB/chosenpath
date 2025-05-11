@@ -2,9 +2,10 @@ Smaller commits!
 
 # NEXT
 
-- 10: react-dom
-- 3: story generation without websocket (only to be used in game part of application)
+- 4: react-dom: refactor admin and users
+- 4: game websocket: refactor to work with new react-dom / request/response flow
 - 4: improve admin auth system
+
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 

@@ -1,6 +1,6 @@
 import { LoaderFunctionArgs } from "react-router-dom";
 import { Logger } from "../../shared/logger";
-import { apiClient } from "../../shared/apiClient";
+import { templateApi } from "../../shared/apiClient";
 import { StoryTemplate } from "core/types";
 import { groupTagsByCategories } from "../../shared/tagCategories";
 
@@ -31,8 +31,7 @@ export async function libraryLoader({
 
   try {
     // Fetch all published templates
-    const response = await apiClient.get(`/templates`);
-    const templates = response.data.templates;
+    const templates = (await templateApi.getTemplates()) as StoryTemplate[];
 
     Logger.App.log(`Loaded ${templates.length} templates for library`);
 

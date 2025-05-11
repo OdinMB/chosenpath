@@ -9,6 +9,7 @@ import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterModal } from "shared/components";
 import { NewsletterCard } from "./NewsletterCard";
 import { useNavigate, useLoaderData } from "react-router-dom";
+import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
 
 interface LibraryLoaderData {
   templates: StoryTemplate[];
@@ -87,16 +88,22 @@ export function LibraryBrowser() {
   const { templates, tagCategories, initialTags, initialPlayerCount } =
     useLoaderData() as LibraryLoaderData;
 
-  const [filteredTemplates, setFilteredTemplates] = useState<StoryTemplate[]>(
-    []
-  );
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Filters
-  const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
-    initialPlayerCount
-  );
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags || []);
+  const {
+    filteredTemplates,
+    showFilters,
+    playerCountFilter,
+    selectedTags,
+    setPlayerCountFilter,
+    handleTagToggle,
+    clearFilters,
+    toggleShowFilters,
+    getAvailablePlayerCounts,
+    applyFilters,
+  } = useLibraryBrowser({
+    templates,
+    initialTags,
+    initialPlayerCount,
+  });
 
   // State for Share Modal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -110,79 +117,15 @@ export function LibraryBrowser() {
     handleSubscribe,
   } = useNewsletter();
 
-  // Update URL with current filters
-  const updateUrlWithFilters = useCallback(() => {
-    const params = new URLSearchParams();
-
-    // Add tags parameter if tags are selected
-    if (selectedTags && selectedTags.length > 0) {
-      params.set("tags", selectedTags.join(","));
-    }
-
-    // Add player count parameter if set
-    if (playerCountFilter !== null) {
-      params.set("players", playerCountFilter.toString());
-    }
-
-    // Update URL without reloading the page
-    const newUrl = params.toString()
-      ? `${window.location.pathname}?${params.toString()}`
-      : window.location.pathname;
-
-    window.history.replaceState({}, "", newUrl);
-  }, [selectedTags, playerCountFilter]);
-
   // Apply filters when they change
   useEffect(() => {
-    let result = [...templates];
-
-    // Filter by player count
-    if (playerCountFilter !== null) {
-      result = result.filter(
-        (template) =>
-          playerCountFilter >= template.playerCountMin &&
-          playerCountFilter <= template.playerCountMax
-      );
-    }
-
-    // Filter by selected tags
-    if (selectedTags.length > 0) {
-      result = result.filter(
-        (template) =>
-          template.tags &&
-          selectedTags.every((tag) => template.tags.includes(tag))
-      );
-    }
-
-    setFilteredTemplates(result);
-
-    // Update URL when filters change, but only if we have active filters
-    updateUrlWithFilters();
-  }, [templates, playerCountFilter, selectedTags, updateUrlWithFilters]);
+    applyFilters();
+  }, [applyFilters]);
 
   // Calculate filter indicator and display
   const activeFilterCount =
     (playerCountFilter !== null ? 1 : 0) + selectedTags.length;
   const hasActiveFilters = activeFilterCount > 0;
-
-  // Get available player counts
-  const getAvailablePlayerCounts = () => {
-    // Find min and max possible player counts from all templates
-    if (templates.length === 0)
-      return Array.from({ length: 10 }, (_, i) => i + 1);
-
-    const minCounts = templates.map((t) => t.playerCountMin);
-    const maxCounts = templates.map((t) => t.playerCountMax);
-
-    const minCount = Math.min(...minCounts);
-    const maxCount = Math.max(...maxCounts);
-
-    // Generate array of all possible player counts
-    return Array.from(
-      { length: maxCount - minCount + 1 },
-      (_, i) => i + minCount
-    );
-  };
 
   // Generate share URL with current filter configuration
   const getShareUrl = () => {
@@ -204,23 +147,6 @@ export function LibraryBrowser() {
   const handleShare = () => {
     setShareUrl(getShareUrl());
     setIsShareModalOpen(true);
-  };
-
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
-
-  const clearFilters = () => {
-    setPlayerCountFilter(null);
-    setSelectedTags([]);
-    // Clear URL parameters when filters are cleared
-    window.history.replaceState({}, document.title, window.location.pathname);
-  };
-
-  const toggleShowFilters = () => {
-    setShowFilters((prev) => !prev);
   };
 
   const handleSelectTemplate = useCallback(
@@ -267,7 +193,7 @@ export function LibraryBrowser() {
                 {playerCountFilter} player{playerCountFilter !== 1 ? "s" : ""}
                 <button
                   onClick={() => setPlayerCountFilter(null)}
-                  className="ml-1 text-primary-600 hover:text-primary-800"
+                  className="ml-1 text-primary-400 hover:text-primary-600"
                   aria-label="Remove player count filter"
                 >
                   <Icons.Close className="w-3 h-3" />
@@ -283,7 +209,7 @@ export function LibraryBrowser() {
                 {tag}
                 <button
                   onClick={() => handleTagToggle(tag)}
-                  className="ml-1 text-primary-600 hover:text-primary-800"
+                  className="ml-1 text-primary-400 hover:text-primary-600"
                   aria-label={`Remove ${tag} filter`}
                 >
                   <Icons.Close className="w-3 h-3" />

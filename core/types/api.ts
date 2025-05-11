@@ -70,12 +70,12 @@ export interface CreateStoryFromTemplateRequest extends ClientRequest {
   maxTurns: number;
   generateImages: boolean;
 }
-export interface CreateStoryResponse
-  extends SuccessResponse<{
-    storyId: string;
-    codes: Record<string, string>;
-    status: "queued" | "ready";
-  }> {}
+export interface CreateStoryInfo {
+  storyId: string;
+  codes: Record<string, string>;
+  status: "queued" | "ready";
+}
+export interface CreateStoryResponse extends SuccessResponse<CreateStoryInfo> {}
 
 /**
  * User basics

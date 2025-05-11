@@ -165,7 +165,6 @@ export function GameSessionProvider({
 
           // Store or update the code
           updateStoredSetWithCode(data.data.code, playerRole, title, true);
-          refreshStoredCodeSets();
         } else if ("errorMessage" in data) {
           logger.info(
             "[GameSessionProvider] Code verification failed:",
@@ -244,7 +243,6 @@ export function GameSessionProvider({
     setConnectionStale,
     isRequestPending: (type: string) => wsService.isRequestPending(type),
     isOperationRunning: (type: string) => wsService.isOperationRunning(type),
-    storedCodeSets,
   };
 
   return (

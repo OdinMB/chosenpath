@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { API_CONFIG } from "core/config";
 import {
@@ -13,6 +13,7 @@ import {
   CreateStoryFromTemplateRequest,
   RateLimitedResponse,
   ModerationBlockedResponse,
+  CreateStoryInfo,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -20,14 +21,32 @@ import {
   RateLimitNotification,
 } from "./notifications/notifications";
 import { notificationService } from "./notifications/notificationService";
+import { StoryTemplate } from "core/types/story";
 
 // Extend axios request config to include adminAuth property
 interface AdminRequestConfig extends AxiosRequestConfig {
   adminAuth?: boolean;
 }
 
+// Type for our transformed API client
+type TransformedApiClient = {
+  get: <T>(url: string, config?: AxiosRequestConfig) => Promise<T>;
+  post: <T>(
+    url: string,
+    data: unknown,
+    config?: AxiosRequestConfig
+  ) => Promise<T>;
+  put: <T>(
+    url: string,
+    data: unknown,
+    config?: AxiosRequestConfig
+  ) => Promise<T>;
+  delete: <T>(url: string, config?: AxiosRequestConfig) => Promise<T>;
+  head: (url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse>;
+};
+
 // Create axios instance with base configuration
-const apiClient = axios.create({
+const axiosInstance = axios.create({
   baseURL: API_CONFIG.DEFAULT_API_URL,
   timeout: 30000,
   headers: {
@@ -39,7 +58,7 @@ const apiClient = axios.create({
 export const LONG_OPERATION_TIMEOUT = 180000; // 3 minutes
 
 // Add request interceptor to include auth token in all requests
-apiClient.interceptors.request.use(
+axiosInstance.interceptors.request.use(
   (config) => {
     // Log all requests
     Logger.API?.info?.(
@@ -105,7 +124,7 @@ apiClient.interceptors.request.use(
 );
 
 // Add response interceptor to handle common response tasks
-apiClient.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => {
     // Log all server responses
     Logger.API?.info?.(
@@ -134,11 +153,15 @@ apiClient.interceptors.response.use(
       // Handle different response statuses
       switch (apiResponse.status) {
         case ResponseStatus.SUCCESS:
-          // For success responses, extract the data property from API response
-          return {
-            ...response,
-            data: response.data.data,
-          };
+          // For success responses, return just the data payload
+          // Log the transformed return value
+          Logger.API?.debug?.(
+            `Transformed data: ${JSON.stringify(response.data.data).substring(
+              0,
+              500
+            )}${JSON.stringify(response.data.data).length > 500 ? "..." : ""}`
+          );
+          return response.data.data;
 
         case ResponseStatus.MODERATION_BLOCKED: {
           const moderationError = apiResponse as ModerationBlockedResponse;
@@ -240,6 +263,9 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Cast the axios instance to our transformed type
+export const apiClient = axiosInstance as unknown as TransformedApiClient;
+
 // User story API functions
 export const userStoriesApi = {
   /**
@@ -280,7 +306,7 @@ export const userStoriesApi = {
 
 // Admin API functions that use an explicit admin token
 // These bypass the normal auth token from localStorage
-const adminApi = {
+export const adminApi = {
   get: (url: string, adminToken: string, config: AxiosRequestConfig = {}) => {
     return apiClient.get(url, {
       ...config,
@@ -399,25 +425,46 @@ export const storyApi = {
   /**
    * Create a new story
    */
-  createStory: (data: CreateStoryRequest) => {
-    return apiClient.post<CreateStoryResponse>("/stories", data);
+  createStory: async (data: CreateStoryRequest): Promise<CreateStoryInfo> => {
+    return apiClient.post<CreateStoryResponse["data"]>("/stories", data);
   },
 
   /**
    * Create a story from template
    */
-  createStoryFromTemplate: (data: CreateStoryFromTemplateRequest) => {
-    return apiClient.post<CreateStoryResponse>("/stories/template", data);
+  createStoryFromTemplate: async (
+    data: CreateStoryFromTemplateRequest
+  ): Promise<CreateStoryInfo> => {
+    return apiClient.post<CreateStoryResponse["data"]>(
+      "/stories/template",
+      data
+    );
   },
 
   /**
    * Check story status
    */
-  checkStoryStatus: (storyId: string) => {
+  checkStoryStatus: async (
+    storyId: string
+  ): Promise<{ status: "queued" | "ready" }> => {
     return apiClient.get<{ status: "queued" | "ready" }>(
       `/stories/${storyId}/status`
     );
   },
 };
 
-export { apiClient, adminApi };
+export const templateApi = {
+  getTemplates: async (forWelcomeScreen = false): Promise<StoryTemplate[]> => {
+    return apiClient
+      .get<{ templates: StoryTemplate[] }>(
+        `/templates${forWelcomeScreen ? "?forWelcomeScreen=true" : ""}`
+      )
+      .then((response) => response.templates);
+  },
+  getTemplate: async (templateId: string): Promise<StoryTemplate> => {
+    const response = await apiClient.get<{ template: StoryTemplate }>(
+      `/templates/${templateId}`
+    );
+    return response.template;
+  },
+};

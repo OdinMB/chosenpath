@@ -1,6 +1,7 @@
 import { LoaderFunction } from "react-router-dom";
-import { apiClient } from "shared/apiClient";
+import { templateApi } from "shared/apiClient";
 import { Logger } from "shared/logger";
+import { StoryTemplate } from "core/types";
 
 /**
  * Loader for the template configuration page
@@ -17,8 +18,9 @@ export const templateConfigLoader: LoaderFunction = async ({ params }) => {
     Logger.App.log(`Loading template for configuration: ${templateId}`);
 
     // Fetch the template by ID
-    const response = await apiClient.get(`/templates/${templateId}`);
-    const template = response.data.template;
+    const template = (await templateApi.getTemplate(
+      templateId
+    )) as StoryTemplate;
 
     if (!template) {
       throw new Error("Template not found");

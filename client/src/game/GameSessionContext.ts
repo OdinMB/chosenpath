@@ -1,6 +1,5 @@
 import { createContext } from "react";
 import type { ClientStoryState, RateLimitInfo } from "core/types";
-import { StoredCodeSet } from "../shared/SessionContext";
 
 // Define the GameSessionContext type
 export interface GameSessionContextType {
@@ -21,7 +20,6 @@ export interface GameSessionContextType {
   isConnecting: boolean;
   isRequestPending: (type: string) => boolean;
   isOperationRunning: (type: string) => boolean;
-  storedCodeSets: StoredCodeSet[];
 }
 
 // Create the context

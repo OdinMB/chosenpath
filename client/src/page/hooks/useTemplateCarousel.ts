@@ -1,7 +1,7 @@
 import { useState, useEffect, RefObject } from "react";
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { apiClient } from "shared/apiClient";
+import { templateApi } from "shared/apiClient";
 
 type SwipeHandlers = {
   onSwipeLeft?: () => void;
@@ -72,14 +72,12 @@ export function useTemplateCarousel() {
 
       try {
         // Fetch templates from the API specifically for the welcome screen
-        const response = await apiClient.get(
-          `/templates?forWelcomeScreen=true`
-        );
+        const templates = await templateApi.getTemplates(true);
 
         Logger.App.log(
-          `Loaded ${response.data.templates.length} templates for welcome screen`
+          `Loaded ${templates.length} templates for welcome screen`
         );
-        setTemplates(response.data.templates);
+        setTemplates(templates);
       } catch (error) {
         Logger.App.error("Failed to load templates", error);
         setError("Failed to load story templates");

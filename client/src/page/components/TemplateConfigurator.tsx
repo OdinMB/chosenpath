@@ -10,7 +10,7 @@ import { storeCodeSet } from "shared/utils/codeSetUtils";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { StoryTemplate } from "core/types";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
-import { ResponseStatus, RateLimitedResponse } from "core/types/api";
+import { RateLimitedResponse } from "core/types/api";
 import { notificationService } from "shared/notifications/notificationService";
 
 interface TemplateConfigLoaderData {
@@ -55,12 +55,10 @@ export function TemplateConfigurator() {
         generateImages,
       });
 
-      if (response.status === ResponseStatus.SUCCESS) {
-        const { codes } = response.data;
-        // Store codes in localStorage
-        storeCodeSet(codes, `Template: ${template.id}`, true);
-        Logger.App.log("Stored player codes in localStorage");
-      }
+      const { codes } = response;
+      // Store codes in localStorage
+      storeCodeSet(codes, `Template: ${template.id}`, true);
+      Logger.App.log("Stored player codes in localStorage");
     } catch (error) {
       console.error(error);
       notificationService.addErrorNotification();
