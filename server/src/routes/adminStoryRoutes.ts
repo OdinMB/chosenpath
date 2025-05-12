@@ -4,6 +4,7 @@ import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
 import { DeleteStoryRequest } from "core/types/index.js";
 import { verifyAdmin } from "users/authMiddleware.js";
+import { v4 as uuidv4 } from "uuid";
 const router = Router();
 
 // Get list of stories
@@ -49,22 +50,29 @@ router.get("/admin/stories/:id", verifyAdmin(), async (req, res) => {
 
 // Delete story
 router.delete("/admin/stories/:id", verifyAdmin(), async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
+  const requestId = (req.query.requestId as string) || uuidv4();
+  const storyId = req.params.id;
+
+  // Validate the request matches DeleteStoryRequest type
+  const deleteRequest: DeleteStoryRequest = {
+    id: storyId,
+    requestId,
+  };
 
   try {
-    const deleteRequest = req.body as DeleteStoryRequest;
-    const storyId = deleteRequest.id;
-
-    Logger.Route.log(`Deleting story: ${storyId}`);
+    Logger.Route.log(`[${requestId}] Deleting story: ${storyId}`);
     await adminStoryService.deleteStory(storyId);
-    Logger.Route.log(`Successfully deleted story: ${storyId}`);
+    Logger.Route.log(`[${requestId}] Successfully deleted story: ${storyId}`);
     sendSuccess(res, { success: true }, requestId);
   } catch (error) {
     if ((error as Error).message === "Story not found") {
-      Logger.Route.error(`Story not found`);
+      Logger.Route.error(`[${requestId}] Story not found: ${storyId}`);
       return sendNotFound(res, "Story not found", requestId);
     }
-    Logger.Route.error(`Failed to delete story`, error);
+    Logger.Route.error(
+      `[${requestId}] Failed to delete story: ${storyId}`,
+      error
+    );
     sendError(res, "Failed to delete story", 500, requestId, error);
   }
 });

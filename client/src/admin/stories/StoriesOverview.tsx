@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, useNavigate } from "react-router-dom";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui";
 import { Logger } from "shared/logger";
 import { adminStoryApi } from "admin/adminApi";
@@ -13,6 +13,7 @@ import { formatDate } from "core/utils/dateUtils";
 
 export const StoriesOverview = () => {
   const stories = useLoaderData() as StoriesListItem[];
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -26,10 +27,9 @@ export const StoriesOverview = () => {
     Logger.Admin.log(`Attempting to delete story: ${storyId}`);
     try {
       await adminStoryApi.deleteStory(storyId);
-
       Logger.Admin.log(`Successfully deleted story: ${storyId}`);
-      // Refresh the page to get updated data
-      window.location.reload();
+      // Use navigate to refresh the data without losing auth state
+      navigate(".", { replace: true });
     } catch (error) {
       Logger.Admin.error(`Error deleting story: ${storyId}`, error);
       setError("Failed to delete story. Please try again.");

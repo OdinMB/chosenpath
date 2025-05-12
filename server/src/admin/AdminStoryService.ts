@@ -36,8 +36,6 @@ export class AdminStoryService {
       const storiesInfo = await Promise.all(
         storyIds.map(async (storyId) => {
           try {
-            Logger.AdminService.log(`Processing story: ${storyId}`);
-
             const data = await readStoryFile(storyId);
             const storyData = JSON.parse(data);
 
