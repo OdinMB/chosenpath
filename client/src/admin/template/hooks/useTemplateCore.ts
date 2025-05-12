@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
-import { adminApi } from "admin/adminApi";
+import { adminTemplateApi } from "admin/adminApi";
 import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../templateTypes";
@@ -24,7 +24,7 @@ export const useTemplateCore = (token: string) => {
     Logger.Admin.log("Loading story templates");
 
     try {
-      const response = await adminApi.get(`/admin/templates`, token);
+      const response = await adminTemplateApi.getTemplates();
 
       Logger.Admin.log(
         `Successfully loaded ${response.data.templates.length} story templates`

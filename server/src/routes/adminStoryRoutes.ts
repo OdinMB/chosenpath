@@ -2,27 +2,33 @@ import { Router } from "express";
 import { Logger } from "shared/logger.js";
 import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
-import { DeleteStoryRequest } from "core/types/adminApi.js";
+import { DeleteStoryRequest } from "core/types/index.js";
 import { verifyAdmin } from "users/authMiddleware.js";
 const router = Router();
 
 // Get list of stories
-router.get("/admin/stories", verifyAdmin, async (req, res) => {
+router.get("/admin/stories", verifyAdmin(), async (req, res) => {
   const requestId = req.query.requestId as string;
+  Logger.Route.log(`[${requestId}] Starting GET /admin/stories request`);
 
   try {
-    Logger.Route.log("Fetching list of stories");
+    Logger.Route.log(`[${requestId}] Fetching list of stories`);
     const stories = await adminStoryService.getStoriesList();
-    Logger.Route.log(`Returning ${stories.length} stories`);
+    Logger.Route.log(
+      `[${requestId}] Successfully fetched ${stories.length} stories`
+    );
+
+    Logger.Route.log(`[${requestId}] Sending response`);
     sendSuccess(res, { stories }, requestId);
+    Logger.Route.log(`[${requestId}] Response sent successfully`);
   } catch (error) {
-    Logger.Route.error("Failed to load stories", error);
+    Logger.Route.error(`[${requestId}] Failed to load stories`, error);
     sendError(res, "Failed to load stories", 500, requestId, error);
   }
 });
 
 // Get story details
-router.get("/admin/stories/:id", verifyAdmin, async (req, res) => {
+router.get("/admin/stories/:id", verifyAdmin(), async (req, res) => {
   const requestId = req.query.requestId as string;
 
   try {
@@ -42,7 +48,7 @@ router.get("/admin/stories/:id", verifyAdmin, async (req, res) => {
 });
 
 // Delete story
-router.delete("/admin/stories/:id", verifyAdmin, async (req, res) => {
+router.delete("/admin/stories/:id", verifyAdmin(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
 
   try {

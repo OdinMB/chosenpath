@@ -1,6 +1,6 @@
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
-import { adminApi } from "admin/adminApi";
+import { adminTemplateApi } from "admin/adminApi";
 
 // Interface for templateCore to use for loading state
 interface TemplateCore {
@@ -20,11 +20,7 @@ export const useTemplateExport = (
 
     try {
       // Use the adminApi.get method with the admin token
-      const response = await adminApi.get(
-        `/admin/templates/${template.id}/assets`,
-        token,
-        { responseType: "blob" }
-      );
+      const response = await adminTemplateApi.getTemplateAssets();
 
       // Create a download link
       const link = document.createElement("a");

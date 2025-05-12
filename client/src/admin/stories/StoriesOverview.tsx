@@ -9,8 +9,7 @@ import {
   ColumnOption,
 } from "shared/components";
 import { StoriesListItem } from "core/types";
-import { formatDate } from "shared/utils/timeUtils";
-
+import { formatDate } from "core/utils/dateUtils";
 
 export const StoriesOverview = () => {
   const stories = useLoaderData() as StoriesListItem[];
@@ -75,7 +74,7 @@ export const StoriesOverview = () => {
       label: "Beat",
       render: (story) => (
         <>
-          {story.characterSelectionCompleted ? story.currentBeat || 1} /{" "}
+          {story.characterSelectionCompleted ? story.currentBeat || 1 : 0} /{" "}
           {story.maxTurns}
         </>
       ),

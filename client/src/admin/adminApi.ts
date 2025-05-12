@@ -1,12 +1,23 @@
 import { StoriesListItem, StoryTemplate, User } from "core/types";
 import { apiClient } from "shared/apiClient";
+import { Logger } from "shared/logger";
 
 // Admin Story API functions
 export const adminStoryApi = {
   getStories: async (): Promise<StoriesListItem[]> => {
-    return apiClient
-      .get<{ stories: StoriesListItem[] }>(`/admin/stories`)
-      .then((response) => response.stories);
+    Logger.Admin.log("Fetching stories from admin API");
+    try {
+      const response = await apiClient.get<{ stories: StoriesListItem[] }>(
+        `/admin/stories`
+      );
+      Logger.Admin.log(
+        `Successfully fetched ${response.stories.length} stories`
+      );
+      return response.stories;
+    } catch (error) {
+      Logger.Admin.error("Failed to fetch stories from admin API", error);
+      throw error;
+    }
   },
 
   deleteStory: async (storyId: string): Promise<void> => {

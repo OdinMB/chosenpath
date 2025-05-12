@@ -137,10 +137,15 @@ export interface TemplateIterationResponse
 export interface StoriesListItem {
   id: string;
   title: string;
-  createdAt: string;
+  createdAt: string | null;
   updatedAt: string;
-  players: number;
-  status: string;
+  gameMode: string;
+  playerCount: number;
+  characterSelectionCompleted: boolean;
+  maxTurns: number;
+  currentBeat: number;
+  templateId?: string;
+  error?: string;
 }
 
 export interface StoriesResponse

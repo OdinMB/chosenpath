@@ -5,7 +5,7 @@ import {
 } from "core/types/admin";
 import { Logger } from "shared/logger";
 import { LONG_OPERATION_TIMEOUT } from "shared/apiClient";
-import { adminApi } from "admin/adminApi";
+import { adminTemplateApi } from "admin/adminApi";
 
 interface UseTemplateApiProps {
   token: string;
@@ -34,11 +34,7 @@ export function useTemplateApi({
         template: template,
       };
 
-      const response = await adminApi.put(
-        `/admin/templates/${template.id}`,
-        request,
-        token
-      );
+      const response = await adminTemplateApi.updateTemplate(request);
 
       Logger.Admin.log("Template saved successfully", response);
 

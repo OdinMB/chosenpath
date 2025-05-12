@@ -28,7 +28,7 @@ export class AdminStoryService {
    */
   async getStoriesList(): Promise<StoryInfo[]> {
     try {
-      Logger.AdminService.log("Loading list of stories");
+      Logger.AdminService.log("Starting getStoriesList");
       const storyIds = await listStoryDirectories();
       Logger.AdminService.log(`Found ${storyIds.length} story directories`);
 
@@ -36,7 +36,7 @@ export class AdminStoryService {
       const storiesInfo = await Promise.all(
         storyIds.map(async (storyId) => {
           try {
-            Logger.AdminService.log(`Loading metadata for story: ${storyId}`);
+            Logger.AdminService.log(`Processing story: ${storyId}`);
 
             const data = await readStoryFile(storyId);
             const storyData = JSON.parse(data);
@@ -65,7 +65,10 @@ export class AdminStoryService {
               templateId: story.getState().templateId,
             };
           } catch (error) {
-            Logger.AdminService.error(`Error loading story: ${storyId}`, error);
+            Logger.AdminService.error(
+              `Error processing story: ${storyId}`,
+              error
+            );
             return {
               id: storyId,
               title: "Error loading story",
@@ -77,7 +80,7 @@ export class AdminStoryService {
       );
 
       Logger.AdminService.log(
-        `Successfully loaded metadata for ${storiesInfo.length} stories`
+        `Successfully processed all ${storiesInfo.length} stories`
       );
       return storiesInfo;
     } catch (error) {

@@ -6,7 +6,7 @@ import { TemplateCarouselManager } from "./template/TemplateCarouselManager.js";
 import { StoriesOverview } from "./stories/StoriesOverview.js";
 import { TemplateForm } from "./template/components";
 import { AdminRouteGuard } from "./components/AdminRouteGuard";
-import { storyLoader } from "./stories/storyLoader";
+import { adminStoryLoader } from "./stories/adminStoryLoader";
 
 // Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
@@ -33,7 +33,7 @@ export const adminRoutes: RouteObject[] = [
       {
         path: "stories",
         element: <StoriesOverview />,
-        loader: storyLoader,
+        loader: adminStoryLoader,
       },
       {
         path: "templates/new",

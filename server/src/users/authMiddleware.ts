@@ -80,6 +80,7 @@ export function verifyUser(options: AuthOptions = { required: true }) {
         Logger.Route.log(`Role verification passed for user: ${user.id}`);
       }
 
+      Logger.Route.log(`Authentication passed for user: ${user.id}`);
       next();
     } catch (error) {
       Logger.Route.error(`Authentication error`, error);

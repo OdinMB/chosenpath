@@ -3,7 +3,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
-import { adminApi } from "admin/adminApi";
+import { adminTemplateApi } from "admin/adminApi";
 
 export const useTemplateCarouselManager = (token: string) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -18,7 +18,7 @@ export const useTemplateCarouselManager = (token: string) => {
       setError(null);
 
       try {
-        const response = await adminApi.get("/admin/templates", token);
+        const response = await adminTemplateApi.getTemplates();
 
         // Filter for published templates marked for welcome screen
         const welcomeScreenTemplates = response.data.templates
