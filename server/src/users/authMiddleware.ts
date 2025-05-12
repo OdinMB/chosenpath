@@ -36,6 +36,10 @@ interface AuthOptions {
  */
 export function verifyUser(options: AuthOptions = { required: true }) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    Logger.Route.log(
+      `[${req.method}] ${req.path} - Starting auth verification`
+    );
+
     // Extract token from cookie
     const token = req.cookies.authToken;
 
@@ -47,6 +51,9 @@ export function verifyUser(options: AuthOptions = { required: true }) {
           requestId: req.body?.requestId || "unknown",
         });
       }
+      Logger.Route.log(
+        `[${req.method}] ${req.path} - No token provided, continuing without authentication`
+      );
       return next(); // Continue without authentication for optional routes
     }
 
@@ -61,23 +68,36 @@ export function verifyUser(options: AuthOptions = { required: true }) {
             requestId: req.body?.requestId || "unknown",
           });
         }
+        Logger.Route.log(
+          `[${req.method}] ${req.path} - Invalid token, continuing without authentication`
+        );
         return next(); // Continue without authentication for optional routes
       }
 
       // Add user and token to request object
       req.user = user;
       req.token = token;
+      Logger.Route.log(
+        `[${req.method}] ${req.path} - Authenticated as ${user.username} (${user.roleId})`
+      );
 
       // Check role requirements if specified
       if (options.roles && options.roles.length > 0) {
+        Logger.Route.log(
+          `Verifying roles for user ${user.id}: ${options.roles.join(", ")}`
+        );
         if (!options.roles.includes(user.roleId as Role)) {
-          Logger.Route.warn(`Role verification failed for user: ${user.id}`);
+          Logger.Route.warn(
+            `Role verification failed for user: ${user.id} (has role: ${user.roleId})`
+          );
           return res.status(403).json({
             error: "Insufficient permissions",
             requestId: req.body?.requestId || "unknown",
           });
         }
-        Logger.Route.log(`Role verification passed for user: ${user.id}`);
+        Logger.Route.log(
+          `Role verification passed for user: ${user.id} (role: ${user.roleId})`
+        );
       }
 
       Logger.Route.log(`Authentication passed for user: ${user.id}`);
@@ -98,5 +118,7 @@ export function verifyUser(options: AuthOptions = { required: true }) {
 }
 
 // Convenience functions for common use cases
-export const verifyAdmin = () => verifyUser({ roles: [ROLES.ADMIN] });
-export const verifyRegularUser = () => verifyUser({ roles: [ROLES.USER] });
+export const verifyAdmin = () =>
+  verifyUser({ required: true, roles: [ROLES.ADMIN] });
+export const verifyRegularUser = () =>
+  verifyUser({ required: true, roles: [ROLES.USER] });

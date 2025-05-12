@@ -7,6 +7,8 @@ import { StoriesOverview } from "./stories/StoriesOverview.js";
 import { TemplateForm } from "./template/components";
 import { AdminRouteGuard } from "./components/AdminRouteGuard";
 import { adminStoryLoader } from "./stories/adminStoryLoader";
+import { adminUsersLoader } from "./users/usersLoader";
+import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 
 // Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
@@ -17,10 +19,12 @@ export const adminRoutes: RouteObject[] = [
         <AdminLayout />
       </AdminRouteGuard>
     ),
+    errorElement: <AdminErrorBoundary />,
     children: [
       {
         path: "users",
         element: <UsersOverview />,
+        loader: adminUsersLoader,
       },
       {
         path: "templates",

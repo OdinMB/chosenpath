@@ -7,7 +7,6 @@ import { GameWebSocketServer } from "./routes/websocket.js";
 import { GameHandler } from "game/GameHandler.js";
 import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
-import csrf from "csurf";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
 

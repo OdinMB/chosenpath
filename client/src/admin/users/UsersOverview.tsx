@@ -27,11 +27,7 @@ export const UsersOverview = () => {
   const handleDeleteUser = async (userId: string) => {
     Logger.Admin.log(`Attempting to delete user: ${userId}`);
     try {
-      const token = localStorage.getItem("admin_token");
-      if (!token) throw new Error("Not authenticated");
-
       await adminUsersApi.deleteUser(userId);
-
       Logger.Admin.log(`Successfully deleted user: ${userId}`);
       // Update the local state
       setUsers(users.filter((user) => user.id !== userId));
@@ -74,7 +70,7 @@ export const UsersOverview = () => {
     {
       key: "lastLoginAt",
       label: "Last Login",
-      render: (user) => formatDate(user.lastLoginAt),
+      render: (user) => formatDate(user.lastLoginAt ?? undefined),
     },
     {
       key: "id" as keyof UserListItem,
@@ -115,7 +111,7 @@ export const UsersOverview = () => {
           Registered Users
         </h2>
         <PrimaryButton
-          onClick={() => navigate(0)} // Refresh the page to reload data
+          onClick={() => navigate(".", { replace: true })}
           variant="outline"
           leftBorder={false}
           leftIcon={<Icons.Refresh className="h-4 w-4" />}

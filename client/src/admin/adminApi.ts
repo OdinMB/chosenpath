@@ -1,4 +1,4 @@
-import { StoriesListItem, StoryTemplate, User } from "core/types";
+import { StoriesListItem, StoryTemplate, UserListItem } from "core/types";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
@@ -40,10 +40,30 @@ export const adminTemplateApi = {
   },
 };
 
+// Admin Users API functions
 export const adminUsersApi = {
-  getUsers: async (): Promise<User[]> => {
-    return apiClient
-      .get<{ users: User[] }>(`/admin/users`)
-      .then((response) => response.users);
+  getUsers: async (): Promise<UserListItem[]> => {
+    Logger.Admin.log("Fetching users from admin API");
+    try {
+      const response = await apiClient.get<{ users: UserListItem[] }>(
+        `/admin/users`
+      );
+      Logger.Admin.log(`Successfully fetched ${response.users.length} users`);
+      return response.users;
+    } catch (error) {
+      Logger.Admin.error("Failed to fetch users from admin API", error);
+      throw error;
+    }
+  },
+
+  deleteUser: async (userId: string): Promise<void> => {
+    Logger.Admin.log(`Deleting user: ${userId}`);
+    try {
+      await apiClient.delete(`/admin/users/${userId}`);
+      Logger.Admin.log(`Successfully deleted user: ${userId}`);
+    } catch (error) {
+      Logger.Admin.error(`Failed to delete user: ${userId}`, error);
+      throw error;
+    }
   },
 };

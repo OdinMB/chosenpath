@@ -90,6 +90,15 @@ export interface DeleteStoryRequest extends ClientRequest {
   id: string;
 }
 
+// User Management
+export interface GetUsersRequest extends ClientRequest {
+  // Optional filters could be added here
+}
+
+export interface DeleteUserRequest extends ClientRequest {
+  id: string;
+}
+
 // ===============================================
 // Response Types
 // ===============================================
@@ -158,6 +167,21 @@ export interface StoryResponse
   // No additional fields needed
 }
 
+// User Responses
+export interface UserListItem {
+  id: string;
+  username: string;
+  email: string;
+  roleId: string;
+  createdAt: number;
+  lastLoginAt: number | null;
+}
+
+export interface UsersResponse
+  extends SuccessResponse<{ users: UserListItem[] }> {
+  // No additional fields needed
+}
+
 // Union type for all possible admin responses
 export type AdminResponse =
   | TemplatesResponse
@@ -168,5 +192,6 @@ export type AdminResponse =
   | StoryResponse
   | UploadFileResponse
   | ImportFilesResponse
+  | UsersResponse
   | RateLimitedResponse
   | ErrorResponse;
