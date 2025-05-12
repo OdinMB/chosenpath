@@ -28,6 +28,7 @@ import {
   getAllUserRelatedStories,
 } from "users/userStoryService.js";
 import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
+import { API_CONFIG } from "server/config.js";
 
 const router = express.Router();
 
@@ -106,9 +107,13 @@ router.post("/auth/login", async (req, res) => {
     res.cookie("authToken", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       expires: new Date(result.expiresAt),
       path: "/",
+      domain:
+        process.env.NODE_ENV === "production"
+          ? `.${API_CONFIG.DEFAULT_DOMAIN}`
+          : undefined,
     });
 
     // Increment rate limit after successful login
