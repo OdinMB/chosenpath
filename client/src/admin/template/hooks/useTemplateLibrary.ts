@@ -2,17 +2,17 @@ import { useTemplateCore } from "./useTemplateCore";
 import { useTemplateProcessing } from "./useTemplateProcessing";
 import { useTemplateImport } from "./useTemplateImport";
 import { useTemplateExport } from "./useTemplateExport";
+import { StoryTemplate } from "core/types";
 
-export const useTemplateLibrary = (token: string) => {
+export const useTemplateLibrary = (initialTemplates: StoryTemplate[]) => {
   // Initialize the core hook for basic template operations
-  const templateCore = useTemplateCore(token);
+  const templateCore = useTemplateCore(initialTemplates);
 
   // Initialize template processing hook (passing templates from core)
   const templateProcessing = useTemplateProcessing(templateCore.templates);
 
   // Initialize template import hook (passing processing and core utilities)
   const templateImport = useTemplateImport(
-    token,
     {
       processTemplateFile: templateProcessing.processTemplateFile,
       processCollectionFile: templateProcessing.processCollectionFile,
@@ -21,14 +21,14 @@ export const useTemplateLibrary = (token: string) => {
     },
     {
       createTemplate: templateCore.createTemplate,
-      loadTemplates: templateCore.loadTemplates,
+      revalidator: templateCore.revalidator,
       setIsLoading: templateCore.setIsLoading,
       setError: templateCore.setError,
     }
   );
 
   // Initialize template export hook (passing core utilities)
-  const templateExport = useTemplateExport(token, {
+  const templateExport = useTemplateExport({
     setIsLoading: templateCore.setIsLoading,
     setError: templateCore.setError,
   });
@@ -37,10 +37,9 @@ export const useTemplateLibrary = (token: string) => {
   return {
     // Core template operations and state
     templates: templateCore.templates,
-    isLoading: templateCore.isLoading,
     error: templateCore.error,
     deleteDialog: templateCore.deleteDialog,
-    loadTemplates: templateCore.loadTemplates,
+    revalidator: templateCore.revalidator,
     handleDeleteTemplate: templateCore.handleDeleteTemplate,
     openDeleteDialog: templateCore.openDeleteDialog,
     closeDeleteDialog: templateCore.closeDeleteDialog,

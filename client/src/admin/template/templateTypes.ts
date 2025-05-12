@@ -83,7 +83,9 @@ export interface TemplateCore {
   createTemplate: (
     templateData: Partial<StoryTemplate>
   ) => Promise<StoryTemplate>;
-  loadTemplates: () => Promise<void>;
+  revalidator: {
+    revalidate: () => void;
+  };
   setIsLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
 }

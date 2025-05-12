@@ -1,58 +1,33 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
 import { adminTemplateApi } from "admin/adminApi";
 import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../templateTypes";
+import { useRevalidator } from "react-router-dom";
 
 // Type definitions have been moved to templateTypes.ts
 
-export const useTemplateCore = (token: string) => {
-  const [templates, setTemplates] = useState<StoryTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
+  const [templates] = useState<StoryTemplate[]>(initialTemplates);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({
     isOpen: false,
     templateId: "",
   });
-
-  // Load templates from the server
-  const loadTemplates = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    Logger.Admin.log("Loading story templates");
-
-    try {
-      const response = await adminTemplateApi.getTemplates();
-
-      Logger.Admin.log(
-        `Successfully loaded ${response.data.templates.length} story templates`
-      );
-      setTemplates(response.data.templates);
-    } catch (error) {
-      Logger.Admin.error("Failed to load story templates", error);
-      setError("Failed to load story templates. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
+  const revalidator = useRevalidator();
 
   // Delete a template
   const handleDeleteTemplate = async (templateId: string) => {
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
-      const request = {
-        id: templateId,
-      };
-
-      await adminApi.delete(`/admin/templates/${templateId}`, token, {
-        data: request,
-      });
+      await adminTemplateApi.deleteTemplate(templateId);
 
       Logger.Admin.log(`Successfully deleted template: ${templateId}`);
-      // Refresh the list
-      loadTemplates();
+      // Revalidate the loader data
+      revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error(`Error deleting template: ${templateId}`, error);
       setError("Failed to delete template. Please try again.");
@@ -68,16 +43,14 @@ export const useTemplateCore = (token: string) => {
         template: templateData as Partial<StoryTemplate>,
       };
 
-      const response = await adminApi.post(
-        `/admin/templates`,
-        templateRequest,
-        token
-      );
+      const response = await adminTemplateApi.createTemplate(templateRequest);
 
       Logger.Admin.log(
-        `Successfully created template: ${response.data.template.title}`
+        `Successfully created template: ${response.template.title}`
       );
-      return response.data.template;
+      // Revalidate the loader data
+      revalidator.revalidate();
+      return response.template;
     } catch (error) {
       Logger.Admin.error(
         `Error creating template: ${templateData.title}`,
@@ -115,7 +88,7 @@ export const useTemplateCore = (token: string) => {
     formatDateTime,
 
     // Methods
-    loadTemplates,
+    revalidator,
     handleDeleteTemplate,
     createTemplate,
     openDeleteDialog,

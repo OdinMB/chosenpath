@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { PrimaryButton, Icons, ConfirmDialog } from "components/ui/index";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { ShareLink } from "components/ShareLink";
@@ -9,29 +8,25 @@ import {
   useTableFilterSort,
   ColumnOption,
 } from "shared/components";
+import { useLoaderData, useRevalidator, useNavigate } from "react-router-dom";
+import { AdminTemplateLoaderData } from "./adminTemplateLoader";
+import { adminTemplateApi } from "admin/adminApi";
+import { Logger } from "shared/logger";
+import { createDefaultTemplate } from "./utils/templateFactory";
 
-type TemplateLibraryProps = {
-  token: string;
-  onCreateNew: () => void;
-  onEdit: (template: StoryTemplate) => void;
-};
-
-export const TemplateLibrary = ({
-  token,
-  onCreateNew,
-  onEdit,
-}: TemplateLibraryProps) => {
+export const TemplateLibrary = () => {
+  const { templates: initialTemplates } =
+    useLoaderData() as AdminTemplateLoaderData;
+  const revalidator = useRevalidator();
+  const navigate = useNavigate();
   const {
     templates,
-    isLoading,
     error,
     fileInputRef,
     collectionFileInputRef,
     deleteDialog,
     importDialog,
     collectionImportDialog,
-    loadTemplates,
-    formatDate,
     formatDateTime,
     handleDeleteTemplate,
     openDeleteDialog,
@@ -44,7 +39,7 @@ export const TemplateLibrary = ({
     handleExportAllTemplates,
     handleFileInputChange,
     handleCollectionFileInputChange,
-  } = useTemplateLibrary(token);
+  } = useTemplateLibrary(initialTemplates);
 
   const getStatusColor = (status: PublicationStatus) => {
     switch (status) {
@@ -59,21 +54,17 @@ export const TemplateLibrary = ({
     }
   };
 
-  const tableColumns: ColumnOption<StoryTemplate>[] = [
+  const columns: ColumnOption<StoryTemplate>[] = [
     {
       key: "title",
       label: "Title",
-      filterable: true,
       render: (template) => (
-        <div>
-          <span className="font-medium">{template.title}</span>
-        </div>
+        <span className="font-medium">{template.title}</span>
       ),
     },
     {
       key: "publicationStatus",
       label: "Status",
-      filterable: true,
       render: (template) => (
         <span
           className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
@@ -90,7 +81,6 @@ export const TemplateLibrary = ({
     {
       key: "tags",
       label: "Tags",
-      filterable: true,
       sortable: false,
       className: "py-3 px-4 text-left hidden xl:table-cell",
       render: (template) => (
@@ -113,34 +103,36 @@ export const TemplateLibrary = ({
     {
       key: "playerCountMin",
       label: "Players",
-      className: "py-3 px-4 text-left hidden md:table-cell",
+      className: "py-3 px-4 text-center hidden md:table-cell",
       render: (template) => (
         <>
           {template.playerCountMin === template.playerCountMax
             ? template.playerCountMin
-            : `${template.playerCountMin} - ${template.playerCountMax}`}
+            : `${template.playerCountMin}-${template.playerCountMax}`}
         </>
       ),
     },
     {
       key: "maxTurnsMin",
-      label: "Length",
-      className: "py-3 px-4 text-left hidden lg:table-cell",
+      label: "Beats",
+      filterable: false,
+      className: "py-3 px-4 text-center hidden md:table-cell",
       render: (template) => (
         <>
           {template.maxTurnsMin === template.maxTurnsMax
             ? `${template.maxTurnsMin}`
-            : `${template.maxTurnsMin} - ${template.maxTurnsMax}`}
+            : `${template.maxTurnsMin}-${template.maxTurnsMax}`}
         </>
       ),
     },
     {
       key: "updatedAt",
       label: "Updated",
-      className: "py-3 px-4 text-left hidden md:table-cell",
+      filterable: false,
+      className: "py-3 px-4 text-left hidden lg:table-cell",
       render: (template) => (
         <span className="whitespace-nowrap">
-          {formatDate(template.updatedAt)}
+          {formatDateTime(template.updatedAt)}
         </span>
       ),
     },
@@ -152,7 +144,7 @@ export const TemplateLibrary = ({
       render: (template) => (
         <div className="flex space-x-3">
           <button
-            onClick={() => onEdit(template)}
+            onClick={() => navigate(`/admin/templates/${template.id}`)}
             className="text-secondary hover:text-secondary-700 transition-colors"
             title="Edit template"
           >
@@ -193,9 +185,17 @@ export const TemplateLibrary = ({
     initialSort: { key: "updatedAt", direction: "desc" },
   });
 
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
+  const handleCreateNewTemplate = async () => {
+    try {
+      const defaultTemplate = createDefaultTemplate();
+      const response = await adminTemplateApi.createTemplate({
+        template: defaultTemplate,
+      });
+      navigate(`/admin/templates/${response.template.id}`);
+    } catch (error) {
+      Logger.Admin.error("Failed to create new template", error);
+    }
+  };
 
   return (
     <div className="bg-gray-50 pt-4 rounded-lg">
@@ -203,11 +203,11 @@ export const TemplateLibrary = ({
         <h2 className="text-xl font-semibold text-secondary">Templates</h2>
         <div className="flex gap-2">
           <PrimaryButton
-            onClick={loadTemplates}
+            onClick={revalidator.revalidate}
             size="sm"
             variant="outline"
             leftBorder={false}
-            disabled={isLoading}
+            disabled={revalidator.state === "loading"}
             leftIcon={<Icons.Refresh className="h-4 w-4" />}
             title="Refresh templates"
           ></PrimaryButton>
@@ -256,24 +256,46 @@ export const TemplateLibrary = ({
             title="Export all templates"
           ></PrimaryButton>
 
+          {/* Create New */}
           <PrimaryButton
-            onClick={onCreateNew}
+            onClick={handleCreateNewTemplate}
             size="sm"
+            variant="primary"
+            leftBorder={false}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
+            title="Create new template"
           >
-            Create New
+            New Template
           </PrimaryButton>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 flex items-center rounded-md bg-tertiary-100 p-4 text-sm text-tertiary">
-          <Icons.Error className="mr-2 h-5 w-5" />
-          <span>{error}</span>
+        <div className="mb-4 rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <Icons.Error className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <div className="mt-2 text-sm text-red-700">{error}</div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Confirmation Dialogs */}
+      <SortableTable
+        data={filteredTemplates}
+        columns={columns}
+        sortConfig={sortConfig}
+        onSort={requestSort}
+        filters={filters}
+        onFilter={addFilter}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
+        isLoading={revalidator.state === "loading"}
+        emptyMessage="No templates found"
+      />
 
       {/* Delete Template Dialog */}
       <ConfirmDialog
@@ -281,7 +303,7 @@ export const TemplateLibrary = ({
         onClose={closeDeleteDialog}
         onConfirm={() => handleDeleteTemplate(deleteDialog.templateId)}
         title="Delete Template"
-        message="Are you sure you want to delete this story template? This action cannot be undone."
+        message="Are you sure you want to delete this template? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
       />
@@ -325,44 +347,15 @@ Do you want to proceed with the import and override the existing template?`
         onClose={closeCollectionImportDialog}
         onConfirm={confirmCollectionImport}
         title="Import Template Collection"
-        message={
-          collectionImportDialog.file
-            ? `This collection contains ${collectionImportDialog.summary.total} templates:
+        message={`Found ${collectionImportDialog.summary.total} templates:
+- ${collectionImportDialog.summary.new} new templates
+- ${collectionImportDialog.summary.newer} newer versions
+- ${collectionImportDialog.summary.same} same versions
+- ${collectionImportDialog.summary.older} older versions
 
-• ${collectionImportDialog.summary.new} **new templates**
-• ${collectionImportDialog.summary.newer} templates that are **newer than** existing ones
-• ${collectionImportDialog.summary.older} templates that are **older than** existing ones
-• ${collectionImportDialog.summary.same} templates with the **same update time** as existing ones
-
-Proceeding will import or update all templates in the collection. Continue?`
-            : "Are you sure you want to import this template collection?"
-        }
-        confirmText="Import All"
+Do you want to proceed with the import?`}
+        confirmText="Import"
         cancelText="Cancel"
-      />
-
-      <SortableTable
-        data={filteredTemplates}
-        columns={tableColumns}
-        filters={filters}
-        sortConfig={sortConfig}
-        onSort={requestSort}
-        onFilter={addFilter}
-        onRemoveFilter={removeFilter}
-        onClearFilters={clearFilters}
-        isLoading={isLoading}
-        emptyMessage={
-          <div>
-            <p>No story templates found.</p>
-            <PrimaryButton
-              onClick={onCreateNew}
-              className="mt-4"
-              leftIcon={<Icons.Plus className="h-4 w-4" />}
-            >
-              Create Your First Template
-            </PrimaryButton>
-          </div>
-        }
       />
     </div>
   );

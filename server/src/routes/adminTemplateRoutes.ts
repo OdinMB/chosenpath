@@ -40,7 +40,7 @@ const router = express.Router();
 const templateService = new AdminTemplateService();
 
 // Admin - Get all templates
-router.get("/admin/templates", verifyAdmin, async (req, res) => {
+router.get("/admin/templates", verifyAdmin(), async (req, res) => {
   try {
     const requestId = req.query.requestId as string;
     const templates = await templateService.getAllTemplates();
@@ -59,7 +59,7 @@ router.get("/admin/templates", verifyAdmin, async (req, res) => {
 });
 
 // Admin - Get all templates with their assets
-router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
+router.get("/admin/templates/all/assets", verifyAdmin(), async (req, res) => {
   const requestId = req.query.requestId as string;
   const request = { requestId } as ExportAllTemplatesAssetsRequest;
 
@@ -142,7 +142,7 @@ router.get("/admin/templates/all/assets", verifyAdmin, async (req, res) => {
 });
 
 // Admin - Get template by ID
-router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
+router.get("/admin/templates/:id", verifyAdmin(), async (req, res) => {
   const { id } = req.params;
   const requestId = req.query.requestId as string;
 
@@ -162,7 +162,7 @@ router.get("/admin/templates/:id", verifyAdmin, async (req, res) => {
 });
 
 // Admin - Get all assets for a template (images, etc.)
-router.get("/admin/templates/:id/assets", verifyAdmin, async (req, res) => {
+router.get("/admin/templates/:id/assets", verifyAdmin(), async (req, res) => {
   const { id } = req.params;
   const requestId = req.query.requestId as string;
   const request = { id, requestId } as ExportTemplateAssetsRequest;
@@ -208,7 +208,7 @@ router.get("/admin/templates/:id/assets", verifyAdmin, async (req, res) => {
 });
 
 // Create a new template
-router.post("/admin/templates", verifyAdmin, async (req, res) => {
+router.post("/admin/templates", verifyAdmin(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const createRequest = req.body as CreateTemplateRequest;
 
@@ -232,7 +232,7 @@ router.post("/admin/templates", verifyAdmin, async (req, res) => {
 });
 
 // Update a template
-router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
+router.put("/admin/templates/:id", verifyAdmin(), async (req, res) => {
   const { id } = req.params;
   const requestId = req.body?.requestId || "unknown";
   const updateRequest = req.body as UpdateTemplateRequest;
@@ -258,7 +258,7 @@ router.put("/admin/templates/:id", verifyAdmin, async (req, res) => {
 });
 
 // Delete a template
-router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
+router.delete("/admin/templates/:id", verifyAdmin(), async (req, res) => {
   const { id } = req.params;
   const requestId = req.body?.requestId || "unknown";
   const deleteRequest = req.body as DeleteTemplateRequest;
@@ -284,7 +284,7 @@ router.delete("/admin/templates/:id", verifyAdmin, async (req, res) => {
 });
 
 // Generate a template using AI
-router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
+router.post("/admin/templates/generate", verifyAdmin(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const generateRequest = req.body as GenerateTemplateRequest;
 
@@ -319,7 +319,7 @@ router.post("/admin/templates/generate", verifyAdmin, async (req, res) => {
 });
 
 // Iterate on a template with AI
-router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
+router.post("/admin/templates/:id/iterate", verifyAdmin(), async (req, res) => {
   const { id } = req.params;
   const requestId = req.body?.requestId || "unknown";
   const iterationRequest = req.body as TemplateIterationRequest;
@@ -369,7 +369,7 @@ router.post("/admin/templates/:id/iterate", verifyAdmin, async (req, res) => {
 // Upload a file to a template directory (respecting subdirectories)
 router.post(
   "/admin/templates/:id/files",
-  verifyAdmin,
+  verifyAdmin(),
   upload.single("file"),
   async (req, res) => {
     const { id } = req.params;
@@ -454,7 +454,7 @@ router.post(
 // Import template files from a zip archive
 router.post(
   "/admin/templates/:id/import",
-  verifyAdmin,
+  verifyAdmin(),
   upload.single("zip"),
   async (req, res) => {
     const { id } = req.params;

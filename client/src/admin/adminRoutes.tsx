@@ -8,6 +8,7 @@ import { TemplateForm } from "./template/components";
 import { AdminRouteGuard } from "./components/AdminRouteGuard";
 import { adminStoryLoader } from "./stories/adminStoryLoader";
 import { adminUsersLoader } from "./users/usersLoader";
+import { adminTemplateLoader } from "./template/adminTemplateLoader";
 import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 
 // Define routes for the admin section
@@ -22,6 +23,11 @@ export const adminRoutes: RouteObject[] = [
     errorElement: <AdminErrorBoundary />,
     children: [
       {
+        path: "stories",
+        element: <StoriesOverview />,
+        loader: adminStoryLoader,
+      },
+      {
         path: "users",
         element: <UsersOverview />,
         loader: adminUsersLoader,
@@ -29,19 +35,15 @@ export const adminRoutes: RouteObject[] = [
       {
         path: "templates",
         element: <TemplateLibrary />,
+        loader: adminTemplateLoader,
+      },
+      {
+        path: "templates/:id",
+        element: <TemplateForm />,
       },
       {
         path: "carousel",
         element: <TemplateCarouselManager />,
-      },
-      {
-        path: "stories",
-        element: <StoriesOverview />,
-        loader: adminStoryLoader,
-      },
-      {
-        path: "templates/new",
-        element: <TemplateForm />,
       },
     ],
   },

@@ -1,4 +1,5 @@
 import { StoriesListItem, StoryTemplate, UserListItem } from "core/types";
+import { CreateTemplateRequest } from "core/types/admin";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
@@ -37,6 +38,68 @@ export const adminTemplateApi = {
     return apiClient
       .get<{ template: StoryTemplate }>(`/admin/templates/${templateId}`)
       .then((response) => response.template);
+  },
+
+  deleteTemplate: async (templateId: string): Promise<void> => {
+    Logger.Admin.log(`Deleting template: ${templateId}`);
+    try {
+      await apiClient.delete(`/admin/templates/${templateId}`);
+      Logger.Admin.log(`Successfully deleted template: ${templateId}`);
+    } catch (error) {
+      Logger.Admin.error(`Failed to delete template: ${templateId}`, error);
+      throw error;
+    }
+  },
+
+  createTemplate: async (
+    request: CreateTemplateRequest
+  ): Promise<{ template: StoryTemplate }> => {
+    Logger.Admin.log("Creating template");
+    try {
+      const response = await apiClient.post<{ template: StoryTemplate }>(
+        "/admin/templates",
+        request
+      );
+      Logger.Admin.log(
+        `Successfully created template: ${response.template.title}`
+      );
+      return response;
+    } catch (error) {
+      Logger.Admin.error("Failed to create template", error);
+      throw error;
+    }
+  },
+
+  exportTemplate: async (
+    templateId: string
+  ): Promise<{ template: StoryTemplate }> => {
+    Logger.Admin.log(`Exporting template: ${templateId}`);
+    try {
+      const response = await apiClient.get<{ template: StoryTemplate }>(
+        `/admin/templates/${templateId}/export`
+      );
+      Logger.Admin.log(`Successfully exported template: ${templateId}`);
+      return response;
+    } catch (error) {
+      Logger.Admin.error(`Failed to export template: ${templateId}`, error);
+      throw error;
+    }
+  },
+
+  exportAllTemplates: async (): Promise<{ templates: StoryTemplate[] }> => {
+    Logger.Admin.log("Exporting all templates");
+    try {
+      const response = await apiClient.get<{ templates: StoryTemplate[] }>(
+        "/admin/templates/export"
+      );
+      Logger.Admin.log(
+        `Successfully exported ${response.templates.length} templates`
+      );
+      return response;
+    } catch (error) {
+      Logger.Admin.error("Failed to export all templates", error);
+      throw error;
+    }
   },
 };
 

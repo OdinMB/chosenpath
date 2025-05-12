@@ -18,7 +18,6 @@ import {
 } from "../utils/zipTemplateUtils";
 
 export const useTemplateImport = (
-  token: string,
   templateProcessing: TemplateProcessing,
   templateCore: TemplateCore
 ) => {
@@ -66,7 +65,7 @@ export const useTemplateImport = (
       // Import assets if there are any
       if (fileCount > 0) {
         await importTemplateZip(
-          token,
+          API_CONFIG.DEFAULT_API_URL,
           createdTemplate.id,
           zipBlob,
           API_CONFIG.DEFAULT_API_URL
@@ -106,7 +105,7 @@ export const useTemplateImport = (
         templateDir
       );
       await importTemplateZip(
-        token,
+        API_CONFIG.DEFAULT_API_URL,
         createdTemplate.id,
         zipBlob,
         API_CONFIG.DEFAULT_API_URL
@@ -176,7 +175,7 @@ export const useTemplateImport = (
       await importTemplate(templateData, assetFiles, zipData, templateDir);
 
       // Refresh templates list
-      await templateCore.loadTemplates();
+      templateCore.revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error("Failed to import template", error);
       templateCore.setError(
@@ -216,7 +215,7 @@ export const useTemplateImport = (
       closeImportDialog();
 
       // Refresh templates list
-      await templateCore.loadTemplates();
+      templateCore.revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error("Failed to import template after confirmation", error);
       templateCore.setError("Failed to import template. Please try again.");
@@ -319,7 +318,7 @@ export const useTemplateImport = (
       closeCollectionImportDialog();
 
       // Refresh templates list
-      await templateCore.loadTemplates();
+      templateCore.revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error(
         "Failed to import template collection after confirmation",
@@ -366,37 +365,81 @@ export const useTemplateImport = (
     processTemplateCollectionImport(file);
   };
 
-  const handleFileInputChange = (
+  const handleFileInputChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      Logger.Admin.log(
-        `Selected file: ${file.name} (${file.type}), size: ${file.size} bytes`
-      );
-      handleImportTemplate(file);
+    if (!file) return;
 
-      // Reset the file input so the same file can be selected again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+    try {
+      const { templateData } = await templateProcessing.processTemplateFile(
+        file
+      );
+      const existingTemplate =
+        templateProcessing.findExistingTemplate(templateData);
+      const isNewer = existingTemplate
+        ? templateProcessing.compareTemplateVersions(
+            existingTemplate,
+            templateData
+          )
+        : false;
+
+      setImportDialog({
+        isOpen: true,
+        file,
+        existingTemplate,
+        newTemplate: templateData,
+        isNewer,
+      });
+    } catch (error) {
+      Logger.Admin.error("Error processing template file", error);
+      templateCore.setError(
+        "Failed to process template file. Please try again."
+      );
     }
   };
 
-  const handleCollectionFileInputChange = (
+  const handleCollectionFileInputChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      Logger.Admin.log(
-        `Selected collection file: ${file.name} (${file.type}), size: ${file.size} bytes`
-      );
-      handleImportTemplateCollection(file);
+    if (!file) return;
 
-      // Reset the file input so the same file can be selected again
-      if (collectionFileInputRef.current) {
-        collectionFileInputRef.current.value = "";
-      }
+    try {
+      const { templates } = await templateProcessing.processCollectionFile(
+        file
+      );
+      const summary: ImportSummary = {
+        total: templates.length,
+        new: 0,
+        newer: 0,
+        older: 0,
+        same: 0,
+      };
+
+      templates.forEach((info) => {
+        if (!info.existingTemplate) {
+          summary.new++;
+        } else if (info.isNewer) {
+          summary.newer++;
+        } else if (info.isSameAge) {
+          summary.same++;
+        } else {
+          summary.older++;
+        }
+      });
+
+      setCollectionImportDialog({
+        isOpen: true,
+        file,
+        summary,
+        templates,
+      });
+    } catch (error) {
+      Logger.Admin.error("Error processing collection file", error);
+      templateCore.setError(
+        "Failed to process collection file. Please try again."
+      );
     }
   };
 
