@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
 import { adminTemplateApi } from "admin/adminApi";
@@ -10,7 +10,7 @@ import { useRevalidator } from "react-router-dom";
 // Type definitions have been moved to templateTypes.ts
 
 export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
-  const [templates] = useState<StoryTemplate[]>(initialTemplates);
+  const [templates, setTemplates] = useState<StoryTemplate[]>(initialTemplates);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({
@@ -18,6 +18,11 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
     templateId: "",
   });
   const revalidator = useRevalidator();
+
+  // Effect to update templates when initialTemplates change (e.g., after loader revalidation)
+  useEffect(() => {
+    setTemplates(initialTemplates);
+  }, [initialTemplates]);
 
   // Delete a template
   const handleDeleteTemplate = async (templateId: string) => {
