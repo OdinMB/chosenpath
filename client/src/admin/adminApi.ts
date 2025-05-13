@@ -94,34 +94,35 @@ export const adminTemplateApi = {
     }
   },
 
-  exportTemplate: async (
-    templateId: string
-  ): Promise<{ template: StoryTemplate }> => {
-    Logger.Admin.log(`Exporting template: ${templateId}`);
+  exportTemplate: async (templateId: string): Promise<Blob> => {
+    Logger.Admin.log(`Exporting template assets: ${templateId}`);
     try {
-      const response = await apiClient.get<{ template: StoryTemplate }>(
-        `/admin/templates/${templateId}/export`
+      const blobResponse = await apiClient.get<Blob>(
+        `/admin/templates/${templateId}/assets`,
+        { responseType: "blob" }
       );
-      Logger.Admin.log(`Successfully exported template: ${templateId}`);
-      return response;
+      Logger.Admin.log(`Successfully exported template assets: ${templateId}`);
+      return blobResponse;
     } catch (error) {
-      Logger.Admin.error(`Failed to export template: ${templateId}`, error);
+      Logger.Admin.error(
+        `Failed to export template assets: ${templateId}`,
+        error
+      );
       throw error;
     }
   },
 
-  exportAllTemplates: async (): Promise<{ templates: StoryTemplate[] }> => {
-    Logger.Admin.log("Exporting all templates");
+  exportAllTemplates: async (): Promise<Blob> => {
+    Logger.Admin.log("Exporting all template assets");
     try {
-      const response = await apiClient.get<{ templates: StoryTemplate[] }>(
-        "/admin/templates/export"
+      const blobResponse = await apiClient.get<Blob>(
+        "/admin/templates/all/assets",
+        { responseType: "blob" }
       );
-      Logger.Admin.log(
-        `Successfully exported ${response.templates.length} templates`
-      );
-      return response;
+      Logger.Admin.log("Successfully exported all template assets");
+      return blobResponse;
     } catch (error) {
-      Logger.Admin.error("Failed to export all templates", error);
+      Logger.Admin.error("Failed to export all template assets", error);
       throw error;
     }
   },

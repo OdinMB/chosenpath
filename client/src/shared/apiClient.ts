@@ -130,19 +130,35 @@ axiosInstance.interceptors.request.use(
 // Add response interceptor to handle common response tasks
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Log all server responses
+    const responseUrl = response.config.url || "";
+    // const contentType = response.headers && response.headers['content-type']; // Removed unused variable
+
+    // Handle Blob responses first
+    if (
+      response.config.responseType === "blob" &&
+      response.data instanceof Blob
+    ) {
+      Logger.API?.info?.(
+        `Response from ${responseUrl}: ${response.status} ${response.statusText} - Blob data received (type: ${response.data.type}, size: ${response.data.size})`
+      );
+      return response.data; // Return the Blob data itself
+    }
+
+    // Original logging for non-blob data (now happens after blob check)
     Logger.API?.info?.(
-      `Response from ${response.config.url}: ${response.status} ${
+      `Response from ${responseUrl}: ${response.status} ${
         response.statusText
       }: ${JSON.stringify(response.data).substring(0, 500)}`
     );
 
     // Skip API response handling for health check
-    if (response.config.url?.includes("/health")) {
+    if (responseUrl.includes("/health")) {
+      // For health check, if it's not a blob and made it here, it's likely the raw axios response.
+      // Depending on what callers of /health expect, this might need to be response.data or response.
       return response;
     }
 
-    // Check if the response is a valid API response
+    // Check if the response is a standard API JSON response
     if (
       response.data &&
       typeof response.data === "object" &&
@@ -150,7 +166,6 @@ axiosInstance.interceptors.response.use(
     ) {
       const apiResponse = response.data as BaseServerResponse;
 
-      // Log the API response status and data structure
       Logger.API?.debug?.(
         `API Response status: ${apiResponse.status}, Data: ${JSON.stringify(
           apiResponse
@@ -159,18 +174,16 @@ axiosInstance.interceptors.response.use(
         }`
       );
 
-      // Handle different response statuses
       switch (apiResponse.status) {
         case ResponseStatus.SUCCESS:
-          // For success responses, return just the data payload
-          // Log the transformed return value
           Logger.API?.debug?.(
-            `Transformed data: ${JSON.stringify(response.data.data).substring(
-              0,
-              500
-            )}${JSON.stringify(response.data.data).length > 500 ? "..." : ""}`
+            `Transformed data (SUCCESS): ${JSON.stringify(
+              response.data.data
+            ).substring(0, 500)}${
+              JSON.stringify(response.data.data).length > 500 ? "..." : ""
+            }`
           );
-          return response.data.data;
+          return response.data.data; // Return just the nested 'data' payload for standard success
 
         case ResponseStatus.MODERATION_BLOCKED: {
           const moderationError = apiResponse as ModerationBlockedResponse;
@@ -210,7 +223,6 @@ axiosInstance.interceptors.response.use(
         }
 
         default: {
-          // Add notification for unknown status
           notificationService.addNotification({
             type: "error",
             title: "Error",
@@ -226,22 +238,19 @@ axiosInstance.interceptors.response.use(
         }
       }
     } else {
-      // Log non-standard responses
       Logger.API?.debug?.(
-        `Non-standard response structure: ${typeof response.data}`
+        `Non-standard response structure from ${responseUrl}: ${typeof response.data}`
       );
-      // Add notification for invalid response format
       notificationService.addNotification({
         type: "error",
         title: "Error",
-        message: "Invalid response format",
+        message: "Invalid response format from server",
         duration: 5000,
       });
-      // For non-standard responses, reject with a generic error
       return Promise.reject({
         status: ResponseStatus.ERROR,
-        errorMessage: "Invalid response format",
-        requestId: uuidv4(),
+        errorMessage: "Invalid response format from server",
+        requestId: uuidv4(), // Generate a new requestId as we might not have one from the response
         timestamp: Date.now(),
       } as ErrorResponse);
     }

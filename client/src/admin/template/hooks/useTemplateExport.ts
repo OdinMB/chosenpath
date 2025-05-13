@@ -9,27 +9,34 @@ interface TemplateCore {
 }
 
 export const useTemplateExport = (templateCore: TemplateCore) => {
-  // Export a single template
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename; // Use the suggested filename
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  // Export a single template (with its assets) as a ZIP
   const handleExportTemplate = async (template: StoryTemplate) => {
-    Logger.Admin.log(`Exporting template: ${template.title}`);
+    Logger.Admin.log(`Exporting template assets: ${template.title}`);
     templateCore.setIsLoading(true);
 
     try {
-      // Use getTemplate to fetch the template data directly
-      const fetchedTemplate = await adminTemplateApi.getTemplate(template.id);
-      const blob = new Blob([JSON.stringify(fetchedTemplate, null, 2)], {
-        type: "application/json",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${template.title.toLowerCase().replace(/\s+/g, "-")}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const zipBlob = await adminTemplateApi.exportTemplate(template.id);
+      // Suggest a filename, browser might use Content-Disposition from server
+      const filename = `${template.title
+        .toLowerCase()
+        .replace(/\s+/g, "-")}.zip`;
+      triggerDownload(zipBlob, filename);
     } catch (error) {
-      Logger.Admin.error(`Error exporting template: ${template.title}`, error);
+      Logger.Admin.error(
+        `Error exporting template assets: ${template.title}`,
+        error
+      );
       notificationService.addErrorNotification(
         "Failed to export template. Please try again."
       );
@@ -38,28 +45,22 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
     }
   };
 
-  // Export all templates
+  // Export all templates (with their assets) as a ZIP
   const handleExportAllTemplates = async () => {
-    Logger.Admin.log("Exporting all templates");
+    Logger.Admin.log("Exporting all template assets");
     templateCore.setIsLoading(true);
 
     try {
-      const response = await adminTemplateApi.exportAllTemplates();
-      const blob = new Blob([JSON.stringify(response.templates, null, 2)], {
-        type: "application/json",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "templates.json";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const zipBlob = await adminTemplateApi.exportAllTemplates();
+      // Suggest a filename
+      const filename = `all-templates-${
+        new Date().toISOString().split("T")[0]
+      }.zip`;
+      triggerDownload(zipBlob, filename);
     } catch (error) {
-      Logger.Admin.error("Error exporting all templates", error);
+      Logger.Admin.error("Error exporting all template assets", error);
       notificationService.addErrorNotification(
-        "Failed to export templates. Please try again."
+        "Failed to export all templates. Please try again."
       );
     } finally {
       templateCore.setIsLoading(false);
