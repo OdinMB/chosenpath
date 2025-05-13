@@ -17,32 +17,23 @@ import {
   Outcome,
   StoryElement,
   TemplateIterationSections,
+  GameModes,
 } from "core/types";
 import { PrimaryButton, Icons, Select, Tabs } from "components/ui";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
 import { Logger } from "shared/logger";
+import { useLoaderData } from "react-router-dom";
 
-interface TemplateFormProps {
-  template: StoryTemplate;
-  onSubmit: (template: StoryTemplate) => void;
-  isLoading: boolean;
-  token: string;
-  setIsLoading: (isLoading: boolean) => void;
-}
+export const TemplateForm: React.FC = () => {
+  const initialTemplate = useLoaderData() as StoryTemplate;
 
-export const TemplateForm: React.FC<TemplateFormProps> = ({
-  template,
-  onSubmit,
-  isLoading,
-  token,
-  setIsLoading,
-}) => {
   const {
     activeTab,
     setActiveTab,
     formData,
+    isLoading,
     tags,
     handleSubmit,
     getPlayerOptionsFromStoryTemplate,
@@ -79,10 +70,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     gameModeOptions,
     getGameModeValue,
   } = useTemplateForm({
-    initialTemplate: template,
-    onSubmit,
-    token,
-    setIsLoading,
+    initialTemplate,
   });
 
   // Add these hooks for AI iteration
@@ -92,10 +80,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     requestAiIteration,
     handleCloseModal,
     handleAcceptSection,
-  } = useAiIteration({
-    token,
-    setIsLoading,
-  });
+  } = useAiIteration();
 
   // Define tab navigation items
   const tabItems = [
@@ -162,18 +147,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     sections: Array<TemplateIterationSections>
   ) => {
     try {
-      setIsLoading(true);
       await requestAiIteration(formData, feedback, sections);
     } catch (error) {
       console.error("Error submitting AI iteration:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Use a separate AI iteration section that's not inside the main form
   const renderAiIterationSection = () => {
-    if (activeTab !== "ai-iterate") return null;
+    if (activeTab !== "ai-iterate" || !formData.id) return null;
 
     return (
       <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
@@ -384,10 +366,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                 onBack={() => setActiveTab("basic")}
                 initialPlayerCount={formData.playerCountMin}
                 initialMaxTurns={formData.maxTurnsMin}
-                initialGameMode={formData.gameMode}
+                initialGameMode={formData.gameMode || GameModes.Cooperative}
                 showBackButton={false}
                 isLoading={isLoading}
-                wrappingForm={true}
                 templateMode={true}
               />
             </div>

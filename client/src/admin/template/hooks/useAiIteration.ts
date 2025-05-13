@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Logger } from "shared/logger";
-import { LONG_OPERATION_TIMEOUT } from "shared/apiClient";
 import { adminTemplateApi } from "admin/adminApi";
 import {
   StoryTemplate,
@@ -8,18 +7,18 @@ import {
   TemplateIterationSections,
 } from "core/types";
 import { templateIterationSections } from "core/utils/templateIterationSections";
+import { notificationService } from "../../../shared/notifications/notificationService";
 
-interface UseAiIterationProps {
-  token: string;
-  setIsLoading: (isLoading: boolean) => void;
-}
+// No props needed for this hook anymore
+// interface UseAiIterationProps {}
 
-export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
+export function useAiIteration() {
+  // Props removed
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [iterationData, setIterationData] = useState<Partial<StoryTemplate>>(
     {}
   );
-  const [error, setError] = useState<string | null>(null);
+  const [isIterating, setIsIterating] = useState(false);
 
   const requestAiIteration = async (
     template: StoryTemplate,
@@ -29,15 +28,13 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     if (!template.id) {
       const errorMsg = "Invalid template ID for AI iteration";
       Logger.Admin.error(errorMsg);
-      setError(errorMsg);
+      notificationService.addErrorNotification(errorMsg);
       throw new Error(errorMsg);
     }
 
     try {
-      setError(null);
-      setIsLoading(true);
+      setIsIterating(true);
 
-      // Create a request with the proper type
       const request: TemplateIterationRequest = {
         templateId: template.id,
         feedback,
@@ -47,29 +44,22 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
         maxTurns: template.maxTurnsMin,
       };
 
-      // Make the API request with adminApi
-      const response = await adminApi.post(
-        `/admin/templates/${template.id}/iterate`,
-        request,
-        token,
-        { timeout: LONG_OPERATION_TIMEOUT }
-      );
-
-      const templateUpdate: Partial<StoryTemplate> =
-        response.data.templateUpdate;
+      const response = await adminTemplateApi.iterateTemplate(request);
+      const templateUpdate = response.templateUpdate;
 
       Logger.Admin.log("AI partial StoryTemplate:", templateUpdate);
 
       setIterationData(templateUpdate);
       setIsModalOpen(true);
       return templateUpdate;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "AI iteration failed";
       Logger.Admin.error("AI iteration error:", errorMsg);
-      setError(errorMsg);
-      throw error;
+      notificationService.addErrorNotification(errorMsg);
+      throw err;
     } finally {
-      setIsLoading(false);
+      setIsIterating(false);
     }
   };
 
@@ -77,27 +67,21 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     setIsModalOpen(false);
   };
 
-  // Clears the modal data for the section that was accepted
   const handleAcceptSection = (
     sectionKey: TemplateIterationSections,
     data: Partial<StoryTemplate>
   ) => {
-    // Handle the acceptance of a section
     Logger.Admin.log(`Accepted section: ${String(sectionKey)}`, data);
 
-    // Clear the data for that section since it's been accepted
     setIterationData((prev) => {
       const updated = { ...prev };
 
-      // Delete all fields related to the selected section
       if (sectionKey in templateIterationSections) {
         const fieldsToDelete = templateIterationSections[sectionKey];
-        // Delete each field
         fieldsToDelete.forEach((field: string) => {
           delete updated[field as keyof Partial<StoryTemplate>];
         });
 
-        // Special handling for players section - also delete player1-n fields
         if (sectionKey === "players") {
           Object.keys(updated).forEach((key) => {
             if (key.startsWith("player")) {
@@ -107,7 +91,6 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
         }
       }
 
-      // If no more sections, close the modal
       if (Object.keys(updated).length === 0) {
         setIsModalOpen(false);
       }
@@ -124,6 +107,6 @@ export function useAiIteration({ token, setIsLoading }: UseAiIterationProps) {
     requestAiIteration,
     handleCloseModal,
     handleAcceptSection,
-    error,
+    isLoading: isIterating,
   };
 }

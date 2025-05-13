@@ -1,5 +1,10 @@
 import { StoriesListItem, StoryTemplate, UserListItem } from "core/types";
-import { CreateTemplateRequest } from "core/types/admin";
+import {
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  GenerateTemplateRequest,
+  TemplateIterationRequest,
+} from "core/types/admin";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
@@ -70,6 +75,25 @@ export const adminTemplateApi = {
     }
   },
 
+  updateTemplate: async (
+    request: UpdateTemplateRequest
+  ): Promise<{ template: StoryTemplate }> => {
+    Logger.Admin.log(`Updating template: ${request.id}`);
+    try {
+      const response = await apiClient.put<{ template: StoryTemplate }>(
+        `/admin/templates/${request.id}`,
+        { template: request.template } // Ensure body matches server expectation if request is { template: ... }
+      );
+      Logger.Admin.log(
+        `Successfully updated template: ${response.template.title}`
+      );
+      return response;
+    } catch (error) {
+      Logger.Admin.error(`Failed to update template: ${request.id}`, error);
+      throw error;
+    }
+  },
+
   exportTemplate: async (
     templateId: string
   ): Promise<{ template: StoryTemplate }> => {
@@ -98,6 +122,50 @@ export const adminTemplateApi = {
       return response;
     } catch (error) {
       Logger.Admin.error("Failed to export all templates", error);
+      throw error;
+    }
+  },
+
+  generateTemplateViaApi: async (
+    request: GenerateTemplateRequest
+  ): Promise<{ template: StoryTemplate }> => {
+    Logger.Admin.log("Generating template via API", request);
+    try {
+      const response = await apiClient.post<{ template: StoryTemplate }>(
+        "/admin/templates/generate",
+        request
+      );
+      Logger.Admin.log(
+        `Successfully generated template via API: ${response.template.title}`
+      );
+      return response;
+    } catch (error) {
+      Logger.Admin.error("Failed to generate template via API", error);
+      throw error;
+    }
+  },
+
+  iterateTemplate: async (
+    request: TemplateIterationRequest
+  ): Promise<{ templateUpdate: Partial<StoryTemplate> }> => {
+    Logger.Admin.log(`Iterating template: ${request.templateId}`, request);
+    try {
+      const response = await apiClient.post<{
+        templateUpdate: Partial<StoryTemplate>;
+      }>(
+        `/admin/templates/${request.templateId}/iterate`,
+        request // Send the whole request object as the body
+      );
+      Logger.Admin.log(
+        `Successfully iterated template: ${request.templateId}`,
+        response.templateUpdate
+      );
+      return response;
+    } catch (error) {
+      Logger.Admin.error(
+        `Failed to iterate template: ${request.templateId}`,
+        error
+      );
       throw error;
     }
   },

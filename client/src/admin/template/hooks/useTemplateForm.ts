@@ -11,13 +11,21 @@ import {
   StoryElement,
   Outcome,
   ImageInstructions,
+  PlayerCount,
 } from "core/types";
 import { Logger } from "shared/logger";
 import { MAX_PLAYERS } from "core/config";
 import { useBasicInfoTab } from "./useBasicInfoTab";
 import { useGuidelinesEditor } from "./useGuidelinesEditor";
-import { useTemplateApi } from "./useTemplateApi";
+import { adminTemplateApi } from "../../adminApi"; // Import adminTemplateApi
 import { useTabs } from "components/ui/useTabs";
+import {
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  GenerateTemplateRequest,
+} from "core/types/admin";
+import { useNavigate } from "react-router-dom";
+import { notificationService } from "../../../shared/notifications/notificationService";
 
 // Define the TabType type
 export type TabType =
@@ -33,20 +41,17 @@ export type TabType =
 
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
-  onSubmit: (template: StoryTemplate) => void;
-  token: string;
-  setIsLoading: (isLoading: boolean) => void;
+  // onSubmit: (template: StoryTemplate) => void; // Will be handled internally by navigation/revalidation
+  // token: string; // No longer needed
+  // setIsLoading: (isLoading: boolean) => void; // Will be handled internally
 }
 
-export function useTemplateForm({
-  initialTemplate,
-  onSubmit,
-  token,
-  setIsLoading,
-}: UseTemplateFormProps) {
+export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
   // Core state
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
   const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
+  const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
+  const navigate = useNavigate();
 
   // Use specialized hooks
   const {
@@ -63,7 +68,6 @@ export function useTemplateForm({
     handlePublicationStatusChange,
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
-    // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
     getMinTurnsOptions,
@@ -82,26 +86,26 @@ export function useTemplateForm({
     conflicts,
     decisions,
     typesOfThreads,
+    switchAndThreadInstructions,
     setWorld,
     setRules,
     setTone,
     setConflicts,
     setDecisions,
     setTypesOfThreads,
+    setSwitchAndThreadInstructions,
+    updateGuidelines,
     handleArrayFieldChange,
     handleAddArrayItem,
     handleRemoveArrayItem,
-    updateGuidelines,
-    setSwitchAndThreadInstructions,
   } = useGuidelinesEditor({
     guidelines: formData.guidelines,
-    onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
-  });
-
-  const { saveTemplate, generateTemplate } = useTemplateApi({
-    token,
-    onSuccess: onSubmit,
-    setIsLoading,
+    onChange: (updates) => {
+      setFormData((prev) => ({
+        ...prev,
+        guidelines: { ...prev.guidelines, ...updates.guidelines },
+      }));
+    },
   });
 
   // Update form data when initialTemplate prop changes
@@ -213,32 +217,126 @@ export function useTemplateForm({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     Logger.UI.log("Form submission started");
+    setIsLoading(true);
 
-    // Ensure guidelines are up to date
-    updateGuidelines();
+    try {
+      updateGuidelines();
 
-    // Construct the final template, merging all state
-    const updatedTemplate: StoryTemplate = {
-      ...formData,
-      tags,
-    };
+      const templateToSubmit: StoryTemplate = {
+        ...formData,
+        tags,
+      };
 
-    // Save the template
-    await saveTemplate(updatedTemplate);
+      if (!templateToSubmit.id) {
+        // Create new template
+        Logger.Admin.log("Creating new template in form", templateToSubmit);
+        const createRequest: CreateTemplateRequest = {
+          template: templateToSubmit,
+        };
+        const response = await adminTemplateApi.createTemplate(createRequest);
+        Logger.Admin.log("Template created successfully", response.template);
+        navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
+      } else {
+        // Update existing template
+        Logger.Admin.log(
+          `Updating template: ${templateToSubmit.id}`,
+          templateToSubmit
+        );
+        const updateRequest: UpdateTemplateRequest = {
+          id: templateToSubmit.id,
+          template: templateToSubmit,
+        };
+        const response = await adminTemplateApi.updateTemplate(updateRequest);
+        Logger.Admin.log("Template saved successfully", response.template);
+        // Optionally, show a success notification
+        // Revalidation of data for a library view would typically happen there, or if this form closes.
+      }
+    } catch (err) {
+      Logger.Admin.error("Error submitting template form:", err);
+      const message =
+        err instanceof Error ? err.message : "Failed to save template";
+      notificationService.addErrorNotification(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle AI draft setup
   const handleAIDraftSetup = async (options: {
     prompt: string;
-    playerCount: number;
+    playerCount: PlayerCount;
     maxTurns: number;
     gameMode: GameMode;
+    generateImages: boolean;
   }) => {
-    await generateTemplate({
-      ...options,
-      currentTemplate: formData,
-      onUpdate: (tab: string) => setActiveTab(tab as TabType),
-    });
+    Logger.UI.log("AI Draft setup initiated with options:", options);
+    setIsLoading(true);
+
+    try {
+      const request: GenerateTemplateRequest = {
+        prompt: options.prompt,
+        playerCount: options.playerCount,
+        maxTurns: options.maxTurns,
+        gameMode: options.gameMode,
+        generateImages: options.generateImages,
+      };
+
+      const response = await adminTemplateApi.generateTemplateViaApi(request);
+      const generatedTemplateData = response.template;
+
+      Logger.UI.log("AI Draft generated data:", generatedTemplateData);
+
+      // Prepare player-specific updates separately for better type handling
+      const playerSpecificUpdates: {
+        [K in (typeof PLAYER_SLOTS)[number]]?: PlayerOptionsGeneration;
+      } = {};
+      PLAYER_SLOTS.forEach((slot) => {
+        const key = slot as keyof StoryTemplate; // key is one of 'player1', 'player2', etc.
+        if (Object.prototype.hasOwnProperty.call(generatedTemplateData, key)) {
+          playerSpecificUpdates[slot] = generatedTemplateData[
+            key
+          ] as PlayerOptionsGeneration;
+        }
+      });
+
+      // Merge generated data into existing formData, keeping existing ID, etc.
+      setFormData((prev) => ({
+        ...prev, // Keep existing ID, created/updated timestamps, publication status etc.
+        title: generatedTemplateData.title || prev.title,
+        teaser: generatedTemplateData.teaser || prev.teaser,
+        imageInstructions:
+          generatedTemplateData.imageInstructions || prev.imageInstructions,
+        guidelines: generatedTemplateData.guidelines || prev.guidelines,
+        storyElements:
+          generatedTemplateData.storyElements || prev.storyElements,
+        sharedOutcomes:
+          generatedTemplateData.sharedOutcomes || prev.sharedOutcomes,
+        statGroups: generatedTemplateData.statGroups || prev.statGroups,
+        sharedStats: generatedTemplateData.sharedStats || prev.sharedStats,
+        playerStats: generatedTemplateData.playerStats || prev.playerStats,
+        characterSelectionIntroduction:
+          generatedTemplateData.characterSelectionIntroduction ||
+          prev.characterSelectionIntroduction,
+        ...playerSpecificUpdates, // Spread the prepared player-specific updates
+        // Update gameMode, playerCount, maxTurns from the generation options as these define the structure
+        gameMode: options.gameMode,
+        playerCountMin: options.playerCount,
+        playerCountMax: options.playerCount,
+        maxTurnsMin: options.maxTurns,
+        maxTurnsMax: options.maxTurns,
+      }));
+
+      // Switch to a relevant tab after drafting, e.g., basic info or guidelines
+      setActiveTab("basic");
+      // Optionally, show a success notification
+    } catch (err) {
+      Logger.Admin.error("Error during AI draft generation:", err);
+      const message =
+        err instanceof Error ? err.message : "Failed to generate draft content";
+      notificationService.addErrorNotification(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handlers for specific form sections
@@ -315,6 +413,7 @@ export function useTemplateForm({
     activeTab,
     setActiveTab,
     formData,
+    isLoading,
     // Expose data from other hooks
     world,
     rules,
@@ -322,6 +421,7 @@ export function useTemplateForm({
     conflicts,
     decisions,
     typesOfThreads,
+    switchAndThreadInstructions,
     tags,
     // Handlers for guidelines tab
     handleArrayFieldChange,

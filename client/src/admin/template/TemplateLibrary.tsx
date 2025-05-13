@@ -9,14 +9,14 @@ import {
   ColumnOption,
 } from "shared/components";
 import { useLoaderData, useRevalidator, useNavigate } from "react-router-dom";
-import { AdminTemplateLoaderData } from "./adminTemplateLoader";
+import { AdminTemplatesLoaderData } from "./adminTemplatesLoader.js";
 import { adminTemplateApi } from "admin/adminApi";
 import { Logger } from "shared/logger";
 import { createDefaultTemplate } from "./utils/templateFactory";
 
 export const TemplateLibrary = () => {
   const { templates: initialTemplates } =
-    useLoaderData() as AdminTemplateLoaderData;
+    useLoaderData() as AdminTemplatesLoaderData;
   const revalidator = useRevalidator();
   const navigate = useNavigate();
   const {

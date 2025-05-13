@@ -10,20 +10,47 @@ import { notificationService } from "shared/notifications/notificationService";
 
 interface StoryInitializerProps {
   onBack: () => void;
+  onSetup?: (options: {
+    prompt: string;
+    playerCount: PlayerCount;
+    maxTurns: number;
+    gameMode: GameMode;
+    generateImages: boolean;
+  }) => Promise<void>;
+  initialPlayerCount?: PlayerCount;
+  initialMaxTurns?: number;
+  initialGameMode?: GameMode;
+  showBackButton?: boolean;
+  isLoading?: boolean;
+  templateMode?: boolean;
 }
 
-export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
+export const StoryInitializer = ({
+  onBack,
+  onSetup,
+  initialPlayerCount,
+  initialMaxTurns,
+  initialGameMode,
+  showBackButton = true,
+  isLoading: externalIsLoading,
+  templateMode = false,
+}: StoryInitializerProps) => {
   const [prompt, setPrompt] = useState("");
-  const [playerCount, setPlayerCount] = useState<PlayerCount>(MIN_PLAYERS);
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(
+    initialPlayerCount || MIN_PLAYERS
+  );
+  const [maxTurns] = useState<number>(initialMaxTurns || DEFAULT_TURNS);
   const [generateImages, setGenerateImages] = useState(false);
-  const [gameMode, setGameMode] = useState<GameMode>(GameModes.Cooperative);
+  const [gameMode, setGameMode] = useState<GameMode>(
+    initialGameMode || GameModes.Cooperative
+  );
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
   const navigate = useNavigate();
 
   const {
-    isLoading,
+    isLoading: internalIsLoading,
     storyId,
     playerCodes,
     storyReady,
@@ -138,22 +165,38 @@ export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      await createStory({
-        prompt,
-        playerCount,
-        maxTurns: DEFAULT_TURNS,
-        generateImages,
-        gameMode,
-      });
-
-      // Handle successful response
-      if (storyId) {
-        navigate(`/story/${storyId}`);
+    if (templateMode && onSetup) {
+      try {
+        await onSetup({
+          prompt,
+          playerCount,
+          maxTurns,
+          gameMode,
+          generateImages,
+        });
+      } catch (error) {
+        console.error("Error during template AI draft setup:", error);
+        notificationService.addErrorNotification(
+          "Failed to draft template content. Please try again."
+        );
       }
-    } catch (error) {
-      console.error(error);
-      notificationService.addErrorNotification();
+    } else {
+      try {
+        await createStory({
+          prompt,
+          playerCount,
+          maxTurns,
+          generateImages,
+          gameMode,
+        });
+
+        if (storyId) {
+          navigate(`/story/${storyId}`);
+        }
+      } catch (error) {
+        console.error(error);
+        notificationService.addErrorNotification();
+      }
     }
   };
 
@@ -184,6 +227,8 @@ export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
     Logger.App.log(`Updated game mode to: ${mode}`);
   };
 
+  const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
+
   if (storyId && playerCodes) {
     return (
       <PlayerCodes
@@ -194,9 +239,15 @@ export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
     );
   }
 
+  const FormWrapper = templateMode ? "div" : "form";
+  const submitButtonType = templateMode ? "button" : "submit";
+
   return (
     <div className="p-4 md:p-6 font-lora">
-      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
+      <FormWrapper
+        onSubmit={!templateMode ? handleSubmit : undefined}
+        className="max-w-2xl mx-auto space-y-6"
+      >
         {/* Player Count and Game Mode Box */}
         <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
           {/* Player Count */}
@@ -275,7 +326,7 @@ export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
               size="sm"
               leftBorder={false}
               className="self-end sm:self-auto"
-              disabled={isLoading}
+              disabled={currentIsLoading}
             >
               Get suggestion
             </PrimaryButton>
@@ -286,54 +337,59 @@ export const StoryInitializer = ({ onBack }: StoryInitializerProps) => {
             onChange={(e) => setPrompt(e.target.value)}
             className={`w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
             placeholder={getPlaceholderText()}
-            disabled={isLoading}
+            disabled={currentIsLoading}
             required
           />
         </div>
 
-        {/* Images Box */}
-        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-          <div className="items-center flex">
-            <input
-              id="generate-images"
-              type="checkbox"
-              checked={generateImages}
-              onChange={(e) => setGenerateImages(e.target.checked)}
-              className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-              disabled={isLoading}
-            />
-            <label
-              htmlFor="generate-images"
-              className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
-            >
-              Generate additional custom images for this story
-            </label>
+        {/* Images Box - Conditionally render if not in templateMode */}
+        {!templateMode && (
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+            <div className="items-center flex">
+              <input
+                id="generate-images"
+                type="checkbox"
+                checked={generateImages}
+                onChange={(e) => setGenerateImages(e.target.checked)}
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                disabled={currentIsLoading}
+              />
+              <label
+                htmlFor="generate-images"
+                className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
+              >
+                Generate additional custom images for this story
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex flex-row gap-3 sm:gap-4 pt-2">
-          <PrimaryButton
-            type="button"
-            size="lg"
-            onClick={onBack}
-            variant="outline"
-            leftBorder={false}
-            leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
-          >
-            Back
-          </PrimaryButton>
+          {showBackButton && (
+            <PrimaryButton
+              type="button"
+              size="lg"
+              onClick={onBack}
+              variant="outline"
+              leftBorder={false}
+              leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
+            >
+              Back
+            </PrimaryButton>
+          )}
 
           <PrimaryButton
-            type="submit"
+            type={submitButtonType}
+            onClick={templateMode ? handleSubmit : undefined}
             size="lg"
-            disabled={isLoading}
+            disabled={currentIsLoading}
             fullWidth
             className="font-semibold text-lg"
           >
-            Create Story
+            {templateMode ? "Draft Content" : "Create Story"}
           </PrimaryButton>
         </div>
-      </form>
+      </FormWrapper>
     </div>
   );
 };

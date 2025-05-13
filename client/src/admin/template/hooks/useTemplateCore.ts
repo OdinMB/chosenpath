@@ -6,13 +6,13 @@ import { CreateTemplateRequest } from "core/types";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../templateTypes";
 import { useRevalidator } from "react-router-dom";
+import { notificationService } from "../../../shared/notifications/notificationService";
 
 // Type definitions have been moved to templateTypes.ts
 
 export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
   const [templates, setTemplates] = useState<StoryTemplate[]>(initialTemplates);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({
     isOpen: false,
     templateId: "",
@@ -35,7 +35,9 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
       revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error(`Error deleting template: ${templateId}`, error);
-      setError("Failed to delete template. Please try again.");
+      notificationService.addErrorNotification(
+        "Failed to delete template. Please try again."
+      );
     }
   };
 
@@ -61,7 +63,9 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
         `Error creating template: ${templateData.title}`,
         error
       );
-      setError("Failed to create template. Please try again.");
+      notificationService.addErrorNotification(
+        "Failed to create template. Please try again."
+      );
       throw error;
     }
   };
@@ -85,7 +89,6 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
     // State
     templates,
     isLoading,
-    error,
     deleteDialog,
 
     // Date formatting (using shared utils)
@@ -101,6 +104,5 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
 
     // State setters
     setIsLoading,
-    setError,
   };
 };
