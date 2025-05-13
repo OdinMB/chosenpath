@@ -165,7 +165,6 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   teaser: string;
   tags: string[];
   publicationStatus: PublicationStatusType;
-  imageFile: string;
   showOnWelcomeScreen: boolean;
   order: number;
 };

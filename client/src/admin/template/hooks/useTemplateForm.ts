@@ -355,9 +355,6 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     }));
   };
 
-  const handleImageFileChange = (imageFile: string) =>
-    setFormData((prev) => ({ ...prev, imageFile }));
-
   const handleStoryElementsChange = (elements: StoryElement[]) =>
     setFormData((prev) => ({ ...prev, storyElements: elements }));
 
@@ -448,7 +445,6 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     handleMaxTurnsMinChange,
     handleMaxTurnsMaxChange,
     handleStatsChange,
-    handleImageFileChange,
     handleStoryElementsChange,
     handleOutcomesChange,
     handlePlayerChange,

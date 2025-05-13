@@ -15,8 +15,9 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
     templateCore.setIsLoading(true);
 
     try {
-      const response = await adminTemplateApi.exportTemplate(template.id);
-      const blob = new Blob([JSON.stringify(response.template, null, 2)], {
+      // Use getTemplate to fetch the template data directly
+      const fetchedTemplate = await adminTemplateApi.getTemplate(template.id);
+      const blob = new Blob([JSON.stringify(fetchedTemplate, null, 2)], {
         type: "application/json",
       });
       const url = window.URL.createObjectURL(blob);
