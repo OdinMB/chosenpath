@@ -3,6 +3,7 @@ import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
 import JSZip from "jszip";
 import { API_CONFIG } from "client/config";
+import { notificationService } from "shared/notifications/notificationService";
 import {
   ImportDialogState,
   CollectionImportDialogState,
@@ -142,7 +143,6 @@ export const useTemplateImport = (
 
     Logger.Admin.log(`Processing template from file: ${file.name}`);
     templateCore.setIsLoading(true);
-    templateCore.setError(null);
 
     try {
       // Process the file to extract template data and assets
@@ -178,7 +178,7 @@ export const useTemplateImport = (
       templateCore.revalidator.revalidate();
     } catch (error) {
       Logger.Admin.error("Failed to import template", error);
-      templateCore.setError(
+      notificationService.addErrorNotification(
         "Failed to import template. Please check the file format."
       );
     } finally {
@@ -217,10 +217,13 @@ export const useTemplateImport = (
       // Refresh templates list
       templateCore.revalidator.revalidate();
     } catch (error) {
-      Logger.Admin.error("Failed to import template after confirmation", error);
-      templateCore.setError("Failed to import template. Please try again.");
+      Logger.Admin.error("Failed to import template", error);
+      notificationService.addErrorNotification(
+        "Failed to import template. Please try again."
+      );
     } finally {
       templateCore.setIsLoading(false);
+      closeImportDialog();
     }
   };
 
@@ -232,7 +235,6 @@ export const useTemplateImport = (
 
     Logger.Admin.log(`Processing template collection from file: ${file.name}`);
     templateCore.setIsLoading(true);
-    templateCore.setError(null);
 
     try {
       // Process the collection file
@@ -250,9 +252,9 @@ export const useTemplateImport = (
         templates: templateInfos,
       });
     } catch (error) {
-      Logger.Admin.error("Failed to import template collection", error);
-      templateCore.setError(
-        "Failed to import template collection. Please check the file format."
+      Logger.Admin.error("Failed to process template collection", error);
+      notificationService.addErrorNotification(
+        "Failed to process template collection. Please check the file format."
       );
     } finally {
       templateCore.setIsLoading(false);
@@ -263,72 +265,90 @@ export const useTemplateImport = (
    * Confirm import of a template collection after user approval
    */
   const confirmCollectionImport = async () => {
-    if (
-      !collectionImportDialog.file ||
-      collectionImportDialog.templates.length === 0
-    )
+    if (!collectionImportDialog.file || !collectionImportDialog.templates)
       return;
 
     templateCore.setIsLoading(true);
+    let importedCount = 0;
+    const totalToImport = collectionImportDialog.templates.filter(
+      (t) => !t.existingTemplate || t.isNewer
+    ).length;
+
     try {
       if (collectionImportDialog.file.name.endsWith(".zip")) {
-        // Re-process the ZIP to import templates with assets
+        // Re-process the ZIP to get asset handling data (zipData, zipFiles)
+        // but decisions will be based on collectionImportDialog.templates
         const {
-          templates: templateInfos,
+          // templates from processCollectionFile is not used for decision logic here
           zipData,
           zipFiles,
         } = await templateProcessing.processCollectionFile(
           collectionImportDialog.file
         );
 
-        // Import each template from the dialog
-        for (const templateInfo of templateInfos) {
-          const templateDir = templateInfo.templateDir;
-
-          try {
-            // Import this template with all its assets from its directory
-            await importTemplateFromCollection(
-              templateInfo.template,
-              templateDir,
-              zipData!,
-              zipFiles!
-            );
-          } catch (importError) {
-            Logger.Admin.error(
-              `Error importing template from ${templateDir}`,
-              importError
-            );
-            // Continue with other templates even if one fails
+        // Iterate over the templates the user saw and confirmed in the dialog
+        for (const dialogTemplateInfo of collectionImportDialog.templates) {
+          // Only import if it's new or newer
+          if (
+            !dialogTemplateInfo.existingTemplate ||
+            dialogTemplateInfo.isNewer
+          ) {
+            try {
+              await importTemplateFromCollection(
+                dialogTemplateInfo.template,
+                dialogTemplateInfo.templateDir,
+                zipData!, // Use zipData from the re-processed collection
+                zipFiles! // Use zipFiles from the re-processed collection
+              );
+              importedCount++;
+            } catch (importError) {
+              Logger.Admin.error(
+                `Error importing template ${
+                  dialogTemplateInfo.template.title || "untitled"
+                } from ${dialogTemplateInfo.templateDir}`,
+                importError
+              );
+              // Continue with other templates even if one fails
+            }
           }
         }
       } else {
         // JSON array import
-        for (const templateInfo of collectionImportDialog.templates) {
-          try {
-            // Create template on server
-            await templateCore.createTemplate(templateInfo.template);
-          } catch (error) {
-            Logger.Admin.error("Failed to import a template", error);
-            // Continue with other templates
+        // Iterate over the templates the user saw and confirmed in the dialog
+        for (const dialogTemplateInfo of collectionImportDialog.templates) {
+          // Only import if it's new or newer
+          if (
+            !dialogTemplateInfo.existingTemplate ||
+            dialogTemplateInfo.isNewer
+          ) {
+            try {
+              await templateCore.createTemplate(dialogTemplateInfo.template);
+              importedCount++;
+            } catch (error) {
+              Logger.Admin.error(
+                `Failed to import template ${
+                  dialogTemplateInfo.template.title || "untitled"
+                } from JSON array`,
+                error
+              );
+              // Continue with other templates
+            }
           }
         }
       }
 
-      // Close dialog
-      closeCollectionImportDialog();
-
-      // Refresh templates list
-      templateCore.revalidator.revalidate();
-    } catch (error) {
-      Logger.Admin.error(
-        "Failed to import template collection after confirmation",
-        error
+      Logger.Admin.log(
+        `Successfully imported ${importedCount} templates from collection.`
       );
-      templateCore.setError(
-        "Failed to import template collection. Please try again."
+    } catch (error) {
+      Logger.Admin.error("Error during collection import", error);
+      notificationService.addErrorNotification(
+        `Failed to import some templates from the collection. ${importedCount}/${totalToImport} imported.`
       );
     } finally {
       templateCore.setIsLoading(false);
+      templateCore.revalidator.revalidate();
+      closeCollectionImportDialog();
     }
   };
 
@@ -369,77 +389,28 @@ export const useTemplateImport = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const { templateData } = await templateProcessing.processTemplateFile(
-        file
-      );
-      const existingTemplate =
-        templateProcessing.findExistingTemplate(templateData);
-      const isNewer = existingTemplate
-        ? templateProcessing.compareTemplateVersions(
-            existingTemplate,
-            templateData
-          )
-        : false;
-
-      setImportDialog({
-        isOpen: true,
-        file,
-        existingTemplate,
-        newTemplate: templateData,
-        isNewer,
-      });
-    } catch (error) {
-      Logger.Admin.error("Error processing template file", error);
-      templateCore.setError(
-        "Failed to process template file. Please try again."
-      );
+    if (file) {
+      await processTemplateImport(file);
+    }
+    // Reset file input to allow re-uploading the same file
+    if (event.target) {
+      event.target.value = "";
     }
   };
 
+  /**
+   * Handle file input change for template collection
+   */
   const handleCollectionFileInputChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const { templates } = await templateProcessing.processCollectionFile(
-        file
-      );
-      const summary: ImportSummary = {
-        total: templates.length,
-        new: 0,
-        newer: 0,
-        older: 0,
-        same: 0,
-      };
-
-      templates.forEach((info) => {
-        if (!info.existingTemplate) {
-          summary.new++;
-        } else if (info.isNewer) {
-          summary.newer++;
-        } else if (info.isSameAge) {
-          summary.same++;
-        } else {
-          summary.older++;
-        }
-      });
-
-      setCollectionImportDialog({
-        isOpen: true,
-        file,
-        summary,
-        templates,
-      });
-    } catch (error) {
-      Logger.Admin.error("Error processing collection file", error);
-      templateCore.setError(
-        "Failed to process collection file. Please try again."
-      );
+    if (file) {
+      await processTemplateCollectionImport(file);
+    }
+    // Reset file input to allow re-uploading the same file
+    if (event.target) {
+      event.target.value = "";
     }
   };
 

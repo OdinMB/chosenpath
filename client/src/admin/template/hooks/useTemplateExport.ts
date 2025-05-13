@@ -1,11 +1,11 @@
 import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
 import { adminTemplateApi } from "admin/adminApi";
+import { notificationService } from "shared/notifications/notificationService";
 
 // Interface for templateCore to use for loading state
 interface TemplateCore {
   setIsLoading: (isLoading: boolean) => void;
-  setError: (error: string | null) => void;
 }
 
 export const useTemplateExport = (templateCore: TemplateCore) => {
@@ -13,7 +13,6 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
   const handleExportTemplate = async (template: StoryTemplate) => {
     Logger.Admin.log(`Exporting template: ${template.title}`);
     templateCore.setIsLoading(true);
-    templateCore.setError(null);
 
     try {
       const response = await adminTemplateApi.exportTemplate(template.id);
@@ -30,7 +29,9 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
       document.body.removeChild(a);
     } catch (error) {
       Logger.Admin.error(`Error exporting template: ${template.title}`, error);
-      templateCore.setError("Failed to export template. Please try again.");
+      notificationService.addErrorNotification(
+        "Failed to export template. Please try again."
+      );
     } finally {
       templateCore.setIsLoading(false);
     }
@@ -40,7 +41,6 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
   const handleExportAllTemplates = async () => {
     Logger.Admin.log("Exporting all templates");
     templateCore.setIsLoading(true);
-    templateCore.setError(null);
 
     try {
       const response = await adminTemplateApi.exportAllTemplates();
@@ -57,7 +57,9 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
       document.body.removeChild(a);
     } catch (error) {
       Logger.Admin.error("Error exporting all templates", error);
-      templateCore.setError("Failed to export templates. Please try again.");
+      notificationService.addErrorNotification(
+        "Failed to export templates. Please try again."
+      );
     } finally {
       templateCore.setIsLoading(false);
     }

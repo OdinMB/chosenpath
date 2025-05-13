@@ -80,6 +80,7 @@ export const TemplateForm: React.FC = () => {
     requestAiIteration,
     handleCloseModal,
     handleAcceptSection,
+    isLoading: isAiIterating,
   } = useAiIteration();
 
   // Define tab navigation items
@@ -161,7 +162,7 @@ export const TemplateForm: React.FC = () => {
       <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
         <AiIterationForm
           onSubmit={handleAiIterationSubmit}
-          isLoading={isLoading}
+          isLoading={isAiIterating}
           templateId={formData.id}
         />
       </div>

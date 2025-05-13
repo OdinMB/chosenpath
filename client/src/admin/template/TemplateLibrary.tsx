@@ -21,7 +21,6 @@ export const TemplateLibrary = () => {
   const navigate = useNavigate();
   const {
     templates,
-    error,
     fileInputRef,
     collectionFileInputRef,
     deleteDialog,
@@ -269,20 +268,6 @@ export const TemplateLibrary = () => {
           </PrimaryButton>
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Icons.Error className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">{error}</div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <SortableTable
         data={filteredTemplates}

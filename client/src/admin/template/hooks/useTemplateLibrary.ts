@@ -23,21 +23,18 @@ export const useTemplateLibrary = (initialTemplates: StoryTemplate[]) => {
       createTemplate: templateCore.createTemplate,
       revalidator: templateCore.revalidator,
       setIsLoading: templateCore.setIsLoading,
-      setError: templateCore.setError,
     }
   );
 
   // Initialize template export hook (passing core utilities)
   const templateExport = useTemplateExport({
     setIsLoading: templateCore.setIsLoading,
-    setError: templateCore.setError,
   });
 
   // Compose and return all the functionality
   return {
     // Core template operations and state
     templates: templateCore.templates,
-    error: templateCore.error,
     deleteDialog: templateCore.deleteDialog,
     revalidator: templateCore.revalidator,
     handleDeleteTemplate: templateCore.handleDeleteTemplate,

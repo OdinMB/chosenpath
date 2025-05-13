@@ -87,5 +87,4 @@ export interface TemplateCore {
     revalidate: () => void;
   };
   setIsLoading: (isLoading: boolean) => void;
-  setError: (error: string | null) => void;
 }
