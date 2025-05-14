@@ -133,7 +133,7 @@ router.post("/auth/login", async (req, res) => {
  * Logout user
  * POST /auth/logout
  */
-router.post("/auth/logout", verifyRegularUser(), async (req, res) => {
+router.post("/auth/logout", verifyUser(), async (req, res) => {
   const requestId = req.body?.requestId || "unknown";
   const token = req.cookies.authToken;
 

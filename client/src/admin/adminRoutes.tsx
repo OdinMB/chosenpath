@@ -1,4 +1,4 @@
-import { RouteObject } from "react-router-dom";
+import { RouteObject, Navigate } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout.js";
 import { UsersOverview } from "./users/UsersOverview";
 import { TemplateLibrary } from "./template/TemplateLibrary.js";
@@ -23,6 +23,10 @@ export const adminRoutes: RouteObject[] = [
     ),
     errorElement: <AdminErrorBoundary />,
     children: [
+      {
+        index: true,
+        element: <Navigate to="/admin/templates" replace />,
+      },
       {
         path: "stories",
         element: <StoriesOverview />,

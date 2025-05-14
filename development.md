@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 4: react-dom: refactor admin
 - 4: game websocket: make work again
 - 5: system for managing db?
 
