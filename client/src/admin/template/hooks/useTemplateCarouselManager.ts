@@ -4,8 +4,9 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
 import { adminTemplateApi } from "admin/adminApi";
+import { UpdateTemplateRequest } from "core/types/admin";
 
-export const useTemplateCarouselManager = (token: string) => {
+export const useTemplateCarouselManager = () => {
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export const useTemplateCarouselManager = (token: string) => {
         const response = await adminTemplateApi.getTemplates();
 
         // Filter for published templates marked for welcome screen
-        const welcomeScreenTemplates = response.data.templates
+        const welcomeScreenTemplates = response
           .filter(
             (template: StoryTemplate) =>
               template.publicationStatus === PublicationStatus.Published &&
@@ -50,7 +51,7 @@ export const useTemplateCarouselManager = (token: string) => {
     };
 
     fetchTemplates();
-  }, [token]);
+  }, []); // Removed token from dependency array
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -74,26 +75,24 @@ export const useTemplateCarouselManager = (token: string) => {
       const updatePromises = templates.map(async (template, index) => {
         // Only update if order has changed
         if (template.order !== index) {
-          const request = {
+          const requestForUpdate: UpdateTemplateRequest = {
             id: template.id,
             template: {
               order: index,
             },
           };
-
-          return adminApi.put(
-            `/admin/templates/${template.id}`,
-            request,
-            token
-          );
+          return adminTemplateApi.updateTemplate(requestForUpdate);
         }
-        return { data: { template } };
+        // If no update needed, return a resolved promise with the existing template structure
+        return Promise.resolve({ template });
       });
 
       await Promise.all(updatePromises);
       Logger.Admin.log("Successfully saved template order");
 
-      // Update local state with new orders
+      // Update local state with new orders.
+      // The `templates` state is already visually reordered by `handleDragEnd`.
+      // This ensures the `order` property reflects the new index.
       setTemplates(
         templates.map((template, index) => ({
           ...template,

@@ -5,8 +5,6 @@ Smaller commits!
 - 4: game websocket: make work again
 - 5: system for managing db?
 
-- 4: prevent logout on page reload
-
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 

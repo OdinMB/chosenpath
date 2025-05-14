@@ -16,15 +16,9 @@ import { SortableItem } from "./components/SortableItem.js";
 import { PrimaryButton, InfoIcon } from "components/ui";
 import { useTemplateCarouselManager } from "./hooks/useTemplateCarouselManager.js";
 
-interface TemplateCarouselManagerProps {
-  token: string;
-}
-
-export const TemplateCarouselManager: React.FC<
-  TemplateCarouselManagerProps
-> = ({ token }) => {
+export const TemplateCarouselManager: React.FC = () => {
   const { templates, isLoading, error, isSaving, handleDragEnd, saveOrder } =
-    useTemplateCarouselManager(token);
+    useTemplateCarouselManager();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
