@@ -5,6 +5,7 @@ import "./index.css";
 import { pageRoutes } from "./page/pageRoutes";
 import { adminRoutes } from "./admin/adminRoutes";
 import { userRoutes } from "./users/usersRoutes";
+import { gameRoutes } from "./game/gameRoutes";
 import { ErrorBoundary } from "./shared/components/ErrorBoundary";
 import { LoadingSpinner } from "./shared/components/LoadingSpinner";
 import { NotificationProvider } from "./shared/NotificationContext";
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
   ...pageRoutes,
   ...adminRoutes,
   ...userRoutes,
+  ...gameRoutes,
   // Fallback route for 404s
   {
     path: "*",

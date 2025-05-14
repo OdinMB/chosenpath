@@ -6,12 +6,14 @@ import {
   StateUpdateNotification,
   VerifyCodeResponse,
   ErrorResponse,
+  PlayerCount,
 } from "core/types/index.js";
 import { connectionManager } from "../shared/ConnectionManager.js";
 import {
   RateLimitedAction,
   SOCKET_CONFIG,
   GAME_SESSION_CONFIG,
+  getApiConfig,
 } from "core/config.js";
 import {
   checkRateLimit,
@@ -19,6 +21,7 @@ import {
   getClientIP,
 } from "shared/rateLimiter.js";
 import { Logger } from "shared/logger.js";
+import { isDevelopment, API_CONFIG } from "../config.js";
 
 export class GameWebSocketServer {
   private io: Server;
@@ -35,14 +38,18 @@ export class GameWebSocketServer {
           // Allow requests with no origin
           if (!origin) return callback(null, true);
 
-          // Check if the origin is in the allowed list
-          if (config.corsOrigins.indexOf(origin) !== -1) {
-            return callback(null, true);
+          // Extract domain from origin
+          const originDomain = origin.replace(/^https?:\/\//, "");
+
+          // Check if the origin domain is in the allowed list
+          if (API_CONFIG.DEFAULT_CORS_ORIGIN.includes(originDomain)) {
+            return callback(null, true); // Allow if origin is in the list
           }
 
           callback(new Error("Not allowed by CORS"));
         },
-        methods: ["GET", "POST", "DELETE"],
+        methods: ["GET", "POST"], // WebSocket typically uses GET for handshake, POST for some upgrades
+        credentials: true, // Important if you are dealing with cookies/auth
       },
       path: "/socket.io",
       // Add Socket.IO keep-alive configurations
@@ -126,6 +133,17 @@ export class GameWebSocketServer {
   ): boolean {
     // Get client IP address using the helper function
     const ip = getClientIP(socket);
+    if (!ip) {
+      // Handle cases where IP might not be available
+      Logger.Websocket.warn(
+        "[WebSocket] Could not determine client IP for rate limiting",
+        {
+          socketId: socket.id,
+        }
+      );
+      // Potentially allow or deny, based on policy for unknown IPs
+      return false; // Or true, depending on strictness
+    }
 
     // Enhanced debugging for rate limit tracking
     console.log(`[WebSocket] Rate limit check for ${action}:`, {
@@ -261,54 +279,6 @@ export class GameWebSocketServer {
           });
         }
       });
-
-      socket.on(
-        "make_choice",
-        async (data: { optionIndex: number; requestId?: string }) => {
-          try {
-            console.log("[WebSocket] Make choice request:", data);
-
-            // Check rate limiting
-            if (
-              this.checkAndHandleRateLimit(
-                socket,
-                "make_choice",
-                data.requestId
-              )
-            ) {
-              return;
-            }
-
-            // Process the request using the GameHandler
-            await this.gameHandler.makeChoice(socket, data.optionIndex);
-
-            // Send immediate success response that the request was accepted
-            socket.emit("response", {
-              type: "make_choice_response",
-              status: ResponseStatus.SUCCESS,
-              requestId: data.requestId || crypto.randomUUID(),
-              timestamp: Date.now(),
-              data: { optionIndex: data.optionIndex },
-            });
-            Logger.Websocket.log(
-              "[WebSocket] make_choice_response with optionIndex:",
-              data.optionIndex
-            );
-          } catch (error) {
-            Logger.Websocket.error("[WebSocket] Error making choice:", error);
-            socket.emit("response", {
-              type: "make_choice_response",
-              status: ResponseStatus.ERROR,
-              requestId: data.requestId || crypto.randomUUID(),
-              timestamp: Date.now(),
-              errorMessage:
-                error instanceof Error
-                  ? error.message
-                  : "Failed to make choice",
-            });
-          }
-        }
-      );
 
       socket.on(
         "select_character",
@@ -484,6 +454,52 @@ export class GameWebSocketServer {
           });
         }
       });
+
+      // Ensure make_choice handler is present
+      socket.on(
+        "make_choice",
+        async (data: { optionIndex: number; requestId?: string }) => {
+          try {
+            console.log("[WebSocket] Make choice request:", data);
+
+            if (
+              this.checkAndHandleRateLimit(
+                socket,
+                "make_choice",
+                data.requestId
+              )
+            ) {
+              return;
+            }
+
+            await this.gameHandler.makeChoice(socket, data.optionIndex);
+
+            socket.emit("response", {
+              type: "make_choice_response",
+              status: ResponseStatus.SUCCESS,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              data: { optionIndex: data.optionIndex },
+            });
+            Logger.Websocket.log(
+              "[WebSocket] make_choice_response with optionIndex:",
+              data.optionIndex
+            );
+          } catch (error) {
+            Logger.Websocket.error("[WebSocket] Error making choice:", error);
+            socket.emit("response", {
+              type: "make_choice_response",
+              status: ResponseStatus.ERROR,
+              requestId: data.requestId || crypto.randomUUID(),
+              timestamp: Date.now(),
+              errorMessage:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to make choice",
+            });
+          }
+        }
+      );
     });
   }
 

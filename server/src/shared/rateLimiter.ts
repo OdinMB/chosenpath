@@ -55,16 +55,16 @@ setInterval(() => {
 
 /**
  * Check if a request is rate limited
- * @param req The Express request object
+ * @param ip The client's IP address
  * @param action The action type (MAKE_CHOICE or NEW_STORY)
  * @returns Object with isLimited flag and timeRemaining in ms
  */
 export function checkRateLimit(
-  req: Request,
+  ip: string,
   action: RateLimitedAction
 ): RateLimitInfo {
   // Extract IP from request
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  // const ip = req.ip || req.socket.remoteAddress || "unknown";
   const normalizedIp = normalizeIP(ip);
 
   const now = Date.now();
@@ -112,22 +112,36 @@ export function checkRateLimit(
 }
 
 /**
- * Increment the request count for an IP and action
+ * Wrapper for checkRateLimit that accepts an Express Request object.
  * @param req The Express request object
+ * @param action The action type
+ * @returns RateLimitInfo
+ */
+export function checkRateLimitForRequest(
+  req: Request,
+  action: RateLimitedAction
+): RateLimitInfo {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  return checkRateLimit(ip, action);
+}
+
+/**
+ * Increment the request count for an IP and action
+ * @param ip The client's IP address
  * @param action The action type (MAKE_CHOICE or NEW_STORY)
  */
 export function incrementRateLimit(
-  req: Request,
+  ip: string,
   action: RateLimitedAction
 ): void {
   // Extract IP from request
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  // const ip = req.ip || req.socket.remoteAddress || "unknown";
   const normalizedIp = normalizeIP(ip);
   Logger.Route.log(
     `[RateLimiter] Incrementing rate limit for ${normalizedIp} - ${action}`
   );
 
-  const limitStatus = checkRateLimit(req, action);
+  const limitStatus = checkRateLimit(ip, action);
 
   // If not already limited, increment the count
   if (!limitStatus.isLimited) {
@@ -140,6 +154,19 @@ export function incrementRateLimit(
       `[RateLimiter] Rate limit already exceeded for ${normalizedIp} - ${action}, not incrementing`
     );
   }
+}
+
+/**
+ * Wrapper for incrementRateLimit that accepts an Express Request object.
+ * @param req The Express request object
+ * @param action The action type
+ */
+export function incrementRateLimitForRequest(
+  req: Request,
+  action: RateLimitedAction
+): void {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  incrementRateLimit(ip, action);
 }
 
 /**

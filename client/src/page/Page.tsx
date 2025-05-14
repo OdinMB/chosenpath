@@ -32,7 +32,8 @@ export function Page() {
       Math.random().toString(36).substring(2, 15);
     localStorage.setItem(`playerCode_${tabId}`, code);
 
-    // Navigation will be handled by the session effect when the story is loaded
+    // Navigate to the game page with the code
+    navigate(`/game/${code}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

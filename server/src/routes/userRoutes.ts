@@ -27,7 +27,10 @@ import {
   getStoriesWithUser,
   getAllUserRelatedStories,
 } from "users/userStoryService.js";
-import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
+import {
+  checkRateLimitForRequest,
+  incrementRateLimitForRequest,
+} from "shared/rateLimiter.js";
 import { API_CONFIG } from "server/config.js";
 
 const router = express.Router();
@@ -95,7 +98,7 @@ router.post("/auth/login", async (req, res) => {
   }
 
   // Check rate limit
-  const rateLimit = checkRateLimit(req, "login");
+  const rateLimit = checkRateLimitForRequest(req, "login");
   if (rateLimit.isLimited) {
     return sendRateLimited(res, rateLimit, requestId);
   }
@@ -117,7 +120,7 @@ router.post("/auth/login", async (req, res) => {
     });
 
     // Increment rate limit after successful login
-    incrementRateLimit(req, "login");
+    incrementRateLimitForRequest(req, "login");
 
     return sendSuccess(res, { user: result.user }, requestId);
   } catch (error) {
@@ -256,7 +259,7 @@ router.post("/users/story-codes", verifyRegularUser(), async (req, res) => {
   }
 
   // Apply rate limiting
-  const rateLimitStatus = checkRateLimit(req, "associate_story_code");
+  const rateLimitStatus = checkRateLimitForRequest(req, "associate_story_code");
 
   if (rateLimitStatus.isLimited) {
     return sendRateLimited(res, rateLimitStatus, requestId);
@@ -268,7 +271,7 @@ router.post("/users/story-codes", verifyRegularUser(), async (req, res) => {
     }
 
     // Increment rate limit
-    incrementRateLimit(req, "associate_story_code");
+    incrementRateLimitForRequest(req, "associate_story_code");
 
     const association = await associateStoryCode(
       req.user.id,

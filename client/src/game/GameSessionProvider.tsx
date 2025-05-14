@@ -4,7 +4,7 @@ import type {
   WSServerMessage,
   RateLimitInfo,
 } from "core/types";
-import { wsService } from "../shared/WebSocketService.js";
+import { wsService } from "./WebSocketService.js";
 import { updateStoredSetWithCode } from "../shared/utils/codeSetUtils.js";
 import { Logger } from "../shared/logger.js";
 import { useSession } from "../shared/useSession.js";
@@ -18,8 +18,7 @@ export function GameSessionProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { sessionId, setSessionId, setError, isLoading, setIsLoading } =
-    useSession();
+  const { sessionId, setSessionId, isLoading, setIsLoading } = useSession();
 
   const [storyState, setStoryState] = useState<ClientStoryState | null>(null);
   const [storyCodes, setStoryCodes] = useState<Record<string, string> | null>(
@@ -30,7 +29,7 @@ export function GameSessionProvider({
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
 
   const [connectionStale, setConnectionStale] = useState<string | null>(null);
-  const [error, setGameError] = useState<string | null>(null);
+  const [gameError, setGameError] = useState<string | null>(null);
 
   // Use refs to track states without causing effect reruns
   const isLoadingRef = useRef(isLoading);
@@ -43,13 +42,21 @@ export function GameSessionProvider({
   // Handler for errors that updates both local and session error states
   const handleError = useCallback(
     (errorMsg: string | null) => {
+      logger.warn("[GameSessionProvider] handleError called with:", errorMsg);
       setGameError(errorMsg);
-      setError(errorMsg);
     },
-    [setError]
+    [setGameError]
   );
 
   useEffect(() => {
+    // Ensure WebSocket service is connected when the provider mounts
+    if (!wsService.isConnected()) {
+      logger.info(
+        "[GameSessionProvider] WebSocket not connected, attempting to connect."
+      );
+      wsService.connect(); // Pass current sessionId if available, or it will use its own
+    }
+
     wsService.clearMessageHandlers();
 
     wsService.onMessage("create_session_response", (data: WSServerMessage) => {
@@ -202,7 +209,7 @@ export function GameSessionProvider({
       wsService.disconnect();
       wsService.clearMessageHandlers();
     };
-  }, [setError, setIsLoading, setSessionId, handleError]);
+  }, [setSessionId, setIsLoading, handleError]);
 
   useEffect(() => {
     if (rateLimit && rateLimit.timeRemaining > 0) {
@@ -234,7 +241,7 @@ export function GameSessionProvider({
     storyCodes,
     setStoryCodes,
 
-    error,
+    error: gameError,
     setError: handleError,
     rateLimit,
     setRateLimit,

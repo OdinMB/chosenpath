@@ -6,7 +6,10 @@ import {
   sendRateLimited,
 } from "shared/responseUtils.js";
 import { storyCreationService } from "shared/StoryCreationService.js";
-import { checkRateLimit, incrementRateLimit } from "shared/rateLimiter.js";
+import {
+  checkRateLimitForRequest,
+  incrementRateLimitForRequest,
+} from "shared/rateLimiter.js";
 import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
@@ -20,14 +23,14 @@ router.post("/stories", async (req: Request, res) => {
   try {
     const requestId = req.body?.requestId || "unknown";
     // Check rate limit
-    const rateLimit = checkRateLimit(req, "initialize_story");
+    const rateLimit = checkRateLimitForRequest(req, "initialize_story");
     if (rateLimit.isLimited) {
       sendRateLimited(res, rateLimit, requestId);
       return;
     }
 
     // Increment rate limit after successful creation
-    incrementRateLimit(req, "initialize_story");
+    incrementRateLimitForRequest(req, "initialize_story");
 
     const { prompt, playerCount, maxTurns, generateImages, gameMode } =
       req.body as CreateStoryRequest;
@@ -55,7 +58,7 @@ router.post("/stories/template", async (req, res) => {
 
   try {
     // Check rate limit
-    const rateLimit = checkRateLimit(req, "initialize_story");
+    const rateLimit = checkRateLimitForRequest(req, "initialize_story");
     if (rateLimit.isLimited) {
       sendRateLimited(res, rateLimit, requestId);
       return;
@@ -73,7 +76,7 @@ router.post("/stories/template", async (req, res) => {
     );
 
     // Increment rate limit after successful creation
-    incrementRateLimit(req, "initialize_story");
+    incrementRateLimitForRequest(req, "initialize_story");
   } catch (error) {
     Logger.Route.error("Failed to create story from template", error);
     sendError(res, "Failed to create story", 500, requestId, error);
