@@ -1,20 +1,27 @@
-import { useUserStories } from "../hooks";
-import { UserStoryCodeAssociation } from "core/types/api";
+import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
 import { StoryCard } from "shared/components/StoryCard";
 import { Logger } from "shared/logger";
 import { useMemo } from "react";
 
 interface UserStoriesListProps {
+  stories: StoryMetadata[];
+  storyCodes: UserStoryCodeAssociation[];
+  isLoading?: boolean; // Keep isLoading and error for potential direct use cases
+  error?: string | null;
   onCodeSelect?: (code: string) => void;
 }
 
-export function UserStoriesList({ onCodeSelect }: UserStoriesListProps) {
-  const { storyCodes, stories, isLoading, error } = useUserStories();
-
+export function UserStoriesList({
+  stories,
+  storyCodes,
+  isLoading,
+  error,
+  onCodeSelect,
+}: UserStoriesListProps) {
   // Log only once when data changes
   useMemo(() => {
-    Logger.App.log("UserStoriesList - storyCodes:", storyCodes.length);
-    Logger.App.log("UserStoriesList - stories:", stories.length);
+    Logger.App.log("UserStoriesList - storyCodes received:", storyCodes.length);
+    Logger.App.log("UserStoriesList - stories received:", stories.length);
   }, [storyCodes.length, stories.length]);
 
   const handlePlay = (_storyId: string, code?: string) => {
@@ -36,21 +43,22 @@ export function UserStoriesList({ onCodeSelect }: UserStoriesListProps) {
   }, [storyCodes]);
 
   // Create display stories - memoize to avoid recreating on each render
+  // If stories are provided directly, use them. Otherwise, derive from codes (less likely now with loader)
   const displayStories = useMemo(() => {
-    // If there are no stories but we have story codes, create mock stories from the codes
     const result =
       stories.length > 0
         ? stories
         : Array.from(storyCodesMap.entries()).map(([storyId, codes]) => {
             const firstCode = codes[0];
+            // This fallback logic might be simplified or removed if stories are always provided
             return {
               id: storyId,
-              title: `Story ${storyId}`,
+              title: `Story ${storyId.substring(0, 8)}...`,
               createdAt: firstCode.createdAt,
               updatedAt: firstCode.lastPlayedAt,
-              maxTurns: 10,
-              generateImages: true,
-              creatorId: firstCode.userId,
+              maxTurns: 10, // Placeholder
+              generateImages: true, // Placeholder
+              creatorId: firstCode.userId, // Placeholder
             };
           });
 

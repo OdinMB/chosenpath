@@ -292,7 +292,7 @@ router.post("/users/story-codes", verifyRegularUser(), async (req, res) => {
  * Get all stories related to the current user (both as creator and player)
  * GET /users/all-stories
  */
-router.get("/users/all-stories", verifyRegularUser(), async (req, res) => {
+router.get("/users/all-stories", verifyUser(), async (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
   try {

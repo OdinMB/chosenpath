@@ -157,6 +157,7 @@ export async function getAllUserRelatedStories(
        WHERE s.creatorId = ?`,
       userId
     );
+    Logger.Route.log(`Created stories: ${createdStories.length}`);
 
     // Then, get stories where the user is a player but not the creator
     const playedStories = await db.all<StoryMetadata[]>(
@@ -169,6 +170,7 @@ export async function getAllUserRelatedStories(
       userId,
       userId
     );
+    Logger.Route.log(`Played stories: ${playedStories.length}`);
 
     // Combine the results
     const stories = [...createdStories, ...playedStories];

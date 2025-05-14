@@ -40,8 +40,8 @@ export function UserAccountButton() {
     console.log("UserAccountButton: Stories link clicked");
     try {
       setDropdownOpen(false);
-      console.log("UserAccountButton: About to navigate to /my-stories");
-      navigate("/my-stories");
+      console.log("UserAccountButton: About to navigate to /users/my-stories");
+      navigate("/users/my-stories");
       console.log("UserAccountButton: Navigation function called");
     } catch (error) {
       console.error(
