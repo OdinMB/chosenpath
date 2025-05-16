@@ -1,6 +1,7 @@
 import http from "http";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 import { API_CONFIG, isDevelopment } from "server/config.js";
 import { router } from "./routes/index.js";
 import { GameWebSocketServer } from "./routes/websocket.js";
@@ -9,6 +10,7 @@ import { initializeDatabase, closeDatabase } from "./shared/db.js";
 import { cleanupExpiredSessions } from "./users/userService.js";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
+dotenv.config();
 
 // Extend Express Request type to include csrfToken
 declare global {

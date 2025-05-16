@@ -51,7 +51,6 @@ export class AdminTemplateService {
   private async initializeStorage() {
     try {
       await ensureStorageDirectory(this.storagePath);
-      this.logger.log(`Storage initialized at ${this.storagePath}`);
     } catch (error) {
       this.logger.error("Failed to initialize storage", error);
       throw new Error("Failed to initialize library storage");

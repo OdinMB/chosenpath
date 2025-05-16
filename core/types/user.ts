@@ -19,9 +19,9 @@ export interface User {
   id: string;
   email: string;
   username: string;
-  roleId: string;
-  createdAt: number;
-  updatedAt: number;
+  roleid: string;
+  createdat: string;
+  updatedat: string;
 }
 
 /**
@@ -29,9 +29,9 @@ export interface User {
  * Includes sensitive fields like password hash
  */
 export interface UserDB extends User {
-  passwordHash: string;
-  rememberToken?: string;
-  lastLoginAt?: number;
+  passwordhash: string;
+  remembertoken?: string;
+  lastloginat?: string;
 }
 
 /**
@@ -44,14 +44,15 @@ export interface PublicUser {
   email: string;
   roleId: string;
   createdAt: number;
+  lastLoginAt: number | null;
 }
 
 /**
  * Session token information
  */
 export interface UserSession {
-  userId: string;
+  userid: string;
   token: string;
-  expiresAt: number;
-  isRemembered: boolean;
+  expiresat: number;
+  isremembered: boolean;
 }

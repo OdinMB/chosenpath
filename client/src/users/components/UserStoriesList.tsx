@@ -55,11 +55,11 @@ export function UserStoriesList({
               id: storyId,
               title: `Story ${storyId.substring(0, 8)}...`,
               createdAt: firstCode.createdAt,
-              updatedAt: firstCode.lastPlayedAt,
+              updatedAt: firstCode.lastPlayedAt ?? firstCode.createdAt,
               maxTurns: 10, // Placeholder
               generateImages: true, // Placeholder
               creatorId: firstCode.userId, // Placeholder
-            };
+            } as StoryMetadata;
           });
 
     Logger.App.log("UserStoriesList - displayStories count:", result.length);

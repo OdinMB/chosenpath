@@ -171,7 +171,7 @@ export interface UserStoryCodeAssociation {
   playerSlot: string;
   code: string;
   createdAt: number;
-  lastPlayedAt: number;
+  lastPlayedAt: number | null;
 }
 export interface AssociateStoryCodeRequest extends ClientRequest {
   storyId: string;
@@ -193,7 +193,7 @@ export interface StoryMetadata {
   updatedAt: number;
   maxTurns: number;
   generateImages: boolean;
-  creatorId: string;
+  creatorId: string | null;
 }
 export interface StoryPlayerEntry {
   storyId: string;

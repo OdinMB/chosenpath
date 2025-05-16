@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- 4: game websocket: make work again
 - 5: system for managing db?
+- 3: stories / codes / player associations in DB
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes

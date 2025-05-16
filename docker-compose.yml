@@ -1,0 +1,16 @@
+services:
+  postgres_dev:
+    image: postgres:16 # You can change '16' if you find a different version number
+    container_name: chosenpath_postgres_dev
+    environment:
+      POSTGRES_USER: devuser # Feel free to change
+      POSTGRES_PASSWORD: devpassword # Change this to a secure password
+      POSTGRES_DB: chosenpath_dev # Feel free to change
+    ports:
+      - "5432:5432" # Maps your local port 5432 to the container's port 5432
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data # Persists data across container restarts
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:

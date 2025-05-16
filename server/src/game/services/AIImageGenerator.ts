@@ -149,7 +149,7 @@ export class AIImageGenerator {
   private getPromptSectionFromImageInstructions(
     imageInstructions: ImageInstructions
   ): string {
-    let prompt = "Consider the following guidelines:\n\n";
+    let prompt = "=======\n\n";
 
     // Format each instruction with its key
     const instructionMap: Record<string, string> = {

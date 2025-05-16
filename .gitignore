@@ -37,8 +37,6 @@ DOCS/**
 
 # Server data directories
 # Exclude story checkpoints (local development only)
-db.sqlite
-db.sqlite-journal
 data/story_checkpoints/**
 # Exclude story mocks (local development only)
 data/mocks/**

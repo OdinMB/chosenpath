@@ -9,6 +9,12 @@ dotenv.config();
 export const isDevelopment = process.env.NODE_ENV === "development";
 export const API_CONFIG = getApiConfig(isDevelopment);
 
+// Session durations (moved from userService)
+export const SESSION_DURATION = {
+  STANDARD: 24 * 60 * 60 * 1000, // 24 hours
+  REMEMBERED: 30 * 24 * 60 * 60 * 1000, // 30 days
+};
+
 // Storage paths configuration
 export const STORAGE_PATHS = {
   development: {

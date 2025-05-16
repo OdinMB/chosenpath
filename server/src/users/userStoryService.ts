@@ -7,6 +7,55 @@ import {
   StoryPlayerEntry,
 } from "core/types/api.js";
 
+// ---- Intermediate DB Row Types (lowercase) ----
+interface UserStoryCodeDbRow {
+  userid: string;
+  storyid: string;
+  playerslot: string;
+  code: string;
+  createdat: string;
+  lastplayedat: string | null;
+}
+
+interface StoryMetadataDbRow {
+  id: string;
+  title: string;
+  templateid?: string;
+  createdat: string;
+  updatedat: string;
+  maxturns: number;
+  generateimages: boolean;
+  creatorid: string | null;
+}
+
+interface StoryPlayerEntryDbRow {
+  storyid: string;
+  playerslot: string;
+  code: string;
+  userid: string | null;
+  lastplayedat: string | null;
+}
+
+// For the ad-hoc return type of getStoryPlayerByCode (camelCase DTO-like structure)
+interface StoryPlayerDetail {
+  storyId: string;
+  playerSlot: string;
+  code: string;
+  userId: string | null;
+  createdAt: number; // from stories table
+  lastPlayedAt: number | null; // from story_players table
+}
+// DB row version for getStoryPlayerByCode query
+interface StoryPlayerDetailDbRow {
+  storyid: string;
+  playerslot: string;
+  code: string;
+  userid: string | null;
+  createdat: string;
+  lastplayedat: string | null;
+}
+// ---- End Intermediate DB Row Types ----
+
 /**
  * Get all story codes associated with a user
  */
@@ -14,20 +63,38 @@ export async function getUserStoryCodes(
   userId: string
 ): Promise<UserStoryCodeAssociation[]> {
   try {
-    const db = getDb();
-
-    const codes = await db.all<UserStoryCodeAssociation[]>(
+    const pool = getDb();
+    const result = await pool.query<UserStoryCodeDbRow>(
       `SELECT 
-        ? as userId, sp.storyId, sp.playerSlot, sp.code, s.createdAt, sp.lastPlayedAt 
+        $1 AS userid, 
+        sp.storyid, 
+        sp.playerslot, 
+        sp.code, 
+        s.createdat, 
+        sp.lastplayedat 
        FROM story_players sp
-       JOIN stories s ON sp.storyId = s.id
-       WHERE sp.userId = ?
-       ORDER BY sp.lastPlayedAt DESC`,
-      userId,
-      userId
+       JOIN stories s ON sp.storyid = s.id
+       WHERE sp.userid = $2
+       ORDER BY sp.lastplayedat DESC`,
+      [userId, userId]
     );
-
-    return codes || [];
+    return result.rows.map((row) => {
+      const createdAtNum = parseInt(row.createdat, 10);
+      const lastPlayedAtNum = row.lastplayedat
+        ? parseInt(row.lastplayedat, 10)
+        : null;
+      return {
+        userId: row.userid,
+        storyId: row.storyid,
+        playerSlot: row.playerslot,
+        code: row.code,
+        createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+        lastPlayedAt:
+          lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
+            ? null
+            : lastPlayedAtNum,
+      };
+    });
   } catch (error) {
     Logger.Route.error(`Failed to get story codes for user ${userId}`, error);
     throw new Error("Failed to retrieve user story codes");
@@ -37,17 +104,43 @@ export async function getUserStoryCodes(
 /**
  * Get story player details by code
  */
-export async function getStoryPlayerByCode(code: string) {
+export async function getStoryPlayerByCode(
+  code: string
+): Promise<StoryPlayerDetail | null> {
   try {
-    const db = getDb();
-
-    return await db.get(
-      `SELECT sp.storyId, sp.playerSlot, sp.code, sp.userId, s.createdAt, sp.lastPlayedAt
+    const pool = getDb();
+    const result = await pool.query<StoryPlayerDetailDbRow>(
+      `SELECT 
+        sp.storyid, 
+        sp.playerslot, 
+        sp.code, 
+        sp.userid, 
+        s.createdat, 
+        sp.lastplayedat
        FROM story_players sp
-       JOIN stories s ON sp.storyId = s.id
-       WHERE sp.code = ?`,
-      code
+       JOIN stories s ON sp.storyid = s.id
+       WHERE sp.code = $1`,
+      [code]
     );
+    const row = result.rows[0];
+    if (!row) return null;
+
+    const createdAtNum = parseInt(row.createdat, 10);
+    const lastPlayedAtNum = row.lastplayedat
+      ? parseInt(row.lastplayedat, 10)
+      : null;
+
+    return {
+      storyId: row.storyid,
+      playerSlot: row.playerslot,
+      code: row.code,
+      userId: row.userid,
+      createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+      lastPlayedAt:
+        lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
+          ? null
+          : lastPlayedAtNum,
+    };
   } catch (error) {
     Logger.Route.error(`Failed to get story player for code ${code}`, error);
     throw new Error("Failed to retrieve story player information");
@@ -64,71 +157,53 @@ export async function associateStoryCode(
   code: string
 ): Promise<UserStoryCodeAssociation> {
   try {
-    const db = getDb();
+    const pool = getDb();
     const now = Date.now();
 
     // Check if story exists first
-    const story = await db.get(
-      "SELECT id, createdAt FROM stories WHERE id = ?",
-      storyId
+    const storyResult = await pool.query<{ id: string; createdat: string }>(
+      "SELECT id, createdat FROM stories WHERE id = $1",
+      [storyId]
     );
-    let storyCreatedAt = now;
+    const storyDbRow = storyResult.rows[0];
+    let storyCreatedAtForDto = now;
 
-    if (!story) {
-      // Insert story metadata record with minimal information
-      // The full story data remains in the file system
-      await db.run(
-        `INSERT INTO stories (id, title, createdAt, updatedAt, maxTurns, generateImages, creatorId)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        storyId,
-        "Unknown Story",
-        now,
-        now,
-        10,
-        true,
-        null
+    if (!storyDbRow) {
+      await pool.query(
+        `INSERT INTO stories (id, title, createdat, updatedat, maxturns, generateimages, creatorid)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [storyId, "Unknown Story", now, now, 10, true, null]
       );
     } else {
-      storyCreatedAt = story.createdAt;
+      const parsedCreatedAt = parseInt(storyDbRow.createdat, 10);
+      storyCreatedAtForDto = isNaN(parsedCreatedAt) ? 0 : parsedCreatedAt;
     }
 
-    // Check if player record already exists
-    const existingPlayer = await db.get(
-      `SELECT code FROM story_players WHERE code = ?`,
-      code
+    const existingPlayerResult = await pool.query(
+      `SELECT code FROM story_players WHERE code = $1`,
+      [code]
     );
+    const existingPlayer = existingPlayerResult.rows[0];
 
     if (existingPlayer) {
-      // Update existing player record
-      await db.run(
-        `UPDATE story_players
-         SET userId = ?, lastPlayedAt = ?
-         WHERE code = ?`,
-        userId,
-        now,
-        code
+      await pool.query(
+        `UPDATE story_players SET userid = $1, lastplayedat = $2 WHERE code = $3`,
+        [userId, now, code]
       );
     } else {
-      // Create new player record
-      await db.run(
-        `INSERT INTO story_players
-         (storyId, playerSlot, code, userId, lastPlayedAt)
-         VALUES (?, ?, ?, ?, ?)`,
-        storyId,
-        playerSlot,
-        code,
-        userId,
-        now
+      await pool.query(
+        `INSERT INTO story_players (storyid, playerslot, code, userid, lastplayedat)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [storyId, playerSlot, code, userId, now]
       );
     }
 
-    // Return the association data
     return {
-      userId,
-      storyId,
-      playerSlot,
-      code,
-      createdAt: storyCreatedAt,
+      userId: userId,
+      storyId: storyId,
+      playerSlot: playerSlot,
+      code: code,
+      createdAt: storyCreatedAtForDto,
       lastPlayedAt: now,
     };
   } catch (error) {
@@ -147,121 +222,152 @@ export async function getAllUserRelatedStories(
   userId: string
 ): Promise<ExtendedStoryMetadata[]> {
   try {
-    const db = getDb();
+    const pool = getDb();
 
-    // First, get stories where user is the creator
-    const createdStories = await db.all<StoryMetadata[]>(
-      `SELECT DISTINCT
-        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
-       FROM stories s
-       WHERE s.creatorId = ?`,
-      userId
+    const createdStoriesResult = await pool.query<StoryMetadataDbRow>(
+      `SELECT id, title, templateid, createdat, updatedat, maxturns, generateimages, creatorid
+       FROM stories WHERE creatorid = $1`,
+      [userId]
+    );
+    const createdStories: StoryMetadata[] = createdStoriesResult.rows.map(
+      (row) => {
+        const createdAtNum = parseInt(row.createdat, 10);
+        const updatedAtNum = parseInt(row.updatedat, 10);
+        return {
+          id: row.id,
+          title: row.title,
+          templateId: row.templateid,
+          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
+          maxTurns: row.maxturns,
+          generateImages: row.generateimages,
+          creatorId: row.creatorid,
+        };
+      }
     );
     Logger.Route.log(`Created stories: ${createdStories.length}`);
 
-    // Then, get stories where the user is a player but not the creator
-    const playedStories = await db.all<StoryMetadata[]>(
-      `SELECT DISTINCT
-        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
+    const playedStoriesResult = await pool.query<StoryMetadataDbRow>(
+      `SELECT DISTINCT s.id, s.title, s.templateid, s.createdat, s.updatedat, s.maxturns, s.generateimages, s.creatorid,
+        sp.lastplayedat AS "sp_lastplayedat_for_ordering"
        FROM stories s
-       JOIN story_players sp ON s.id = sp.storyId
-       WHERE sp.userId = ? AND s.creatorId != ?
-       ORDER BY sp.lastPlayedAt DESC`,
-      userId,
-      userId
+       JOIN story_players sp ON s.id = sp.storyid
+       WHERE sp.userid = $1 AND (s.creatorid IS NULL OR s.creatorid != $2)
+       ORDER BY "sp_lastplayedat_for_ordering" DESC`,
+      [userId, userId]
+    );
+    const playedStories: StoryMetadata[] = playedStoriesResult.rows.map(
+      (row) => {
+        const createdAtNum = parseInt(row.createdat, 10);
+        const updatedAtNum = parseInt(row.updatedat, 10);
+        return {
+          id: row.id,
+          title: row.title,
+          templateId: row.templateid,
+          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
+          maxTurns: row.maxturns,
+          generateImages: row.generateimages,
+          creatorId: row.creatorid,
+        };
+      }
     );
     Logger.Route.log(`Played stories: ${playedStories.length}`);
 
-    // Combine the results
-    const stories = [...createdStories, ...playedStories];
-
-    // Create a map to track which stories the user created
+    const stories: StoryMetadata[] = [...createdStories, ...playedStories];
     const createdStoryIds = new Set(createdStories.map((s) => s.id));
-
-    // Create extended story objects with player info
     const extendedStories: ExtendedStoryMetadata[] = [];
 
     for (const story of stories) {
       const isCreator = createdStoryIds.has(story.id);
-
-      // Get player entries for this story
-      let players: StoryPlayerEntry[];
+      let playersDto: StoryPlayerEntry[];
 
       if (isCreator) {
-        // For stories where user is creator, get ALL player entries
-        players = await db.all<StoryPlayerEntry[]>(
-          `SELECT 
-             storyId, playerSlot, code, userId, lastPlayedAt
-            FROM story_players
-            WHERE storyId = ?
-            ORDER BY playerSlot`,
-          story.id
+        const playersResult = await pool.query<StoryPlayerEntryDbRow>(
+          `SELECT storyid, playerslot, code, userid, lastplayedat
+           FROM story_players WHERE storyid = $1 ORDER BY playerslot`,
+          [story.id]
         );
+        playersDto = playersResult.rows.map((prow) => {
+          const lastPlayedAtNum = prow.lastplayedat
+            ? parseInt(prow.lastplayedat, 10)
+            : null;
+          return {
+            storyId: prow.storyid,
+            playerSlot: prow.playerslot,
+            code: prow.code,
+            userId: prow.userid,
+            lastPlayedAt:
+              lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
+                ? null
+                : lastPlayedAtNum,
+          };
+        });
       } else {
-        // For stories where user is just a player, only get THEIR player entries
-        players = await db.all<StoryPlayerEntry[]>(
-          `SELECT 
-             storyId, playerSlot, code, userId, lastPlayedAt
-            FROM story_players
-            WHERE storyId = ? AND userId = ?
-            ORDER BY playerSlot`,
-          story.id,
-          userId
+        const playersResult = await pool.query<StoryPlayerEntryDbRow>(
+          `SELECT storyid, playerslot, code, userid, lastplayedat
+           FROM story_players WHERE storyid = $1 AND userid = $2 ORDER BY playerslot`,
+          [story.id, userId]
         );
+        playersDto = playersResult.rows.map((prow) => {
+          const lastPlayedAtNum = prow.lastplayedat
+            ? parseInt(prow.lastplayedat, 10)
+            : null;
+          return {
+            storyId: prow.storyid,
+            playerSlot: prow.playerslot,
+            code: prow.code,
+            userId: prow.userid,
+            lastPlayedAt:
+              lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
+                ? null
+                : lastPlayedAtNum,
+          };
+        });
       }
-
-      // Add to extended stories
       extendedStories.push({
         ...story,
-        players: players || [],
+        players: playersDto || [],
       });
     }
 
-    // Get all story IDs to fetch last played times for sorting
     const allStoryIds = extendedStories.map((s) => s.id);
-
-    // Create a map of story ID to last played time
     const lastPlayedMap: Record<string, number> = {};
 
-    // Only fetch last played times if there are stories
     if (allStoryIds.length > 0) {
-      // Get the last played times for all stories
-      const lastPlayedTimes = await db.all(
-        `SELECT storyId, MAX(lastPlayedAt) as lastPlayed
-         FROM story_players
-         WHERE storyId IN (${allStoryIds.map(() => "?").join(",")})
-         GROUP BY storyId`,
-        ...allStoryIds
+      const lastPlayedTimesResult = await pool.query<{
+        storyid: string;
+        lastplayed: string | null;
+      }>(
+        `SELECT storyid, MAX(lastplayedat) as lastplayed
+         FROM story_players WHERE storyid = ANY($1::TEXT[]) GROUP BY storyid`,
+        [allStoryIds]
       );
-
-      // Populate the map with results
-      for (const record of lastPlayedTimes) {
-        lastPlayedMap[record.storyId] = record.lastPlayed || 0;
+      for (const record of lastPlayedTimesResult.rows) {
+        if (record.lastplayed !== null) {
+          const lastPlayedNum = parseInt(record.lastplayed, 10);
+          if (!isNaN(lastPlayedNum)) {
+            lastPlayedMap[record.storyid] = lastPlayedNum;
+          }
+        }
       }
     }
 
-    // Sort all stories by last played time or updated time
     extendedStories.sort((a, b) => {
       const aLastPlayed = lastPlayedMap[a.id] || a.updatedAt;
       const bLastPlayed = lastPlayedMap[b.id] || b.updatedAt;
-
-      // Sort in descending order (newest first)
       return bLastPlayed - aLastPlayed;
     });
 
     Logger.Route.log(
       `getAllUserRelatedStories for user ${userId}: Found ${
-        extendedStories?.length || 0
+        extendedStories.length || 0
       } stories`
     );
-
-    // Log all story IDs for debugging
-    if (extendedStories?.length > 0) {
-      const storyIds = extendedStories.map((s) => s.id).join(", ");
-      Logger.Route.log(`Story IDs: ${storyIds}`);
-      Logger.Route.log(`Extended stories: ${JSON.stringify(extendedStories)}`);
+    if (extendedStories.length > 0) {
+      const storyIdsToLog = extendedStories.map((s) => s.id).join(", ");
+      Logger.Route.log(`Story IDs: ${storyIdsToLog}`);
     }
-
     return extendedStories;
   } catch (error) {
     Logger.Route.error(
@@ -277,18 +383,33 @@ export async function getAllUserRelatedStories(
  */
 export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
   try {
-    const db = getDb();
+    const pool = getDb();
 
-    const stories = await db.all<StoryMetadata[]>(
+    const result = await pool.query<StoryMetadataDbRow>(
       `SELECT 
-        id, title, templateId, createdAt, updatedAt, maxTurns, generateImages, creatorId
+        id, title, templateid, createdat, updatedat, maxturns, generateimages, creatorid
        FROM stories 
-       WHERE creatorId = ?
-       ORDER BY updatedAt DESC`,
-      userId
+       WHERE creatorid = $1
+       ORDER BY updatedat DESC`,
+      [userId]
     );
 
-    return stories || [];
+    return (
+      result.rows.map((row) => {
+        const createdAtNum = parseInt(row.createdat, 10);
+        const updatedAtNum = parseInt(row.updatedat, 10);
+        return {
+          id: row.id,
+          title: row.title,
+          templateId: row.templateid,
+          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
+          maxTurns: row.maxturns,
+          generateImages: row.generateimages,
+          creatorId: row.creatorid,
+        };
+      }) || []
+    );
   } catch (error) {
     Logger.Route.error(`Failed to get stories for user ${userId}`, error);
     throw new Error("Failed to retrieve user stories");
@@ -302,19 +423,34 @@ export async function getStoriesWithUser(
   userId: string
 ): Promise<StoryMetadata[]> {
   try {
-    const db = getDb();
+    const pool = getDb();
 
-    const stories = await db.all<StoryMetadata[]>(
+    const result = await pool.query<StoryMetadataDbRow>(
       `SELECT DISTINCT
-        s.id, s.title, s.templateId, s.createdAt, s.updatedAt, s.maxTurns, s.generateImages, s.creatorId
+        s.id, s.title, s.templateid, s.createdat, s.updatedat, s.maxturns, s.generateimages, s.creatorid
        FROM stories s
-       JOIN story_players sp ON s.id = sp.storyId
-       WHERE sp.userId = ?
-       ORDER BY sp.lastPlayedAt DESC`,
-      userId
+       JOIN story_players sp ON s.id = sp.storyid
+       WHERE sp.userid = $1
+       ORDER BY sp.lastplayedat DESC`,
+      [userId]
     );
 
-    return stories || [];
+    return (
+      result.rows.map((row) => {
+        const createdAtNum = parseInt(row.createdat, 10);
+        const updatedAtNum = parseInt(row.updatedat, 10);
+        return {
+          id: row.id,
+          title: row.title,
+          templateId: row.templateid,
+          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
+          maxTurns: row.maxturns,
+          generateImages: row.generateimages,
+          creatorId: row.creatorid,
+        };
+      }) || []
+    );
   } catch (error) {
     Logger.Route.error(`Failed to get stories with user ${userId}`, error);
     throw new Error("Failed to retrieve stories with user");
@@ -330,18 +466,15 @@ export async function updateLastPlayedTime(
   playerSlot: string
 ): Promise<void> {
   try {
-    const db = getDb();
+    const pool = getDb();
     const now = Date.now();
 
     // Update the story_players record
-    await db.run(
+    await pool.query(
       `UPDATE story_players 
-       SET lastPlayedAt = ? 
-       WHERE storyId = ? AND playerSlot = ? AND userId = ?`,
-      now,
-      storyId,
-      playerSlot,
-      userId
+       SET lastPlayedAt = $1 
+       WHERE storyId = $2 AND playerSlot = $3 AND userId = $4`,
+      [now, storyId, playerSlot, userId]
     );
   } catch (error) {
     Logger.Route.error(
