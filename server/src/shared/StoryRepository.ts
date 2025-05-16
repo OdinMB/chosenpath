@@ -1,14 +1,10 @@
-import { connectionManager } from "shared/ConnectionManager.js";
-import type { StoryState, PlayerSlot } from "core/types/index.js";
+import type { StoryState } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 import { Logger } from "shared/logger.js";
-import fs from "fs/promises";
 import {
   readStoryFile,
   writeStoryFile,
-  listStoryDirectories,
   deleteStoryDirectory,
-  getStoryFilePath,
 } from "./storageUtils.js";
 
 export class StoryRepository {
@@ -94,75 +90,6 @@ export class StoryRepository {
       throw error;
     }
   }
-
-  // Helper method to clean up completed or abandoned stories
-  async cleanupStories(): Promise<void> {
-    try {
-      const storyIds = await listStoryDirectories();
-
-      for (const storyId of storyIds) {
-        const activePlayers = connectionManager.getActivePlayersInGame(storyId);
-
-        // If no active players and story is old, delete it
-        if (activePlayers.length === 0) {
-          try {
-            const filePath = getStoryFilePath(storyId);
-            const stats = await fs.stat(filePath);
-            const ageInHours =
-              (Date.now() - Number(stats.mtimeMs)) / (1000 * 60 * 60);
-
-            if (ageInHours > 120) {
-              // Delete stories older than 72 hours
-              await this.deleteStory(storyId);
-            }
-          } catch (statError) {
-            // Skip if we can't get stats (file might not exist)
-            Logger.StoryRepository.error(
-              `Error getting stats for story ${storyId}:`,
-              statError
-            );
-          }
-        }
-      }
-    } catch (error) {
-      Logger.StoryRepository.error("Failed to cleanup states:", error);
-    }
-  }
-
-  async getActiveStories(): Promise<
-    Array<{ storyId: string; playerCount: number }>
-  > {
-    const result: Array<{ storyId: string; playerCount: number }> = [];
-
-    for (const [storyId, story] of this.storyStates) {
-      const activePlayers = connectionManager.getActivePlayersInGame(storyId);
-      if (activePlayers.length > 0) {
-        const state = story.getState();
-        result.push({
-          storyId,
-          playerCount: Object.keys(state.players).length,
-        });
-      }
-    }
-
-    return result;
-  }
-
-  getAllStories(): Array<{ storyId: string; story: Story }> {
-    return Array.from(this.storyStates.entries()).map(([storyId, story]) => ({
-      storyId,
-      story,
-    }));
-  }
-
-  // This method is being removed as ConnectionManager will handle code lookups via DB.
-  // async findStoryByCode(
-  //   code: string
-  // ): Promise<{ storyId: string; story: Story } | null> {
-  //   Logger.StoryRepository.log("Searching for state with code:", code);
-  //   // ... old implementation ...
-  //   return null;
-  // }
 }
 
 // Export singleton instance
