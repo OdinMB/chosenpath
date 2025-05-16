@@ -91,16 +91,18 @@ export function useImageGeneration(): UseImageGenerationResult {
       console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
-      const response = await apiClient.post(apiUrl, payload, {
-        timeout: LONG_OPERATION_TIMEOUT,
-      });
+      const response = await apiClient.post<GenerateImageResponse>(
+        apiUrl,
+        payload,
+        {
+          timeout: LONG_OPERATION_TIMEOUT,
+        }
+      );
 
-      console.log("Image generation response:", response.data);
-      console.log("Response status:", response.status);
-      console.log("Response headers:", response.headers);
+      console.log("Image generation response:", response);
 
       // Handle successful response - apiClient already extracts the data property
-      return response.data;
+      return response;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
@@ -149,14 +151,18 @@ export function useImageGeneration(): UseImageGenerationResult {
       console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
-      const response = await apiClient.post(apiUrl, payload, {
-        timeout: LONG_OPERATION_TIMEOUT,
-      });
+      const response = await apiClient.post<GenerateImageResponse>(
+        apiUrl,
+        payload,
+        {
+          timeout: LONG_OPERATION_TIMEOUT,
+        }
+      );
 
-      console.log("Cover image generation response:", response.data);
+      console.log("Cover image generation response:", response);
 
       // Handle successful response - apiClient already extracts the data property
-      return response.data;
+      return response;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
@@ -223,14 +229,18 @@ export function useImageGeneration(): UseImageGenerationResult {
       console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
-      const response = await apiClient.post(apiUrl, payload, {
-        timeout: LONG_OPERATION_TIMEOUT,
-      });
+      const response = await apiClient.post<GenerateImageResponse>(
+        apiUrl,
+        payload,
+        {
+          timeout: LONG_OPERATION_TIMEOUT,
+        }
+      );
 
-      console.log("Player image generation response:", response.data);
+      console.log("Player image generation response:", response);
 
       // Handle successful response - apiClient already extracts the data property
-      return response.data;
+      return response;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
