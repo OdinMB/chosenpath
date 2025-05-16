@@ -10,10 +10,8 @@ import type {
   StoryReadyNotification,
   SelectCharacterResponse,
   MakeChoiceResponse,
-  WSErrorResponse,
 } from "core/types/websocket.js";
 import { Logger } from "shared/logger.js";
-import { ContentFilterService } from "./services/ContentFilterService.js";
 
 export class GameHandler {
   protected storyRepository: StoryRepository;

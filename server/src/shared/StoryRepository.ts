@@ -1,21 +1,14 @@
-import path from "path";
 import { connectionManager } from "shared/ConnectionManager.js";
 import type { StoryState, PlayerSlot } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 import { Logger } from "shared/logger.js";
 import fs from "fs/promises";
-import fsSync from "fs";
 import {
-  readStorageFile,
-  writeStorageFile,
-  getStorageFileStats,
   readStoryFile,
   writeStoryFile,
   listStoryDirectories,
   deleteStoryDirectory,
   getStoryFilePath,
-  getStoryDirectoryPath,
-  getStoragePath,
 } from "./storageUtils.js";
 
 export class StoryRepository {
@@ -57,30 +50,6 @@ export class StoryRepository {
       // Cache in memory
       this.storyStates.set(storyId, story);
       Logger.StoryRepository.log("Cached state in memory");
-
-      // Register codes with ConnectionManager if they're not already registered
-      const stateData = story.getState();
-      if (stateData.playerCodes) {
-        Logger.StoryRepository.log("Registering player codes...");
-        Object.entries(stateData.playerCodes).forEach(([slot, code]) => {
-          if (!connectionManager.hasCode(code as string)) {
-            Logger.StoryRepository.log("Registering new code:", {
-              slot,
-              code,
-            });
-            connectionManager.registerCode(
-              storyId,
-              slot as PlayerSlot,
-              code as string
-            );
-          } else {
-            Logger.StoryRepository.log("Code already registered:", {
-              slot,
-              code,
-            });
-          }
-        });
-      }
 
       // Return a fresh copy
       return new Story(JSON.parse(JSON.stringify(state)));
@@ -179,34 +148,6 @@ export class StoryRepository {
     return result;
   }
 
-  // Add this method to load all existing stories on startup
-  async loadExistingStories(): Promise<void> {
-    try {
-      const storyIds = await listStoryDirectories();
-      Logger.StoryRepository.log("Loading existing stories...");
-
-      for (const storyId of storyIds) {
-        try {
-          const data = await readStoryFile(storyId);
-          const state = JSON.parse(data) as StoryState;
-          const story = new Story(state);
-          this.storyStates.set(storyId, story);
-          Logger.StoryRepository.log("Loaded story:", storyId);
-        } catch (error) {
-          Logger.StoryRepository.error(
-            `Failed to load story ${storyId}:`,
-            error
-          );
-        }
-      }
-
-      Logger.StoryRepository.log("Finished loading stories");
-      return;
-    } catch (error) {
-      Logger.StoryRepository.error("Failed to load existing stories:", error);
-    }
-  }
-
   getAllStories(): Array<{ storyId: string; story: Story }> {
     return Array.from(this.storyStates.entries()).map(([storyId, story]) => ({
       storyId,
@@ -214,73 +155,14 @@ export class StoryRepository {
     }));
   }
 
-  async findStoryByCode(
-    code: string
-  ): Promise<{ storyId: string; story: Story } | null> {
-    Logger.StoryRepository.log("Searching for state with code:", code);
-
-    try {
-      // Try memory cache first
-      for (const [storyId, story] of this.storyStates.entries()) {
-        const stateData = story.getState();
-        if (
-          stateData.playerCodes &&
-          Object.values(stateData.playerCodes).some((c) => c === code)
-        ) {
-          Logger.StoryRepository.log("Found code in memory cache:", storyId);
-          return {
-            storyId,
-            story: new Story(JSON.parse(JSON.stringify(story.getState()))),
-          };
-        }
-      }
-
-      // If not in memory, search on disk
-      const storyIds = await listStoryDirectories();
-      Logger.StoryRepository.log(
-        "Searching through",
-        storyIds.length,
-        "story directories"
-      );
-
-      for (const storyId of storyIds) {
-        try {
-          const data = await readStoryFile(storyId);
-          const state = JSON.parse(data) as StoryState;
-          const story = new Story(state);
-
-          // Check if this state contains the code
-          const stateData = story.getState();
-          if (
-            stateData.playerCodes &&
-            Object.values(stateData.playerCodes).some((c) => c === code)
-          ) {
-            Logger.StoryRepository.log("Found code in story:", storyId);
-
-            // Cache the found state
-            this.storyStates.set(storyId, story);
-            Logger.StoryRepository.log("Cached found state in memory");
-
-            return {
-              storyId,
-              story: new Story(JSON.parse(JSON.stringify(state))),
-            };
-          }
-        } catch (error) {
-          Logger.StoryRepository.error(
-            `Error checking story ${storyId}:`,
-            error
-          );
-        }
-      }
-
-      Logger.StoryRepository.log("Code not found in any story");
-      return null;
-    } catch (error) {
-      Logger.StoryRepository.error("Failed to find state by code:", error);
-      return null;
-    }
-  }
+  // This method is being removed as ConnectionManager will handle code lookups via DB.
+  // async findStoryByCode(
+  //   code: string
+  // ): Promise<{ storyId: string; story: Story } | null> {
+  //   Logger.StoryRepository.log("Searching for state with code:", code);
+  //   // ... old implementation ...
+  //   return null;
+  // }
 }
 
 // Export singleton instance

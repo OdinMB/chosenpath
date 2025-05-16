@@ -34,8 +34,8 @@ export async function initializeDatabase() {
         id TEXT PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
         description TEXT,
-        createdAt BIGINT NOT NULL,
-        updatedAt BIGINT NOT NULL
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL
       )
     `);
 
@@ -45,24 +45,24 @@ export async function initializeDatabase() {
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         username TEXT UNIQUE NOT NULL,
-        passwordHash TEXT NOT NULL,
-        roleId TEXT NOT NULL,
-        rememberToken TEXT,
-        lastLoginAt BIGINT,
-        createdAt BIGINT NOT NULL,
-        updatedAt BIGINT NOT NULL,
-        FOREIGN KEY (roleId) REFERENCES roles (id)
+        password_hash TEXT NOT NULL,
+        role_id TEXT NOT NULL,
+        remember_token TEXT,
+        last_login_at BIGINT,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        FOREIGN KEY (role_id) REFERENCES roles (id)
       )
     `);
 
     // Create or update role_permissions table (references roles)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS role_permissions (
-        roleId TEXT NOT NULL,
+        role_id TEXT NOT NULL,
         permission TEXT NOT NULL,
-        createdAt BIGINT NOT NULL,
-        PRIMARY KEY (roleId, permission),
-        FOREIGN KEY (roleId) REFERENCES roles (id) ON DELETE CASCADE
+        created_at BIGINT NOT NULL,
+        PRIMARY KEY (role_id, permission),
+        FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE
       )
     `);
 
@@ -70,7 +70,7 @@ export async function initializeDatabase() {
     const nowEpochMs = Date.now();
     await pool.query(
       `
-      INSERT INTO roles (id, name, description, createdAt, updatedAt)
+      INSERT INTO roles (id, name, description, created_at, updated_at)
       VALUES 
         ('role_user', 'user', 'Regular user with basic permissions', $1, $1),
         ('role_admin', 'admin', 'Administrator with full system access', $1, $1)
@@ -81,7 +81,7 @@ export async function initializeDatabase() {
 
     await pool.query(
       `
-      INSERT INTO role_permissions (roleId, permission, createdAt)
+      INSERT INTO role_permissions (role_id, permission, created_at)
       VALUES 
         ('role_user', 'user:read', $1),
         ('role_user', 'user:write', $1),
@@ -89,7 +89,7 @@ export async function initializeDatabase() {
         ('role_admin', 'user:write', $1),
         ('role_admin', 'admin:read', $1),
         ('role_admin', 'admin:write', $1)
-      ON CONFLICT (roleId, permission) DO NOTHING
+      ON CONFLICT (role_id, permission) DO NOTHING
     `,
       [nowEpochMs]
     );
@@ -98,11 +98,11 @@ export async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        expiresAt BIGINT NOT NULL,
-        isRemembered BOOLEAN NOT NULL DEFAULT FALSE,
-        createdAt BIGINT NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+        user_id TEXT NOT NULL,
+        expires_at BIGINT NOT NULL,
+        is_remembered BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at BIGINT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )
     `);
 
@@ -110,14 +110,15 @@ export async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stories (
         id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        templateId TEXT,
-        createdAt BIGINT NOT NULL,
-        updatedAt BIGINT NOT NULL,
-        maxTurns INTEGER NOT NULL,
-        generateImages BOOLEAN NOT NULL DEFAULT TRUE,
-        creatorId TEXT,
-        FOREIGN KEY (creatorId) REFERENCES users (id) ON DELETE SET NULL
+        title TEXT,
+        template_id TEXT,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        max_turns INTEGER NOT NULL,
+        generate_images BOOLEAN NOT NULL DEFAULT TRUE,
+        creator_id TEXT,
+        current_turn INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (creator_id) REFERENCES users (id) ON DELETE SET NULL
       )
     `);
 
@@ -128,14 +129,15 @@ export async function initializeDatabase() {
     // as it handles the "already exists" case.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS story_players (
-        storyId TEXT NOT NULL,
-        playerSlot TEXT NOT NULL,
+        story_id TEXT NOT NULL,
+        player_slot TEXT NOT NULL,
         code TEXT NOT NULL UNIQUE,
-        userId TEXT,
-        lastPlayedAt BIGINT,
-        PRIMARY KEY (storyId, playerSlot),
-        FOREIGN KEY (storyId) REFERENCES stories (id) ON DELETE CASCADE,
-        FOREIGN KEY (userId) REFERENCES users (id) ON DELETE SET NULL
+        user_id TEXT,
+        last_played_at BIGINT,
+        is_pending BOOLEAN NOT NULL DEFAULT TRUE,
+        PRIMARY KEY (story_id, player_slot),
+        FOREIGN KEY (story_id) REFERENCES stories (id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
       )
     `);
 
@@ -147,19 +149,19 @@ export async function initializeDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`
     );
     await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions (userId)`
+      `CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)`
     );
     await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_sessions_expiresAt ON sessions (expiresAt)`
+      `CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at)`
     );
     await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_stories_creatorId ON stories (creatorId)`
+      `CREATE INDEX IF NOT EXISTS idx_stories_creator_id ON stories (creator_id)`
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_story_players_code ON story_players (code)`
     );
     await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_story_players_userId ON story_players (userId)`
+      `CREATE INDEX IF NOT EXISTS idx_story_players_user_id ON story_players (user_id)`
     );
 
     Logger.DB.log("PostgreSQL database initialized successfully");

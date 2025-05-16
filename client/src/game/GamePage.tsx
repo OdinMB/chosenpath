@@ -5,6 +5,7 @@ import { gameService } from "./GameService";
 import { wsService } from "./WebSocketService";
 import { Logger } from "../shared/logger";
 import { GameLayout } from "./components/GameLayout";
+import { useAuth } from "shared/useAuth";
 
 // Placeholder for actual game UI components
 const ConnectingView = () => (
@@ -29,6 +30,7 @@ export const GamePage: React.FC = () => {
   } = useGameSession();
   const { code: joinCode } = useParams<{ code?: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Generate a unique ID for this tab if it doesn't exist
   const [tabId] = React.useState(
@@ -59,9 +61,14 @@ export const GamePage: React.FC = () => {
       !isLoading &&
       !isRequestPending("verify_code")
     ) {
-      Logger.App.log("Attempting to verify join code:", joinCode);
+      Logger.App.log(
+        "Attempting to verify join code:",
+        joinCode,
+        "User:",
+        user
+      );
       setIsLoading(true); // Set loading when verifying code
-      gameService.verifyCode(joinCode);
+      gameService.verifyCode(joinCode, user?.id);
     }
   }, [
     sessionId,
@@ -71,6 +78,7 @@ export const GamePage: React.FC = () => {
     isConnecting,
     isRequestPending,
     setIsLoading,
+    user,
   ]);
 
   useEffect(() => {

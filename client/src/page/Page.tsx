@@ -3,14 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import {
-  StoredCodeSetsList,
-  OrDivider,
-  LibraryCategoryGrid,
-} from "./components";
-import { hasCodeSets } from "shared/utils/codeSetUtils.js";
+import { OrDivider, LibraryCategoryGrid } from "./components";
 import { useNewsletter } from "shared/hooks/useNewsletter";
-import { NewsletterButton, NewsletterModal } from "shared/components";
+import {
+  NewsletterButton,
+  NewsletterModal,
+  StoryCard,
+} from "shared/components";
+import { StoryMetadata, UserStoryCodeAssociation } from "core/types/api";
+import { useAuth } from "shared/useAuth";
+import { useStoredCodeSets } from "./hooks/useStoredCodeSets";
+import { StoredCodeSet } from "shared/SessionContext";
+import { deleteStoredCodeSet } from "shared/utils/codeSetUtils";
+import { formatTimestampToMonthDayTime } from "core/utils/dateUtils";
 
 // Page component refactored to use React Router
 export function Page() {
@@ -22,7 +27,8 @@ export function Page() {
     closeNewsletterModal,
     handleSubscribe,
   } = useNewsletter();
-  const hasStoredCodeSets = hasCodeSets();
+  const { user } = useAuth();
+  const { codeSets, refreshLocalCodeSets } = useStoredCodeSets();
 
   // Handle code submission - now uses gameService directly
   const handleCodeSubmit = (code: string) => {
@@ -65,6 +71,22 @@ export function Page() {
     }
   };
 
+  // Handler for deleting a code set via StoryCard
+  const handleDeleteStoryCardCodeSet = (storyId: string) => {
+    const timestampToDelete = parseInt(storyId, 10);
+    if (!isNaN(timestampToDelete)) {
+      if (deleteStoredCodeSet(timestampToDelete)) {
+        // You could add logging or user feedback here if desired
+        console.log(`Code set with timestamp ${timestampToDelete} deleted.`);
+      } else {
+        console.warn(
+          `Failed to delete code set with timestamp ${timestampToDelete}.`
+        );
+      }
+      refreshLocalCodeSets(); // Refresh the UI
+    }
+  };
+
   return (
     <>
       <div className="max-w-md mx-auto p-4 font-lora">
@@ -75,16 +97,86 @@ export function Page() {
             distant galaxies or serving croissants in a Parisian café.
           </p>
           <p>
-            Everything is free during the alpha phase. Jump in and share your
-            feedback!
+            Everything is free during the alpha phase. No account required. Jump
+            in and share your feedback!
           </p>
         </div>
 
         <div className="space-y-6">
           {/* Stored Code Sets */}
-          <StoredCodeSetsList onCodeSubmit={handleCodeSubmit} />
+          {codeSets.length > 0 && (
+            <div className="space-y-4">
+              {codeSets.map((codeSet: StoredCodeSet) => {
+                const storyMetadata: StoryMetadata = {
+                  id: codeSet.timestamp.toString(),
+                  title:
+                    codeSet.title ||
+                    `Story from ${formatTimestampToMonthDayTime(
+                      codeSet.timestamp
+                    )}`,
+                  creatorId: user?.id || "",
+                  createdAt: codeSet.timestamp,
+                  updatedAt: codeSet.timestamp,
+                  maxTurns: 0,
+                  generateImages: false,
+                  templateId: undefined,
+                };
 
-          {hasStoredCodeSets && <OrDivider />}
+                const playerAssociations: UserStoryCodeAssociation[] =
+                  Object.entries(codeSet.codes).map(
+                    ([playerSlot, codeValue], index) => {
+                      const isCurrentUserSlot = index === 0;
+                      return {
+                        storyId: storyMetadata.id,
+                        userId:
+                          isCurrentUserSlot && user
+                            ? user.id
+                            : `anonymous-${playerSlot}-${codeSet.timestamp}`,
+                        code: codeValue,
+                        playerSlot: playerSlot,
+                        lastPlayedAt:
+                          codeSet.lastActive && isCurrentUserSlot
+                            ? codeSet.timestamp
+                            : null,
+                        createdAt: codeSet.timestamp,
+                      };
+                    }
+                  );
+
+                const handleStoryCardPlay = (
+                  storyId: string,
+                  playCode?: string
+                ) => {
+                  if (playCode) {
+                    handleCodeSubmit(playCode);
+                  } else {
+                    const targetCodeSet = codeSets.find(
+                      (cs) => cs.timestamp.toString() === storyId
+                    );
+                    if (targetCodeSet) {
+                      const firstCode = Object.values(targetCodeSet.codes)[0];
+                      if (firstCode) {
+                        handleCodeSubmit(firstCode);
+                      }
+                    }
+                  }
+                };
+
+                return (
+                  <StoryCard
+                    key={storyMetadata.id}
+                    story={storyMetadata}
+                    players={playerAssociations}
+                    onPlay={handleStoryCardPlay}
+                    onDelete={handleDeleteStoryCardCodeSet}
+                    size="default"
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {codeSets.length > 0 && <OrDivider />}
 
           <PrimaryButton
             onClick={handleNewStory}

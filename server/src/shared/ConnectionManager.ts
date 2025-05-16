@@ -9,6 +9,7 @@ import { storyRepository } from "shared/StoryRepository.js";
 import { Story } from "core/models/Story.js";
 import { Server } from "socket.io";
 import { Logger } from "shared/logger.js";
+import { storyDbService, StoryPlayerDbInfo } from "./StoryDbService.js"; // Changed from storyMetadataDbService
 
 interface PlayerConnection {
   socketIds: Set<string>;
@@ -103,6 +104,20 @@ export class ConnectionManager {
       });
     }
 
+    // If userId is present, update the database
+    if (userId) {
+      storyDbService
+        .assignUserToPlayerSlot(storyId, playerSlot, userId)
+        .catch((err) => {
+          Logger.ConnectionManager.error(
+            `Failed to assign user ${userId} to slot ${playerSlot} in story ${storyId} in DB:`,
+            err
+          );
+          // Depending on requirements, you might want to handle this error more gracefully
+          // For now, just logging it.
+        });
+    }
+
     // Update lookup maps
     this.socketMap.set(socket.id, { storyId, playerSlot });
     this.codeMap.set(code, { storyId, playerSlot });
@@ -151,55 +166,47 @@ export class ConnectionManager {
     }
   }
 
-  hasCode(code: string): boolean {
-    return this.codeMap.has(code);
-  }
-
   async getPlayerByCode(
     code: string
   ): Promise<{ storyId: string; playerSlot: PlayerSlot } | undefined> {
     Logger.ConnectionManager.log("Looking up player by code:", code);
 
-    // Check in-memory mapping first
-    const mapping = this.codeMap.get(code);
-    if (mapping) {
-      Logger.ConnectionManager.log("Found code mapping in memory");
-      return mapping;
+    const cachedMapping = this.codeMap.get(code);
+    if (cachedMapping) {
+      Logger.ConnectionManager.log("Found code mapping in memory cache");
+      return cachedMapping;
     }
 
-    // If not found, try to find the story file containing this code
     Logger.ConnectionManager.log(
-      "Code not found in memory, searching files..."
+      "Code not found in memory, querying database via service..."
     );
-    const result = await this.findStoryByCode(code);
+    try {
+      const dbPlayerInfo: StoryPlayerDbInfo | undefined =
+        await storyDbService.getStoryPlayerByCode(code);
 
-    if (result) {
-      const { storyId, story } = result;
+      if (dbPlayerInfo) {
+        const { storyId, playerSlot } = dbPlayerInfo;
+        Logger.ConnectionManager.log("Found code in database via service:", {
+          storyId,
+          playerSlot,
+        });
 
-      // Create game session if it doesn't exist
-      if (!this.gameSessions.has(storyId)) {
-        this.createGameSession(storyId);
-      }
-
-      // Register the found mapping
-      const playerSlot = Object.entries(story.getPlayerCodes()).find(
-        ([_, c]) => c === code
-      )?.[0] as PlayerSlot;
-
-      if (playerSlot) {
-        this.registerCode(storyId, playerSlot, code);
+        if (!this.gameSessions.has(storyId)) {
+          this.createGameSession(storyId);
+        }
+        this.codeMap.set(code, { storyId, playerSlot });
         return { storyId, playerSlot };
+      } else {
+        Logger.ConnectionManager.log("Code not found in database via service");
+        return undefined;
       }
+    } catch (dbError) {
+      Logger.ConnectionManager.error(
+        "Service error looking up player by code:",
+        dbError
+      );
+      return undefined;
     }
-
-    Logger.ConnectionManager.log("Code not found in any story");
-    return undefined;
-  }
-
-  private async findStoryByCode(
-    code: string
-  ): Promise<{ storyId: string; story: Story } | null> {
-    return storyRepository.findStoryByCode(code);
   }
 
   getActivePlayersInGame(storyId: string): Array<{
@@ -317,27 +324,32 @@ export class ConnectionManager {
     stories: Array<{ storyId: string; state: StoryState }>
   ): void {
     Logger.ConnectionManager.log(
-      "Reconstructing mappings from story states..."
+      "Reconstructing mappings from provided story states (priming cache)..."
     );
 
     stories.forEach(({ storyId, state }) => {
-      // Create game session
-      this.createGameSession(storyId);
+      // Create game session if not already present (e.g. from getPlayerByCode)
+      if (!this.gameSessions.has(storyId)) {
+        this.createGameSession(storyId);
+      }
 
-      // Register codes from state
+      // Register codes from state into the in-memory codeMap cache
       if (state.playerCodes) {
         Object.entries(state.playerCodes).forEach(([slot, code]) => {
-          Logger.ConnectionManager.log("Reconstructing code mapping:", {
+          Logger.ConnectionManager.log("Priming codeMap cache from state:", {
             storyId,
             slot,
             code,
           });
-          this.registerCode(storyId, slot as PlayerSlot, code);
+          // This assumes that stories passed here are active or recently active.
+          if (!this.codeMap.has(code)) {
+            this.codeMap.set(code, { storyId, playerSlot: slot as PlayerSlot });
+          }
         });
       }
     });
 
-    Logger.ConnectionManager.log("Finished reconstructing mappings");
+    Logger.ConnectionManager.log("Finished priming cache from story states");
   }
 
   async verifyCode(
@@ -425,9 +437,28 @@ export class ConnectionManager {
   async getPlayerCodes(
     storyId: string
   ): Promise<Record<string, string> | undefined> {
-    // Get the story from repository instead of from session
-    const story = await storyRepository.getStory(storyId);
-    return story?.getPlayerCodes();
+    Logger.ConnectionManager.log(
+      "Fetching player codes via service for story:",
+      storyId
+    );
+    try {
+      const codes = await storyDbService.getStoryPlayerCodes(storyId);
+      if (codes) {
+        Logger.ConnectionManager.log("Found codes via service:", codes);
+        return codes as Record<string, string>; // Cast because service returns Record<PlayerSlot, string>
+      }
+      Logger.ConnectionManager.log(
+        "No codes found via service for story:",
+        storyId
+      );
+      return undefined;
+    } catch (dbError) {
+      Logger.ConnectionManager.error(
+        "Service error fetching player codes:",
+        dbError
+      );
+      return undefined;
+    }
   }
 }
 

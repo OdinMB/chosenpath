@@ -2,23 +2,23 @@ Smaller commits!
 
 # NEXT
 
-- 5: system for managing db?
-- 3: stories / codes / player associations in DB
+- 2: See pending players, current beat, etc. of active games
+- 2: update admin functions for story management to use new db system
+- 2: Prettier (basic) user view
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
-
 - 1: delete codes on story generation any error (with deleteCodeSetsByContent(codes))
-- 5: protect image generation endpoints against abuse
+- 2: protect image generation endpoints against abuse
 
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
 
+- 5: Difficulty level (affecting base points)
+
 - 10: More (multiplayer) templates (try to make 1-3 players work)
-
 - 4: for templates: additional images that are not attached to a story element
-
 - 1: percentage stats at 0%: name not visible
 - 2: add support and examples for 1-beat threads
 
@@ -36,7 +36,6 @@ Focus: Text/Images, English, Multiplayer
 - 30: Different languages
 - 10: Resolution animation elements (thread, group)
 - 5: Setting to deactivate the resolution animations
-- 5: Difficulty level (affecting base points)
 - 10: Create story based on kids' drawings
 - 10: creation/template setting: jokers to see risky/safe or even modifiers
 - 20: Music (OpenAI's new API?)
@@ -44,13 +43,11 @@ Focus: Text/Images, English, Multiplayer
 
 # SERIOUS PROJECT
 
-- 10: Manage stories in DB
 - 1: Export stories
 - 2: Users: transfer local games to cloud (requires stories db)
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration
-- 5: See pending players, current beat, etc. of active games
 - 15: System to view/navigate save files
 - 7: system to add useful images generated in template-based stories to the template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)

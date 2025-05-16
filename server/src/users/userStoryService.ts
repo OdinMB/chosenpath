@@ -7,33 +7,53 @@ import {
   StoryPlayerEntry,
 } from "core/types/api.js";
 
-// ---- Intermediate DB Row Types (lowercase) ----
+// DB Row Types now reflect snake_case from the database
 interface UserStoryCodeDbRow {
-  userid: string;
-  storyid: string;
-  playerslot: string;
+  user_id: string; // Was userid
+  story_id: string; // Was storyid
+  player_slot: string; // Was playerslot
   code: string;
-  createdat: string;
-  lastplayedat: string | null;
+  created_at: string; // Was createdat (from stories table)
+  last_played_at: string | null; // Was lastplayedat (from story_players table)
 }
 
 interface StoryMetadataDbRow {
   id: string;
   title: string;
-  templateid?: string;
-  createdat: string;
-  updatedat: string;
-  maxturns: number;
-  generateimages: boolean;
-  creatorid: string | null;
+  template_id?: string; // Was templateid
+  created_at: string; // Was createdat
+  updated_at: string; // Was updatedat
+  max_turns: number; // Was maxturns
+  generate_images: boolean; // Was generateimages
+  creator_id: string | null; // Was creatorid
+  // current_turn is also available but not always fetched by these queries
 }
 
 interface StoryPlayerEntryDbRow {
-  storyid: string;
-  playerslot: string;
+  story_id: string; // Was storyid
+  player_slot: string; // Was playerslot
   code: string;
-  userid: string | null;
-  lastplayedat: string | null;
+  user_id: string | null; // Was userid
+  last_played_at: string | null; // Was lastplayedat
+}
+
+interface StoryPlayerDetailDbRow {
+  story_id: string; // Was storyid
+  player_slot: string; // Was playerslot
+  code: string;
+  user_id: string | null; // Was userid
+  created_at: string; // Was createdat (from stories table)
+  last_played_at: string | null; // Was lastplayedat (from story_players table)
+}
+
+interface StoryPlayerDetail {
+  // DTO remains camelCase
+  storyId: string;
+  playerSlot: string;
+  code: string;
+  userId: string | null;
+  createdAt: number;
+  lastPlayedAt: number | null;
 }
 
 // For the ad-hoc return type of getStoryPlayerByCode (camelCase DTO-like structure)
@@ -45,16 +65,6 @@ interface StoryPlayerDetail {
   createdAt: number; // from stories table
   lastPlayedAt: number | null; // from story_players table
 }
-// DB row version for getStoryPlayerByCode query
-interface StoryPlayerDetailDbRow {
-  storyid: string;
-  playerslot: string;
-  code: string;
-  userid: string | null;
-  createdat: string;
-  lastplayedat: string | null;
-}
-// ---- End Intermediate DB Row Types ----
 
 /**
  * Get all story codes associated with a user
@@ -66,27 +76,27 @@ export async function getUserStoryCodes(
     const pool = getDb();
     const result = await pool.query<UserStoryCodeDbRow>(
       `SELECT 
-        $1 AS userid, 
-        sp.storyid, 
-        sp.playerslot, 
+        $1 AS user_id, 
+        sp.story_id, 
+        sp.player_slot, 
         sp.code, 
-        s.createdat, 
-        sp.lastplayedat 
+        s.created_at, 
+        sp.last_played_at 
        FROM story_players sp
-       JOIN stories s ON sp.storyid = s.id
-       WHERE sp.userid = $2
-       ORDER BY sp.lastplayedat DESC`,
+       JOIN stories s ON sp.story_id = s.id
+       WHERE sp.user_id = $2
+       ORDER BY sp.last_played_at DESC NULLS LAST`, // Added NULLS LAST for robust sorting
       [userId, userId]
     );
     return result.rows.map((row) => {
-      const createdAtNum = parseInt(row.createdat, 10);
-      const lastPlayedAtNum = row.lastplayedat
-        ? parseInt(row.lastplayedat, 10)
+      const createdAtNum = parseInt(row.created_at, 10);
+      const lastPlayedAtNum = row.last_played_at
+        ? parseInt(row.last_played_at, 10)
         : null;
       return {
-        userId: row.userid,
-        storyId: row.storyid,
-        playerSlot: row.playerslot,
+        userId: row.user_id,
+        storyId: row.story_id,
+        playerSlot: row.player_slot,
         code: row.code,
         createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
         lastPlayedAt:
@@ -111,30 +121,30 @@ export async function getStoryPlayerByCode(
     const pool = getDb();
     const result = await pool.query<StoryPlayerDetailDbRow>(
       `SELECT 
-        sp.storyid, 
-        sp.playerslot, 
+        sp.story_id, 
+        sp.player_slot, 
         sp.code, 
-        sp.userid, 
-        s.createdat, 
-        sp.lastplayedat
+        sp.user_id, 
+        s.created_at, 
+        sp.last_played_at
        FROM story_players sp
-       JOIN stories s ON sp.storyid = s.id
+       JOIN stories s ON sp.story_id = s.id
        WHERE sp.code = $1`,
       [code]
     );
     const row = result.rows[0];
     if (!row) return null;
 
-    const createdAtNum = parseInt(row.createdat, 10);
-    const lastPlayedAtNum = row.lastplayedat
-      ? parseInt(row.lastplayedat, 10)
+    const createdAtNum = parseInt(row.created_at, 10);
+    const lastPlayedAtNum = row.last_played_at
+      ? parseInt(row.last_played_at, 10)
       : null;
 
     return {
-      storyId: row.storyid,
-      playerSlot: row.playerslot,
+      storyId: row.story_id,
+      playerSlot: row.player_slot,
       code: row.code,
-      userId: row.userid,
+      userId: row.user_id,
       createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
       lastPlayedAt:
         lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
@@ -160,22 +170,22 @@ export async function associateStoryCode(
     const pool = getDb();
     const now = Date.now();
 
-    // Check if story exists first
-    const storyResult = await pool.query<{ id: string; createdat: string }>(
-      "SELECT id, createdat FROM stories WHERE id = $1",
+    const storyResult = await pool.query<{ id: string; created_at: string }>( // snake_case
+      "SELECT id, created_at FROM stories WHERE id = $1",
       [storyId]
     );
     const storyDbRow = storyResult.rows[0];
     let storyCreatedAtForDto = now;
 
     if (!storyDbRow) {
+      // This logic might be too simplistic, assumes default for missing story
       await pool.query(
-        `INSERT INTO stories (id, title, createdat, updatedat, maxturns, generateimages, creatorid)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [storyId, "Unknown Story", now, now, 10, true, null]
+        `INSERT INTO stories (id, title, created_at, updated_at, max_turns, generate_images, creator_id, current_turn)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [storyId, "Unknown Story", now, now, 10, true, null, 0]
       );
     } else {
-      const parsedCreatedAt = parseInt(storyDbRow.createdat, 10);
+      const parsedCreatedAt = parseInt(storyDbRow.created_at, 10); // snake_case
       storyCreatedAtForDto = isNaN(parsedCreatedAt) ? 0 : parsedCreatedAt;
     }
 
@@ -187,14 +197,14 @@ export async function associateStoryCode(
 
     if (existingPlayer) {
       await pool.query(
-        `UPDATE story_players SET userid = $1, lastplayedat = $2 WHERE code = $3`,
+        `UPDATE story_players SET user_id = $1, last_played_at = $2 WHERE code = $3`,
         [userId, now, code]
       );
     } else {
       await pool.query(
-        `INSERT INTO story_players (storyid, playerslot, code, userid, lastplayedat)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [storyId, playerSlot, code, userId, now]
+        `INSERT INTO story_players (story_id, player_slot, code, user_id, last_played_at, is_pending)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [storyId, playerSlot, code, userId, now, true] // Default is_pending to true
       );
     }
 
@@ -225,50 +235,50 @@ export async function getAllUserRelatedStories(
     const pool = getDb();
 
     const createdStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT id, title, templateid, createdat, updatedat, maxturns, generateimages, creatorid
-       FROM stories WHERE creatorid = $1`,
+      `SELECT id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id
+       FROM stories WHERE creator_id = $1`,
       [userId]
     );
     const createdStories: StoryMetadata[] = createdStoriesResult.rows.map(
       (row) => {
-        const createdAtNum = parseInt(row.createdat, 10);
-        const updatedAtNum = parseInt(row.updatedat, 10);
+        const createdAtNum = parseInt(row.created_at, 10);
+        const updatedAtNum = parseInt(row.updated_at, 10);
         return {
           id: row.id,
           title: row.title,
-          templateId: row.templateid,
+          templateId: row.template_id,
           createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
           updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.maxturns,
-          generateImages: row.generateimages,
-          creatorId: row.creatorid,
+          maxTurns: row.max_turns,
+          generateImages: row.generate_images,
+          creatorId: row.creator_id,
         };
       }
     );
     Logger.Route.log(`Created stories: ${createdStories.length}`);
 
     const playedStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT DISTINCT s.id, s.title, s.templateid, s.createdat, s.updatedat, s.maxturns, s.generateimages, s.creatorid,
-        sp.lastplayedat AS "sp_lastplayedat_for_ordering"
+      `SELECT DISTINCT s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id,
+        sp.last_played_at AS sp_last_played_at_for_ordering
        FROM stories s
-       JOIN story_players sp ON s.id = sp.storyid
-       WHERE sp.userid = $1 AND (s.creatorid IS NULL OR s.creatorid != $2)
-       ORDER BY "sp_lastplayedat_for_ordering" DESC`,
+       JOIN story_players sp ON s.id = sp.story_id
+       WHERE sp.user_id = $1 AND (s.creator_id IS NULL OR s.creator_id != $2)
+       ORDER BY sp_last_played_at_for_ordering DESC NULLS LAST`,
       [userId, userId]
     );
     const playedStories: StoryMetadata[] = playedStoriesResult.rows.map(
       (row) => {
-        const createdAtNum = parseInt(row.createdat, 10);
-        const updatedAtNum = parseInt(row.updatedat, 10);
+        const createdAtNum = parseInt(row.created_at, 10);
+        const updatedAtNum = parseInt(row.updated_at, 10);
         return {
           id: row.id,
           title: row.title,
-          templateId: row.templateid,
+          templateId: row.template_id,
           createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
           updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.maxturns,
-          generateImages: row.generateimages,
-          creatorId: row.creatorid,
+          maxTurns: row.max_turns,
+          generateImages: row.generate_images,
+          creatorId: row.creator_id,
         };
       }
     );
@@ -284,19 +294,19 @@ export async function getAllUserRelatedStories(
 
       if (isCreator) {
         const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT storyid, playerslot, code, userid, lastplayedat
-           FROM story_players WHERE storyid = $1 ORDER BY playerslot`,
+          `SELECT story_id, player_slot, code, user_id, last_played_at
+           FROM story_players WHERE story_id = $1 ORDER BY player_slot`,
           [story.id]
         );
         playersDto = playersResult.rows.map((prow) => {
-          const lastPlayedAtNum = prow.lastplayedat
-            ? parseInt(prow.lastplayedat, 10)
+          const lastPlayedAtNum = prow.last_played_at
+            ? parseInt(prow.last_played_at, 10)
             : null;
           return {
-            storyId: prow.storyid,
-            playerSlot: prow.playerslot,
+            storyId: prow.story_id,
+            playerSlot: prow.player_slot,
             code: prow.code,
-            userId: prow.userid,
+            userId: prow.user_id,
             lastPlayedAt:
               lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
                 ? null
@@ -305,19 +315,19 @@ export async function getAllUserRelatedStories(
         });
       } else {
         const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT storyid, playerslot, code, userid, lastplayedat
-           FROM story_players WHERE storyid = $1 AND userid = $2 ORDER BY playerslot`,
+          `SELECT story_id, player_slot, code, user_id, last_played_at
+           FROM story_players WHERE story_id = $1 AND user_id = $2 ORDER BY player_slot`,
           [story.id, userId]
         );
         playersDto = playersResult.rows.map((prow) => {
-          const lastPlayedAtNum = prow.lastplayedat
-            ? parseInt(prow.lastplayedat, 10)
+          const lastPlayedAtNum = prow.last_played_at
+            ? parseInt(prow.last_played_at, 10)
             : null;
           return {
-            storyId: prow.storyid,
-            playerSlot: prow.playerslot,
+            storyId: prow.story_id,
+            playerSlot: prow.player_slot,
             code: prow.code,
-            userId: prow.userid,
+            userId: prow.user_id,
             lastPlayedAt:
               lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
                 ? null
@@ -336,18 +346,19 @@ export async function getAllUserRelatedStories(
 
     if (allStoryIds.length > 0) {
       const lastPlayedTimesResult = await pool.query<{
-        storyid: string;
-        lastplayed: string | null;
+        story_id: string; // snake_case
+        last_played: string | null; // snake_case
       }>(
-        `SELECT storyid, MAX(lastplayedat) as lastplayed
-         FROM story_players WHERE storyid = ANY($1::TEXT[]) GROUP BY storyid`,
+        `SELECT story_id, MAX(last_played_at) as last_played
+         FROM story_players WHERE story_id = ANY($1::TEXT[]) GROUP BY story_id`,
         [allStoryIds]
       );
       for (const record of lastPlayedTimesResult.rows) {
-        if (record.lastplayed !== null) {
-          const lastPlayedNum = parseInt(record.lastplayed, 10);
+        if (record.last_played !== null) {
+          // snake_case
+          const lastPlayedNum = parseInt(record.last_played, 10); // snake_case
           if (!isNaN(lastPlayedNum)) {
-            lastPlayedMap[record.storyid] = lastPlayedNum;
+            lastPlayedMap[record.story_id] = lastPlayedNum; // snake_case
           }
         }
       }
@@ -384,29 +395,28 @@ export async function getAllUserRelatedStories(
 export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
   try {
     const pool = getDb();
-
     const result = await pool.query<StoryMetadataDbRow>(
       `SELECT 
-        id, title, templateid, createdat, updatedat, maxturns, generateimages, creatorid
+        id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id
        FROM stories 
-       WHERE creatorid = $1
-       ORDER BY updatedat DESC`,
+       WHERE creator_id = $1
+       ORDER BY updated_at DESC`,
       [userId]
     );
 
     return (
       result.rows.map((row) => {
-        const createdAtNum = parseInt(row.createdat, 10);
-        const updatedAtNum = parseInt(row.updatedat, 10);
+        const createdAtNum = parseInt(row.created_at, 10);
+        const updatedAtNum = parseInt(row.updated_at, 10);
         return {
           id: row.id,
           title: row.title,
-          templateId: row.templateid,
+          templateId: row.template_id,
           createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
           updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.maxturns,
-          generateImages: row.generateimages,
-          creatorId: row.creatorid,
+          maxTurns: row.max_turns,
+          generateImages: row.generate_images,
+          creatorId: row.creator_id,
         };
       }) || []
     );
@@ -424,30 +434,29 @@ export async function getStoriesWithUser(
 ): Promise<StoryMetadata[]> {
   try {
     const pool = getDb();
-
     const result = await pool.query<StoryMetadataDbRow>(
       `SELECT DISTINCT
-        s.id, s.title, s.templateid, s.createdat, s.updatedat, s.maxturns, s.generateimages, s.creatorid
+        s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id
        FROM stories s
-       JOIN story_players sp ON s.id = sp.storyid
-       WHERE sp.userid = $1
-       ORDER BY sp.lastplayedat DESC`,
+       JOIN story_players sp ON s.id = sp.story_id
+       WHERE sp.user_id = $1
+       ORDER BY sp.last_played_at DESC NULLS LAST`, // Added NULLS LAST
       [userId]
     );
 
     return (
       result.rows.map((row) => {
-        const createdAtNum = parseInt(row.createdat, 10);
-        const updatedAtNum = parseInt(row.updatedat, 10);
+        const createdAtNum = parseInt(row.created_at, 10);
+        const updatedAtNum = parseInt(row.updated_at, 10);
         return {
           id: row.id,
           title: row.title,
-          templateId: row.templateid,
+          templateId: row.template_id,
           createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
           updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.maxturns,
-          generateImages: row.generateimages,
-          creatorId: row.creatorid,
+          maxTurns: row.max_turns,
+          generateImages: row.generate_images,
+          creatorId: row.creator_id,
         };
       }) || []
     );
@@ -469,13 +478,17 @@ export async function updateLastPlayedTime(
     const pool = getDb();
     const now = Date.now();
 
-    // Update the story_players record
     await pool.query(
       `UPDATE story_players 
-       SET lastPlayedAt = $1 
-       WHERE storyId = $2 AND playerSlot = $3 AND userId = $4`,
+       SET last_played_at = $1 
+       WHERE story_id = $2 AND player_slot = $3 AND user_id = $4`,
       [now, storyId, playerSlot, userId]
     );
+    // Also update the parent story's updated_at timestamp
+    await pool.query(`UPDATE stories SET updated_at = $1 WHERE id = $2`, [
+      now,
+      storyId,
+    ]);
   } catch (error) {
     Logger.Route.error(
       `Failed to update last played time for user ${userId}, story ${storyId}`,

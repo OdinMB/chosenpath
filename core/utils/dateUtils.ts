@@ -36,3 +36,16 @@ export const formatDateTime = (dateString: string): string => {
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
+
+/**
+ * Format a timestamp to Month Day, Time format
+ * @param timestamp - The number of milliseconds since January 1, 1970, 00:00:00 UTC.
+ * @returns Formatted date and time string (e.g., "April 7, 2:30 PM")
+ */
+export const formatTimestampToMonthDayTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const monthName = date.toLocaleString("en-US", { month: "long" });
+  const day = date.getDate();
+  const time = date.toLocaleString(undefined, { timeStyle: "short" });
+  return `${monthName} ${day}, ${time}`;
+};

@@ -16,6 +16,7 @@ import { connectionManager } from "shared/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
+import { storyDbService } from "server/shared/StoryDbService.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -79,7 +80,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     // Ensure the story directory structure exists
     await ensureStoryDirectoryStructure(gameId);
 
-    // Store the updated story in the repository
+    // Store the updated story in the repository (this also updates stories.current_turn and stories.updatedAt)
     await storyRepository.storeStory(gameId, story);
 
     // Then broadcast the update to all connected clients
@@ -166,6 +167,25 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
         // Store and broadcast the updated state with images
         await this.updateAndBroadcastStory(gameId, finalStory);
+
+        // --- DB Integration: Update story_players and stories.updatedAt after turn progresses ---
+        // This also updates story.current_turn via storeStory -> storyDbService.updateStoryTurnAndTimestamp
+        // and stories.updatedAt is handled by setAllPlayersPending
+        const playerSlots = finalStory.getPlayerSlots();
+        try {
+          await storyDbService.updateStoryTurnAndTimestamp(
+            gameId,
+            finalStory.getCurrentTurn()
+          );
+          await storyDbService.setAllPlayersPending(gameId, playerSlots);
+          // Logger.Queue.log(...); // Logging is done by the service methods
+        } catch (dbError) {
+          Logger.Queue.error(
+            `DB service error updating players to pending for ${gameId}:`,
+            dbError
+          );
+        }
+        // --- DB Integration End ---
       }
     } catch (error) {
       console.error(
@@ -191,8 +211,21 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       optionIndex
     );
 
-    // Store and broadcast the story update
+    // Store and broadcast the story update (this also updates stories.current_turn via storeStory -> service)
     await this.updateAndBroadcastStory(gameId, storyWithBeatResolution);
+
+    // --- DB Integration: Update story_players for the player who made a choice ---
+    // stories.updatedAt is handled by updatePlayerStatus
+    try {
+      await storyDbService.updatePlayerStatus(gameId, playerSlot, false); // isPending = false
+      // Logger.Queue.log(...); // Logging by service
+    } catch (dbError) {
+      Logger.Queue.error(
+        `DB service error updating player ${playerSlot} status for ${gameId}:`,
+        dbError
+      );
+    }
+    // --- DB Integration End ---
 
     // Queue next operation if all choices are in
     if (storyWithBeatResolution.areAllChoicesSubmitted()) {
@@ -306,6 +339,19 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
     // Store and broadcast the updated state
     await this.updateAndBroadcastStory(gameId, updatedStory);
+
+    // --- DB Integration: Update story_players for the player who selected a character ---
+    // stories.updatedAt is handled by updatePlayerStatus
+    try {
+      await storyDbService.updatePlayerStatus(gameId, playerSlot, false); // isPending = false
+      // Logger.Queue.log(...); // Logging by service
+    } catch (dbError) {
+      Logger.Queue.error(
+        `DB service error updating player ${playerSlot} status for ${gameId} (char select):`,
+        dbError
+      );
+    }
+    // --- DB Integration End ---
 
     // Check if all players have completed character selection
     if (updatedStory.areAllCharactersSelected()) {

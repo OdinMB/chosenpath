@@ -41,6 +41,7 @@ export interface VerifyCodeMessage extends BaseClientMessage {
   type: "verify_code";
   sessionId: string;
   code: string;
+  userId?: string;
 }
 
 export interface ExitStoryMessage extends BaseClientMessage {

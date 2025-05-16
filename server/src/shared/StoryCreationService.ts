@@ -11,6 +11,8 @@ import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory
 import { storyRepository } from "./StoryRepository.js";
 import { sendSuccess, sendModerationBlocked } from "./responseUtils.js";
 import { Response } from "express";
+import { storyDbService } from "./StoryDbService.js";
+import { getDb } from "./db.js";
 
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
@@ -39,13 +41,54 @@ export class StoryCreationService {
     return codes;
   }
 
+  private async _createStoryDbEntries(
+    storyId: string,
+    title: string | null,
+    templateId: string | null,
+    playerCodes: Record<string, string>,
+    maxTurns: number,
+    generateImages: boolean,
+    creatorId?: string
+  ): Promise<void> {
+    const db = getDb();
+    try {
+      await db.query("BEGIN");
+
+      await storyDbService.createStoryEntry(
+        storyId,
+        title,
+        templateId,
+        maxTurns,
+        generateImages,
+        creatorId
+      );
+
+      await storyDbService.bulkCreateStoryPlayerEntries(storyId, playerCodes);
+
+      await db.query("COMMIT");
+      Logger.Route.log(
+        `Story and player DB entries committed for story: ${storyId}`
+      );
+    } catch (dbError) {
+      await db.query("ROLLBACK");
+      Logger.Route.error(
+        `DB transaction for story ${storyId} creation rolled back:`,
+        dbError
+      );
+      throw new Error(
+        `Failed to create story ${storyId} DB entries due to transaction failure.`
+      );
+    }
+  }
+
   async createStory(
     prompt: string,
     generateImages: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    res: Response
+    res: Response,
+    creatorId?: string
   ): Promise<void> {
     Logger.Route.log(
       `Creating new story with prompt: "${prompt.substring(0, 50)}..."`
@@ -73,6 +116,18 @@ export class StoryCreationService {
     await ensureStoryDirectoryStructure(storyId);
     Logger.Route.log(`Created directory structure for story: ${storyId}`);
 
+    // --- DB Integration Start ---
+    await this._createStoryDbEntries(
+      storyId,
+      null, // Title is initially null for AI stories
+      null, // No templateId for custom stories
+      playerCodes,
+      maxTurns,
+      generateImages,
+      creatorId
+    );
+    // --- DB Integration End ---
+
     // Register game session and codes
     connectionManager.createGameSession(storyId);
     Object.entries(playerCodes).forEach(([slot, code]) => {
@@ -88,7 +143,8 @@ export class StoryCreationService {
       playerCount,
       maxTurns,
       gameMode,
-      playerCodes
+      playerCodes,
+      creatorId
     ).catch((error) => {
       Logger.Route.error(
         `Failed to generate story state for ${storyId}:`,
@@ -111,7 +167,8 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    playerCodes: Record<string, string>
+    playerCodes: Record<string, string>,
+    creatorId?: string
   ): Promise<void> {
     try {
       Logger.Route.log(`Starting story generation for ${storyId}`);
@@ -128,6 +185,19 @@ export class StoryCreationService {
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
 
       const story = Story.create(storyState);
+
+      // --- DB Integration: Update story title ---
+      if (storyState.title) {
+        try {
+          await storyDbService.updateStoryTitle(storyId, storyState.title);
+        } catch (dbError) {
+          Logger.Route.error(
+            `DB error updating title for story ${storyId} via service:`,
+            dbError
+          );
+        }
+      }
+      // --- DB Integration End ---
 
       // Add player codes to state
       const storyWithCodes = story.clone({
@@ -148,7 +218,8 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     generateImages: boolean,
-    res: Response
+    res: Response,
+    creatorId?: string
   ): Promise<void> {
     Logger.Route.log(`Creating story from template: ${templateId}`);
 
@@ -183,6 +254,18 @@ export class StoryCreationService {
     // Create story directory structure
     await ensureStoryDirectoryStructure(storyId);
     Logger.Route.log(`Created directory structure for story: ${storyId}`);
+
+    // --- DB Integration Start ---
+    await this._createStoryDbEntries(
+      storyId,
+      template.title, // Title is known from template
+      templateId,
+      playerCodes,
+      maxTurns,
+      generateImages,
+      creatorId
+    );
+    // --- DB Integration End ---
 
     // Register game session and codes
     connectionManager.createGameSession(storyId);

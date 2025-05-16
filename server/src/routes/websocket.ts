@@ -347,12 +347,14 @@ export class GameWebSocketServer {
         async (data: {
           sessionId: string;
           code: string;
+          userId?: string;
           requestId?: string;
         }) => {
           try {
             console.log("[WebSocket] Verifying code:", {
               sessionId: data.sessionId,
               code: data.code,
+              userId: data.userId,
             });
 
             // Check rate limiting
@@ -379,7 +381,8 @@ export class GameWebSocketServer {
                   playerInfo.storyId,
                   playerInfo.playerSlot,
                   data.code,
-                  socket
+                  socket,
+                  data.userId
                 );
 
                 // Join the socket to the game's room

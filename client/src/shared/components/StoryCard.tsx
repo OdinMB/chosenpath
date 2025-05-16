@@ -1,14 +1,16 @@
 import { formatRelativeTime } from "../utils/timeUtils";
 import { CoverCard } from "./CoverCard";
-import { PrimaryButton, InfoIcon } from "./ui";
+import { PrimaryButton, InfoIcon, ConfirmDialog, Icons, Tooltip } from "./ui";
 import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
 import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "shared/useAuth";
+import { useState } from "react";
 
 type StoryCardProps = {
   story: StoryMetadata;
   players?: UserStoryCodeAssociation[];
   onPlay?: (storyId: string, code?: string) => void;
+  onDelete?: (storyId: string) => void;
   showPlayButton?: boolean;
   size?: "default" | "large";
   className?: string;
@@ -19,12 +21,14 @@ export const StoryCard = ({
   story,
   players = [],
   onPlay,
+  onDelete,
   showPlayButton = true,
   size = "default",
   className = "",
   children,
 }: StoryCardProps) => {
   const { user } = useAuth();
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   // Size-based class mapping
   const sizeClasses = {
@@ -55,6 +59,17 @@ export const StoryCard = ({
     }
   };
 
+  const handleDelete = () => {
+    setIsConfirmDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (onDelete) {
+      onDelete(story.id);
+    }
+    setIsConfirmDialogOpen(false);
+  };
+
   // Determine if we should show the image and what source to use
   const shouldShowImage = story.generateImages === true || story.templateId;
   const imageSource = story.templateId ? "template" : "story";
@@ -77,58 +92,84 @@ export const StoryCard = ({
   };
 
   return (
-    <CoverCard
-      sourceId={shouldShowImage ? imageSourceId : undefined}
-      source={imageSource}
-      title={story.title}
-      size={size}
-      onClick={handlePlay}
-      className={className}
-    >
-      <div className="flex justify-between items-center mb-2">
-        <h3 className={`${sizeClasses.title} text-primary-800`}>
-          {story.title}
-        </h3>
-        {showPlayButton && onPlay && (
-          <PrimaryButton onClick={handlePlay} className="ml-4">
-            Play
-          </PrimaryButton>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex flex-col gap-1 text-primary-500 mb-3">
-        <div className="flex items-center">
-          <span className={`${sizeClasses.info} font-semibold`}>
-            {story.maxTurns} turns
-          </span>
-          <InfoIcon
-            tooltipText={infoTooltip}
-            position="top"
-            className="ml-4 mt-1"
-          />
+    <>
+      <ConfirmDialog
+        isOpen={isConfirmDialogOpen}
+        onClose={() => setIsConfirmDialogOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Story"
+        message="Are you sure you want to delete this story? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+      <CoverCard
+        sourceId={shouldShowImage ? imageSourceId : undefined}
+        source={imageSource}
+        title={story.title}
+        size={size}
+        onClick={handlePlay}
+        className={`${className} relative`}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <h3 className={`${sizeClasses.title} text-primary-800`}>
+            {story.title}
+          </h3>
+          {showPlayButton && onPlay && (
+            <PrimaryButton onClick={handlePlay} className="ml-4">
+              Play
+            </PrimaryButton>
+          )}
         </div>
-      </div>
 
-      {/* Story Codes */}
-      {codesToShow.length > 0 && (
-        <div className="mt-3 flex flex-col gap-2">
-          {codesToShow.map((player) => (
-            <PlayerCode
-              key={player.code}
-              code={player.code}
-              size="sm"
-              label={getPlayerCodeLabel(player)}
+        {/* Info */}
+        <div className="flex flex-col gap-1 text-primary-500 mb-3">
+          <div className="flex items-center">
+            <span className={`${sizeClasses.info} font-semibold`}>
+              {story.maxTurns} turns
+            </span>
+            <InfoIcon
+              tooltipText={infoTooltip}
+              position="top"
+              className="ml-4 mt-1"
             />
-          ))}
+          </div>
         </div>
-      )}
 
-      {/* Optional children */}
-      {children}
+        {/* Story Codes */}
+        {codesToShow.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2">
+            {codesToShow.map((player) => (
+              <PlayerCode
+                key={player.code}
+                code={player.code}
+                size="sm"
+                label={getPlayerCodeLabel(player)}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* Flex spacer */}
-      <div className="flex-grow"></div>
-    </CoverCard>
+        {/* Optional children */}
+        {children}
+
+        {/* Flex spacer */}
+        <div className="flex-grow"></div>
+
+        {/* Delete Button - absolutely positioned */}
+        {onDelete && isCreator && (
+          <div className="absolute bottom-3 right-3">
+            <Tooltip content="Delete story" position="left">
+              <button
+                onClick={handleDelete}
+                className="text-red-600 hover:text-red-700 focus:outline-none flex items-center"
+                aria-label="Delete story"
+              >
+                <Icons.Trash />
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </CoverCard>
+    </>
   );
 };

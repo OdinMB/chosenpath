@@ -39,19 +39,20 @@ class GameService {
     });
   }
 
-  verifyCode(code: string) {
+  verifyCode(code: string, userId?: string) {
     const sessionId = wsService.getSessionId();
     if (!sessionId) {
       console.warn("[GameService] Cannot verify code: no session");
       return;
     }
 
-    console.log("[GameService] Verifying code:", code);
+    console.log("[GameService] Verifying code:", code, "for user:", userId);
     wsService.setPlayerCode(code);
     wsService.sendMessage({
       type: "verify_code",
       sessionId,
       code,
+      userId,
     });
   }
 }
