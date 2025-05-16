@@ -167,26 +167,26 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
         // Store and broadcast the updated state with images
         await this.updateAndBroadcastStory(gameId, finalStory);
-
-        // --- DB Integration: Update story_players and stories.updatedAt after turn progresses ---
-        // This also updates story.current_turn via storeStory -> storyDbService.updateStoryTurnAndTimestamp
-        // and stories.updatedAt is handled by setAllPlayersPending
-        const playerSlots = finalStory.getPlayerSlots();
-        try {
-          await storyDbService.updateStoryTurnAndTimestamp(
-            gameId,
-            finalStory.getCurrentTurn()
-          );
-          await storyDbService.setAllPlayersPending(gameId, playerSlots);
-          // Logger.Queue.log(...); // Logging is done by the service methods
-        } catch (dbError) {
-          Logger.Queue.error(
-            `DB service error updating players to pending for ${gameId}:`,
-            dbError
-          );
-        }
-        // --- DB Integration End ---
       }
+
+      // --- DB Integration: Update story_players and stories.updatedAt after turn progresses ---
+      // This also updates story.current_turn via storeStory -> storyDbService.updateStoryTurnAndTimestamp
+      // and stories.updatedAt is handled by setAllPlayersPending
+      const playerSlots = finalStory.getPlayerSlots();
+      try {
+        await storyDbService.updateStoryTurnAndTimestamp(
+          gameId,
+          finalStory.getCurrentTurn()
+        );
+        await storyDbService.setAllPlayersPending(gameId, playerSlots);
+        // Logger.Queue.log(...); // Logging is done by the service methods
+      } catch (dbError) {
+        Logger.Queue.error(
+          `DB service error updating players to pending for ${gameId}:`,
+          dbError
+        );
+      }
+      // --- DB Integration End ---
     } catch (error) {
       console.error(
         "[GameQueueProcessor] Failed to move story forward:",
