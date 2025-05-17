@@ -14,6 +14,8 @@ import {
   RateLimitedResponse,
   ModerationBlockedResponse,
   CreateStoryInfo,
+  GetResumableStoriesRequest,
+  ResumableStoryMetadata,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -404,4 +406,11 @@ export const templateApi = {
     );
     return response.template;
   },
+};
+
+// Method to get resumable stories
+export const getResumableStories = async (
+  params: GetResumableStoriesRequest
+): Promise<ResumableStoryMetadata[]> => {
+  return apiClient.post<ResumableStoryMetadata[]>("/stories/resumable", params);
 };

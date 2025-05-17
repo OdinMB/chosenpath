@@ -1,14 +1,14 @@
 import { formatRelativeTime } from "../utils/timeUtils";
 import { CoverCard } from "./CoverCard";
 import { PrimaryButton, InfoIcon, ConfirmDialog, Icons, Tooltip } from "./ui";
-import { UserStoryCodeAssociation, StoryMetadata } from "core/types/api";
+import { StoryMetadata, ResumableStoryPlayer } from "core/types/api";
 import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "shared/useAuth";
 import { useState } from "react";
 
 type StoryCardProps = {
   story: StoryMetadata;
-  players?: UserStoryCodeAssociation[];
+  players?: ResumableStoryPlayer[];
   onPlay?: (storyId: string, code?: string) => void;
   onDelete?: (storyId: string) => void;
   showPlayButton?: boolean;
@@ -36,7 +36,7 @@ export const StoryCard = ({
     info: size === "large" ? "text-sm" : "text-xs",
   };
 
-  // Get the user's player slot if available
+  // User's own player entry from the ResumableStoryPlayer list
   const userPlayer = players.find((p) => p.userId === user?.id);
 
   // Format timestamps for the tooltip
@@ -55,7 +55,15 @@ export const StoryCard = ({
 
   const handlePlay = () => {
     if (onPlay) {
-      onPlay(story.id, userPlayer?.code);
+      // Pass the user's code if available and they are a player,
+      // otherwise, if only one code is visible, pass that.
+      // This might need more sophisticated logic if multiple codes are visible to a non-player user.
+      const playCode =
+        userPlayer?.code ||
+        (players.filter((p) => p.code).length === 1
+          ? players.find((p) => p.code)?.code
+          : undefined);
+      onPlay(story.id, playCode);
     }
   };
 
@@ -75,19 +83,23 @@ export const StoryCard = ({
   const imageSource = story.templateId ? "template" : "story";
   const imageSourceId = story.templateId || story.id;
 
-  // Determine which codes to show - if user is creator, show all; otherwise only show user's code
-  const isCreator = user?.id && story.creatorId === user.id;
-  const codesToShow = isCreator
-    ? players
-    : players.filter((p) => p.userId === user?.id);
+  // Filter players who have a code visible to the current user (code is now optional)
+  // The server already applies visibility rules to the `code` field.
+  const playersWithVisibleCode = players.filter(
+    (p) => typeof p.code === "string" && p.code !== ""
+  );
 
   // Function to get label for a player code
-  const getPlayerCodeLabel = (player: UserStoryCodeAssociation) => {
-    // User's own code
+  // Now uses ResumableStoryPlayer which might have a username
+  const getPlayerCodeLabel = (player: ResumableStoryPlayer) => {
+    if (player.username) {
+      return player.userId === user?.id
+        ? `You (${player.username})`
+        : player.username;
+    }
     if (player.userId === user?.id) {
       return "You";
     }
-    // Other players' codes
     return `Player ${player.playerSlot.replace("player", "")}`;
   };
 
@@ -116,10 +128,7 @@ export const StoryCard = ({
             {story.title}
           </h3>
           {showPlayButton && onPlay && (
-            <PrimaryButton
-              onClick={handlePlay}
-              className="ml-4 w-auto" // Desktop: auto width, margin left
-            >
+            <PrimaryButton onClick={handlePlay} className="ml-4 w-auto">
               Resume
             </PrimaryButton>
           )}
@@ -149,24 +158,23 @@ export const StoryCard = ({
 
         {/* --- Mobile: Resume Button (after info section) --- */}
         {showPlayButton && onPlay && (
-          <PrimaryButton
-            onClick={handlePlay}
-            className="w-full mb-3 md:hidden" // Mobile: full width, margin bottom. Hidden on md+
-          >
+          <PrimaryButton onClick={handlePlay} className="w-full mb-3 md:hidden">
             Resume
           </PrimaryButton>
         )}
 
-        {codesToShow.length > 0 && (
+        {/* Display player codes / usernames */}
+        {playersWithVisibleCode.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
-            {codesToShow.map((player) => (
-              <div key={player.code} className="flex items-center">
+            {playersWithVisibleCode.map((player) => (
+              // player.code is now guaranteed to be a string here
+              <div key={player.playerSlot} className="flex items-center">
                 <PlayerCode
-                  code={player.code}
+                  code={player.code!}
                   size="sm"
                   label={getPlayerCodeLabel(player)}
                 />
-                {players.length >= 2 && player.isPending && (
+                {player.isPending && (
                   <span className="ml-2 text-xs text-yellow-600 font-semibold">
                     Pending
                   </span>
@@ -180,7 +188,7 @@ export const StoryCard = ({
 
         <div className="flex-grow"></div>
 
-        {onDelete && isCreator && (
+        {onDelete && story.creatorId === user?.id && (
           <div className="absolute bottom-3 right-3">
             <Tooltip content="Delete story" position="left">
               <button

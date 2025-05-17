@@ -1,6 +1,10 @@
 import { getDb } from "./db.js";
 import { Logger } from "./logger.js";
 import { PlayerSlot, StoryState } from "core/types/index.js";
+import {
+  ResumableStoryMetadata,
+  ResumableStoryPlayer,
+} from "core/types/api.js";
 
 // Interface for player info retrieved from DB
 export interface StoryPlayerDbInfo {
@@ -413,6 +417,190 @@ class StoryDbService {
         `ROLLBACK: Error deleting story ${storyId} and its players:`,
         error
       );
+      throw error;
+    }
+  }
+
+  async getResumableStories(
+    userId?: string,
+    storyCodes?: string[],
+    authenticatedUserId?: string
+  ): Promise<ResumableStoryMetadata[]> {
+    Logger.Transaction.log(
+      `getResumableStories called with userId: ${userId}, storyCodes: ${storyCodes?.join(
+        ","
+      )}, authenticatedUserId: ${authenticatedUserId}`
+    );
+    const db = getDb();
+
+    if (!userId && (!storyCodes || storyCodes.length === 0)) {
+      Logger.Transaction.warn(
+        "getResumableStories: No userId or storyCodes provided."
+      );
+      return [];
+    }
+
+    let queryParams: any[] = [];
+    let paramIndex = 1;
+
+    // Base query
+    let sqlQuery = `
+      SELECT
+        s.id AS story_id,
+        s.title AS story_title,
+        s.template_id,
+        s.created_at AS story_created_at,
+        s.updated_at AS story_updated_at,
+        s.max_turns,
+        s.current_beat,
+        s.generate_images,
+        s.creator_id,
+        sp.player_slot,
+        sp.code AS player_code,
+        sp.user_id AS player_user_id,
+        sp.last_played_at AS player_last_played_at,
+        sp.is_pending AS player_is_pending,
+        u.username AS player_username
+      FROM stories s
+      LEFT JOIN story_players sp ON s.id = sp.story_id
+      LEFT JOIN users u ON sp.user_id = u.id
+    `;
+
+    const whereClauses: string[] = [];
+    const storyIdSubQueryClauses: string[] = [];
+
+    if (userId) {
+      // Stories where the user is the creator OR a player
+      storyIdSubQueryClauses.push(`s.creator_id = $${paramIndex}`);
+      queryParams.push(userId);
+      paramIndex++;
+      storyIdSubQueryClauses.push(
+        `EXISTS (SELECT 1 FROM story_players sp_sub WHERE sp_sub.story_id = s.id AND sp_sub.user_id = $${paramIndex})`
+      );
+      queryParams.push(userId);
+      paramIndex++;
+    }
+
+    if (storyCodes && storyCodes.length > 0) {
+      // Stories linked by specific player codes
+      storyIdSubQueryClauses.push(
+        `EXISTS (SELECT 1 FROM story_players sp_sub WHERE sp_sub.story_id = s.id AND sp_sub.code = ANY($${paramIndex}::text[]))`
+      );
+      queryParams.push(storyCodes);
+      paramIndex++;
+    }
+
+    if (storyIdSubQueryClauses.length > 0) {
+      whereClauses.push(
+        `s.id IN (SELECT s.id FROM stories s WHERE ${storyIdSubQueryClauses.join(
+          " OR "
+        )})`
+      );
+    }
+
+    if (whereClauses.length > 0) {
+      sqlQuery += " WHERE " + whereClauses.join(" AND ");
+    }
+    sqlQuery += " ORDER BY s.updated_at DESC, sp.player_slot ASC";
+
+    try {
+      Logger.DB.log("Executing getResumableStories query:", {
+        sqlQuery,
+        queryParams,
+      });
+      const result = await db.query(sqlQuery, queryParams);
+      Logger.DB.log(
+        `getResumableStories query returned ${result.rows.length} rows.`
+      );
+
+      const storiesMap = new Map<string, ResumableStoryMetadata>();
+      const playersByStoryMap = new Map<string, ResumableStoryPlayer[]>();
+
+      for (const row of result.rows) {
+        if (!row.story_id) continue; // Should not happen with current query
+
+        let story = storiesMap.get(row.story_id);
+        if (!story) {
+          story = {
+            id: row.story_id,
+            title: row.story_title,
+            templateId: row.template_id,
+            createdAt: parseInt(row.story_created_at, 10),
+            updatedAt: parseInt(row.story_updated_at, 10),
+            maxTurns: row.max_turns,
+            currentBeat: row.current_beat,
+            generateImages: row.generate_images,
+            creatorId: row.creator_id,
+            players: [], // Will be populated later by permission logic
+          };
+          storiesMap.set(row.story_id, story);
+          playersByStoryMap.set(row.story_id, []);
+        }
+
+        if (row.player_slot) {
+          // Ensure there is player data
+          const player: ResumableStoryPlayer = {
+            storyId: row.story_id,
+            playerSlot: row.player_slot,
+            code: row.player_code, // Will be filtered later by permissions
+            userId: row.player_user_id,
+            lastPlayedAt: row.player_last_played_at
+              ? parseInt(row.player_last_played_at, 10)
+              : null,
+            isPending: row.player_is_pending,
+            username: row.player_username,
+          };
+          playersByStoryMap.get(row.story_id)?.push(player);
+        }
+      }
+
+      const finalStories: ResumableStoryMetadata[] = [];
+      for (const [storyId, story] of storiesMap.entries()) {
+        const allPlayersForStory = playersByStoryMap.get(storyId) || [];
+        const visiblePlayers: ResumableStoryPlayer[] = [];
+
+        const isCreator =
+          authenticatedUserId && story.creatorId === authenticatedUserId;
+        const isPlayer1 =
+          authenticatedUserId &&
+          allPlayersForStory.some(
+            (p) =>
+              p.playerSlot === "player1" && p.userId === authenticatedUserId
+          );
+        const canSeeAllCodes = isCreator || isPlayer1;
+
+        for (const player of allPlayersForStory) {
+          let playerCodeToShow: string | undefined = undefined;
+          if (canSeeAllCodes) {
+            playerCodeToShow = player.code;
+          } else if (
+            authenticatedUserId &&
+            player.userId === authenticatedUserId
+          ) {
+            playerCodeToShow = player.code;
+          } else if (
+            storyCodes &&
+            player.code &&
+            storyCodes.includes(player.code)
+          ) {
+            playerCodeToShow = player.code;
+          }
+
+          visiblePlayers.push({
+            ...player,
+            code: playerCodeToShow, // Apply filtered code
+          });
+        }
+        story.players = visiblePlayers;
+        finalStories.push(story);
+      }
+
+      Logger.Transaction.log(
+        `getResumableStories processed ${finalStories.length} stories.`
+      );
+      return finalStories;
+    } catch (error) {
+      Logger.DB.error("Error in getResumableStories:", error);
       throw error;
     }
   }

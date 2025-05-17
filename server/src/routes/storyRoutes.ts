@@ -1,4 +1,4 @@
-import { Router, Request } from "express";
+import { Router, Request, Response } from "express";
 import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
@@ -16,6 +16,8 @@ import {
 } from "core/types/api.js";
 import { PlayerCount } from "core/types/index.js";
 import { verifyUser } from "../users/authMiddleware.js";
+import { storyDbService } from "../shared/StoryDbService.js";
+import { GetResumableStoriesRequest } from "core/types/api.js";
 
 const router = Router();
 
@@ -112,5 +114,54 @@ router.get("/stories/:id/status", async (req, res) => {
     sendError(res, "Failed to check story status", 500, requestId, error);
   }
 });
+
+// Get resumable stories
+router.post(
+  "/stories/resumable",
+  verifyUser({ required: false }),
+  async (req: Request, res: Response) => {
+    const requestId =
+      (req.body as GetResumableStoriesRequest)?.requestId ||
+      "unknown-resumable-stories";
+    try {
+      const { userId, storyCodes } = req.body as GetResumableStoriesRequest;
+      const authenticatedUserId = (req as any).user?.id;
+
+      // Prioritize authenticatedUserId if present, otherwise use userId from body.
+      const effectiveUserId = authenticatedUserId || userId;
+
+      Logger.Route.log(
+        `Handling getResumableStories. UserID (effective): ${effectiveUserId}, Codes: ${storyCodes?.join(
+          ", "
+        )}`
+      );
+
+      if (!effectiveUserId && (!storyCodes || storyCodes.length === 0)) {
+        return sendError(
+          res,
+          "User ID or Story Codes must be provided.",
+          400,
+          requestId
+        );
+      }
+
+      const resumableStories = await storyDbService.getResumableStories(
+        effectiveUserId,
+        storyCodes,
+        authenticatedUserId // Pass authenticatedUserId for permission checks
+      );
+      sendSuccess(res, resumableStories, requestId);
+    } catch (error) {
+      Logger.Route.error("Failed to get resumable stories:", error);
+      sendError(
+        res,
+        "Failed to retrieve resumable stories.",
+        500,
+        requestId,
+        error
+      );
+    }
+  }
+);
 
 export default router;

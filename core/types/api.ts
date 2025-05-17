@@ -200,7 +200,7 @@ export interface StoryMetadata {
 export interface StoryPlayerEntry {
   storyId: string;
   playerSlot: string;
-  code: string;
+  code?: string;
   userId: string | null;
   lastPlayedAt: number | null;
   isPending?: boolean;
@@ -211,6 +211,25 @@ export interface ExtendedStoryMetadata extends StoryMetadata {
 export interface UserStoriesResponse {
   stories: StoryMetadata[] | ExtendedStoryMetadata[];
 }
+
+/**
+ * Resumable stories (combining user-specific and code-based retrieval)
+ */
+export interface GetResumableStoriesRequest extends ClientRequest {
+  userId?: string;
+  storyCodes?: string[];
+}
+
+export interface ResumableStoryPlayer extends StoryPlayerEntry {
+  username?: string; // Added to display username if available
+}
+
+export interface ResumableStoryMetadata extends StoryMetadata {
+  players: ResumableStoryPlayer[];
+}
+
+export interface GetResumableStoriesResponse
+  extends SuccessResponse<ResumableStoryMetadata[]> {}
 
 /**
  * Admin specific types

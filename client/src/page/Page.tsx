@@ -6,9 +6,7 @@ import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, LibraryCategoryGrid } from "./components";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterButton, NewsletterModal } from "shared/components";
-import { useAuth } from "shared/useAuth";
-import { UserStoriesList } from "../users/components/UserStoriesList";
-import { StoredCodeSetsList } from "./components/StoredCodeSetsList";
+import { ResumableStories } from "shared/components/ResumableStories";
 
 // LibraryLoaderData interface removed as useLoaderData is not called directly in Page for its return value
 
@@ -22,20 +20,20 @@ export function Page() {
     closeNewsletterModal,
     handleSubscribe,
   } = useNewsletter();
-  const { user } = useAuth();
+  // const { user } = useAuth(); // No longer needed here as ResumableStories handles it
   // useLoaderData() is not called here as its return (templates) isn't directly used by Page.tsx logic.
   // The libraryLoader for the route will still run.
 
   // Handle code submission - now uses gameService directly
-  const handleCodeSubmit = (code: string) => {
+  const handleCodeSubmit = (submittedCode: string) => {
     // Store the code in localStorage with a unique key for this session
     const tabId =
       sessionStorage.getItem("tabId") ||
       Math.random().toString(36).substring(2, 15);
-    localStorage.setItem(`playerCode_${tabId}`, code);
+    localStorage.setItem(`playerCode_${tabId}`, submittedCode);
 
     // Navigate to the game page with the code
-    navigate(`/game/${code}`);
+    navigate(`/game/${submittedCode}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,13 +81,7 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
-          {user ? (
-            // Authenticated user view: UserStoriesList will fetch its own data.
-            <UserStoriesList onCodeSelect={handleCodeSubmit} />
-          ) : (
-            // Unauthenticated user view
-            <StoredCodeSetsList onCodeSubmit={handleCodeSubmit} />
-          )}
+          <ResumableStories onCodeSelect={handleCodeSubmit} />
 
           {/* Divider logic might need adjustment based on UserStoriesList content / StoredCodeSetsList visibility */}
           {/* For simplicity, let's assume a divider is usually good before Create Your Own Story */}
