@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "shared/useAuth";
-import { getResumableStories } from "shared/apiClient"; // Import standalone function
+import { getResumableStories } from "shared/apiClient";
 import { getSortedCodeSets } from "shared/utils/codeSetUtils";
-import { ResumableStoryMetadata } from "core/types/api"; // Removed ResumableStoryPlayer as it's used inline
+import { ResumableStoryMetadata } from "core/types/api";
 import { StoryCard } from "./StoryCard";
 import { Logger } from "shared/logger";
 import { useNavigate } from "react-router-dom";
-import { UserStoryCodeAssociation } from "core/types/api"; // Import for explicit mapping
+import { UserStoryCodeAssociation } from "core/types/api";
 
 interface ResumableStoriesProps {
-  onCodeSelect?: (code: string) => void;
+  onSetHasContent?: (hasContent: boolean) => void; // New prop
 }
 
-export const ResumableStories: React.FC<ResumableStoriesProps> = () => {
+export const ResumableStories: React.FC<ResumableStoriesProps> = ({
+  onSetHasContent,
+}) => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [stories, setStories] = useState<ResumableStoryMetadata[]>([]);
@@ -20,45 +22,60 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchStories = async () => {
+    let didCancel = false;
+
+    const determineAndFetch = async () => {
+      const localCodeSets = getSortedCodeSets();
+      const localStoryCodes = localCodeSets.flatMap((cs) =>
+        cs.codes ? Object.values(cs.codes) : []
+      );
+
+      if (!user && localStoryCodes.length === 0) {
+        if (didCancel) return;
+        Logger.App.log(
+          "ResumableStories: Unauthenticated and no local codes. No content."
+        );
+        setIsLoading(false);
+        setStories([]);
+        setError(null);
+        onSetHasContent?.(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
+
       try {
-        const localCodeSets = getSortedCodeSets();
-        const storyCodes = localCodeSets.flatMap((cs) =>
-          Object.values(cs.codes)
-        );
-
-        Logger.App.log(
-          "ResumableStories: Fetching stories with userId:",
-          user?.id,
-          "and codes:",
-          storyCodes.length
-        );
-
         const fetchedData = await getResumableStories({
           userId: user?.id,
-          storyCodes: storyCodes.length > 0 ? storyCodes : undefined,
+          storyCodes: localStoryCodes.length > 0 ? localStoryCodes : undefined,
         });
 
+        if (didCancel) return;
         setStories(fetchedData);
-        Logger.App.log(
-          "ResumableStories: Fetched stories count:",
-          fetchedData.length
-        );
+        onSetHasContent?.(fetchedData.length > 0);
       } catch (err) {
+        if (didCancel) return;
         const errorMessage =
           err instanceof Error
             ? err.message
             : "Failed to load resumable stories";
         Logger.App.error("ResumableStories: Error fetching stories:", err);
         setError(errorMessage);
+        onSetHasContent?.(false);
       } finally {
-        setIsLoading(false);
+        if (!didCancel) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchStories();
-  }, [user, isAuthenticated]);
+
+    determineAndFetch();
+
+    return () => {
+      didCancel = true;
+    };
+  }, [user, isAuthenticated, onSetHasContent]); // Added isAuthenticated to dependencies
 
   const handlePlay = (storyId: string, code?: string) => {
     Logger.App.log(`ResumableStories: Play story ${storyId} with code ${code}`);
@@ -77,6 +94,13 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = () => {
         <div className="animate-spin h-5 w-5 border-2 border-primary-500 rounded-full border-t-transparent"></div>
       </div>
     );
+  }
+
+  if (onSetHasContent && error) {
+    return null;
+  }
+  if (onSetHasContent && !isLoading && stories.length === 0) {
+    return null;
   }
 
   if (error) {

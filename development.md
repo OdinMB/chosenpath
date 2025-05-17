@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 2: See pending players, current beat, etc. of active games
 - 2: Prettier (basic) user view
 - 2: account header bar at the top. Show # MP stories in which user is pending.
 
@@ -44,7 +43,7 @@ Focus: Text/Images, English, Multiplayer
 # SERIOUS PROJECT
 
 - 1: Export stories
-- 2: Users: transfer local games to cloud (requires stories db)
+- 2: Users: transfer local games to cloud (happens already when joining because user id is tracked in db?)
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration

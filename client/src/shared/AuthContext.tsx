@@ -100,7 +100,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         username,
         password,
       });
-
       console.log("AuthProvider: Registration successful");
     } catch (error) {
       console.error("AuthProvider: Registration failed", error);

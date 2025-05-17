@@ -67,8 +67,8 @@ export const RATE_LIMITS: Record<
   },
   // Limit login attempts
   login: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 5, // 5 attempts per 15 minutes
+    windowMs: 3 * 60 * 1000, // 3 minutes
+    maxRequests: 5, // 5 attempts per 3 minutes
   },
 };
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate /*, useLoaderData */ } from "react-router-dom";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
@@ -7,12 +7,13 @@ import { OrDivider, LibraryCategoryGrid } from "./components";
 import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterButton, NewsletterModal } from "shared/components";
 import { ResumableStories } from "shared/components/ResumableStories";
-
-// LibraryLoaderData interface removed as useLoaderData is not called directly in Page for its return value
+import { useAuth } from "shared/useAuth";
 
 // Page component refactored to use React Router
 export function Page() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  console.log("Page: Render - user.id from useAuth():", user?.id);
   const [code, setCode] = useState("");
   const {
     isNewsletterModalOpen,
@@ -20,9 +21,22 @@ export function Page() {
     closeNewsletterModal,
     handleSubscribe,
   } = useNewsletter();
-  // const { user } = useAuth(); // No longer needed here as ResumableStories handles it
-  // useLoaderData() is not called here as its return (templates) isn't directly used by Page.tsx logic.
-  // The libraryLoader for the route will still run.
+
+  const [showResumableSection, setShowResumableSection] = useState(true);
+  const previousUserIdRef = useRef<string | undefined | null>(user?.id);
+
+  useEffect(() => {
+    const currentUserId = user?.id;
+    // Only reset if the userId has actually changed from one distinct state to another
+    if (previousUserIdRef.current !== currentUserId) {
+      setShowResumableSection(true);
+    }
+    previousUserIdRef.current = currentUserId;
+  }, [user?.id]);
+
+  const handleResumableContent = useCallback((hasContent: boolean) => {
+    setShowResumableSection(hasContent);
+  }, []);
 
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,11 +83,19 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
-          <ResumableStories />
+          {showResumableSection && (
+            <>
+              <ResumableStories
+                key={user?.id || "loggedOut"}
+                onSetHasContent={handleResumableContent}
+              />
+              <OrDivider />
+            </>
+          )}
 
           {/* Divider logic might need adjustment based on UserStoriesList content / StoredCodeSetsList visibility */}
           {/* For simplicity, let's assume a divider is usually good before Create Your Own Story */}
-          <OrDivider />
+          {/* <OrDivider /> */}
 
           <PrimaryButton
             onClick={handleNewStory}
