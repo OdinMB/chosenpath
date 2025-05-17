@@ -3,13 +3,17 @@ import { Logger } from "shared/logger.js";
 import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminStoryService } from "admin/AdminStoryService.js";
 import { DeleteStoryRequest } from "core/types/index.js";
+import {
+  GetAdminStoriesResponse,
+  GetAdminStoriesResponseData,
+} from "core/types/api.js";
 import { verifyAdmin } from "users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
 const router = Router();
 
 // Get list of stories
 router.get("/admin/stories", verifyAdmin(), async (req, res) => {
-  const requestId = req.query.requestId as string;
+  const requestId = (req.query.requestId as string) || uuidv4();
   Logger.Route.log(`[${requestId}] Starting GET /admin/stories request`);
 
   try {
@@ -20,7 +24,8 @@ router.get("/admin/stories", verifyAdmin(), async (req, res) => {
     );
 
     Logger.Route.log(`[${requestId}] Sending response`);
-    sendSuccess(res, { stories }, requestId);
+    const responseData: GetAdminStoriesResponseData = { stories };
+    sendSuccess<GetAdminStoriesResponseData>(res, responseData, requestId);
     Logger.Route.log(`[${requestId}] Response sent successfully`);
   } catch (error) {
     Logger.Route.error(`[${requestId}] Failed to load stories`, error);

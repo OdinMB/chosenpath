@@ -208,3 +208,14 @@ export interface ExtendedStoryMetadata extends StoryMetadata {
 export interface UserStoriesResponse {
   stories: StoryMetadata[] | ExtendedStoryMetadata[];
 }
+
+/**
+ * Admin specific types
+ */
+import { AdminStoriesListItem } from "./story.js"; // Ensure this import is present or add it
+
+export interface GetAdminStoriesResponseData {
+  stories: AdminStoriesListItem[];
+}
+export interface GetAdminStoriesResponse
+  extends SuccessResponse<GetAdminStoriesResponseData> {}

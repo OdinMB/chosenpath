@@ -8,11 +8,11 @@ import {
   useTableFilterSort,
   ColumnOption,
 } from "shared/components";
-import { StoriesListItem } from "core/types";
+import { AdminStoriesListItem } from "core/types/story.js";
 import { formatDate } from "core/utils/dateUtils";
 
 export const StoriesOverview = () => {
-  const stories = useLoaderData() as StoriesListItem[];
+  const stories = useLoaderData() as AdminStoriesListItem[];
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -50,7 +50,7 @@ export const StoriesOverview = () => {
     });
   };
 
-  const tableColumns: ColumnOption<StoriesListItem>[] = [
+  const tableColumns: ColumnOption<AdminStoriesListItem>[] = [
     {
       key: "title",
       label: "Title",
@@ -58,7 +58,8 @@ export const StoriesOverview = () => {
       render: (story) => (
         <div>
           <span className={story.error ? "text-tertiary" : "font-medium"}>
-            {story.title}
+            {story.title ||
+              (story.error ? "Error Loading Title" : "[Untitled Story]")}
           </span>
         </div>
       ),
@@ -91,7 +92,7 @@ export const StoriesOverview = () => {
       render: (story) => formatDate(story.updatedAt),
     },
     {
-      key: "id" as keyof StoriesListItem,
+      key: "id" as keyof AdminStoriesListItem,
       label: "Actions",
       sortable: false,
       filterable: false,

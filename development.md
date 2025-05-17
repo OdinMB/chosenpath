@@ -3,8 +3,8 @@ Smaller commits!
 # NEXT
 
 - 2: See pending players, current beat, etc. of active games
-- 2: update admin functions for story management to use new db system
 - 2: Prettier (basic) user view
+- 2: account header bar at the top. Show # MP stories in which user is pending.
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes

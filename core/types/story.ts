@@ -223,3 +223,18 @@ export type ClientStoryState = {
   pendingPlayers: PlayerSlot[];
   gameOver: boolean;
 };
+
+// Type for items in the admin stories list
+export type AdminStoriesListItem = {
+  id: string;
+  title: string | null;
+  createdAt: string; // ISO string format
+  updatedAt: string; // ISO string format
+  gameMode: string | null;
+  playerCount: number;
+  characterSelectionCompleted: boolean;
+  maxTurns: number;
+  currentBeat: number; // Represents current_turn from DB
+  templateId?: string | null;
+  error?: string; // Optional error message if story JSON couldn't be fully processed
+};

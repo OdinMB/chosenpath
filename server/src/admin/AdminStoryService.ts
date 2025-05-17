@@ -1,89 +1,85 @@
 import { storyRepository } from "shared/StoryRepository.js";
-import {
-  listStoryDirectories,
-  readStoryFile,
-  getStoryFilePath,
-} from "shared/storageUtils.js";
+import { readStoryFile, getStoryFilePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { Story } from "core/models/Story.js";
-import fs from "fs/promises";
-
-export type StoryInfo = {
-  id: string;
-  title: string;
-  createdAt: string | null;
-  updatedAt: string;
-  gameMode: string;
-  playerCount: number;
-  characterSelectionCompleted: boolean;
-  maxTurns: number;
-  currentBeat: number;
-  templateId?: string;
-  error?: string;
-};
+import { storyDbService, StoryDbOverviewItem } from "shared/StoryDbService.js";
+import { AdminStoriesListItem } from "core/types/story.js";
 
 export class AdminStoryService {
   /**
-   * Get a list of all stories with basic metadata
+   * Get a list of all stories with combined DB and file metadata
    */
-  async getStoriesList(): Promise<StoryInfo[]> {
+  async getStoriesList(): Promise<AdminStoriesListItem[]> {
+    Logger.AdminService.log("Starting getStoriesList (DB-focused)");
     try {
-      Logger.AdminService.log("Starting getStoriesList");
-      const storyIds = await listStoryDirectories();
-      Logger.AdminService.log(`Found ${storyIds.length} story directories`);
+      const dbStories: StoryDbOverviewItem[] =
+        await storyDbService.getStoryOverviewList();
+      Logger.AdminService.log(
+        `Fetched ${dbStories.length} stories from DB overview`
+      );
 
-      // Get basic info for each story
-      const storiesInfo = await Promise.all(
-        storyIds.map(async (storyId) => {
+      const storiesInfo: AdminStoriesListItem[] = await Promise.all(
+        dbStories.map(async (dbStory) => {
+          let storyModel: Story | null = null;
+          let storyJsonError: string | undefined = undefined;
+          let storyTitleFromModel: string | null = null;
+          let gameModeFromModel: string | null = null;
+          let characterSelectionCompletedFromModel: boolean = false; // Default if JSON not found
+
           try {
-            const data = await readStoryFile(storyId);
-            const storyData = JSON.parse(data);
-
-            // Create a Story instance to leverage its methods
-            const story = Story.create(storyData);
-
-            // Get file stats for last modified time
-            const storyFilePath = getStoryFilePath(storyId);
-            const fileStats = await fs.stat(storyFilePath);
-
-            // Return story info with ID directly using Story methods
-            return {
-              id: storyId,
-              title: story.getTitle(),
-              createdAt: (storyData as any).createdAt || null,
-              updatedAt: new Date(fileStats.mtime).toISOString(),
-              gameMode: story.getGameMode(),
-              playerCount: story.getNumberOfPlayers(),
-              characterSelectionCompleted:
-                story.getState().characterSelectionCompleted,
-              maxTurns: story.getMaxTurns(),
-              currentBeat: story.getState().characterSelectionCompleted
-                ? story.getCurrentTurn()
-                : 0,
-              templateId: story.getState().templateId,
-            };
+            storyModel = await storyRepository.getStory(dbStory.id);
+            if (storyModel) {
+              storyTitleFromModel = storyModel.getTitle(); // Might be more accurate if AI generated
+              gameModeFromModel = storyModel.getGameMode();
+              characterSelectionCompletedFromModel =
+                storyModel.getState().characterSelectionCompleted;
+            } else {
+              // This case means DB entry exists, but story file/JSON is missing or unparsable by StoryRepository
+              storyJsonError = "Story file not found or unreadable.";
+              Logger.AdminService.warn(
+                `Story file for ${dbStory.id} not found or unreadable, though DB entry exists.`
+              );
+            }
           } catch (error) {
+            storyJsonError = (error as Error).message;
             Logger.AdminService.error(
-              `Error processing story: ${storyId}`,
+              `Error processing story file for ${dbStory.id}:`,
               error
             );
-            return {
-              id: storyId,
-              title: "Error loading story",
-              error: (error as Error).message,
-              currentBeat: 0,
-            } as StoryInfo;
           }
+
+          // Prefer title from Story model if available and DB title is null, otherwise use DB title.
+          // If both are null, it remains null.
+          const finalTitle =
+            dbStory.title === null && storyTitleFromModel !== null
+              ? storyTitleFromModel
+              : dbStory.title;
+
+          return {
+            id: dbStory.id,
+            title: finalTitle,
+            // Convert epoch ms from DB to ISO string for consistency with client expectation
+            createdAt: new Date(dbStory.created_at).toISOString(),
+            updatedAt: new Date(dbStory.updated_at).toISOString(),
+            gameMode: gameModeFromModel,
+            playerCount: dbStory.player_count,
+            characterSelectionCompleted: characterSelectionCompletedFromModel,
+            maxTurns: dbStory.max_turns,
+            currentBeat: dbStory.current_turn, // Directly from stories.current_turn
+            templateId: dbStory.template_id,
+            error: storyJsonError,
+          };
         })
       );
 
       Logger.AdminService.log(
-        `Successfully processed all ${storiesInfo.length} stories`
+        `Successfully processed and enriched all ${storiesInfo.length} stories`
       );
       return storiesInfo;
     } catch (error) {
-      Logger.AdminService.error("Failed to load stories", error);
-      throw new Error("Failed to load stories");
+      Logger.AdminService.error("Failed to load stories list", error);
+      // If storyDbService.getStoryOverviewList() throws, this will catch it.
+      throw new Error("Failed to load stories list");
     }
   }
 
@@ -107,12 +103,38 @@ export class AdminStoryService {
    * Delete a story
    */
   async deleteStory(storyId: string): Promise<void> {
-    Logger.AdminService.log(`Deleting story: ${storyId}`);
+    Logger.AdminService.log(`Deleting story (DB and files): ${storyId}`);
     try {
-      await storyRepository.deleteStory(storyId);
-      Logger.AdminService.log(`Successfully deleted story: ${storyId}`);
+      // Step 1: Delete database entries (story and associated players)
+      // This is done first so if file deletion fails, we don't have orphaned DB entries.
+      // If DB deletion fails, we don't attempt file deletion.
+      await storyDbService.deleteStoryWithPlayers(storyId);
+      Logger.AdminService.log(
+        `Successfully deleted DB entries for story: ${storyId}`
+      );
+
+      // Step 2: Delete story directory from file system
+      try {
+        await storyRepository.deleteStory(storyId); // This deletes the directory
+        Logger.AdminService.log(
+          `Successfully deleted story directory from file system: ${storyId}`
+        );
+      } catch (fileError) {
+        // Log the error, but don't let it hide a successful DB deletion.
+        // The overall operation might be considered partially successful or require manual cleanup for files.
+        Logger.AdminService.error(
+          `Failed to delete story directory for ${storyId} after DB deletion. Manual cleanup may be required.`,
+          fileError
+        );
+        // Optionally, re-throw or handle as a more critical failure if strict consistency is paramount.
+        // For now, we'll consider DB deletion the more critical part for data integrity.
+      }
     } catch (error) {
-      Logger.AdminService.error(`Failed to delete story: ${storyId}`, error);
+      Logger.AdminService.error(
+        `Failed to delete story ${storyId} (DB or files):`,
+        error
+      );
+      // Re-throw the original error (could be from DB or initial file system error if we changed order)
       throw error;
     }
   }

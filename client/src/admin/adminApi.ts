@@ -1,19 +1,21 @@
-import { StoriesListItem, StoryTemplate, UserListItem } from "core/types";
+import { StoryTemplate, UserListItem } from "core/types";
+import { AdminStoriesListItem } from "core/types/story.js";
 import {
   CreateTemplateRequest,
   UpdateTemplateRequest,
   GenerateTemplateRequest,
   TemplateIterationRequest,
 } from "core/types/admin";
+import { GetAdminStoriesResponseData } from "core/types/api.js";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
 // Admin Story API functions
 export const adminStoryApi = {
-  getStories: async (): Promise<StoriesListItem[]> => {
+  getStories: async (): Promise<AdminStoriesListItem[]> => {
     Logger.Admin.log("Fetching stories from admin API");
     try {
-      const response = await apiClient.get<{ stories: StoriesListItem[] }>(
+      const response = await apiClient.get<GetAdminStoriesResponseData>(
         `/admin/stories`
       );
       Logger.Admin.log(

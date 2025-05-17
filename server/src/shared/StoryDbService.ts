@@ -1,12 +1,24 @@
 import { getDb } from "./db.js";
 import { Logger } from "./logger.js";
-import { PlayerSlot } from "core/types/index.js";
+import { PlayerSlot, StoryState } from "core/types/index.js";
 
 // Interface for player info retrieved from DB
 export interface StoryPlayerDbInfo {
   storyId: string;
   playerSlot: PlayerSlot;
   // Add other fields if needed by callers, e.g., userId, is_pending
+}
+
+// Interface for the data returned by getStoryOverviewList
+export interface StoryDbOverviewItem {
+  id: string;
+  title: string | null;
+  created_at: number; // As epoch milliseconds
+  updated_at: number; // As epoch milliseconds
+  current_turn: number;
+  max_turns: number;
+  template_id: string | null;
+  player_count: number;
 }
 
 class StoryDbService {
@@ -315,6 +327,89 @@ class StoryDbService {
     } catch (error) {
       Logger.Transaction.error(
         `Error assigning user ${userId} to player slot ${playerSlot} for story ${storyId} in DB:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  async getStoryOverviewList(): Promise<StoryDbOverviewItem[]> {
+    const db = getDb();
+    // player_count is returned as a string by COUNT, so cast to INTEGER
+    const query = `
+      SELECT
+        s.id,
+        s.title,
+        s.created_at,
+        s.updated_at,
+        s.current_turn,
+        s.max_turns,
+        s.template_id,
+        COALESCE(pc.player_count, 0)::INTEGER AS player_count
+      FROM stories s
+      LEFT JOIN (
+        SELECT story_id, COUNT(*) AS player_count
+        FROM story_players
+        GROUP BY story_id
+      ) pc ON s.id = pc.story_id
+      ORDER BY s.updated_at DESC;
+    `;
+    try {
+      const result = await db.query(query);
+      // Ensure timestamps are numbers (epoch ms) as defined in StoryDbOverviewItem
+      return result.rows.map((row) => ({
+        ...row,
+        created_at: parseInt(row.created_at, 10),
+        updated_at: parseInt(row.updated_at, 10),
+      }));
+    } catch (error) {
+      Logger.Transaction.error("Error fetching story overview list:", error);
+      throw error;
+    }
+  }
+
+  async deleteStoryWithPlayers(storyId: string): Promise<void> {
+    const db = getDb();
+    try {
+      await db.query("BEGIN");
+      Logger.Transaction.log(
+        `BEGIN: Delete story and players for story_id: ${storyId}`
+      );
+
+      // Delete from story_players first due to potential foreign key constraints
+      // (though current schema might use ON DELETE CASCADE, explicit is safer)
+      const deletePlayersResult = await db.query(
+        "DELETE FROM story_players WHERE story_id = $1",
+        [storyId]
+      );
+      Logger.Transaction.log(
+        `Deleted ${deletePlayersResult.rowCount} player(s) for story_id: ${storyId}`
+      );
+
+      // Then delete from stories
+      const deleteStoryResult = await db.query(
+        "DELETE FROM stories WHERE id = $1",
+        [storyId]
+      );
+
+      if (deleteStoryResult.rowCount === 0) {
+        // This could mean the story didn't exist, or an issue occurred.
+        // If story_players were deleted but story wasn't, transaction will rollback.
+        Logger.Transaction.warn(
+          `Story with id: ${storyId} not found in stories table for deletion, or already deleted.`
+        );
+      } else {
+        Logger.Transaction.log(`Deleted story from stories table: ${storyId}`);
+      }
+
+      await db.query("COMMIT");
+      Logger.Transaction.log(
+        `COMMIT: Successfully deleted story and players for story_id: ${storyId}`
+      );
+    } catch (error) {
+      await db.query("ROLLBACK");
+      Logger.Transaction.error(
+        `ROLLBACK: Error deleting story ${storyId} and its players:`,
         error
       );
       throw error;
