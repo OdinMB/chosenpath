@@ -172,6 +172,7 @@ export interface UserStoryCodeAssociation {
   code: string;
   createdAt: number;
   lastPlayedAt: number | null;
+  isPending?: boolean;
 }
 export interface AssociateStoryCodeRequest extends ClientRequest {
   storyId: string;
@@ -192,6 +193,7 @@ export interface StoryMetadata {
   createdAt: number;
   updatedAt: number;
   maxTurns: number;
+  currentBeat?: number;
   generateImages: boolean;
   creatorId: string | null;
 }
@@ -201,6 +203,7 @@ export interface StoryPlayerEntry {
   code: string;
   userId: string | null;
   lastPlayedAt: number | null;
+  isPending?: boolean;
 }
 export interface ExtendedStoryMetadata extends StoryMetadata {
   players: StoryPlayerEntry[];

@@ -107,24 +107,36 @@ export const StoryCard = ({
         source={imageSource}
         title={story.title}
         size={size}
-        onClick={handlePlay}
+        onClick={showPlayButton && onPlay ? undefined : handlePlay}
         className={`${className} relative`}
       >
-        <div className="flex justify-between items-center mb-2">
+        {/* --- Desktop: Title and Resume Button on one line --- */}
+        <div className="hidden md:flex md:justify-between md:items-start mb-2">
           <h3 className={`${sizeClasses.title} text-primary-800`}>
             {story.title}
           </h3>
           {showPlayButton && onPlay && (
-            <PrimaryButton onClick={handlePlay} className="ml-4">
-              Play
+            <PrimaryButton
+              onClick={handlePlay}
+              className="ml-4 w-auto" // Desktop: auto width, margin left
+            >
+              Resume
             </PrimaryButton>
           )}
         </div>
 
-        {/* Info */}
+        {/* --- Mobile: Title (standalone) --- */}
+        <h3 className={`${sizeClasses.title} text-primary-800 mb-2 md:hidden`}>
+          {story.title}
+        </h3>
+
+        {/* Info section (turns, icons) - Always below title configurations */}
         <div className="flex flex-col gap-1 text-primary-500 mb-3">
           <div className="flex items-center">
             <span className={`${sizeClasses.info} font-semibold`}>
+              {typeof story.currentBeat === "number"
+                ? `${story.currentBeat} / `
+                : ""}
               {story.maxTurns} turns
             </span>
             <InfoIcon
@@ -135,27 +147,39 @@ export const StoryCard = ({
           </div>
         </div>
 
-        {/* Story Codes */}
+        {/* --- Mobile: Resume Button (after info section) --- */}
+        {showPlayButton && onPlay && (
+          <PrimaryButton
+            onClick={handlePlay}
+            className="w-full mb-3 md:hidden" // Mobile: full width, margin bottom. Hidden on md+
+          >
+            Resume
+          </PrimaryButton>
+        )}
+
         {codesToShow.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
             {codesToShow.map((player) => (
-              <PlayerCode
-                key={player.code}
-                code={player.code}
-                size="sm"
-                label={getPlayerCodeLabel(player)}
-              />
+              <div key={player.code} className="flex items-center">
+                <PlayerCode
+                  code={player.code}
+                  size="sm"
+                  label={getPlayerCodeLabel(player)}
+                />
+                {players.length >= 2 && player.isPending && (
+                  <span className="ml-2 text-xs text-yellow-600 font-semibold">
+                    Pending
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         )}
 
-        {/* Optional children */}
         {children}
 
-        {/* Flex spacer */}
         <div className="flex-grow"></div>
 
-        {/* Delete Button - absolutely positioned */}
         {onDelete && isCreator && (
           <div className="absolute bottom-3 right-3">
             <Tooltip content="Delete story" position="left">

@@ -1,21 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate /*, useLoaderData */ } from "react-router-dom";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, LibraryCategoryGrid } from "./components";
 import { useNewsletter } from "shared/hooks/useNewsletter";
-import {
-  NewsletterButton,
-  NewsletterModal,
-  StoryCard,
-} from "shared/components";
-import { StoryMetadata, UserStoryCodeAssociation } from "core/types/api";
+import { NewsletterButton, NewsletterModal } from "shared/components";
 import { useAuth } from "shared/useAuth";
-import { useStoredCodeSets } from "./hooks/useStoredCodeSets";
-import { StoredCodeSet } from "shared/SessionContext";
-import { deleteStoredCodeSet } from "shared/utils/codeSetUtils";
-import { formatTimestampToMonthDayTime } from "core/utils/dateUtils";
+import { UserStoriesList } from "../users/components/UserStoriesList";
+import { StoredCodeSetsList } from "./components/StoredCodeSetsList";
+
+// LibraryLoaderData interface removed as useLoaderData is not called directly in Page for its return value
 
 // Page component refactored to use React Router
 export function Page() {
@@ -28,7 +23,8 @@ export function Page() {
     handleSubscribe,
   } = useNewsletter();
   const { user } = useAuth();
-  const { codeSets, refreshLocalCodeSets } = useStoredCodeSets();
+  // useLoaderData() is not called here as its return (templates) isn't directly used by Page.tsx logic.
+  // The libraryLoader for the route will still run.
 
   // Handle code submission - now uses gameService directly
   const handleCodeSubmit = (code: string) => {
@@ -71,22 +67,6 @@ export function Page() {
     }
   };
 
-  // Handler for deleting a code set via StoryCard
-  const handleDeleteStoryCardCodeSet = (storyId: string) => {
-    const timestampToDelete = parseInt(storyId, 10);
-    if (!isNaN(timestampToDelete)) {
-      if (deleteStoredCodeSet(timestampToDelete)) {
-        // You could add logging or user feedback here if desired
-        console.log(`Code set with timestamp ${timestampToDelete} deleted.`);
-      } else {
-        console.warn(
-          `Failed to delete code set with timestamp ${timestampToDelete}.`
-        );
-      }
-      refreshLocalCodeSets(); // Refresh the UI
-    }
-  };
-
   return (
     <>
       <div className="max-w-md mx-auto p-4 font-lora">
@@ -103,80 +83,17 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
-          {/* Stored Code Sets */}
-          {codeSets.length > 0 && (
-            <div className="space-y-4">
-              {codeSets.map((codeSet: StoredCodeSet) => {
-                const storyMetadata: StoryMetadata = {
-                  id: codeSet.timestamp.toString(),
-                  title:
-                    codeSet.title ||
-                    `Story from ${formatTimestampToMonthDayTime(
-                      codeSet.timestamp
-                    )}`,
-                  creatorId: user?.id || "",
-                  createdAt: codeSet.timestamp,
-                  updatedAt: codeSet.timestamp,
-                  maxTurns: 0,
-                  generateImages: false,
-                  templateId: undefined,
-                };
-
-                const playerAssociations: UserStoryCodeAssociation[] =
-                  Object.entries(codeSet.codes).map(
-                    ([playerSlot, codeValue], index) => {
-                      const isCurrentUserSlot = index === 0;
-                      return {
-                        storyId: storyMetadata.id,
-                        userId:
-                          isCurrentUserSlot && user
-                            ? user.id
-                            : `anonymous-${playerSlot}-${codeSet.timestamp}`,
-                        code: codeValue,
-                        playerSlot: playerSlot,
-                        lastPlayedAt:
-                          codeSet.lastActive && isCurrentUserSlot
-                            ? codeSet.timestamp
-                            : null,
-                        createdAt: codeSet.timestamp,
-                      };
-                    }
-                  );
-
-                const handleStoryCardPlay = (
-                  storyId: string,
-                  playCode?: string
-                ) => {
-                  if (playCode) {
-                    handleCodeSubmit(playCode);
-                  } else {
-                    const targetCodeSet = codeSets.find(
-                      (cs) => cs.timestamp.toString() === storyId
-                    );
-                    if (targetCodeSet) {
-                      const firstCode = Object.values(targetCodeSet.codes)[0];
-                      if (firstCode) {
-                        handleCodeSubmit(firstCode);
-                      }
-                    }
-                  }
-                };
-
-                return (
-                  <StoryCard
-                    key={storyMetadata.id}
-                    story={storyMetadata}
-                    players={playerAssociations}
-                    onPlay={handleStoryCardPlay}
-                    onDelete={handleDeleteStoryCardCodeSet}
-                    size="default"
-                  />
-                );
-              })}
-            </div>
+          {user ? (
+            // Authenticated user view: UserStoriesList will fetch its own data.
+            <UserStoriesList onCodeSelect={handleCodeSubmit} />
+          ) : (
+            // Unauthenticated user view
+            <StoredCodeSetsList onCodeSubmit={handleCodeSubmit} />
           )}
 
-          {codeSets.length > 0 && <OrDivider />}
+          {/* Divider logic might need adjustment based on UserStoriesList content / StoredCodeSetsList visibility */}
+          {/* For simplicity, let's assume a divider is usually good before Create Your Own Story */}
+          <OrDivider />
 
           <PrimaryButton
             onClick={handleNewStory}
@@ -189,12 +106,10 @@ export function Page() {
 
           <OrDivider />
 
-          {/* Browse Library with Categories */}
           <LibraryCategoryGrid onBrowseLibrary={handleBrowseWithCategory} />
 
           <OrDivider />
 
-          {/* Join with Code */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex flex-row gap-3 w-full">
               <input
@@ -205,7 +120,6 @@ export function Page() {
                 className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm placeholder-primary-400"
                 placeholder="Story code"
               />
-
               <PrimaryButton
                 type="submit"
                 disabled={!code.trim()}
@@ -218,7 +132,7 @@ export function Page() {
 
           <OrDivider />
 
-          {/* Choose from Carousel */}
+          {/* TemplateCarousel likely fetches its own templates or uses a global state */}
           <TemplateCarousel onPlay={handleSelectTemplate} />
         </div>
 

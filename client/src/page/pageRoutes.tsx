@@ -2,7 +2,6 @@ import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
 import { libraryLoader } from "./loaders/libraryLoader";
 import { templateConfigLoader } from "./loaders/templateConfigLoader";
-import { codeJoinLoader } from "./loaders/codeJoinLoader";
 import { templateLoader } from "shared/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { LibraryBrowser } from "./components/LibraryBrowser";
@@ -25,12 +24,6 @@ export const pageRoutes: RouteObject[] = [
         path: "/setup",
         element: <StoryInitializer onBack={() => window.history.back()} />,
         id: "story-setup",
-      },
-      {
-        path: "/join/:code",
-        loader: codeJoinLoader,
-        element: <div>Player Codes (Coming Soon)</div>,
-        id: "player-codes",
       },
       // Group template-related routes under a shared error boundary
       {

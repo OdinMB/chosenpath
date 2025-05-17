@@ -1,4 +1,4 @@
-import { LoaderFunction } from "react-router-dom";
+import { LoaderFunction /*, LoaderFunctionArgs */ } from "react-router-dom";
 import { usersApi } from "./usersApi";
 import { ExtendedStoryMetadata } from "core/types/api";
 import { Logger } from "shared/logger";

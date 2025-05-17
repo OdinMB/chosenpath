@@ -9,41 +9,43 @@ import {
 
 // DB Row Types now reflect snake_case from the database
 interface UserStoryCodeDbRow {
-  user_id: string; // Was userid
-  story_id: string; // Was storyid
-  player_slot: string; // Was playerslot
+  user_id: string;
+  story_id: string;
+  player_slot: string;
   code: string;
-  created_at: string; // Was createdat (from stories table)
-  last_played_at: string | null; // Was lastplayedat (from story_players table)
+  created_at: string;
+  last_played_at: string | null;
+  is_pending: boolean;
 }
 
 interface StoryMetadataDbRow {
   id: string;
   title: string;
-  template_id?: string; // Was templateid
-  created_at: string; // Was createdat
-  updated_at: string; // Was updatedat
-  max_turns: number; // Was maxturns
-  generate_images: boolean; // Was generateimages
-  creator_id: string | null; // Was creatorid
-  // current_turn is also available but not always fetched by these queries
+  template_id?: string;
+  created_at: string;
+  updated_at: string;
+  max_turns: number;
+  generate_images: boolean;
+  creator_id: string | null;
+  current_beat: number;
 }
 
 interface StoryPlayerEntryDbRow {
-  story_id: string; // Was storyid
-  player_slot: string; // Was playerslot
+  story_id: string;
+  player_slot: string;
   code: string;
-  user_id: string | null; // Was userid
-  last_played_at: string | null; // Was lastplayedat
+  user_id: string | null;
+  last_played_at: string | null;
+  is_pending: boolean;
 }
 
 interface StoryPlayerDetailDbRow {
-  story_id: string; // Was storyid
-  player_slot: string; // Was playerslot
+  story_id: string;
+  player_slot: string;
   code: string;
-  user_id: string | null; // Was userid
-  created_at: string; // Was createdat (from stories table)
-  last_played_at: string | null; // Was lastplayedat (from story_players table)
+  user_id: string | null;
+  created_at: string;
+  last_played_at: string | null;
 }
 
 interface StoryPlayerDetail {
@@ -81,7 +83,8 @@ export async function getUserStoryCodes(
         sp.player_slot, 
         sp.code, 
         s.created_at, 
-        sp.last_played_at 
+        sp.last_played_at,
+        sp.is_pending
        FROM story_players sp
        JOIN stories s ON sp.story_id = s.id
        WHERE sp.user_id = $2
@@ -235,7 +238,7 @@ export async function getAllUserRelatedStories(
     const pool = getDb();
 
     const createdStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id
+      `SELECT id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat
        FROM stories WHERE creator_id = $1`,
       [userId]
     );
@@ -252,14 +255,16 @@ export async function getAllUserRelatedStories(
           maxTurns: row.max_turns,
           generateImages: row.generate_images,
           creatorId: row.creator_id,
+          currentBeat: row.current_beat,
         };
       }
     );
     Logger.Route.log(`Created stories: ${createdStories.length}`);
 
     const playedStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT DISTINCT s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id,
-        sp.last_played_at AS sp_last_played_at_for_ordering
+      `SELECT DISTINCT s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id, s.current_beat,
+        sp.last_played_at AS sp_last_played_at_for_ordering,
+        sp.is_pending
        FROM stories s
        JOIN story_players sp ON s.id = sp.story_id
        WHERE sp.user_id = $1 AND (s.creator_id IS NULL OR s.creator_id != $2)
@@ -279,6 +284,7 @@ export async function getAllUserRelatedStories(
           maxTurns: row.max_turns,
           generateImages: row.generate_images,
           creatorId: row.creator_id,
+          currentBeat: row.current_beat,
         };
       }
     );
@@ -294,7 +300,7 @@ export async function getAllUserRelatedStories(
 
       if (isCreator) {
         const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT story_id, player_slot, code, user_id, last_played_at
+          `SELECT story_id, player_slot, code, user_id, last_played_at, is_pending
            FROM story_players WHERE story_id = $1 ORDER BY player_slot`,
           [story.id]
         );
@@ -311,11 +317,12 @@ export async function getAllUserRelatedStories(
               lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
                 ? null
                 : lastPlayedAtNum,
+            isPending: prow.is_pending,
           };
         });
       } else {
         const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT story_id, player_slot, code, user_id, last_played_at
+          `SELECT story_id, player_slot, code, user_id, last_played_at, is_pending
            FROM story_players WHERE story_id = $1 AND user_id = $2 ORDER BY player_slot`,
           [story.id, userId]
         );
@@ -332,6 +339,7 @@ export async function getAllUserRelatedStories(
               lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
                 ? null
                 : lastPlayedAtNum,
+            isPending: prow.is_pending,
           };
         });
       }
@@ -397,7 +405,7 @@ export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
     const pool = getDb();
     const result = await pool.query<StoryMetadataDbRow>(
       `SELECT 
-        id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id
+        id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat
        FROM stories 
        WHERE creator_id = $1
        ORDER BY updated_at DESC`,
@@ -417,6 +425,7 @@ export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
           maxTurns: row.max_turns,
           generateImages: row.generate_images,
           creatorId: row.creator_id,
+          currentBeat: row.current_beat,
         };
       }) || []
     );
@@ -436,7 +445,7 @@ export async function getStoriesWithUser(
     const pool = getDb();
     const result = await pool.query<StoryMetadataDbRow>(
       `SELECT DISTINCT
-        s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id
+        s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id, s.current_beat
        FROM stories s
        JOIN story_players sp ON s.id = sp.story_id
        WHERE sp.user_id = $1
@@ -457,6 +466,7 @@ export async function getStoriesWithUser(
           maxTurns: row.max_turns,
           generateImages: row.generate_images,
           creatorId: row.creator_id,
+          currentBeat: row.current_beat,
         };
       }) || []
     );

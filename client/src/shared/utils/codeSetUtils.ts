@@ -211,5 +211,5 @@ export function generateJoinLink(code: string): string {
   // Create URL with the domain and code
   const domain = API_CONFIG.DEFAULT_CORS_ORIGIN;
 
-  return `${domain}/join/${code}`;
+  return `${domain}/game/${code}`;
 }
