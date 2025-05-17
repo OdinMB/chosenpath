@@ -65,7 +65,7 @@ export class AdminStoryService {
             playerCount: dbStory.player_count,
             characterSelectionCompleted: characterSelectionCompletedFromModel,
             maxTurns: dbStory.max_turns,
-            currentBeat: dbStory.current_turn, // Directly from stories.current_turn
+            currentBeat: dbStory.current_beat,
             templateId: dbStory.template_id,
             error: storyJsonError,
           };

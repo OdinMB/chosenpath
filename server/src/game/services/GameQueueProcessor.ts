@@ -174,7 +174,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       // and stories.updatedAt is handled by setAllPlayersPending
       const playerSlots = finalStory.getPlayerSlots();
       try {
-        await storyDbService.updateStoryTurnAndTimestamp(
+        await storyDbService.updateStoryBeatAndTimestamp(
           gameId,
           finalStory.getCurrentTurn()
         );

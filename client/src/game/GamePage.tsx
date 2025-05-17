@@ -33,12 +33,27 @@ export const GamePage: React.FC = () => {
   const { user } = useAuth();
 
   // Generate a unique ID for this tab if it doesn't exist
-  const [tabId] = React.useState(
-    () =>
-      sessionStorage.getItem("tabId") ||
-      Math.random().toString(36).substring(2, 15)
-  );
-  const playerCodeKey = `playerCode_${tabId}`;
+  // const [tabId] = React.useState( // tabId is no longer used in GamePage directly
+  //   () =>
+  //     sessionStorage.getItem("tabId") ||
+  //     Math.random().toString(36).substring(2, 15)
+  // );
+  // const playerCodeKey = `playerCode_${tabId}`; // playerCodeKey is not directly used in GamePage, but in wsService
+
+  useEffect(() => {
+    // Inform WebSocketService about the join code from URL as early as possible
+    if (joinCode) {
+      wsService.setExternalJoinCode(joinCode);
+    }
+    // Clean up external join code when component unmounts or joinCode changes to null
+    return () => {
+      if (joinCode) {
+        // If GamePage is unmounting or joinCode is removed, unclear if we should nullify externalJoinCode.
+        // For now, let wsService manage its own state based on setPlayerCode or clearPlayerCode calls.
+        // wsService.setExternalJoinCode(null); // Tentatively removing this to avoid premature nullification
+      }
+    };
+  }, [joinCode]);
 
   useEffect(() => {
     Logger.App.log("GamePage mounted/updated", {
@@ -98,10 +113,10 @@ export const GamePage: React.FC = () => {
       // e.g., using a setStoryState(null) if appropriate from useGameSession
       // For now, GameSessionProvider handles setStoryState(null) on exit_story_response
     }
-    localStorage.removeItem(playerCodeKey);
+    // localStorage.removeItem(playerCodeKey); // Managed by wsService.clearPlayerCode
     localStorage.removeItem("sessionId"); // Ensure session ID is cleared
     navigate("/"); // Navigate to home page
-  }, [navigate, setSessionId, playerCodeKey, storyState]);
+  }, [navigate, setSessionId, storyState]);
 
   const handleChoiceSelected = useCallback(
     (optionIndex: number) => {

@@ -117,7 +117,7 @@ export async function initializeDatabase() {
         max_turns INTEGER NOT NULL,
         generate_images BOOLEAN NOT NULL DEFAULT TRUE,
         creator_id TEXT,
-        current_turn INTEGER NOT NULL DEFAULT 0,
+        current_beat INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (creator_id) REFERENCES users (id) ON DELETE SET NULL
       )
     `);

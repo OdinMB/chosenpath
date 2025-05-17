@@ -15,7 +15,7 @@ export interface StoryDbOverviewItem {
   title: string | null;
   created_at: number; // As epoch milliseconds
   updated_at: number; // As epoch milliseconds
-  current_turn: number;
+  current_beat: number; // Renamed from current_turn
   max_turns: number;
   template_id: string | null;
   player_count: number;
@@ -29,14 +29,14 @@ class StoryDbService {
     maxTurns: number,
     generateImages: boolean,
     creatorId: string | undefined,
-    initialTurn: number = 0
+    initialBeat: number = 0 // Renamed from initialTurn
   ): Promise<void> {
     const db = getDb();
     const now = Date.now();
     const query = `
-      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_turn)
+      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `;
+    `; // Renamed current_turn to current_beat in SQL
     try {
       await db.query(query, [
         id,
@@ -47,7 +47,7 @@ class StoryDbService {
         maxTurns,
         generateImages,
         creatorId,
-        initialTurn,
+        initialBeat, // Renamed from initialTurn
       ]);
       Logger.Transaction.log(`Created story entry in DB: ${id}`);
     } catch (error) {
@@ -158,24 +158,25 @@ class StoryDbService {
     }
   }
 
-  async updateStoryTurnAndTimestamp(
+  async updateStoryBeatAndTimestamp(
+    // Renamed from updateStoryTurnAndTimestamp
     storyId: string,
-    currentTurn: number
+    currentBeat: number // Renamed from currentTurn
   ): Promise<void> {
     const db = getDb();
     const now = Date.now();
     // This function is for when the story file itself is updated, reflecting a new turn.
     // GameQueueProcessor will call a separate function to update player statuses and story.updated_at for player actions.
     const query =
-      "UPDATE stories SET current_turn = $1, updated_at = $2 WHERE id = $3";
+      "UPDATE stories SET current_beat = $1, updated_at = $2 WHERE id = $3"; // Renamed current_turn to current_beat
     try {
-      await db.query(query, [currentTurn, now, storyId]);
+      await db.query(query, [currentBeat, now, storyId]);
       Logger.Transaction.log(
-        `Updated story turn to ${currentTurn} and timestamp in DB for: ${storyId}`
+        `Updated story beat to ${currentBeat} and timestamp in DB for: ${storyId}` // Updated log message
       );
     } catch (error) {
       Logger.Transaction.error(
-        `Error updating story turn and timestamp in DB for ${storyId}:`,
+        `Error updating story beat and timestamp in DB for ${storyId}:`, // Updated log message
         error
       );
       throw error;
@@ -342,7 +343,7 @@ class StoryDbService {
         s.title,
         s.created_at,
         s.updated_at,
-        s.current_turn,
+        s.current_beat,
         s.max_turns,
         s.template_id,
         COALESCE(pc.player_count, 0)::INTEGER AS player_count

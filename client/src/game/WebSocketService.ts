@@ -105,6 +105,7 @@ export class WebSocketService {
   private sessionId: string | null = null;
   private playerCode: string | null = null;
   private tabId: string;
+  private externalJoinCode: string | null = null;
   private messageHandlers = new Map<string, MessageHandler>();
   private isConnecting = false;
   private readonly MAX_RECONNECT_ATTEMPTS =
@@ -268,7 +269,18 @@ export class WebSocketService {
         const playerCodeKey = `playerCode_${this.tabId}`;
         const storedCode = localStorage.getItem(playerCodeKey);
 
-        if (storedCode === this.playerCode) {
+        if (
+          this.externalJoinCode &&
+          this.externalJoinCode !== this.playerCode &&
+          storedCode === this.playerCode
+        ) {
+          Logger.WebSocket.log(
+            `[WebSocketService] External join code '${this.externalJoinCode}' is present and different from stored playerCode '${this.playerCode}'. Deferring automatic verification.`
+          );
+          // GamePage will handle the verification of externalJoinCode.
+          // We might want to clear this.playerCode here if the external one should always take precedence
+          // For now, just deferring.
+        } else if (storedCode === this.playerCode) {
           Logger.WebSocket.log(
             "[WebSocketService] Attempting to reconnect with player code:",
             this.playerCode
@@ -280,9 +292,10 @@ export class WebSocketService {
           });
         } else {
           Logger.WebSocket.log(
-            "[WebSocketService] Player code no longer valid, creating new session"
+            "[WebSocketService] Player code ${this.playerCode} no longer valid or different from localStorage ${storedCode}, creating new session"
           );
-          this.playerCode = null;
+          this.playerCode = null; // Clear invalid code
+          this.clearPlayerCode(); // Remove from storage
           this.sendMessage({ type: "create_session" });
         }
       } else if (!this.sessionId) {
@@ -642,6 +655,7 @@ export class WebSocketService {
     this.playerCode = null;
     const playerCodeKey = `playerCode_${this.tabId}`;
     localStorage.removeItem(playerCodeKey);
+    this.externalJoinCode = null;
   }
 
   setPlayerCode(code: string) {
@@ -649,6 +663,15 @@ export class WebSocketService {
     this.playerCode = code;
     const playerCodeKey = `playerCode_${this.tabId}`;
     localStorage.setItem(playerCodeKey, code);
+    this.externalJoinCode = null;
+  }
+
+  public setExternalJoinCode(code: string | null): void {
+    Logger.WebSocket.log(
+      "[WebSocketService] Setting external join code:",
+      code
+    );
+    this.externalJoinCode = code;
   }
 }
 

@@ -179,7 +179,7 @@ export function GameSessionProvider({
           );
           handleError(data.errorMessage);
           setIsLoading(false);
-
+          setIsConnecting(false);
           setStoryState(null);
         }
       }
