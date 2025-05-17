@@ -264,10 +264,6 @@ export class GameWebSocketServer {
             timestamp: Date.now(),
             data: { sessionId },
           });
-          Logger.Websocket.log(
-            "[WebSocket] create_session_response with sessionId:",
-            sessionId
-          );
         } catch (error) {
           Logger.Websocket.error("[WebSocket] Error creating session:", error);
           socket.emit("response", {

@@ -49,14 +49,46 @@ export function GameSessionProvider({
   );
 
   useEffect(() => {
+    const handleWsRawConnect = () => {
+      logger.info("[GameSessionProvider] WebSocket raw connect event.");
+      setIsConnecting(false); // Socket is connected
+    };
+    const handleWsRawDisconnect = (reason: string) => {
+      logger.info(
+        `[GameSessionProvider] WebSocket raw disconnect event. Reason: ${reason}`
+      );
+      // Only set isConnecting to true if it's not an intentional client disconnect
+      // or if we expect an automatic reconnection attempt for this reason.
+      if (reason !== "io client disconnect") {
+        setIsConnecting(true); // Socket is disconnected, so we are "connecting" or trying to.
+      }
+    };
+
+    wsService.subscribeToConnect(handleWsRawConnect);
+    wsService.subscribeToDisconnect(handleWsRawDisconnect);
+
     // Ensure WebSocket service is connected when the provider mounts
     if (!wsService.isConnected()) {
       logger.info(
         "[GameSessionProvider] WebSocket not connected, attempting to connect."
       );
-      wsService.connect(); // Pass current sessionId if available, or it will use its own
+      // Pass the current sessionId from context (via useSession) to wsService.connect
+      // wsService should use this sessionId for its operations (e.g. rejoin attempts)
+      // instead of its own potentially stale localStorage copy.
+      wsService.connect(sessionId || undefined);
+    } else {
+      // If already connected, ensure wsService has the latest sessionId
+      if (sessionId && wsService.getSessionId() !== sessionId) {
+        logger.info(
+          `[GameSessionProvider] Syncing wsService sessionId to: ${sessionId}`
+        );
+        wsService.setSessionId(sessionId);
+      }
+      // If already connected, we are not "connecting"
+      setIsConnecting(false);
     }
 
+    // Message Handlers Setup (onMessage calls)
     wsService.clearMessageHandlers();
 
     wsService.onMessage("create_session_response", (data: WSServerMessage) => {
@@ -72,12 +104,6 @@ export function GameSessionProvider({
         setSessionId(data.data.sessionId);
         localStorage.setItem("sessionId", data.data.sessionId);
         wsService.setSessionId(data.data.sessionId);
-
-        // Ensure we mark connection as complete
-        setIsConnecting(false);
-        logger.info(
-          "[GameSessionProvider] Connection complete, isConnecting set to false"
-        );
       }
     });
 
@@ -156,7 +182,7 @@ export function GameSessionProvider({
         if ("data" in data && data.data.state) {
           setStoryState(data.data.state);
           setIsLoading(false);
-          setIsConnecting(false);
+          // setIsConnecting(false); // No longer needed here
 
           // Try to find the player role from the data directly or compute it
           let playerRole = "player1"; // Default fallback
@@ -179,7 +205,7 @@ export function GameSessionProvider({
           );
           handleError(data.errorMessage);
           setIsLoading(false);
-          setIsConnecting(false);
+          // setIsConnecting(false); // No longer needed here
           setStoryState(null);
         }
       }
@@ -206,10 +232,11 @@ export function GameSessionProvider({
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      wsService.disconnect();
+      wsService.unsubscribeFromConnect(handleWsRawConnect);
+      wsService.unsubscribeFromDisconnect(handleWsRawDisconnect);
       wsService.clearMessageHandlers();
     };
-  }, [setSessionId, setIsLoading, handleError]);
+  }, [sessionId, setSessionId, setIsLoading, handleError]);
 
   useEffect(() => {
     if (rateLimit && rateLimit.timeRemaining > 0) {

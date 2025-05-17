@@ -32,58 +32,64 @@ export const GamePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Generate a unique ID for this tab if it doesn't exist
-  // const [tabId] = React.useState( // tabId is no longer used in GamePage directly
-  //   () =>
-  //     sessionStorage.getItem("tabId") ||
-  //     Math.random().toString(36).substring(2, 15)
-  // );
-  // const playerCodeKey = `playerCode_${tabId}`; // playerCodeKey is not directly used in GamePage, but in wsService
-
   useEffect(() => {
-    // Inform WebSocketService about the join code from URL as early as possible
     if (joinCode) {
       wsService.setExternalJoinCode(joinCode);
+      Logger.App.log(
+        `GamePage: External join code set in wsService: ${joinCode}`
+      );
     }
-    // Clean up external join code when component unmounts or joinCode changes to null
     return () => {
-      if (joinCode) {
-        // If GamePage is unmounting or joinCode is removed, unclear if we should nullify externalJoinCode.
-        // For now, let wsService manage its own state based on setPlayerCode or clearPlayerCode calls.
-        // wsService.setExternalJoinCode(null); // Tentatively removing this to avoid premature nullification
-      }
+      // wsService.setExternalJoinCode(null); // Consider if this is needed on unmount
     };
   }, [joinCode]);
 
   useEffect(() => {
-    Logger.App.log("GamePage mounted/updated", {
+    Logger.App.log("GamePage effect triggered", {
       sessionId,
       storyState,
       isLoading,
       isConnecting,
       joinCode,
+      isReqPendCreate: isRequestPending("create_session"),
+      isReqPendVerify: isRequestPending("verify_code"),
+      isReqPendRejoin: isRequestPending("rejoin_session"),
     });
 
-    if (!sessionId && !isRequestPending("create_session")) {
-      Logger.App.log("No session ID, requesting new session.");
-      wsService.sendMessage({ type: "create_session" });
+    if (isConnecting) {
+      Logger.App.log(
+        "GamePage: WebSocket still connecting, deferring actions."
+      );
+      return;
     }
 
+    // Attempt to create a session if one doesn't exist and isn't already pending
+    if (!sessionId && !isRequestPending("create_session")) {
+      Logger.App.log(
+        "GamePage: No session ID and not pending create_session. Requesting new session NOW."
+      );
+      wsService.sendMessage({ type: "create_session" });
+      return;
+    }
+
+    // Attempt to verify code if we have a joinCode, a sessionId, no current storyState, and not busy with other critical ops
     if (
       joinCode &&
-      sessionId &&
+      sessionId && // This check is crucial
       !storyState &&
       !isLoading &&
-      !isRequestPending("verify_code")
+      !isRequestPending("verify_code") &&
+      !isRequestPending("rejoin_session") &&
+      !isRequestPending("create_session") // Also ensure create_session isn't the immediate pending op
     ) {
       Logger.App.log(
-        "Attempting to verify join code:",
+        "GamePage: Has sessionId and joinCode. Attempting to verify join code NOW:",
         joinCode,
         "User:",
-        user
+        user?.id
       );
-      setIsLoading(true); // Set loading when verifying code
-      gameService.verifyCode(joinCode, user?.id);
+      setIsLoading(true);
+      gameService.verifyCode(joinCode, user?.id); // This eventually calls wsService.sendMessage
     }
   }, [
     sessionId,
@@ -107,16 +113,9 @@ export const GamePage: React.FC = () => {
     Logger.App.log("handleExitGame called");
     gameService.exitStory();
     setSessionId(null);
-    // setError(null); // Clear game-specific errors on exit
-    if (storyState) {
-      // Potentially clear other story-related states if necessary
-      // e.g., using a setStoryState(null) if appropriate from useGameSession
-      // For now, GameSessionProvider handles setStoryState(null) on exit_story_response
-    }
-    // localStorage.removeItem(playerCodeKey); // Managed by wsService.clearPlayerCode
-    localStorage.removeItem("sessionId"); // Ensure session ID is cleared
-    navigate("/"); // Navigate to home page
-  }, [navigate, setSessionId, storyState]);
+    localStorage.removeItem("sessionId");
+    navigate("/");
+  }, [navigate, setSessionId]);
 
   const handleChoiceSelected = useCallback(
     (optionIndex: number) => {
@@ -147,14 +146,26 @@ export const GamePage: React.FC = () => {
     [storyState, setIsLoading]
   );
 
-  if (isConnecting || (isLoading && !storyState && !error)) {
-    // Show connecting view if isConnecting is true, or if isLoading is true without a storyState or an error
-    // This handles initial load, session creation, and code verification loading states.
+  // Render logic
+  if (isConnecting) {
+    Logger.App.log(
+      "GamePage: Rendering ConnectingView (WebSocket is connecting)."
+    );
+    return <ConnectingView />;
+  }
+
+  if (!sessionId && isRequestPending("create_session")) {
+    Logger.App.log("GamePage: Rendering ConnectingView (Creating session...)", {
+      globalPending: isRequestPending("create_session"),
+    });
     return <ConnectingView />;
   }
 
   if (error && !storyState) {
-    // If there's an error and no story state, it implies a critical failure (e.g., join failed)
+    Logger.App.error(
+      "GamePage: Rendering ErrorView due to error and no storyState.",
+      error
+    );
     return (
       <div>
         Error: {error}. Please try again or return to the{" "}
@@ -163,16 +174,51 @@ export const GamePage: React.FC = () => {
     );
   }
 
-  if (!storyState) {
-    // This case might occur if connection is established but no story is active (e.g., after a failed join not caught by error above)
-    // Or if ws connection drops and reconnects without successfully rejoining/re-verifying.
-    Logger.App.warn(
-      "No storyState available, but not actively connecting or in error state. Displaying connecting view as fallback."
+  // At this point, WebSocket is connected. Session creation is not the primary pending blocking op if sessionId is null.
+  // (If !sessionId and create_session was pending, the above block would have caught it)
+
+  // If we have a session ID, but no story state yet.
+  // This could be because we are waiting for joinCode verification, rejoining, or some other loading state.
+  if (
+    sessionId &&
+    !storyState &&
+    (isLoading ||
+      isRequestPending("verify_code") ||
+      isRequestPending("rejoin_session"))
+  ) {
+    Logger.App.log(
+      "GamePage: Rendering ConnectingView (Session exists, no story. Likely verifying/rejoining or other loading operation).",
+      {
+        isLoading,
+        verifyPending: isRequestPending("verify_code"),
+        rejoinPending: isRequestPending("rejoin_session"),
+      }
     );
-    return <ConnectingView />; // Fallback to connecting or a specific lobby/error view
+    return <ConnectingView />;
   }
 
-  // If storyState is available, render GameLayout
+  // Fallback: If none of the above, but still no storyState, show ConnectingView.
+  // This covers cases like:
+  //    - Session created, but joinCode effect hasn't run yet or isn't applicable for the current flow.
+  //    - Other unexpected intermediate states.
+  if (!storyState) {
+    Logger.App.warn(
+      "GamePage: Rendering ConnectingView (Fallback: no storyState. Conditions: WS connected, no critical error, session might exist, not actively in a recognized loading/pending state like session creation, code verification, or rejoin).",
+      {
+        sessionId,
+        isLoading,
+        isConnecting, // Should be false here
+        error,
+        isReqPendCreate: isRequestPending("create_session"),
+        isReqPendVerify: isRequestPending("verify_code"),
+        isReqPendRejoin: isRequestPending("rejoin_session"),
+      }
+    );
+    return <ConnectingView />;
+  }
+
+  // All good, render the game
+  Logger.App.log("GamePage: Rendering GameLayout with storyState.", storyState);
   return (
     <GameLayout
       onExitGame={handleExitGame}

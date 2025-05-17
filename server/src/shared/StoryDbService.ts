@@ -504,10 +504,6 @@ class StoryDbService {
     sqlQuery += " ORDER BY s.updated_at DESC, sp.player_slot ASC";
 
     try {
-      Logger.DB.log("Executing getResumableStories query:", {
-        sqlQuery,
-        queryParams,
-      });
       const result = await db.query(sqlQuery, queryParams);
       Logger.DB.log(
         `getResumableStories query returned ${result.rows.length} rows.`

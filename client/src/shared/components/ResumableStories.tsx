@@ -12,9 +12,7 @@ interface ResumableStoriesProps {
   onCodeSelect?: (code: string) => void;
 }
 
-export const ResumableStories: React.FC<ResumableStoriesProps> = ({
-  onCodeSelect,
-}) => {
+export const ResumableStories: React.FC<ResumableStoriesProps> = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [stories, setStories] = useState<ResumableStoryMetadata[]>([]);
@@ -64,13 +62,7 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
 
   const handlePlay = (storyId: string, code?: string) => {
     Logger.App.log(`ResumableStories: Play story ${storyId} with code ${code}`);
-    if (onCodeSelect && code) {
-      onCodeSelect(code);
-    } else if (code) {
-      const tabId =
-        sessionStorage.getItem("tabId") ||
-        Math.random().toString(36).substring(2, 15);
-      localStorage.setItem(`playerCode_${tabId}`, code);
+    if (code) {
       navigate(`/game/${code}`);
     } else {
       Logger.App.warn(

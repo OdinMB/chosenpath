@@ -24,22 +24,10 @@ export function Page() {
   // useLoaderData() is not called here as its return (templates) isn't directly used by Page.tsx logic.
   // The libraryLoader for the route will still run.
 
-  // Handle code submission - now uses gameService directly
-  const handleCodeSubmit = (submittedCode: string) => {
-    // Store the code in localStorage with a unique key for this session
-    const tabId =
-      sessionStorage.getItem("tabId") ||
-      Math.random().toString(36).substring(2, 15);
-    localStorage.setItem(`playerCode_${tabId}`, submittedCode);
-
-    // Navigate to the game page with the code
-    navigate(`/game/${submittedCode}`);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
-    handleCodeSubmit(code.trim());
+    navigate(`/game/${code}`);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +69,7 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
-          <ResumableStories onCodeSelect={handleCodeSubmit} />
+          <ResumableStories />
 
           {/* Divider logic might need adjustment based on UserStoriesList content / StoredCodeSetsList visibility */}
           {/* For simplicity, let's assume a divider is usually good before Create Your Own Story */}
@@ -102,7 +90,7 @@ export function Page() {
 
           <OrDivider />
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleJoinGame} className="space-y-4">
             <div className="flex flex-row gap-3 w-full">
               <input
                 id="code"

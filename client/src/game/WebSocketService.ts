@@ -104,8 +104,6 @@ export class WebSocketService {
   private socket: Socket | null = null;
   private sessionId: string | null = null;
   private playerCode: string | null = null;
-  private tabId: string;
-  private externalJoinCode: string | null = null;
   private messageHandlers = new Map<string, MessageHandler>();
   private isConnecting = false;
   private readonly MAX_RECONNECT_ATTEMPTS =
@@ -114,22 +112,17 @@ export class WebSocketService {
   private pendingRequests = new Set<string>();
   // Track background operations
   private backgroundOperations = new Set<string>();
+  private onConnectSubscribers: Array<() => void> = [];
+  private onDisconnectSubscribers: Array<(reason: string) => void> = [];
 
   constructor() {
-    this.tabId =
-      sessionStorage.getItem("tabId") ||
-      Math.random().toString(36).substring(2, 15);
-    sessionStorage.setItem("tabId", this.tabId);
-
-    const playerCodeKey = `playerCode_${this.tabId}`;
-    this.playerCode = localStorage.getItem(playerCodeKey);
-    this.sessionId = localStorage.getItem("sessionId");
-
-    Logger.WebSocket.log("[WebSocketService] Initialized with:", {
-      tabId: this.tabId,
-      playerCode: this.playerCode,
-      sessionId: this.sessionId,
-    });
+    Logger.WebSocket.log(
+      "[WebSocketService] Initialized with (sessionId will be set via connect/setSessionId):",
+      {
+        playerCode: this.playerCode,
+        sessionId: this.sessionId,
+      }
+    );
   }
 
   // Track a request that's waiting for a response
@@ -179,48 +172,72 @@ export class WebSocketService {
   }
 
   setSessionId(sessionId: string) {
+    const oldSessionId = this.sessionId;
     this.sessionId = sessionId;
+    Logger.WebSocket.log(
+      `[WebSocketService] SessionId explicitly set from ${oldSessionId} to: ${sessionId}`
+    );
   }
 
   isConnected(): boolean {
     return this.socket?.connected || false;
   }
 
-  connect(sessionId?: string) {
-    if (this.isConnecting) {
-      Logger.WebSocket.log("[WebSocketService] Connection already in progress");
+  connect(sessionIdToUse?: string) {
+    const currentSocketId = this.socket?.id;
+    Logger.WebSocket.log(
+      `[WebSocketService] connect() called. Current this.sessionId: ${
+        this.sessionId
+      }, sessionIdToUse: ${sessionIdToUse}, current socket ID: ${currentSocketId}, isConnecting: ${
+        this.isConnecting
+      }, isConnected: ${this.isConnected()}`
+    );
+
+    if (this.isConnecting && !sessionIdToUse) {
+      Logger.WebSocket.log(
+        "[WebSocketService] Connection already in progress (isConnecting=true) and no new sessionId provided. Aborting this connect() call."
+      );
       return;
     }
 
-    // Set the session ID if provided, but don't overwrite existing one
-    if (sessionId && !this.sessionId) {
-      this.sessionId = sessionId;
-    }
-
-    // Don't disconnect if already connected with the correct session ID
-    if (this.socket?.connected) {
-      if (this.sessionId === sessionId || !sessionId) {
-        Logger.WebSocket.log(
-          "[WebSocketService] Already connected with correct sessionId"
-        );
-        return;
-      }
-      // Only disconnect if we need to use a different session ID
+    if (
+      this.socket?.connected &&
+      sessionIdToUse &&
+      this.sessionId !== sessionIdToUse
+    ) {
       Logger.WebSocket.log(
-        "[WebSocketService] Disconnecting to reconnect with a different sessionId"
+        `[WebSocketService] SessionId will change from ${this.sessionId} to ${sessionIdToUse}. Disconnecting existing socket ${this.socket.id} to ensure fresh connection context.`
       );
       this.disconnect();
+    } else if (this.socket?.connected && !this.isConnecting) {
+      if (sessionIdToUse === undefined && this.sessionId !== null) {
+        Logger.WebSocket.log(
+          `[WebSocketService] connect() called without sessionIdToUse, but already connected with socket ${this.socket.id} and sessionId ${this.sessionId}. Keeping existing socket.`
+        );
+      } else {
+        Logger.WebSocket.log(
+          `[WebSocketService] Already connected with socket ${this.socket.id} and sessionId ${this.sessionId} (or no change dictated by sessionIdToUse '${sessionIdToUse}'). Not creating new socket.`
+        );
+      }
+      this.onConnectSubscribers.forEach((handler) => handler());
+      return;
     }
+
+    this.sessionId = sessionIdToUse || this.sessionId;
+    Logger.WebSocket.log(
+      `[WebSocketService] Proceeding to establish connection. Target sessionId: ${this.sessionId}`
+    );
 
     this.isConnecting = true;
 
     const socketUrl = import.meta.env.PROD
       ? config.wsServerUrl
       : `${window.location.protocol}//${window.location.hostname}:${config.wsPort}`;
-    Logger.WebSocket.log("[WebSocketService] Connecting to:", socketUrl);
+    Logger.WebSocket.log("[WebSocketService] Connecting to URL:", socketUrl);
+    Logger.WebSocket.log(
+      "[WebSocketService] Creating new io() socket instance."
+    );
 
-    // Use WebSocket only (no polling) to prevent transport changes
-    // This eliminates the polling->websocket upgrade cycle which can cause disconnects
     this.socket = io(socketUrl, {
       path: "/socket.io",
       reconnection: true,
@@ -248,89 +265,58 @@ export class WebSocketService {
 
     this.socket.on("connect_error", (error) => {
       Logger.WebSocket.error(
-        "[WebSocketService] Connection error:",
+        "[WebSocketService] Connection failed:",
         error.message
       );
+      this.isConnecting = false;
     });
 
     this.socket.on("connect", () => {
-      this.isConnecting = false;
       Logger.WebSocket.log(
-        "[WebSocketService] Connected to server with state:",
-        {
-          playerCode: this.playerCode,
-          sessionId: this.sessionId,
-          socketId: this.socket?.id,
-        }
+        `[WebSocketService] Connected successfully. Socket ID: ${this.socket?.id}`
       );
+      this.isConnecting = false;
+      // Notify subscribers
+      this.onConnectSubscribers.forEach((handler) => handler());
 
-      if (this.playerCode) {
-        // Check if the player code is still in localStorage
-        const playerCodeKey = `playerCode_${this.tabId}`;
-        const storedCode = localStorage.getItem(playerCodeKey);
-
-        if (
-          this.externalJoinCode &&
-          this.externalJoinCode !== this.playerCode &&
-          storedCode === this.playerCode
-        ) {
-          Logger.WebSocket.log(
-            `[WebSocketService] External join code '${this.externalJoinCode}' is present and different from stored playerCode '${this.playerCode}'. Deferring automatic verification.`
-          );
-          // GamePage will handle the verification of externalJoinCode.
-          // We might want to clear this.playerCode here if the external one should always take precedence
-          // For now, just deferring.
-        } else if (storedCode === this.playerCode) {
-          Logger.WebSocket.log(
-            "[WebSocketService] Attempting to reconnect with player code:",
-            this.playerCode
-          );
-          this.sendMessage({
-            type: "verify_code",
-            sessionId: this.sessionId || "",
-            code: this.playerCode,
-          });
-        } else {
-          Logger.WebSocket.log(
-            "[WebSocketService] Player code ${this.playerCode} no longer valid or different from localStorage ${storedCode}, creating new session"
-          );
-          this.playerCode = null; // Clear invalid code
-          this.clearPlayerCode(); // Remove from storage
-          this.sendMessage({ type: "create_session" });
-        }
-      } else if (!this.sessionId) {
+      if (this.sessionId) {
         Logger.WebSocket.log(
-          "[WebSocketService] No existing session or code, creating new session"
+          "[WebSocketService] Reconnected. Attempting to rejoin session:",
+          this.sessionId
         );
-        this.sendMessage({ type: "create_session" });
+        this.sendMessage({
+          type: "rejoin_session",
+          sessionId: this.sessionId,
+          playerCode: this.playerCode,
+        });
       } else {
         Logger.WebSocket.log(
-          "[WebSocketService] Already have sessionId, no need to create session"
+          "[WebSocketService] Connected without a session ID. Waiting for session creation."
         );
+        // If a 'create_session' was pending from a *previous* socket instance
+        // that died, the 'pendingRequests' set still has 'create_session'.
+        // Clearing it allows a new attempt on this new connection.
+        if (this.pendingRequests.has("create_session")) {
+          Logger.WebSocket.warn(
+            "[WebSocketService] Clearing stale 'create_session' from pendingRequests on new connection without session."
+          );
+          this.removePendingRequest("create_session");
+        }
       }
     });
 
     this.socket.on("disconnect", (reason) => {
-      Logger.WebSocket.log("[WebSocketService] Disconnected:", {
-        reason,
-        playerCode: this.playerCode,
-        sessionId: this.sessionId,
-      });
+      Logger.WebSocket.log("[WebSocketService] Disconnected:", reason);
+      this.isConnecting = false;
+      // Notify subscribers
+      this.onDisconnectSubscribers.forEach((handler) => handler(reason));
 
-      // If we have a pending request, we want to reconnect quickly
-      const hasPendingOperation =
-        this.pendingRequests.size > 0 || this.backgroundOperations.size > 0;
-
-      if (hasPendingOperation) {
+      if (reason === "io server disconnect") {
+        this.socket?.connect();
+      } else if (reason === "io client disconnect") {
         Logger.WebSocket.log(
-          "[WebSocketService] Reconnecting due to disconnect with pending operations"
+          "[WebSocketService] Disconnected by client intentionally."
         );
-
-        // Don't reset the isConnecting flag so it will reconnect through our connect method
-        this.socket = null;
-
-        // Let the socket reconnect automatically (through the socket.io reconnection mechanism)
-        // rather than calling connect() manually, which could cause double reconnection
       }
     });
 
@@ -363,23 +349,22 @@ export class WebSocketService {
       "story_codes_notification",
       (data: StoryCodesNotification) => {
         Logger.WebSocket.log(
-          "[WebSocketService] Player codes notification received:",
+          "[WebSocketService] Story codes notification:",
           data
         );
-        const handler = this.messageHandlers.get("story_codes_notification");
-        if (handler) {
-          handler(data);
-        } else {
-          Logger.WebSocket.warn(
-            "[WebSocketService] No handler for story_codes"
-          );
-        }
       }
     );
 
     // Handle request response messages (including rate limits)
     this.socket.on("response", (data: ServerResponse) => {
-      Logger.WebSocket.log("[WebSocketService] Response received:", data);
+      // Logger.WebSocket.log(
+      //   "[WebSocketService] RAW RESPONSE RECEIVED FROM SERVER:",
+      //   JSON.stringify(data) // Removed verbose raw log
+      // );
+      Logger.WebSocket.log(
+        "[WebSocketService] Response received (parsed):",
+        data
+      );
 
       if (!data.status) {
         Logger.WebSocket.warn(
@@ -576,6 +561,43 @@ export class WebSocketService {
         }
       }
     );
+
+    // Centralized message handler for all messages from the server
+    this.socket.on("message", (data: WSServerMessage) => {
+      Logger.WebSocket.log("[WebSocketService] Received message:", data);
+
+      if (data.type && this.messageHandlers.has(data.type)) {
+        this.messageHandlers.get(data.type)?.(data);
+      } else {
+        Logger.WebSocket.log(
+          `[WebSocketService] No specific handler for message type: ${data.type}`
+        );
+      }
+
+      if (
+        data.type.endsWith("_response") ||
+        data.type.endsWith("_notification")
+      ) {
+        let operationType = "";
+        // Check if operationType exists on data and is a string
+        if (data && typeof data === "object" && "operationType" in data) {
+          // More specific check for operationType
+          const potentialOpType = (data as { operationType?: unknown })
+            .operationType;
+          if (typeof potentialOpType === "string") {
+            operationType = potentialOpType;
+          }
+        }
+        // Fallback if operationType is not found or not a string
+        if (!operationType) {
+          operationType = data.type.replace(/_response$|_notification$/, "");
+        }
+
+        if (operationType && this.isRequestPending(operationType)) {
+          this.removePendingRequest(operationType);
+        }
+      }
+    });
   }
 
   onMessage(type: string, handler: MessageHandler) {
@@ -587,91 +609,99 @@ export class WebSocketService {
   }
 
   sendMessage(message: WSMessage) {
-    Logger.WebSocket.log("[WebSocketService] Sending message:", {
-      type: message.type,
-      socketId: this.socket?.id,
-      connected: this.socket?.connected,
-    });
-    if (!this.socket?.connected) {
-      Logger.WebSocket.warn(
-        "[WebSocketService] Cannot send message: not connected"
+    if (!this.socket || !this.socket.connected) {
+      Logger.WebSocket.error(
+        "[WebSocketService] Cannot send message: Not connected."
       );
       return;
     }
 
-    // Add to pending requests
-    this.addPendingRequest(message.type);
-
-    const messageWithSession = {
-      ...message,
-      sessionId: this.sessionId,
+    const eventType = message.type;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { type, ...payloadFields } = message;
+    const payload = {
+      ...payloadFields,
+      sessionId: this.sessionId, // Ensure sessionId is part of the payload
     };
 
-    this.socket.emit(message.type, messageWithSession);
+    Logger.WebSocket.log(
+      `[WebSocketService] Sending event '${eventType}' on socket ${this.socket.id} with payload:`,
+      payload
+    );
+    this.socket.emit(eventType, payload);
+
+    if (
+      !eventType.endsWith("_response") &&
+      !eventType.endsWith("_notification")
+    ) {
+      this.addPendingRequest(eventType);
+    }
   }
 
   clearSession() {
-    Logger.WebSocket.log("[WebSocketService] Clearing session:", {
-      oldSessionId: this.sessionId,
-    });
-
-    // Don't clear the player code as it might be needed for resuming
     this.sessionId = null;
+    this.playerCode = null;
     localStorage.removeItem("sessionId");
+    Logger.WebSocket.log("[WebSocketService] Session cleared.");
   }
 
   handleExitStoryResponse() {
-    this.socket?.emit("leave_session", this.sessionId);
-    this.clearSession();
+    this.clearPlayerCode();
   }
 
   disconnect(clearCode = false) {
     if (this.socket) {
-      Logger.WebSocket.log(
-        "[WebSocketService] Manually disconnecting socket:",
-        {
-          socketId: this.socket.id,
-          connected: this.socket.connected,
-          pendingRequests: Array.from(this.pendingRequests),
-          clearCode,
-        }
-      );
+      Logger.WebSocket.log("[WebSocketService] Disconnecting...");
       this.socket.disconnect();
-      this.socket = null;
     }
-    this.sessionId = null;
+    this.socket = null;
     this.isConnecting = false;
-
     if (clearCode) {
       this.clearPlayerCode();
     }
   }
 
   clearPlayerCode() {
-    Logger.WebSocket.log(
-      "[WebSocketService] Clearing player code:",
-      this.playerCode
-    );
     this.playerCode = null;
-    const playerCodeKey = `playerCode_${this.tabId}`;
-    localStorage.removeItem(playerCodeKey);
-    this.externalJoinCode = null;
+    Logger.WebSocket.log("[WebSocketService] Player code cleared internally.");
   }
 
   setPlayerCode(code: string) {
-    Logger.WebSocket.log("[WebSocketService] Setting player code:", code);
     this.playerCode = code;
-    const playerCodeKey = `playerCode_${this.tabId}`;
-    localStorage.setItem(playerCodeKey, code);
-    this.externalJoinCode = null;
+    Logger.WebSocket.log(
+      "[WebSocketService] Player code set internally to:",
+      code
+    );
   }
 
   public setExternalJoinCode(code: string | null): void {
     Logger.WebSocket.log(
-      "[WebSocketService] Setting external join code:",
+      "[WebSocketService] Setting external join code, which now updates internal playerCode:",
       code
     );
-    this.externalJoinCode = code;
+    this.playerCode = code;
+  }
+
+  // Method for components to subscribe to the raw connect event
+  public subscribeToConnect(handler: () => void) {
+    this.onConnectSubscribers.push(handler);
+  }
+
+  public unsubscribeFromConnect(handler: () => void) {
+    this.onConnectSubscribers = this.onConnectSubscribers.filter(
+      (sub) => sub !== handler
+    );
+  }
+
+  // Method for components to subscribe to the raw disconnect event
+  public subscribeToDisconnect(handler: (reason: string) => void) {
+    this.onDisconnectSubscribers.push(handler);
+  }
+
+  public unsubscribeFromDisconnect(handler: (reason: string) => void) {
+    this.onDisconnectSubscribers = this.onDisconnectSubscribers.filter(
+      (sub) => sub !== handler
+    );
   }
 }
 
