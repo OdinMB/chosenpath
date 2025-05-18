@@ -23,7 +23,6 @@ export const RATE_LIMITED_ACTIONS = [
   "verify_code",
   "make_choice",
   "join_game",
-  "associate_story_code",
   "login",
   "imageGeneration",
 ] as const;
@@ -60,11 +59,6 @@ export const RATE_LIMITS: Record<
   verify_code: {
     windowMs: 60 * 1000, // 1 minute
     maxRequests: 15,
-  },
-  // Limit story code association attempts
-  associate_story_code: {
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    maxRequests: 10,
   },
   // Limit login attempts
   login: {

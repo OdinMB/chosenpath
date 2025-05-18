@@ -94,10 +94,6 @@ export function Page() {
             </>
           )}
 
-          {/* Divider logic might need adjustment based on UserStoriesList content / StoredCodeSetsList visibility */}
-          {/* For simplicity, let's assume a divider is usually good before Create Your Own Story */}
-          {/* <OrDivider /> */}
-
           <PrimaryButton
             onClick={handleNewStory}
             fullWidth

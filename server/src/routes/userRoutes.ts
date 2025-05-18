@@ -18,11 +18,9 @@ import {
   RegisterUserRequest,
   LoginUserRequest,
   PasswordUpdateRequest,
-  AssociateStoryCodeRequest,
 } from "core/types/api.js";
 import {
   getUserStoryCodes,
-  associateStoryCode,
   getUserStories,
   getStoriesWithUser,
   getAllUserRelatedStories,
@@ -299,55 +297,6 @@ router.get("/users/story-codes", verifyRegularUser(), async (req, res) => {
 
     const errorMessage =
       error instanceof Error ? error.message : "Failed to get story codes";
-
-    return sendError(res, errorMessage, 500, requestId);
-  }
-});
-
-/**
- * Associate a story code with the current user
- * POST /users/story-codes
- */
-router.post("/users/story-codes", verifyRegularUser(), async (req, res) => {
-  const requestId = req.body?.requestId || "unknown";
-  const { storyId, playerSlot, code } = req.body as AssociateStoryCodeRequest;
-
-  if (!storyId || !playerSlot || !code) {
-    return sendBadRequest(
-      res,
-      "Story ID, player slot, and code are required",
-      requestId
-    );
-  }
-
-  // Apply rate limiting
-  const rateLimitStatus = checkRateLimitForRequest(req, "associate_story_code");
-
-  if (rateLimitStatus.isLimited) {
-    return sendRateLimited(res, rateLimitStatus, requestId);
-  }
-
-  try {
-    if (!req.user) {
-      return sendUnauthorized(res, "Authentication required", requestId);
-    }
-
-    // Increment rate limit
-    incrementRateLimitForRequest(req, "associate_story_code");
-
-    const association = await associateStoryCode(
-      req.user.id,
-      storyId,
-      playerSlot,
-      code
-    );
-
-    return sendSuccess(res, { storyCode: association }, requestId);
-  } catch (error) {
-    Logger.Route.error("Failed to associate story code", error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to associate story code";
 
     return sendError(res, errorMessage, 500, requestId);
   }

@@ -4,7 +4,6 @@ export * from "./StoryInitializer";
 export * from "./TemplateConfigurator";
 export { OrDivider } from "./OrDivider";
 export { PageHeader } from "./PageHeader";
-export { StoredCodeSetsList } from "./StoredCodeSetsList";
 export { TemplateCard } from "./TemplateCard";
 export { TemplateCarousel } from "./TemplateCarousel";
 export { CategoryTile } from "./CategoryTile";

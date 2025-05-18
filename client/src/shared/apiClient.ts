@@ -7,7 +7,6 @@ import {
   ErrorResponse,
   UserStoryCodesResponse,
   UserStoriesResponse,
-  AssociateStoryCodeRequest,
   CreateStoryRequest,
   CreateStoryResponse,
   CreateStoryFromTemplateRequest,
@@ -338,13 +337,6 @@ export const userStoriesApi = {
    */
   getStoryCodes: () => {
     return apiClient.get<UserStoryCodesResponse>("/users/story-codes");
-  },
-
-  /**
-   * Associate a story code with the current user
-   */
-  associateStoryCode: (data: AssociateStoryCodeRequest) => {
-    return apiClient.post("/users/story-codes", data);
   },
 
   /**

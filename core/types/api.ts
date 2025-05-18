@@ -174,11 +174,6 @@ export interface UserStoryCodeAssociation {
   lastPlayedAt: number | null;
   isPending?: boolean;
 }
-export interface AssociateStoryCodeRequest extends ClientRequest {
-  storyId: string;
-  playerSlot: string;
-  code: string;
-}
 export interface UserStoryCodesResponse {
   storyCodes: UserStoryCodeAssociation[];
 }
