@@ -4,10 +4,8 @@ Smaller commits!
 
 - 2: Show # MP stories in which user is pending.
 
-- 1: Registration: More useful error messages when stuff goes wrong
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
-- 1: delete codes on story generation any error (with deleteCodeSetsByContent(codes))
 - 2: rate limit via express-rate-limit library
 
 # BETTER EXPERIENCE

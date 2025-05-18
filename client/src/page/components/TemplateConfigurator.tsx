@@ -55,6 +55,12 @@ export function TemplateConfigurator() {
         generateImages,
       });
 
+      if (!response) {
+        // If response is undefined, an error was handled by the hook (e.g., navigation occurred).
+        // The component should not proceed further.
+        return;
+      }
+
       const { codes } = response;
       // Store codes in localStorage
       storeCodeSet(codes, `Template: ${template.id}`, true);

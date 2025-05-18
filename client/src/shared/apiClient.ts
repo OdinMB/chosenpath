@@ -133,9 +133,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => {
     const responseUrl = response.config.url || "";
-    // const contentType = response.headers && response.headers['content-type']; // Removed unused variable
 
-    // Handle Blob responses first
     if (
       response.config.responseType === "blob" &&
       response.data instanceof Blob
@@ -143,31 +141,29 @@ axiosInstance.interceptors.response.use(
       Logger.API?.info?.(
         `Response from ${responseUrl}: ${response.status} ${response.statusText} - Blob data received (type: ${response.data.type}, size: ${response.data.size})`
       );
-      return response.data; // Return the Blob data itself
+      return response.data;
     }
 
-    // Original logging for non-blob data (now happens after blob check)
     Logger.API?.info?.(
       `Response from ${responseUrl}: ${response.status} ${
         response.statusText
       }: ${JSON.stringify(response.data).substring(0, 500)}`
     );
 
-    // Skip API response handling for health check
     if (responseUrl.includes("/health")) {
-      // For health check, if it's not a blob and made it here, it's likely the raw axios response.
-      // Depending on what callers of /health expect, this might need to be response.data or response.
       return response;
     }
 
-    // Check if the response is a standard API JSON response
+    // For successful (2xx) responses, if it's our standard API structure with data.status === SUCCESS,
+    // we return response.data.data. Other 2xx responses that don't fit this (e.g. plain JSON object not wrapped)
+    // would be handled by the final else block in this success handler.
     if (
       response.data &&
       typeof response.data === "object" &&
-      "status" in response.data
+      "status" in response.data &&
+      response.data.status === ResponseStatus.SUCCESS
     ) {
       const apiResponse = response.data as BaseServerResponse;
-
       Logger.API?.debug?.(
         `API Response status: ${apiResponse.status}, Data: ${JSON.stringify(
           apiResponse
@@ -175,90 +171,40 @@ axiosInstance.interceptors.response.use(
           JSON.stringify(apiResponse).length > 500 ? "..." : ""
         }`
       );
-
-      switch (apiResponse.status) {
-        case ResponseStatus.SUCCESS:
-          Logger.API?.debug?.(
-            `Transformed data (SUCCESS): ${JSON.stringify(
-              response.data.data
-            ).substring(0, 500)}${
-              JSON.stringify(response.data.data).length > 500 ? "..." : ""
-            }`
-          );
-          return response.data.data; // Return just the nested 'data' payload for standard success
-
-        case ResponseStatus.MODERATION_BLOCKED: {
-          const moderationError = apiResponse as ModerationBlockedResponse;
-          notificationService.addNotification({
-            type: "error",
-            title: "Content Moderation",
-            message: "Your content was flagged by our moderation system.",
-            reason: moderationError.moderation.reason,
-            autoClose: false,
-          } as ModerationNotification);
-          return Promise.reject(apiResponse);
-        }
-
-        case ResponseStatus.RATE_LIMITED: {
-          const rateLimitError = apiResponse as RateLimitedResponse;
-          notificationService.addNotification({
-            type: "warning",
-            title: "Rate Limit Exceeded",
-            message: "You've reached the maximum number of requests.",
-            timeRemaining: rateLimitError.rateLimit.timeRemaining,
-            autoClose: false,
-          } as RateLimitNotification);
-          return Promise.reject(apiResponse);
-        }
-
-        case ResponseStatus.ERROR:
-        case ResponseStatus.INVALID: {
-          const errorResponse = apiResponse as ErrorResponse;
-          notificationService.addNotification({
-            type: "error",
-            title: "Error",
-            message:
-              errorResponse.errorMessage || "An unexpected error occurred.",
-            duration: 5000,
-          });
-          return Promise.reject(apiResponse);
-        }
-
-        default: {
-          notificationService.addNotification({
-            type: "error",
-            title: "Error",
-            message: "An unexpected error occurred.",
-            duration: 5000,
-          });
-          return Promise.reject({
-            status: ResponseStatus.ERROR,
-            errorMessage: "Unknown response status",
-            requestId: apiResponse.requestId,
-            timestamp: apiResponse.timestamp,
-          } as ErrorResponse);
-        }
-      }
-    } else {
       Logger.API?.debug?.(
-        `Non-standard response structure from ${responseUrl}: ${typeof response.data}`
+        `Transformed data (SUCCESS): ${JSON.stringify(
+          response.data.data
+        ).substring(0, 500)}${
+          JSON.stringify(response.data.data).length > 500 ? "..." : ""
+        }`
       );
-      notificationService.addNotification({
-        type: "error",
-        title: "Error",
-        message: "Invalid response format from server",
-        duration: 5000,
-      });
-      return Promise.reject({
-        status: ResponseStatus.ERROR,
-        errorMessage: "Invalid response format from server",
-        requestId: uuidv4(), // Generate a new requestId as we might not have one from the response
-        timestamp: Date.now(),
-      } as ErrorResponse);
+      return response.data.data; // Return just the nested 'data' payload
+    } else {
+      // This handles 2xx responses that are not our standard {status: "success", data: ...} format
+      // OR if somehow a non-SUCCESS status (like ERROR) was sent with a 2xx HTTP code (which would be unusual).
+      Logger.API?.debug?.(
+        `Non-standard successful response structure or unexpected status in 2xx from ${responseUrl}: ${typeof response.data}`
+      );
+      // If it has a status field but it's not SUCCESS, it's an issue for a 2xx response.
+      if (
+        response.data &&
+        response.data.status &&
+        response.data.status !== ResponseStatus.SUCCESS
+      ) {
+        notificationService.addNotification({
+          type: "error",
+          title: "API Error",
+          message: `Unexpected API status '${response.data.status}' in a successful HTTP response.`,
+          duration: 7000,
+        });
+        return Promise.reject(response.data); // Reject with the problematic data.
+      }
+      // If it's a 2xx but not our expected wrapper, return the data as is.
+      // This could be for endpoints that return direct JSON objects/arrays without the status wrapper.
+      return response.data;
     }
   },
   async (error) => {
-    // Log error responses
     Logger.API?.error?.(`API Error: ${error.message}`);
     if (error.response) {
       Logger.API?.error?.(
@@ -266,9 +212,68 @@ axiosInstance.interceptors.response.use(
           error.config?.url || "unknown"
         }`
       );
+
+      const apiResponse = error.response.data as BaseServerResponse; // Type assertion
+
+      if (apiResponse && apiResponse.status) {
+        switch (apiResponse.status) {
+          case ResponseStatus.MODERATION_BLOCKED: {
+            const moderationError = apiResponse as ModerationBlockedResponse;
+            const detailedMessage = `Story creation blocked. Reason: ${moderationError.moderation.reason}`;
+            notificationService.addNotification({
+              type: "error",
+              title: "Content Moderation",
+              message: detailedMessage,
+              reason: moderationError.moderation.reason, // Keep for potential richer display
+              // moderationInfo: moderationError.moderation, // To use ContentModerationNotification.tsx directly
+              autoClose: false,
+            } as ModerationNotification);
+            return Promise.reject(apiResponse); // Reject with the structured API error
+          }
+          case ResponseStatus.RATE_LIMITED: {
+            const rateLimitError = apiResponse as RateLimitedResponse;
+            notificationService.addNotification({
+              type: "warning",
+              title: "Rate Limit Exceeded",
+              message:
+                "You've reached the maximum number of requests for this action.",
+              timeRemaining: rateLimitError.rateLimit.timeRemaining,
+              autoClose: false,
+            } as RateLimitNotification);
+            return Promise.reject(apiResponse);
+          }
+          case ResponseStatus.ERROR:
+          case ResponseStatus.INVALID: {
+            const errorResponse = apiResponse as ErrorResponse;
+            notificationService.addNotification({
+              type: "error",
+              title: errorResponse.operationType
+                ? `Error: ${errorResponse.operationType}`
+                : "Error",
+              message:
+                errorResponse.errorMessage ||
+                "An unexpected server error occurred.",
+              duration: 5000,
+            });
+            return Promise.reject(apiResponse);
+          }
+          default: {
+            // This case handles situations where error.response.data exists and has a 'status'
+            // field, but that status isn't one of the known handled cases.
+            notificationService.addNotification({
+              type: "error",
+              title: "API Error",
+              message: `Received an unknown API status: ${apiResponse.status}. Please try again.`,
+              duration: 5000,
+            });
+            return Promise.reject(apiResponse);
+          }
+        }
+      }
     }
 
-    // Handle CSRF token failures
+    // Fallback for CSRF token failures (which might not have error.response.data in our API format)
+    // or other network errors where error.response.data is not in our standard API format.
     if (
       error.response?.status === 403 &&
       error.response?.data?.errorMessage === "Invalid CSRF token"
@@ -303,18 +308,23 @@ axiosInstance.interceptors.response.use(
       }
     }
 
-    // For other errors, extract the error message from API response
-    const errorMessage = error.response?.data?.errorMessage || error.message;
+    // Generic fallback notification if none of the above specific handlers caught it.
+    // This handles cases like network errors (error.response is undefined), or if error.response.data
+    // isn't in the expected {status: ..., ...} format.
+    const fallbackErrorMessage =
+      error.response?.data?.errorMessage || // If there's a structured message from a non-standard API error
+      (typeof error.response?.data === "string" ? error.response.data : null) || // If data is just a string message
+      error.message || // Axios or network error message
+      "An unexpected network or server error occurred.";
 
-    // Add notification for network/other errors
     notificationService.addNotification({
       type: "error",
-      title: "Error",
-      message: errorMessage || "An unexpected error occurred.",
-      duration: 5000,
+      title: "Network/Server Error",
+      message: fallbackErrorMessage,
+      duration: 7000,
     });
 
-    return Promise.reject(error);
+    return Promise.reject(error); // Reject with the original Axios error if not handled by specific cases above
   }
 );
 

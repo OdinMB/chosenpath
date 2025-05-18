@@ -6,7 +6,12 @@ import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
   CreateStoryInfo,
+  // ModerationBlockedResponse, // Not directly needed if relying on interceptor for notification details
+  // ResponseStatus, // Not directly needed for status check in hook if interceptor handles it
 } from "core/types/api";
+import { deleteCodeSetsByContent } from "../../shared/utils/codeSetUtils"; // Added
+// notificationService can be kept for non-API related notifications like polling errors, if any.
+// import { notificationService } from "../../shared/notifications/notificationService"; // Removed as unused
 
 export function useStoryCreation() {
   const navigate = useNavigate();
@@ -17,28 +22,49 @@ export function useStoryCreation() {
   );
   const [storyReady, setStoryReady] = useState(false);
 
+  // Centralized error handler for story creation
+  const handleError = (
+    error: unknown,
+    codesToDelete?: Record<string, string> | null
+  ) => {
+    Logger.App.error("Story creation process failed:", error);
+    setIsLoading(false);
+
+    if (codesToDelete) {
+      deleteCodeSetsByContent(codesToDelete);
+      Logger.App.log("Attempted to delete local player codes.", codesToDelete);
+    }
+
+    // Notifications are primarily handled by the apiClient's response interceptor.
+    // This function's main jobs are cleanup and navigation.
+    navigate("/");
+    Logger.App.log("Redirected to / after story creation failure.");
+  };
+
   const createStory = async (
     data: CreateStoryRequest
-  ): Promise<CreateStoryInfo> => {
+  ): Promise<CreateStoryInfo | undefined> => {
     setIsLoading(true);
-    Logger.App.log("Starting story creation process");
+    Logger.App.log("Starting story creation process (new)");
+    let localPlayerCodes: Record<string, string> | null = null;
 
     try {
       Logger.App.log("Sending createStory request to server");
-      const storyData = (await storyApi.createStory(data)) as CreateStoryInfo;
+      const storyData = await storyApi.createStory(data);
+      localPlayerCodes = storyData.codes; // Store codes locally in case polling setup fails
 
       Logger.App.log(`Received story ID: ${storyData.storyId}`);
-
       setStoryId(storyData.storyId);
       setPlayerCodes(storyData.codes);
       Logger.App.log("Received player codes, starting status polling");
 
-      // Start polling for story status
       const checkStatus = async () => {
         try {
           Logger.App.log(`Checking status for story: ${storyData.storyId}`);
-          const status = await storyApi.checkStoryStatus(storyData.storyId);
-          if (status.status === "ready") {
+          const statusResult = await storyApi.checkStoryStatus(
+            storyData.storyId
+          );
+          if (statusResult.status === "ready") {
             Logger.App.log(`Story ${storyData.storyId} is ready`);
             setStoryReady(true);
           } else {
@@ -47,64 +73,95 @@ export function useStoryCreation() {
             );
             setTimeout(checkStatus, 2000);
           }
-        } catch (error) {
-          Logger.App.error("Failed to check story status:", error);
+        } catch (pollError) {
+          Logger.App.error(
+            "Failed to check story status during polling:",
+            pollError
+          );
+          // apiClient interceptor should handle notifications for API errors during polling.
+          // A custom notification here could be for non-API errors or specific UI feedback.
+          // Example:
+          // notificationService.addNotification({
+          //   type: "warning",
+          //   title: "Update",
+          //   message: "Having trouble confirming story readiness. It might take a bit longer."
+          // });
         }
       };
       checkStatus();
 
+      setIsLoading(false); // Set loading false after initial success response and polling setup
       return storyData;
     } catch (error) {
-      Logger.App.error("Failed to create story:", error);
-      throw error; // Let the centralized error handler deal with it
-    } finally {
-      setIsLoading(false);
+      // This error is from storyApi.createStory, processed by apiClient interceptor
+      handleError(error, localPlayerCodes);
+      return undefined; // Indicate failure and that error was handled
     }
   };
 
   const createStoryFromTemplate = async (
     data: CreateStoryFromTemplateRequest
-  ): Promise<CreateStoryInfo> => {
+  ): Promise<CreateStoryInfo | undefined> => {
     setIsLoading(true);
-    Logger.App.log("Starting template story creation process");
+    Logger.App.log("Starting template story creation process (new)");
+    let localPlayerCodes: Record<string, string> | null = null;
 
     try {
       Logger.App.log("Sending createStoryFromTemplate request to server");
-      const response = await storyApi.createStoryFromTemplate(data);
-      Logger.App.log("Received response from server. responseData: ", response);
+      const responseData = await storyApi.createStoryFromTemplate(data);
+      localPlayerCodes = responseData.codes;
 
-      Logger.App.log(`Received story ID: ${response.storyId}`);
+      Logger.App.log(
+        "Received response from server. responseData: ",
+        responseData
+      );
+      Logger.App.log(`Received story ID: ${responseData.storyId}`);
+      setStoryId(responseData.storyId);
+      setPlayerCodes(responseData.codes);
 
-      setStoryId(response.storyId);
-      setPlayerCodes(response.codes);
-      Logger.App.log("Received player codes, starting status polling");
-
-      // Start polling for story status
-      const checkStatus = async () => {
-        try {
-          Logger.App.log(`Checking status for story: ${response.storyId}`);
-          const status = await storyApi.checkStoryStatus(response.storyId);
-          if (status.status === "ready") {
-            Logger.App.log(`Story ${response.storyId} is ready`);
-            setStoryReady(true);
-          } else {
+      if (responseData.status === "ready") {
+        setStoryReady(true);
+        Logger.App.log(
+          `Template story ${responseData.storyId} is ready immediately.`
+        );
+      } else {
+        // This case might be rare for templates if they are always 'ready'
+        Logger.App.warn(
+          `Template story ${responseData.storyId} has status ${responseData.status}. Polling...`
+        );
+        const checkStatus = async () => {
+          try {
             Logger.App.log(
-              `Story ${response.storyId} is still queued, will check again in 2s`
+              `Checking status for story: ${responseData.storyId}`
             );
-            setTimeout(checkStatus, 2000);
+            const statusResult = await storyApi.checkStoryStatus(
+              responseData.storyId
+            );
+            if (statusResult.status === "ready") {
+              Logger.App.log(`Story ${responseData.storyId} is ready`);
+              setStoryReady(true);
+            } else {
+              Logger.App.log(
+                `Story ${responseData.storyId} is still queued, will check again in 2s`
+              );
+              setTimeout(checkStatus, 2000);
+            }
+          } catch (pollError) {
+            Logger.App.error(
+              "Failed to check story status for template during polling:",
+              pollError
+            );
+            // apiClient interceptor should handle notifications.
           }
-        } catch (error) {
-          Logger.App.error("Failed to check story status:", error);
-        }
-      };
-      checkStatus();
-
-      return response;
-    } catch (error) {
-      Logger.App.error("Failed to create story from template:", error);
-      throw error; // Let the centralized error handler deal with it
-    } finally {
+        };
+        checkStatus();
+      }
       setIsLoading(false);
+      return responseData;
+    } catch (error) {
+      // This error is from storyApi.createStoryFromTemplate, processed by apiClient interceptor
+      handleError(error, localPlayerCodes);
+      return undefined; // Indicate failure and that error was handled
     }
   };
 

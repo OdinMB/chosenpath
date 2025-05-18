@@ -9,7 +9,11 @@ import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 import { Story } from "core/models/Story.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { storyRepository } from "./StoryRepository.js";
-import { sendSuccess, sendModerationBlocked } from "./responseUtils.js";
+import {
+  sendSuccess,
+  sendModerationBlocked,
+  sendError,
+} from "./responseUtils.js";
 import { Response } from "express";
 import { storyDbService } from "./StoryDbService.js";
 import { getDb } from "./db.js";
@@ -195,6 +199,7 @@ export class StoryCreationService {
             `DB error updating title for story ${storyId} via service:`,
             dbError
           );
+          // Not re-throwing, allow story creation to proceed
         }
       }
       // --- DB Integration End ---
@@ -209,7 +214,20 @@ export class StoryCreationService {
       Logger.Route.log(`Successfully stored story: ${storyId}`);
     } catch (error) {
       Logger.Route.error(`Error generating story state for ${storyId}:`, error);
-      throw error;
+      Logger.Route.log(`Cleaning up DB entries for failed story ${storyId}`);
+      try {
+        await storyDbService.deleteStoryWithPlayers(storyId);
+        Logger.Route.log(
+          `Successfully cleaned up DB entries for story ${storyId}`
+        );
+      } catch (cleanupError) {
+        Logger.Route.error(
+          `Failed to clean up DB entries for story ${storyId}:`,
+          cleanupError
+        );
+      }
+      // TODO: Consider deleting the story directory: await deleteStoryDirectory(storyId);
+      throw error; // Re-throw the original error
     }
   }
 
@@ -222,17 +240,17 @@ export class StoryCreationService {
     creatorId?: string
   ): Promise<void> {
     Logger.Route.log(`Creating story from template: ${templateId}`);
+    const storyId = randomUUID();
 
-    // Fetch the template from the library
     const templateService = new AdminTemplateService();
     const template = await templateService.getTemplateById(templateId);
 
     if (!template) {
       Logger.Route.error(`Template not found: ${templateId}`);
-      throw new Error(`Template not found: ${templateId}`);
+      sendError(res, `Template not found: ${templateId}`, 404); // Send error and return
+      return;
     }
 
-    // Validate that requested player count is within template limits
     if (
       playerCount < template.playerCountMin ||
       playerCount > template.playerCountMax
@@ -240,62 +258,82 @@ export class StoryCreationService {
       Logger.Route.error(
         `Invalid player count ${playerCount} for template ${templateId}`
       );
-      throw new Error(
-        `Player count ${playerCount} is outside template limits (${template.playerCountMin}-${template.playerCountMax})`
-      );
+      sendError(
+        res,
+        `Player count ${playerCount} is outside template limits (${template.playerCountMin}-${template.playerCountMax})`,
+        400
+      ); // Send error and return
+      return;
     }
 
-    const storyId = randomUUID();
     const playerCodes = this.generatePlayerCodes(playerCount);
     Logger.Route.log(
       `Generated story ID: ${storyId} with ${playerCount} player codes`
     );
 
-    // Create story directory structure
     await ensureStoryDirectoryStructure(storyId);
     Logger.Route.log(`Created directory structure for story: ${storyId}`);
 
-    // --- DB Integration Start ---
-    await this._createStoryDbEntries(
-      storyId,
-      template.title, // Title is known from template
-      templateId,
-      playerCodes,
-      maxTurns,
-      generateImages,
-      creatorId
-    );
-    // --- DB Integration End ---
+    try {
+      await this._createStoryDbEntries(
+        storyId,
+        template.title,
+        templateId,
+        playerCodes,
+        maxTurns,
+        generateImages,
+        creatorId
+      );
 
-    // Register game session and codes
-    connectionManager.createGameSession(storyId);
-    Object.entries(playerCodes).forEach(([slot, code]) => {
-      connectionManager.registerCode(storyId, slot, code);
-    });
-    Logger.Route.log(`Registered game session and codes for story: ${storyId}`);
+      connectionManager.createGameSession(storyId);
+      Object.entries(playerCodes).forEach(([slot, code]) => {
+        connectionManager.registerCode(storyId, slot, code);
+      });
+      Logger.Route.log(
+        `Registered game session and codes for story: ${storyId}`
+      );
 
-    // Convert template to story state
-    const storyState = createStoryStateFromTemplate(
-      storyId,
-      template,
-      maxTurns,
-      generateImages,
-      playerCodes
-    );
-    Logger.Route.log(`Created story state from template for: ${storyId}`);
+      const storyState = createStoryStateFromTemplate(
+        storyId,
+        template,
+        maxTurns,
+        generateImages,
+        playerCodes
+      );
+      Logger.Route.log(`Created story state from template for: ${storyId}`);
 
-    // Create the story instance
-    const story = Story.create(storyState);
+      const story = Story.create(storyState);
 
-    // Store the story immediately since no LLM is involved
-    await storyRepository.storeStory(storyId, story);
-    Logger.Route.log(`Successfully stored template-based story: ${storyId}`);
+      await storyRepository.storeStory(storyId, story);
+      Logger.Route.log(`Successfully stored template-based story: ${storyId}`);
 
-    sendSuccess(res, {
-      storyId,
-      codes: playerCodes,
-      status: "ready",
-    });
+      sendSuccess(res, {
+        storyId,
+        codes: playerCodes,
+        status: "ready",
+      });
+    } catch (error) {
+      Logger.Route.error(
+        `Failed to create story from template ${templateId} for story ${storyId}:`,
+        error
+      );
+      Logger.Route.log(
+        `Cleaning up DB entries for failed template story ${storyId}`
+      );
+      try {
+        await storyDbService.deleteStoryWithPlayers(storyId);
+        Logger.Route.log(
+          `Successfully cleaned up DB entries for template story ${storyId}`
+        );
+      } catch (cleanupError) {
+        Logger.Route.error(
+          `Failed to clean up DB entries for template story ${storyId}:`,
+          cleanupError
+        );
+      }
+      // TODO: Consider deleting story directory here: await deleteStoryDirectory(storyId);
+      sendError(res, "Failed to create story from template", 500); // Send error after cleanup attempt
+    }
   }
 
   async checkStoryStatus(storyId: string): Promise<"queued" | "ready"> {

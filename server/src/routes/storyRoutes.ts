@@ -18,6 +18,7 @@ import { PlayerCount } from "core/types/index.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { storyDbService } from "../shared/StoryDbService.js";
 import { GetResumableStoriesRequest } from "core/types/api.js";
+import { v4 as uuidv4 } from "uuid";
 
 const router = Router();
 
@@ -54,10 +55,15 @@ router.post(
       );
     } catch (error) {
       Logger.Route.error("Failed to create story:", error);
-      res.status(500).json({
-        error: "Failed to create story",
-        type: "ServerError",
-      });
+      // Get requestId from the body if available, or generate a new one if critical for sendError
+      const requestId = (req.body as CreateStoryRequest)?.requestId || uuidv4();
+      sendError(
+        res,
+        "Failed to create story due to an internal server issue.",
+        500,
+        requestId,
+        error
+      );
     }
   }
 );
