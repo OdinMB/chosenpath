@@ -14,7 +14,8 @@ export interface AuthContextType {
   register: (
     email: string,
     username: string,
-    password: string
+    password: string,
+    subscribeToNewsletter?: boolean
   ) => Promise<void>;
 }
 

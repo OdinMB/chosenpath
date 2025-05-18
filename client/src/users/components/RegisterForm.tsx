@@ -20,6 +20,7 @@ export function RegisterForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [subscribeToNewsletter, setSubscribeToNewsletter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localSuccessMessage, setLocalSuccessMessage] = useState<string | null>(
     null
@@ -97,7 +98,7 @@ export function RegisterForm({
     try {
       console.log("RegisterForm: Attempting registration");
       setError(null);
-      await register(email, username, password);
+      await register(email, username, password, subscribeToNewsletter);
       console.log("RegisterForm: Registration successful");
       setLocalSuccessMessage("Registration successful! You can now log in.");
 
@@ -215,6 +216,23 @@ export function RegisterForm({
             disabled={formDisabled}
             required
           />
+        </div>
+
+        <div className="mb-4">
+          <input
+            type="checkbox"
+            id="subscribeNewsletter"
+            checked={subscribeToNewsletter}
+            onChange={(e) => setSubscribeToNewsletter(e.target.checked)}
+            disabled={formDisabled}
+            className="mr-2 leading-tight"
+          />
+          <label
+            htmlFor="subscribeNewsletter"
+            className="text-sm text-gray-700"
+          >
+            I want to learn about new stories and features
+          </label>
         </div>
 
         <div className="flex flex-col space-y-3">

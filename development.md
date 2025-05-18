@@ -2,13 +2,13 @@ Smaller commits!
 
 # NEXT
 
-- 2: Prettier (basic) user view
-- 2: account header bar at the top. Show # MP stories in which user is pending.
+- 2: Show # MP stories in which user is pending.
 
+- 1: Registration: More useful error messages when stuff goes wrong
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 - 1: delete codes on story generation any error (with deleteCodeSetsByContent(codes))
-- 2: protect image generation endpoints against abuse
+- 2: protect image generation endpoints against abuse. CORS etc. enough?
 
 # BETTER EXPERIENCE
 
@@ -43,7 +43,6 @@ Focus: Text/Images, English, Multiplayer
 # SERIOUS PROJECT
 
 - 1: Export stories
-- 2: Users: transfer local games to cloud (happens already when joining because user id is tracked in db?)
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 5: Credits system for generating stories
 - 15: Stripe integration

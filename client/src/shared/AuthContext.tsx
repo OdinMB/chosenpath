@@ -2,6 +2,7 @@ import { useState, useEffect, ReactNode } from "react";
 import { PublicUser } from "core/types/user.js";
 import { AuthContext } from "./AuthContextDefinition";
 import { authApi } from "./authApi";
+import { useNewsletter } from "./hooks/useNewsletter";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -10,6 +11,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { handleSubscribe: subscribeEmailToNewsletter } = useNewsletter();
 
   console.log("AuthProvider: Initializing");
 
@@ -90,9 +92,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const register = async (
     email: string,
     username: string,
-    password: string
+    password: string,
+    subscribeToNewsletter?: boolean
   ): Promise<void> => {
-    console.log("AuthProvider: Registration initiated", { email, username });
+    console.log("AuthProvider: Registration initiated", {
+      email,
+      username,
+      subscribeToNewsletter,
+    });
     setIsLoading(true);
     try {
       await authApi.register({
@@ -101,6 +108,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         password,
       });
       console.log("AuthProvider: Registration successful");
+      if (subscribeToNewsletter) {
+        try {
+          console.log("AuthProvider: Subscribing to newsletter", { email });
+          await subscribeEmailToNewsletter(email);
+          console.log("AuthProvider: Newsletter subscription successful");
+        } catch (newsletterError) {
+          console.error(
+            "AuthProvider: Newsletter subscription failed",
+            newsletterError
+          );
+        }
+      }
     } catch (error) {
       console.error("AuthProvider: Registration failed", error);
       throw error;
