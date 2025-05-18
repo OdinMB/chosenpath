@@ -51,9 +51,9 @@ type TransformedApiClient = {
 const axiosInstance = axios.create({
   baseURL: API_CONFIG.DEFAULT_API_URL,
   withCredentials: true, // Enable sending cookies
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // headers: { // Removing default Content-Type to let Axios handle it dynamically
+  //   "Content-Type": "application/json",
+  // },
 });
 
 // Special timeout for AI operations that take longer

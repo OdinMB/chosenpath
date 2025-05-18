@@ -9,6 +9,7 @@ import {
 import { GetAdminStoriesResponseData } from "core/types/api.js";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
+import { v4 as uuidv4 } from "uuid";
 
 // Admin Story API functions
 export const adminStoryApi = {
@@ -125,6 +126,44 @@ export const adminTemplateApi = {
       return blobResponse;
     } catch (error) {
       Logger.Admin.error("Failed to export all template assets", error);
+      throw error;
+    }
+  },
+
+  importTemplateZip: async (
+    templateId: string,
+    zipData: Blob
+  ): Promise<{ filesImported: number; files: string[] }> => {
+    Logger.Admin.log(`Importing ZIP to template ${templateId} via admin API`);
+    const formData = new FormData();
+    formData.append("zip", zipData, "template-assets.zip");
+
+    const requestId = uuidv4();
+    const url = `/admin/templates/${templateId}/import?requestId=${requestId}`;
+
+    try {
+      const responseData = await apiClient.post<{
+        filesImported: number;
+        files: string[];
+      }>(url, formData, {
+        headers: {
+          // Authorization: `Bearer ${token}`, // No longer needed
+          // 'Content-Type': 'multipart/form-data' is set automatically by axios for FormData
+        },
+      });
+      Logger.Admin.log(
+        `Successfully imported ${
+          responseData.filesImported
+        } files to template ${templateId} from admin API. Files: ${
+          responseData.files?.join(", ") || "none"
+        }`
+      );
+      return responseData;
+    } catch (error) {
+      Logger.Admin.error(
+        `Failed to import ZIP to template ${templateId} via admin API`,
+        error
+      );
       throw error;
     }
   },

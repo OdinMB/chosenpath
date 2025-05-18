@@ -6,7 +6,6 @@ Smaller commits!
 
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
-- 2: rate limit via express-rate-limit library
 
 # BETTER EXPERIENCE
 
@@ -55,13 +54,12 @@ Focus: Text/Images, English, Multiplayer
 - 1: Track story elements that a player has NOT been introduced to yet (don't show in ClientState)
 - 2: refactor templateRoutes -> route + AdminTemplateService + shared TemplateService
 - Retry mechanism for queue actions
-- Make sure that there are only 3 backgrounds per player / 3 options per beat
 - Check if ids actually exist when changes are proposed by the AI (e.g. outcome ID)
+- 2: rate limit via express-rate-limit library
 - Separate ui from business logic in client for game/page
 - for generation + iteration: generate a stats = Stat[] attribute where Stat includes a "shared" vs. "player" attribute. That way, the whole zod stuff doesn't have to be sent to the servers twice.
 - Move newMilestone changes to switch generation (away from beat generation)?
 - Add setup and deployment instructions
-- 1: zipTemplateUtils.ts still has a direct fetch command (instead of apiClient)
 
 # NOTES
 

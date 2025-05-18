@@ -3,52 +3,6 @@ import { StoryTemplate } from "core/types";
 import { Logger } from "shared/logger";
 
 /**
- * Import a ZIP file directly to a template (client-side)
- * @param token - Auth token
- * @param templateId - ID of the template
- * @param zipData - The ZIP file blob to upload
- * @param apiUrl - API URL (optional)
- */
-export const importTemplateZip = async (
-  token: string,
-  templateId: string,
-  zipData: Blob,
-  apiUrl: string
-): Promise<{ filesImported: number; files: string[] }> => {
-  const formData = new FormData();
-  formData.append("zip", zipData, "template-assets.zip");
-
-  const url = `${apiUrl}/admin/templates/${templateId}/import?requestId=${crypto.randomUUID()}`;
-
-  Logger.Admin.log(`Importing ZIP file to template ${templateId}`);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to import ZIP file to template: ${response.statusText}. ${errorText}`
-    );
-  }
-
-  const result = await response.json();
-  Logger.Admin.log(
-    `Successfully imported ${result.data.filesImported} files to template ${templateId}`
-  );
-
-  return {
-    filesImported: result.data.filesImported,
-    files: result.data.files || [],
-  };
-};
-
-/**
  * Create a ZIP with files from a specific template directory
  */
 export const createTemplateAssetsZip = async (

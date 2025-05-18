@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
 import JSZip from "jszip";
-import { API_CONFIG } from "client/config";
 import { notificationService } from "shared/notifications/notificationService";
 import {
   ImportDialogState,
@@ -13,10 +12,10 @@ import {
   ImportSummary,
 } from "../templateTypes";
 import {
-  importTemplateZip,
   createTemplateAssetsZip,
   createAssetZipFromFiles,
 } from "../utils/zipTemplateUtils";
+import { adminTemplateApi } from "../../adminApi";
 
 export const useTemplateImport = (
   templateProcessing: TemplateProcessing,
@@ -65,12 +64,7 @@ export const useTemplateImport = (
 
       // Import assets if there are any
       if (fileCount > 0) {
-        await importTemplateZip(
-          API_CONFIG.DEFAULT_API_URL,
-          createdTemplate.id,
-          zipBlob,
-          API_CONFIG.DEFAULT_API_URL
-        );
+        await adminTemplateApi.importTemplateZip(createdTemplate.id, zipBlob);
       }
 
       Logger.Admin.log(`Imported template: ${createdTemplate.title}`);
@@ -105,12 +99,7 @@ export const useTemplateImport = (
         zipData,
         templateDir
       );
-      await importTemplateZip(
-        API_CONFIG.DEFAULT_API_URL,
-        createdTemplate.id,
-        zipBlob,
-        API_CONFIG.DEFAULT_API_URL
-      );
+      await adminTemplateApi.importTemplateZip(createdTemplate.id, zipBlob);
     }
 
     return createdTemplate;
