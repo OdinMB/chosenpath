@@ -241,3 +241,16 @@ export interface GetAdminStoriesResponseData {
 }
 export interface GetAdminStoriesResponse
   extends SuccessResponse<GetAdminStoriesResponseData> {}
+
+// Add new DisplayableStoryPlayer interface
+export interface DisplayableStoryPlayer {
+  storyId: string;
+  playerSlot: string;
+  userId: string | null | undefined; // Allow null and undefined
+  code?: string;
+  username?: string;
+  isPending?: boolean;
+  isCurrentUser: boolean;
+  lastPlayedAt?: number | null; // Allow null
+  storyCreatedAt: number;
+}

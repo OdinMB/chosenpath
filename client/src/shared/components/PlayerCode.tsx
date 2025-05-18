@@ -3,7 +3,7 @@ import { Icons, Tooltip } from "components/ui";
 import { generateJoinLink } from "shared/utils/codeSetUtils";
 
 export interface PlayerCodeProps {
-  code: string;
+  code?: string;
   size?: "sm" | "md" | "lg";
   showCopyCode?: boolean;
   showShareLink?: boolean;
@@ -13,7 +13,6 @@ export interface PlayerCodeProps {
 export function PlayerCode({
   code,
   size = "md",
-  showCopyCode = true,
   showShareLink = true,
   label = null,
 }: PlayerCodeProps) {
@@ -58,12 +57,14 @@ export function PlayerCode({
 
   const sizeClasses = getSizeClasses();
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(code);
-    setCopiedItem("code");
-  };
+  // const handleCopyCode = () => {
+  //   if (!code) return;
+  //   navigator.clipboard.writeText(code);
+  //   setCopiedItem("code");
+  // };
 
   const handleCopyJoinLink = () => {
+    if (!code) return;
     const joinLink = generateJoinLink(code);
     navigator.clipboard.writeText(joinLink);
     setCopiedItem("link");
@@ -72,47 +73,51 @@ export function PlayerCode({
   return (
     <div className="flex items-center">
       {label && (
-        <span className="font-medium text-primary-600 mr-2">{label}:</span>
+        <span className="font-medium text-primary-600 mr-2">{label}</span>
       )}
-      <div
-        className={`${sizeClasses.container} ${sizeClasses.code} inline-flex items-center border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono`}
-      >
-        {code}
-      </div>
+      {code ? (
+        <div
+          className={`${sizeClasses.container} ${sizeClasses.code} inline-flex items-center border rounded-lg border-primary-100 bg-white text-primary shadow-sm font-mono`}
+        >
+          {code}
+        </div>
+      ) : null}
 
-      <div className="flex ml-2">
-        {showCopyCode && (
-          <Tooltip content="Copy code" position="top">
-            <button
-              onClick={handleCopyCode}
-              className={`text-primary-400 hover:text-primary-600 mr-1 ${sizeClasses.translateY}`}
-              aria-label="Copy code"
+      {code && (
+        <div className="flex ml-2">
+          {/* {showCopyCode && (
+            <Tooltip content="Copy code" position="top">
+              <button
+                onClick={handleCopyCode}
+                className={`text-primary-400 hover:text-primary-600 mr-1 ${sizeClasses.translateY}`}
+                aria-label="Copy code"
+              >
+                <Icons.Clipboard className={sizeClasses.icon} />
+              </button>
+            </Tooltip>
+          )} */}
+
+          {showShareLink && (
+            <Tooltip content="Copy join link" position="top">
+              <button
+                onClick={handleCopyJoinLink}
+                className={`text-primary-400 hover:text-primary-600 ${sizeClasses.translateY}`}
+                aria-label="Copy join link"
+              >
+                <Icons.Share className={sizeClasses.icon} />
+              </button>
+            </Tooltip>
+          )}
+
+          {copiedItem && (
+            <span
+              className={`ml-2 text-xs text-green-500 animate-fadeIn ${sizeClasses.translateY}`}
             >
-              <Icons.Clipboard className={sizeClasses.icon} />
-            </button>
-          </Tooltip>
-        )}
-
-        {showShareLink && (
-          <Tooltip content="Copy join link" position="top">
-            <button
-              onClick={handleCopyJoinLink}
-              className={`text-primary-400 hover:text-primary-600 ${sizeClasses.translateY}`}
-              aria-label="Copy join link"
-            >
-              <Icons.Share className={sizeClasses.icon} />
-            </button>
-          </Tooltip>
-        )}
-
-        {copiedItem && (
-          <span
-            className={`ml-2 text-xs text-green-500 animate-fadeIn ${sizeClasses.translateY}`}
-          >
-            Copied!
-          </span>
-        )}
-      </div>
+              Copied!
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

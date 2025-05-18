@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { useAuth } from "shared/useAuth";
 import { getResumableStories } from "shared/apiClient";
 import { getSortedCodeSets } from "shared/utils/codeSetUtils";
-import { ResumableStoryMetadata } from "core/types/api";
+import { StoredCodeSet } from "../SessionContext";
+import {
+  ResumableStoryMetadata,
+  ResumableStoryPlayer,
+  DisplayableStoryPlayer,
+} from "core/types/api";
 import { StoryCard } from "./StoryCard";
 import { Logger } from "shared/logger";
 import { useNavigate } from "react-router-dom";
-import { UserStoryCodeAssociation } from "core/types/api";
 
 interface ResumableStoriesProps {
-  onSetHasContent?: (hasContent: boolean) => void; // New prop
+  onSetHasContent?: (hasContent: boolean) => void;
 }
 
 export const ResumableStories: React.FC<ResumableStoriesProps> = ({
@@ -25,12 +29,12 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
     let didCancel = false;
 
     const determineAndFetch = async () => {
-      const localCodeSets = getSortedCodeSets();
-      const localStoryCodes = localCodeSets.flatMap((cs) =>
+      const localSets: StoredCodeSet[] = getSortedCodeSets();
+      const allFlattenedLocalCodes = localSets.flatMap((cs) =>
         cs.codes ? Object.values(cs.codes) : []
       );
 
-      if (!user && localStoryCodes.length === 0) {
+      if (!user && allFlattenedLocalCodes.length === 0) {
         if (didCancel) return;
         Logger.App.log(
           "ResumableStories: Unauthenticated and no local codes. No content."
@@ -48,7 +52,10 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
       try {
         const fetchedData = await getResumableStories({
           userId: user?.id,
-          storyCodes: localStoryCodes.length > 0 ? localStoryCodes : undefined,
+          storyCodes:
+            allFlattenedLocalCodes.length > 0
+              ? allFlattenedLocalCodes
+              : undefined,
         });
 
         if (didCancel) return;
@@ -75,7 +82,7 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
     return () => {
       didCancel = true;
     };
-  }, [user, isAuthenticated, onSetHasContent]); // Added isAuthenticated to dependencies
+  }, [user, isAuthenticated, onSetHasContent]);
 
   const handlePlay = (storyId: string, code?: string) => {
     Logger.App.log(`ResumableStories: Play story ${storyId} with code ${code}`);
@@ -115,33 +122,71 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
     );
   }
 
+  const allLocalCodeSets: StoredCodeSet[] = getSortedCodeSets();
+
   return (
     <div className="w-full space-y-4">
       {stories.map((story) => {
-        const storyCardPlayers: UserStoryCodeAssociation[] = story.players.map(
-          (p) => ({
-            storyId: p.storyId,
-            playerSlot: p.playerSlot,
-            code: p.code || "", // Ensure code is a string
-            userId: p.userId || "", // Ensure userId is a string
-            lastPlayedAt: p.lastPlayedAt,
-            isPending: p.isPending,
-            createdAt: p.lastPlayedAt || story.createdAt, // Fallback for createdAt
-            // Note: `username` from `ResumableStoryPlayer` is not part of `UserStoryCodeAssociation`
-            // StoryCard will need to be adapted to use this if it's passed separately or if its player type changes.
-          })
+        const allEffectivelyHeldCodes: string[] = allLocalCodeSets.flatMap(
+          (cs) => Object.values(cs.codes)
+        );
+
+        let isPlayer1SlotOverriddenForThisStory = false;
+        for (const localSet of allLocalCodeSets) {
+          if (Object.values(localSet.codes).length > 1) {
+            const localSetCodes = Object.values(localSet.codes);
+            const storyPlayerCodes = story.players
+              .map((player) => player.code)
+              .filter(Boolean) as string[];
+            if (
+              localSetCodes.some((localCode) =>
+                storyPlayerCodes.includes(localCode)
+              )
+            ) {
+              isPlayer1SlotOverriddenForThisStory = true;
+              break;
+            }
+          }
+        }
+
+        const displayPlayers: DisplayableStoryPlayer[] = story.players.map(
+          (p: ResumableStoryPlayer) => {
+            let isThisPlayerYou = false;
+            if (isPlayer1SlotOverriddenForThisStory) {
+              if (p.playerSlot === "player1") {
+                isThisPlayerYou = true;
+              } else {
+                isThisPlayerYou = !!(user && user.id && user.id === p.userId);
+              }
+            } else {
+              const isUserIdMatch = !!(user && user.id && user.id === p.userId);
+              const isCodeHeldLocally = !!(
+                p.code && allEffectivelyHeldCodes.includes(p.code)
+              );
+              isThisPlayerYou = isUserIdMatch || isCodeHeldLocally;
+            }
+
+            return {
+              storyId: p.storyId,
+              playerSlot: p.playerSlot,
+              userId: p.userId,
+              code: p.code,
+              username: p.username,
+              isPending: p.isPending,
+              isCurrentUser: isThisPlayerYou,
+              lastPlayedAt: p.lastPlayedAt,
+              storyCreatedAt: story.createdAt,
+            };
+          }
         );
 
         return (
           <StoryCard
             key={story.id}
             story={story}
-            players={storyCardPlayers}
+            players={displayPlayers}
             onPlay={handlePlay}
             showPlayButton={true}
-            // Pass down the original ResumableStoryPlayer array if StoryCard can use it for enriched display (e.g. usernames)
-            // For now, sticking to UserStoryCodeAssociation for the 'players' prop.
-            // We might need a new prop like `resumablePlayers={story.players}` for StoryCard to access usernames.
           />
         );
       })}

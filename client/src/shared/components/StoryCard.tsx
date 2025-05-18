@@ -1,14 +1,14 @@
 import { formatRelativeTime } from "../utils/timeUtils";
 import { CoverCard } from "./CoverCard";
 import { PrimaryButton, InfoIcon, ConfirmDialog, Icons, Tooltip } from "./ui";
-import { StoryMetadata, ResumableStoryPlayer } from "core/types/api";
+import { ResumableStoryMetadata, DisplayableStoryPlayer } from "core/types/api";
 import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "shared/useAuth";
 import { useState } from "react";
 
 type StoryCardProps = {
-  story: StoryMetadata;
-  players?: ResumableStoryPlayer[];
+  story: ResumableStoryMetadata;
+  players?: DisplayableStoryPlayer[];
   onPlay?: (storyId: string, code?: string) => void;
   onDelete?: (storyId: string) => void;
   showPlayButton?: boolean;
@@ -30,14 +30,27 @@ export const StoryCard = ({
   const { user } = useAuth();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
+  // Sort players: current user first, then by original order (or playerSlot for stability)
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.isCurrentUser && !b.isCurrentUser) {
+      return -1;
+    }
+    if (!a.isCurrentUser && b.isCurrentUser) {
+      return 1;
+    }
+    // Optional: secondary sort by playerSlot if names can be ambiguous or for stability
+    // return a.playerSlot.localeCompare(b.playerSlot);
+    return 0; // Keep original relative order for non-current users
+  });
+
   // Size-based class mapping
   const sizeClasses = {
     title: size === "large" ? "text-xl" : "text-lg",
     info: size === "large" ? "text-sm" : "text-xs",
   };
 
-  // User's own player entry from the ResumableStoryPlayer list
-  const userPlayer = players.find((p) => p.userId === user?.id);
+  // User's own player entry, now using isCurrentUser flag
+  const userPlayer = players.find((p) => p.isCurrentUser);
 
   // Format timestamps for the tooltip
   const lastPlayedTime = userPlayer?.lastPlayedAt
@@ -55,9 +68,6 @@ export const StoryCard = ({
 
   const handlePlay = () => {
     if (onPlay) {
-      // Pass the user's code if available and they are a player,
-      // otherwise, if only one code is visible, pass that.
-      // This might need more sophisticated logic if multiple codes are visible to a non-player user.
       const playCode =
         userPlayer?.code ||
         (players.filter((p) => p.code).length === 1
@@ -83,24 +93,16 @@ export const StoryCard = ({
   const imageSource = story.templateId ? "template" : "story";
   const imageSourceId = story.templateId || story.id;
 
-  // Filter players who have a code visible to the current user (code is now optional)
-  // The server already applies visibility rules to the `code` field.
-  const playersWithVisibleCode = players.filter(
-    (p) => typeof p.code === "string" && p.code !== ""
-  );
-
-  // Function to get label for a player code
-  // Now uses ResumableStoryPlayer which might have a username
-  const getPlayerCodeLabel = (player: ResumableStoryPlayer) => {
-    if (player.username) {
-      return player.userId === user?.id
-        ? `You (${player.username})`
-        : player.username;
-    }
-    if (player.userId === user?.id) {
+  // Updated getPlayerCodeLabel to use isCurrentUser and username
+  const getPlayerCodeLabel = (player: DisplayableStoryPlayer) => {
+    if (player.isCurrentUser) {
       return "You";
     }
-    return `Player ${player.playerSlot.replace("player", "")}`;
+    if (player.username) {
+      return player.username;
+    }
+    const playerNumber = player.playerSlot.replace("player", "");
+    return `Player ${playerNumber.trim()}`;
   };
 
   return (
@@ -124,11 +126,14 @@ export const StoryCard = ({
       >
         {/* --- Desktop: Title and Resume Button on one line --- */}
         <div className="hidden md:flex md:justify-between md:items-start mb-2">
-          <h3 className={`${sizeClasses.title} text-primary-800`}>
+          <h3 className={`${sizeClasses.title} text-primary-800 pr-2`}>
             {story.title}
           </h3>
           {showPlayButton && onPlay && (
-            <PrimaryButton onClick={handlePlay} className="ml-4 w-auto">
+            <PrimaryButton
+              onClick={handlePlay}
+              className="ml-4 w-auto flex-shrink-0"
+            >
               Resume
             </PrimaryButton>
           )}
@@ -163,24 +168,64 @@ export const StoryCard = ({
           </PrimaryButton>
         )}
 
-        {/* Display player codes / usernames */}
-        {playersWithVisibleCode.length > 0 && (
+        {/* Display player codes / usernames - iterate over ALL players */}
+        {players.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
-            {playersWithVisibleCode.map((player) => (
-              // player.code is now guaranteed to be a string here
-              <div key={player.playerSlot} className="flex items-center">
-                <PlayerCode
-                  code={player.code!}
-                  size="sm"
-                  label={getPlayerCodeLabel(player)}
-                />
-                {player.isPending && (
-                  <span className="ml-2 text-xs text-yellow-600 font-semibold">
-                    Pending
+            {sortedPlayers.map((player) => {
+              const isMultiplayerStory = story.players.length > 1;
+              const nameLabel = getPlayerCodeLabel(player);
+              const nameFontSizeClass =
+                nameLabel.length >= 8 ? "text-xs sm:text-sm" : "text-sm";
+
+              const isSomeoneElsePending =
+                isMultiplayerStory &&
+                story.players.some(
+                  (p) => p.isPending && p.playerSlot !== player.playerSlot
+                );
+              const showWaiting =
+                isMultiplayerStory &&
+                !player.isPending &&
+                (player.isCurrentUser ? isSomeoneElsePending : true);
+
+              return (
+                <div
+                  key={player.playerSlot}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 items-center"
+                >
+                  {/* Col 1: Player Name */}
+                  <span
+                    className={`font-medium text-primary-600 ${nameFontSizeClass} truncate`}
+                  >
+                    {nameLabel}
                   </span>
-                )}
-              </div>
-            ))}
+
+                  {/* Col 2: Status Text - responsive width, text-left */}
+                  <div className="text-xs text-left w-[70px]">
+                    {" "}
+                    {/* Consistent width for status column */}
+                    {isMultiplayerStory && player.isPending && (
+                      <span className="text-yellow-600 font-semibold">
+                        Pending
+                      </span>
+                    )}
+                    {showWaiting && (
+                      <span className="text-primary-500 font-semibold">
+                        Waiting
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Col 3: Code + Icons - wrapped for non-mobile left padding */}
+                  <div className="md:pl-2">
+                    <PlayerCode
+                      code={player.code}
+                      size="sm"
+                      showShareLink={!!player.code}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
