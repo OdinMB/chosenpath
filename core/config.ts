@@ -25,6 +25,7 @@ export const RATE_LIMITED_ACTIONS = [
   "join_game",
   "associate_story_code",
   "login",
+  "imageGeneration",
 ] as const;
 export type RateLimitedAction = (typeof RATE_LIMITED_ACTIONS)[number];
 
@@ -48,12 +49,12 @@ export const RATE_LIMITS: Record<
   // Game choices rate limiting
   make_choice: {
     windowMs: 30 * 1000, // 30 seconds
-    maxRequests: 6,
+    maxRequests: 4,
   },
   // Limit game join attempts
   join_game: {
     windowMs: 60 * 1000, // 1 minute
-    maxRequests: 30,
+    maxRequests: 5,
   },
   // Limit verify code attempts
   verify_code: {
@@ -67,8 +68,12 @@ export const RATE_LIMITS: Record<
   },
   // Limit login attempts
   login: {
-    windowMs: 3 * 60 * 1000, // 3 minutes
-    maxRequests: 5, // 5 attempts per 3 minutes
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    maxRequests: 50, // 50 attempts per 24 hours
+  },
+  imageGeneration: {
+    windowMs: 60 * 60 * 1000, // 1 hour
+    maxRequests: 50, // 50 attempts per 1 hour
   },
 };
 

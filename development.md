@@ -8,7 +8,7 @@ Smaller commits!
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
 - 1: delete codes on story generation any error (with deleteCodeSetsByContent(codes))
-- 2: protect image generation endpoints against abuse. CORS etc. enough?
+- 2: rate limit via express-rate-limit library
 
 # BETTER EXPERIENCE
 
