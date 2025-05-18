@@ -18,7 +18,7 @@ export function UserAccountHeader() {
 
   return (
     <>
-      <div className="bg-slate-50 border-b border-slate-200 px-4 py-1 text-sm">
+      <div className="bg-slate-50 border-b border-slate-200 px-4 py-1 text-sm mb-2">
         <div className="container mx-auto flex flex-wrap justify-end md:justify-center items-center space-x-4 h-auto md:h-8 min-h-[32px]">
           {isAuthenticated ? (
             <>

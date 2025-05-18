@@ -86,7 +86,7 @@ export function TableFilterSort<T>({
   return (
     <>
       {shouldRenderFilterUI && (
-        <div className="bg-white p-3 border border-gray-200 rounded-md mb-4 shadow-sm">
+        <div className="bg-white p-3 mb-4">
           <div className="flex flex-col md:flex-row md:justify-between gap-4">
             {/* Filter Controls */}
             {filterableColumns.length > 0 && (

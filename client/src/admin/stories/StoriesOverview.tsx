@@ -124,7 +124,7 @@ export const StoriesOverview = () => {
   });
 
   return (
-    <div className="bg-gray-50 pt-4 rounded-lg">
+    <div className="pt-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-secondary">Stored Stories</h2>
         <PrimaryButton

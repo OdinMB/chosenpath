@@ -88,6 +88,7 @@ export function Page() {
               <ResumableStories
                 key={user?.id || "loggedOut"}
                 onSetHasContent={handleResumableContent}
+                forceSingleColumn={true}
               />
               <OrDivider />
             </>

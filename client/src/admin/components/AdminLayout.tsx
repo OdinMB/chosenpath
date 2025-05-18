@@ -4,7 +4,7 @@ import { UserAccountHeader } from "users/components/UserAccountHeader";
 
 export function AdminLayout() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <UserAccountHeader />
       <AdminHeader />
       <div className="container mx-auto px-6 py-6">

@@ -14,10 +14,12 @@ import { useNavigate } from "react-router-dom";
 
 interface ResumableStoriesProps {
   onSetHasContent?: (hasContent: boolean) => void;
+  forceSingleColumn?: boolean;
 }
 
 export const ResumableStories: React.FC<ResumableStoriesProps> = ({
   onSetHasContent,
+  forceSingleColumn,
 }) => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -125,7 +127,14 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
   const allLocalCodeSets: StoredCodeSet[] = getSortedCodeSets();
 
   return (
-    <div className="w-full space-y-4">
+    <div
+      className={
+        "w-full space-y-4" +
+        (!forceSingleColumn
+          ? " md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
+          : "")
+      }
+    >
       {stories.map((story) => {
         const allEffectivelyHeldCodes: string[] = allLocalCodeSets.flatMap(
           (cs) => Object.values(cs.codes)

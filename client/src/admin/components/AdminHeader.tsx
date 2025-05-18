@@ -24,7 +24,7 @@ export const AdminHeader = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
+    <header className="">
       <div className="container mx-auto px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="w-24"></div> {/* Left spacer */}
