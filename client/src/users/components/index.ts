@@ -1,6 +1,6 @@
 export * from "./LoginForm";
 export * from "./RegisterForm";
-export * from "./UserAccountButton";
+export * from "./UserAccountHeader";
 export * from "./UserAccountModal";
 export * from "./UserAccountPage";
 export * from "./UserRouteGuard";

@@ -1,13 +1,11 @@
-import { PrimaryButton, Icons, Tabs } from "components/ui";
+import { Tabs } from "components/ui";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "shared/useAuth";
 
 type AdminTab = "templates" | "carousel" | "stories" | "users";
 
 export const AdminHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
 
   const tabItems = [
     { id: "templates" as AdminTab, label: "Templates" },
@@ -32,14 +30,7 @@ export const AdminHeader = () => {
           <div className="w-24"></div> {/* Left spacer */}
           <h1 className="text-2xl font-bold text-secondary">Admin</h1>
           <div className="w-24 flex justify-end">
-            <PrimaryButton
-              onClick={logout}
-              variant="outline"
-              size="sm"
-              leftIcon={<Icons.LogOut className="h-4 w-4" />}
-            >
-              Logout
-            </PrimaryButton>
+            {/* Logout Button Removed */}
           </div>
         </div>
       </div>

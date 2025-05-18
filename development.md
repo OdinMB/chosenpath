@@ -48,6 +48,7 @@ Focus: Text/Images, English, Multiplayer
 - 5: Credits system for generating stories
 - 15: Stripe integration
 - 15: System to view/navigate save files
+- 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images generated in template-based stories to the template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
 - 20: Use React routing for frontend
