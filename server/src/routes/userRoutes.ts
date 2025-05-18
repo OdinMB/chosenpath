@@ -35,6 +35,15 @@ import { API_CONFIG } from "server/config.js";
 
 const router = express.Router();
 
+// Password criteria utility functions (moved to top for clarity or can be in a shared util)
+const MIN_PASSWORD_LENGTH = 8;
+const hasMinLength = (pw: string) => pw.length >= MIN_PASSWORD_LENGTH;
+const hasLowercase = (pw: string) => /[a-z]/.test(pw);
+const hasUppercase = (pw: string) => /[A-Z]/.test(pw);
+const hasNumber = (pw: string) => /\d/.test(pw);
+const hasSpecialChar = (pw: string) =>
+  /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(pw); // Ensure this matches client's corrected version
+
 /**
  * Register a new user
  * POST /auth/register
@@ -58,11 +67,45 @@ router.post("/auth/register", async (req, res) => {
     return sendBadRequest(res, "Invalid email format", requestId);
   }
 
-  // Validate password strength
-  if (password.length < 8) {
+  // Updated password validation
+  const passwordCheck = {
+    minLength: hasMinLength(password),
+    lowercase: hasLowercase(password),
+    uppercase: hasUppercase(password),
+    number: hasNumber(password),
+    specialChar: hasSpecialChar(password),
+  };
+
+  const criteriaMetCount = [
+    passwordCheck.lowercase,
+    passwordCheck.uppercase,
+    passwordCheck.number,
+    passwordCheck.specialChar,
+  ].filter(Boolean).length;
+
+  if (!passwordCheck.minLength || criteriaMetCount < 3) {
+    // Construct a detailed message or a generic one
+    let errorDetail: string[] = [];
+    if (!passwordCheck.minLength)
+      errorDetail.push(`be at least ${MIN_PASSWORD_LENGTH} characters`);
+    if (criteriaMetCount < 3) {
+      let unmetSubCriteria: string[] = [];
+      if (!passwordCheck.lowercase) unmetSubCriteria.push("lowercase letter");
+      if (!passwordCheck.uppercase) unmetSubCriteria.push("uppercase letter");
+      if (!passwordCheck.number) unmetSubCriteria.push("number");
+      if (!passwordCheck.specialChar)
+        unmetSubCriteria.push("special character");
+      errorDetail.push(
+        `contain at least 3 of: ${unmetSubCriteria.slice(0, 2).join(", ")}${
+          unmetSubCriteria.length > 2 ? "..." : ""
+        }`
+      ); // Keep it concise
+    }
+
     return sendBadRequest(
       res,
-      "Password must be at least 8 characters long",
+      `Password must be 8+ characters and meet at least 3 of: lowercase, uppercase, number, or special character.`, // Generic message for client
+      // `Password validation failed: ${errorDetail.join('; ')}`, // More detailed message for server log or specific client needs
       requestId
     );
   }
@@ -73,15 +116,34 @@ router.post("/auth/register", async (req, res) => {
   } catch (error) {
     Logger.Route.error("User registration failed", error);
 
-    // Handle specific errors
     const errorMessage =
       error instanceof Error ? error.message : "Registration failed";
 
+    if (errorMessage === "Email already in use") {
+      return sendBadRequest(
+        res,
+        "Email already in use. Please choose a different email.",
+        requestId
+      );
+    }
+    if (errorMessage === "Username already taken") {
+      return sendBadRequest(
+        res,
+        "Username already taken. Please choose a different username.",
+        requestId
+      );
+    }
+    // For other "already" cases or generic failures
     if (errorMessage.includes("already")) {
       return sendBadRequest(res, errorMessage, requestId);
     }
 
-    return sendError(res, errorMessage, 500, requestId);
+    return sendError(
+      res,
+      "An unexpected error occurred during registration.",
+      500,
+      requestId
+    );
   }
 });
 
