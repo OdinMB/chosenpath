@@ -5,18 +5,14 @@ import {
   ResponseStatus,
   BaseServerResponse,
   ErrorResponse,
-  UserStoryCodesResponse,
-  UserStoriesResponse,
   CreateStoryRequest,
   CreateStoryResponse,
   CreateStoryFromTemplateRequest,
   RateLimitedResponse,
   ModerationBlockedResponse,
   CreateStoryInfo,
-  GetResumableStoriesRequest,
-  ResumableStoryMetadata,
-  UserStoryCountsResponse,
-  UserStoryCounts,
+  ExtendedStoryMetadata,
+  GetUserStoryFeedResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -164,14 +160,6 @@ axiosInstance.interceptors.response.use(
       "status" in response.data &&
       response.data.status === ResponseStatus.SUCCESS
     ) {
-      const apiResponse = response.data as BaseServerResponse;
-      Logger.API?.debug?.(
-        `API Response status: ${apiResponse.status}, Data: ${JSON.stringify(
-          apiResponse
-        ).substring(0, 500)}${
-          JSON.stringify(apiResponse).length > 500 ? "..." : ""
-        }`
-      );
       Logger.API?.debug?.(
         `Transformed data (SUCCESS): ${JSON.stringify(
           response.data.data
@@ -335,44 +323,21 @@ export const apiClient = axiosInstance as unknown as TransformedApiClient;
 // User story API functions
 export const userStoriesApi = {
   /**
-   * Get all story codes associated with the current user
+   * Get the story feed for the current user and/or specified story codes.
+   * @param clientStoryCodes Optional array of story codes (story IDs) to fetch.
    */
-  getStoryCodes: async (): Promise<UserStoryCodesResponse> => {
-    // Interceptor unwraps SuccessResponse<T> to T. UserStoryCodesResponse is already the payload T.
-    return axiosInstance.get<UserStoryCodesResponse>(
-      "/users/story-codes"
-    ) as any;
-  },
-
-  /**
-   * Get all stories created by the current user
-   */
-  getUserStories: async (): Promise<UserStoriesResponse> => {
-    return axiosInstance.get<UserStoriesResponse>("/users/stories") as any;
-  },
-
-  /**
-   * Get all stories where the current user is a player (has a code)
-   */
-  getPlayerStories: async (): Promise<UserStoriesResponse> => {
-    return axiosInstance.get<UserStoriesResponse>(
-      "/users/player-stories"
-    ) as any;
-  },
-
-  /**
-   * Get all stories related to the current user (both as creator and player)
-   */
-  getAllUserStories: async (): Promise<UserStoriesResponse> => {
-    return axiosInstance.get<UserStoriesResponse>("/users/all-stories") as any;
-  },
-
-  getUserStoryCounts: async (): Promise<{ counts: UserStoryCounts }> => {
-    // UserStoryCountsResponse is SuccessResponse<{ counts: UserStoryCounts }>
-    // Interceptor unwraps this to { counts: UserStoryCounts }
-    return axiosInstance.get<UserStoryCountsResponse>(
-      "/users/story-counts"
-    ) as any;
+  getUserStoryFeed: async (
+    clientStoryCodes?: string[]
+  ): Promise<{ stories: ExtendedStoryMetadata[] }> => {
+    let url = "/users/stories/feed";
+    if (clientStoryCodes && clientStoryCodes.length > 0) {
+      const params = new URLSearchParams();
+      params.append("clientStoryCodes", clientStoryCodes.join(","));
+      url += `?${params.toString()}`;
+    }
+    // apiClient.get<T> is typed to return Promise<T> (the unwrapped data from the interceptor).
+    // We want T to be GetUserStoryFeedResponse['data'], which is { stories: ExtendedStoryMetadata[] }.
+    return apiClient.get<GetUserStoryFeedResponse["data"]>(url);
   },
 };
 
@@ -423,11 +388,4 @@ export const templateApi = {
     );
     return response.template;
   },
-};
-
-// Method to get resumable stories
-export const getResumableStories = async (
-  params: GetResumableStoriesRequest
-): Promise<ResumableStoryMetadata[]> => {
-  return apiClient.post<ResumableStoryMetadata[]>("/stories/resumable", params);
 };

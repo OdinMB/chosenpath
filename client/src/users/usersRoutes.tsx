@@ -4,7 +4,6 @@ import { UserAccountPage } from "./components/UserAccountPage";
 import { UsersLayout } from "./components/UsersLayout";
 import { UserRouteGuard } from "./components/UserRouteGuard";
 import { UsersErrorBoundary } from "./components/UsersErrorBoundary";
-import { userStoriesLoader } from "./usersLoader";
 
 export const userRoutes: RouteObject[] = [
   {
@@ -23,7 +22,6 @@ export const userRoutes: RouteObject[] = [
       {
         path: "my-stories",
         element: <Users />,
-        loader: userStoriesLoader, // Add the loader here
         id: "user-stories",
       },
       // You can add other user-specific child routes here, e.g., account settings

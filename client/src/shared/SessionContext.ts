@@ -1,21 +1,19 @@
 import { createContext } from "react";
-
-export type StoredCodeSet = {
-  codes: Record<string, string>;
-  timestamp: number;
-  title?: string;
-  lastActive: boolean;
-};
+import { ExtendedStoryMetadata } from "core/types/api.js";
 
 export type SessionContextType = {
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
-  // Stored code sets
-  storedCodeSets: StoredCodeSet[];
+  // Stored code sets - now an array of string arrays
+  storedCodeSets: string[][];
   refreshStoredCodeSets: () => void;
-  deleteCodeSet: (timestamp: number) => void;
+  deleteCodeSet: (codeSetToRemove: string[]) => void; // Parameter changed to string[]
+  // New story feed properties
+  storyFeed: Record<string, ExtendedStoryMetadata>;
+  fetchStoryFeed: () => Promise<void>;
+  clearStoryFeed: () => void;
 };
 
 export const SessionContext = createContext<SessionContextType>({
@@ -23,7 +21,11 @@ export const SessionContext = createContext<SessionContextType>({
   setSessionId: () => {},
   isLoading: false,
   setIsLoading: () => {},
-  storedCodeSets: [],
+  storedCodeSets: [], // Default to empty array of arrays
   refreshStoredCodeSets: () => {},
-  deleteCodeSet: () => {},
+  deleteCodeSet: () => {}, // Parameter changed
+  // Default values for new story feed properties
+  storyFeed: {},
+  fetchStoryFeed: async () => {},
+  clearStoryFeed: () => {},
 });

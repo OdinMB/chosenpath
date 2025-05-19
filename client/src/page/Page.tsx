@@ -8,12 +8,12 @@ import { useNewsletter } from "shared/hooks/useNewsletter";
 import { NewsletterButton, NewsletterModal } from "shared/components";
 import { ResumableStories } from "shared/components/ResumableStories";
 import { useAuth } from "shared/useAuth";
+import { Logger } from "shared/logger";
 
 // Page component refactored to use React Router
 export function Page() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  console.log("Page: Render - user.id from useAuth():", user?.id);
   const [code, setCode] = useState("");
   const {
     isNewsletterModalOpen,
@@ -27,16 +27,21 @@ export function Page() {
 
   useEffect(() => {
     const currentUserId = user?.id;
-    // Only reset if the userId has actually changed from one distinct state to another
     if (previousUserIdRef.current !== currentUserId) {
+      Logger.App.debug(
+        `Page.tsx: User changed (effect). Prev: ${previousUserIdRef.current}, Curr: ${currentUserId}. Forcing showResumableSection to true.`
+      );
       setShowResumableSection(true);
     }
     previousUserIdRef.current = currentUserId;
   }, [user?.id]);
 
-  const handleResumableContent = useCallback((hasContent: boolean) => {
-    setShowResumableSection(hasContent);
-  }, []);
+  const handleResumableContent = useCallback(
+    (hasContent: boolean) => {
+      setShowResumableSection(hasContent);
+    },
+    [setShowResumableSection]
+  );
 
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();

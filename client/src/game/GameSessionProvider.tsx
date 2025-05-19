@@ -5,7 +5,6 @@ import type {
   RateLimitInfo,
 } from "core/types";
 import { wsService } from "./WebSocketService.js";
-import { updateStoredSetWithCode } from "../shared/utils/codeSetUtils.js";
 import { Logger } from "../shared/logger.js";
 import { useSession } from "../shared/useSession.js";
 import { GameSessionContext } from "./GameSessionContext";
@@ -182,22 +181,13 @@ export function GameSessionProvider({
         if ("data" in data && data.data.state) {
           setStoryState(data.data.state);
           setIsLoading(false);
-          // setIsConnecting(false); // No longer needed here
+          // setIsConnecting(false); // Ensure this is correctly handled if needed elsewhere
 
-          // Try to find the player role from the data directly or compute it
-          let playerRole = "player1"; // Default fallback
-          if (data.data.state.players) {
-            // Find the first and only player in ClientStoryState
-            const playerKeys = Object.keys(data.data.state.players);
-            if (playerKeys.length > 0) {
-              playerRole = playerKeys[0];
-            }
-          }
-
-          const title = data.data.state.title;
-
-          // Store or update the code
-          updateStoredSetWithCode(data.data.code, playerRole, title, true);
+          // The logic to store the code (data.data.code) has been moved to GamePage.tsx
+          // It will use addCodeSetToStorage([joinCodeFromUrlParams]) after storyState is set.
+          // No need to call updateStoredSetWithCode or similar here anymore.
+          // Example: data.data.code is the verified code, data.data.state.title is available.
+          // GamePage will use the joinCode from URL params to store.
         } else if ("errorMessage" in data) {
           logger.info(
             "[GameSessionProvider] Code verification failed:",

@@ -2,37 +2,44 @@ import { useAuth } from "shared/useAuth";
 import { useUserAccountModal } from "../hooks/useUserAccountModal.js";
 import { useNavigate } from "react-router-dom";
 import { Icons } from "../../shared/components/ui/Icons";
-import { useEffect, useState } from "react";
-import { usersApi } from "../usersApi";
-import { UserStoryCounts } from "core/types/api";
+import { useMemo } from "react";
+import { useSession } from "shared/useSession";
+import { ExtendedStoryMetadata } from "core/types/api";
 
 export function UserAccountHeader() {
-  const { user, isAuthenticated, logout, isLoading: authIsLoading } = useAuth(); // Renamed isLoading to authIsLoading to avoid conflict
+  const { user, isAuthenticated, logout, isLoading: authIsLoading } = useAuth();
   const { openLoginModal, AccountModal } = useUserAccountModal();
   const navigate = useNavigate();
+  const { storyFeed, isLoading: isSessionLoading } = useSession();
 
-  const [storyCounts, setStoryCounts] = useState<UserStoryCounts | null>(null);
-  const [isLoadingCounts, setIsLoadingCounts] = useState(false);
+  const derivedCounts = useMemo(() => {
+    const counts = {
+      singlePlayerActiveCount: 0,
+      multiPlayerActiveCount: 0,
+      multiPlayerPendingCount: 0,
+    };
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      setIsLoadingCounts(true);
-      usersApi
-        .getUserStoryCounts()
-        .then((counts) => {
-          setStoryCounts(counts);
-        })
-        .catch((error) => {
-          console.error("Failed to fetch story counts:", error);
-          setStoryCounts(null); // Clear counts on error
-        })
-        .finally(() => {
-          setIsLoadingCounts(false);
-        });
-    } else {
-      setStoryCounts(null); // Clear counts if not authenticated
+    if (!isAuthenticated || !user || Object.keys(storyFeed).length === 0) {
+      return counts;
     }
-  }, [isAuthenticated, user]);
+
+    Object.values(storyFeed).forEach((story: ExtendedStoryMetadata) => {
+      if (story.players.length === 1) {
+        counts.singlePlayerActiveCount++;
+      } else {
+        counts.multiPlayerActiveCount++;
+
+        const playerEntryForCurrentUser = story.players.find(
+          (p) => p.isCurrentUser
+        );
+        if (playerEntryForCurrentUser && playerEntryForCurrentUser.isPending) {
+          counts.multiPlayerPendingCount++;
+        }
+      }
+    });
+
+    return counts;
+  }, [storyFeed, user, isAuthenticated]);
 
   const handleLogout = async () => {
     await logout();
@@ -78,55 +85,55 @@ export function UserAccountHeader() {
                 My Stories
               </button>
               {/* Story Counts Display */}
-              {!isLoadingCounts && storyCounts && (
+              {!isSessionLoading && derivedCounts && (
                 <div className="flex items-center text-slate-700">
                   {/* Single-player stories */}
                   <div
                     className="flex items-center -ml-1 mr-2 border border-slate-300 rounded-md px-1"
                     title={`${
-                      storyCounts.singlePlayerActiveCount
+                      derivedCounts.singlePlayerActiveCount
                     } single-player ${
-                      storyCounts.singlePlayerActiveCount === 1
+                      derivedCounts.singlePlayerActiveCount === 1
                         ? "story"
                         : "stories"
                     }`}
                   >
                     <Icons.User className="h-4 w-4 mr-0.5 p-[1px]" />
-                    <span>{storyCounts.singlePlayerActiveCount}</span>
+                    <span>{derivedCounts.singlePlayerActiveCount}</span>
                   </div>
 
                   {/* Multi-player stories */}
                   <div
                     className="flex items-center border border-slate-300 rounded-md px-1 -ml-1"
                     title={`${
-                      storyCounts.multiPlayerActiveCount
+                      derivedCounts.multiPlayerActiveCount
                     } multi-player ${
-                      storyCounts.multiPlayerActiveCount === 1
+                      derivedCounts.multiPlayerActiveCount === 1
                         ? "story"
                         : "stories"
                     }${
-                      storyCounts.multiPlayerPendingCount > 0
-                        ? `, ${storyCounts.multiPlayerPendingCount} pending your action`
+                      derivedCounts.multiPlayerPendingCount > 0
+                        ? `, ${derivedCounts.multiPlayerPendingCount} pending your action`
                         : ""
                     }`}
                   >
                     <Icons.Users className="h-4 w-4" />
-                    {storyCounts.multiPlayerPendingCount > 0 && (
+                    {derivedCounts.multiPlayerPendingCount > 0 && (
                       <NotificationBadge
-                        count={storyCounts.multiPlayerPendingCount}
+                        count={derivedCounts.multiPlayerPendingCount}
                       />
                     )}
-                    {storyCounts.multiPlayerPendingCount > 0 && (
+                    {derivedCounts.multiPlayerPendingCount > 0 && (
                       <span className="mx-0.5">/</span>
                     )}
                     <span
                       className={`${
-                        storyCounts.multiPlayerPendingCount > 0
+                        derivedCounts.multiPlayerPendingCount > 0
                           ? "ml-0"
                           : "ml-1"
                       }`}
                     >
-                      {storyCounts.multiPlayerActiveCount}
+                      {derivedCounts.multiPlayerActiveCount}
                     </span>
                   </div>
                 </div>

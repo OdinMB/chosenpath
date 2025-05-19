@@ -12,6 +12,7 @@ import { NotificationProvider } from "./shared/NotificationContext";
 import { NotificationDisplay } from "./shared/notifications/NotificationDisplay";
 import { SessionProvider } from "./shared/SessionProvider";
 import { AuthProvider } from "./shared/AuthContext";
+import { AppInitializer } from "./shared/AppInitializer";
 
 // Combine all routes
 const router = createBrowserRouter([
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <NotificationProvider>
       <SessionProvider>
         <AuthProvider>
+          <AppInitializer />
           <Suspense fallback={<LoadingSpinner size="large" />}>
             <RouterProvider router={router} />
           </Suspense>

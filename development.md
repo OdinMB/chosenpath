@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
+- 2: Check if verifyUser variations return the user id, and if malicious requests could just claim to be a different user and then be verified as A user
 - 2: Generate images for AI-generated stories
-- 2: Show # MP stories in which user is pending.
 - 1: Check issue with image references in interludes
 
 # BETTER EXPERIENCE

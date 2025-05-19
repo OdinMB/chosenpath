@@ -1,24 +1,12 @@
 import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
 import {
-  UserStoryCodeAssociation,
   StoryMetadata,
   ExtendedStoryMetadata,
   StoryPlayerEntry,
-  UserStoryCounts,
 } from "core/types/api.js";
 
-// DB Row Types now reflect snake_case from the database
-interface UserStoryCodeDbRow {
-  user_id: string;
-  story_id: string;
-  player_slot: string;
-  code: string;
-  created_at: string;
-  last_played_at: string | null;
-  is_pending: boolean;
-}
-
+// DB Row Types for StoryMetadata and StoryPlayerEntry (if still needed by getStoryFeed or other functions)
 interface StoryMetadataDbRow {
   id: string;
   title: string;
@@ -40,6 +28,7 @@ interface StoryPlayerEntryDbRow {
   is_pending: boolean;
 }
 
+// Interface for StoryPlayerDetail (used by getStoryPlayerByCode)
 interface StoryPlayerDetailDbRow {
   story_id: string;
   player_slot: string;
@@ -50,7 +39,6 @@ interface StoryPlayerDetailDbRow {
 }
 
 interface StoryPlayerDetail {
-  // DTO remains camelCase
   storyId: string;
   playerSlot: string;
   code: string;
@@ -59,64 +47,175 @@ interface StoryPlayerDetail {
   lastPlayedAt: number | null;
 }
 
-// For the ad-hoc return type of getStoryPlayerByCode (camelCase DTO-like structure)
-interface StoryPlayerDetail {
-  storyId: string;
-  playerSlot: string;
-  code: string;
-  userId: string | null;
-  createdAt: number; // from stories table
-  lastPlayedAt: number | null; // from story_players table
+// DB Row Types for combined query
+interface StoryFeedDbRow {
+  id: string;
+  title: string;
+  template_id?: string;
+  created_at: string; // story.created_at
+  updated_at: string; // story.updated_at
+  max_turns: number;
+  generate_images: boolean;
+  creator_id: string | null;
+  current_beat: number;
+  // Player fields (can be null if a story has no players or if LEFT JOIN doesn't match)
+  sp_story_id: string | null;
+  sp_player_slot: string | null;
+  sp_code: string | null;
+  sp_user_id: string | null;
+  sp_last_played_at: string | null;
+  sp_is_pending: boolean | null;
+  sp_username: string | null; // Added for player username
 }
 
 /**
- * Get all story codes associated with a user
+ * New consolidated function to get all relevant story data for a user or codes.
  */
-export async function getUserStoryCodes(
-  userId: string
-): Promise<UserStoryCodeAssociation[]> {
-  try {
-    const pool = getDb();
-    const result = await pool.query<UserStoryCodeDbRow>(
-      `SELECT 
-        $1 AS user_id, 
-        sp.story_id, 
-        sp.player_slot, 
-        sp.code, 
-        s.created_at, 
-        sp.last_played_at,
-        sp.is_pending
-       FROM story_players sp
-       JOIN stories s ON sp.story_id = s.id
-       WHERE sp.user_id = $2
-       ORDER BY sp.last_played_at DESC NULLS LAST`, // Added NULLS LAST for robust sorting
-      [userId, userId]
+export async function getStoryFeed(
+  authUserId?: string,
+  clientPlayerCodes?: string[]
+): Promise<ExtendedStoryMetadata[]> {
+  const pool = getDb();
+  const finalQueryParams: (string | string[])[] = [];
+  const unionClauses: string[] = [];
+
+  let paramIdx = 1;
+  if (authUserId) {
+    finalQueryParams.push(authUserId);
+    unionClauses.push(
+      `SELECT id as story_id FROM stories WHERE creator_id = $${paramIdx}`
     );
-    return result.rows.map((row) => {
+    unionClauses.push(
+      `SELECT story_id FROM story_players WHERE user_id = $${paramIdx}`
+    );
+    paramIdx++;
+  }
+  if (clientPlayerCodes && clientPlayerCodes.length > 0) {
+    finalQueryParams.push(clientPlayerCodes);
+    unionClauses.push(
+      `SELECT story_id FROM story_players WHERE code = ANY($${paramIdx}::TEXT[])`
+    );
+    paramIdx++;
+  }
+
+  if (unionClauses.length === 0) {
+    Logger.Route.log(
+      "getStoryFeed: No authUserId or clientPlayerCodes provided. Returning empty array."
+    );
+    return [];
+  }
+
+  const ctes = `WITH RelevantStoryIDs AS (
+    ${unionClauses.join(
+      " UNION \n    " /* Each UNION clause on a new line for readability */
+    )}
+  )
+  `;
+
+  const baseQuery = `
+    ${ctes}
+    SELECT
+      s.id,
+      s.title,
+      s.template_id,
+      s.created_at,
+      s.updated_at,
+      s.max_turns,
+      s.generate_images,
+      s.creator_id,
+      s.current_beat,
+      sp.story_id as sp_story_id,
+      sp.player_slot as sp_player_slot,
+      sp.code as sp_code,
+      sp.user_id as sp_user_id,
+      sp.last_played_at as sp_last_played_at,
+      sp.is_pending as sp_is_pending,
+      u.username as sp_username
+    FROM stories s
+    JOIN RelevantStoryIDs rsi ON s.id = rsi.story_id
+    LEFT JOIN story_players sp ON s.id = sp.story_id
+    LEFT JOIN users u ON sp.user_id = u.id
+    ORDER BY s.updated_at DESC, s.id, sp.player_slot;
+  `;
+
+  Logger.Route.log(
+    `Executing getStoryFeed query: ${baseQuery
+      .replace(/\s+/g, " ")
+      .trim()} with params: ${JSON.stringify(finalQueryParams)}`
+  );
+
+  const result = await pool.query<StoryFeedDbRow>(baseQuery, finalQueryParams);
+  Logger.Route.log(`getStoryFeed query returned ${result.rowCount} rows.`);
+
+  const storiesMap: Map<string, ExtendedStoryMetadata> = new Map();
+
+  result.rows.forEach((row) => {
+    let story = storiesMap.get(row.id);
+    if (!story) {
       const createdAtNum = parseInt(row.created_at, 10);
-      const lastPlayedAtNum = row.last_played_at
-        ? parseInt(row.last_played_at, 10)
-        : null;
-      return {
-        userId: row.user_id,
-        storyId: row.story_id,
-        playerSlot: row.player_slot,
-        code: row.code,
+      const updatedAtNum = parseInt(row.updated_at, 10);
+      story = {
+        id: row.id,
+        title: row.title,
+        templateId: row.template_id,
         createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
+        updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
+        maxTurns: row.max_turns,
+        generateImages: row.generate_images,
+        creatorId: row.creator_id,
+        currentBeat: row.current_beat,
+        players: [],
+      };
+      storiesMap.set(row.id, story);
+    }
+
+    if (row.sp_story_id) {
+      const lastPlayedAtNum = row.sp_last_played_at
+        ? parseInt(row.sp_last_played_at, 10)
+        : null;
+      const isCurrentUsersPlayerEntry = authUserId
+        ? row.sp_user_id === authUserId
+        : false;
+
+      // Determine if the code should be included
+      let shouldIncludeCode = false;
+      if (authUserId === row.creator_id || isCurrentUsersPlayerEntry) {
+        shouldIncludeCode = true;
+      } else if (
+        clientPlayerCodes &&
+        row.sp_code &&
+        clientPlayerCodes.includes(row.sp_code)
+      ) {
+        shouldIncludeCode = true;
+      }
+
+      const playerEntry: StoryPlayerEntry = {
+        storyId: row.sp_story_id,
+        playerSlot: row.sp_player_slot!,
+        code: shouldIncludeCode ? row.sp_code || undefined : undefined,
+        userId: row.sp_user_id,
         lastPlayedAt:
           lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
             ? null
             : lastPlayedAtNum,
+        isPending: row.sp_is_pending || false,
+        isCurrentUser: isCurrentUsersPlayerEntry,
+        username: row.sp_username || undefined,
       };
-    });
-  } catch (error) {
-    Logger.Route.error(`Failed to get story codes for user ${userId}`, error);
-    throw new Error("Failed to retrieve user story codes");
-  }
+      // Ensure player is not added multiple times if story appears due to multiple reasons in CTE (though JOIN rsi should handle distinct stories)
+      if (!story.players.find((p) => p.playerSlot === playerEntry.playerSlot)) {
+        story.players.push(playerEntry);
+      }
+    }
+  });
+
+  const extendedStories = Array.from(storiesMap.values());
+  Logger.Route.log(`Returning ${extendedStories.length} stories in feed.`);
+  return extendedStories;
 }
 
 /**
- * Get story player details by code
+ * Get story player details by code (Kept for potential use by game joining logic)
  */
 export async function getStoryPlayerByCode(
   code: string
@@ -162,255 +261,7 @@ export async function getStoryPlayerByCode(
 }
 
 /**
- * Get all stories related to a user (both as creator and as player)
- */
-export async function getAllUserRelatedStories(
-  userId: string
-): Promise<ExtendedStoryMetadata[]> {
-  try {
-    const pool = getDb();
-
-    const createdStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat
-       FROM stories WHERE creator_id = $1`,
-      [userId]
-    );
-    const createdStories: StoryMetadata[] = createdStoriesResult.rows.map(
-      (row) => {
-        const createdAtNum = parseInt(row.created_at, 10);
-        const updatedAtNum = parseInt(row.updated_at, 10);
-        return {
-          id: row.id,
-          title: row.title,
-          templateId: row.template_id,
-          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
-          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.max_turns,
-          generateImages: row.generate_images,
-          creatorId: row.creator_id,
-          currentBeat: row.current_beat,
-        };
-      }
-    );
-    Logger.Route.log(`Created stories: ${createdStories.length}`);
-
-    const playedStoriesResult = await pool.query<StoryMetadataDbRow>(
-      `SELECT DISTINCT s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id, s.current_beat,
-        sp.last_played_at AS sp_last_played_at_for_ordering,
-        sp.is_pending
-       FROM stories s
-       JOIN story_players sp ON s.id = sp.story_id
-       WHERE sp.user_id = $1 AND (s.creator_id IS NULL OR s.creator_id != $2)
-       ORDER BY sp_last_played_at_for_ordering DESC NULLS LAST`,
-      [userId, userId]
-    );
-    const playedStories: StoryMetadata[] = playedStoriesResult.rows.map(
-      (row) => {
-        const createdAtNum = parseInt(row.created_at, 10);
-        const updatedAtNum = parseInt(row.updated_at, 10);
-        return {
-          id: row.id,
-          title: row.title,
-          templateId: row.template_id,
-          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
-          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.max_turns,
-          generateImages: row.generate_images,
-          creatorId: row.creator_id,
-          currentBeat: row.current_beat,
-        };
-      }
-    );
-    Logger.Route.log(`Played stories: ${playedStories.length}`);
-
-    const stories: StoryMetadata[] = [...createdStories, ...playedStories];
-    const createdStoryIds = new Set(createdStories.map((s) => s.id));
-    const extendedStories: ExtendedStoryMetadata[] = [];
-
-    for (const story of stories) {
-      const isCreator = createdStoryIds.has(story.id);
-      let playersDto: StoryPlayerEntry[];
-
-      if (isCreator) {
-        const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT story_id, player_slot, code, user_id, last_played_at, is_pending
-           FROM story_players WHERE story_id = $1 ORDER BY player_slot`,
-          [story.id]
-        );
-        playersDto = playersResult.rows.map((prow) => {
-          const lastPlayedAtNum = prow.last_played_at
-            ? parseInt(prow.last_played_at, 10)
-            : null;
-          return {
-            storyId: prow.story_id,
-            playerSlot: prow.player_slot,
-            code: prow.code,
-            userId: prow.user_id,
-            lastPlayedAt:
-              lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
-                ? null
-                : lastPlayedAtNum,
-            isPending: prow.is_pending,
-          };
-        });
-      } else {
-        const playersResult = await pool.query<StoryPlayerEntryDbRow>(
-          `SELECT story_id, player_slot, code, user_id, last_played_at, is_pending
-           FROM story_players WHERE story_id = $1 AND user_id = $2 ORDER BY player_slot`,
-          [story.id, userId]
-        );
-        playersDto = playersResult.rows.map((prow) => {
-          const lastPlayedAtNum = prow.last_played_at
-            ? parseInt(prow.last_played_at, 10)
-            : null;
-          return {
-            storyId: prow.story_id,
-            playerSlot: prow.player_slot,
-            code: prow.code,
-            userId: prow.user_id,
-            lastPlayedAt:
-              lastPlayedAtNum === null || isNaN(lastPlayedAtNum)
-                ? null
-                : lastPlayedAtNum,
-            isPending: prow.is_pending,
-          };
-        });
-      }
-      extendedStories.push({
-        ...story,
-        players: playersDto || [],
-      });
-    }
-
-    const allStoryIds = extendedStories.map((s) => s.id);
-    const lastPlayedMap: Record<string, number> = {};
-
-    if (allStoryIds.length > 0) {
-      const lastPlayedTimesResult = await pool.query<{
-        story_id: string; // snake_case
-        last_played: string | null; // snake_case
-      }>(
-        `SELECT story_id, MAX(last_played_at) as last_played
-         FROM story_players WHERE story_id = ANY($1::TEXT[]) GROUP BY story_id`,
-        [allStoryIds]
-      );
-      for (const record of lastPlayedTimesResult.rows) {
-        if (record.last_played !== null) {
-          // snake_case
-          const lastPlayedNum = parseInt(record.last_played, 10); // snake_case
-          if (!isNaN(lastPlayedNum)) {
-            lastPlayedMap[record.story_id] = lastPlayedNum; // snake_case
-          }
-        }
-      }
-    }
-
-    extendedStories.sort((a, b) => {
-      const aLastPlayed = lastPlayedMap[a.id] || a.updatedAt;
-      const bLastPlayed = lastPlayedMap[b.id] || b.updatedAt;
-      return bLastPlayed - aLastPlayed;
-    });
-
-    Logger.Route.log(
-      `getAllUserRelatedStories for user ${userId}: Found ${
-        extendedStories.length || 0
-      } stories`
-    );
-    if (extendedStories.length > 0) {
-      const storyIdsToLog = extendedStories.map((s) => s.id).join(", ");
-      Logger.Route.log(`Story IDs: ${storyIdsToLog}`);
-    }
-    return extendedStories;
-  } catch (error) {
-    Logger.Route.error(
-      `Failed to get related stories for user ${userId}`,
-      error
-    );
-    throw new Error("Failed to retrieve user's related stories");
-  }
-}
-
-/**
- * Get all stories created by a user
- */
-export async function getUserStories(userId: string): Promise<StoryMetadata[]> {
-  try {
-    const pool = getDb();
-    const result = await pool.query<StoryMetadataDbRow>(
-      `SELECT 
-        id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat
-       FROM stories 
-       WHERE creator_id = $1
-       ORDER BY updated_at DESC`,
-      [userId]
-    );
-
-    return (
-      result.rows.map((row) => {
-        const createdAtNum = parseInt(row.created_at, 10);
-        const updatedAtNum = parseInt(row.updated_at, 10);
-        return {
-          id: row.id,
-          title: row.title,
-          templateId: row.template_id,
-          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
-          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.max_turns,
-          generateImages: row.generate_images,
-          creatorId: row.creator_id,
-          currentBeat: row.current_beat,
-        };
-      }) || []
-    );
-  } catch (error) {
-    Logger.Route.error(`Failed to get stories for user ${userId}`, error);
-    throw new Error("Failed to retrieve user stories");
-  }
-}
-
-/**
- * Get stories where the user is a player
- */
-export async function getStoriesWithUser(
-  userId: string
-): Promise<StoryMetadata[]> {
-  try {
-    const pool = getDb();
-    const result = await pool.query<StoryMetadataDbRow>(
-      `SELECT DISTINCT
-        s.id, s.title, s.template_id, s.created_at, s.updated_at, s.max_turns, s.generate_images, s.creator_id, s.current_beat
-       FROM stories s
-       JOIN story_players sp ON s.id = sp.story_id
-       WHERE sp.user_id = $1
-       ORDER BY sp.last_played_at DESC NULLS LAST`, // Added NULLS LAST
-      [userId]
-    );
-
-    return (
-      result.rows.map((row) => {
-        const createdAtNum = parseInt(row.created_at, 10);
-        const updatedAtNum = parseInt(row.updated_at, 10);
-        return {
-          id: row.id,
-          title: row.title,
-          templateId: row.template_id,
-          createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
-          updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
-          maxTurns: row.max_turns,
-          generateImages: row.generate_images,
-          creatorId: row.creator_id,
-          currentBeat: row.current_beat,
-        };
-      }) || []
-    );
-  } catch (error) {
-    Logger.Route.error(`Failed to get stories with user ${userId}`, error);
-    throw new Error("Failed to retrieve stories with user");
-  }
-}
-
-/**
- * Update the last played time for a user's story code
+ * Update the last played time for a user's story code (Kept for game logic)
  */
 export async function updateLastPlayedTime(
   userId: string,
@@ -427,7 +278,6 @@ export async function updateLastPlayedTime(
        WHERE story_id = $2 AND player_slot = $3 AND user_id = $4`,
       [now, storyId, playerSlot, userId]
     );
-    // Also update the parent story's updated_at timestamp
     await pool.query(`UPDATE stories SET updated_at = $1 WHERE id = $2`, [
       now,
       storyId,
@@ -439,83 +289,4 @@ export async function updateLastPlayedTime(
     );
     throw new Error("Failed to update last played time");
   }
-}
-
-/**
- * Get aggregated story counts for a user.
- * - Single-player active stories
- * - Multi-player active stories
- * - Multi-player stories where the user is pending
- * @param userId The ID of the user
- * @returns Promise<UserStoryCounts>
- */
-export async function getUserStoryCounts(
-  userId: string
-): Promise<UserStoryCounts> {
-  // Step 1: Get all related stories with user-specific player data (for isPending)
-  const relatedStories = await getAllUserRelatedStories(userId);
-
-  let singlePlayerActiveCount = 0;
-  let multiPlayerActiveCount = 0;
-  let multiPlayerPendingCount = 0;
-
-  if (!relatedStories || relatedStories.length === 0) {
-    return {
-      singlePlayerActiveCount: 0,
-      multiPlayerActiveCount: 0,
-      multiPlayerPendingCount: 0,
-    };
-  }
-
-  // Step 2: Extract all unique story IDs
-  const storyIds = relatedStories.map((story) => story.id);
-
-  const pool = getDb();
-  let storyIdToTotalSlotCount: Record<string, number> = {};
-
-  // Step 3: Batch query for total distinct player slot counts for these stories
-  if (storyIds.length > 0) {
-    const slotCountsResult = await pool.query<{
-      story_id: string;
-      total_slot_count: string; // COUNT returns a string initially
-    }>(
-      `SELECT story_id, COUNT(DISTINCT player_slot) AS total_slot_count
-       FROM story_players
-       WHERE story_id = ANY($1::TEXT[])
-       GROUP BY story_id`,
-      [storyIds]
-    );
-
-    for (const row of slotCountsResult.rows) {
-      storyIdToTotalSlotCount[row.story_id] = parseInt(
-        row.total_slot_count,
-        10
-      );
-    }
-  }
-
-  // Step 4: Iterate through stories and use the fetched slot counts
-  for (const story of relatedStories) {
-    const actualPlayerSlotCount = storyIdToTotalSlotCount[story.id] || 0;
-
-    if (actualPlayerSlotCount > 0) {
-      if (actualPlayerSlotCount === 1) {
-        singlePlayerActiveCount++;
-      } else {
-        // actualPlayerSlotCount > 1
-        multiPlayerActiveCount++;
-        // Pending logic uses story.players from getAllUserRelatedStories (already user-specific)
-        const userPlayerEntry = story.players.find((p) => p.userId === userId);
-        if (userPlayerEntry && userPlayerEntry.isPending) {
-          multiPlayerPendingCount++;
-        }
-      }
-    }
-  }
-
-  return {
-    singlePlayerActiveCount,
-    multiPlayerActiveCount,
-    multiPlayerPendingCount,
-  };
 }

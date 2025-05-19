@@ -6,7 +6,6 @@ import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
-import { storeCodeSet } from "shared/utils/codeSetUtils";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { StoryTemplate } from "core/types";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
@@ -61,12 +60,11 @@ export function TemplateConfigurator() {
         return;
       }
 
-      const { codes } = response;
-      // Store codes in localStorage
-      storeCodeSet(codes, `Template: ${template.id}`, true);
-      Logger.App.log("Stored player codes in localStorage");
+      Logger.App.log(
+        "Template story creation initiated by TemplateConfigurator."
+      );
     } catch (error) {
-      console.error(error);
+      console.error("Error in TemplateConfigurator handleSubmit:", error);
       notificationService.addErrorNotification();
     }
   };

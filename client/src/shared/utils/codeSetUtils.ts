@@ -1,215 +1,197 @@
-import { StoredCodeSet } from "../SessionContext.js";
 import { Logger } from "../logger.js";
-import { API_CONFIG } from "client/config";
+import { API_CONFIG } from "../../config"; // Import API_CONFIG
 
-// Create a dedicated logger for code set operations
-const logger = Logger.UI;
-
-/**
- * Stores a code set in localStorage
- * @param codes - The player codes to store
- * @param title - Optional title for the code set
- * @param lastActive - Whether this is the currently active code set
- */
-export function storeCodeSet(
-  codes: Record<string, string>,
-  title?: string,
-  lastActive?: boolean
-): void {
-  try {
-    const codeSet: StoredCodeSet = {
-      codes,
-      timestamp: Date.now(),
-      title,
-      lastActive: lastActive || false,
-    };
-
-    // Get existing code sets
-    const existingSets = getStoredCodeSets();
-
-    // Add new code set
-    existingSets.push(codeSet);
-    logger.log("Adding new code set. Total sets:", existingSets.length);
-
-    // Save back to localStorage
-    localStorage.setItem("storyCodes", JSON.stringify(existingSets));
-    return;
-  } catch (error) {
-    logger.error("Error storing code set in localStorage", error);
-  }
-}
+const LOCAL_STORAGE_KEY = "playerCodeSets";
+const logger = Logger.App; // Changed from Logger.Util to Logger.App
 
 /**
- * Get all stored code sets from localStorage
- * @returns Array of code sets stored in localStorage
+ * Retrieves all stored code sets (array of string arrays) from localStorage.
+ * @returns {string[][]} An array of code sets, or an empty array if none found or on error.
  */
-export function getStoredCodeSets(): StoredCodeSet[] {
+export function getStoredCodeSets(): string[][] {
   try {
-    const setsJSON = localStorage.getItem("storyCodes");
-    if (!setsJSON) return [];
-
+    const setsJSON = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!setsJSON) {
+      return [];
+    }
     const sets = JSON.parse(setsJSON);
-    return Array.isArray(sets) ? sets : [];
+    if (
+      Array.isArray(sets) &&
+      sets.every(
+        (set) =>
+          Array.isArray(set) && set.every((code) => typeof code === "string")
+      )
+    ) {
+      return sets;
+    }
+    logger.warn(
+      "Invalid data structure found in localStorage for playerCodeSets_v2. Returning empty array and clearing invalid data."
+    );
+    localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear invalid data
+    return [];
   } catch (error) {
-    logger.error("Error getting stored code sets", error);
+    logger.error("Error getting stored code sets from localStorage", error);
     return [];
   }
 }
 
 /**
- * Check if there are any stored code sets
- * @returns Boolean indicating whether there are any stored code sets
+ * Saves the list of all code sets to localStorage.
+ * @param {string[][]} codeSets - The complete list of code sets to save.
  */
-export function hasCodeSets(): boolean {
+function saveCodeSetsToStorage(codeSets: string[][]): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(codeSets));
+  } catch (error) {
+    logger.error("Error saving code sets to localStorage", error);
+  }
+}
+
+/**
+ * Compares two string arrays for equality, ignoring order.
+ * @param {string[]} arr1
+ * @param {string[]} arr2
+ * @returns {boolean} True if the arrays contain the same strings.
+ */
+function areCodeSetsIdentical(arr1: string[], arr2: string[]): boolean {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+  const sortedArr1 = [...arr1].sort();
+  const sortedArr2 = [...arr2].sort();
+  return sortedArr1.every((value, index) => value === sortedArr2[index]);
+}
+
+/**
+ * Adds a new code set (array of strings) to localStorage if an identical set doesn't already exist.
+ * @param {string[]} newCodeSet - The new code set to add (e.g., ["CODE1", "CODE2"] or ["SINGLE_CODE"]).
+ */
+export function addCodeSetToStorage(newCodeSet: string[]): void {
+  if (
+    !newCodeSet ||
+    newCodeSet.length === 0 ||
+    !newCodeSet.every((code) => typeof code === "string" && code.trim() !== "")
+  ) {
+    logger.warn(
+      "Attempted to store an empty, invalid, or non-string code set:",
+      newCodeSet
+    );
+    return;
+  }
+
+  const existingCodeSets = getStoredCodeSets();
+  const alreadyExists = existingCodeSets.some((existingSet) =>
+    areCodeSetsIdentical(existingSet, newCodeSet)
+  );
+
+  if (alreadyExists) {
+    logger.log(
+      "Code set already exists in storage, not adding again:",
+      newCodeSet
+    );
+    return;
+  }
+
+  existingCodeSets.push(newCodeSet);
+  saveCodeSetsToStorage(existingCodeSets);
+  logger.log(
+    "Added new code set to storage:",
+    newCodeSet,
+    "Total sets:",
+    existingCodeSets.length
+  );
+}
+
+/**
+ * Removes a specific code set from localStorage.
+ * @param {string[]} codeSetToRemove - The code set to remove.
+ */
+export function removeCodeSetFromStorage(codeSetToRemove: string[]): void {
+  if (
+    !codeSetToRemove ||
+    codeSetToRemove.length === 0 ||
+    !codeSetToRemove.every((code) => typeof code === "string")
+  ) {
+    logger.warn(
+      "Attempted to remove an empty or invalid code set:",
+      codeSetToRemove
+    );
+    return;
+  }
+  const existingCodeSets = getStoredCodeSets();
+  const filteredSets = existingCodeSets.filter(
+    (existingSet) => !areCodeSetsIdentical(existingSet, codeSetToRemove)
+  );
+
+  if (filteredSets.length === existingCodeSets.length) {
+    logger.warn("Code set to remove not found in storage:", codeSetToRemove);
+  } else {
+    saveCodeSetsToStorage(filteredSets);
+    logger.log(
+      "Removed code set from storage:",
+      codeSetToRemove,
+      "Remaining sets:",
+      filteredSets.length
+    );
+  }
+}
+
+/**
+ * Retrieves all unique player codes from all stored sets.
+ * @returns {string[]} A flat array of unique player codes.
+ */
+export function getAllUniqueCodesFromStorage(): string[] {
+  const allSets = getStoredCodeSets();
+  const allCodes: string[] = [];
+  allSets.forEach((set) => {
+    if (Array.isArray(set)) {
+      // Ensure the set itself is an array
+      set.forEach((code) => {
+        if (typeof code === "string") {
+          // Ensure each code is a string
+          allCodes.push(code);
+        }
+      });
+    }
+  });
+  return Array.from(new Set(allCodes)); // Deduplicate
+}
+
+/**
+ * Check if there are any stored code sets.
+ * @returns {boolean} Boolean indicating whether there are any stored code sets.
+ */
+export function hasStoredCodeSets(): boolean {
   return getStoredCodeSets().length > 0;
 }
 
 /**
- * Gets code sets sorted by activity status and timestamp
- * @returns Array of code sets sorted with active sets first, then by newest first
- */
-export function getSortedCodeSets(): StoredCodeSet[] {
-  return [...getStoredCodeSets()].sort((a, b) => {
-    // First priority: lastActive flag
-    if (a.lastActive && !b.lastActive) return -1;
-    if (!a.lastActive && b.lastActive) return 1;
-
-    // Second priority: timestamp (newest first)
-    return b.timestamp - a.timestamp;
-  });
-}
-
-/**
- * Delete a code set by timestamp
- * @param timestamp - The timestamp of the code set to delete
- * @returns True if a code set was deleted, false otherwise
- */
-export function deleteStoredCodeSet(timestamp: number): boolean {
-  try {
-    const sets = getStoredCodeSets();
-    const originalLength = sets.length;
-    const filteredSets = sets.filter((set) => set.timestamp !== timestamp);
-
-    if (filteredSets.length === originalLength) {
-      logger.warn("No code set found with timestamp:", timestamp);
-      return false;
-    }
-
-    localStorage.setItem("storyCodes", JSON.stringify(filteredSets));
-    logger.log(
-      "Successfully deleted code set. Remaining sets:",
-      filteredSets.length
-    );
-    return true;
-  } catch (error) {
-    logger.error("Error deleting code set", error);
-    return false;
-  }
-}
-
-/**
- * Find and delete code sets matching a specific set of codes
- * @param codes - The codes to match against
- * @returns Number of code sets deleted
- */
-export function deleteCodeSetsByContent(codes: Record<string, string>): number {
-  try {
-    const sets = getStoredCodeSets();
-    let deletedCount = 0;
-
-    // Find matching sets
-    const matchingSets = sets.filter((set) => {
-      const setCodeValues = Object.values(set.codes);
-      const targetCodeValues = Object.values(codes);
-
-      return (
-        setCodeValues.length === targetCodeValues.length &&
-        targetCodeValues.every((code) => setCodeValues.includes(code))
-      );
-    });
-
-    if (matchingSets.length === 0) return 0;
-
-    // Delete each matching set
-    matchingSets.forEach((set) => {
-      if (deleteStoredCodeSet(set.timestamp)) {
-        deletedCount++;
-      }
-    });
-
-    return deletedCount;
-  } catch (error) {
-    logger.error("Error deleting code sets by content", error);
-    return 0;
-  }
-}
-
-/**
- * Update a stored set with a new code or create a new set if not found
- * @param code - The player code
- * @param playerRole - The role of the player (e.g., "player1")
- * @param title - Optional title for the code set
- * @param lastActive - Whether this is the active code set
- */
-export function updateStoredSetWithCode(
-  code: string,
-  playerRole: string,
-  title?: string,
-  lastActive?: boolean
-): void {
-  try {
-    const sets = getStoredCodeSets();
-
-    // Find if any set contains this code
-    const existingSetIndex = sets.findIndex((set) =>
-      Object.values(set.codes).includes(code)
-    );
-
-    if (existingSetIndex >= 0) {
-      // Update existing set
-      sets[existingSetIndex].codes[playerRole] = code;
-
-      // Update title if provided and not already set
-      if (title && !sets[existingSetIndex].title) {
-        sets[existingSetIndex].title = title;
-      }
-
-      // Update active status if specified
-      if (lastActive !== undefined) {
-        sets[existingSetIndex].lastActive = lastActive;
-
-        // If this set is now active, make other sets inactive
-        if (lastActive) {
-          sets.forEach((set, i) => {
-            if (i !== existingSetIndex) set.lastActive = false;
-          });
-        }
-      }
-    } else {
-      // Create new set if code not found
-      sets.push({
-        codes: { [playerRole]: code },
-        timestamp: Date.now(),
-        title,
-        lastActive: lastActive || false,
-      });
-    }
-
-    localStorage.setItem("storyCodes", JSON.stringify(sets));
-    logger.log("Updated code set for", code);
-  } catch (error) {
-    logger.error("Error updating stored code", error);
-  }
-}
-
-/**
- * Generate a shareable join link for a code
- * @param code - The player code to create a link for
- * @returns A complete URL that can be shared for direct joining
+ * Generate a shareable join link for a code.
+ * @param {string} code - The player code to create a link for.
+ * @returns {string} A complete URL that can be shared for direct joining.
  */
 export function generateJoinLink(code: string): string {
-  // Create URL with the domain and code
-  const domain = API_CONFIG.DEFAULT_CORS_ORIGIN;
+  let baseUrl = "";
+  // DEFAULT_CORS_ORIGIN can be string[] or string.
+  if (Array.isArray(API_CONFIG.DEFAULT_CORS_ORIGIN)) {
+    baseUrl = API_CONFIG.DEFAULT_CORS_ORIGIN[0]; // Use the first one if it's an array
+  } else {
+    baseUrl = API_CONFIG.DEFAULT_CORS_ORIGIN;
+  }
 
-  return `${domain}/game/${code}`;
+  // Ensure baseUrl has a protocol, default to https if not present and not localhost
+  if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+    if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+      baseUrl = "http://" + baseUrl;
+    } else {
+      baseUrl = "https://" + baseUrl;
+    }
+  }
+
+  // Remove trailing slash if present, before appending /game/:code
+  if (baseUrl.endsWith("/")) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
+
+  return `${baseUrl}/game/${code}`;
 }

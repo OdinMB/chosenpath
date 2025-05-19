@@ -163,22 +163,6 @@ export interface GenerateElementImageRequest extends ClientRequest {
 }
 
 /**
- * User story code association
- */
-export interface UserStoryCodeAssociation {
-  userId: string;
-  storyId: string;
-  playerSlot: string;
-  code: string;
-  createdAt: number;
-  lastPlayedAt: number | null;
-  isPending?: boolean;
-}
-export interface UserStoryCodesResponse {
-  storyCodes: UserStoryCodeAssociation[];
-}
-
-/**
  * Basic story metadata
  */
 export interface StoryMetadata {
@@ -192,6 +176,7 @@ export interface StoryMetadata {
   generateImages: boolean;
   creatorId: string | null;
 }
+
 export interface StoryPlayerEntry {
   storyId: string;
   playerSlot: string;
@@ -199,65 +184,27 @@ export interface StoryPlayerEntry {
   userId: string | null;
   lastPlayedAt: number | null;
   isPending?: boolean;
+  isCurrentUser?: boolean;
+  username?: string;
 }
+
 export interface ExtendedStoryMetadata extends StoryMetadata {
   players: StoryPlayerEntry[];
 }
-export interface UserStoriesResponse {
-  stories: StoryMetadata[] | ExtendedStoryMetadata[];
-}
 
 /**
- * Resumable stories (combining user-specific and code-based retrieval)
+ * New Story Feed Types
  */
-export interface GetResumableStoriesRequest extends ClientRequest {
-  userId?: string;
-  storyCodes?: string[];
-}
-
-export interface ResumableStoryPlayer extends StoryPlayerEntry {
-  username?: string; // Added to display username if available
-}
-
-export interface ResumableStoryMetadata extends StoryMetadata {
-  players: ResumableStoryPlayer[];
-}
-
-export interface GetResumableStoriesResponse
-  extends SuccessResponse<ResumableStoryMetadata[]> {}
-
-/**
- * User story counts
- */
-export interface UserStoryCounts {
-  singlePlayerActiveCount: number;
-  multiPlayerActiveCount: number;
-  multiPlayerPendingCount: number;
-}
-
-export interface UserStoryCountsResponse
-  extends SuccessResponse<{ counts: UserStoryCounts }> {}
+export interface GetUserStoryFeedResponse
+  extends SuccessResponse<{ stories: ExtendedStoryMetadata[] }> {}
 
 /**
  * Admin specific types
  */
-import { AdminStoriesListItem } from "./story.js"; // Ensure this import is present or add it
+import { AdminStoriesListItem } from "./story.js";
 
 export interface GetAdminStoriesResponseData {
   stories: AdminStoriesListItem[];
 }
 export interface GetAdminStoriesResponse
   extends SuccessResponse<GetAdminStoriesResponseData> {}
-
-// Add new DisplayableStoryPlayer interface
-export interface DisplayableStoryPlayer {
-  storyId: string;
-  playerSlot: string;
-  userId: string | null | undefined; // Allow null and undefined
-  code?: string;
-  username?: string;
-  isPending?: boolean;
-  isCurrentUser: boolean;
-  lastPlayedAt?: number | null; // Allow null
-  storyCreatedAt: number;
-}

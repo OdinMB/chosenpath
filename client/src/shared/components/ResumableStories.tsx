@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "shared/useAuth";
-import { getResumableStories } from "shared/apiClient";
-import { getSortedCodeSets } from "shared/utils/codeSetUtils";
-import { StoredCodeSet } from "../SessionContext";
-import {
-  ResumableStoryMetadata,
-  ResumableStoryPlayer,
-  DisplayableStoryPlayer,
-} from "core/types/api";
+import { useSession } from "shared/useSession";
+import { getAllUniqueCodesFromStorage } from "shared/utils/codeSetUtils";
+import { ExtendedStoryMetadata, StoryPlayerEntry } from "core/types/api";
 import { StoryCard } from "./StoryCard";
 import { Logger } from "shared/logger";
 import { useNavigate } from "react-router-dom";
@@ -22,77 +17,90 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
   forceSingleColumn,
 }) => {
   const { user, isAuthenticated } = useAuth();
+  const { storyFeed, isLoading: isSessionLoading } = useSession();
   const navigate = useNavigate();
-  const [stories, setStories] = useState<ResumableStoryMetadata[]>([]);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [displayableStories, setDisplayableStories] = useState<
+    ExtendedStoryMetadata[]
+  >([]);
 
   useEffect(() => {
-    let didCancel = false;
+    if (isSessionLoading) {
+      setIsLoading(true);
+      return;
+    }
 
-    const determineAndFetch = async () => {
-      const localSets: StoredCodeSet[] = getSortedCodeSets();
-      const allFlattenedLocalCodes = localSets.flatMap((cs) =>
-        cs.codes ? Object.values(cs.codes) : []
+    try {
+      const allStoriesFromFeed: ExtendedStoryMetadata[] =
+        Object.values(storyFeed);
+
+      const allMyUniqueLocalCodes = getAllUniqueCodesFromStorage();
+
+      const relevantStories = allStoriesFromFeed.filter(
+        (story: ExtendedStoryMetadata) => {
+          if (user && story.creatorId === user.id) return true;
+          if (
+            user &&
+            story.players.some((p: StoryPlayerEntry) => p.userId === user.id)
+          )
+            return true;
+          if (
+            story.players.some(
+              (p: StoryPlayerEntry) =>
+                p.code && allMyUniqueLocalCodes.includes(p.code)
+            )
+          )
+            return true;
+          return false;
+        }
       );
 
-      if (!user && allFlattenedLocalCodes.length === 0) {
-        if (didCancel) return;
-        Logger.App.log(
-          "ResumableStories: Unauthenticated and no local codes. No content."
-        );
-        setIsLoading(false);
-        setStories([]);
-        setError(null);
-        onSetHasContent?.(false);
-        return;
-      }
+      relevantStories.sort(
+        (a: ExtendedStoryMetadata, b: ExtendedStoryMetadata) =>
+          b.updatedAt - a.updatedAt
+      );
 
-      setIsLoading(true);
+      setDisplayableStories(relevantStories);
+      onSetHasContent?.(relevantStories.length > 0);
       setError(null);
-
-      try {
-        const fetchedData = await getResumableStories({
-          userId: user?.id,
-          storyCodes:
-            allFlattenedLocalCodes.length > 0
-              ? allFlattenedLocalCodes
-              : undefined,
-        });
-
-        if (didCancel) return;
-        setStories(fetchedData);
-        onSetHasContent?.(fetchedData.length > 0);
-      } catch (err) {
-        if (didCancel) return;
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Failed to load resumable stories";
-        Logger.App.error("ResumableStories: Error fetching stories:", err);
-        setError(errorMessage);
-        onSetHasContent?.(false);
-      } finally {
-        if (!didCancel) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    determineAndFetch();
-
-    return () => {
-      didCancel = true;
-    };
-  }, [user, isAuthenticated, onSetHasContent]);
+    } catch (e) {
+      const errorMessage =
+        e instanceof Error ? e.message : "Failed to process resumable stories";
+      Logger.App.error(
+        "ResumableStories: Error processing stories from feed:",
+        e
+      );
+      setError(errorMessage);
+      setDisplayableStories([]);
+      onSetHasContent?.(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [storyFeed, user, isAuthenticated, onSetHasContent, isSessionLoading]);
 
   const handlePlay = (storyId: string, code?: string) => {
     Logger.App.log(`ResumableStories: Play story ${storyId} with code ${code}`);
     if (code) {
       navigate(`/game/${code}`);
     } else {
+      const storyToPlay = storyFeed[storyId];
+      if (storyToPlay) {
+        const currentUserPlayerEntry = storyToPlay.players.find(
+          (p: StoryPlayerEntry) => p.isCurrentUser && p.code
+        );
+        if (currentUserPlayerEntry && currentUserPlayerEntry.code) {
+          navigate(`/game/${currentUserPlayerEntry.code}`);
+          return;
+        }
+        if (storyToPlay.players.length === 1 && storyToPlay.players[0].code) {
+          navigate(`/game/${storyToPlay.players[0].code}`);
+          return;
+        }
+      }
       Logger.App.warn(
-        "ResumableStories: Play action, but no usable code found."
+        `ResumableStories: Play action for story ${storyId}, but no usable code found directly or via current user.`
       );
     }
   };
@@ -108,7 +116,7 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
   if (onSetHasContent && error) {
     return null;
   }
-  if (onSetHasContent && !isLoading && stories.length === 0) {
+  if (onSetHasContent && !isLoading && displayableStories.length === 0) {
     return null;
   }
 
@@ -116,15 +124,13 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
     return <div className="text-red-500 p-4 text-sm">Error: {error}</div>;
   }
 
-  if (stories.length === 0) {
+  if (displayableStories.length === 0) {
     return (
       <div className="text-gray-500 text-sm p-4">
         No resumable stories found.
       </div>
     );
   }
-
-  const allLocalCodeSets: StoredCodeSet[] = getSortedCodeSets();
 
   return (
     <div
@@ -135,65 +141,11 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
           : "")
       }
     >
-      {stories.map((story) => {
-        const allEffectivelyHeldCodes: string[] = allLocalCodeSets.flatMap(
-          (cs) => Object.values(cs.codes)
-        );
-
-        let isPlayer1SlotOverriddenForThisStory = false;
-        for (const localSet of allLocalCodeSets) {
-          if (Object.values(localSet.codes).length > 1) {
-            const localSetCodes = Object.values(localSet.codes);
-            const storyPlayerCodes = story.players
-              .map((player) => player.code)
-              .filter(Boolean) as string[];
-            if (
-              localSetCodes.some((localCode) =>
-                storyPlayerCodes.includes(localCode)
-              )
-            ) {
-              isPlayer1SlotOverriddenForThisStory = true;
-              break;
-            }
-          }
-        }
-
-        const displayPlayers: DisplayableStoryPlayer[] = story.players.map(
-          (p: ResumableStoryPlayer) => {
-            let isThisPlayerYou = false;
-            if (isPlayer1SlotOverriddenForThisStory) {
-              if (p.playerSlot === "player1") {
-                isThisPlayerYou = true;
-              } else {
-                isThisPlayerYou = !!(user && user.id && user.id === p.userId);
-              }
-            } else {
-              const isUserIdMatch = !!(user && user.id && user.id === p.userId);
-              const isCodeHeldLocally = !!(
-                p.code && allEffectivelyHeldCodes.includes(p.code)
-              );
-              isThisPlayerYou = isUserIdMatch || isCodeHeldLocally;
-            }
-
-            return {
-              storyId: p.storyId,
-              playerSlot: p.playerSlot,
-              userId: p.userId,
-              code: p.code,
-              username: p.username,
-              isPending: p.isPending,
-              isCurrentUser: isThisPlayerYou,
-              lastPlayedAt: p.lastPlayedAt,
-              storyCreatedAt: story.createdAt,
-            };
-          }
-        );
-
+      {displayableStories.map((story: ExtendedStoryMetadata) => {
         return (
           <StoryCard
             key={story.id}
             story={story}
-            players={displayPlayers}
             onPlay={handlePlay}
             showPlayButton={true}
           />

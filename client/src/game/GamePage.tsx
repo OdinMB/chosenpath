@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameSession } from "./useGameSession";
 import { gameService } from "./GameService";
@@ -6,6 +6,8 @@ import { wsService } from "./WebSocketService";
 import { Logger } from "../shared/logger";
 import { GameLayout } from "./components/GameLayout";
 import { useAuth } from "shared/useAuth";
+import { useSession } from "../shared/useSession";
+import { addCodeSetToStorage } from "../shared/utils/codeSetUtils";
 
 // Placeholder for actual game UI components
 const ConnectingView = () => (
@@ -31,21 +33,27 @@ export const GamePage: React.FC = () => {
   const { code: joinCode } = useParams<{ code?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refreshStoredCodeSets, fetchStoryFeed } = useSession();
+  const [hasStoredJoinCode, setHasStoredJoinCode] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     if (joinCode) {
       wsService.setExternalJoinCode(joinCode);
-      Logger.App.log(
+      Logger.App.debug(
         `GamePage: External join code set in wsService: ${joinCode}`
       );
     }
     return () => {
-      // wsService.setExternalJoinCode(null); // Consider if this is needed on unmount
+      Logger.App.debug(
+        `GamePage: Cleanup effect for joinCode. Current joinCode before unmount/change: ${joinCode}. Setting wsService external join code to null.`
+      );
+      wsService.setExternalJoinCode(null);
     };
   }, [joinCode]);
 
   useEffect(() => {
-    Logger.App.log("GamePage effect triggered", {
+    Logger.App.debug("GamePage effect triggered", {
       sessionId,
       storyState,
       isLoading,
@@ -54,10 +62,16 @@ export const GamePage: React.FC = () => {
       isReqPendCreate: isRequestPending("create_session"),
       isReqPendVerify: isRequestPending("verify_code"),
       isReqPendRejoin: isRequestPending("rejoin_session"),
+      isExiting,
     });
 
+    if (isExiting) {
+      Logger.App.log("GamePage: Currently exiting, aborting effect logic.");
+      return;
+    }
+
     if (isConnecting) {
-      Logger.App.log(
+      Logger.App.debug(
         "GamePage: WebSocket still connecting, deferring actions."
       );
       return;
@@ -65,7 +79,7 @@ export const GamePage: React.FC = () => {
 
     // Attempt to create a session if one doesn't exist and isn't already pending
     if (!sessionId && !isRequestPending("create_session")) {
-      Logger.App.log(
+      Logger.App.debug(
         "GamePage: No session ID and not pending create_session. Requesting new session NOW."
       );
       wsService.sendMessage({ type: "create_session" });
@@ -82,7 +96,7 @@ export const GamePage: React.FC = () => {
       !isRequestPending("rejoin_session") &&
       !isRequestPending("create_session") // Also ensure create_session isn't the immediate pending op
     ) {
-      Logger.App.log(
+      Logger.App.debug(
         "GamePage: Has sessionId and joinCode. Attempting to verify join code NOW:",
         joinCode,
         "User:",
@@ -100,6 +114,29 @@ export const GamePage: React.FC = () => {
     isRequestPending,
     setIsLoading,
     user,
+    isExiting,
+  ]);
+
+  // Effect to store the joinCode once the game is successfully loaded/verified
+  useEffect(() => {
+    // Only proceed if we have a storyState (indicating successful load/join)
+    // and we haven't already stored this specific joinCode in this component instance.
+    if (storyState && joinCode && !hasStoredJoinCode) {
+      Logger.App.info(
+        `GamePage: Game loaded with code ${joinCode}. Storing code locally.`
+      );
+      // For a single joined code, the "set" is an array with one element.
+      addCodeSetToStorage([joinCode]);
+      refreshStoredCodeSets(); // Notify session provider of the change
+      fetchStoryFeed(); // Fetch the updated story feed
+      setHasStoredJoinCode(true); // Mark as stored to prevent re-storage on re-renders
+    }
+  }, [
+    storyState,
+    joinCode,
+    refreshStoredCodeSets,
+    fetchStoryFeed,
+    hasStoredJoinCode,
   ]);
 
   useEffect(() => {
@@ -110,12 +147,18 @@ export const GamePage: React.FC = () => {
   }, [error]);
 
   const handleExitGame = useCallback(() => {
-    Logger.App.log("handleExitGame called");
-    gameService.exitStory();
-    setSessionId(null);
-    localStorage.removeItem("sessionId");
-    navigate("/");
-  }, [navigate, setSessionId]);
+    Logger.App.info("handleExitGame called");
+    setIsExiting(true);
+
+    if (sessionId) {
+      // Only attempt to exit if there's a session
+      gameService.exitStory();
+    }
+    // wsService.setExternalJoinCode(null); // This is now handled by the useEffect cleanup for joinCode
+    setSessionId(null); // Clear session ID on client side
+    localStorage.removeItem("sessionId"); // Explicitly remove from localStorage
+    navigate("/"); // Navigate to home
+  }, [navigate, setSessionId, sessionId]);
 
   const handleChoiceSelected = useCallback(
     (optionIndex: number) => {
@@ -146,18 +189,33 @@ export const GamePage: React.FC = () => {
     [storyState, setIsLoading]
   );
 
+  // Early return if in the process of exiting - THIS MUST BE AFTER ALL HOOKS
+  if (isExiting) {
+    Logger.App.debug(
+      "GamePage: Rendering minimal view because isExiting is true."
+    );
+    return (
+      <div className="app flex items-center justify-center min-h-screen">
+        <p className="text-primary-600">Exiting game...</p>
+      </div>
+    );
+  }
+
   // Render logic
   if (isConnecting) {
-    Logger.App.log(
+    Logger.App.debug(
       "GamePage: Rendering ConnectingView (WebSocket is connecting)."
     );
     return <ConnectingView />;
   }
 
   if (!sessionId && isRequestPending("create_session")) {
-    Logger.App.log("GamePage: Rendering ConnectingView (Creating session...)", {
-      globalPending: isRequestPending("create_session"),
-    });
+    Logger.App.debug(
+      "GamePage: Rendering ConnectingView (Creating session...)",
+      {
+        globalPending: isRequestPending("create_session"),
+      }
+    );
     return <ConnectingView />;
   }
 
@@ -186,7 +244,7 @@ export const GamePage: React.FC = () => {
       isRequestPending("verify_code") ||
       isRequestPending("rejoin_session"))
   ) {
-    Logger.App.log(
+    Logger.App.debug(
       "GamePage: Rendering ConnectingView (Session exists, no story. Likely verifying/rejoining or other loading operation).",
       {
         isLoading,
@@ -218,7 +276,10 @@ export const GamePage: React.FC = () => {
   }
 
   // All good, render the game
-  Logger.App.log("GamePage: Rendering GameLayout with storyState.", storyState);
+  Logger.App.info(
+    "GamePage: Rendering GameLayout with storyState.",
+    storyState
+  );
   return (
     <GameLayout
       onExitGame={handleExitGame}

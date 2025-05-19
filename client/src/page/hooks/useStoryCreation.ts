@@ -6,15 +6,16 @@ import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
   CreateStoryInfo,
-  // ModerationBlockedResponse, // Not directly needed if relying on interceptor for notification details
-  // ResponseStatus, // Not directly needed for status check in hook if interceptor handles it
 } from "core/types/api";
-import { deleteCodeSetsByContent } from "../../shared/utils/codeSetUtils"; // Added
-// notificationService can be kept for non-API related notifications like polling errors, if any.
-// import { notificationService } from "../../shared/notifications/notificationService"; // Removed as unused
+import {
+  addCodeSetToStorage,
+  removeCodeSetFromStorage,
+} from "../../shared/utils/codeSetUtils";
+import { useSession } from "../../shared/useSession";
 
 export function useStoryCreation() {
   const navigate = useNavigate();
+  const { refreshStoredCodeSets } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [storyId, setStoryId] = useState<string | null>(null);
   const [playerCodes, setPlayerCodes] = useState<Record<string, string> | null>(
@@ -22,80 +23,96 @@ export function useStoryCreation() {
   );
   const [storyReady, setStoryReady] = useState(false);
 
-  // Centralized error handler for story creation
-  const handleError = (
-    error: unknown,
-    codesToDelete?: Record<string, string> | null
-  ) => {
+  const handleError = (error: unknown, codesToDelete?: string[] | null) => {
     Logger.App.error("Story creation process failed:", error);
     setIsLoading(false);
 
-    if (codesToDelete) {
-      deleteCodeSetsByContent(codesToDelete);
-      Logger.App.log("Attempted to delete local player codes.", codesToDelete);
+    if (codesToDelete && codesToDelete.length > 0) {
+      removeCodeSetFromStorage(codesToDelete);
+      Logger.App.log(
+        "Attempted to delete local player codeset on error.",
+        codesToDelete
+      );
+      refreshStoredCodeSets();
     }
-
-    // Notifications are primarily handled by the apiClient's response interceptor.
-    // This function's main jobs are cleanup and navigation.
-    navigate("/");
-    Logger.App.log("Redirected to / after story creation failure.");
+    // Navigation on error is commented out as it might be too disruptive
+    // navigate("/");
+    // Logger.App.log("Redirected to / after story creation failure.");
   };
 
-  const createStory = async (
-    data: CreateStoryRequest
-  ): Promise<CreateStoryInfo | undefined> => {
-    setIsLoading(true);
-    Logger.App.log("Starting story creation process (new)");
-    let localPlayerCodes: Record<string, string> | null = null;
+  // This is the common success handler used by createStory (prompt-based)
+  // createStoryFromTemplate now has its own explicit logic as per user revert.
+  const handleStoryDataResponse = (storyData: CreateStoryInfo) => {
+    Logger.App.log(`Received story ID: ${storyData.storyId}`);
+    setStoryId(storyData.storyId);
+    setPlayerCodes(storyData.codes);
 
-    try {
-      Logger.App.log("Sending createStory request to server");
-      const storyData = await storyApi.createStory(data);
-      localPlayerCodes = storyData.codes; // Store codes locally in case polling setup fails
+    const codesArray = Object.values(storyData.codes);
+    if (codesArray.length > 0) {
+      addCodeSetToStorage(codesArray);
+      refreshStoredCodeSets();
+      Logger.App.log(
+        "Stored new player code set locally (prompt-based):",
+        codesArray
+      );
+    }
 
-      Logger.App.log(`Received story ID: ${storyData.storyId}`);
-      setStoryId(storyData.storyId);
-      setPlayerCodes(storyData.codes);
-      Logger.App.log("Received player codes, starting status polling");
-
+    if (storyData.status === "ready") {
+      Logger.App.log(`Story ${storyData.storyId} is ready immediately.`);
+      setStoryReady(true);
+      setIsLoading(false);
+    } else {
+      Logger.App.log(
+        `Story ${storyData.storyId} status is ${storyData.status}. Polling...`
+      );
       const checkStatus = async () => {
         try {
-          Logger.App.log(`Checking status for story: ${storyData.storyId}`);
+          Logger.App.log(`Polling status for story: ${storyData.storyId}`);
           const statusResult = await storyApi.checkStoryStatus(
             storyData.storyId
           );
           if (statusResult.status === "ready") {
             Logger.App.log(`Story ${storyData.storyId} is ready`);
             setStoryReady(true);
+            setIsLoading(false);
           } else {
             Logger.App.log(
-              `Story ${storyData.storyId} is still queued, will check again in 2s`
+              `Story ${storyData.storyId} is still ${statusResult.status}, will check again in 2s`
             );
-            setTimeout(checkStatus, 2000);
+            if (!storyReady) {
+              setTimeout(checkStatus, 2000);
+            }
           }
         } catch (pollError) {
           Logger.App.error(
-            "Failed to check story status during polling:",
+            `Failed to poll story status for ${storyData.storyId}:`,
             pollError
           );
-          // apiClient interceptor should handle notifications for API errors during polling.
-          // A custom notification here could be for non-API errors or specific UI feedback.
-          // Example:
-          // notificationService.addNotification({
-          //   type: "warning",
-          //   title: "Update",
-          //   message: "Having trouble confirming story readiness. It might take a bit longer."
-          // });
+          setIsLoading(false);
         }
       };
-      checkStatus();
+      if (!storyReady) {
+        checkStatus();
+      }
+    }
+  };
 
-      setIsLoading(false); // Set loading false after initial success response and polling setup
+  const createStory = async (
+    data: CreateStoryRequest
+  ): Promise<CreateStoryInfo | undefined> => {
+    setIsLoading(true);
+    Logger.App.log("Starting story creation process (prompt-based)");
+    let tempCodesForCleanup: string[] | null = null;
+
+    try {
+      Logger.App.log("Sending createStory request to server");
+      const storyData = await storyApi.createStory(data);
+      tempCodesForCleanup = Object.values(storyData.codes);
+      handleStoryDataResponse(storyData); // Uses the common handler
       return storyData;
     } catch (error) {
-      // This error is from storyApi.createStory, processed by apiClient interceptor
-      handleError(error, localPlayerCodes);
-      return undefined; // Indicate failure and that error was handled
+      handleError(error, tempCodesForCleanup);
+      return undefined;
     }
   };
 
@@ -103,65 +120,84 @@ export function useStoryCreation() {
     data: CreateStoryFromTemplateRequest
   ): Promise<CreateStoryInfo | undefined> => {
     setIsLoading(true);
-    Logger.App.log("Starting template story creation process (new)");
-    let localPlayerCodes: Record<string, string> | null = null;
+    Logger.App.log("Starting template story creation process (template-based)");
+    // Correctly declare codesForPotentialCleanup for this function's scope
+    let tempCodesForCleanup: string[] | null = null;
 
     try {
       Logger.App.log("Sending createStoryFromTemplate request to server");
       const responseData = await storyApi.createStoryFromTemplate(data);
-      localPlayerCodes = responseData.codes;
+
+      // Store codes from API response
+      const apiReturnedPlayerCodes = responseData.codes; // Record<string, string>
+      tempCodesForCleanup = Object.values(apiReturnedPlayerCodes); // string[] for cleanup
 
       Logger.App.log(
-        "Received response from server. responseData: ",
+        "Received response from server for template. responseData: ",
         responseData
       );
       Logger.App.log(`Received story ID: ${responseData.storyId}`);
       setStoryId(responseData.storyId);
-      setPlayerCodes(responseData.codes);
+      setPlayerCodes(apiReturnedPlayerCodes); // Set state with Record<string, string>
+
+      // Add codes to local storage
+      if (tempCodesForCleanup.length > 0) {
+        addCodeSetToStorage(tempCodesForCleanup);
+        refreshStoredCodeSets();
+        Logger.App.log(
+          "Stored new player code set locally (from template):",
+          tempCodesForCleanup
+        );
+      }
 
       if (responseData.status === "ready") {
         setStoryReady(true);
         Logger.App.log(
           `Template story ${responseData.storyId} is ready immediately.`
         );
+        setIsLoading(false); // Stop loading if ready
       } else {
-        // This case might be rare for templates if they are always 'ready'
         Logger.App.warn(
           `Template story ${responseData.storyId} has status ${responseData.status}. Polling...`
         );
         const checkStatus = async () => {
           try {
             Logger.App.log(
-              `Checking status for story: ${responseData.storyId}`
+              `Polling status for template story: ${responseData.storyId}`
             );
             const statusResult = await storyApi.checkStoryStatus(
               responseData.storyId
             );
             if (statusResult.status === "ready") {
-              Logger.App.log(`Story ${responseData.storyId} is ready`);
+              Logger.App.log(`Template story ${responseData.storyId} is ready`);
               setStoryReady(true);
+              setIsLoading(false); // Stop loading once polling confirms ready
             } else {
               Logger.App.log(
-                `Story ${responseData.storyId} is still queued, will check again in 2s`
+                `Template story ${responseData.storyId} is still ${statusResult.status}, will check again in 2s`
               );
-              setTimeout(checkStatus, 2000);
+              if (!storyReady) {
+                // Continue polling only if not ready
+                setTimeout(checkStatus, 2000);
+              }
             }
           } catch (pollError) {
             Logger.App.error(
-              "Failed to check story status for template during polling:",
+              "Failed to poll story status for template during polling:",
               pollError
             );
-            // apiClient interceptor should handle notifications.
+            setIsLoading(false); // Stop loading on polling error
           }
         };
-        checkStatus();
+        if (!storyReady) {
+          // Start polling if not immediately ready
+          checkStatus();
+        }
       }
-      setIsLoading(false);
       return responseData;
     } catch (error) {
-      // This error is from storyApi.createStoryFromTemplate, processed by apiClient interceptor
-      handleError(error, localPlayerCodes);
-      return undefined; // Indicate failure and that error was handled
+      handleError(error, tempCodesForCleanup); // Pass the string[] for cleanup
+      return undefined;
     }
   };
 

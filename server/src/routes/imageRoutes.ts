@@ -62,11 +62,12 @@ const serveImageFile = (
       if (!res.headersSent) {
         sendError(res, "Failed to serve image", 500, requestId, err);
       }
-    } else {
-      Logger.Route.log(
-        `[IMAGE-DEBUG] Image file sent successfully: ${imagePath}`
-      );
     }
+    // else {
+    //   Logger.Route.log(
+    //     `[IMAGE-DEBUG] Image file sent successfully: ${imagePath}`
+    //   );
+    // }
   });
 };
 
