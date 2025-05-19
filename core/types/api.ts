@@ -227,6 +227,18 @@ export interface GetResumableStoriesResponse
   extends SuccessResponse<ResumableStoryMetadata[]> {}
 
 /**
+ * User story counts
+ */
+export interface UserStoryCounts {
+  singlePlayerActiveCount: number;
+  multiPlayerActiveCount: number;
+  multiPlayerPendingCount: number;
+}
+
+export interface UserStoryCountsResponse
+  extends SuccessResponse<{ counts: UserStoryCounts }> {}
+
+/**
  * Admin specific types
  */
 import { AdminStoriesListItem } from "./story.js"; // Ensure this import is present or add it

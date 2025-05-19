@@ -24,6 +24,7 @@ import {
   getUserStories,
   getStoriesWithUser,
   getAllUserRelatedStories,
+  getUserStoryCounts,
 } from "users/userStoryService.js";
 import {
   checkRateLimitForRequest,
@@ -373,5 +374,35 @@ router.get("/users/player-stories", verifyRegularUser(), async (req, res) => {
     return sendError(res, errorMessage, 500, requestId);
   }
 });
+
+/**
+ * Get story counts for the current user
+ * GET /users/story-counts
+ * Returns: { counts: { singlePlayerActiveCount: number, multiPlayerActiveCount: number, multiPlayerPendingCount: number } }
+ */
+router.get(
+  "/users/story-counts",
+  verifyUser({ required: true }),
+  async (req, res) => {
+    const requestId = (req.query.requestId as string) || "unknown";
+
+    try {
+      if (!req.user) {
+        return sendUnauthorized(res, "Authentication required", requestId);
+      }
+
+      const counts = await getUserStoryCounts(req.user.id);
+
+      return sendSuccess(res, { counts }, requestId);
+    } catch (error) {
+      Logger.Route.error("Failed to get user story counts", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to get story counts";
+
+      return sendError(res, errorMessage, 500, requestId);
+    }
+  }
+);
 
 export default router;

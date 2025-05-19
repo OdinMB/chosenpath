@@ -5,6 +5,7 @@ import {
   StoryMetadata,
   ExtendedStoryMetadata,
   StoryPlayerEntry,
+  UserStoryCounts,
 } from "core/types/api.js";
 
 // DB Row Types now reflect snake_case from the database
@@ -438,4 +439,83 @@ export async function updateLastPlayedTime(
     );
     throw new Error("Failed to update last played time");
   }
+}
+
+/**
+ * Get aggregated story counts for a user.
+ * - Single-player active stories
+ * - Multi-player active stories
+ * - Multi-player stories where the user is pending
+ * @param userId The ID of the user
+ * @returns Promise<UserStoryCounts>
+ */
+export async function getUserStoryCounts(
+  userId: string
+): Promise<UserStoryCounts> {
+  // Step 1: Get all related stories with user-specific player data (for isPending)
+  const relatedStories = await getAllUserRelatedStories(userId);
+
+  let singlePlayerActiveCount = 0;
+  let multiPlayerActiveCount = 0;
+  let multiPlayerPendingCount = 0;
+
+  if (!relatedStories || relatedStories.length === 0) {
+    return {
+      singlePlayerActiveCount: 0,
+      multiPlayerActiveCount: 0,
+      multiPlayerPendingCount: 0,
+    };
+  }
+
+  // Step 2: Extract all unique story IDs
+  const storyIds = relatedStories.map((story) => story.id);
+
+  const pool = getDb();
+  let storyIdToTotalSlotCount: Record<string, number> = {};
+
+  // Step 3: Batch query for total distinct player slot counts for these stories
+  if (storyIds.length > 0) {
+    const slotCountsResult = await pool.query<{
+      story_id: string;
+      total_slot_count: string; // COUNT returns a string initially
+    }>(
+      `SELECT story_id, COUNT(DISTINCT player_slot) AS total_slot_count
+       FROM story_players
+       WHERE story_id = ANY($1::TEXT[])
+       GROUP BY story_id`,
+      [storyIds]
+    );
+
+    for (const row of slotCountsResult.rows) {
+      storyIdToTotalSlotCount[row.story_id] = parseInt(
+        row.total_slot_count,
+        10
+      );
+    }
+  }
+
+  // Step 4: Iterate through stories and use the fetched slot counts
+  for (const story of relatedStories) {
+    const actualPlayerSlotCount = storyIdToTotalSlotCount[story.id] || 0;
+
+    if (actualPlayerSlotCount > 0) {
+      if (actualPlayerSlotCount === 1) {
+        singlePlayerActiveCount++;
+      } else {
+        // actualPlayerSlotCount > 1
+        multiPlayerActiveCount++;
+        // Pending logic uses story.players from getAllUserRelatedStories (already user-specific)
+        const userPlayerEntry = story.players.find((p) => p.userId === userId);
+        if (userPlayerEntry && userPlayerEntry.isPending) {
+          multiPlayerPendingCount++;
+        }
+      }
+    }
+  }
+
+  return {
+    singlePlayerActiveCount,
+    multiPlayerActiveCount,
+    multiPlayerPendingCount,
+  };
 }

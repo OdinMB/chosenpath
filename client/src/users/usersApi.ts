@@ -2,6 +2,7 @@ import { userStoriesApi } from "shared/apiClient";
 import {
   ExtendedStoryMetadata,
   UserStoryCodeAssociation,
+  UserStoryCounts,
 } from "core/types/api";
 import { Logger } from "shared/logger";
 
@@ -33,6 +34,20 @@ export const usersApi = {
       return response.storyCodes;
     } catch (error) {
       Logger.App.error("Failed to fetch story codes via usersApi", error);
+      throw error;
+    }
+  },
+
+  getUserStoryCounts: async (): Promise<UserStoryCounts> => {
+    Logger.App.log("Fetching user story counts via usersApi");
+    try {
+      const response = await userStoriesApi.getUserStoryCounts();
+      Logger.App.log(
+        `Successfully fetched user story counts: SP: ${response.counts.singlePlayerActiveCount}, MP: ${response.counts.multiPlayerActiveCount}, Pending: ${response.counts.multiPlayerPendingCount}`
+      );
+      return response.counts;
+    } catch (error) {
+      Logger.App.error("Failed to fetch user story counts via usersApi", error);
       throw error;
     }
   },

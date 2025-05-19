@@ -15,6 +15,8 @@ import {
   CreateStoryInfo,
   GetResumableStoriesRequest,
   ResumableStoryMetadata,
+  UserStoryCountsResponse,
+  UserStoryCounts,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -335,29 +337,42 @@ export const userStoriesApi = {
   /**
    * Get all story codes associated with the current user
    */
-  getStoryCodes: () => {
-    return apiClient.get<UserStoryCodesResponse>("/users/story-codes");
+  getStoryCodes: async (): Promise<UserStoryCodesResponse> => {
+    // Interceptor unwraps SuccessResponse<T> to T. UserStoryCodesResponse is already the payload T.
+    return axiosInstance.get<UserStoryCodesResponse>(
+      "/users/story-codes"
+    ) as any;
   },
 
   /**
    * Get all stories created by the current user
    */
-  getUserStories: () => {
-    return apiClient.get<UserStoriesResponse>("/users/stories");
+  getUserStories: async (): Promise<UserStoriesResponse> => {
+    return axiosInstance.get<UserStoriesResponse>("/users/stories") as any;
   },
 
   /**
    * Get all stories where the current user is a player (has a code)
    */
-  getPlayerStories: () => {
-    return apiClient.get<UserStoriesResponse>("/users/player-stories");
+  getPlayerStories: async (): Promise<UserStoriesResponse> => {
+    return axiosInstance.get<UserStoriesResponse>(
+      "/users/player-stories"
+    ) as any;
   },
 
   /**
    * Get all stories related to the current user (both as creator and player)
    */
-  getAllUserStories: () => {
-    return apiClient.get<UserStoriesResponse>("/users/all-stories");
+  getAllUserStories: async (): Promise<UserStoriesResponse> => {
+    return axiosInstance.get<UserStoriesResponse>("/users/all-stories") as any;
+  },
+
+  getUserStoryCounts: async (): Promise<{ counts: UserStoryCounts }> => {
+    // UserStoryCountsResponse is SuccessResponse<{ counts: UserStoryCounts }>
+    // Interceptor unwraps this to { counts: UserStoryCounts }
+    return axiosInstance.get<UserStoryCountsResponse>(
+      "/users/story-counts"
+    ) as any;
   },
 };
 
