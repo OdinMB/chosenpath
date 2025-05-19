@@ -289,13 +289,19 @@ router.post("/admin/templates/generate", verifyAdmin(), async (req, res) => {
   const generateRequest = req.body as GenerateTemplateRequest;
 
   try {
-    const { prompt, playerCount, maxTurns, gameMode, generateImages } =
-      generateRequest;
+    const {
+      prompt,
+      playerCount,
+      maxTurns,
+      gameMode,
+      generateImages,
+      difficultyLevel,
+    } = generateRequest;
 
-    if (!prompt || !playerCount || !maxTurns || !gameMode) {
+    if (!prompt || !playerCount || !maxTurns || !gameMode || !difficultyLevel) {
       return sendBadRequest(
         res,
-        "Missing required fields: prompt, playerCount, maxTurns, gameMode",
+        "Missing required fields: prompt, playerCount, maxTurns, gameMode, difficultyLevel",
         requestId
       );
     }
@@ -307,7 +313,8 @@ router.post("/admin/templates/generate", verifyAdmin(), async (req, res) => {
       generateImages || false,
       playerCount,
       maxTurns,
-      gameMode
+      gameMode,
+      difficultyLevel
     );
 
     Logger.Route.log(`Generated template: ${template.title}`);

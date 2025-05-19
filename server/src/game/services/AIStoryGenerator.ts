@@ -12,8 +12,8 @@ import type {
   SwitchAnalysis,
   ThreadAnalysis,
   PlayerCount,
-  BeatsNeedingImages,
   GameMode,
+  DifficultyLevel,
   StatValueEntry,
 } from "core/types/index.js";
 import {
@@ -82,7 +82,8 @@ export class AIStoryGenerator {
     generateImages: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
-    gameMode: GameMode
+    gameMode: GameMode,
+    difficultyLevel: DifficultyLevel
   ): Promise<StoryState> {
     const setup = await this.generateStorySetup(
       prompt,
@@ -106,6 +107,7 @@ export class AIStoryGenerator {
       title: setup.title,
       imageInstructions: setup.imageInstructions,
       gameMode,
+      difficultyLevel,
       guidelines: setup.guidelines,
       storyElements: setup.storyElements,
       worldFacts: [],

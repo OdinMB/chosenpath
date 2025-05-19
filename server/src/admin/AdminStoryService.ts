@@ -1,5 +1,4 @@
 import { storyRepository } from "shared/StoryRepository.js";
-import { readStoryFile, getStoryFilePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { Story } from "core/models/Story.js";
 import { storyDbService, StoryDbOverviewItem } from "shared/StoryDbService.js";
@@ -57,11 +56,14 @@ export class AdminStoryService {
 
           return {
             id: dbStory.id,
-            title: finalTitle,
-            // Convert epoch ms from DB to ISO string for consistency with client expectation
+            title: finalTitle || "Untitled Story",
             createdAt: new Date(dbStory.created_at).toISOString(),
             updatedAt: new Date(dbStory.updated_at).toISOString(),
             gameMode: gameModeFromModel,
+            difficultyLevel: {
+              title: dbStory.difficulty_title,
+              modifier: dbStory.difficulty_modifier,
+            },
             playerCount: dbStory.player_count,
             characterSelectionCompleted: characterSelectionCompletedFromModel,
             maxTurns: dbStory.max_turns,

@@ -1,4 +1,9 @@
-import { GameMode, PlayerCount, StoryTemplate } from "./index.js";
+import {
+  GameMode,
+  PlayerCount,
+  StoryTemplate,
+  DifficultyLevel,
+} from "./index.js";
 import {
   ClientRequest,
   RateLimitedResponse,
@@ -66,6 +71,7 @@ export interface GenerateTemplateRequest extends ClientRequest {
   maxTurns: number;
   gameMode: GameMode;
   generateImages?: boolean;
+  difficultyLevel: DifficultyLevel;
 }
 
 export interface TemplateIterationRequest extends ClientRequest {

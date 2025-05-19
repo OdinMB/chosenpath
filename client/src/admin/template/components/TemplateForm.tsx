@@ -62,6 +62,7 @@ export const TemplateForm: React.FC = () => {
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
     handleImageInstructionsChange,
+    handleDifficultyLevelsChange,
     // New helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,
@@ -241,6 +242,8 @@ export const TemplateForm: React.FC = () => {
               getGameModeValue={getGameModeValue}
               showOnWelcomeScreen={formData.showOnWelcomeScreen || false}
               setShowOnWelcomeScreen={handleShowOnWelcomeScreenChange}
+              difficultyLevels={formData.difficultyLevels || []}
+              handleDifficultyLevelsChange={handleDifficultyLevelsChange}
             />
           )}
 

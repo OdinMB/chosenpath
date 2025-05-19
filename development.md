@@ -2,9 +2,9 @@ Smaller commits!
 
 # NEXT
 
-- 2: Check if verifyUser variations return the user id, and if malicious requests could just claim to be a different user and then be verified as A user
 - 2: Generate images for AI-generated stories
 - 1: Check issue with image references in interludes
+- 1: story feed updates: every once in a while IF >= 1 multiplayer story with at least 1 pending other player
 
 # BETTER EXPERIENCE
 

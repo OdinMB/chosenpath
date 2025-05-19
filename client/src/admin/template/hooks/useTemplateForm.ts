@@ -12,6 +12,7 @@ import {
   Outcome,
   ImageInstructions,
   PlayerCount,
+  DifficultyLevel,
 } from "core/types";
 import { Logger } from "shared/logger";
 import { MAX_PLAYERS } from "core/config";
@@ -26,6 +27,7 @@ import {
 } from "core/types/admin";
 import { useNavigate } from "react-router-dom";
 import { notificationService } from "../../../shared/notifications/notificationService";
+import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 
 // Define the TabType type
 export type TabType =
@@ -49,7 +51,14 @@ interface UseTemplateFormProps {
 export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
   // Core state
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
-  const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
+  const [formData, setFormData] = useState<StoryTemplate>(() => ({
+    ...initialTemplate,
+    difficultyLevels:
+      initialTemplate.difficultyLevels &&
+      initialTemplate.difficultyLevels.length > 0
+        ? initialTemplate.difficultyLevels
+        : [getDefaultDifficultyLevel()].filter(Boolean), // Ensure it's an array with the default
+  }));
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
   const navigate = useNavigate();
 
@@ -74,6 +83,7 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     getMaxTurnsOptions,
     gameModeOptions,
     getGameModeValue,
+    handleDifficultyLevelsChange,
   } = useBasicInfoTab({
     template: formData,
     onChange: (updates) => setFormData((prev) => ({ ...prev, ...updates })),
@@ -268,21 +278,21 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
+    difficultyLevel: DifficultyLevel;
   }) => {
-    Logger.UI.log("AI Draft setup initiated with options:", options);
     setIsLoading(true);
-
+    Logger.UI.log("AI Draft setup initiated with options:", options);
     try {
-      const request: GenerateTemplateRequest = {
+      const requestData: GenerateTemplateRequest = {
         prompt: options.prompt,
         playerCount: options.playerCount,
         maxTurns: options.maxTurns,
         gameMode: options.gameMode,
         generateImages: options.generateImages,
+        difficultyLevel: options.difficultyLevel,
       };
-
-      const response = await adminTemplateApi.generateTemplateViaApi(request);
-      const generatedTemplateData = response.template;
+      const result = await adminTemplateApi.generateTemplateViaApi(requestData);
+      const generatedTemplateData = result.template;
 
       Logger.UI.log("AI Draft generated data:", generatedTemplateData);
 
@@ -452,6 +462,7 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     handlePublicationStatusChange,
     handleShowOnWelcomeScreenChange,
     handleImageInstructionsChange,
+    handleDifficultyLevelsChange,
     // Helper functions
     getMinPlayerOptions,
     getMaxPlayerOptions,

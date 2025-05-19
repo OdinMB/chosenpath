@@ -14,7 +14,7 @@ import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
 } from "core/types/api.js";
-import { PlayerCount } from "core/types/index.js";
+import { PlayerCount, DifficultyLevel } from "core/types/index.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -37,8 +37,14 @@ router.post(
       // Increment rate limit after successful creation
       incrementRateLimitForRequest(req, "initialize_story");
 
-      const { prompt, playerCount, maxTurns, generateImages, gameMode } =
-        req.body as CreateStoryRequest;
+      const {
+        prompt,
+        playerCount,
+        maxTurns,
+        generateImages,
+        gameMode,
+        difficultyLevel,
+      } = req.body as CreateStoryRequest;
 
       const creatorId = (req as any).user?.id;
 
@@ -48,6 +54,7 @@ router.post(
         playerCount as PlayerCount,
         maxTurns,
         gameMode,
+        difficultyLevel,
         res,
         creatorId
       );
@@ -81,16 +88,23 @@ router.post(
         return;
       }
 
-      const createRequest = req.body as CreateStoryFromTemplateRequest;
+      const {
+        templateId,
+        playerCount: reqPlayerCount,
+        maxTurns: reqMaxTurns,
+        generateImages: reqGenerateImages,
+        difficultyLevel: reqDifficultyLevel,
+      } = req.body as CreateStoryFromTemplateRequest;
       Logger.Route.log("Creating story from template");
 
       const creatorId = (req as any).user?.id;
 
       await storyCreationService.createStoryFromTemplate(
-        createRequest.templateId,
-        createRequest.playerCount as PlayerCount,
-        createRequest.maxTurns,
-        createRequest.generateImages,
+        templateId,
+        reqPlayerCount as PlayerCount,
+        reqMaxTurns,
+        reqGenerateImages,
+        reqDifficultyLevel,
         res,
         creatorId
       );

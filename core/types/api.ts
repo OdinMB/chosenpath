@@ -1,4 +1,9 @@
-import { ImageQuality, ImageSize, ImageInstructions } from "./index.js";
+import {
+  ImageQuality,
+  ImageSize,
+  ImageInstructions,
+  DifficultyLevel,
+} from "./index.js";
 import { PublicUser } from "./user.js";
 import { GameMode } from "./story.js";
 
@@ -63,12 +68,14 @@ export interface CreateStoryRequest extends ClientRequest {
   playerCount: number;
   maxTurns: number;
   gameMode: GameMode;
+  difficultyLevel: DifficultyLevel;
 }
 export interface CreateStoryFromTemplateRequest extends ClientRequest {
   templateId: string;
   playerCount: number;
   maxTurns: number;
   generateImages: boolean;
+  difficultyLevel: DifficultyLevel;
 }
 export interface CreateStoryInfo {
   storyId: string;
@@ -175,6 +182,7 @@ export interface StoryMetadata {
   currentBeat?: number;
   generateImages: boolean;
   creatorId: string | null;
+  difficultyLevel: DifficultyLevel;
 }
 
 export interface StoryPlayerEntry {

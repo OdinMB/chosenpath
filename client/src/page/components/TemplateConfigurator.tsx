@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
-import { PlayerCount } from "core/types";
-import { PrimaryButton, Icons } from "components/ui";
+import { PlayerCount, DifficultyLevel } from "core/types";
+import { PrimaryButton, Icons, Tooltip } from "components/ui";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
@@ -11,6 +11,10 @@ import { StoryTemplate } from "core/types";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
 import { RateLimitedResponse } from "core/types/api";
 import { notificationService } from "shared/notifications/notificationService";
+import {
+  getDifficultyDescription,
+  getDefaultDifficultyLevel,
+} from "core/utils/difficultyUtils.ts";
 
 interface TemplateConfigLoaderData {
   template: StoryTemplate;
@@ -24,6 +28,12 @@ export function TemplateConfigurator() {
   );
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
+  const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
+    useState<DifficultyLevel>(
+      template.difficultyLevels && template.difficultyLevels.length > 0
+        ? template.difficultyLevels[0]
+        : getDefaultDifficultyLevel()
+    );
   const [rateLimit, setRateLimit] = useState<
     RateLimitedResponse["rateLimit"] | null
   >(null);
@@ -40,7 +50,10 @@ export function TemplateConfigurator() {
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;
   const needsTurnsConfig = template.maxTurnsMin !== template.maxTurnsMax;
-  const hasConfigurableSettings = needsPlayerConfig || needsTurnsConfig || true;
+  const needsDifficultyConfig =
+    template.difficultyLevels && template.difficultyLevels.length > 1;
+  const hasConfigurableSettings =
+    needsPlayerConfig || needsTurnsConfig || needsDifficultyConfig || true;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +65,7 @@ export function TemplateConfigurator() {
         playerCount,
         maxTurns,
         generateImages,
+        difficultyLevel: selectedDifficultyLevel,
       });
 
       if (!response) {
@@ -73,6 +87,13 @@ export function TemplateConfigurator() {
     const value = Number(e.target.value);
     setPlayerCount(value as PlayerCount);
     Logger.App.log(`Updated player count to: ${value}`);
+  };
+
+  const handleDifficultyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const index = Number(e.target.value);
+    if (template.difficultyLevels && template.difficultyLevels[index]) {
+      setSelectedDifficultyLevel(template.difficultyLevels[index]);
+    }
   };
 
   const handleBack = () => {
@@ -176,6 +197,51 @@ export function TemplateConfigurator() {
                   <div className="flex justify-between text-xs md:text-sm text-primary-600">
                     <span>{template.maxTurnsMin} turns</span>
                     <span>{template.maxTurnsMax} turns</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Difficulty Level Slider - Only show if configurable */}
+              {needsDifficultyConfig && template.difficultyLevels && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="difficulty-level"
+                    className="text-sm md:text-base font-medium text-primary flex items-center"
+                  >
+                    Difficulty: {selectedDifficultyLevel.title}
+                    <Tooltip
+                      content={getDifficultyDescription(
+                        selectedDifficultyLevel.modifier
+                      )}
+                      position="top"
+                      className="ml-2"
+                    >
+                      <Icons.Info className="h-4 w-4 text-primary-400" />
+                    </Tooltip>
+                  </label>
+                  <input
+                    id="difficulty-level"
+                    type="range"
+                    min={0}
+                    max={template.difficultyLevels.length - 1}
+                    step={1}
+                    value={template.difficultyLevels.findIndex(
+                      (level) =>
+                        level.modifier === selectedDifficultyLevel.modifier
+                    )}
+                    onChange={handleDifficultyChange}
+                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+                    disabled={isLoading}
+                  />
+                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
+                    <span>{template.difficultyLevels[0].title}</span>
+                    <span>
+                      {
+                        template.difficultyLevels[
+                          template.difficultyLevels.length - 1
+                        ].title
+                      }
+                    </span>
                   </div>
                 </div>
               )}

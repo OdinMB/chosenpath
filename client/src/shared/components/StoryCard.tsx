@@ -5,6 +5,7 @@ import { ExtendedStoryMetadata, StoryPlayerEntry } from "core/types/api";
 import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "shared/useAuth";
 import { useState } from "react";
+import { getDifficultyDescription } from "core/utils/difficultyUtils.ts";
 
 type StoryCardProps = {
   story: ExtendedStoryMetadata;
@@ -136,17 +137,32 @@ export const StoryCard = ({
         </h3>
 
         <div className="flex flex-col gap-1 text-primary-500 mb-3">
-          <div className="flex items-center">
+          <div className="flex items-center flex-wrap">
             <span className={`${sizeClasses.info} font-semibold`}>
               {typeof story.currentBeat === "number"
                 ? `${story.currentBeat} / `
                 : ""}
               {story.maxTurns} turns
             </span>
+            {story.difficultyLevel && (
+              <span className="flex items-center ml-3">
+                <span className={`${sizeClasses.info} font-semibold mr-2`}>
+                  {story.difficultyLevel.title}
+                </span>
+                <InfoIcon
+                  tooltipText={getDifficultyDescription(
+                    story.difficultyLevel.modifier
+                  )}
+                  position="top"
+                  className="mb-1"
+                />
+              </span>
+            )}
             <InfoIcon
               tooltipText={infoTooltip}
               position="top"
-              className="ml-4 mt-1"
+              className="ml-4 mb-1"
+              icon={Icons.Clock}
             />
           </div>
         </div>

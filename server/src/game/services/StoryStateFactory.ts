@@ -1,4 +1,10 @@
-import { PlayerSlot, StoryState, StoryTemplate } from "core/types/index.js";
+import {
+  PlayerSlot,
+  StoryState,
+  StoryTemplate,
+  DifficultyLevel,
+  PlayerCount,
+} from "core/types/index.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
 
 /**
@@ -7,14 +13,18 @@ import { loadTemplateImages } from "shared/storageUtils.js";
  * @param template The template to convert
  * @param playerCount The number of players
  * @param maxTurns The maximum number of turns
+ * @param generateImages Whether to generate images
+ * @param difficultyLevel The chosen difficulty level for this story
  * @param playerCodes The player codes to include in the state
  * @returns A complete StoryState ready to be used in a Story instance
  */
 export function createStoryStateFromTemplate(
   gameId: string,
   template: StoryTemplate,
+  playerCount: PlayerCount,
   maxTurns: number,
   generateImages: boolean,
+  difficultyLevel: DifficultyLevel,
   playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
 ): StoryState {
   let sharedStatValues = template.sharedStats.map((stat) => ({
@@ -29,6 +39,7 @@ export function createStoryStateFromTemplate(
     title: template.title,
     imageInstructions: template.imageInstructions,
     gameMode: template.gameMode,
+    difficultyLevel: difficultyLevel,
     guidelines: template.guidelines,
     storyElements: template.storyElements || [],
     worldFacts: [],

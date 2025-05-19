@@ -10,6 +10,7 @@ import {
   PublicationStatus,
   Stat,
   TemplateIterationSections,
+  DifficultyLevel,
 } from "core/types/index.js";
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
@@ -74,6 +75,7 @@ export class AdminTemplateService {
       maxTurnsMin: baseTemplate.maxTurnsMin || 10,
       maxTurnsMax: baseTemplate.maxTurnsMax || 15,
       tags: baseTemplate.tags || [],
+      difficultyLevels: baseTemplate.difficultyLevels || [],
       createdAt: baseTemplate.createdAt || now,
       updatedAt: baseTemplate.updatedAt || now,
       title: baseTemplate.title || "",
@@ -329,7 +331,8 @@ export class AdminTemplateService {
     generateImages: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
-    gameMode: GameMode
+    gameMode: GameMode,
+    difficultyLevel: DifficultyLevel
   ): Promise<StoryTemplate> {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
@@ -345,7 +348,8 @@ export class AdminTemplateService {
         generateImages,
         playerCount,
         maxTurns,
-        gameMode
+        gameMode,
+        difficultyLevel
       );
 
       // Convert story state to template
@@ -384,6 +388,7 @@ export class AdminTemplateService {
         gameMode,
         maxTurnsMin: maxTurns,
         maxTurnsMax: maxTurns,
+        difficultyLevels: [difficultyLevel],
         ...templateData,
         tags: [],
       }) as StoryTemplate;

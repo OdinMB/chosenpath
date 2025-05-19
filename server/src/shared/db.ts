@@ -110,14 +110,16 @@ export async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stories (
         id TEXT PRIMARY KEY,
-        title TEXT,
         template_id TEXT,
+        creator_id TEXT,
+        generate_images BOOLEAN NOT NULL DEFAULT TRUE,
+        max_turns INTEGER NOT NULL,
+        difficulty_modifier INTEGER NOT NULL,
+        difficulty_title TEXT NOT NULL,
+        title TEXT,
+        current_beat INTEGER NOT NULL DEFAULT 0,
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL,
-        max_turns INTEGER NOT NULL,
-        generate_images BOOLEAN NOT NULL DEFAULT TRUE,
-        creator_id TEXT,
-        current_beat INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (creator_id) REFERENCES users (id) ON DELETE SET NULL
       )
     `);

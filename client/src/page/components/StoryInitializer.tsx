@@ -1,12 +1,17 @@
 import { useState, useMemo, useCallback } from "react";
-import { PlayerCount, GameMode, GameModes } from "core/types";
-import { PrimaryButton, Icons } from "components/ui";
+import { PlayerCount, GameMode, GameModes, DifficultyLevel } from "core/types";
+import { PrimaryButton, Icons, Tooltip } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
 import { useNavigate } from "react-router-dom";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
+import {
+  DEFAULT_DIFFICULTY_LEVELS,
+  getDifficultyDescription,
+  getDefaultDifficultyLevel,
+} from "core/utils/difficultyUtils.ts";
 
 interface StoryInitializerProps {
   onBack: () => void;
@@ -16,6 +21,7 @@ interface StoryInitializerProps {
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
+    difficultyLevel: DifficultyLevel;
   }) => Promise<void>;
   initialPlayerCount?: PlayerCount;
   initialMaxTurns?: number;
@@ -44,6 +50,8 @@ export const StoryInitializer = ({
   const [gameMode, setGameMode] = useState<GameMode>(
     initialGameMode || GameModes.Cooperative
   );
+  const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
+    useState<DifficultyLevel>(getDefaultDifficultyLevel());
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
@@ -173,6 +181,7 @@ export const StoryInitializer = ({
           maxTurns,
           gameMode,
           generateImages,
+          difficultyLevel: selectedDifficultyLevel,
         });
       } catch (error) {
         console.error("Error during template AI draft setup:", error);
@@ -188,6 +197,7 @@ export const StoryInitializer = ({
           maxTurns,
           generateImages,
           gameMode,
+          difficultyLevel: selectedDifficultyLevel,
         });
 
         if (storyId) {
@@ -225,6 +235,11 @@ export const StoryInitializer = ({
 
     setGameMode(mode);
     Logger.App.log(`Updated game mode to: ${mode}`);
+  };
+
+  const handleDifficultyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const index = Number(e.target.value);
+    setSelectedDifficultyLevel(DEFAULT_DIFFICULTY_LEVELS[index]);
   };
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
@@ -340,6 +355,42 @@ export const StoryInitializer = ({
             disabled={currentIsLoading}
             required
           />
+        </div>
+
+        {/* Difficulty Level Box */}
+        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-4">
+          <label
+            htmlFor="difficulty-level"
+            className="text-sm md:text-base font-medium text-primary flex items-center"
+          >
+            Difficulty: {selectedDifficultyLevel.title}
+            <Tooltip
+              content={getDifficultyDescription(
+                selectedDifficultyLevel.modifier
+              )}
+              position="top"
+              className="ml-2"
+            >
+              <Icons.Info className="h-4 w-4 text-primary-400" />
+            </Tooltip>
+          </label>
+          <input
+            id="difficulty-level"
+            type="range"
+            min={0}
+            max={DEFAULT_DIFFICULTY_LEVELS.length - 1}
+            step={1}
+            value={DEFAULT_DIFFICULTY_LEVELS.findIndex(
+              (level) => level.modifier === selectedDifficultyLevel.modifier
+            )}
+            onChange={handleDifficultyChange}
+            className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+            disabled={currentIsLoading}
+          />
+          <div className="flex justify-between text-xs md:text-sm text-primary-600">
+            <span>Easier</span>
+            <span>Harder</span>
+          </div>
         </div>
 
         {/* Images Box - Conditionally render if not in templateMode */}

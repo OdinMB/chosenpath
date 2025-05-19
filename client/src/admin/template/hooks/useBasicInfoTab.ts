@@ -5,6 +5,7 @@ import {
   GameModes,
   PlayerCount,
   PublicationStatusType,
+  DifficultyLevel,
 } from "core/types";
 import { MIN_PLAYERS, MAX_PLAYERS, MIN_TURNS, MAX_TURNS } from "core/config";
 
@@ -61,6 +62,10 @@ export function useBasicInfoTab({ template, onChange }: UseBasicInfoTabProps) {
         newGameMode = GameModes.Cooperative;
     }
     handleChange("gameMode", newGameMode);
+  };
+
+  const handleDifficultyLevelsChange = (levels: DifficultyLevel[]) => {
+    onChange({ difficultyLevels: levels });
   };
 
   const handlePublicationStatusChange = (
@@ -140,6 +145,7 @@ export function useBasicInfoTab({ template, onChange }: UseBasicInfoTabProps) {
     handlePublicationStatusChange,
     handleShowOnWelcomeScreenChange: (value: boolean) =>
       handleChange("showOnWelcomeScreen", value),
+    handleDifficultyLevelsChange,
     // Export UI helper functions
     getStoryLengthOptions,
     getPlayerCountOptions,

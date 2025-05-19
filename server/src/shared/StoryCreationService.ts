@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { PlayerCount, GameMode } from "core/types/index.js";
+import { PlayerCount, GameMode, DifficultyLevel } from "core/types/index.js";
 import { connectionManager } from "./ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "./storageUtils.js";
 import { ContentFilterService } from "../game/services/ContentFilterService.js";
@@ -52,6 +52,8 @@ export class StoryCreationService {
     playerCodes: Record<string, string>,
     maxTurns: number,
     generateImages: boolean,
+    difficultyTitle: string,
+    difficultyModifier: number,
     creatorId?: string
   ): Promise<void> {
     const db = getDb();
@@ -64,7 +66,9 @@ export class StoryCreationService {
         templateId,
         maxTurns,
         generateImages,
-        creatorId
+        creatorId,
+        difficultyTitle,
+        difficultyModifier
       );
 
       await storyDbService.bulkCreateStoryPlayerEntries(storyId, playerCodes);
@@ -91,6 +95,7 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
+    difficultyLevel: DifficultyLevel,
     res: Response,
     creatorId?: string
   ): Promise<void> {
@@ -128,6 +133,8 @@ export class StoryCreationService {
       playerCodes,
       maxTurns,
       generateImages,
+      difficultyLevel.title,
+      difficultyLevel.modifier,
       creatorId
     );
     // --- DB Integration End ---
@@ -147,6 +154,7 @@ export class StoryCreationService {
       playerCount,
       maxTurns,
       gameMode,
+      difficultyLevel,
       playerCodes,
       creatorId
     ).catch((error) => {
@@ -171,6 +179,7 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
+    difficultyLevel: DifficultyLevel,
     playerCodes: Record<string, string>,
     creatorId?: string
   ): Promise<void> {
@@ -184,7 +193,8 @@ export class StoryCreationService {
         generateImages,
         playerCount,
         maxTurns,
-        gameMode
+        gameMode,
+        difficultyLevel
       );
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
 
@@ -236,18 +246,18 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     generateImages: boolean,
+    difficultyLevel: DifficultyLevel,
     res: Response,
     creatorId?: string
   ): Promise<void> {
-    Logger.Route.log(`Creating story from template: ${templateId}`);
-    const storyId = randomUUID();
-
-    const templateService = new AdminTemplateService();
-    const template = await templateService.getTemplateById(templateId);
+    Logger.Route.log(
+      `Creating story from template: ${templateId} for ${playerCount} players, difficulty: ${difficultyLevel.title}`
+    );
+    const adminTemplateService = new AdminTemplateService();
+    const template = await adminTemplateService.getTemplateById(templateId);
 
     if (!template) {
-      Logger.Route.error(`Template not found: ${templateId}`);
-      sendError(res, `Template not found: ${templateId}`, 404); // Send error and return
+      sendError(res, "Template not found", 404);
       return;
     }
 
@@ -266,6 +276,7 @@ export class StoryCreationService {
       return;
     }
 
+    const storyId = randomUUID();
     const playerCodes = this.generatePlayerCodes(playerCount);
     Logger.Route.log(
       `Generated story ID: ${storyId} with ${playerCount} player codes`
@@ -282,6 +293,8 @@ export class StoryCreationService {
         playerCodes,
         maxTurns,
         generateImages,
+        difficultyLevel.title,
+        difficultyLevel.modifier,
         creatorId
       );
 
@@ -296,8 +309,10 @@ export class StoryCreationService {
       const storyState = createStoryStateFromTemplate(
         storyId,
         template,
+        playerCount,
         maxTurns,
         generateImages,
+        difficultyLevel,
         playerCodes
       );
       Logger.Route.log(`Created story state from template for: ${storyId}`);

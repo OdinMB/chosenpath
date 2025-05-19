@@ -58,6 +58,8 @@ interface StoryFeedDbRow {
   generate_images: boolean;
   creator_id: string | null;
   current_beat: number;
+  difficulty_title: string;
+  difficulty_modifier: number;
   // Player fields (can be null if a story has no players or if LEFT JOIN doesn't match)
   sp_story_id: string | null;
   sp_player_slot: string | null;
@@ -124,6 +126,8 @@ export async function getStoryFeed(
       s.generate_images,
       s.creator_id,
       s.current_beat,
+      s.difficulty_title,
+      s.difficulty_modifier,
       sp.story_id as sp_story_id,
       sp.player_slot as sp_player_slot,
       sp.code as sp_code,
@@ -158,6 +162,10 @@ export async function getStoryFeed(
         id: row.id,
         title: row.title,
         templateId: row.template_id,
+        difficultyLevel: {
+          modifier: row.difficulty_modifier,
+          title: row.difficulty_title,
+        },
         createdAt: isNaN(createdAtNum) ? 0 : createdAtNum,
         updatedAt: isNaN(updatedAtNum) ? 0 : updatedAtNum,
         maxTurns: row.max_turns,

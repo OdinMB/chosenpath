@@ -17,6 +17,8 @@ export const POINTS_FOR_UNFAVORABLE_RESOLUTION = -30;
 export const POINTS_FOR_SACRIFICE = 30;
 export const POINTS_FOR_REWARD = -30;
 
+export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = -10;
+
 // Rate limiting configuration
 export const RATE_LIMITED_ACTIONS = [
   "initialize_story",

@@ -53,6 +53,20 @@ export const publicationStatusSchema = z.enum([
 ]);
 export type PublicationStatusType = typeof publicationStatusSchema._type;
 
+export const difficultyLevelSchema = z.object({
+  modifier: z
+    .number()
+    .describe(
+      "Modifier that will be applied to all random number checks in the story. Between +10 and -40. Default is -10."
+    ),
+  title: z
+    .string()
+    .describe(
+      "Short term to summarize the difficulty level in a way that works for the story's setting. Examples: 'Friendly' (for a kids story with +10 modifier), 'Unforgiving' (for a survival story with -30 modifier)"
+    ),
+});
+export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
+
 export const guidelinesSchema = z
   .object({
     world: z
@@ -110,6 +124,9 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   return z
     .object({
       guidelines: guidelinesSchema,
+      difficultyLevel: difficultyLevelSchema.describe(
+        "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is -10. A harsh survival story might have -20/-30; a satire about billionaires doing whatever they want might have 0; a kids story might have +10."
+      ),
       storyElements: StoryElementsSchema,
       sharedOutcomes: z
         .array(outcomeSchema)
@@ -151,13 +168,16 @@ export type StorySetupBase<N extends PlayerCount> = {
   characterSelectionIntroduction: CharacterSelectionIntroduction;
 } & ExactPlayerMap<z.infer<typeof playerOptionsGenerationSchema>, N>;
 
-export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N>;
+export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N> & {
+  difficultyLevel: DifficultyLevel;
+};
 
 export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   id: string;
   createdAt: string;
   updatedAt: string;
   gameMode: GameMode;
+  difficultyLevels: DifficultyLevel[];
   playerCountMin: PlayerCount;
   playerCountMax: PlayerCount;
   maxTurnsMin: number;
@@ -180,6 +200,7 @@ export type StoryState = {
   title: string;
   imageInstructions: ImageInstructions;
   gameMode: GameMode;
+  difficultyLevel: DifficultyLevel;
   guidelines: Guidelines;
   storyElements: StoryElement[];
   worldFacts: string[];
@@ -207,6 +228,7 @@ export type ClientStoryState = {
   templateId?: string;
   title: string;
   gameMode: GameMode;
+  difficultyLevel: DifficultyLevel;
   sharedStats: ClientStat[];
   sharedStatValues: StatValueEntry[];
   playerStats: ClientStat[];
@@ -231,10 +253,11 @@ export type AdminStoriesListItem = {
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
   gameMode: string | null;
+  difficultyLevel: DifficultyLevel | null;
   playerCount: number;
   characterSelectionCompleted: boolean;
   maxTurns: number;
-  currentBeat: number; // Represents current_turn from DB
+  currentBeat: number;
   templateId?: string | null;
   error?: string; // Optional error message if story JSON couldn't be fully processed
 };

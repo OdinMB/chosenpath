@@ -19,6 +19,8 @@ export interface StoryDbOverviewItem {
   max_turns: number;
   template_id: string | null;
   player_count: number;
+  difficulty_title: string;
+  difficulty_modifier: number;
 }
 
 class StoryDbService {
@@ -29,13 +31,15 @@ class StoryDbService {
     maxTurns: number,
     generateImages: boolean,
     creatorId: string | undefined,
-    initialBeat: number = 0 // Renamed from initialTurn
+    difficultyTitle: string,
+    difficultyModifier: number,
+    initialBeat: number = 0
   ): Promise<void> {
     const db = getDb();
     const now = Date.now();
     const query = `
-      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat, difficulty_title, difficulty_modifier)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `; // Renamed current_turn to current_beat in SQL
     try {
       await db.query(query, [
@@ -48,6 +52,8 @@ class StoryDbService {
         generateImages,
         creatorId,
         initialBeat, // Renamed from initialTurn
+        difficultyTitle,
+        difficultyModifier,
       ]);
       Logger.Transaction.log(`Created story entry in DB: ${id}`);
     } catch (error) {
@@ -346,13 +352,12 @@ class StoryDbService {
         s.current_beat,
         s.max_turns,
         s.template_id,
-        COALESCE(pc.player_count, 0)::INTEGER AS player_count
+        s.difficulty_title,
+        s.difficulty_modifier,
+        COUNT(sp.player_slot) as player_count
       FROM stories s
-      LEFT JOIN (
-        SELECT story_id, COUNT(*) AS player_count
-        FROM story_players
-        GROUP BY story_id
-      ) pc ON s.id = pc.story_id
+      LEFT JOIN story_players sp ON s.id = sp.story_id
+      GROUP BY s.id, s.title, s.created_at, s.updated_at, s.current_beat, s.max_turns, s.template_id, s.difficulty_title, s.difficulty_modifier
       ORDER BY s.updated_at DESC;
     `;
     try {
