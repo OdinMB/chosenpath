@@ -2,15 +2,26 @@ Smaller commits!
 
 # NEXT
 
+- 1: resumable stories: spinner when loading page afresh
+- 2: Add difficulties to existing templates
+- 1: Hide difficulty slider for StoryInitialization.
+- 1: Test if AI creates sensible difficulty settings.
+- 1: modifier tags not centered if linebreak
 - 2: Generate images for AI-generated stories
+
+- 1: simple Credits page
+
+Montserrat[wght].ttf: Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
+
+Lora[wght].ttf: Copyright 2011 The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic), with Reserved Font Name "Lora".
+
 - 1: Check issue with image references in interludes
 - 1: story feed updates: every once in a while IF >= 1 multiplayer story with at least 1 pending other player
+- 2: Feedback: move away from Google App Script
 
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
-
-- 5: Difficulty level (affecting base points)
 
 - 10: More (multiplayer) templates (try to make 1-3 players work)
 - 4: for templates: additional images that are not attached to a story element
@@ -40,6 +51,7 @@ Focus: Text/Images, English, Multiplayer
 
 - 1: Export stories
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
+- 4: Images: thumbnail versions (especially for cover images); load full version in modals
 - 5: Credits system for generating stories
 - 15: Stripe integration
 - 15: System to view/navigate save files
