@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { PlayerCount, DifficultyLevel } from "core/types";
-import { PrimaryButton, Icons, Tooltip } from "components/ui";
+import { PrimaryButton, Icons, InfoIcon } from "components/ui";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
@@ -11,10 +11,8 @@ import { StoryTemplate } from "core/types";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
 import { RateLimitedResponse } from "core/types/api";
 import { notificationService } from "shared/notifications/notificationService";
-import {
-  getDifficultyDescription,
-  getDefaultDifficultyLevel,
-} from "core/utils/difficultyUtils.ts";
+import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
+import { DifficultySlider } from "./DifficultySlider";
 
 interface TemplateConfigLoaderData {
   template: StoryTemplate;
@@ -89,11 +87,8 @@ export function TemplateConfigurator() {
     Logger.App.log(`Updated player count to: ${value}`);
   };
 
-  const handleDifficultyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const index = Number(e.target.value);
-    if (template.difficultyLevels && template.difficultyLevels[index]) {
-      setSelectedDifficultyLevel(template.difficultyLevels[index]);
-    }
+  const handleDifficultyChange = (level: DifficultyLevel) => {
+    setSelectedDifficultyLevel(level);
   };
 
   const handleBack = () => {
@@ -203,47 +198,12 @@ export function TemplateConfigurator() {
 
               {/* Difficulty Level Slider - Only show if configurable */}
               {needsDifficultyConfig && template.difficultyLevels && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="difficulty-level"
-                    className="text-sm md:text-base font-medium text-primary flex items-center"
-                  >
-                    Difficulty: {selectedDifficultyLevel.title}
-                    <Tooltip
-                      content={getDifficultyDescription(
-                        selectedDifficultyLevel.modifier
-                      )}
-                      position="top"
-                      className="ml-2"
-                    >
-                      <Icons.Info className="h-4 w-4 text-primary-400" />
-                    </Tooltip>
-                  </label>
-                  <input
-                    id="difficulty-level"
-                    type="range"
-                    min={0}
-                    max={template.difficultyLevels.length - 1}
-                    step={1}
-                    value={template.difficultyLevels.findIndex(
-                      (level) =>
-                        level.modifier === selectedDifficultyLevel.modifier
-                    )}
-                    onChange={handleDifficultyChange}
-                    className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
-                    disabled={isLoading}
-                  />
-                  <div className="flex justify-between text-xs md:text-sm text-primary-600">
-                    <span>{template.difficultyLevels[0].title}</span>
-                    <span>
-                      {
-                        template.difficultyLevels[
-                          template.difficultyLevels.length - 1
-                        ].title
-                      }
-                    </span>
-                  </div>
-                </div>
+                <DifficultySlider
+                  selectedDifficultyLevel={selectedDifficultyLevel}
+                  availableDifficultyLevels={template.difficultyLevels}
+                  onChange={handleDifficultyChange}
+                  disabled={isLoading}
+                />
               )}
 
               {/* Images Checkbox */}
@@ -260,7 +220,12 @@ export function TemplateConfigurator() {
                   htmlFor="generate-images"
                   className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
                 >
-                  Generate additional custom images for this story
+                  Add unique images to your story
+                  <InfoIcon
+                    tooltipText="The story always has default images. We will add images depending on what's happening in your unique story."
+                    className="ml-2 -mt-0.5"
+                    position="top"
+                  />
                 </label>
               </div>
             </div>

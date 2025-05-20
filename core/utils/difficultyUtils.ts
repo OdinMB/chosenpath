@@ -4,11 +4,11 @@ import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "../config.js";
 export const DEFAULT_DIFFICULTY_LEVELS: DifficultyLevel[] = [
   {
     modifier: 10,
-    title: "Relaxed",
+    title: "Friendly",
   },
   {
     modifier: 0,
-    title: "Light Challenge",
+    title: "Relaxed",
   },
   {
     modifier: -10,
@@ -16,11 +16,11 @@ export const DEFAULT_DIFFICULTY_LEVELS: DifficultyLevel[] = [
   },
   {
     modifier: -20,
-    title: "Considerable Challenge",
+    title: "Challenging",
   },
   {
     modifier: -30,
-    title: "Demanding Narrative",
+    title: "Struggle",
   },
   {
     modifier: -40,
