@@ -1,129 +1,41 @@
-import {
-  ChallengeOption,
-  ResolutionDetails,
-  Beat,
-  ClientStoryState,
-} from "core/types";
-import {
-  POINTS_FOR_FAVORABLE_RESOLUTION,
-  POINTS_FOR_MIXED_RESOLUTION,
-  POINTS_FOR_UNFAVORABLE_RESOLUTION,
-} from "core/config";
+import { ResolutionDetails } from "core/types";
 
 /**
- * Enhances ResolutionDetails with readable point modifiers
- * for display in the UI
+ * Enhances ResolutionDetails by ensuring readablePointModifiers array exists.
+ * The backend is now responsible for populating the actual modifiers.
  *
- * @param details The original resolution details
- * @param option The challenge option selected
- * @param beatIndex The index of the beat in the beat history
- * @returns Enhanced resolution details with readable point modifiers
+ * @param details The original resolution details from the backend
+ * @returns Enhanced resolution details, primarily ensuring readablePointModifiers is an array.
  */
 export function enhanceResolutionDetails(
-  details: ResolutionDetails,
-  option: ChallengeOption,
-  beatIndex: number,
-  beatHistory: Beat[]
+  details: ResolutionDetails
 ): ResolutionDetails {
-  // If pointModifiers already exist, return as is
-  if (details.readablePointModifiers) return details;
+  // The backend now provides the full list of readablePointModifiers.
+  // This function primarily ensures the array exists for safe access in UI components
+  // and can be a point for client-side logging or minor adjustments if ever needed.
 
-  const modifiers: Array<[string, number]> = [];
-
-  // Add base points from the option with appropriate label based on resourceType
-  let basePointLabel = "Choice";
-  if (option.resourceType === "sacrifice") {
-    basePointLabel = "Sacrifice";
-  } else if (option.resourceType === "reward") {
-    basePointLabel = "Reward";
-  }
-  modifiers.push([basePointLabel, option.basePoints]);
-
-  // Add stat modifiers with readable names
-  if (option.modifiersToSuccessRate) {
-    option.modifiersToSuccessRate.forEach((mod) => {
-      // Get the stat name from the ID
-      const statName = getStatNameById(mod.statId);
-
-      if (mod.effect !== 0) {
-        modifiers.push([`${statName}`, mod.effect]);
-      }
-    });
+  if (!details) {
+    console.error(
+      "[enhanceResolutionDetails] Received undefined details object. Returning a default structure."
+    );
+    return {
+      points: 0,
+      distribution: { favorable: 0, mixed: 0, unfavorable: 0 },
+      readablePointModifiers: [],
+    };
   }
 
-  // Add resolution effect from previous beat (if there was one)
-  // Beats create momentum - favorable outcomes make it easier to succeed in following beats
-  if (beatIndex > 1) {
-    const previousBeat = beatHistory[beatIndex - 2];
-
-    // Only add momentum if the previous beat had a resolution
-    if (previousBeat && previousBeat.resolution) {
-      let resolutionEffect = 0;
-
-      switch (previousBeat.resolution) {
-        case "favorable":
-          resolutionEffect = POINTS_FOR_FAVORABLE_RESOLUTION;
-          break;
-        case "mixed":
-          resolutionEffect = POINTS_FOR_MIXED_RESOLUTION;
-          break;
-        case "unfavorable":
-          resolutionEffect = POINTS_FOR_UNFAVORABLE_RESOLUTION;
-          break;
-      }
-
-      if (resolutionEffect !== 0) {
-        modifiers.push([`Previous beat`, resolutionEffect]);
-      }
-    }
+  if (!details.readablePointModifiers) {
+    // This case might happen if the backend somehow fails to send it,
+    // or for older data structures if not fully migrated.
+    console.warn(
+      "[enhanceResolutionDetails] Backend did not provide readablePointModifiers. Defaulting to empty array."
+    );
+    return {
+      ...details,
+      readablePointModifiers: [],
+    };
   }
 
-  // Return enhanced details with modifiers
-  return {
-    ...details,
-    readablePointModifiers: modifiers,
-  };
-}
-
-/**
- * Helper function to get stat name by ID
- *
- * @param statId The ID of the stat
- * @returns The human-readable name of the stat
- */
-export function getStatNameById(
-  statId: string,
-  storyState?: ClientStoryState
-): string {
-  if (!storyState) return formatStatId(statId);
-
-  // Check player stats
-  for (const stat of storyState.playerStats || []) {
-    if (stat.id === statId) {
-      return stat.name;
-    }
-  }
-
-  // Check shared stats
-  if (storyState.sharedStats) {
-    for (const stat of storyState.sharedStats) {
-      if (stat.id === statId) {
-        return stat.name;
-      }
-    }
-  }
-
-  // If we don't find the stat, return a formatted version of the ID
-  return formatStatId(statId);
-}
-
-/**
- * Format a stat ID into a readable name
- */
-function formatStatId(statId: string): string {
-  return statId
-    .split("_")
-    .slice(1)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return details;
 }

@@ -17,6 +17,7 @@ import { ChangeService } from "./ChangeService.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/shared/StoryDbService.js";
+import { DifficultyLevel } from "core/types/index.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -205,10 +206,25 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     // Update story with the new choice
     const updatedStory = story.updateChoice(playerSlot, optionIndex);
 
+    // Get the difficulty level from the story state
+    const currentDifficultyLevel = updatedStory.getState().difficultyLevel;
+    let difficultyToUse: DifficultyLevel;
+
+    if (!currentDifficultyLevel) {
+      console.warn(
+        `[GameQueueProcessor] Difficulty level not found in story state for game ${gameId}. Using default (0 modifier). This should be investigated.`
+      );
+      // Provide a default DifficultyLevel to prevent type errors and ensure smooth operation
+      difficultyToUse = { title: "Balanced", modifier: -10 };
+    } else {
+      difficultyToUse = currentDifficultyLevel;
+    }
+
     const storyWithBeatResolution = this.processBeatResolution(
       updatedStory,
       playerSlot,
-      optionIndex
+      optionIndex,
+      difficultyToUse // Pass the validated or default DifficultyLevel object
     );
 
     // Store and broadcast the story update (this also updates stories.current_turn via storeStory -> service)
@@ -241,7 +257,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
   private processBeatResolution(
     story: Story,
     playerSlot: PlayerSlot,
-    optionIndex: number
+    optionIndex: number,
+    difficultyLevel: DifficultyLevel
   ): Story {
     const currentBeat = story.getCurrentBeat(playerSlot);
 
@@ -273,14 +290,26 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     }
 
     // Process challenge beat resolution
-    // Get the thread's last step resolution for this player
     const threadLastStepResolution =
       story.getCurrentThreadLastStepResolution(playerSlot);
 
-    // Get both resolution and details from BeatResolutionService
+    // Ensure difficultyLevel is a valid object, though handleRecordChoice should now guarantee this.
+    // This is an additional safeguard, primarily for direct calls to processBeatResolution if any exist elsewhere.
+    const dLevel = difficultyLevel || {
+      title: "Error: Missing Difficulty",
+      modifier: 0,
+    };
+    if (!difficultyLevel) {
+      console.error(
+        `[GameQueueProcessor] processBeatResolution called with null/undefined difficultyLevel for story ${story.getId()}. Using default.`
+      );
+    }
+
     const result = BeatResolutionService.getChallengeBeatResolution(
       currentBeat,
-      threadLastStepResolution
+      threadLastStepResolution,
+      dLevel, // This is the DifficultyLevel object
+      story // Pass the full story object directly
     );
 
     beatResolution = result.resolution;

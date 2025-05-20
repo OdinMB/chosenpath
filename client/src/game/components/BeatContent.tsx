@@ -77,12 +77,7 @@ export const BeatContent: React.FC<BeatContentProps> = ({
       prevBeat.resolution &&
       prevBeat.resolutionDetails
     ) {
-      resolutionDetails = enhanceResolutionDetails(
-        prevBeat.resolutionDetails,
-        selectedOption,
-        prevBeatIndex + 1, // Add 1 because beat index is 0-based but display is 1-based
-        beatHistory
-      );
+      resolutionDetails = enhanceResolutionDetails(prevBeat.resolutionDetails);
     }
 
     return (

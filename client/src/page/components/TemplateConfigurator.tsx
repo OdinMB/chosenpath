@@ -222,7 +222,7 @@ export function TemplateConfigurator() {
                 >
                   Add unique images to your story
                   <InfoIcon
-                    tooltipText="The story always has default images. We will add images depending on what's happening in your unique story."
+                    tooltipText="The story always has default images. We will add additional ones for your unique story."
                     className="ml-2 -mt-0.5"
                     position="top"
                   />

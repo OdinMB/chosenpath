@@ -263,28 +263,43 @@ export const PreviousChoiceVisualizer: React.FC<
   };
 
   // Render a modifier tag for the animation
-  const renderModifierTag = (name: string, value: number) => (
-    <div
-      className={`
-        inline-flex items-center px-2 py-1 mr-2 mb-1 rounded text-sm
-        bg-white border shadow-sm animate-fadeIn transition-all duration-300
-        ${
-          value >= 0
-            ? "text-emerald-800 border-emerald-200"
-            : "text-red-800 border-red-200"
-        }
-      `}
-    >
-      <span className="mr-1.5 font-medium">{name}</span>
-      <span
-        className={`font-bold ${
-          value >= 0 ? "text-emerald-600" : "text-red-600"
-        }`}
+  const renderModifierTag = (modifier: {
+    name: string;
+    value: number;
+    tooltip?: string;
+  }) => {
+    const tagContent = (
+      <div
+        className={`
+          inline-flex items-center px-2 py-1 mr-2 mb-1 rounded text-sm
+          bg-white border shadow-sm animate-fadeIn transition-all duration-300
+          ${
+            modifier.value >= 0
+              ? "text-emerald-800 border-emerald-200"
+              : "text-red-800 border-red-200"
+          }
+        `}
       >
-        {value >= 0 ? `+${value}` : value}
-      </span>
-    </div>
-  );
+        <span className="mr-1.5 font-medium">{modifier.name}</span>
+        <span
+          className={`font-bold ${
+            modifier.value >= 0 ? "text-emerald-600" : "text-red-600"
+          }`}
+        >
+          {modifier.value >= 0 ? `+${modifier.value}` : modifier.value}
+        </span>
+      </div>
+    );
+
+    if (modifier.tooltip) {
+      return (
+        <Tooltip content={modifier.tooltip} position="top">
+          {tagContent}
+        </Tooltip>
+      );
+    }
+    return tagContent;
+  };
 
   return (
     <div className="max-w-2xl mx-auto mb-4 flex justify-center">
@@ -427,7 +442,7 @@ export const PreviousChoiceVisualizer: React.FC<
                         {getRiskDisplayText(choice.riskType)}
                       </span>
                       <InfoIcon
-                        className="ml-1 mt-1"
+                        className="ml-1 -mt-0.5"
                         tooltipText={formatRiskDistribution(choice.riskType)}
                       />
                     </div>
@@ -438,7 +453,7 @@ export const PreviousChoiceVisualizer: React.FC<
                           {choice.resourceType}
                         </span>
                         <InfoIcon
-                          className="ml-1 mt-1"
+                          className="ml-1 -mt-0.5"
                           tooltipText={getResourceTypeInfo(choice.resourceType)}
                         />
                       </div>
@@ -449,7 +464,6 @@ export const PreviousChoiceVisualizer: React.FC<
                             {currentPoints >= 0 ? "Bonus" : "Malus"}:
                           </span>
                           {renderPointsValue(currentPoints)}
-                          {/* InfoIcon hidden as requested */}
                         </div>
                       )
                     )}
@@ -463,21 +477,32 @@ export const PreviousChoiceVisualizer: React.FC<
                             {currentPoints >= 0 ? "Bonus" : "Malus"}:
                           </span>
                           {renderPointsValue(currentPoints)}
-                          {/* InfoIcon hidden as requested */}
                         </div>
                       )}
                   </div>
                 </div>
 
                 {/* Animated modifier tags */}
-                {(isModifierAnimating || visibleModifiers.length > 0) && (
+                {(isModifierAnimating ||
+                  visibleModifiers.length > 0 ||
+                  (!animateRoll &&
+                    expanded &&
+                    isChallenge &&
+                    resolutionDetails &&
+                    resolutionDetails.readablePointModifiers &&
+                    resolutionDetails.readablePointModifiers.length > 0)) && (
                   <div className="flex flex-wrap mt-2 mb-0">
                     {/* Add the same container used for emoji to ensure alignment */}
                     <div className="hidden md:block w-14 items-center justify-center"></div>
                     <div className="flex flex-wrap">
-                      {visibleModifiers.map(([name, value], index) => (
-                        <React.Fragment key={index}>
-                          {renderModifierTag(name, value)}
+                      {(!animateRoll &&
+                      expanded &&
+                      resolutionDetails?.readablePointModifiers
+                        ? resolutionDetails.readablePointModifiers
+                        : visibleModifiers
+                      ).map((mod) => (
+                        <React.Fragment key={mod.name}>
+                          {renderModifierTag(mod)}
                         </React.Fragment>
                       ))}
                     </div>

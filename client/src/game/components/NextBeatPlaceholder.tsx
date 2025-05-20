@@ -35,12 +35,7 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
       selectedOption &&
       selectedOption.optionType === "challenge"
     ) {
-      return enhanceResolutionDetails(
-        previousBeat.resolutionDetails,
-        selectedOption,
-        1, // We're only dealing with a single previousBeat
-        [previousBeat] // We only need this beat for context
-      );
+      return enhanceResolutionDetails(previousBeat.resolutionDetails);
     }
     return isValidData ? previousBeat.resolutionDetails : undefined;
   }, [isValidData, previousBeat, selectedOption, isChallengeBeat]);

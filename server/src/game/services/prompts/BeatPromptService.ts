@@ -438,12 +438,12 @@ ${
 ${
   story.getCurrentBeatType() === "thread"
     ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
-      "--- basePoints: for normal resource types: assign a value between +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest (in general, ignoring the specific stats in the current story state). +" +
+      "--- basePoints: for normal resource types: assign a value between +5 to -15. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15 here. " +
       POINTS_FOR_SACRIFICE +
       " for sacrifice options. " +
       POINTS_FOR_REWARD +
       " for reward options.\n" +
-      "--- modifiers: identify stats (individual and shared) that given their current value have an effect on the likelihood of success. This must be consistent with the stat's 'effects on challenge success' in the story state. Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere.\n" +
+      "--- modifiers: identify stats (individual or shared) that given their current value have an effect on the likelihood of success. This must be consistent with the stat's definition (its 'effects on challenge success' attribute). Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Consider both positive and negative effects.\n" +
       "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
     : ""
 }

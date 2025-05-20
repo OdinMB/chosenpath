@@ -52,7 +52,7 @@ const optionChallengeSchema = z
     basePoints: z
       .number()
       .describe(
-        "For normal resource types: +15 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest.\n" +
+        "For normal resource types: +5 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15.\n" +
           "For sacrifice resource types: +20 to +30 depending on how much is sacrificed and how much sense this option makes for achieving a favorable result / winning the contest.\n" +
           "For reward resource types: -20 to -30 depending on how much is gained and how much sense this option makes for achieving a favorable result / winning the contest."
       ),
@@ -81,7 +81,7 @@ const optionChallengeSchema = z
           )
       )
       .describe(
-        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Only mention stats that with their current value change the success rate of this option and by how much. (Stats that are mentioned here don't change themselves. They just influence the success rate.)"
+        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Only mention stats that with their current value change the success rate of this option and by how much. Consider both positive and negative effects."
       ),
   })
   .describe(
@@ -345,7 +345,11 @@ export interface ResolutionDetails {
   distribution: ProbabilityDistribution;
   roll?: number;
   points: number;
-  readablePointModifiers?: Array<[string, number]>;
+  readablePointModifiers?: Array<{
+    name: string;
+    value: number;
+    tooltip?: string;
+  }>;
 }
 
 export type Beat = z.infer<typeof beatGenerationSchema> & {

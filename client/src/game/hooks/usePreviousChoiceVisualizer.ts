@@ -11,46 +11,6 @@ const MODIFIER_PHASE_DURATION = 4000; // 4 seconds for modifiers (increased from
 const ROLL_PHASE_DURATION = 3500; // 3.5 seconds for roll animations
 const TOTAL_ANIMATION_DURATION = MODIFIER_PHASE_DURATION + ROLL_PHASE_DURATION; // 7.5 seconds total
 
-// Helper function outside the component to adjust modifiers
-function adjustModifiersWithPreviousBeat(
-  readableModifiers: Array<[string, number]> = [],
-  totalPoints = 0
-): Array<[string, number]> {
-  // If no modifiers or totalPoints is 0, return empty array
-  if (readableModifiers.length === 0 || totalPoints === 0) {
-    return readableModifiers;
-  }
-
-  // Calculate sum of existing modifiers
-  const modifiersSum = readableModifiers.reduce(
-    (sum, [, value]) => sum + value,
-    0
-  );
-
-  // No adjustment needed if sum matches total
-  if (modifiersSum === totalPoints) {
-    return readableModifiers;
-  }
-
-  // Calculate difference for "Previous beat" modifier
-  const difference = totalPoints - modifiersSum;
-
-  // Check if "Previous beat" already exists
-  const previousBeatIndex = readableModifiers.findIndex(
-    ([name]) => name === "Previous beat"
-  );
-
-  if (previousBeatIndex >= 0) {
-    // Update existing "Previous beat" modifier
-    const result = [...readableModifiers];
-    result[previousBeatIndex] = ["Previous beat", difference];
-    return result;
-  } else {
-    // Add new "Previous beat" modifier at the beginning
-    return [["Previous beat", difference], ...readableModifiers];
-  }
-}
-
 interface UsePreviousChoiceVisualizerProps {
   animateRoll: boolean;
   resolution?: Resolution;
@@ -75,7 +35,7 @@ interface UsePreviousChoiceVisualizerResult {
   currentMarkerPosition: number;
 
   // Modifier animation
-  visibleModifiers: Array<[string, number]>;
+  visibleModifiers: Array<{ name: string; value: number; tooltip?: string }>;
   isModifierAnimating: boolean;
 
   // Points animation
@@ -139,23 +99,22 @@ export const usePreviousChoiceVisualizer = ({
 
   // Modifier animation state
   const [visibleModifiers, setVisibleModifiers] = useState<
-    Array<[string, number]>
+    Array<{ name: string; value: number; tooltip?: string }>
   >([]);
   const [isModifierAnimating, setIsModifierAnimating] = useState(false);
   const modifierTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
   // Store adjusted modifiers in a ref to maintain stable reference
-  const adjustedModifiersRef = useRef<Array<[string, number]>>([]);
+  const adjustedModifiersRef = useRef<
+    Array<{ name: string; value: number; tooltip?: string }>
+  >([]);
 
   // Update adjusted modifiers when resolutionDetails changes
   useEffect(() => {
     if (resolutionDetails) {
-      const originalModifiers = resolutionDetails.readablePointModifiers || [];
-      const finalTotal = resolutionDetails.points || 0;
-      adjustedModifiersRef.current = adjustModifiersWithPreviousBeat(
-        originalModifiers,
-        finalTotal
-      );
+      // Directly use readablePointModifiers if available, should be prepared by enhanceResolutionDetails
+      adjustedModifiersRef.current =
+        resolutionDetails.readablePointModifiers || [];
     } else {
       adjustedModifiersRef.current = [];
     }
@@ -168,8 +127,12 @@ export const usePreviousChoiceVisualizer = ({
     isComplete: isPointsComplete,
     isTransitioning: isPointsTransitioning,
   } = usePointsAnimation({
-    modifiers: adjustedModifiersRef.current,
-    visibleModifiers,
+    modifiers: adjustedModifiersRef.current.map(
+      ({ name, value }): [string, number] => [name, value]
+    ),
+    visibleModifiers: visibleModifiers.map(
+      ({ name, value }): [string, number] => [name, value]
+    ),
     isAnimating: isModifierAnimating,
     finalTotal: resolutionDetails?.points || 0,
   });
@@ -185,7 +148,9 @@ export const usePreviousChoiceVisualizer = ({
         mixed: 34,
         unfavorable: 33,
       },
-      visibleModifiers,
+      visibleModifiers: visibleModifiers.map(
+        ({ name, value }): [string, number] => [name, value]
+      ),
       isPointsTransitioning,
     });
 

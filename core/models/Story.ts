@@ -130,11 +130,38 @@ export class Story {
   }
 
   getStatById(statId: string): Stat | null {
-    return (
-      this.state.playerStats.find((stat) => stat.id === statId) ||
-      this.state.sharedStats.find((stat) => stat.id === statId) ||
-      null
-    );
+    // 1. Try direct match in playerStats
+    let foundStat = this.state.playerStats.find((stat) => stat.id === statId);
+    if (foundStat) {
+      return foundStat;
+    }
+
+    // 2. Try direct match in sharedStats
+    foundStat = this.state.sharedStats.find((stat) => stat.id === statId);
+    if (foundStat) {
+      return foundStat;
+    }
+
+    // 3. Try to parse player-slot-specific statId to a generic player statId
+    //    Assumes generic player stats are defined with IDs like "player_strength",
+    //    and modifiers might use slot-specific IDs like "player1_strength".
+    const playerSpecificPattern = /^player[A-Za-z0-9]+_(.+)$/;
+    const match = statId.match(playerSpecificPattern);
+
+    if (match && match[1]) {
+      const genericSuffix = match[1]; // e.g., "strength" from "player1_strength"
+      const genericPlayerStatId = `player_${genericSuffix}`; // e.g., "player_strength"
+
+      // Attempt to find the stat using the constructed generic ID in playerStats
+      foundStat = this.state.playerStats.find(
+        (stat) => stat.id === genericPlayerStatId
+      );
+      if (foundStat) {
+        return foundStat;
+      }
+    }
+
+    return null; // Stat not found
   }
 
   getSharedStats(): Stat[] {
