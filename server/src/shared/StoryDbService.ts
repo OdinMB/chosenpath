@@ -31,8 +31,8 @@ class StoryDbService {
     maxTurns: number,
     generateImages: boolean,
     creatorId: string | undefined,
-    difficultyTitle: string,
-    difficultyModifier: number,
+    difficultyTitle: string | null,
+    difficultyModifier: number | null,
     initialBeat: number = 0
   ): Promise<void> {
     const db = getDb();
@@ -416,6 +416,61 @@ class StoryDbService {
       await db.query("ROLLBACK");
       Logger.Transaction.error(
         `ROLLBACK: Error deleting story ${storyId} and its players:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  async updateStoryGeneratedDetails(
+    storyId: string,
+    title: string | null,
+    difficultyTitle: string | null,
+    difficultyModifier: number | null
+  ): Promise<void> {
+    const db = getDb();
+    const now = Date.now();
+    const updates: string[] = [];
+    const values: (string | number | null)[] = [];
+    let placeholderIndex = 1;
+
+    if (title !== null && title !== undefined) {
+      updates.push(`title = $${placeholderIndex++}`);
+      values.push(title);
+    }
+    if (difficultyTitle !== null && difficultyTitle !== undefined) {
+      updates.push(`difficulty_title = $${placeholderIndex++}`);
+      values.push(difficultyTitle);
+    }
+    if (difficultyModifier !== null && difficultyModifier !== undefined) {
+      updates.push(`difficulty_modifier = $${placeholderIndex++}`);
+      values.push(difficultyModifier);
+    }
+
+    if (updates.length === 0) {
+      Logger.Transaction.log(
+        `No details to update in DB for story: ${storyId}`
+      );
+      return; // Nothing to update
+    }
+
+    values.push(now); // for updated_at
+    values.push(storyId); // for WHERE id =
+
+    const query = `
+      UPDATE stories
+      SET ${updates.join(", ")}, updated_at = $${placeholderIndex++}
+      WHERE id = $${placeholderIndex}
+    `;
+
+    try {
+      await db.query(query, values);
+      Logger.Transaction.log(
+        `Updated generated details in DB for story: ${storyId}`
+      );
+    } catch (error) {
+      Logger.Transaction.error(
+        `Error updating generated details in DB for ${storyId}:`,
         error
       );
       throw error;

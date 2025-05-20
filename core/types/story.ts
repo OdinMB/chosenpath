@@ -57,7 +57,7 @@ export const difficultyLevelSchema = z.object({
   modifier: z
     .number()
     .describe(
-      "Modifier that will be applied to all random number checks in the story. Between +10 and -40. Default is -10."
+      "Modifier that will be applied to all random number checks in the story. Between +10 and -40. Use steps of 10. Default is -10. At that level, players tend to achieve most but not all of their goals in the end. At -30, players tend to achieve only a few of their goals, and the story features many failures."
     ),
   title: z
     .string()

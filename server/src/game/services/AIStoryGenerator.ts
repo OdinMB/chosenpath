@@ -83,7 +83,7 @@ export class AIStoryGenerator {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel
+    difficultyLevel: DifficultyLevel | undefined
   ): Promise<StoryState> {
     const setup = await this.generateStorySetup(
       prompt,
@@ -102,12 +102,14 @@ export class AIStoryGenerator {
         } as StatValueEntry)
     );
 
+    const finalDifficultyLevel = difficultyLevel || setup.difficultyLevel;
+
     const initialState: StoryState = {
       id: gameId,
       title: setup.title,
       imageInstructions: setup.imageInstructions,
       gameMode,
-      difficultyLevel,
+      difficultyLevel: finalDifficultyLevel,
       guidelines: setup.guidelines,
       storyElements: setup.storyElements,
       worldFacts: [],

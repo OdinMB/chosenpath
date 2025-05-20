@@ -68,7 +68,7 @@ export interface CreateStoryRequest extends ClientRequest {
   playerCount: number;
   maxTurns: number;
   gameMode: GameMode;
-  difficultyLevel: DifficultyLevel;
+  difficultyLevel?: DifficultyLevel;
 }
 export interface CreateStoryFromTemplateRequest extends ClientRequest {
   templateId: string;

@@ -71,7 +71,7 @@ export interface GenerateTemplateRequest extends ClientRequest {
   maxTurns: number;
   gameMode: GameMode;
   generateImages?: boolean;
-  difficultyLevel: DifficultyLevel;
+  difficultyLevel?: DifficultyLevel;
 }
 
 export interface TemplateIterationRequest extends ClientRequest {

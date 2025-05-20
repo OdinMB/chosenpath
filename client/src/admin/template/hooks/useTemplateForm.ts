@@ -271,26 +271,34 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     }
   };
 
-  // Handle AI draft setup
+  // AI-assisted drafting of template content
   const handleAIDraftSetup = async (options: {
     prompt: string;
     playerCount: PlayerCount;
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
-    difficultyLevel: DifficultyLevel;
+    difficultyLevel?: DifficultyLevel; // Made optional
   }) => {
     setIsLoading(true);
-    Logger.UI.log("AI Draft setup initiated with options:", options);
+    Logger.UI.log("AI draft setup initiated with options:", options);
+
+    // If difficultyLevel is not provided by StoryInitializer (because it was commented out),
+    // we might need to ensure a default is used if the API expects one, or if our logic here needs it.
+    // For now, we'll assume the API or downstream logic can handle an undefined difficultyLevel
+    // or that the AI will choose one.
+    const difficultyToUse = options.difficultyLevel; // This will be undefined if not sent
+
+    const requestData: GenerateTemplateRequest = {
+      prompt: options.prompt,
+      playerCount: options.playerCount,
+      maxTurns: options.maxTurns,
+      gameMode: options.gameMode,
+      generateImages: options.generateImages,
+      difficultyLevel: difficultyToUse, // Directly assign, it can be undefined
+    };
+
     try {
-      const requestData: GenerateTemplateRequest = {
-        prompt: options.prompt,
-        playerCount: options.playerCount,
-        maxTurns: options.maxTurns,
-        gameMode: options.gameMode,
-        generateImages: options.generateImages,
-        difficultyLevel: options.difficultyLevel,
-      };
       const result = await adminTemplateApi.generateTemplateViaApi(requestData);
       const generatedTemplateData = result.template;
 

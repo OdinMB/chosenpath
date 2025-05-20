@@ -7,11 +7,10 @@ import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
 import { useNavigate } from "react-router-dom";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
-import {
-  DEFAULT_DIFFICULTY_LEVELS,
-  getDefaultDifficultyLevel,
-} from "core/utils/difficultyUtils.ts";
-import { DifficultySlider } from "./DifficultySlider";
+import // DEFAULT_DIFFICULTY_LEVELS,
+// getDefaultDifficultyLevel,
+"core/utils/difficultyUtils.ts";
+// import { DifficultySlider } from "./DifficultySlider";
 
 interface StoryInitializerProps {
   onBack: () => void;
@@ -21,7 +20,7 @@ interface StoryInitializerProps {
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
-    difficultyLevel: DifficultyLevel;
+    difficultyLevel?: DifficultyLevel;
   }) => Promise<void>;
   initialPlayerCount?: PlayerCount;
   initialMaxTurns?: number;
@@ -50,8 +49,6 @@ export const StoryInitializer = ({
   const [gameMode, setGameMode] = useState<GameMode>(
     initialGameMode || GameModes.Cooperative
   );
-  const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
-    useState<DifficultyLevel>(getDefaultDifficultyLevel());
   const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
     new Set()
   );
@@ -181,7 +178,6 @@ export const StoryInitializer = ({
           maxTurns,
           gameMode,
           generateImages,
-          difficultyLevel: selectedDifficultyLevel,
         });
       } catch (error) {
         console.error("Error during template AI draft setup:", error);
@@ -197,7 +193,6 @@ export const StoryInitializer = ({
           maxTurns,
           generateImages,
           gameMode,
-          difficultyLevel: selectedDifficultyLevel,
         });
 
         if (storyId) {
@@ -235,10 +230,6 @@ export const StoryInitializer = ({
 
     setGameMode(mode);
     Logger.App.log(`Updated game mode to: ${mode}`);
-  };
-
-  const handleDifficultyChange = (level: DifficultyLevel) => {
-    setSelectedDifficultyLevel(level);
   };
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
@@ -357,7 +348,7 @@ export const StoryInitializer = ({
         </div>
 
         {/* Difficulty Level Box */}
-        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+        {/* <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
           <DifficultySlider
             selectedDifficultyLevel={selectedDifficultyLevel}
             availableDifficultyLevels={DEFAULT_DIFFICULTY_LEVELS}
@@ -366,7 +357,7 @@ export const StoryInitializer = ({
             sliderLabelMin="Easier"
             sliderLabelMax="Harder"
           />
-        </div>
+        </div> */}
 
         {/* Images Box - Conditionally render if not in templateMode */}
         {!templateMode && (

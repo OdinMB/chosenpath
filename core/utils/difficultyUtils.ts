@@ -30,21 +30,21 @@ export const DEFAULT_DIFFICULTY_LEVELS: DifficultyLevel[] = [
 
 export function getDifficultyDescription(modifier: number): string {
   if (modifier >= 10) {
-    return "Things tend to go well for you.";
+    return "Things tend to go well.";
   }
   if (modifier >= 0) {
-    return "Things tend to go well for you in the end.";
+    return "Things tend to go well in the end.";
   }
   if (modifier >= -10) {
-    return "A balanced experience.";
+    return "Ups and downs. A balanced experience.";
   }
   if (modifier >= -20) {
-    return "You will experience significant challenges.";
+    return "Things can go horribly wrong.";
   }
   if (modifier >= -30) {
-    return "Constant struggle. You will play against the odds.";
+    return "A constant struggle. You will play against the odds.";
   }
-  return "The odds are stacked against you. Good luck!";
+  return "Are you sure you want to do this?";
 }
 
 export function getDefaultDifficultyLevel(): DifficultyLevel {

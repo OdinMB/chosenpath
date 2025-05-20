@@ -52,8 +52,8 @@ export class StoryCreationService {
     playerCodes: Record<string, string>,
     maxTurns: number,
     generateImages: boolean,
-    difficultyTitle: string,
-    difficultyModifier: number,
+    difficultyTitle: string | null,
+    difficultyModifier: number | null,
     creatorId?: string
   ): Promise<void> {
     const db = getDb();
@@ -95,7 +95,7 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel,
+    difficultyLevel: DifficultyLevel | undefined,
     res: Response,
     creatorId?: string
   ): Promise<void> {
@@ -128,13 +128,13 @@ export class StoryCreationService {
     // --- DB Integration Start ---
     await this._createStoryDbEntries(
       storyId,
-      null, // Title is initially null for AI stories
+      null, // Title is initially null
       null, // No templateId for custom stories
       playerCodes,
       maxTurns,
       generateImages,
-      difficultyLevel.title,
-      difficultyLevel.modifier,
+      difficultyLevel?.title || null, // Pass null if undefined
+      difficultyLevel?.modifier || null, // Pass null if undefined
       creatorId
     );
     // --- DB Integration End ---
@@ -154,7 +154,7 @@ export class StoryCreationService {
       playerCount,
       maxTurns,
       gameMode,
-      difficultyLevel,
+      difficultyLevel, // Pass original difficultyLevel (could be undefined)
       playerCodes,
       creatorId
     ).catch((error) => {
@@ -179,7 +179,7 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel,
+    difficultyLevel: DifficultyLevel | undefined,
     playerCodes: Record<string, string>,
     creatorId?: string
   ): Promise<void> {
@@ -198,21 +198,22 @@ export class StoryCreationService {
       );
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
 
-      const story = Story.create(storyState);
-
-      // --- DB Integration: Update story title ---
-      if (storyState.title) {
-        try {
-          await storyDbService.updateStoryTitle(storyId, storyState.title);
-        } catch (dbError) {
-          Logger.Route.error(
-            `DB error updating title for story ${storyId} via service:`,
-            dbError
-          );
-          // Not re-throwing, allow story creation to proceed
-        }
+      // --- DB Integration: Update title and AI-defined difficulty level ---
+      // Ensure storyState.difficultyLevel is defined by AIStoryGenerator
+      if (!storyState.difficultyLevel) {
+        throw new Error(
+          "AIStoryGenerator failed to define a difficultyLevel for the story."
+        );
       }
+      await storyDbService.updateStoryGeneratedDetails(
+        storyId,
+        storyState.title, // This could be null if AI didn't set one
+        storyState.difficultyLevel.title,
+        storyState.difficultyLevel.modifier
+      );
       // --- DB Integration End ---
+
+      const story = Story.create(storyState);
 
       // Add player codes to state
       const storyWithCodes = story.clone({
