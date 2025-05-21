@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameSession } from "./useGameSession";
 import { gameService } from "./GameService";
@@ -37,6 +37,11 @@ export const GamePage: React.FC = () => {
   const [hasStoredJoinCode, setHasStoredJoinCode] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
 
+  // Add a counter for code verification attempts
+  const verificationAttemptRef = useRef(0);
+  // Track if we've tried verifying the code at least once
+  const hasTriedVerificationRef = useRef(false);
+
   useEffect(() => {
     if (joinCode) {
       wsService.setExternalJoinCode(joinCode);
@@ -63,6 +68,8 @@ export const GamePage: React.FC = () => {
       isReqPendVerify: isRequestPending("verify_code"),
       isReqPendRejoin: isRequestPending("rejoin_session"),
       isExiting,
+      verificationAttempts: verificationAttemptRef.current,
+      hasTriedVerification: hasTriedVerificationRef.current,
     });
 
     if (isExiting) {
@@ -104,6 +111,46 @@ export const GamePage: React.FC = () => {
       );
       setIsLoading(true);
       gameService.verifyCode(joinCode, user?.id); // This eventually calls wsService.sendMessage
+      verificationAttemptRef.current += 1;
+      hasTriedVerificationRef.current = true;
+    }
+    // If we're in a situation where:
+    // 1. We have a joinCode and sessionId
+    // 2. We don't have a storyState
+    // 3. We've tried verification before but it might have failed or been ignored
+    // 4. We're not currently in a pending verification state
+    // Then retry verification after a short delay
+    else if (
+      joinCode &&
+      sessionId &&
+      !storyState &&
+      !isRequestPending("verify_code") &&
+      !isRequestPending("rejoin_session") &&
+      !isRequestPending("create_session") &&
+      hasTriedVerificationRef.current &&
+      verificationAttemptRef.current < 3 // Limit retries
+    ) {
+      Logger.App.info(
+        `GamePage: Still no storyState after ${verificationAttemptRef.current} verification attempt(s). Retrying verification after delay...`
+      );
+
+      // Add a slight delay before retrying to ensure WebSocket is fully ready
+      const retryTimeout = setTimeout(() => {
+        if (!storyState) {
+          // Double-check we still need to verify
+          Logger.App.debug(
+            `GamePage: Retrying code verification attempt #${
+              verificationAttemptRef.current + 1
+            } for code:`,
+            joinCode
+          );
+          setIsLoading(true);
+          gameService.verifyCode(joinCode, user?.id);
+          verificationAttemptRef.current += 1;
+        }
+      }, 1000); // 1 second delay
+
+      return () => clearTimeout(retryTimeout);
     }
   }, [
     sessionId,
@@ -138,6 +185,13 @@ export const GamePage: React.FC = () => {
     fetchStoryFeed,
     hasStoredJoinCode,
   ]);
+
+  // Reset attempt counter when storyState is loaded
+  useEffect(() => {
+    if (storyState) {
+      verificationAttemptRef.current = 0;
+    }
+  }, [storyState]);
 
   useEffect(() => {
     if (error) {
@@ -270,16 +324,14 @@ export const GamePage: React.FC = () => {
         isReqPendCreate: isRequestPending("create_session"),
         isReqPendVerify: isRequestPending("verify_code"),
         isReqPendRejoin: isRequestPending("rejoin_session"),
+        verificationAttempts: verificationAttemptRef.current,
       }
     );
     return <ConnectingView />;
   }
 
-  // All good, render the game
-  Logger.App.info(
-    "GamePage: Rendering GameLayout with storyState.",
-    storyState
-  );
+  // If we reach here, we have a storyState, so render the game UI
+  Logger.App.log("GamePage: Rendering GameLayout with storyState.", storyState);
   return (
     <GameLayout
       onExitGame={handleExitGame}
