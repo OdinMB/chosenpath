@@ -267,21 +267,17 @@ Title: ${
           ")' after the title to indicate the beat number of the current thread."
     }
 
-Request new image (optional)
 ${
   story.generatesImages()
-    ? "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.)\n" +
+    ? "Request new image (optional)\n" +
+      "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.)\n" +
       "Only provide references to images with characters or elements that are needed to generate the new image. Remember that each reference costs money (for the LLM to process).\n" +
       "If you generate an image, choose an id that is not already used in the image library.\n" +
       "Skip this step if a fitting image is already available in the image library. If a character is analyzing magic glyphs, request a new image and don't just show the generic character image. If we already have an image of a flock of birds, don't generate a new one just because the weather has changed.\n" +
-      "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag. Use the new image relatively late in the beat text. (That way, we buy some time for the image generation to finish.)"
-    : "This story does not allow image generation. Do not request any new images." +
-      story.hasImages()
-    ? " You can use the existing images in the image library, though."
+      "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag. Use the new image relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
+      "\n"
     : ""
-}
-
-Text
+}Text
 - The first paragraph must
 --- continue exactly where the previous beat for this player ended
 --- describe how the player performs the action that was chosen in the previous beat
@@ -356,7 +352,11 @@ ${
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
       "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in. No image tags at the end of the beat text.\n" +
       "- Parameters:\n" +
-      "--- id: the id of the image from the story's image library. Image ids correspond to story elements.\n" +
+      "--- id: the id of the image from the story's image library. The id must match exactly. Only use ids that are listed in the image library" +
+      (story.generatesImages()
+        ? " (or that you just requested to be generated)"
+        : "") +
+      "!\n" +
       "--- source: 'template' or 'story' (as per image library)\n" +
       "--- desc: a caption that will be displayed below the image. Provide at least the name of the element that the image depicts.\n" +
       "--- float (optional): 'left', 'right' (default is 'left')\n" +
@@ -368,7 +368,7 @@ ${
       (story.isFirstBeat()
         ? "- In this first beat of the story, include an image of the player character that this beat is for, plus an image of some other story element.\n"
         : "")
-    : "This story does not support images. Do not use them in the beat text."
+    : "This story does not support images. Do not use image tags in the beat text."
 }
 ${
   story.getCurrentBeatType() !== "ending"

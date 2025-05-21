@@ -6,6 +6,7 @@ import {
   createImageFromPlaceholder,
 } from "shared/utils/imageUtils.js";
 import { StoryImage } from "shared/components/StoryImage";
+import { ClientStateManager } from "core/models/ClientStateManager.js";
 
 // Types used within the utility
 interface ImageElement {
@@ -37,6 +38,8 @@ export function processStoryText(
   // Fix potential encoding issues by normalizing the text
   text = text.normalize();
 
+  const stateManager = new ClientStateManager();
+
   // Check if text contains image placeholders
   const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
 
@@ -67,6 +70,27 @@ export function processStoryText(
 
   matches.forEach((match, index) => {
     const imagePlaceholder: ImagePlaceholder = parseImagePlaceholder(match);
+
+    // Check if the image exists in the library if generateImages is false
+    const imageExists = stateManager.hasImage(
+      storyState,
+      imagePlaceholder.id,
+      imagePlaceholder.source
+    );
+
+    // Skip if the image doesn't exist and generateImages is false
+    if (!storyState.generateImages && !imageExists) {
+      // Record the position for removal but don't create an element
+      const position = text.indexOf(match);
+      imageElements.push({
+        position,
+        placeholder: match,
+        paragraphIndex: 0,
+        element: null,
+      });
+      return;
+    }
+
     const finalImage: ImageUI | null = createImageFromPlaceholder(
       imagePlaceholder,
       storyState
@@ -328,10 +352,32 @@ export function processStoryText(
         1,
         ...([
           beforeText ? { type: "text", content: beforeText } : null,
-          { type: "image", content: imageEl.element },
+          imageEl.element ? { type: "image", content: imageEl.element } : null,
           afterText ? { type: "text", content: afterText } : null,
         ].filter(Boolean) as TextSegment[])
       );
+    }
+  });
+
+  // Also remove any remaining image placeholders from all imageElements (including non-valid ones)
+  // This handles cases where images couldn't be displayed (null element)
+  imageElements.forEach((imageEl) => {
+    if (!imageEl.element && imageEl.placeholder) {
+      // Find if any text segment still contains this placeholder
+      const textSegmentIndex = segments.findIndex(
+        (segment) =>
+          segment.type === "text" &&
+          (segment.content as string).includes(imageEl.placeholder)
+      );
+
+      if (textSegmentIndex !== -1) {
+        const textSegment = segments[textSegmentIndex].content as string;
+        // Simply remove the placeholder text
+        segments[textSegmentIndex].content = textSegment.replace(
+          imageEl.placeholder,
+          ""
+        );
+      }
     }
   });
 

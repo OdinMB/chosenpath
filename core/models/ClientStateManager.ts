@@ -158,6 +158,49 @@ export class ClientStateManager {
     return state.images && state.images.length > 0;
   }
 
+  /**
+   * Check if a specific image ID exists in the story state's image library
+   */
+  hasImage(
+    state: StoryState | ClientStoryState,
+    imageId: string,
+    source: string
+  ): boolean {
+    // Special case for player images
+    if (imageId.startsWith("player")) {
+      const playerSlot = imageId as PlayerSlot;
+
+      // Verify the player exists in the state
+      if (!state.players[playerSlot]) {
+        return false;
+      }
+
+      // Player images exist under these conditions:
+      if (source === "template") {
+        // Template player images exist if the story is based on a template
+        return !!state.templateId;
+      } else if (source === "story") {
+        // Story player images exist only if generateImages is true
+        return !!state.generateImages;
+      }
+
+      return false;
+    }
+
+    // For other images, check if they exist in the image library
+    if (
+      !state.images ||
+      !Array.isArray(state.images) ||
+      state.images.length === 0
+    ) {
+      return false;
+    }
+
+    return state.images.some(
+      (image) => image.id === imageId && image.source === source
+    );
+  }
+
   getNumberOfPlayers(state: StoryState | ClientStoryState): number {
     return Object.keys(state.players).length;
   }

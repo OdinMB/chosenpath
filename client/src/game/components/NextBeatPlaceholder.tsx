@@ -61,6 +61,19 @@ export const NextBeatPlaceholder: React.FC<NextBeatPlaceholderProps> = ({
             interlude.imageSource &&
             interlude.imageSource !== "none"
           ) {
+            // Check if the image should be shown
+            // For generateImages=false, only show existing images
+            const imageExists = stateManager.hasImage(
+              storyState,
+              interlude.imageId,
+              interlude.imageSource
+            );
+
+            // Skip image if it doesn't exist and generateImages is false
+            if (!storyState.generateImages && !imageExists) {
+              return item;
+            }
+
             const interludeImagePlaceholder = {
               id: interlude.imageId,
               source: interlude.imageSource,

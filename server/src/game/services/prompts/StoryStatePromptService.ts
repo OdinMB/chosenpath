@@ -174,7 +174,7 @@ ${modeDescriptions[story.getGameMode()]}
     if (!story.includesImages()) return "";
 
     let imageSource = story.isBasedOnTemplate() ? "template" : "story";
-    let text = "IMAGE LIBRARY:";
+    let text = "IMAGE LIBRARY:\n";
     if (!story.hasImages()) {
       text += "No images yet.";
     } else {

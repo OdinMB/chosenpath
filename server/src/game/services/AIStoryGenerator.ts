@@ -333,7 +333,11 @@ export class AIStoryGenerator {
       story.getCurrentBeatType() === "ending" ||
         (story.getCurrentBeatType() === "switch" && !story.isFirstBeat()),
       // multiplayerCoordination = true only if it's a multiplayer game
-      story.isMultiplayer()
+      story.isMultiplayer(),
+      // Pass the generateImages flag from the story
+      story.generatesImages(),
+      // Pass the hasImages flag from the story
+      story.hasImages()
     );
     const structuredModel = this.textModel.withStructuredOutput(schema);
 
@@ -376,9 +380,13 @@ export class AIStoryGenerator {
           updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
 
           // If the imageRequest is an object, add it to the imageRequests array
-          // (Could be an empty string to indicate that no image is needed)
-          if (beat.imageRequest && typeof beat.imageRequest === "object") {
-            imageRequests.push(beat.imageRequest);
+          // Only collect image requests if generateImages is true
+          if (
+            story.generatesImages() &&
+            beat.imageRequest &&
+            typeof beat.imageRequest === "object"
+          ) {
+            imageRequests.push(beat.imageRequest as ImageRequest);
           }
         } else {
           throw new Error(

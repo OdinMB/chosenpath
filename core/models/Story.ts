@@ -439,6 +439,11 @@ export class Story {
     return this.hasImages() || this.state.generateImages;
   }
 
+  // assumes that templates always have at least a few default images
+  hasImages(): boolean {
+    return this.state.images.length > 0 || this.isBasedOnTemplate();
+  }
+
   generatesImages(): boolean {
     return this.state.generateImages;
   }
@@ -449,10 +454,6 @@ export class Story {
 
   getImage(imageId: string) {
     return this.imageManager.getImage(this.state, imageId);
-  }
-
-  hasImages(): boolean {
-    return this.state.images.length > 0;
   }
 
   addImage(image: ImageStoryState) {

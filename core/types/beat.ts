@@ -193,71 +193,98 @@ const interludeSchema = z.object({
   text: z.string().describe("1-2 sentences of flavor text."),
 });
 
-export const beatGenerationSchema = z.object({
-  plan: beatPlanSchema,
-  title: z
-    .string()
-    .describe(
-      "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'. If it's the ending, simple 'The End'."
-    ),
-  imageRequest: z
-    .union([z.string(), imageRequestSchema])
-    .describe(
-      "Optional: Request a new image depicting a key moment in this beat if no fitting image is already available in the image library. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Images requested for this beat must be used in this beat. The source of the new image is 'story'."
-    ),
-  text: z
-    .string()
-    .describe(
-      "Main narrative text for one particular player.\n" +
-        "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
-        "- Start exactly where the previous beat for this player ended.\n" +
-        "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
-        "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
-        "- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options. Don't define or narrate the resolution of the beat. (That will happen in the next round, based on players' choices.)\n" +
-        "- Use present tense.\n" +
-        "- Address the player character for whom this beat is written directly ('You' instead of the name of the character). Refer to other player characters by their name or in third person.\n" +
-        "- If the story includes images, add 1 or ideally 2 image tags to the beat text (3 are already too many).\n" +
+export const createBeatGenerationSchema = (
+  generateImages: boolean = false,
+  hasImages: boolean = true
+) => {
+  // Create base text description that's shared regardless of generateImages value
+  const baseTextDescription =
+    "Main narrative text for one particular player.\n" +
+    "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
+    "- Start exactly where the previous beat for this player ended.\n" +
+    "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
+    "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
+    "- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options. Don't define or narrate the resolution of the beat. (That will happen in the next round, based on players' choices.)\n" +
+    "- Use present tense.\n" +
+    "- Address the player character for whom this beat is written directly ('You' instead of the name of the character). Refer to other player characters by their name or in third person.\n";
+
+  // Add image-specific instructions based on generateImages flag
+  const imageInstructions =
+    generateImages || hasImages
+      ? "- You can add 1 or ideally 2 image tags to the beat text (3 are already too many).\n" +
         "--- Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'.\n" +
+        "--- You can ONLY use images that are listed in the story state's image library" +
+        (generateImages ? " and that you just requested to be generated" : "") +
+        ". No other images exist.\n" +
         "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
         "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
-        "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
-        "--- If there is no image library or if there are no relevant images, don't add any image tags.\n" +
-        "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
-        "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'"
-    ),
-  summary: z
-    .string()
-    .describe(
-      "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[insert player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [insert player name] that [specific thing]'."
-    ),
-  options: z
-    .array(
-      z.discriminatedUnion("optionType", [
-        optionExplorationSchema,
-        optionChallengeSchema,
-      ])
-    )
-    .describe(
-      "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options. Don't repeat similar options to what this player was offered before in the same thread."
-    ),
-  interludes: z
-    .array(interludeSchema)
-    .describe(
-      'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Hint at interesting details without spelling them out. Make the player wonder what else is going on in the world. (Example: "The Guild Hall is across the dry canal" makes the player wonder: Why is the canal dry?)\n- If images are disabled for this story, only create the first interlude.'
-    ),
-});
+        (generateImages
+          ? "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n"
+          : "")
+      : "- Do NOT include any image tags in the beat text. This story does not support images.\n";
+
+  // Closing instructions that are shared regardless of generateImages value
+  const closingInstructions =
+    "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
+    "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'";
+
+  const fullTextDescription =
+    baseTextDescription + imageInstructions + closingInstructions;
+
+  return z.object({
+    plan: beatPlanSchema,
+    title: z
+      .string()
+      .describe(
+        "If a switch: [title of the switch]. If part of a thread: '[title for the thread] ([current beat number within the thread]/[total number of beats in the thread])'. If it's the ending, simple 'The End'."
+      ),
+    ...(generateImages && {
+      imageRequest: z
+        .union([z.string(), imageRequestSchema])
+        .describe(
+          "Optional. Request a new image depicting a key moment in this beat if no fitting image is already available in the image library. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.) Images requested for this beat must be used in this beat. The source of the new image is 'story'."
+        ),
+    }),
+    text: z.string().describe(fullTextDescription),
+    summary: z
+      .string()
+      .describe(
+        "One-sentence summary of the beat. Don't include the options for this beat. The purpose is to provide context for future beat generations, so be specific! Bad: '[insert player name] gets a cryptiv hint from [npc]'. Good: '[npc] tells [insert player name] that [specific thing]'."
+      ),
+    options: z
+      .array(
+        z.discriminatedUnion("optionType", [
+          optionExplorationSchema,
+          optionChallengeSchema,
+        ])
+      )
+      .describe(
+        "Exactly 3 choices for the player. Don't allow the player to leave the scene, suddenly do something else, or derail the core theme of the switch/thread. Only mention the action/decision of the player, not the consequences. Remember that both sacrifices and rewards are certain and not just risks or potential rewards. There can only ever be a total of zero or one sacrifice/reward option among the 3 options. Don't repeat similar options to what this player was offered before in the same thread."
+      ),
+    interludes: z
+      .array(interludeSchema)
+      .describe(
+        'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Hint at interesting details without spelling them out. Make the player wonder what else is going on in the world. (Example: "The Guild Hall is across the dry canal" makes the player wonder: Why is the canal dry?)\n- If images are disabled for this story, only create the first interlude.'
+      ),
+  });
+};
+
+export const beatGenerationSchema = createBeatGenerationSchema(true, true); // Default to true for existing references, will be specified at creation
 
 export const createSetOfBeatGenerationSchema = (
   playerCount: PlayerCount,
   canAddMilestones: boolean = false,
-  multiplayerCoordination: boolean = false
+  multiplayerCoordination: boolean = false,
+  generateImages: boolean = false,
+  hasImages: boolean = false
 ) => {
+  const beatSchema = createBeatGenerationSchema(generateImages, hasImages);
   const beatSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
       `player${i + 1}`,
-      beatGenerationSchema,
+      beatSchema,
     ])
-  ) as Record<`player${number}`, typeof beatGenerationSchema>;
+  ) as Record<`player${number}`, typeof beatSchema>;
 
   const baseSchema = {
     statsAffectingDecisionConsequences: z

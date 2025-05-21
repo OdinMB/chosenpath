@@ -5,7 +5,6 @@ Smaller commits!
 - 2: Generate images for AI-generated stories
 
 - 1: resumable stories: spinner when loading page afresh (when?)
-- 1: Check issue with image references in interludes
 - 1: story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
 - 2: Feedback: move away from Google App Script
 
