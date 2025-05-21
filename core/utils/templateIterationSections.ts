@@ -7,4 +7,5 @@ export const templateIterationSections: Record<string, string[]> = {
   // player1-n will be added programmatically
   players: ["characterSelectionIntroduction", "characterSelectionPlan"],
   media: ["imageInstructions"],
+  difficultyLevels: ["difficultyLevels"],
 } as const;

@@ -38,13 +38,14 @@ export class StorySetupPromptService {
     const setupPrompt =
       this.getCreationModeInstructions(iterationMode) +
       "Guidelines for story setups:\n\n" +
-      this.getGuidelinesInstructions() +
+      this.getGuidelinesInstructions(sections) +
       this.getInventoryInstructions(sections, playerCount > 1) +
       this.getOutcomesInstructions(sections, playerCount > 1) +
       this.getStoryElementsInstructions(sections) +
       this.getStatInstructions(sections, playerCount > 1) +
       this.getExampleStatSetups(iterationMode) +
       this.getCharacterSelectionInstructions(sections, playerCount > 1) +
+      this.getDifficultyLevelsInstructions(sections) +
       "#".repeat(50) +
       "\n\n" +
       this.getConfigurationInstructions(
@@ -68,8 +69,15 @@ export class StorySetupPromptService {
     }
   }
 
-  private static getGuidelinesInstructions(): string {
-    return `Inclusivity and diversity
+  private static getGuidelinesInstructions(
+    sections: TemplateIterationSections[]
+  ): string {
+    if (
+      sections.includes("guidelines") ||
+      sections.includes("players") ||
+      sections.includes("storyElements")
+    ) {
+      return `Inclusivity and diversity
 Our goal is two-fold: generate a convincing story, and use this opportunity to defy biases and stereotypes.
 We value inclusivity and diverse representation more highly than an 'accurate' or representation of reality or conforming to readers' expectations within fictional worlds.
 
@@ -89,6 +97,8 @@ Weave these points into the story setup
 - Include them in the guidelines that will define the setting, tone, and structure of the story. Do this in a flavorful way that suits the story. Don't just copy the points above.
 - Apply these points to player identities/backgrounds and NPCs
 \n`;
+    }
+    return "";
   }
 
   private static getInventoryInstructions(
@@ -666,6 +676,20 @@ Outline generic archetypes that the backgrounds could implement and flesh out.
     } else {
       return "";
     }
+  }
+
+  private static getDifficultyLevelsInstructions(
+    sections: TemplateIterationSections[]
+  ): string {
+    if (sections.includes("difficultyLevels")) {
+      return `Difficulty Levels
+- Define 3 difficulty levels appropriate for the story.
+- Each difficulty level must have a 'modifier' (number between +10 and -40, in steps of 10) and a 'title' (string).
+- The title should be a short, flavorful term that summarizes the difficulty level within the story's setting. Example: For a survival story, a modifier of -30 could be titled "Unforgiving". For a lighthearted adventure, +10 could be "Friendly Jaunt".
+- 0 means that things tend to go well for the player. -10 means that there are some ups and downs, but things will be OK in the end. -20 features frequent failures, and not all goals will be reached. -30 is playing against the odds, with players typically achieving only a few successes throughout the story. -40 only works if failures are at the core of the story.
+\n\n`;
+    }
+    return "";
   }
 
   private static getConfigurationInstructions(

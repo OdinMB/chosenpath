@@ -159,6 +159,19 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 Media
               </label>
             </div>
+            <div className="flex items-center">
+              <Checkbox
+                id="difficultyLevels-section"
+                checked={selectedSections.includes("difficultyLevels")}
+                onChange={() => handleSectionToggle("difficultyLevels")}
+              />
+              <label
+                htmlFor="difficultyLevels-section"
+                className="ml-2 text-sm text-gray-700"
+              >
+                Difficulty Levels
+              </label>
+            </div>
           </div>
         </div>
 

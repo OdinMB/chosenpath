@@ -137,6 +137,8 @@ export const TemplateForm: React.FC = () => {
       }
     } else if (sectionKey === "media" && data.imageInstructions) {
       handleImageInstructionsChange(data.imageInstructions);
+    } else if (sectionKey === "difficultyLevels" && data.difficultyLevels) {
+      handleDifficultyLevelsChange(data.difficultyLevels);
     }
 
     // Delete the section from the iteration state and modal

@@ -112,7 +112,10 @@ export const statGroupsSchema = z
     "Names of groups for character stats. This is just a way to organize stats in the UI. Maximum of 3 groups."
   );
 
-export const createStorySetupSchema = (playerCount: PlayerCount) => {
+export const createStorySetupSchema = (
+  playerCount: PlayerCount,
+  mode: "story" | "template" = "story"
+) => {
   // Create a record of required player schemas based on player count
   const playerSchemas = Object.fromEntries(
     Array.from({ length: playerCount }, (_, i) => [
@@ -124,9 +127,19 @@ export const createStorySetupSchema = (playerCount: PlayerCount) => {
   return z
     .object({
       guidelines: guidelinesSchema,
-      difficultyLevel: difficultyLevelSchema.describe(
-        "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is -10. A harsh survival story might have -20/-30; a satire about billionaires doing whatever they want might have 0; a kids story might have +10."
-      ),
+      ...(mode === "story"
+        ? {
+            difficultyLevel: difficultyLevelSchema.describe(
+              "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is -10. A harsh survival story might have -20/-30; a satire about billionaires doing whatever they want might have 0; a kids story might have +10."
+            ),
+          }
+        : {
+            difficultyLevels: z
+              .array(difficultyLevelSchema)
+              .describe(
+                "Array of 1-3 difficulty levels for the template that the player can choose from."
+              ),
+          }),
       storyElements: StoryElementsSchema,
       sharedOutcomes: z
         .array(outcomeSchema)

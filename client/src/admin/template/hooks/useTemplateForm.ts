@@ -342,6 +342,9 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
         playerCountMax: options.playerCount,
         maxTurnsMin: options.maxTurns,
         maxTurnsMax: options.maxTurns,
+        difficultyLevels: difficultyToUse
+          ? [difficultyToUse]
+          : prev.difficultyLevels, // Populate difficultyLevels
       }));
 
       // Switch to a relevant tab after drafting, e.g., basic info or guidelines

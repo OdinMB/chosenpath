@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 2: Add difficulties to existing templates
+- 1: Select middle difficulty as a default in template configurator
 - 1: modifier tags not centered if linebreak
 - 2: Generate images for AI-generated stories
 
@@ -14,7 +14,7 @@ Lora[wght].ttf: Copyright 2011 The Lora Project Authors (https://github.com/cyre
 
 - 1: resumable stories: spinner when loading page afresh (when?)
 - 1: Check issue with image references in interludes
-- 1: story feed updates: every once in a while IF >= 1 multiplayer story with at least 1 pending other player
+- 1: story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
 - 2: Feedback: move away from Google App Script
 
 # BETTER EXPERIENCE

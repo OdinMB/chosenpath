@@ -438,7 +438,7 @@ export class AIStoryGenerator {
       );
 
       // Get the full schema
-      const fullSchema = createStorySetupSchema(playerCount);
+      const fullSchema = createStorySetupSchema(playerCount, "template");
       const shapeEntries = Object.entries(fullSchema.shape);
 
       // Set to track fields to keep

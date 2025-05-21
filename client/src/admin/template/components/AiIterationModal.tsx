@@ -23,7 +23,8 @@ type ModalTabType =
   | "sharedOutcomes"
   | "stats"
   | "players"
-  | "media";
+  | "media"
+  | "difficultyLevels";
 
 interface AiIterationModalProps {
   isOpen: boolean;
@@ -85,6 +86,10 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
 
   if (iterationData.imageInstructions) {
     tabs.push({ id: "media", label: "Media" });
+  }
+
+  if (iterationData.difficultyLevels) {
+    tabs.push({ id: "difficultyLevels", label: "Difficulty Levels" });
   }
 
   // Set active tab to first tab if we have tabs and the currently active tab doesn't exist
@@ -261,6 +266,34 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               setImageInstructions={() => {}}
               readOnly={true}
             />
+          </div>
+        )}
+
+        {activeTab === "difficultyLevels" && iterationData.difficultyLevels && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Difficulty Levels</h3>
+              <PrimaryButton
+                onClick={() => {
+                  Logger.UI.log("Accepting difficultyLevels updates");
+                  onAcceptSection("difficultyLevels", iterationData);
+                }}
+                leftIcon={<Icons.Check className="h-4 w-4" />}
+              >
+                Accept Difficulty Levels
+              </PrimaryButton>
+            </div>
+            {/* Display basic info for difficulty levels - assuming it's an array of objects with title and modifier */}
+            <div className="space-y-2">
+              {iterationData.difficultyLevels.map((dl, index) => (
+                <div key={index} className="p-2 border rounded bg-white">
+                  <p className="font-semibold">{dl.title}</p>
+                  <p className="text-sm text-gray-600">
+                    Modifier: {dl.modifier}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
