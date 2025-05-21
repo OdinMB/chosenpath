@@ -406,6 +406,10 @@ export class Story {
     return new Story(updatedState);
   }
 
+  getCharacterIdentity(playerSlot: PlayerSlot) {
+    return this.playerManager.getCharacterIdentity(this.state, playerSlot);
+  }
+
   // Thread forwarding methods
   getCurrentThreadDuration() {
     return this.threadManager.getCurrentThreadDuration(this.state);

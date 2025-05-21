@@ -176,7 +176,7 @@ ${modeDescriptions[story.getGameMode()]}
     let imageSource = story.isBasedOnTemplate() ? "template" : "story";
     let text = "IMAGE LIBRARY:\n";
     if (!story.hasImages()) {
-      text += "No images yet.";
+      text += "No non-player images yet.";
     } else {
       text += story
         .getImages()
@@ -187,14 +187,20 @@ ${modeDescriptions[story.getGameMode()]}
             }`
         )
         .join("\n");
+    }
+    text +=
+      "\nFor images of player characters, use ids player1, player2, etc. and source " +
+      imageSource +
+      ".";
+    if (!story.isFirstBeat()) {
       text +=
-        "\nFor images of player characters, use ids player1, player2, etc. and source " +
-        imageSource +
-        ".";
-      if (!story.isFirstBeat()) {
+        " Don't use a player's own image in beats for that player (except for interludes).";
+      if (!story.isMultiplayer()) {
         text +=
-          " Don't use a player's own image in beats for that player (except for interludes). Do show other players' images in beats with other players, though.";
+          " Do show other players' images in beats with other players, though.";
       }
+    }
+    if (story.isBasedOnTemplate()) {
       text +=
         "\nFor the story's cover image, use imageId = 'cover' and source " +
         imageSource +

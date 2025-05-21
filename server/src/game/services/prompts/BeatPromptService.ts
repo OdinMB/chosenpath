@@ -273,8 +273,12 @@ ${
       "Request a new image depicting a key moment in this beat. Reference images of players and story elements that should be included in the image by their ids (player1, ancient_ruins, etc.)\n" +
       "Only provide references to images with characters or elements that are needed to generate the new image. Remember that each reference costs money (for the LLM to process).\n" +
       "If you generate an image, choose an id that is not already used in the image library.\n" +
+      "Image ids must not start with 'player', 'player1_' etc. This prefix is reserved for player images, which are handled differently. Use the name of the player character instead.\n" +
       "Skip this step if a fitting image is already available in the image library. If a character is analyzing magic glyphs, request a new image and don't just show the generic character image. If we already have an image of a flock of birds, don't generate a new one just because the weather has changed.\n" +
       "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag. Use the new image relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
+      (!story.isBasedOnTemplate
+        ? ""
+        : "If a generic image for a story element is not yet available, start by requesting such a generic image for the story element first (like NPCs, locations, items, etc.). Once such a generic image is available, you can request images that feature these story elements in more complex arrangements in later beats.") +
       "\n"
     : ""
 }Text
@@ -348,7 +352,7 @@ Example: If the player decided to organize a vote, describe what they do, how th
 
 Image tags
 ${
-  story.hasImages()
+  story.hasImages() || story.generatesImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
       "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in. No image tags at the end of the beat text.\n" +
       "- Parameters:\n" +
@@ -367,6 +371,9 @@ ${
       "- Try to add 1-2 images per beat. 3 are already too many.\n" +
       (story.isFirstBeat()
         ? "- In this first beat of the story, include an image of the player character that this beat is for, plus an image of some other story element.\n"
+        : "") +
+      (!story.hasImages()
+        ? "- This story does not yet have any non-player images in its image library. You can, however, user player images and request new images to be generated. The requested image will be available for this beat."
         : "")
     : "This story does not support images. Do not use image tags in the beat text."
 }

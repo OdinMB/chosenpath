@@ -356,23 +356,10 @@ export class AIImageGenerator {
     return this.saveImageToFile(imageId, "story", storyId, imageBuffer, subDir);
   }
 
-  private async saveImageToTemp(imageBuffer: Buffer): Promise<string> {
-    try {
-      const tempBasePath = getStoragePath("temp");
-      const tempPath = path.normalize(
-        path.join(tempBasePath, `${uuidv4()}.jpeg`)
-      );
-      fs.writeFileSync(tempPath, imageBuffer);
-      return tempPath;
-    } catch (error) {
-      Logger.Story.error("Error saving image to template:", error);
-      throw error;
-    }
-  }
-
   async generateImagesForBeats(
     story: Story,
-    imageRequests: ImageRequest[]
+    imageRequests: ImageRequest[],
+    saveToStoryState: boolean = true
   ): Promise<Story> {
     let updatedStory = story;
 
@@ -402,23 +389,28 @@ export class AIImageGenerator {
         const imageBuffer = await this.generateImage(
           prompt,
           imageReferences.length > 0 ? imageReferences : undefined,
-          IMAGE_SIZES.SQUARE, // faster/cheaper than other sizes. Allows using medium quality instead of low
+          imageRequest.imageSize || IMAGE_SIZES.SQUARE, // faster/cheaper than other sizes. Allows using medium quality instead of low
           IMAGE_GENERATION_BEAT_QUALITY
         );
 
-        const imagePath = await this.saveImageToStory(
+        await this.saveImageToStory(
           imageRequest.id,
           story.getId(),
-          imageBuffer
+          imageBuffer,
+          imageRequest.subDir
         );
 
-        const imageStoryState: ImageStoryState = {
-          id: imageRequest.id,
-          source: "story",
-          description: imageRequest.caption,
-        };
+        // Player images for example are not added to the story state
+        // They are just assumed to be available
+        if (saveToStoryState) {
+          const imageStoryState: ImageStoryState = {
+            id: imageRequest.id,
+            source: "story",
+            description: imageRequest.caption,
+          };
 
-        updatedStory = updatedStory.addImage(imageStoryState);
+          updatedStory = updatedStory.addImage(imageStoryState);
+        }
       } catch (error) {
         Logger.Story.error("Failed to generate image for beat:", error);
       }

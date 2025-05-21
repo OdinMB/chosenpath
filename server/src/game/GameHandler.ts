@@ -1,13 +1,11 @@
 import type { Socket } from "socket.io";
 import type { Story } from "core/models/Story.js";
-import { getPlayerSlots } from "core/utils/playerUtils.js";
-import type { PlayerCount, PlayerSlot } from "core/types/index.js";
+import type { PlayerSlot } from "core/types/index.js";
 import { StoryRepository } from "shared/StoryRepository.js";
 import { connectionManager } from "shared/ConnectionManager.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
 import type { OperationErrorEvent } from "./queue.js";
 import type {
-  StoryReadyNotification,
   SelectCharacterResponse,
   MakeChoiceResponse,
 } from "core/types/websocket.js";
@@ -65,38 +63,6 @@ export class GameHandler {
       if (initialization.socketId === socketId) {
         this.pendingInitializations.delete(key);
       }
-    }
-  }
-
-  private handleStoryInitialized(event: {
-    gameId: string;
-    story: Story;
-  }): void {
-    const { gameId, story } = event;
-    console.log(`[GameHandler] Story initialized for game: ${gameId}`);
-
-    // Get all sockets associated with this game
-    const gameSocketIds = this.getSocketIdsForGame(gameId);
-
-    // Send notification to all sockets in the game
-    for (const socketId of gameSocketIds) {
-      const socket = this.sockets.get(socketId);
-      if (socket) {
-        Logger.Websocket.log(
-          `[GameHandler] Emitting story_ready_notification to socket: ${socketId}`
-        );
-        socket.emit("story_ready_notification", {
-          type: "story_ready_notification",
-          gameId,
-        } as StoryReadyNotification);
-      }
-    }
-
-    // Resolve any pending operations for this game
-    if (this.pendingOperations.has(gameId)) {
-      const { resolve } = this.pendingOperations.get(gameId)!;
-      resolve();
-      this.pendingOperations.delete(gameId);
     }
   }
 
@@ -191,21 +157,6 @@ export class GameHandler {
         this.pendingInitializations.delete(event.gameId);
       }
     }
-  }
-
-  private generatePlayerCodes(
-    playerCount: PlayerCount
-  ): Record<string, string> {
-    const codes: Record<string, string> = {};
-    const playerSlots = getPlayerSlots(playerCount);
-
-    playerSlots.forEach((slot) => {
-      // Generate a random 6-character code
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      codes[slot] = code;
-    });
-
-    return codes;
   }
 
   async makeChoice(socket: Socket, optionIndex: number) {

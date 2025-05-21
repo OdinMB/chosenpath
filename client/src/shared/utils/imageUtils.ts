@@ -262,6 +262,12 @@ export function createImageFromPlaceholder(
 
   // player images get special treatment
   if (placeholder.id.startsWith("player")) {
+    // check if placeholder.id is a valid player slot
+    if (!storyState.players[placeholder.id as PlayerSlot]) {
+      console.error("Invalid player slot:", placeholder.id);
+      return null;
+    }
+
     const playerIdentity =
       storyState.players[placeholder.id as PlayerSlot].identityChoice;
     return createPlayerIdentityImage(

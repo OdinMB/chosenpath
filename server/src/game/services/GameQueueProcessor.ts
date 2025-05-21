@@ -10,14 +10,15 @@ import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "core/models/Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
-import { Resolution } from "core/types/index.js";
+import { ImageRequest, Resolution, IMAGE_SIZES } from "core/types/index.js";
 import { storyRepository } from "shared/StoryRepository.js";
 import { connectionManager } from "shared/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/shared/StoryDbService.js";
-import { DifficultyLevel } from "core/types/index.js";
+import { DifficultyLevel, CharacterIdentity } from "core/types/index.js";
+import { z } from "zod";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -349,7 +350,8 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       throw new Error(`No character options found for player ${playerSlot}`);
     }
 
-    const selectedIdentity = options.possibleCharacterIdentities[identityIndex];
+    const selectedIdentity: CharacterIdentity =
+      options.possibleCharacterIdentities[identityIndex];
     const selectedBackground =
       options.possibleCharacterBackgrounds[backgroundIndex];
 
@@ -366,9 +368,6 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       backgroundIndex
     );
 
-    // Store and broadcast the updated state
-    await this.updateAndBroadcastStory(gameId, updatedStory);
-
     // --- DB Integration: Update story_players for the player who selected a character ---
     // stories.updatedAt is handled by updatePlayerStatus
     try {
@@ -381,6 +380,33 @@ export class GameQueueProcessor extends BaseQueueProcessor<
       );
     }
     // --- DB Integration End ---
+
+    // Store and broadcast the updated state
+    await this.updateAndBroadcastStory(gameId, updatedStory);
+
+    // If not based on a template, and generates images, generate an image for the player identity
+    if (story.generatesImages() && !story.isBasedOnTemplate()) {
+      console.log("[GameQueueProcessor] Generating player image");
+      const imageRequest: ImageRequest = {
+        caption: selectedIdentity.name,
+        id: playerSlot + "_" + identityIndex,
+        prompt:
+          "Pronouns: " +
+          selectedIdentity.pronouns.personal +
+          "/" +
+          selectedIdentity.pronouns.possessive +
+          "\n" +
+          selectedIdentity.appearance,
+        subDir: "players",
+        imageSize: IMAGE_SIZES.PORTRAIT,
+        referenceImageIds: [],
+      };
+      await this.aiImageGenerator.generateImagesForBeats(
+        updatedStory,
+        [imageRequest],
+        false // don't add image to story state image library
+      );
+    }
 
     // Check if all players have completed character selection
     if (updatedStory.areAllCharactersSelected()) {

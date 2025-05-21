@@ -108,7 +108,7 @@ export const imageRequestSchema = z.object({
   id: z
     .string()
     .describe(
-      "The ID of the dynamic image. Don't override existing ids of images that are already in the image library of this story."
+      "The ID of the dynamic image. Don't override existing ids of images that are already in the image library of this story. Don't use ids that start with the string 'player' (as in 'player1_' etc.) This prefix is reserved for player images, which are handled differently. Use the name of the player character instead."
     ),
   referenceImageIds: z
     .array(z.string())
@@ -121,4 +121,7 @@ export const imageRequestSchema = z.object({
       "A prompt to generate the dynamic image. Will be submitted to the LLM in addition to general image generation instructions for this story and the reference images (if any). No need to include instructions for overall aesthetics, just describe what's in the image."
     ),
 });
-export type ImageRequest = z.infer<typeof imageRequestSchema>;
+export type ImageRequest = z.infer<typeof imageRequestSchema> & {
+  subDir?: string;
+  imageSize?: ImageSize;
+};

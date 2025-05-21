@@ -8,6 +8,7 @@ import {
   ResolutionDetails,
   Thread,
   StatValueEntry,
+  CharacterIdentity,
 } from "../types/index.js";
 import { replacePronounPlaceholders } from "../utils/playerUtils.js";
 
@@ -368,5 +369,24 @@ export class PlayerManager {
       ...state,
       players,
     };
+  }
+
+  getCharacterIdentity(
+    state: StoryState,
+    playerSlot: PlayerSlot
+  ): CharacterIdentity | null {
+    try {
+      const characterIdentity: CharacterIdentity = {
+        name: state.players[playerSlot].name,
+        pronouns: state.players[playerSlot].pronouns,
+        appearance: state.players[playerSlot].appearance,
+      };
+      return characterIdentity;
+    } catch (error) {
+      console.error(
+        `Error getting character identity for player ${playerSlot}`
+      );
+      return null;
+    }
   }
 }
