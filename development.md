@@ -2,10 +2,11 @@ Smaller commits!
 
 # NEXT
 
-- 2: Generate images for AI-generated stories
-
-- 1: resumable stories: spinner when loading page afresh (when?)
-- 1: story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
+- 2: Generate images for premise-based stories
+- 2: Fix mass import of templates (difficulty missing).
+  Maybe zip of zips as export to make everything consistent?
+- 1: Resumable stories: spinner when loading page afresh (when?)
+- 1: Story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
 - 2: Feedback: move away from Google App Script
 
 # BETTER EXPERIENCE

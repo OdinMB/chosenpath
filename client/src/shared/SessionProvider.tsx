@@ -60,6 +60,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const clearStoryFeed = useCallback(() => {
     setStoryFeed({});
+    setIsLoading(false);
     Logger.App.info("Story feed cleared.");
   }, []);
 

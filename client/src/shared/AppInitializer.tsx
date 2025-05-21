@@ -44,6 +44,12 @@ export const AppInitializer: React.FC = () => {
         fetchStoryFeed();
       } else if (storedCodeSets.length > 0) {
         fetchStoryFeed();
+      } else {
+        // When there's no auth user and no stored codes, explicitly set isLoading to false
+        Logger.App.debug(
+          "AppInitializer: No auth user and no stored codes, nothing to fetch."
+        );
+        clearStoryFeed();
       }
       initialLoadOrAuthProcessedRef.current = true;
     }

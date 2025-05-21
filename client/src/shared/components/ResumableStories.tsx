@@ -38,6 +38,16 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
 
       const allMyUniqueLocalCodes = getAllUniqueCodesFromStorage();
 
+      if (
+        allStoriesFromFeed.length === 0 &&
+        allMyUniqueLocalCodes.length === 0
+      ) {
+        setIsLoading(false);
+        setDisplayableStories([]);
+        onSetHasContent?.(false);
+        return;
+      }
+
       const relevantStories = allStoriesFromFeed.filter(
         (story: ExtendedStoryMetadata) => {
           if (user && story.creatorId === user.id) return true;
