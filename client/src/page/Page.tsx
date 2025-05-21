@@ -178,7 +178,19 @@ export function Page() {
               </a>
             </div>
           </div>
-          <p>Sonnenallee 50, 12045 Berlin</p>
+          <p className="mb-1">Sonnenallee 50, 12045 Berlin</p>
+          <div>
+            <a
+              href="/credits"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/credits");
+              }}
+              className="text-primary-400 hover:text-primary-600"
+            >
+              Credits
+            </a>
+          </div>
         </footer>
       </div>
     </>

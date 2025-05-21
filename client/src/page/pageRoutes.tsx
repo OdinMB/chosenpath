@@ -8,6 +8,7 @@ import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
 import { StoryInitializer } from "./components/StoryInitializer";
 import { PageLayout } from "./PageLayout";
+import { Credits } from "./components/Credits";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -24,6 +25,11 @@ export const pageRoutes: RouteObject[] = [
         path: "/setup",
         element: <StoryInitializer onBack={() => window.history.back()} />,
         id: "story-setup",
+      },
+      {
+        path: "/credits",
+        element: <Credits />,
+        id: "credits",
       },
       // Group template-related routes under a shared error boundary
       {

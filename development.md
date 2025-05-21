@@ -2,14 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 1: modifier tags not centered if linebreak
 - 2: Generate images for AI-generated stories
-
-- 1: simple Credits page
-
-Montserrat[wght].ttf: Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
-
-Lora[wght].ttf: Copyright 2011 The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic), with Reserved Font Name "Lora".
 
 - 1: resumable stories: spinner when loading page afresh (when?)
 - 1: Check issue with image references in interludes
