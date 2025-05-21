@@ -99,7 +99,7 @@ export const characterBackgroundSchema = z
     fluffTemplate: z
       .string()
       .describe(
-        "Character background description with placeholders: '{name}' for the character's name, and the following ones for pronouns (for the character, not any other other entities): '{personal}' (for he/she/they/it), '{object}' (for him/her/them/it), '{possessive}' (for his/her/their/its), and '{reflexive}' (for himself/herself/themselves/itself). Use '{Personal}' instead of '{personal}' if you want the first letter to be uppercase (e.g. 'He' instead of 'he')."
+        "Character background description with placeholders: '{name}' for the character's name, and the following ones for pronouns (for the character, not any other other entities): '{name}' (instead of personal pronouns like he/she/they/it, as the following sentence will also work for identifies with they/them pronouns), '{object}' (for him/her/them/it), '{possessive}' (for his/her/their/its), and '{reflexive}' (for himself/herself/themselves/itself). Use '{Possessive}' instead of '{possessive}' if you want the first letter to be uppercase (e.g. 'His' instead of 'his')."
       ),
     initialPlayerStatValues: z
       .array(statValueEntrySchema)

@@ -81,7 +81,7 @@ const optionChallengeSchema = z
           )
       )
       .describe(
-        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Only mention stats that with their current value change the success rate of this option and by how much. Consider both positive and negative effects."
+        "2 most relevant stats (individual and/or shared) that add or substract options from the favorable/mixed/unfavorable probability distribution. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Only mention stats that with their current value change the success rate of this option and by how much. Consider both positive and negative effects. Obviously, only use stats that actually exist in the story state."
       ),
   })
   .describe(

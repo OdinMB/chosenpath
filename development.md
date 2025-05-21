@@ -2,7 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: Select middle difficulty as a default in template configurator
 - 1: modifier tags not centered if linebreak
 - 2: Generate images for AI-generated stories
 
