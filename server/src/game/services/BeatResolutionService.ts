@@ -200,19 +200,23 @@ export class BeatResolutionService {
       `[BeatResolutionService] Base points for option: ${currentOptionPoints}`
     );
     let choiceTooltip = "";
+    let choiceName = "";
     if (option.resourceType === "sacrifice") {
       choiceTooltip = "You gave up something to gain an advantage";
+      choiceName = "Sacrifice";
     } else if (option.resourceType === "reward") {
       choiceTooltip = "You knew this would make things more difficult";
+      choiceName = "Reward";
     } else {
       // normal
       choiceTooltip =
         option.basePoints >= 0
           ? "Your approach is promising"
           : "Not the most promising approach";
+      choiceName = "Choice";
     }
     outOptionSpecificModifiers.push({
-      name: "Choice",
+      name: choiceName,
       value: option.basePoints,
       tooltip: choiceTooltip,
     });

@@ -494,7 +494,7 @@ export const PreviousChoiceVisualizer: React.FC<
                   <div className="flex flex-wrap mt-2 mb-0">
                     {/* Add the same container used for emoji to ensure alignment */}
                     <div className="hidden md:block w-14 items-center justify-center"></div>
-                    <div className="flex flex-wrap md:max-w-md">
+                    <div className="flex flex-wrap">
                       {(!animateRoll &&
                       expanded &&
                       resolutionDetails?.readablePointModifiers
