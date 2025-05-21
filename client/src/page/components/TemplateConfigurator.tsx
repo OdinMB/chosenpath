@@ -27,11 +27,18 @@ export function TemplateConfigurator() {
   const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
   const [generateImages, setGenerateImages] = useState(false);
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
-    useState<DifficultyLevel>(
-      template.difficultyLevels && template.difficultyLevels.length > 0
-        ? template.difficultyLevels[0]
-        : getDefaultDifficultyLevel()
-    );
+    useState<DifficultyLevel>(() => {
+      if (template.difficultyLevels && template.difficultyLevels.length > 0) {
+        const levels = template.difficultyLevels;
+        // Sort by modifier ascending (easier to harder)
+        const sortedLevels = [...levels].sort(
+          (a, b) => a.modifier - b.modifier
+        );
+        const midIndex = Math.floor((sortedLevels.length - 1) / 2);
+        return sortedLevels[midIndex];
+      }
+      return getDefaultDifficultyLevel();
+    });
   const [rateLimit, setRateLimit] = useState<
     RateLimitedResponse["rateLimit"] | null
   >(null);
