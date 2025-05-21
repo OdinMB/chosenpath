@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logger } from "shared/logger";
 import { storyApi } from "shared/apiClient";
@@ -22,10 +22,37 @@ export function useStoryCreation() {
     null
   );
   const [storyReady, setStoryReady] = useState(false);
+  const pollingStartTimeRef = useRef<number | null>(null);
+
+  // Clear polling start time when component unmounts or when story becomes ready
+  useEffect(() => {
+    if (storyReady) {
+      pollingStartTimeRef.current = null;
+    }
+  }, [storyReady]);
+
+  const getPollingInterval = () => {
+    if (pollingStartTimeRef.current === null) {
+      pollingStartTimeRef.current = Date.now();
+      return 10000; // Start with 10 seconds
+    }
+
+    const elapsedTime = Date.now() - pollingStartTimeRef.current;
+    const elapsedSeconds = Math.floor(elapsedTime / 1000);
+
+    if (elapsedSeconds <= 30) {
+      return 10000; // 0-30 seconds: poll every 10 seconds
+    } else if (elapsedSeconds <= 60) {
+      return 5000; // 31-50 seconds: poll every 5 seconds
+    } else {
+      return 2000; // >50 seconds: poll every 2 seconds
+    }
+  };
 
   const handleError = (error: unknown, codesToDelete?: string[] | null) => {
     Logger.App.error("Story creation process failed:", error);
     setIsLoading(false);
+    pollingStartTimeRef.current = null;
 
     if (codesToDelete && codesToDelete.length > 0) {
       removeCodeSetFromStorage(codesToDelete);
@@ -61,6 +88,7 @@ export function useStoryCreation() {
       Logger.App.log(`Story ${storyData.storyId} is ready immediately.`);
       setStoryReady(true);
       setIsLoading(false);
+      pollingStartTimeRef.current = null;
     } else {
       Logger.App.log(
         `Story ${storyData.storyId} status is ${storyData.status}. Polling...`
@@ -75,12 +103,16 @@ export function useStoryCreation() {
             Logger.App.log(`Story ${storyData.storyId} is ready`);
             setStoryReady(true);
             setIsLoading(false);
+            pollingStartTimeRef.current = null;
           } else {
+            const interval = getPollingInterval();
             Logger.App.log(
-              `Story ${storyData.storyId} is still ${statusResult.status}, will check again in 2s`
+              `Story ${storyData.storyId} is still ${
+                statusResult.status
+              }, will check again in ${interval / 1000}s`
             );
             if (!storyReady) {
-              setTimeout(checkStatus, 2000);
+              setTimeout(checkStatus, interval);
             }
           }
         } catch (pollError) {
@@ -89,6 +121,7 @@ export function useStoryCreation() {
             pollError
           );
           setIsLoading(false);
+          pollingStartTimeRef.current = null;
         }
       };
       if (!storyReady) {
@@ -101,6 +134,7 @@ export function useStoryCreation() {
     data: CreateStoryRequest
   ): Promise<CreateStoryInfo | undefined> => {
     setIsLoading(true);
+    pollingStartTimeRef.current = null;
     Logger.App.log("Starting story creation process (prompt-based)");
     let tempCodesForCleanup: string[] | null = null;
 
@@ -120,6 +154,7 @@ export function useStoryCreation() {
     data: CreateStoryFromTemplateRequest
   ): Promise<CreateStoryInfo | undefined> => {
     setIsLoading(true);
+    pollingStartTimeRef.current = null;
     Logger.App.log("Starting template story creation process (template-based)");
     // Correctly declare codesForPotentialCleanup for this function's scope
     let tempCodesForCleanup: string[] | null = null;
@@ -156,6 +191,7 @@ export function useStoryCreation() {
           `Template story ${responseData.storyId} is ready immediately.`
         );
         setIsLoading(false); // Stop loading if ready
+        pollingStartTimeRef.current = null;
       } else {
         Logger.App.warn(
           `Template story ${responseData.storyId} has status ${responseData.status}. Polling...`
@@ -172,13 +208,17 @@ export function useStoryCreation() {
               Logger.App.log(`Template story ${responseData.storyId} is ready`);
               setStoryReady(true);
               setIsLoading(false); // Stop loading once polling confirms ready
+              pollingStartTimeRef.current = null;
             } else {
+              const interval = getPollingInterval();
               Logger.App.log(
-                `Template story ${responseData.storyId} is still ${statusResult.status}, will check again in 2s`
+                `Template story ${responseData.storyId} is still ${
+                  statusResult.status
+                }, will check again in ${interval / 1000}s`
               );
               if (!storyReady) {
                 // Continue polling only if not ready
-                setTimeout(checkStatus, 2000);
+                setTimeout(checkStatus, interval);
               }
             }
           } catch (pollError) {
@@ -187,6 +227,7 @@ export function useStoryCreation() {
               pollError
             );
             setIsLoading(false); // Stop loading on polling error
+            pollingStartTimeRef.current = null;
           }
         };
         if (!storyReady) {

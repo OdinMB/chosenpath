@@ -22,7 +22,7 @@ export function PlayerCodes({
 }: PlayerCodesProps) {
   const [timeSinceLoad, setTimeSinceLoad] = useState(0);
 
-  const FALLBACK_READY_TIME = 90; // in seconds
+  const FALLBACK_READY_TIME = 105; // in seconds
 
   // If the story isn't marked ready by the server after 60 seconds,
   // assume it's probably ready but we missed the notification
