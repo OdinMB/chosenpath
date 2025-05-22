@@ -18,7 +18,6 @@ import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/shared/StoryDbService.js";
 import { DifficultyLevel, CharacterIdentity } from "core/types/index.js";
-import { z } from "zod";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -386,7 +385,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
 
     // If not based on a template, and generates images, generate an image for the player identity
     if (story.generatesImages() && !story.isBasedOnTemplate()) {
-      console.log("[GameQueueProcessor] Generating player image");
+      console.log("[GameQueueProcessor] Generating player image in background");
       const imageRequest: ImageRequest = {
         caption: selectedIdentity.name,
         id: playerSlot + "_" + identityIndex,
@@ -401,11 +400,17 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         imageSize: IMAGE_SIZES.PORTRAIT,
         referenceImageIds: [],
       };
-      this.aiImageGenerator.generateImagesForBeats(
-        updatedStory,
-        [imageRequest],
-        false // don't add image to story state image library
-      );
+
+      // Fire and forget - no await
+      this.aiImageGenerator
+        .generateImagesForBeats(
+          updatedStory,
+          [imageRequest],
+          false // don't add image to story state image library
+        )
+        .catch((err) => {
+          Logger.Queue.error(`Failed to generate player image: ${err}`);
+        });
     }
 
     // Check if all players have completed character selection

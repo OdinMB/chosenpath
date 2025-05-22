@@ -1,11 +1,18 @@
 import { randomUUID } from "crypto";
-import { PlayerCount, GameMode, DifficultyLevel } from "core/types/index.js";
+import {
+  PlayerCount,
+  GameMode,
+  DifficultyLevel,
+  ImageRequest,
+  IMAGE_SIZES,
+} from "core/types/index.js";
 import { connectionManager } from "./ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "./storageUtils.js";
 import { ContentFilterService } from "../game/services/ContentFilterService.js";
 import { Logger } from "./logger.js";
 import { AdminTemplateService } from "../admin/AdminTemplateService.js";
 import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
+import { AIImageGenerator } from "../game/services/AIImageGenerator.js";
 import { Story } from "core/models/Story.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { storyRepository } from "./StoryRepository.js";
@@ -21,10 +28,12 @@ import { getDb } from "./db.js";
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
   private aiStoryGenerator: AIStoryGenerator;
+  private aiImageGenerator: AIImageGenerator;
 
   constructor() {
     this.contentFilter = new ContentFilterService();
     this.aiStoryGenerator = new AIStoryGenerator();
+    this.aiImageGenerator = new AIImageGenerator();
   }
 
   private generatePlayerCodes(
@@ -223,6 +232,43 @@ export class StoryCreationService {
       // Store the story
       await storyRepository.storeStory(storyId, storyWithCodes);
       Logger.Route.log(`Successfully stored story: ${storyId}`);
+
+      // Generate cover image for non-template-based stories with image generation enabled
+      if (generateImages) {
+        // This is a new story, not based on a template
+        Logger.Route.log(`Generating cover image for story: ${storyId}`);
+
+        // Get cover prompt from story image instructions
+        const coverPrompt = storyWithCodes.getImageInstructions()?.coverPrompt;
+
+        if (coverPrompt) {
+          // Fire and forget - no await
+          const imageRequest: ImageRequest = {
+            caption: "Story Cover",
+            id: "cover",
+            prompt: coverPrompt,
+            imageSize: IMAGE_SIZES.PORTRAIT,
+            referenceImageIds: [],
+          };
+
+          this.aiImageGenerator
+            .generateImagesForBeats(
+              storyWithCodes,
+              [imageRequest],
+              false // don't add to story state image library
+            )
+            .catch((err) => {
+              Logger.Route.error(
+                `Failed to generate cover image for story ${storyId}:`,
+                err
+              );
+            });
+        } else {
+          Logger.Route.warn(
+            `No cover prompt found for story ${storyId}, skipping cover image generation`
+          );
+        }
+      }
     } catch (error) {
       Logger.Route.error(`Error generating story state for ${storyId}:`, error);
       Logger.Route.log(`Cleaning up DB entries for failed story ${storyId}`);
