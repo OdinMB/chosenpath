@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useGameSession } from "game/useGameSession";
 import { PrimaryButton, Icons, Modal } from "components/ui";
-// Types for feedback
-type FeedbackType = "story" | "general" | "issue" | "idea";
-type FeedbackRating = "positive" | "negative" | null;
+import { feedbackApi } from "shared/apiClient";
+import { FeedbackType, FeedbackRating } from "core/types/api";
 
 interface FeedbackData {
   type: FeedbackType;
   rating: FeedbackRating;
   comment: string;
   storyId?: string;
+  storyTitle?: string;
   contactInfo?: string;
   storyText?: string;
 }
@@ -33,7 +33,7 @@ export function FeedbackModal({
 
   // State for feedback form
   const [type, setType] = useState<FeedbackType>(
-    mode === "story-beat" ? "story" : "general"
+    mode === "story-beat" ? "beat" : "general"
   );
   const [rating, setRating] = useState<FeedbackRating>(initialRating);
   const [comment, setComment] = useState("");
@@ -62,88 +62,33 @@ export function FeedbackModal({
       contactInfo: contactInfo || undefined,
     };
 
-    // Add story-specific data if in story beat mode
-    if (mode === "story-beat") {
-      if (storyState) {
-        feedbackData.storyId = storyState.title;
-      }
-      if (storyText) {
-        // Truncate very long story text to avoid URL length issues
-        // For Google Apps Script, we need to keep this shorter than for regular APIs
-        // We need to make sure this text is properly formatted for transmission
-        const truncatedText = storyText.substring(0, 200); // Shorter is more reliable
-        feedbackData.storyText = truncatedText
-          .replace(/\r?\n/g, " ") // Replace newlines with spaces
-          .replace(/"/g, "'") // Replace double quotes with single quotes to avoid JSON issues
-          .trim();
-        console.log(
-          "Story text to be submitted (truncated):",
-          feedbackData.storyText
-        );
-      } else {
-        console.log("No story text available to submit");
-      }
+    // Add story data if available, regardless of mode
+    if (storyState) {
+      feedbackData.storyId = storyState.id;
+      feedbackData.storyTitle = storyState.title;
+    }
+
+    if (storyText) {
+      // Store the full story text
+      feedbackData.storyText = storyText;
     }
 
     try {
-      // Your deployed Google Apps Script web app URL
-      const scriptUrl =
-        "https://script.google.com/macros/s/AKfycbzFmU6A6xWduf3jyzTwMwN3x1mvE5T5YABKJVMOG9p60KJs-zCOE7NKz1m6NJaV1oyK/exec";
-
-      // Instead of relying on the helper function, let's directly create a URLSearchParams object
-      // and make a direct GET request which tends to be more reliable with Google Apps Script
-      const params = new URLSearchParams();
-      params.append("feedbackType", feedbackData.type);
-      if (feedbackData.rating) {
-        params.append("rating", feedbackData.rating);
-      }
-      params.append("comments", feedbackData.comment);
-      if (feedbackData.storyId) {
-        params.append("storyId", feedbackData.storyId);
-      }
-      if (feedbackData.storyText) {
-        // Add the storyText as a URL parameter
-        params.append("storyText", feedbackData.storyText);
-      }
-      if (feedbackData.contactInfo) {
-        params.append("contactInfo", feedbackData.contactInfo);
-      }
-
-      // Create a direct GET request with parameters in the URL
-      const getUrl = `${scriptUrl}?${params.toString()}`;
-      console.log(`Submitting GET request with length: ${getUrl.length}`);
-
-      // Use an image to make the request - this is a common way to make GET requests
-      // without triggering CORS issues
-      const img = new Image();
-      img.style.display = "none";
-      img.onload = () => console.log("Request succeeded");
-      img.onerror = () =>
-        console.log("Request completed with expected error (normal)");
-      document.body.appendChild(img);
-      img.src = getUrl;
+      // Submit feedback using our new API
+      await feedbackApi.submitFeedback({
+        type: feedbackData.type,
+        rating: feedbackData.rating,
+        comment: feedbackData.comment,
+        storyId: feedbackData.storyId,
+        storyTitle: feedbackData.storyTitle,
+        contactInfo: feedbackData.contactInfo,
+        storyText: feedbackData.storyText,
+      });
 
       console.log("Feedback submitted successfully");
 
-      // Log the data being submitted
-      console.log("All submitted data:", {
-        feedbackType: feedbackData.type,
-        rating: feedbackData.rating,
-        comments: feedbackData.comment,
-        storyId: feedbackData.storyId,
-        storyText: feedbackData.storyText
-          ? feedbackData.storyText.substring(0, 50) + "..."
-          : undefined,
-        contactInfo: feedbackData.contactInfo,
-      });
-
       setIsSubmitted(true);
       setTimeout(() => {
-        // Clean up the image element
-        if (document.body.contains(img)) {
-          document.body.removeChild(img);
-        }
-
         onClose();
         setIsSubmitted(false);
         setRating(initialRating);
@@ -205,7 +150,7 @@ export function FeedbackModal({
               {[
                 { id: "general", label: "Feedback" },
                 { id: "issue", label: "Issue" },
-                { id: "idea", label: "Suggestion" },
+                { id: "suggestion", label: "Suggestion" },
               ].map((option) => (
                 <button
                   key={option.id}

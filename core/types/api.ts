@@ -216,3 +216,22 @@ export interface GetAdminStoriesResponseData {
 }
 export interface GetAdminStoriesResponse
   extends SuccessResponse<GetAdminStoriesResponseData> {}
+
+/**
+ * Feedback types
+ */
+export type FeedbackType = "beat" | "general" | "issue" | "suggestion";
+export type FeedbackRating = "positive" | "negative" | null;
+
+export interface SubmitFeedbackRequest extends ClientRequest {
+  type: FeedbackType;
+  rating: FeedbackRating;
+  comment: string;
+  storyId?: string;
+  storyTitle?: string;
+  contactInfo?: string;
+  storyText?: string;
+}
+
+export interface SubmitFeedbackResponse
+  extends SuccessResponse<{ feedbackId: string }> {}

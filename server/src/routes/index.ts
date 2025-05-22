@@ -13,6 +13,7 @@ import adminTemplateRoutes from "./adminTemplateRoutes.js";
 
 import { imageRouter } from "./imageRoutes.js";
 import imageGenerationRoutes from "./imageGenerationRoutes.js";
+import feedbackRoutes from "./feedbackRoutes.js";
 
 const router = express.Router();
 
@@ -34,6 +35,9 @@ router.use(newsletterRoutes);
 
 // User authentication routes
 router.use(userRoutes);
+
+// Feedback routes
+router.use("/feedback", feedbackRoutes);
 
 // Admin routes
 router.use(adminUserRoutes);

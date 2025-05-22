@@ -143,6 +143,23 @@ export async function initializeDatabase() {
       )
     `);
 
+    // Create feedback table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        rating TEXT,
+        comment TEXT,
+        story_id TEXT,
+        story_title TEXT,
+        contact_info TEXT,
+        story_text TEXT,
+        user_id TEXT,
+        created_at BIGINT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+      )
+    `);
+
     // Create indexes for better performance
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`
@@ -164,6 +181,12 @@ export async function initializeDatabase() {
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_story_players_user_id ON story_players (user_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback (user_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_feedback_story_id ON feedback (story_id)`
     );
 
     Logger.DB.log("PostgreSQL database initialized successfully");

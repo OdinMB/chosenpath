@@ -2,12 +2,9 @@ Smaller commits!
 
 # NEXT
 
-- 3: parallelize player image generation to save time (nothing depends on it)
-  (Except AI maybe using them as references?)
 - 2: Fix mass import of templates (difficulty missing).
   Maybe zip of zips as export for consistency?
 - 1: Story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
-- 2: Feedback: move away from Google App Script for user feedback
 - 2: Privacy page
 
 # BETTER EXPERIENCE

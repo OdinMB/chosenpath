@@ -13,6 +13,8 @@ import {
   CreateStoryInfo,
   ExtendedStoryMetadata,
   GetUserStoryFeedResponse,
+  SubmitFeedbackRequest,
+  SubmitFeedbackResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -387,5 +389,19 @@ export const templateApi = {
       `/templates/${templateId}`
     );
     return response.template;
+  },
+};
+
+// Feedback API functions
+export const feedbackApi = {
+  /**
+   * Submit user feedback
+   */
+  submitFeedback: async (data: SubmitFeedbackRequest): Promise<string> => {
+    const response = await apiClient.post<SubmitFeedbackResponse["data"]>(
+      "/feedback/submit",
+      data
+    );
+    return response.feedbackId;
   },
 };
