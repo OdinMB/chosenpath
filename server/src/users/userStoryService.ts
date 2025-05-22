@@ -142,12 +142,6 @@ export async function getStoryFeed(
     ORDER BY s.updated_at DESC, s.id, sp.player_slot;
   `;
 
-  Logger.Route.log(
-    `Executing getStoryFeed query: ${baseQuery
-      .replace(/\s+/g, " ")
-      .trim()} with params: ${JSON.stringify(finalQueryParams)}`
-  );
-
   const result = await pool.query<StoryFeedDbRow>(baseQuery, finalQueryParams);
   Logger.Route.log(`getStoryFeed query returned ${result.rowCount} rows.`);
 

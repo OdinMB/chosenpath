@@ -57,7 +57,7 @@ export class StorySetupPromptService {
         templateJson
       );
 
-    console.log("\x1b[36m%s\x1b[0m", setupPrompt);
+    // console.log("\x1b[36m%s\x1b[0m", setupPrompt);
     return setupPrompt;
   }
 

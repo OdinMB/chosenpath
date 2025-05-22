@@ -401,7 +401,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<
         imageSize: IMAGE_SIZES.PORTRAIT,
         referenceImageIds: [],
       };
-      await this.aiImageGenerator.generateImagesForBeats(
+      this.aiImageGenerator.generateImagesForBeats(
         updatedStory,
         [imageRequest],
         false // don't add image to story state image library
