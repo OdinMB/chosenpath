@@ -1,0 +1,26 @@
+User-agent: *
+
+# Allow public pages
+Allow: /
+Allow: /library
+Allow: /credits
+Allow: /privacy
+
+# Disallow admin routes
+Disallow: /admin/
+
+# Disallow user routes
+Disallow: /users/
+
+# Disallow game routes
+Disallow: /game/
+
+# Disallow story creation and configuration
+Disallow: /setup
+Disallow: /templates/*/configure
+
+# Disallow shared template redirects (dynamic content)
+Disallow: /share/
+
+# Sitemap location
+Sitemap: https://chosenpath.com/sitemap.xml 
