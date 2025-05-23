@@ -1,6 +1,10 @@
 import { ReactNode } from "react";
 import { FilterConfig, SortConfig } from "./hooks/useTableFilterSort";
-import { TableFilterSort, ColumnOption } from "./TableFilterSort";
+import {
+  TableFilterSort,
+  ColumnOption,
+  SelectionAction,
+} from "./TableFilterSort";
 
 type SortableTableProps<T> = {
   data: T[];
@@ -16,6 +20,14 @@ type SortableTableProps<T> = {
   className?: string;
   renderRow?: (item: T, index: number) => ReactNode;
   keyExtractor?: (item: T) => string;
+  // Selection props
+  enableSelection?: boolean;
+  selectedItems?: Set<string>;
+  onToggleItemSelection?: (item: T) => void;
+  onToggleAllSelection?: (visibleItems: T[]) => void;
+  selectionActions?: SelectionAction<T>[];
+  getSelectedItems?: (allItems: T[]) => T[];
+  allItems?: T[];
 };
 
 export function SortableTable<T extends { id?: string }>({
@@ -32,9 +44,29 @@ export function SortableTable<T extends { id?: string }>({
   className = "",
   renderRow,
   keyExtractor = (item) => item.id || String(Math.random()),
+  enableSelection = false,
+  selectedItems = new Set(),
+  onToggleItemSelection,
+  onToggleAllSelection,
+  selectionActions = [],
+  getSelectedItems,
+  allItems = [],
 }: SortableTableProps<T>) {
   const renderDefaultRow = (item: T) => (
     <tr key={keyExtractor(item)} className="hover:bg-gray-50">
+      {/* Selection checkbox column */}
+      {enableSelection && (
+        <td className="py-3 px-4 w-12">
+          <input
+            type="checkbox"
+            checked={selectedItems.has(keyExtractor(item))}
+            onChange={() =>
+              onToggleItemSelection && onToggleItemSelection(item)
+            }
+            className="rounded border-gray-300 text-secondary focus:ring-secondary"
+          />
+        </td>
+      )}
       {columns.map((column) => {
         const columnKey = column.key;
         const value = item[columnKey];
@@ -64,6 +96,14 @@ export function SortableTable<T extends { id?: string }>({
         onRemoveFilter={onRemoveFilter}
         onClearFilters={onClearFilters}
         renderMode="filters"
+        enableSelection={enableSelection}
+        selectedItems={selectedItems}
+        onToggleAllSelection={onToggleAllSelection}
+        visibleItems={data}
+        keyExtractor={keyExtractor}
+        selectionActions={selectionActions}
+        getSelectedItems={getSelectedItems}
+        allItems={allItems}
       />
 
       {isLoading ? (
@@ -85,6 +125,14 @@ export function SortableTable<T extends { id?: string }>({
               onRemoveFilter={onRemoveFilter}
               onClearFilters={onClearFilters}
               renderMode="thead"
+              enableSelection={enableSelection}
+              selectedItems={selectedItems}
+              onToggleAllSelection={onToggleAllSelection}
+              visibleItems={data}
+              keyExtractor={keyExtractor}
+              selectionActions={selectionActions}
+              getSelectedItems={getSelectedItems}
+              allItems={allItems}
             />
             <tbody className="divide-y divide-gray-200">
               {renderRow ? data.map(renderRow) : data.map(renderDefaultRow)}

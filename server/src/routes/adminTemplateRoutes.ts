@@ -14,6 +14,7 @@ import {
   TemplateIterationRequest,
   ExportTemplateAssetsRequest,
   ExportAllTemplatesAssetsRequest,
+  ExportSelectedTemplatesAssetsRequest,
   UploadTemplateFileRequest,
   ImportTemplateFilesRequest,
 } from "core/types/index.js";
@@ -58,10 +59,11 @@ router.get("/admin/templates", verifyAdmin(), async (req, res) => {
   }
 });
 
-// Admin - Get all templates with their assets
+// Admin - Get all templates with their assets (or selected templates)
 router.get("/admin/templates/all/assets", verifyAdmin(), async (req, res) => {
   const requestId = req.query.requestId as string;
-  const request = { requestId } as ExportAllTemplatesAssetsRequest;
+  const templateIds = req.query.templateIds as string | undefined;
+  const selectedTemplateIds = templateIds ? templateIds.split(",") : undefined;
 
   try {
     // Get all templates to check if any exist
@@ -70,7 +72,7 @@ router.get("/admin/templates/all/assets", verifyAdmin(), async (req, res) => {
       return sendSuccess(res, { message: "No templates found" }, requestId);
     }
 
-    // Create archive with all templates
+    // Create archive with all or selected templates
     const zip = new JSZip();
 
     // Get the templates directory
@@ -81,11 +83,20 @@ router.get("/admin/templates/all/assets", verifyAdmin(), async (req, res) => {
       return sendError(res, "Templates directory not found", 500, requestId);
     }
 
-    // Get all directories in the templates directory
-    const items = await fs.readdir(templatesBasePath, { withFileTypes: true });
-    const templateDirs = items
-      .filter((item) => item.isDirectory())
-      .map((item) => item.name);
+    // Determine which template directories to process
+    let templateDirs: string[];
+    if (selectedTemplateIds && selectedTemplateIds.length > 0) {
+      // Use only selected template IDs
+      templateDirs = selectedTemplateIds;
+    } else {
+      // Get all directories in the templates directory
+      const items = await fs.readdir(templatesBasePath, {
+        withFileTypes: true,
+      });
+      templateDirs = items
+        .filter((item) => item.isDirectory())
+        .map((item) => item.name);
+    }
 
     if (templateDirs.length === 0) {
       return sendSuccess(
@@ -126,17 +137,21 @@ router.get("/admin/templates/all/assets", verifyAdmin(), async (req, res) => {
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="all-templates-${
-        new Date().toISOString().split("T")[0]
-      }.zip"`
+      `attachment; filename="${
+        selectedTemplateIds ? "selected" : "all"
+      }-templates-${new Date().toISOString().split("T")[0]}.zip"`
     );
 
     // Send the zip file
     res.send(zipBuffer);
 
-    Logger.Route.log(`Exported all templates as zip (with subdirectories)`);
+    Logger.Route.log(
+      `Exported ${
+        selectedTemplateIds ? "selected" : "all"
+      } templates as zip (with subdirectories)`
+    );
   } catch (error) {
-    Logger.Route.error("Error exporting all templates", error);
+    Logger.Route.error("Error exporting templates", error);
     sendError(res, "Failed to export templates", 500, requestId, error);
   }
 });

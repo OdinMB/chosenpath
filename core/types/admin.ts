@@ -53,6 +53,10 @@ export interface ExportAllTemplatesAssetsRequest extends ClientRequest {
   // No additional fields needed
 }
 
+export interface ExportSelectedTemplatesAssetsRequest extends ClientRequest {
+  templateIds?: string[];
+}
+
 export interface UploadTemplateFileRequest extends ClientRequest {
   id: string;
   file: File;

@@ -179,9 +179,15 @@ export const TemplateLibrary = () => {
     addFilter,
     removeFilter,
     clearFilters,
+    selectedItems,
+    toggleItemSelection,
+    toggleAllSelection,
+    clearSelection,
+    getSelectedItems,
   } = useTableFilterSort({
     data: templates,
     initialSort: { key: "updatedAt", direction: "desc" },
+    enableSelection: true,
   });
 
   const handleCreateNewTemplate = async () => {
@@ -195,6 +201,42 @@ export const TemplateLibrary = () => {
       Logger.Admin.error("Failed to create new template", error);
     }
   };
+
+  const handleExportSelected = async (selectedTemplates: StoryTemplate[]) => {
+    if (selectedTemplates.length === 0) return;
+
+    try {
+      const templateIds = selectedTemplates.map((template) => template.id);
+      const zipBlob = await adminTemplateApi.exportSelectedTemplates(
+        templateIds
+      );
+
+      // Create download
+      const url = window.URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `selected-templates-${
+        new Date().toISOString().split("T")[0]
+      }.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Clear selection after export
+      clearSelection();
+    } catch (error) {
+      Logger.Admin.error("Failed to export selected templates", error);
+    }
+  };
+
+  const selectionActions = [
+    {
+      label: "Export Selected",
+      icon: <Icons.Export className="h-4 w-4" />,
+      onClick: handleExportSelected,
+    },
+  ];
 
   return (
     <div className="pt-4">
@@ -280,6 +322,13 @@ export const TemplateLibrary = () => {
         onClearFilters={clearFilters}
         isLoading={revalidator.state === "loading"}
         emptyMessage="No templates found"
+        enableSelection={true}
+        selectedItems={selectedItems}
+        onToggleItemSelection={toggleItemSelection}
+        onToggleAllSelection={toggleAllSelection}
+        selectionActions={selectionActions}
+        getSelectedItems={getSelectedItems}
+        allItems={templates}
       />
 
       {/* Delete Template Dialog */}

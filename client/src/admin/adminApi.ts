@@ -130,6 +130,26 @@ export const adminTemplateApi = {
     }
   },
 
+  exportSelectedTemplates: async (templateIds: string[]): Promise<Blob> => {
+    Logger.Admin.log(
+      `Exporting ${templateIds.length} selected template assets`
+    );
+    try {
+      const params = new URLSearchParams();
+      params.append("templateIds", templateIds.join(","));
+
+      const blobResponse = await apiClient.get<Blob>(
+        `/admin/templates/all/assets?${params.toString()}`,
+        { responseType: "blob" }
+      );
+      Logger.Admin.log("Successfully exported selected template assets");
+      return blobResponse;
+    } catch (error) {
+      Logger.Admin.error("Failed to export selected template assets", error);
+      throw error;
+    }
+  },
+
   importTemplateZip: async (
     templateId: string,
     zipData: Blob

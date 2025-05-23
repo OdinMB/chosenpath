@@ -27,7 +27,6 @@ import {
 } from "core/types/admin";
 import { useNavigate } from "react-router-dom";
 import { notificationService } from "../../../shared/notifications/notificationService";
-import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 
 // Define the TabType type
 export type TabType =
@@ -51,14 +50,7 @@ interface UseTemplateFormProps {
 export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
   // Core state
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
-  const [formData, setFormData] = useState<StoryTemplate>(() => ({
-    ...initialTemplate,
-    difficultyLevels:
-      initialTemplate.difficultyLevels &&
-      initialTemplate.difficultyLevels.length > 0
-        ? initialTemplate.difficultyLevels
-        : [getDefaultDifficultyLevel()].filter(Boolean), // Ensure it's an array with the default
-  }));
+  const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
   const navigate = useNavigate();
 

@@ -216,6 +216,7 @@ export class AdminTemplateService {
       if (!template.id) {
         template.id = uuidv4();
       }
+
       const fullTemplate: StoryTemplate =
         this.createFullTemplateObject(template);
 

@@ -16,17 +16,22 @@ export type TableFilterSortProps<T> = {
   data: T[];
   initialSort?: SortConfig<T>;
   initialFilters?: FilterConfig<T>[];
+  enableSelection?: boolean;
+  keyExtractor?: (item: T) => string;
 };
 
-export function useTableFilterSort<T>({
+export function useTableFilterSort<T extends { id?: string }>({
   data,
   initialSort,
   initialFilters = [],
+  enableSelection = false,
+  keyExtractor = (item) => item.id || String(Math.random()),
 }: TableFilterSortProps<T>) {
   const [sortConfig, setSortConfig] = useState<SortConfig<T> | null>(
     initialSort || null
   );
   const [filters, setFilters] = useState<FilterConfig<T>[]>(initialFilters);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   const requestSort = useCallback(
     (key: keyof T) => {
@@ -71,6 +76,54 @@ export function useTableFilterSort<T>({
   const clearFilters = useCallback(() => {
     setFilters([]);
   }, []);
+
+  // Selection functions
+  const toggleItemSelection = useCallback(
+    (item: T) => {
+      const itemKey = keyExtractor(item);
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(itemKey)) {
+          newSet.delete(itemKey);
+        } else {
+          newSet.add(itemKey);
+        }
+        return newSet;
+      });
+    },
+    [keyExtractor]
+  );
+
+  const toggleAllSelection = useCallback(
+    (visibleItems: T[]) => {
+      const visibleKeys = visibleItems.map(keyExtractor);
+      const allSelected = visibleKeys.every((key) => selectedItems.has(key));
+
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        if (allSelected) {
+          // Deselect all visible items
+          visibleKeys.forEach((key) => newSet.delete(key));
+        } else {
+          // Select all visible items
+          visibleKeys.forEach((key) => newSet.add(key));
+        }
+        return newSet;
+      });
+    },
+    [selectedItems, keyExtractor]
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedItems(new Set());
+  }, []);
+
+  const getSelectedItems = useCallback(
+    (allItems: T[]) => {
+      return allItems.filter((item) => selectedItems.has(keyExtractor(item)));
+    },
+    [selectedItems, keyExtractor]
+  );
 
   const filteredAndSortedData = useMemo(() => {
     // Apply filters
@@ -159,9 +212,15 @@ export function useTableFilterSort<T>({
     filteredAndSortedData,
     sortConfig,
     filters,
+    selectedItems,
     requestSort,
     addFilter,
     removeFilter,
     clearFilters,
+    toggleItemSelection,
+    toggleAllSelection,
+    clearSelection,
+    getSelectedItems,
+    enableSelection,
   };
 }

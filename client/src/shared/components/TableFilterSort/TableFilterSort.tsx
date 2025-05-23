@@ -14,6 +14,13 @@ export type ColumnOption<T> = {
 // Define rendering modes for the component
 export type RenderMode = "filters" | "thead" | "both";
 
+export type SelectionAction<T> = {
+  label: string;
+  icon?: ReactNode;
+  onClick: (selectedItems: T[]) => void;
+  disabled?: (selectedItems: T[]) => boolean;
+};
+
 type TableFilterSortComponentProps<T> = {
   columns: ColumnOption<T>[];
   filters: FilterConfig<T>[];
@@ -23,9 +30,18 @@ type TableFilterSortComponentProps<T> = {
   onRemoveFilter: (key: keyof T) => void;
   onClearFilters: () => void;
   renderMode?: RenderMode;
+  // Selection props
+  enableSelection?: boolean;
+  selectedItems?: Set<string>;
+  onToggleAllSelection?: (visibleItems: T[]) => void;
+  visibleItems?: T[];
+  keyExtractor?: (item: T) => string;
+  selectionActions?: SelectionAction<T>[];
+  getSelectedItems?: (allItems: T[]) => T[];
+  allItems?: T[];
 };
 
-export function TableFilterSort<T>({
+export function TableFilterSort<T extends { id?: string }>({
   columns,
   filters,
   sortConfig,
@@ -34,6 +50,14 @@ export function TableFilterSort<T>({
   onRemoveFilter,
   onClearFilters,
   renderMode = "both",
+  enableSelection = false,
+  selectedItems = new Set(),
+  onToggleAllSelection,
+  visibleItems = [],
+  keyExtractor = (item: T) => item.id || String(Math.random()),
+  selectionActions = [],
+  getSelectedItems,
+  allItems = [],
 }: TableFilterSortComponentProps<T>) {
   const [filterKey, setFilterKey] = useState<keyof T | "">("");
   const [filterValue, setFilterValue] = useState("");
@@ -74,10 +98,30 @@ export function TableFilterSort<T>({
     return null;
   };
 
+  // Check if all visible items are selected
+  const allVisibleSelected =
+    enableSelection &&
+    visibleItems.length > 0 &&
+    visibleItems.every((item) => selectedItems.has(keyExtractor(item)));
+
+  // Check if some (but not all) visible items are selected
+  const someVisibleSelected =
+    enableSelection &&
+    visibleItems.length > 0 &&
+    visibleItems.some((item) => selectedItems.has(keyExtractor(item))) &&
+    !allVisibleSelected;
+
+  // Get currently selected items for actions
+  const currentlySelectedItems = getSelectedItems
+    ? getSelectedItems(allItems)
+    : [];
+
   // Determine if we should render the filter UI based on renderMode
   const shouldRenderFilterUI =
     (renderMode === "filters" || renderMode === "both") &&
-    (filters.length > 0 || filterableColumns.length > 0);
+    (filters.length > 0 ||
+      filterableColumns.length > 0 ||
+      (enableSelection && selectionActions.length > 0));
 
   // Determine if we should render the sort UI based on renderMode
   const shouldRenderSortUI =
@@ -141,6 +185,32 @@ export function TableFilterSort<T>({
                 )}
               </div>
             )}
+
+            {/* Selection Actions */}
+            {enableSelection && selectionActions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {currentlySelectedItems.length > 0 && (
+                  <span className="text-sm text-gray-600 mr-2">
+                    {currentlySelectedItems.length} selected
+                  </span>
+                )}
+                {selectionActions.map((action, index) => (
+                  <button
+                    key={index}
+                    onClick={() => action.onClick(currentlySelectedItems)}
+                    disabled={
+                      action.disabled
+                        ? action.disabled(currentlySelectedItems)
+                        : currentlySelectedItems.length === 0
+                    }
+                    className="inline-flex items-center px-3 py-1 text-sm rounded bg-secondary text-white hover:bg-secondary-700 disabled:bg-gray-300 disabled:text-gray-500"
+                  >
+                    {action.icon && <span className="mr-1">{action.icon}</span>}
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Active Filters Display */}
@@ -175,6 +245,22 @@ export function TableFilterSort<T>({
       {shouldRenderSortUI && (
         <thead className="bg-gray-100 text-primary-800">
           <tr>
+            {/* Selection checkbox column */}
+            {enableSelection && (
+              <th className="py-3 px-4 text-left w-12">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(input) => {
+                    if (input) input.indeterminate = someVisibleSelected;
+                  }}
+                  onChange={() =>
+                    onToggleAllSelection && onToggleAllSelection(visibleItems)
+                  }
+                  className="rounded border-gray-300 text-secondary focus:ring-secondary"
+                />
+              </th>
+            )}
             {columns.map((column) => {
               const baseClassName = column.className || "py-3 px-4 text-left";
               const isSortable = column.sortable !== false;
