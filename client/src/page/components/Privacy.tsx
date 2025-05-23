@@ -8,15 +8,23 @@ export function Privacy() {
       <div className="space-y-6">
         <section>
           <p className="mb-4">
-            We only collect and store data that is absolutely necessary to
-            provide our services.
+            We only collect and store data on your device that is absolutely
+            necessary to provide our services.
           </p>
 
           <p className="mb-4">
-            <b>We do NOT use</b> any invasive services like ads, Google
-            Analytics, user tracking, or any other such nonsense. We're so
-            restrained that we don't even need a cookie banner.
+            <b>We do NOT use</b> invasive services like ads, Google Analytics,
+            user tracking, or any other such nonsense. We're so restrained that
+            we don't even need a cookie banner.
           </p>
+
+          <div className="my-6">
+            <img
+              src="/no-cookies_medium.jpeg"
+              alt="No cookies policy"
+              className="w-full rounded-lg object-cover"
+            />
+          </div>
 
           <h2 className="text-lg font-montserrat font-semibold mt-6 mb-3 text-primary-700">
             Information We Collect
