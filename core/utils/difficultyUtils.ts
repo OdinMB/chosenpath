@@ -3,45 +3,45 @@ import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "../config.js";
 
 export const DEFAULT_DIFFICULTY_LEVELS: DifficultyLevel[] = [
   {
-    modifier: 10,
+    modifier: 20,
     title: "Friendly",
   },
   {
-    modifier: 0,
+    modifier: 10,
     title: "Relaxed",
   },
   {
-    modifier: -10,
+    modifier: -0,
     title: "Balanced",
   },
   {
-    modifier: -20,
+    modifier: -10,
     title: "Challenging",
   },
   {
-    modifier: -30,
+    modifier: -20,
     title: "Struggle",
   },
   {
-    modifier: -40,
+    modifier: -30,
     title: "Grueling",
   },
 ];
 
 export function getDifficultyDescription(modifier: number): string {
-  if (modifier >= 10) {
+  if (modifier >= 20) {
     return "Things tend to go well.";
   }
-  if (modifier >= 0) {
+  if (modifier >= 10) {
     return "Things tend to go well in the end.";
   }
-  if (modifier >= -10) {
+  if (modifier >= 0) {
     return "Ups and downs. A balanced experience.";
   }
-  if (modifier >= -20) {
-    return "Things can go horribly wrong.";
+  if (modifier >= -10) {
+    return "Things can go wrong.";
   }
-  if (modifier >= -30) {
+  if (modifier >= -20) {
     return "A constant struggle. You will play against the odds.";
   }
   return "Are you sure you want to do this?";

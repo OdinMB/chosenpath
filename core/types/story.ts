@@ -57,12 +57,12 @@ export const difficultyLevelSchema = z.object({
   modifier: z
     .number()
     .describe(
-      "Modifier that will be applied to all random number checks in the story. Between +10 and -40. Use steps of 10. Default is -10. At that level, players tend to achieve most but not all of their goals in the end. At -30, players tend to achieve only a few of their goals, and the story features many failures."
+      "Modifier that will be applied to all random number checks in the story. Between +20 and -30. Use steps of 10. Default is 0. At that level, players tend to achieve most but not all of their goals in the end. At -20, players tend to achieve only a few of their goals, and the story features many failures."
     ),
   title: z
     .string()
     .describe(
-      "Short term to summarize the difficulty level in a way that works for the story's setting. Examples: 'Friendly' (for a kids story with +10 modifier), 'Unforgiving' (for a survival story with -30 modifier)"
+      "Short term to summarize the difficulty level in a way that works for the story's setting. Examples: 'Friendly' (for a kids story with +20 modifier), 'Unforgiving' (for a survival story with -20 modifier)"
     ),
 });
 export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
@@ -130,7 +130,7 @@ export const createStorySetupSchema = (
       ...(mode === "story"
         ? {
             difficultyLevel: difficultyLevelSchema.describe(
-              "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is -10. A harsh survival story might have -20/-30; a satire about billionaires doing whatever they want might have 0; a kids story might have +10."
+              "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is 0. A harsh survival story might have -20; a satire about billionaires doing whatever they want might have 10; a cozy kids story might have +20."
             ),
           }
         : {

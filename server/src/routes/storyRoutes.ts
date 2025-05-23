@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request } from "express";
 import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
@@ -14,7 +14,7 @@ import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
 } from "core/types/api.js";
-import { PlayerCount, DifficultyLevel } from "core/types/index.js";
+import { PlayerCount } from "core/types/index.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
 

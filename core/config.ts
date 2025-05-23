@@ -17,7 +17,7 @@ export const POINTS_FOR_UNFAVORABLE_RESOLUTION = -30;
 export const POINTS_FOR_SACRIFICE = 30;
 export const POINTS_FOR_REWARD = -30;
 
-export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = -10;
+export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = 0;
 
 // Interval for checking if user is waiting in multiplayer stories
 export const MULTIPLAYER_STORY_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
