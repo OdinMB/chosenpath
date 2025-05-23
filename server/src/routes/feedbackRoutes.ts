@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { saveFeedback } from "game/services/feedbackService.js";
+import { saveFeedback } from "game/services/FeedbackService.js";
 import { sendSuccess, sendError } from "shared/responseUtils.js";
-import { SubmitFeedbackRequest, ResponseStatus } from "core/types/api.js";
+import { SubmitFeedbackRequest } from "core/types/api.js";
 import { Logger } from "shared/logger.js";
 import { verifyUser } from "users/authMiddleware.js";
 
