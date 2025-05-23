@@ -20,58 +20,68 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
   const safeStringArray = Array.isArray(value) ? value : [];
 
   switch (type) {
-    case "percentage":
+    case "percentage": {
+      const percentValue = Number(value);
+
       return (
         <div className="mb-2 relative w-full">
           <div className="relative h-8 bg-white rounded-lg border border-primary-100 shadow-sm overflow-hidden w-full">
             <div
-              className="h-full bg-accent rounded-r-none"
-              style={{ width: `${value}%` }}
+              className="h-full bg-accent-300 rounded-r-none"
+              style={{ width: `${percentValue}%` }}
             />
             <div className="absolute inset-0 px-2 flex items-center justify-between text-sm">
               <Tooltip
                 content={tooltip}
                 disabled={!tooltip}
                 position="top"
-                className="inline text-white font-medium"
+                className="inline font-medium text-primary-800"
                 contentClassName="max-w-[250px]"
               >
                 {name}
               </Tooltip>
-              <span className="text-primary-700 font-medium">{value}%</span>
+              <span className="font-medium px-1.5 py-0.5 rounded bg-white/90 shadow-sm text-primary-800">
+                {value}%
+              </span>
             </div>
           </div>
         </div>
       );
+    }
 
-    case "opposites":
+    case "opposites": {
+      const leftValuePercent = Number(value);
+      const rightValuePercent = 100 - leftValuePercent;
+
       return (
         <div className="mb-2 relative w-full">
           <div className="relative h-8 bg-white rounded-lg border border-primary-100 shadow-sm overflow-hidden flex w-full">
             <div
-              className="h-full bg-accent rounded-r-none"
-              style={{ width: `${value}%` }}
+              className="h-full bg-accent-300 rounded-r-none"
+              style={{ width: `${leftValuePercent}%` }}
             />
             <div
-              className="h-full bg-secondary rounded-l-none"
-              style={{ width: `${100 - Number(value)}%` }}
+              className="h-full bg-secondary-300 rounded-l-none"
+              style={{ width: `${rightValuePercent}%` }}
             />
             <div className="absolute inset-0 px-2 flex items-center justify-between text-sm">
               <Tooltip
                 content={tooltip}
                 disabled={!tooltip}
                 position="top"
-                className="inline text-white font-medium"
+                className="inline font-medium text-primary-800"
                 contentClassName="max-w-[250px]"
               >
                 {stat1}
               </Tooltip>
-              <span className="text-white font-medium">{value}%</span>
+              <span className="font-medium px-1.5 py-0.5 rounded bg-white/90 shadow-sm text-primary-800">
+                {value}%
+              </span>
               <Tooltip
                 content={tooltip}
                 disabled={!tooltip}
                 position="top"
-                className="inline text-white font-medium"
+                className="inline font-medium text-primary-800"
                 contentClassName="max-w-[250px]"
               >
                 {stat2}
@@ -80,6 +90,7 @@ export function StatDisplay({ name, value, type, tooltip }: StatDisplayProps) {
           </div>
         </div>
       );
+    }
 
     case "boolean":
       return (

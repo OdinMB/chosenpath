@@ -2,16 +2,12 @@ Smaller commits!
 
 # NEXT
 
-- 2: Fix mass import of templates (difficulty missing).
-  Maybe zip of zips as export for consistency?
-
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer
 
 - 10: More (multiplayer) templates (try to make 1-3 players work)
 - 4: for templates: additional images that are not attached to a story element
-- 1: percentage stats at 0%: name not visible
 - 2: add support and examples for 1-beat threads
 
 - 10: system for triggering events / twists / etc. at certain points during the story
@@ -44,7 +40,6 @@ Focus: Text/Images, English, Multiplayer
 - 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images generated in template-based stories to the template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
-- 20: Use React routing for frontend
 
 # TECHNICALITIES
 
