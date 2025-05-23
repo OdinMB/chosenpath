@@ -4,8 +4,6 @@ Smaller commits!
 
 - 2: Fix mass import of templates (difficulty missing).
   Maybe zip of zips as export for consistency?
-- 1: Story feed auto refresh: every once in a while if >= 1 multiplayer story with at least 1 pending other player
-- 2: Privacy page
 
 # BETTER EXPERIENCE
 

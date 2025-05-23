@@ -157,9 +157,9 @@ export function Page() {
             or world builder? Reach out!
           </p>
 
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-2">
             <span>Odin Mühlenbein</span>
-            <div className="flex gap-2 ml-1">
+            <div className="flex gap-2">
               <a
                 href="https://odin.muehlenbein.de"
                 target="_blank"
@@ -177,9 +177,19 @@ export function Page() {
                 <Icons.LinkedIn />
               </a>
             </div>
+            <span>Sonnenallee 50, 12045 Berlin</span>
           </div>
-          <p className="mb-1">Sonnenallee 50, 12045 Berlin</p>
           <div>
+            <a
+              href="/privacy"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/privacy");
+              }}
+              className="text-primary-400 hover:text-primary-600 mr-3"
+            >
+              Privacy
+            </a>
             <a
               href="/credits"
               onClick={(e) => {

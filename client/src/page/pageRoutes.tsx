@@ -9,6 +9,7 @@ import { TemplateConfigurator } from "./components/TemplateConfigurator";
 import { StoryInitializer } from "./components/StoryInitializer";
 import { PageLayout } from "./PageLayout";
 import { Credits } from "./components/Credits";
+import { Privacy } from "./components/Privacy";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -30,6 +31,11 @@ export const pageRoutes: RouteObject[] = [
         path: "/credits",
         element: <Credits />,
         id: "credits",
+      },
+      {
+        path: "/privacy",
+        element: <Privacy />,
+        id: "privacy",
       },
       // Group template-related routes under a shared error boundary
       {
