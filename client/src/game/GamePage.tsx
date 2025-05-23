@@ -211,8 +211,9 @@ export const GamePage: React.FC = () => {
     // wsService.setExternalJoinCode(null); // This is now handled by the useEffect cleanup for joinCode
     setSessionId(null); // Clear session ID on client side
     localStorage.removeItem("sessionId"); // Explicitly remove from localStorage
+    fetchStoryFeed(); // Update the story feed after exiting
     navigate("/"); // Navigate to home
-  }, [navigate, setSessionId, sessionId]);
+  }, [navigate, setSessionId, sessionId, fetchStoryFeed]);
 
   const handleChoiceSelected = useCallback(
     (optionIndex: number) => {

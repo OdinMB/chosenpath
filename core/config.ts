@@ -19,6 +19,9 @@ export const POINTS_FOR_REWARD = -30;
 
 export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = -10;
 
+// Interval for checking if user is waiting in multiplayer stories
+export const MULTIPLAYER_STORY_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
+
 // Rate limiting configuration
 export const RATE_LIMITED_ACTIONS = [
   "initialize_story",
