@@ -7,7 +7,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ onTitleClick, size = "medium" }: PageHeaderProps) {
   return (
-    <header className="px-4 pt-4 md:px-6">
+    <header className="px-4 pt-2 md:px-6">
       <div className="max-w-md mx-auto relative">
         <div className="flex justify-center">
           <AppLogo size={size} onClick={onTitleClick} />

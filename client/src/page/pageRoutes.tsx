@@ -10,11 +10,17 @@ import { StoryInitializer } from "./components/StoryInitializer";
 import { PageLayout } from "./PageLayout";
 import { Credits } from "./components/Credits";
 import { Privacy } from "./components/Privacy";
+import { ScrollRestoration } from "react-router-dom";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
   {
-    element: <PageLayout />,
+    element: (
+      <>
+        <PageLayout />
+        <ScrollRestoration />
+      </>
+    ),
     children: [
       {
         path: "/",

@@ -1,7 +1,7 @@
 export function Credits() {
   return (
     <div className="max-w-md mx-auto p-4 font-lora">
-      <div className="my-6">
+      <div className="mb-6">
         <img
           src="/thank-you.jpeg"
           alt="Thank you"
