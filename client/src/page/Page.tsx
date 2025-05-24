@@ -5,7 +5,11 @@ import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, LibraryCategoryGrid } from "./components";
 import { useNewsletter } from "shared/hooks/useNewsletter";
-import { NewsletterButton, NewsletterModal } from "shared/components";
+import {
+  NewsletterButton,
+  NewsletterModal,
+  DiscordButton,
+} from "shared/components";
 import { ResumableStories } from "shared/components/ResumableStories";
 import { useAuth } from "shared/useAuth";
 import { Logger } from "shared/logger";
@@ -148,8 +152,13 @@ export function Page() {
         />
 
         <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
-          <div className="mb-4 flex items-center">
+          <div className="mb-4 flex items-center gap-4">
             <NewsletterButton onClick={openNewsletterModal} />
+            <DiscordButton
+              onClick={() =>
+                window.open("https://discord.gg/AbKqHCEXUS", "_blank")
+              }
+            />
           </div>
 
           <p className="mb-2">

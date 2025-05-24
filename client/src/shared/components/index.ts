@@ -20,3 +20,4 @@ export {
 } from "./TableFilterSort";
 export { NewsletterButton } from "./NewsletterButton";
 export { NewsletterModal } from "./NewsletterModal";
+export { DiscordButton } from "./DiscordButton";
