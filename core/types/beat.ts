@@ -63,12 +63,12 @@ const optionChallengeSchema = z
             statId: z
               .string()
               .describe(
-                "Id of the stat that is affecting the success rate of this option"
+                "Id of the stat that is affecting the success rate of this option. For player stats, replace 'player' with the player slot id. Example for player1 if the player stat id is 'player_charisma': 'player1_charisma'"
               ),
             reason: z
               .string()
               .describe(
-                "Reason why this stat with its current value affects the success rate of this option. Must be consistent with the stat's 'effects on challenge success' parameter in the story state."
+                "Reason why this stat with its current value (for this player) affects the success rate of this option. Must be consistent with the stat's 'effects on challenge success' parameter in the story state."
               ),
             effect: z
               .number()
