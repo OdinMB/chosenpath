@@ -2,7 +2,6 @@ import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
 import { libraryLoader } from "./loaders/libraryLoader";
 import { templateConfigLoader } from "./loaders/templateConfigLoader";
-import { templateLoader } from "shared/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
@@ -63,12 +62,6 @@ export const pageRoutes: RouteObject[] = [
             loader: libraryLoader,
             element: <LibraryBrowser />,
             id: "library",
-          },
-          {
-            path: "/share/template/:id",
-            loader: templateLoader,
-            element: <div>Redirecting...</div>,
-            id: "shared-template",
           },
         ],
       },

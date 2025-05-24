@@ -18,7 +18,7 @@ export const ShareLink: React.FC<ShareLinkProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Create the share URL using the current domain and template ID
-  const shareUrl = `${window.location.origin}/share/template/${templateId}`;
+  const shareUrl = `${window.location.origin}/templates/${templateId}/configure`;
 
   const handleOpenModal = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent form submission

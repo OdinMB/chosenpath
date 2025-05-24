@@ -22,7 +22,7 @@ export const TAG_CATEGORIES: TagCategory[] = [
   },
   {
     name: "Setting",
-    tags: ["Fantasy", "Glamour", "Reality", "Sci-Fi", "Wild West"],
+    tags: ["Fantasy", "Glamour", "Reality", "Sci-Fi", "Superhero", "Wild West"],
   },
   {
     name: "Tone",

@@ -19,8 +19,5 @@ Disallow: /game/
 Disallow: /setup
 Disallow: /templates/*/configure
 
-# Disallow shared template redirects (dynamic content)
-Disallow: /share/
-
 # Sitemap location
 Sitemap: https://chosenpath.com/sitemap.xml 

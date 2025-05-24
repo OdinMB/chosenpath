@@ -44,12 +44,14 @@ export enum PublicationStatus {
   Draft = "draft",
   Review = "review",
   Published = "published",
+  Private = "private",
 }
 
 export const publicationStatusSchema = z.enum([
   PublicationStatus.Draft,
   PublicationStatus.Review,
   PublicationStatus.Published,
+  PublicationStatus.Private,
 ]);
 export type PublicationStatusType = typeof publicationStatusSchema._type;
 

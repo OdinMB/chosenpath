@@ -202,10 +202,12 @@ export const TemplateForm: React.FC = () => {
             <option value={PublicationStatus.Draft}>Draft</option>
             <option value={PublicationStatus.Review}>Review</option>
             <option value={PublicationStatus.Published}>Published</option>
+            <option value={PublicationStatus.Private}>Private</option>
           </Select>
 
           {formData.id &&
-            formData.publicationStatus === PublicationStatus.Published && (
+            (formData.publicationStatus === PublicationStatus.Published ||
+              formData.publicationStatus === PublicationStatus.Private) && (
               <ShareLink templateId={formData.id} showText={false} />
             )}
         </div>

@@ -56,7 +56,7 @@ router.get("/templates", async (req, res) => {
   }
 });
 
-// Get template by ID (only if published)
+// Get template by ID (only if published or private)
 router.get("/templates/:id", async (req, res) => {
   const { id } = req.params;
   const requestId = req.query.requestId as string;
@@ -68,12 +68,16 @@ router.get("/templates/:id", async (req, res) => {
       return sendNotFound(res, "Template not found", requestId);
     }
 
-    // Only return the template if it's published
-    if (template.publicationStatus !== PublicationStatus.Published) {
+    // Only return the template if it's published or private
+    if (
+      template.publicationStatus !== PublicationStatus.Published &&
+      template.publicationStatus !== PublicationStatus.Private
+    ) {
+      Logger.Route.log(`Template ${id} is not published or private`);
       return sendNotFound(res, "Template not found", requestId);
     }
 
-    Logger.Route.log(`Serving published template ${id}`);
+    Logger.Route.log(`Serving published or private template ${id}`);
     sendSuccess(res, { template }, requestId);
   } catch (error) {
     Logger.Route.error(`Error retrieving template ${id}`, error);
