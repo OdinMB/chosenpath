@@ -505,13 +505,18 @@ ${modeDescriptions[story.getGameMode()]}
       })
       .join("\n\n");
 
-    return [
+    let switchConfigsReturn = [
       "======= CURRENT SWITCH CONFIGURATION =======",
       coordinationPatternSummary,
       "\nConfiguration:",
       switchConfigs,
       playerDecisionsSection,
     ].join("\n");
+
+    switchConfigsReturn +=
+      "\n\nRemember: In these switches, players decided what is supposed to happen next. These things have not yet happened. The current thread and beat must make sure that the story actually continues based on the players' choices.\n";
+
+    return switchConfigsReturn;
   }
 
   private static createThreadConfigurationSection(

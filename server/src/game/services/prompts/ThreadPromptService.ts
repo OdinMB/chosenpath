@@ -27,7 +27,7 @@ export class ThreadPromptService {
 
   static createThreadPrompt(story: Story): string {
     const prompt =
-      this.createContextSection() +
+      this.createContextSection(story) +
       "\n\n" +
       this.createInstructionsSection(story) +
       "\n\n" +
@@ -44,7 +44,7 @@ export class ThreadPromptService {
     return prompt;
   }
 
-  private static createContextSection(): string {
+  private static createContextSection(story: Story): string {
     return `CONTEXT
 
 Outcomes
@@ -60,8 +60,13 @@ are a narrative structure of 5-6 paragraphs of text (4-5 sentences each) followe
 Beats are the smallest narrative unit in the game.
 
 Switches
-are a narrative structure of exactly 1 beat. Their purpose is to give the player agency over the direction of the story. How players should be allocated to threads depends on the switches that precede them.
-
+are a narrative structure of exactly 1 beat. Their purpose is to give the player agency over the direction of the story.
+So far, the players have only decided which direction this thread should take. You must now create a thread (or set of threads) that is based on these choices.
+${
+  story.isMultiplayer()
+    ? "Switches and the decisions that players made in them also determine how you should allocate players to threads.\n"
+    : ""
+}
 Threads
 are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
 They do this by adding a milestone to an outcome. Which milestone is added depends on how the thread unfolds.
@@ -77,7 +82,7 @@ It is time to create the next thread to this sequence for all players.`;
 OUTPUT FORMAT
 
 A duration for this thread (or set of threads) between 2-4 beats.
-- 2 beats: interludes, breathers, and simple transactions (~30% of all threads)
+- 2 beats: interludes, breathers, reflections, and simple transactions (~30% of all threads)
 --- Simple transactions (e.g. buying an artifact, meeting a friendly npc to get information)
 --- Reflections (e.g. a moment of realization, a moment of doubt)
 --- Resource gathering and management (e.g. gathering materials, buying supplies, finding a place to sleep, sending armies around)
