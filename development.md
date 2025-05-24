@@ -55,4 +55,9 @@ Focus: Text/Images, English, Multiplayer
 
 # NOTES
 
+- Flesh out success/failure + luck/mastery: in kinda bad starting positions, success should be characterized as lucky. A master who fails should fail because something got in the way, not because they're bad. Etc.
+- Idea: On failures, allow players to pick the outcome
+  You failed your check to fight back against the goblins? Alright, where do they hurt you? What happens now? This can even be tied in with a narrative currency system. You fail, yes. Now you get to pick an outcome. But if have failed many times before, you have enough ‘Hard Lessons’ to buy the best of these bad outcomes.
+- Idea: Input randomness. Results are clear, but which options are offered is dictated by randomness.
+- Idea: Choosing resolutions. Set of favorable/mixed/unfavorable resolution tokens that the player can spend throughout the story.
 - When a thread just resolved an outcome, the options in the switch beat can still try to move the story toward this now dead end. The generated thread then ignores the player choice to focus on outcomes that are still unresolved. Which is weird given the explicit choice of the player before.

@@ -376,6 +376,7 @@ export const TemplateForm: React.FC = () => {
                 showBackButton={false}
                 isLoading={isLoading}
                 templateMode={true}
+                showDifficultySlider={true}
               />
             </div>
           )}

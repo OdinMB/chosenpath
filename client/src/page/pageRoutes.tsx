@@ -30,7 +30,12 @@ export const pageRoutes: RouteObject[] = [
       },
       {
         path: "/setup",
-        element: <StoryInitializer onBack={() => window.history.back()} />,
+        element: (
+          <StoryInitializer
+            onBack={() => window.history.back()}
+            showDifficultySlider={false}
+          />
+        ),
         id: "story-setup",
       },
       {
