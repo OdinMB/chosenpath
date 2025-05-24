@@ -34,8 +34,12 @@ export function TemplateConfigurator() {
         const sortedLevels = [...levels].sort(
           (a, b) => a.modifier - b.modifier
         );
-        const midIndex = Math.floor((sortedLevels.length - 1) / 2);
-        return sortedLevels[midIndex];
+        // For even number of levels, choose the more difficult of the two middle options
+        const midIndex = Math.floor(sortedLevels.length / 2);
+        // If even number of levels, use midIndex directly (which is the more difficult option)
+        // Since options are sorted by modifier ascending (easier to harder)
+        const adjustedIndex = midIndex;
+        return sortedLevels[adjustedIndex];
       }
       return getDefaultDifficultyLevel();
     });
