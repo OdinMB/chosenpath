@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
+// import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type {
   StoryState,
   StorySetupGeneration,
@@ -54,6 +55,9 @@ export class AIStoryGenerator {
   private textModel: ChatOpenAI;
   private switchThreadModel: ChatOpenAI;
   private generationModel: ChatOpenAI;
+  // private textModel: ChatGoogleGenerativeAI;
+  // private switchThreadModel: ChatGoogleGenerativeAI;
+  // private generationModel: ChatGoogleGenerativeAI;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
@@ -64,16 +68,26 @@ export class AIStoryGenerator {
       modelName: TEXT_MODEL_NAME as string,
       temperature: TEXT_MODEL_TEMPERATURE as number,
     });
-
     this.switchThreadModel = new ChatOpenAI({
       modelName: SWITCH_THREAD_MODEL_NAME as string,
       temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
     });
-
     this.generationModel = new ChatOpenAI({
       modelName: GENERATION_MODEL_NAME as string,
       temperature: GENERATION_MODEL_TEMPERATURE as number,
     });
+    // this.textModel = new ChatGoogleGenerativeAI({
+    //   model: TEXT_MODEL_NAME as string,
+    //   temperature: TEXT_MODEL_TEMPERATURE as number,
+    // });
+    // this.switchThreadModel = new ChatGoogleGenerativeAI({
+    //   model: SWITCH_THREAD_MODEL_NAME as string,
+    //   temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
+    // });
+    // this.generationModel = new ChatGoogleGenerativeAI({
+    //   model: GENERATION_MODEL_NAME as string,
+    //   temperature: GENERATION_MODEL_TEMPERATURE as number,
+    // });
   }
 
   public async createInitialState(
