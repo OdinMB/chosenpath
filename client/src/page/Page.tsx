@@ -13,6 +13,7 @@ import {
 import { ResumableStories } from "shared/components/ResumableStories";
 import { useAuth } from "shared/useAuth";
 import { Logger } from "shared/logger";
+import { config } from "../config";
 
 // Page component refactored to use React Router
 export function Page() {
@@ -87,7 +88,16 @@ export function Page() {
           </p>
           <p>
             Everything is free during the alpha phase. No account required. Jump
-            in and share your feedback!
+            in, share your feedback, and say hello on{" "}
+            <a
+              href={config.discordUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-link"
+            >
+              Discord
+            </a>
+            !
           </p>
         </div>
 
@@ -191,7 +201,7 @@ export function Page() {
                 e.preventDefault();
                 navigate("/privacy");
               }}
-              className="text-primary-400 hover:text-primary-600 mr-3"
+              className="footer-link mr-3"
             >
               Privacy
             </a>
@@ -201,7 +211,7 @@ export function Page() {
                 e.preventDefault();
                 navigate("/credits");
               }}
-              className="text-primary-400 hover:text-primary-600"
+              className="footer-link"
             >
               Credits
             </a>

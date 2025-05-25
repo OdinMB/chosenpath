@@ -2,6 +2,9 @@ Smaller commits!
 
 # NEXT
 
+- 1: Favicons with white background
+- 2: Show feedback in admin panel
+
 # BETTER EXPERIENCE
 
 Focus: Text/Images, English, Multiplayer

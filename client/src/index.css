@@ -124,6 +124,16 @@
   }
 }
 
+@layer components {
+  .text-link {
+    @apply text-secondary-800 hover:text-secondary hover:underline;
+  }
+
+  .footer-link {
+    @apply text-primary-400 hover:text-primary-600;
+  }
+}
+
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
