@@ -21,7 +21,7 @@ export function SidebarFeedbackButton({
     <PrimaryButton
       onClick={handleOpenModal}
       className="w-full mb-3"
-      rightIcon={<Icons.ArrowUp />}
+      rightIcon={<Icons.Star />}
     >
       <span className="font-semibold text-sm mr-4">Share Feedback</span>
     </PrimaryButton>

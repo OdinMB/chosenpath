@@ -13,6 +13,7 @@ import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
+import { DiscordButton } from "shared/components/DiscordButton";
 
 interface Props {
   onExitGame: () => void;
@@ -160,17 +161,21 @@ export function GameLayout({
     // Common footer with title and exit button
     const renderFooter = () => (
       <div className="mt-4">
+        <DiscordButton
+          rightIcon={true}
+          className="w-full mb-3"
+          showText={true}
+        />
         <SidebarFeedbackButton
           closeSidebarOnMobile={() => setShowStats(false)}
           onOpenFeedbackModal={() => setIsFeedbackModalOpen(true)}
         />
-
         <PrimaryButton
           onClick={onExitGame}
           className="w-full"
           rightIcon={<Icons.LogOut />}
         >
-          <span className="font-semibold text-sm mr-4">Leave Story</span>
+          <span className="font-semibold text-sm mr-3">Leave Story</span>
         </PrimaryButton>
       </div>
     );

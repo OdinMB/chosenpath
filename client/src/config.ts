@@ -20,4 +20,5 @@ export const config = {
     (isDevelopment
       ? `http://localhost:${API_CONFIG.DEFAULT_PORT}`
       : `https://api.${API_CONFIG.DEFAULT_DOMAIN}`),
+  discordUrl: "https://discord.gg/AbKqHCEXUS",
 } as const;

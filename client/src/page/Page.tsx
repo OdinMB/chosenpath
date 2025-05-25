@@ -154,11 +154,7 @@ export function Page() {
         <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
           <div className="mb-4 flex items-center gap-4">
             <NewsletterButton onClick={openNewsletterModal} />
-            <DiscordButton
-              onClick={() =>
-                window.open("https://discord.gg/AbKqHCEXUS", "_blank")
-              }
-            />
+            <DiscordButton />
           </div>
 
           <p className="mb-2">
