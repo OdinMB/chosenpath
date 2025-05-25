@@ -214,15 +214,22 @@ ${gameWorldInstructions}
 
 How to make sure that the text follows the principle of 'Show Don't Tell'?
 Create a list of the three most important actions and developments that will be covered in this beat, each with a short instruction on how to make sure that the point is delivered based on the principle of 'show don't tell'. 
-The first item must always be the players performing the actions that they chose in the previous beat and how these actions play out. Concrete descriptions of the characters carrying out the actions; always direct speech if they decided to speak.${
+The first item must always be the players performing the action that they chose in the previous beat and how these actions play out. Concrete descriptions of the characters carrying out the actions; always direct speech if they decided to speak.${
+      (story.getCurrentBeatType() === "thread" &&
+        story.getCurrentThreadType() !== "exploration" &&
+        story.getCurrentThreadBeatsCompleted() > 0) ||
+      story.getCurrentBeatType() === "switch"
+        ? "\nResults of the player's actions depend on the resolution of the previous beat. The thread configuration lays out what it means specifically to succeed and fail. Follow those guidelines."
+        : ""
+    }${
       story.isMultiplayer() && story.isFirstBeat()
         ? "\nSince this is the first beat of a multiplayer story, introduce the characters of the other players."
         : ""
     }
 Examples:
-- The player decided to bribe the guard: we should narrate how the player presents the bribe using direct speech.
-- The old sage provides a cryptic hint: we should spell out the cryptic hint and deliver it in direct speech.
-- The player gets attacked by a goblin: we should describe the actual attack.
+- The player decided to bribe the guard: narrate how the player presents the bribe using direct speech.
+- The old sage provides a cryptic hint: spell out the cryptic hint and deliver it in direct speech.
+- The player mingles with other characters: describe the scene of the mingling. Use direct speech to give an impression of the conversation.
 
 ${
   story.getCurrentBeatType() !== "ending"
@@ -284,9 +291,9 @@ ${
 }Text
 - The first paragraph must
 --- continue exactly where the previous beat for this player ended
---- describe how the player performs the action that was chosen in the previous beat
+--- describe how the player performs the action that was chosen in the previous beat (stay in the scene; show don't tell!)
 --- describe the consequences of that action
-Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is. Don't immediately jump to after the vote!${
+Example: If the player decided to organize a vote, describe what they do, how the vote plays out, and what the outcome is. Stay in the scene.${
       story.getCurrentBeatType() === "thread" &&
       story.getCurrentThreadBeatsCompleted() > 0
         ? "\n- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult.\n"
@@ -297,8 +304,8 @@ Example: If the player decided to organize a vote, describe what they do, how th
         : ""
     }${
       !story.isFirstBeat() && story.getCurrentBeatType() === "switch"
-        ? "\n- For the beat text, focus on the resolution of the previous thread that the player was involved in.\n" +
-          "--- Process the milestones that were added to outcomes. Make it feel relevant to the player.\n" +
+        ? "\n- This beat narrates the resolution of the previous thread that the player was involved in. Spend at least a full paragraph on narrating the milestone that was added to the player's outcome.\n" +
+          "--- Describe the milestone, how it relates to the outcome that it's linked to, and why it's relevant to the player.\n" +
           (story.isMultiplayer()
             ? "--- If several players were in the same thread, process also how the thread's resolution affects the other players.\n" +
               "--- If there were other threads than the one with the player, describe the resolution of the other threads. (Unless it would be implausible for the player to know about it.)"

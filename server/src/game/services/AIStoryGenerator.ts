@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
 // import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type {
@@ -52,6 +53,9 @@ import { templateIterationSections } from "core/utils/templateIterationSections.
 dotenv.config();
 
 export class AIStoryGenerator {
+  // private textModel: ChatAnthropic;
+  // private switchThreadModel: ChatAnthropic;
+  // private generationModel: ChatAnthropic;
   private textModel: ChatOpenAI;
   private switchThreadModel: ChatOpenAI;
   private generationModel: ChatOpenAI;
@@ -64,6 +68,18 @@ export class AIStoryGenerator {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
 
+    // this.textModel = new ChatAnthropic({
+    //   model: TEXT_MODEL_NAME as string,
+    //   temperature: TEXT_MODEL_TEMPERATURE as number,
+    // });
+    // this.switchThreadModel = new ChatAnthropic({
+    //   model: SWITCH_THREAD_MODEL_NAME as string,
+    //   temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
+    // });
+    // this.generationModel = new ChatAnthropic({
+    //   model: GENERATION_MODEL_NAME as string,
+    //   temperature: GENERATION_MODEL_TEMPERATURE as number,
+    // });
     this.textModel = new ChatOpenAI({
       modelName: TEXT_MODEL_NAME as string,
       temperature: TEXT_MODEL_TEMPERATURE as number,

@@ -52,7 +52,7 @@ const optionChallengeSchema = z
     basePoints: z
       .number()
       .describe(
-        "For normal resource types: +5 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15.\n" +
+        "For normal resource types: +5 to -10 depending on how much sense this option makes for achieving a favorable result / winning the contest. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15.\n" +
           "For sacrifice resource types: +20 to +30 depending on how much is sacrificed and how much sense this option makes for achieving a favorable result / winning the contest.\n" +
           "For reward resource types: -20 to -30 depending on how much is gained and how much sense this option makes for achieving a favorable result / winning the contest."
       ),
@@ -124,7 +124,7 @@ export const beatPlanSchema = z.object({
   showDontTellPreviousDecision: z
     .string()
     .describe(
-      "The action that the player decided to do at the end of the previous beat, plus a short instruction on how to make sure that these actions are narrated based on the principle of 'show don't tell'. Concrete descriptions of the character carrying out the action, direct speech if they decided to speak. (The resolution of the decision has already been determined, but the action itself must still be narrated.)"
+      "The action that the player decided to do at the end of the previous beat, plus a short instruction on how to make sure that these actions are narrated based on the principle of 'show don't tell'. Give yourself pointers for concrete descriptions of the character carrying out the action, how to be in the scene, and how to use direct speech if the player decided to speak. (The resolution of the decision has already been determined, but the action itself must still be narrated.) If the previous beat was part of a Challenge or Contest thread, note what the thread instructions say about the resolution of the previous beat (e.g. favorable or unfavorable)."
     ),
   showDontTell: z
     .array(z.string())
@@ -200,9 +200,11 @@ export const createBeatGenerationSchema = (
   // Create base text description that's shared regardless of generateImages value
   const baseTextDescription =
     "Main narrative text for one particular player.\n" +
-    "- Write 5-6 paragraphs with 4-5 sentences each.\n" +
+    "- Write 5-6 paragraphs.\n" +
+    "- Each paragraph must have 3-5 sentences.\n" +
     "- Start exactly where the previous beat for this player ended.\n" +
-    "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph.\n" +
+    "- Describe in detail the action that the player decided to do in the previous beat. Which resolution that decision will lead to is already determined, and the text should reflect that. The action itself hasn't been narrated yet, though. That must be done in the first paragraph. Take into account the resolution of the previous beat (e.g. favorable or unfavorable).\n" +
+    "- If a milestone was added to a player's outcome: spend at least a full paragraph on that milestone (what it means, why it matters, and how the event resonates with the player).\n" +
     "- Follow the 'show don't tell' elements that you generated for the 'plan' attribute. Always be in the action and describe what happens (Good: \"The old sage tells you: 'When the sun sets, the moon will rise.'\"). Never summarize what happens, and never describe what happens in vague or generic terms (Bad: \"The sage gives you a cryptic hint.\" What hint?)\n" +
     "- Remember that the resolution of the beat will only be determined AFTER this beat, based on players' choices. Only lead up to the player options. Don't define or narrate the resolution of the beat. (That will happen in the next round, based on players' choices.)\n" +
     "- Use present tense.\n" +
@@ -226,7 +228,8 @@ export const createBeatGenerationSchema = (
   // Closing instructions that are shared regardless of generateImages value
   const closingInstructions =
     "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
-    "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'";
+    "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
+    "- Remember: 5-6 paragraphs, 3-5 sentences each!";
 
   const fullTextDescription =
     baseTextDescription + imageInstructions + closingInstructions;

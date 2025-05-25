@@ -415,6 +415,10 @@ export class Story {
     return this.threadManager.getCurrentThreadDuration(this.state);
   }
 
+  getCurrentThreadType() {
+    return this.threadManager.getCurrentThreadType(this.state);
+  }
+
   getCurrentThreadBeatsCompleted() {
     return this.threadManager.getCurrentThreadBeatsCompleted(this.state);
   }

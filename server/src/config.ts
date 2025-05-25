@@ -31,22 +31,28 @@ export const STORAGE_PATHS = {
   },
 };
 
-// OpenAI model settings
+// Model settings
+// export const GENERATION_MODEL_NAME =
+//   process.env.GENERATION_MODEL_NAME || "claude-sonnet-4-20250514";
 export const GENERATION_MODEL_NAME =
-  process.env.GENERATION_MODEL_NAME || "gpt-4.1";
+  process.env.GENERATION_MODEL_NAME || "gpt-4.1-mini";
 // export const GENERATION_MODEL_NAME =
 //   process.env.GENERATION_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
 export const GENERATION_MODEL_TEMPERATURE =
   process.env.GENERATION_MODEL_TEMPERATURE || 0.3;
 
+// export const SWITCH_THREAD_MODEL_NAME =
+//   process.env.SWITCH_THREAD_MODEL_NAME || "claude-sonnet-4-20250514";
 export const SWITCH_THREAD_MODEL_NAME =
-  process.env.SWITCH_THREAD_MODEL_NAME || "gpt-4.1";
+  process.env.SWITCH_THREAD_MODEL_NAME || "gpt-4.1-mini";
 // export const SWITCH_THREAD_MODEL_NAME =
 //   process.env.SWITCH_THREAD_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
 export const SWITCH_THREAD_MODEL_TEMPERATURE =
   process.env.SWITCH_THREAD_MODEL_TEMPERATURE || 0.1;
 
-export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1";
+// export const TEXT_MODEL_NAME =
+//   process.env.TEXT_MODEL_NAME || "claude-opus-4-20250514";
+export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1-mini";
 // export const TEXT_MODEL_NAME =
 //   process.env.TEXT_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
 export const TEXT_MODEL_TEMPERATURE = process.env.TEXT_MODEL_TEMPERATURE || 0.3;

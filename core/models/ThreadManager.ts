@@ -6,6 +6,8 @@ import {
   Beat,
   BeatType,
   PlayerSlot,
+  ThreadType,
+  getThreadType,
 } from "../types/index.js";
 
 /**
@@ -381,6 +383,21 @@ export class ThreadManager {
     });
 
     return result;
+  }
+
+  /**
+   * Get the type of the current thread (challenge, contest, or exploration)
+   */
+  getCurrentThreadType(state: StoryState): ThreadType | null {
+    const threadAnalysis = this.getCurrentThreadAnalysis(state);
+    if (!threadAnalysis || threadAnalysis.threads.length === 0) {
+      return null;
+    }
+
+    // Get the first thread from the current analysis
+    // All threads in the same analysis should be of the same type
+    const currentThread = threadAnalysis.threads[0];
+    return getThreadType(currentThread);
   }
 }
 
