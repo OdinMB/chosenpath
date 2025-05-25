@@ -87,7 +87,7 @@ export function Page() {
             distant galaxies or serving croissants in a Parisian café.
           </p>
           <p>
-            Everything is free during the alpha phase. No account required. Jump
+            Everything is free during the beta phase. No account required. Jump
             in, share your feedback, and say hello on{" "}
             <a
               href={config.discordUrl}
