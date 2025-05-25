@@ -35,7 +35,7 @@ export const STORAGE_PATHS = {
 // export const GENERATION_MODEL_NAME =
 //   process.env.GENERATION_MODEL_NAME || "claude-sonnet-4-20250514";
 export const GENERATION_MODEL_NAME =
-  process.env.GENERATION_MODEL_NAME || "gpt-4.1-mini";
+  process.env.GENERATION_MODEL_NAME || "gpt-4.1";
 // export const GENERATION_MODEL_NAME =
 //   process.env.GENERATION_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
 export const GENERATION_MODEL_TEMPERATURE =
