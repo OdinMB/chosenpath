@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useAuth } from "shared/useAuth";
-import { useSession } from "shared/useSession";
+import { useAuth } from "client/shared/auth/useAuth";
+import { useSession } from "client/shared/session/useSession";
 import { Logger } from "shared/logger";
 import { MULTIPLAYER_STORY_CHECK_INTERVAL_MS } from "core/config";
 

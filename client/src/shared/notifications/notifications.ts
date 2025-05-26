@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { NotificationContext } from "../NotificationContext.js";
+import { NotificationContext } from "./NotificationContext.js";
 
 export type NotificationType = "error" | "warning" | "info" | "success";
 

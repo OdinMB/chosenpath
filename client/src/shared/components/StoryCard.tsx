@@ -3,7 +3,7 @@ import { CoverCard } from "./CoverCard";
 import { PrimaryButton, InfoIcon, ConfirmDialog, Icons, Tooltip } from "./ui";
 import { ExtendedStoryMetadata, StoryPlayerEntry } from "core/types/api";
 import { PlayerCode } from "./PlayerCode";
-import { useAuth } from "shared/useAuth";
+import { useAuth } from "client/shared/auth/useAuth";
 import { useState } from "react";
 import { getDifficultyDescription } from "core/utils/difficultyUtils.ts";
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { ResumableStories } from "shared/components/ResumableStories";
+import { ResumableStories } from "client/resources/stories/ResumableStories";
 
 export const Users: React.FC = () => {
   return (

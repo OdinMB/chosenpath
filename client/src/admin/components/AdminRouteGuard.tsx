@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "shared/useAuth";
+import { useAuth } from "client/shared/auth/useAuth";
 import { useEffect, useState } from "react";
 import { notificationService } from "shared/notifications/notificationService";
 

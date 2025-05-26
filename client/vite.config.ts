@@ -18,6 +18,7 @@ const config = {
       game: path.resolve(__dirname, "./src/game"),
       page: path.resolve(__dirname, "./src/page"),
       users: path.resolve(__dirname, "./src/users"),
+      resources: path.resolve(__dirname, "./src/resources"),
     },
     extensions: [".ts", ".js", ".jsx", ".tsx", ".json"],
   },

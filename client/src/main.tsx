@@ -8,10 +8,10 @@ import { userRoutes } from "./users/usersRoutes";
 import { gameRoutes } from "./game/gameRoutes";
 import { ErrorBoundary } from "./shared/components/ErrorBoundary";
 import { LoadingSpinner } from "./shared/components/LoadingSpinner";
-import { NotificationProvider } from "./shared/NotificationContext";
+import { NotificationProvider } from "./shared/notifications/NotificationContext";
 import { NotificationDisplay } from "./shared/notifications/NotificationDisplay";
-import { SessionProvider } from "./shared/SessionProvider";
-import { AuthProvider } from "./shared/AuthContext";
+import { SessionProvider } from "./shared/session/SessionProvider";
+import { AuthProvider } from "./shared/auth/AuthContext";
 import { AppInitializer } from "./shared/AppInitializer";
 
 // Combine all routes

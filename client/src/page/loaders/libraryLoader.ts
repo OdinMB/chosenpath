@@ -2,7 +2,7 @@ import { LoaderFunctionArgs } from "react-router-dom";
 import { Logger } from "../../shared/logger";
 import { templateApi } from "../../shared/apiClient";
 import { StoryTemplate } from "core/types";
-import { groupTagsByCategories } from "../../shared/tagCategories";
+import { groupTagsByCategories } from "../../resources/templates/tagCategories";
 
 interface LibraryLoaderData {
   templates: StoryTemplate[];

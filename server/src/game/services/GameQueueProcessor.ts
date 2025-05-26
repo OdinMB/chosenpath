@@ -5,18 +5,18 @@ import type {
 } from "game/queue.js";
 import type { PlayerSlot } from "core/types/index.js";
 import { AIStoryGenerator } from "./AIStoryGenerator.js";
-import { AIImageGenerator } from "./AIImageGenerator.js";
+import { AIImageGenerator } from "../../images/AIImageGenerator.js";
 import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { BeatResolutionService } from "./BeatResolutionService.js";
 import { Story } from "core/models/Story.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
 import { ImageRequest, Resolution, IMAGE_SIZES } from "core/types/index.js";
-import { storyRepository } from "shared/StoryRepository.js";
-import { connectionManager } from "shared/ConnectionManager.js";
+import { storyRepository } from "../../stories/StoryRepository.js";
+import { connectionManager } from "server/game/ConnectionManager.js";
 import { ChangeService } from "./ChangeService.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
-import { storyDbService } from "server/shared/StoryDbService.js";
+import { storyDbService } from "server/stories/StoryDbService.js";
 import { DifficultyLevel, CharacterIdentity } from "core/types/index.js";
 
 export interface QueueEvents {

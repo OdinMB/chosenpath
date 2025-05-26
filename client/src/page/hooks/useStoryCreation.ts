@@ -11,7 +11,7 @@ import {
   addCodeSetToStorage,
   removeCodeSetFromStorage,
 } from "../../shared/utils/codeSetUtils";
-import { useSession } from "../../shared/useSession";
+import { useSession } from "../../shared/session/useSession";
 
 export function useStoryCreation() {
   const navigate = useNavigate();

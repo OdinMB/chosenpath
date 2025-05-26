@@ -7,11 +7,8 @@
     "paths": {
       "core/*": ["../../core/*"],
       "server/*": ["./*"],
-      "routes/*": ["./routes/*"],
       "shared/*": ["./shared/*"],
-      "admin/*": ["./admin/*"],
       "game/*": ["./game/*"],
-      "page/*": ["./page/*"],
       "users/*": ["./users/*"]
     },
     "strict": true,

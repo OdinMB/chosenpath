@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "shared/useAuth";
+import { useAuth } from "client/shared/auth/useAuth";
 import { PrimaryButton } from "shared/components/ui";
 import { notificationService } from "shared/notifications/notificationService.js";
 

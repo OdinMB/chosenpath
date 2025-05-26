@@ -1,8 +1,7 @@
 import bcrypt from "bcrypt";
-import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import { Logger } from "../shared/logger.js";
-import { UserDB, PublicUser, UserSession } from "core/types/user.js";
+import { PublicUser } from "core/types/user.js";
 import { SESSION_DURATION } from "../config.js";
 import { userDbService } from "./UserDbService.js";
 

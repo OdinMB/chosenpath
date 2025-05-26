@@ -1,8 +1,8 @@
 import type { Socket } from "socket.io";
 import type { Story } from "core/models/Story.js";
 import type { PlayerSlot } from "core/types/index.js";
-import { StoryRepository } from "shared/StoryRepository.js";
-import { connectionManager } from "shared/ConnectionManager.js";
+import { StoryRepository } from "../stories/StoryRepository.js";
+import { connectionManager } from "server/game/ConnectionManager.js";
 import { gameQueueProcessor } from "./services/GameQueueProcessor.js";
 import type { OperationErrorEvent } from "./queue.js";
 import type {

@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
 import { Icons, Input, PrimaryButton, InfoIcon } from "components/ui";
-import { useArrayField } from "../hooks/useArrayField";
 
 export interface ArrayFieldProps {
   title?: string;
@@ -33,12 +32,32 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
   inline = false,
   readOnly = false,
 }) => {
-  const { items, handleAddItem, handleUpdateItem, handleRemoveItem } =
-    useArrayField({
-      initialItems,
-      onChange,
-      readOnly,
-    });
+  const [items, setItems] = useState<string[]>(initialItems);
+
+  const handleAddItem = () => {
+    if (readOnly) return;
+
+    const updatedItems = [...items, ""];
+    setItems(updatedItems);
+    onChange?.(updatedItems);
+  };
+
+  const handleUpdateItem = (index: number, value: string) => {
+    if (readOnly) return;
+
+    const updatedItems = [...items];
+    updatedItems[index] = value;
+    setItems(updatedItems);
+    onChange?.(updatedItems);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    if (readOnly) return;
+
+    const updatedItems = items.filter((_, i) => i !== index);
+    setItems(updatedItems);
+    onChange?.(updatedItems);
+  };
 
   const fieldId = title
     ? title.toLowerCase().replace(/\s+/g, "-")

@@ -4,14 +4,14 @@ import { PrimaryButton, Icons } from "components/ui";
 import { StoryTemplate } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, LibraryCategoryGrid } from "./components";
-import { useNewsletter } from "shared/hooks/useNewsletter";
 import {
   NewsletterButton,
   NewsletterModal,
-  DiscordButton,
-} from "shared/components";
-import { ResumableStories } from "shared/components/ResumableStories";
-import { useAuth } from "shared/useAuth";
+  useNewsletter,
+} from "resources/newsletter";
+import { DiscordButton } from "shared/components";
+import { ResumableStories } from "resources/stories/ResumableStories.js";
+import { useAuth } from "client/shared/auth/useAuth.js";
 import { Logger } from "shared/logger";
 import { config } from "../config";
 

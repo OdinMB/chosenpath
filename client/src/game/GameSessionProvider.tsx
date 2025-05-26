@@ -6,7 +6,7 @@ import type {
 } from "core/types";
 import { wsService } from "./WebSocketService.js";
 import { Logger } from "../shared/logger.js";
-import { useSession } from "../shared/useSession.js";
+import { useSession } from "../shared/session/useSession.js";
 import { GameSessionContext } from "./GameSessionContext";
 
 // Create a dedicated logger for game session operations

@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "shared/useAuth"; // Assuming useAuth hook is in shared directory
+import { useAuth } from "client/shared/auth/useAuth"; // Assuming useAuth hook is in shared directory
 
 interface UserRouteGuardProps {
   children: React.ReactElement;

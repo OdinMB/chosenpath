@@ -1,9 +1,9 @@
-import { useAuth } from "shared/useAuth";
+import { useAuth } from "client/shared/auth/useAuth.js";
 import { useUserAccountModal } from "../hooks/useUserAccountModal.js";
 import { useNavigate } from "react-router-dom";
 import { Icons } from "../../shared/components/ui/Icons";
 import { useMemo } from "react";
-import { useSession } from "shared/useSession";
+import { useSession } from "client/shared/session/useSession.js";
 import { ExtendedStoryMetadata } from "core/types/api";
 
 export function UserAccountHeader() {

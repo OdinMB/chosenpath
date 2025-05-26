@@ -5,8 +5,8 @@ import { gameService } from "./GameService";
 import { wsService } from "./WebSocketService";
 import { Logger } from "../shared/logger";
 import { GameLayout } from "./components/GameLayout";
-import { useAuth } from "shared/useAuth";
-import { useSession } from "../shared/useSession";
+import { useAuth } from "client/shared/auth/useAuth";
+import { useSession } from "../shared/session/useSession";
 import { addCodeSetToStorage } from "../shared/utils/codeSetUtils";
 
 // Placeholder for actual game UI components
