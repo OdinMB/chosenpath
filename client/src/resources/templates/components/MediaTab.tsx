@@ -1,189 +1,206 @@
-import React from "react";
+import React, { useState } from "react";
 import { ImageInstructions } from "core/types";
-import { TextArea, InfoIcon } from "components/ui";
+import { TextArea } from "components/ui";
 import { CoverImageEditor } from "./CoverImageEditor";
 
 interface MediaTabProps {
   templateId?: string;
   imageInstructions: ImageInstructions;
-  setImageInstructions: (updates: Partial<ImageInstructions>) => void;
-  readOnly?: boolean;
+  setImageInstructions: (instructions: ImageInstructions) => void;
+  canGenerateImages?: boolean;
 }
 
 export const MediaTab: React.FC<MediaTabProps> = ({
-  templateId = "",
-  imageInstructions = {
-    visualStyle: "",
-    atmosphere: "",
-    colorPalette: "",
-    settingDetails: "",
-    characterStyle: "",
-    artInfluences: "",
-    coverPrompt: "",
-  },
+  templateId,
+  imageInstructions,
   setImageInstructions,
-  readOnly = false,
+  canGenerateImages = true,
 }) => {
-  const handleInstructionChange = (
-    key: keyof ImageInstructions,
-    value: string
-  ) => {
-    setImageInstructions({
-      ...imageInstructions,
-      [key]: value,
-    });
+  const [expandedSections, setExpandedSections] = useState<{
+    [key: string]: boolean;
+  }>({
+    visualStyle: true,
+    atmosphere: false,
+    colorPalette: false,
+    settingDetails: false,
+    characterStyle: false,
+    artInfluences: false,
+  });
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
 
-  const handleCoverPromptChange = (coverPrompt: string) => {
-    handleInstructionChange("coverPrompt", coverPrompt);
+  const handleChange = (field: keyof ImageInstructions, value: string) => {
+    setImageInstructions({
+      ...imageInstructions,
+      [field]: value,
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* Cover Image Editor */}
-      <div className="mb-6">
+      <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <h3 className="text-lg font-semibold mb-4">Cover Image</h3>
+
         <CoverImageEditor
           templateId={templateId}
           imageInstructions={imageInstructions}
-          onUpdateCoverPrompt={handleCoverPromptChange}
-          readOnly={readOnly}
+          coverPrompt={imageInstructions.coverPrompt || ""}
+          onCoverPromptChange={(value) => handleChange("coverPrompt", value)}
+          canGenerateImages={canGenerateImages}
         />
       </div>
 
-      {/* Image Generation Instructions */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Image Generation Instructions</h3>
-        <p className="text-sm text-gray-600">
-          These instructions will be used to maintain visual consistency across
-          all generated images in the story.
-        </p>
+      {canGenerateImages && (
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold mb-4">
+            Image Generation Instructions
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            These instructions will be used to generate images for all story
+            elements and character identities. Be specific about the visual
+            style you want.
+          </p>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Visual Style</span>
-          <InfoIcon
-            tooltipText="The primary artistic style for images (e.g., watercolor, pixel art, photorealistic)"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="visual-style"
-            name="visual-style"
-            value={imageInstructions?.visualStyle || ""}
-            onChange={(e) =>
-              handleInstructionChange("visualStyle", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., watercolor, pixel art, photorealistic"
-            disabled={readOnly}
-          />
-        </div>
+          <div className="border-t border-gray-200 my-4"></div>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Atmosphere</span>
-          <InfoIcon
-            tooltipText="The mood or emotional tone that should pervade all images"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="atmosphere"
-            name="atmosphere"
-            value={imageInstructions?.atmosphere || ""}
-            onChange={(e) =>
-              handleInstructionChange("atmosphere", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., dark and gritty, light and whimsical"
-            disabled={readOnly}
-          />
-        </div>
+          <div className="space-y-4">
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("visualStyle")}
+              >
+                <span>Visual Style</span>
+                <span>{expandedSections.visualStyle ? "−" : "+"}</span>
+              </button>
+              {expandedSections.visualStyle && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.visualStyle || ""}
+                    onChange={(e) =>
+                      handleChange("visualStyle", e.target.value)
+                    }
+                    placeholder="Describe the overall visual style (e.g., 'digital painting', 'watercolor', 'comic book style')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Color Palette</span>
-          <InfoIcon
-            tooltipText="Key colors or color scheme that should appear consistently"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="color-palette"
-            name="color-palette"
-            value={imageInstructions?.colorPalette || ""}
-            onChange={(e) =>
-              handleInstructionChange("colorPalette", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., muted earth tones, vibrant neon colors"
-            disabled={readOnly}
-          />
-        </div>
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("atmosphere")}
+              >
+                <span>Atmosphere & Mood</span>
+                <span>{expandedSections.atmosphere ? "−" : "+"}</span>
+              </button>
+              {expandedSections.atmosphere && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.atmosphere || ""}
+                    onChange={(e) => handleChange("atmosphere", e.target.value)}
+                    placeholder="Describe the atmosphere (e.g., 'dark and foreboding', 'bright and hopeful')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Setting Details</span>
-          <InfoIcon
-            tooltipText="Essential visual elements of the world that should appear regularly"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="setting-details"
-            name="setting-details"
-            value={imageInstructions?.settingDetails || ""}
-            onChange={(e) =>
-              handleInstructionChange("settingDetails", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., futuristic city with tall glass skyscrapers, ancient ruins"
-            disabled={readOnly}
-          />
-        </div>
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("colorPalette")}
+              >
+                <span>Color Palette</span>
+                <span>{expandedSections.colorPalette ? "−" : "+"}</span>
+              </button>
+              {expandedSections.colorPalette && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.colorPalette || ""}
+                    onChange={(e) =>
+                      handleChange("colorPalette", e.target.value)
+                    }
+                    placeholder="Describe your color palette (e.g., 'muted earth tones', 'vibrant primary colors')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Character Style</span>
-          <InfoIcon
-            tooltipText="How characters should be consistently depicted"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="character-style"
-            name="character-style"
-            value={imageInstructions?.characterStyle || ""}
-            onChange={(e) =>
-              handleInstructionChange("characterStyle", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., anime-inspired, photorealistic, stylized cartoon"
-            disabled={readOnly}
-          />
-        </div>
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("settingDetails")}
+              >
+                <span>Setting Details</span>
+                <span>{expandedSections.settingDetails ? "−" : "+"}</span>
+              </button>
+              {expandedSections.settingDetails && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.settingDetails || ""}
+                    onChange={(e) =>
+                      handleChange("settingDetails", e.target.value)
+                    }
+                    placeholder="Describe setting details to include in images (e.g., 'Victorian architecture', 'futuristic cityscapes')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
 
-        <div className="flex items-start gap-2">
-          <span className="font-semibold pt-2">Art Influences</span>
-          <InfoIcon
-            tooltipText="Artists, art movements, or media styles that should influence the imagery"
-            position="right"
-            className="mt-3"
-          />
-          <TextArea
-            id="art-influences"
-            name="art-influences"
-            value={imageInstructions?.artInfluences || ""}
-            onChange={(e) =>
-              handleInstructionChange("artInfluences", e.target.value)
-            }
-            className="flex-1"
-            rows={2}
-            placeholder="E.g., Cyberpunk, art nouveau"
-            disabled={readOnly}
-          />
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("characterStyle")}
+              >
+                <span>Character Style</span>
+                <span>{expandedSections.characterStyle ? "−" : "+"}</span>
+              </button>
+              {expandedSections.characterStyle && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.characterStyle || ""}
+                    onChange={(e) =>
+                      handleChange("characterStyle", e.target.value)
+                    }
+                    placeholder="Describe character style (e.g., 'realistic proportions', 'stylized anime characters')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <button
+                className="flex items-center justify-between w-full text-left font-medium"
+                onClick={() => toggleSection("artInfluences")}
+              >
+                <span>Art Influences</span>
+                <span>{expandedSections.artInfluences ? "−" : "+"}</span>
+              </button>
+              {expandedSections.artInfluences && (
+                <div className="mt-2">
+                  <TextArea
+                    value={imageInstructions.artInfluences || ""}
+                    onChange={(e) =>
+                      handleChange("artInfluences", e.target.value)
+                    }
+                    placeholder="List artistic influences (e.g., 'Studio Ghibli', 'Art Nouveau', 'cyberpunk aesthetics')"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

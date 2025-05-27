@@ -18,13 +18,9 @@ import { Logger } from "shared/logger";
 import { MAX_PLAYERS } from "core/config";
 import { useBasicInfoTab } from "./useBasicInfoTab";
 import { useGuidelinesEditor } from "./useGuidelinesEditor";
-import { adminTemplateApi } from "admin/adminApi"; // Import adminTemplateApi
+import { templateApi } from "../templateApi"; // Import templateApi instead
 import { useTabs } from "components/ui/useTabs";
-import {
-  CreateTemplateRequest,
-  UpdateTemplateRequest,
-  GenerateTemplateRequest,
-} from "core/types/admin";
+import { GenerateTemplateRequest } from "core/types/admin";
 import { useNavigate } from "react-router-dom";
 import { notificationService } from "shared/notifications/notificationService";
 
@@ -42,12 +38,13 @@ export type TabType =
 
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
-  // onSubmit: (template: StoryTemplate) => void; // Will be handled internally by navigation/revalidation
-  // token: string; // No longer needed
-  // setIsLoading: (isLoading: boolean) => void; // Will be handled internally
+  onSave?: (template: StoryTemplate) => Promise<void>;
 }
 
-export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
+export function useTemplateForm({
+  initialTemplate,
+  onSave,
+}: UseTemplateFormProps) {
   // Core state
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
   const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
@@ -229,35 +226,38 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
         tags,
       };
 
-      if (!templateToSubmit.id) {
-        // Create new template
-        Logger.Admin.log("Creating new template in form", templateToSubmit);
-        const createRequest: CreateTemplateRequest = {
-          template: templateToSubmit,
-        };
-        const response = await adminTemplateApi.createTemplate(createRequest);
-        Logger.Admin.log("Template created successfully", response.template);
-        navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
+      if (onSave) {
+        // Use the provided onSave handler
+        await onSave(templateToSubmit);
       } else {
-        // Update existing template
-        Logger.Admin.log(
-          `Updating template: ${templateToSubmit.id}`,
-          templateToSubmit
-        );
-        const updateRequest: UpdateTemplateRequest = {
-          id: templateToSubmit.id,
-          template: templateToSubmit,
-        };
-        const response = await adminTemplateApi.updateTemplate(updateRequest);
-        Logger.Admin.log("Template saved successfully", response.template);
-        // Optionally, show a success notification
-        // Revalidation of data for a library view would typically happen there, or if this form closes.
+        // Use the default implementation
+        if (!templateToSubmit.id) {
+          // Create new template
+          Logger.Admin.log("Creating new template in form", templateToSubmit);
+          const response = await templateApi.createTemplate(templateToSubmit);
+          Logger.Admin.log("Template created successfully", response.template);
+          navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
+        } else {
+          // Update existing template
+          Logger.Admin.log(
+            `Updating template: ${templateToSubmit.id}`,
+            templateToSubmit
+          );
+          const response = await templateApi.updateTemplate(
+            templateToSubmit.id,
+            templateToSubmit
+          );
+          Logger.Admin.log("Template saved successfully", response.template);
+          // Optionally, show a success notification
+          // Revalidation of data for a library view would typically happen there, or if this form closes.
+        }
       }
     } catch (err) {
       Logger.Admin.error("Error submitting template form:", err);
       const message =
         err instanceof Error ? err.message : "Failed to save template";
       notificationService.addErrorNotification(message);
+      throw err; // Re-throw to allow the component to handle it
     } finally {
       setIsLoading(false);
     }
@@ -291,7 +291,7 @@ export function useTemplateForm({ initialTemplate }: UseTemplateFormProps) {
     };
 
     try {
-      const result = await adminTemplateApi.generateTemplateViaApi(requestData);
+      const result = await templateApi.generateTemplate(requestData);
       const generatedTemplateData = result.template;
 
       Logger.UI.log("AI Draft generated data:", generatedTemplateData);

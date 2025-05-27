@@ -24,18 +24,33 @@ import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
 import { Logger } from "shared/logger";
-import { useLoaderData } from "react-router-dom";
 
-export const TemplateForm: React.FC = () => {
-  const initialTemplate = useLoaderData() as StoryTemplate;
+interface TemplateFormProps {
+  initialTemplate: StoryTemplate;
+  onSave: (template: StoryTemplate) => Promise<void>;
+  onCancel: () => void;
+  canPublish?: boolean;
+  canSetWelcomeScreen?: boolean;
+  canManageTags?: boolean;
+  canGenerateImages?: boolean;
+}
 
+export const TemplateForm: React.FC<TemplateFormProps> = ({
+  initialTemplate,
+  onSave,
+  onCancel,
+  canPublish = false,
+  canSetWelcomeScreen = false,
+  canManageTags = false,
+  canGenerateImages = true,
+}) => {
   const {
     activeTab,
     setActiveTab,
     formData,
     isLoading,
     tags,
-    handleSubmit,
+    handleSubmit: handleFormSubmit,
     getPlayerOptionsFromStoryTemplate,
     handleAIDraftSetup,
     setWorld,
@@ -72,6 +87,7 @@ export const TemplateForm: React.FC = () => {
     getGameModeValue,
   } = useTemplateForm({
     initialTemplate,
+    onSave,
   });
 
   // Add these hooks for AI iteration
@@ -93,8 +109,12 @@ export const TemplateForm: React.FC = () => {
     { id: "outcomes" as TabType, label: "Outcomes" },
     { id: "stats" as TabType, label: "Stats" },
     { id: "players" as TabType, label: "Players" },
-    { id: "ai-draft" as TabType, label: "Draft" },
-    { id: "ai-iterate" as TabType, label: "Iteration" },
+    ...(canGenerateImages
+      ? [
+          { id: "ai-draft" as TabType, label: "Draft" },
+          { id: "ai-iterate" as TabType, label: "Iteration" },
+        ]
+      : []),
   ];
 
   const handleAcceptSectionUpdate = (
@@ -172,6 +192,12 @@ export const TemplateForm: React.FC = () => {
     );
   };
 
+  // Custom submit handler that calls the provided onSave prop
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await handleFormSubmit(e);
+  };
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -179,7 +205,16 @@ export const TemplateForm: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-800 truncate">
             {formData.title ? formData.title : "New Template"}
           </h2>
-          <div>
+          <div className="flex gap-2">
+            <PrimaryButton
+              type="button"
+              onClick={onCancel}
+              variant="outline"
+              size="lg"
+              disabled={isLoading}
+            >
+              Cancel
+            </PrimaryButton>
             <PrimaryButton
               type="submit"
               disabled={isLoading}
@@ -192,6 +227,7 @@ export const TemplateForm: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 mb-4">
+          {/* Allow all users to select a publication status, but restrict 'Published' option if !canPublish */}
           <Select
             value={formData.publicationStatus || PublicationStatus.Draft}
             onChange={handlePublicationStatusChange}
@@ -201,7 +237,9 @@ export const TemplateForm: React.FC = () => {
           >
             <option value={PublicationStatus.Draft}>Draft</option>
             <option value={PublicationStatus.Review}>Review</option>
-            <option value={PublicationStatus.Published}>Published</option>
+            {canPublish && (
+              <option value={PublicationStatus.Published}>Published</option>
+            )}
             <option value={PublicationStatus.Private}>Private</option>
           </Select>
 
@@ -236,7 +274,7 @@ export const TemplateForm: React.FC = () => {
               setMaxTurnsMin={handleMaxTurnsMinChange}
               setMaxTurnsMax={handleMaxTurnsMaxChange}
               tags={tags}
-              handleTagsChange={handleTagsChange}
+              handleTagsChange={canManageTags ? handleTagsChange : undefined}
               // Helper functions
               getMinPlayerOptions={getMinPlayerOptions}
               getMaxPlayerOptions={getMaxPlayerOptions}
@@ -245,7 +283,11 @@ export const TemplateForm: React.FC = () => {
               gameModeOptions={gameModeOptions}
               getGameModeValue={getGameModeValue}
               showOnWelcomeScreen={formData.showOnWelcomeScreen || false}
-              setShowOnWelcomeScreen={handleShowOnWelcomeScreenChange}
+              setShowOnWelcomeScreen={
+                canSetWelcomeScreen
+                  ? handleShowOnWelcomeScreenChange
+                  : undefined
+              }
               difficultyLevels={formData.difficultyLevels || []}
               handleDifficultyLevelsChange={handleDifficultyLevelsChange}
             />
@@ -266,6 +308,7 @@ export const TemplateForm: React.FC = () => {
                 }
               }
               setImageInstructions={handleImageInstructionsChange}
+              canGenerateImages={canGenerateImages}
             />
           )}
 
@@ -353,7 +396,7 @@ export const TemplateForm: React.FC = () => {
             />
           )}
 
-          {activeTab === "ai-draft" && (
+          {activeTab === "ai-draft" && canGenerateImages && (
             <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-2">
                 <div className="flex items-start">
@@ -386,7 +429,7 @@ export const TemplateForm: React.FC = () => {
       </form>
 
       {/* Render the AI-iterate tab outside the main form */}
-      {renderAiIterationSection()}
+      {canGenerateImages && renderAiIterationSection()}
 
       {/* Add the AI iteration modal */}
       <AiIterationModal

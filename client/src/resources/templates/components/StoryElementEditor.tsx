@@ -21,6 +21,7 @@ interface StoryElementEditorProps {
   readOnly?: boolean;
   templateId: string;
   imageInstructions?: ImageInstructions;
+  canGenerateImages?: boolean;
 }
 
 export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
@@ -33,6 +34,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   readOnly = false,
   templateId,
   imageInstructions,
+  canGenerateImages = true,
 }) => {
   const { generateImageForElement } = useImageGeneration();
   const [imageStatus, setImageStatus] = useState<ImageStatus>("ready");
@@ -215,6 +217,25 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
     );
   };
 
+  const generateImageIcon = {
+    icon: isGenerating ? (
+      <Icons.Spinner className="h-5 w-5" />
+    ) : (
+      <Icons.CreateImage className="h-5 w-5" />
+    ),
+    onClick: handleGenerateImage,
+    className: `text-blue-500 hover:text-blue-700 ${
+      isGenerating ? "text-blue-500" : ""
+    }`,
+    ariaLabel: `Generate image for ${element.name}`,
+    title: element.appearance
+      ? isGenerating
+        ? "Generating image..."
+        : "Generate an image based on the element's appearance"
+      : "Element must have an appearance description to generate an image",
+    disabled: isGenerating || !element.appearance || !templateId,
+  };
+
   return (
     <ExpandableItem
       key={element.id}
@@ -230,26 +251,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       renderEditForm={renderElementForm}
       isSaveDisabled={(element) => !element.name || !element.id}
       readOnly={readOnly}
-      actionIcons={[
-        {
-          icon: isGenerating ? (
-            <Icons.Spinner className="h-5 w-5" />
-          ) : (
-            <Icons.CreateImage className="h-5 w-5" />
-          ),
-          onClick: handleGenerateImage,
-          className: `text-blue-500 hover:text-blue-700 ${
-            isGenerating ? "text-blue-500" : ""
-          }`,
-          ariaLabel: `Generate image for ${element.name}`,
-          title: element.appearance
-            ? isGenerating
-              ? "Generating image..."
-              : "Generate an image based on the element's appearance"
-            : "Element must have an appearance description to generate an image",
-          disabled: isGenerating || !element.appearance || !templateId,
-        },
-      ]}
+      actionIcons={canGenerateImages ? [generateImageIcon] : []}
     />
   );
 };

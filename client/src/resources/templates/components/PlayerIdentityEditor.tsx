@@ -32,6 +32,7 @@ interface PlayerIdentityEditorProps {
   readOnly?: boolean;
   templateId: string;
   imageInstructions?: ImageInstructions;
+  canGenerateImages?: boolean;
 }
 
 export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
@@ -46,6 +47,7 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
   readOnly = false,
   templateId,
   imageInstructions,
+  canGenerateImages = true,
 }) => {
   const { generateImageForPlayer, isGenerating: isGeneratingImage } =
     useImageGeneration();
@@ -180,6 +182,27 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
     </div>
   );
 
+  const generateImageIcon = {
+    icon: isGeneratingImage ? (
+      <Icons.Spinner className="h-5 w-5" />
+    ) : (
+      <Icons.CreateImage className="h-5 w-5" />
+    ),
+    onClick: handleGenerateImage,
+    className: `text-blue-500 hover:text-blue-700 ${
+      isGeneratingImage ? "text-blue-500" : ""
+    }`,
+    ariaLabel: `Generate new image for ${
+      identity.name || `Identity ${index + 1}`
+    }`,
+    title: identity.appearance
+      ? isGeneratingImage
+        ? "Generating image..."
+        : "Generate a new image based on the character's appearance"
+      : "Character must have an appearance description to generate an image",
+    disabled: isGeneratingImage || !identity.appearance || !templateId,
+  };
+
   return (
     <ExpandableItem
       id={`identity_${index}`}
@@ -194,28 +217,7 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
       renderEditForm={renderIdentityForm}
       isSaveDisabled={() => false}
       readOnly={readOnly}
-      actionIcons={[
-        {
-          icon: isGeneratingImage ? (
-            <Icons.Spinner className="h-5 w-5" />
-          ) : (
-            <Icons.CreateImage className="h-5 w-5" />
-          ),
-          onClick: handleGenerateImage,
-          className: `text-blue-500 hover:text-blue-700 ${
-            isGeneratingImage ? "text-blue-500" : ""
-          }`,
-          ariaLabel: `Generate new image for ${
-            identity.name || `Identity ${index + 1}`
-          }`,
-          title: identity.appearance
-            ? isGeneratingImage
-              ? "Generating image..."
-              : "Generate a new image based on the character's appearance"
-            : "Character must have an appearance description to generate an image",
-          disabled: isGeneratingImage || !identity.appearance || !templateId,
-        },
-      ]}
+      actionIcons={canGenerateImages ? [generateImageIcon] : []}
     />
   );
 };

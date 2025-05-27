@@ -22,7 +22,6 @@ import {
   RateLimitNotification,
 } from "./notifications/notifications";
 import { notificationService } from "./notifications/notificationService";
-import { StoryTemplate } from "core/types/story";
 
 // Extend axios request config to include adminAuth property
 export interface AdminRequestConfig extends AxiosRequestConfig {
@@ -376,21 +375,7 @@ export const storyApi = {
   },
 };
 
-export const templateApi = {
-  getTemplates: async (forWelcomeScreen = false): Promise<StoryTemplate[]> => {
-    return apiClient
-      .get<{ templates: StoryTemplate[] }>(
-        `/templates${forWelcomeScreen ? "?forWelcomeScreen=true" : ""}`
-      )
-      .then((response) => response.templates);
-  },
-  getTemplate: async (templateId: string): Promise<StoryTemplate> => {
-    const response = await apiClient.get<{ template: StoryTemplate }>(
-      `/templates/${templateId}`
-    );
-    return response.template;
-  },
-};
+// Template API has been moved to resources/templates/templateApi.js
 
 // Feedback API functions
 export const feedbackApi = {

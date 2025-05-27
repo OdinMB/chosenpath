@@ -135,7 +135,11 @@ export function LibraryBrowser() {
       params.set("tags", selectedTags.join(","));
     }
 
-    if (playerCountFilter !== null) {
+    if (
+      playerCountFilter !== null &&
+      playerCountFilter !== undefined &&
+      !isNaN(Number(playerCountFilter))
+    ) {
       params.set("players", playerCountFilter.toString());
     }
 
@@ -144,7 +148,8 @@ export function LibraryBrowser() {
 
   // Handle share button click
   const handleShare = () => {
-    setShareUrl(getShareUrl());
+    const url = getShareUrl();
+    setShareUrl(url);
     setIsShareModalOpen(true);
   };
 

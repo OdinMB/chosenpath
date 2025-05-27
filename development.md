@@ -2,8 +2,16 @@ Smaller commits!
 
 # NEXT
 
+- 1: don't fetch permissions from db all the time
+- 3: manage templates via db
+  permission to edit/see/delete: creator_id = user id
+- 5: Enable users to create templates
+- 4: Better explain template elements and admin panel
+- 1: show creator in template list in admin view; filter by "has creator id"
+- 2: review process for storytellers who want to publish on website
+
 - 1: Favicons with white background
-- 2: Show feedback in admin panel
+- 2: Show feedbacks in admin panel
 
 # BETTER EXPERIENCE
 

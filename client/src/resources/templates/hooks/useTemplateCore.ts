@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { Logger } from "shared/logger";
 import { StoryTemplate } from "core/types";
-import { adminTemplateApi } from "admin/adminApi";
-import { CreateTemplateRequest } from "core/types";
+import { templateApi } from "../templateApi";
 import { formatDate, formatDateTime } from "core/utils/dateUtils";
 import { DeleteDialogState } from "../templateTypes";
 import { useRevalidator } from "react-router-dom";
-import { notificationService } from "../../../shared/notifications/notificationService";
+import { notificationService } from "shared/notifications/notificationService";
 
 // Type definitions have been moved to templateTypes.ts
 
@@ -28,7 +27,7 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
   const handleDeleteTemplate = async (templateId: string) => {
     Logger.Admin.log(`Attempting to delete template: ${templateId}`);
     try {
-      await adminTemplateApi.deleteTemplate(templateId);
+      await templateApi.deleteTemplate(templateId);
 
       Logger.Admin.log(`Successfully deleted template: ${templateId}`);
       // Revalidate the loader data
@@ -46,11 +45,7 @@ export const useTemplateCore = (initialTemplates: StoryTemplate[]) => {
     Logger.Admin.log(`Creating template: ${templateData.title}`);
     try {
       // Create template on server
-      const templateRequest: CreateTemplateRequest = {
-        template: templateData as Partial<StoryTemplate>,
-      };
-
-      const response = await adminTemplateApi.createTemplate(templateRequest);
+      const response = await templateApi.createTemplate(templateData);
 
       Logger.Admin.log(
         `Successfully created template: ${response.template.title}`

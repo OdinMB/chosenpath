@@ -6,17 +6,21 @@ import { useImageGeneration } from "client/resources/templates/hooks/useImageGen
 import { StoryImage } from "shared/components/StoryImage";
 
 interface CoverImageEditorProps {
-  templateId: string;
-  imageInstructions: ImageInstructions;
-  onUpdateCoverPrompt: (coverPrompt: string) => void;
+  templateId?: string;
+  imageInstructions?: ImageInstructions;
+  coverPrompt: string;
+  onCoverPromptChange: (value: string) => void;
   readOnly?: boolean;
+  canGenerateImages?: boolean;
 }
 
 export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   templateId,
   imageInstructions,
-  onUpdateCoverPrompt,
+  coverPrompt,
+  onCoverPromptChange,
   readOnly = false,
+  canGenerateImages = true,
 }) => {
   const { generateCoverImage, isGenerating, error } = useImageGeneration();
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
@@ -26,12 +30,12 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
     id: "cover",
     fileType: "jpeg",
     source: "template",
-    sourceId: templateId,
+    sourceId: templateId || "",
     status: localIsGenerating ? "generating" : "ready",
   };
 
   const handleGenerateCoverImage = async () => {
-    if (!templateId || !imageInstructions.coverPrompt) return;
+    if (!templateId || !imageInstructions?.coverPrompt) return;
 
     try {
       // Set local loading state
@@ -81,8 +85,8 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
             <TextArea
               id="cover-prompt"
               name="cover-prompt"
-              value={imageInstructions.coverPrompt || ""}
-              onChange={(e) => onUpdateCoverPrompt(e.target.value)}
+              value={coverPrompt}
+              onChange={(e) => onCoverPromptChange(e.target.value)}
               placeholder="E.g., A mysterious forest at twilight with ancient ruins barely visible through the mist. A cloaked figure stands at a crossroads, their face hidden in shadow."
               className="w-full mb-4"
               rows={5}
@@ -92,23 +96,32 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
             {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
 
             {/* Generate Button */}
-            <div className="flex justify-center">
-              <PrimaryButton
-                onClick={handleGenerateCoverImage}
-                disabled={
-                  isGenerating ||
-                  localIsGenerating ||
-                  !imageInstructions.coverPrompt ||
-                  readOnly ||
-                  !templateId
-                }
-                isLoading={localIsGenerating}
-                leftIcon={<Icons.CreateImage className="h-5 w-5" />}
-              >
-                Generate Cover Image
-              </PrimaryButton>
-            </div>
-            {!templateId && (
+            {canGenerateImages && (
+              <div className="flex justify-center">
+                <PrimaryButton
+                  onClick={handleGenerateCoverImage}
+                  disabled={
+                    isGenerating ||
+                    localIsGenerating ||
+                    !imageInstructions?.coverPrompt ||
+                    readOnly ||
+                    !templateId
+                  }
+                  isLoading={localIsGenerating}
+                  leftIcon={<Icons.CreateImage className="h-5 w-5" />}
+                >
+                  Generate Cover Image
+                </PrimaryButton>
+              </div>
+            )}
+
+            {!canGenerateImages && (
+              <p className="text-sm text-amber-600 mt-2 text-center">
+                You do not have permission to generate images
+              </p>
+            )}
+
+            {canGenerateImages && !templateId && (
               <p className="text-sm text-amber-600 mt-2 text-center">
                 Save the template first to generate a cover image
               </p>

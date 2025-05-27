@@ -37,7 +37,7 @@ type TemplateDataInput = Omit<
 // Create a type that makes all fields optional for updates
 type TemplateDataUpdate = Partial<TemplateDataInput>;
 
-export class AdminTemplateService {
+export class TemplateService {
   private storagePath: string;
   private logger = Logger.forService("LibraryService");
   private aiStoryGenerator: AIStoryGenerator;

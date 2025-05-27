@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Logger } from "shared/logger";
-import { adminTemplateApi } from "admin/adminApi";
 import {
   StoryTemplate,
   TemplateIterationRequest,
@@ -8,6 +7,7 @@ import {
 } from "core/types";
 import { templateIterationSections } from "core/utils/templateIterationSections";
 import { notificationService } from "../../../shared/notifications/notificationService";
+import { templateApi } from "../templateApi";
 
 // No props needed for this hook anymore
 // interface UseAiIterationProps {}
@@ -44,7 +44,10 @@ export function useAiIteration() {
         maxTurns: template.maxTurnsMin,
       };
 
-      const response = await adminTemplateApi.iterateTemplate(request);
+      const response = await templateApi.iterateTemplate(
+        request.templateId,
+        request
+      );
       const templateUpdate = response.templateUpdate;
 
       Logger.Admin.log("AI partial StoryTemplate:", templateUpdate);

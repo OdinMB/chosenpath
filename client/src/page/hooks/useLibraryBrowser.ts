@@ -16,11 +16,31 @@ export function useLibraryBrowser({
     useState<StoryTemplate[]>(templates);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Get all valid tags from templates
+  const getValidTags = useCallback(() => {
+    const uniqueTags = new Set<string>();
+    templates.forEach((template) => {
+      if (template.tags && Array.isArray(template.tags)) {
+        template.tags.forEach((tag) => {
+          if (tag && typeof tag === "string") {
+            uniqueTags.add(tag);
+          }
+        });
+      }
+    });
+    return uniqueTags;
+  }, [templates]);
+
   // Filters
   const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
     initialPlayerCount
   );
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags || []);
+
+  // Filter initialTags to only include valid tags that exist in templates
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const validTags = getValidTags();
+    return (initialTags || []).filter((tag) => validTags.has(tag));
+  });
 
   // Update URL with current filters
   const updateUrlWithFilters = useCallback(
@@ -35,13 +55,21 @@ export function useLibraryBrowser({
       }
 
       const params = new URLSearchParams();
+      const validTags = getValidTags();
 
-      if (tags && tags.length > 0) {
-        params.set("tags", tags.join(","));
+      // Only include tags that actually exist in templates
+      const filteredTags = tags.filter((tag) => validTags.has(tag));
+      if (filteredTags && filteredTags.length > 0) {
+        params.set("tags", filteredTags.join(","));
       }
 
-      if (players !== null) {
-        params.set("players", players.toString());
+      // Only add players parameter if it's a valid number
+      if (
+        players !== null &&
+        players !== undefined &&
+        !isNaN(Number(players))
+      ) {
+        params.set("players", String(players));
       }
 
       const newUrl = params.toString()
@@ -50,7 +78,7 @@ export function useLibraryBrowser({
 
       window.history.replaceState({}, "", newUrl);
     },
-    [selectedTags, playerCountFilter]
+    [selectedTags, playerCountFilter, getValidTags]
   );
 
   // Apply filters when they change
@@ -65,22 +93,32 @@ export function useLibraryBrowser({
       );
     }
 
-    if (selectedTags.length > 0) {
+    // Get valid tags to filter against
+    const validTags = getValidTags();
+    const validSelectedTags = selectedTags.filter((tag) => validTags.has(tag));
+
+    if (validSelectedTags.length > 0) {
       result = result.filter(
         (template) =>
           template.tags &&
-          selectedTags.every((tag) => template.tags.includes(tag))
+          validSelectedTags.every((tag) => template.tags.includes(tag))
       );
     }
 
     setFilteredTemplates(result);
 
-    if (playerCountFilter !== null || selectedTags.length > 0) {
-      updateUrlWithFilters();
+    if (playerCountFilter !== null || validSelectedTags.length > 0) {
+      updateUrlWithFilters(validSelectedTags);
     } else {
       updateUrlWithFilters([], null, true);
     }
-  }, [templates, playerCountFilter, selectedTags, updateUrlWithFilters]);
+  }, [
+    templates,
+    playerCountFilter,
+    selectedTags,
+    updateUrlWithFilters,
+    getValidTags,
+  ]);
 
   const handleTagToggle = useCallback((tag: string) => {
     setSelectedTags((prev) =>
@@ -100,8 +138,9 @@ export function useLibraryBrowser({
 
   // Get all available player counts based on templates
   const getAvailablePlayerCounts = useCallback(() => {
-    if (templates.length === 0)
+    if (!templates || templates.length === 0) {
       return Array.from({ length: 10 }, (_, i) => i + 1);
+    }
 
     const minCounts = templates.map((t) => t.playerCountMin);
     const maxCounts = templates.map((t) => t.playerCountMax);

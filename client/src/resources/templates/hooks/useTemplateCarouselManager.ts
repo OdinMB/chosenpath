@@ -3,7 +3,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { StoryTemplate, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
-import { adminTemplateApi } from "admin/adminApi";
+import { templateApi } from "../templateApi";
 import { UpdateTemplateRequest } from "core/types/admin";
 
 export const useTemplateCarouselManager = () => {
@@ -19,7 +19,7 @@ export const useTemplateCarouselManager = () => {
       setError(null);
 
       try {
-        const response = await adminTemplateApi.getTemplates();
+        const response = await templateApi.getAllTemplates();
 
         // Filter for published templates marked for welcome screen
         const welcomeScreenTemplates = response
@@ -81,7 +81,10 @@ export const useTemplateCarouselManager = () => {
               order: index,
             },
           };
-          return adminTemplateApi.updateTemplate(requestForUpdate);
+          return templateApi.updateTemplate(
+            requestForUpdate.id,
+            requestForUpdate
+          );
         }
         // If no update needed, return a resolved promise with the existing template structure
         return Promise.resolve({ template });

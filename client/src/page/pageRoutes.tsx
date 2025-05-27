@@ -1,7 +1,7 @@
 import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
-import { libraryLoader } from "./loaders/libraryLoader";
-import { templateConfigLoader } from "./loaders/templateConfigLoader";
+import { templatesLoader } from "../resources/templates/loaders/templatesLoader";
+import { templateLoader } from "../resources/templates/loaders/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
@@ -10,6 +10,7 @@ import { PageLayout } from "./PageLayout";
 import { Credits } from "./components/Credits";
 import { Privacy } from "./components/Privacy";
 import { ScrollRestoration } from "react-router-dom";
+import { libraryLoader } from "./loaders/libraryLoader";
 
 // Define routes for the page section
 export const pageRoutes: RouteObject[] = [
@@ -23,7 +24,11 @@ export const pageRoutes: RouteObject[] = [
     children: [
       {
         path: "/",
-        loader: libraryLoader,
+        loader: async () =>
+          templatesLoader({
+            context: "published",
+            forWelcomeScreen: true,
+          }),
         element: <Page />,
         id: "welcome",
       },
@@ -53,7 +58,7 @@ export const pageRoutes: RouteObject[] = [
         children: [
           {
             path: "/templates/:id/configure",
-            loader: templateConfigLoader,
+            loader: (args) => templateLoader(args, { mode: "playable" }),
             element: <TemplateConfigurator />,
             id: "template-config",
           },

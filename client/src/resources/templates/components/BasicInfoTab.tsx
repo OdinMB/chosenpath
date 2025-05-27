@@ -32,9 +32,9 @@ interface BasicInfoTabProps {
   setMaxTurnsMin: (turns: number) => void;
   setMaxTurnsMax: (turns: number) => void;
   tags: string[];
-  handleTagsChange: (tags: string[]) => void;
+  handleTagsChange?: (tags: string[]) => void;
   showOnWelcomeScreen: boolean;
-  setShowOnWelcomeScreen: (show: boolean) => void;
+  setShowOnWelcomeScreen?: (show: boolean) => void;
   difficultyLevels: DifficultyLevel[]; // This is the array of currently selected/configured levels for the template
   handleDifficultyLevelsChange: (levels: DifficultyLevel[]) => void;
   // Helper functions
@@ -91,6 +91,8 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   }, [tags, allPredefinedTags]);
 
   const handleTagToggle = (tag: string) => {
+    if (!handleTagsChange) return; // Skip if no handler provided
+
     if (tags.includes(tag)) {
       handleTagsChange(tags.filter((t) => t !== tag));
     } else {
@@ -186,7 +188,9 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="player-count-min"
               name="player-count-min"
-              value={playerCountMin.toString()}
+              value={
+                playerCountMin !== undefined ? playerCountMin.toString() : "1"
+              }
               onChange={(e) =>
                 setPlayerCountMin(Number(e.target.value) as PlayerCount)
               }
@@ -206,7 +210,9 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="player-count-max"
               name="player-count-max"
-              value={playerCountMax.toString()}
+              value={
+                playerCountMax !== undefined ? playerCountMax.toString() : "1"
+              }
               onChange={(e) =>
                 setPlayerCountMax(Number(e.target.value) as PlayerCount)
               }
@@ -230,7 +236,11 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="game-mode"
               name="game-mode"
-              value={getGameModeValue().toString()}
+              value={
+                getGameModeValue() !== undefined
+                  ? getGameModeValue().toString()
+                  : "0"
+              }
               onChange={(e) => handleGameModeChange(Number(e.target.value))}
               disabled={playerCountMax === 1}
             >
@@ -260,7 +270,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="story-length-min"
               name="story-length-min"
-              value={maxTurnsMin.toString()}
+              value={maxTurnsMin !== undefined ? maxTurnsMin.toString() : "5"}
               onChange={(e) => setMaxTurnsMin(Number(e.target.value))}
             >
               {getMinTurnsOptions().map((turns) => (
@@ -278,7 +288,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Select
               id="story-length-max"
               name="story-length-max"
-              value={maxTurnsMax.toString()}
+              value={maxTurnsMax !== undefined ? maxTurnsMax.toString() : "10"}
               onChange={(e) => setMaxTurnsMax(Number(e.target.value))}
             >
               {getMaxTurnsOptions().map((turns) => (
@@ -401,6 +411,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           <ArrayField
             items={customTags}
             onChange={(newCustomTags: string[]) => {
+              if (!handleTagsChange) return;
               const predefinedSelected = tags.filter((tag) =>
                 allPredefinedTags.includes(tag)
               );
@@ -424,21 +435,23 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       </div>
 
       {/* Show on welcome screen */}
-      <div className="flex items-center mt-4">
-        <Checkbox
-          id="welcome-screen"
-          checked={showOnWelcomeScreen}
-          onChange={(e) => setShowOnWelcomeScreen(e.target.checked)}
-        />
-        <label htmlFor="welcome-screen" className="ml-2 text-sm">
-          Show on welcome screen
-        </label>
-        <InfoIcon
-          tooltipText="When selected, this template will be shown on the welcome screen"
-          position="right"
-          className="ml-2"
-        />
-      </div>
+      {setShowOnWelcomeScreen && (
+        <div className="flex items-center mt-4">
+          <Checkbox
+            id="welcome-screen"
+            checked={showOnWelcomeScreen}
+            onChange={(e) => setShowOnWelcomeScreen(e.target.checked)}
+          />
+          <label htmlFor="welcome-screen" className="ml-2 text-sm">
+            Show on welcome screen
+          </label>
+          <InfoIcon
+            tooltipText="When selected, this template will be shown on the welcome screen"
+            position="right"
+            className="ml-2"
+          />
+        </div>
+      )}
     </div>
   );
 };

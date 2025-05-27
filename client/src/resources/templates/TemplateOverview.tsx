@@ -8,17 +8,36 @@ import {
   useTableFilterSort,
   ColumnOption,
 } from "shared/components";
-import { useLoaderData, useRevalidator, useNavigate } from "react-router-dom";
-import { AdminTemplatesLoaderData } from "./adminTemplatesLoader.js";
-import { adminTemplateApi } from "admin/adminApi";
+import { useRevalidator } from "react-router-dom";
 import { Logger } from "shared/logger";
-import { createDefaultTemplate } from "./utils/templateFactory.js";
+import { templateApi } from "./templateApi.js";
 
-export const TemplateOverview = () => {
-  const { templates: initialTemplates } =
-    useLoaderData() as AdminTemplatesLoaderData;
+interface TemplateOverviewProps {
+  initialTemplates: StoryTemplate[];
+  onEdit: (templateId: string) => void;
+  onDelete?: (templateId: string) => Promise<void>;
+  onExport?: (template: StoryTemplate) => Promise<void>;
+  onExportAll?: () => Promise<void>;
+  onCreateNew: () => Promise<void>;
+  onImport?: (templateId: string, zipData: Blob) => Promise<unknown>;
+  canPublish?: boolean;
+  canExportAll?: boolean;
+  canImport?: boolean;
+}
+
+export const TemplateOverview = ({
+  initialTemplates,
+  onEdit,
+  onDelete,
+  onExport,
+  onExportAll,
+  onCreateNew,
+  onImport,
+  canPublish = false,
+  canExportAll = false,
+  canImport = false,
+}: TemplateOverviewProps) => {
   const revalidator = useRevalidator();
-  const navigate = useNavigate();
   const {
     templates,
     fileInputRef,
@@ -27,18 +46,93 @@ export const TemplateOverview = () => {
     importDialog,
     collectionImportDialog,
     formatDateTime,
-    handleDeleteTemplate,
     openDeleteDialog,
     closeDeleteDialog,
-    confirmTemplateImport,
     closeImportDialog,
     confirmCollectionImport,
     closeCollectionImportDialog,
-    handleExportTemplate,
-    handleExportAllTemplates,
     handleFileInputChange,
     handleCollectionFileInputChange,
   } = useTemplateOverview(initialTemplates);
+
+  // Handle imports with custom handler if provided
+  const handleImport = onImport || templateApi.importTemplateZip;
+
+  // Custom import handler that makes sure templateId is defined
+  const confirmTemplateImportWithHandler = async () => {
+    try {
+      if (
+        importDialog.file &&
+        importDialog.newTemplate &&
+        importDialog.newTemplate.id
+      ) {
+        // Use the provided handler or default to templateApi
+        await handleImport(importDialog.newTemplate.id, importDialog.file);
+        closeImportDialog();
+        revalidator.revalidate();
+      }
+    } catch (error) {
+      Logger.UI.error("Failed to import template", error);
+    }
+  };
+
+  // Wrap the external handlers with local state management or use default implementations
+  const handleDelete = async (templateId: string) => {
+    try {
+      if (onDelete) {
+        await onDelete(templateId);
+      } else {
+        // Default implementation
+        await templateApi.deleteTemplate(templateId);
+        revalidator.revalidate();
+      }
+      closeDeleteDialog();
+    } catch (error) {
+      Logger.UI.error("Failed to delete template", error);
+    }
+  };
+
+  const handleExport = async (template: StoryTemplate) => {
+    try {
+      if (onExport) {
+        await onExport(template);
+      } else {
+        // Default implementation
+        const zipBlob = await templateApi.exportTemplates([template.id]);
+        templateApi.createDownload(
+          zipBlob,
+          `${template.title.replace(/\s+/g, "-").toLowerCase()}.zip`
+        );
+      }
+    } catch (error) {
+      Logger.UI.error("Failed to export template", error);
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      if (onExportAll) {
+        await onExportAll();
+      } else {
+        // Default implementation
+        const templates = await templateApi.getAllTemplates();
+        const templateIds = templates.map(
+          (template: StoryTemplate) => template.id
+        );
+        const zipBlob = await templateApi.exportTemplates(templateIds);
+        templateApi.createDownload(
+          zipBlob,
+          `all-templates-${new Date().toISOString().split("T")[0]}.zip`
+        );
+      }
+    } catch (error) {
+      Logger.UI.error("Failed to export all templates", error);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    await onCreateNew();
+  };
 
   const getStatusColor = (status: PublicationStatus) => {
     switch (status) {
@@ -53,6 +147,37 @@ export const TemplateOverview = () => {
     }
   };
 
+  // Filter status options if the user doesn't have publish permission
+  const renderStatusColumn = (template: StoryTemplate) => {
+    // If the template is already published, show it regardless of permissions
+    const isAlreadyPublishedOrReview =
+      template.publicationStatus === PublicationStatus.Published ||
+      template.publicationStatus === PublicationStatus.Review;
+
+    // Only show published/review status if the user has permission or it's already set
+    if (!canPublish && !isAlreadyPublishedOrReview) {
+      return (
+        <span className="inline-block px-2 py-1 text-xs font-medium rounded-md bg-gray-100 text-gray-700">
+          <span className="md:hidden">Draft</span>
+          <span className="hidden md:inline">Draft</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+          template.publicationStatus
+        )}`}
+      >
+        <span className="md:hidden">
+          {template.publicationStatus.substring(0, 5)}
+        </span>
+        <span className="hidden md:inline">{template.publicationStatus}</span>
+      </span>
+    );
+  };
+
   const columns: ColumnOption<StoryTemplate>[] = [
     {
       key: "title",
@@ -64,18 +189,7 @@ export const TemplateOverview = () => {
     {
       key: "publicationStatus",
       label: "Status",
-      render: (template) => (
-        <span
-          className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
-            template.publicationStatus
-          )}`}
-        >
-          <span className="md:hidden">
-            {template.publicationStatus.substring(0, 5)}
-          </span>
-          <span className="hidden md:inline">{template.publicationStatus}</span>
-        </span>
-      ),
+      render: renderStatusColumn,
     },
     {
       key: "tags",
@@ -143,17 +257,18 @@ export const TemplateOverview = () => {
       render: (template) => (
         <div className="flex space-x-3">
           <button
-            onClick={() => navigate(`/admin/templates/${template.id}`)}
+            onClick={() => onEdit(template.id)}
             className="text-secondary hover:text-secondary-700 transition-colors"
             title="Edit template"
           >
             <Icons.Edit className="h-5 w-5" />
           </button>
-          {template.publicationStatus === PublicationStatus.Published && (
+          {(canPublish ||
+            template.publicationStatus === PublicationStatus.Published) && (
             <ShareLink templateId={template.id} />
           )}
           <button
-            onClick={() => handleExportTemplate(template)}
+            onClick={() => handleExport(template)}
             className="text-secondary hover:text-secondary-700 transition-colors"
             title="Export template"
           >
@@ -190,43 +305,32 @@ export const TemplateOverview = () => {
     enableSelection: true,
   });
 
-  const handleCreateNewTemplate = async () => {
-    try {
-      const defaultTemplate = createDefaultTemplate();
-      const response = await adminTemplateApi.createTemplate({
-        template: defaultTemplate,
-      });
-      navigate(`/admin/templates/${response.template.id}`);
-    } catch (error) {
-      Logger.Admin.error("Failed to create new template", error);
-    }
-  };
-
   const handleExportSelected = async (selectedTemplates: StoryTemplate[]) => {
     if (selectedTemplates.length === 0) return;
 
     try {
       const templateIds = selectedTemplates.map((template) => template.id);
-      const zipBlob = await adminTemplateApi.exportSelectedTemplates(
-        templateIds
-      );
 
-      // Create download
-      const url = window.URL.createObjectURL(zipBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `selected-templates-${
-        new Date().toISOString().split("T")[0]
-      }.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Use the consistent exportTemplates API
+      const zipBlob = await templateApi.exportTemplates(templateIds);
+
+      // Create a descriptive filename
+      const filename =
+        selectedTemplates.length === 1
+          ? `${selectedTemplates[0].title
+              .replace(/\s+/g, "-")
+              .toLowerCase()}.zip`
+          : `selected-templates-${new Date().toISOString().split("T")[0]}.zip`;
+
+      // Trigger download
+      templateApi.createDownload(zipBlob, filename);
 
       // Clear selection after export
       clearSelection();
+
+      Logger.UI.log(`Exported ${selectedTemplates.length} selected templates`);
     } catch (error) {
-      Logger.Admin.error("Failed to export selected templates", error);
+      Logger.UI.error("Failed to export selected templates", error);
     }
   };
 
@@ -253,53 +357,58 @@ export const TemplateOverview = () => {
             title="Refresh templates"
           ></PrimaryButton>
 
-          {/* Single Import */}
-          <input
-            type="file"
-            accept=".zip,application/zip"
-            ref={fileInputRef}
-            onChange={handleFileInputChange}
-            className="hidden"
-          />
-          <PrimaryButton
-            onClick={() => fileInputRef.current?.click()}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            leftIcon={<Icons.SingleImport className="h-4 w-4" />}
-            title="Import single template"
-          ></PrimaryButton>
+          {canImport && (
+            <>
+              {/* Single Import */}
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                ref={fileInputRef}
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+              <PrimaryButton
+                onClick={() => fileInputRef.current?.click()}
+                size="sm"
+                variant="outline"
+                leftBorder={false}
+                leftIcon={<Icons.SingleImport className="h-4 w-4" />}
+                title="Import single template"
+              ></PrimaryButton>
 
-          {/* Import Collection */}
-          <input
-            type="file"
-            accept=".zip,application/zip"
-            ref={collectionFileInputRef}
-            onChange={handleCollectionFileInputChange}
-            className="hidden"
-          />
-          <PrimaryButton
-            onClick={() => collectionFileInputRef.current?.click()}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            leftIcon={<Icons.ImportCollection className="h-4 w-4" />}
-            title="Import template collection"
-          ></PrimaryButton>
+              {/* Import Collection */}
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                ref={collectionFileInputRef}
+                onChange={handleCollectionFileInputChange}
+                className="hidden"
+              />
+              <PrimaryButton
+                onClick={() => collectionFileInputRef.current?.click()}
+                size="sm"
+                variant="outline"
+                leftBorder={false}
+                leftIcon={<Icons.ImportCollection className="h-4 w-4" />}
+                title="Import template collection"
+              ></PrimaryButton>
+            </>
+          )}
 
-          {/* Export All */}
-          <PrimaryButton
-            onClick={handleExportAllTemplates}
-            size="sm"
-            variant="outline"
-            leftBorder={false}
-            leftIcon={<Icons.ExportAll className="h-4 w-4" />}
-            title="Export all templates"
-          ></PrimaryButton>
+          {canExportAll && (
+            <PrimaryButton
+              onClick={handleExportAll}
+              size="sm"
+              variant="outline"
+              leftBorder={false}
+              leftIcon={<Icons.ExportAll className="h-4 w-4" />}
+              title="Export all templates"
+            ></PrimaryButton>
+          )}
 
           {/* Create New */}
           <PrimaryButton
-            onClick={handleCreateNewTemplate}
+            onClick={handleCreateNew}
             size="sm"
             variant="primary"
             leftBorder={false}
@@ -335,7 +444,7 @@ export const TemplateOverview = () => {
       <ConfirmDialog
         isOpen={deleteDialog.isOpen}
         onClose={closeDeleteDialog}
-        onConfirm={() => handleDeleteTemplate(deleteDialog.templateId)}
+        onConfirm={() => handleDelete(deleteDialog.templateId)}
         title="Delete Template"
         message="Are you sure you want to delete this template? This action cannot be undone."
         confirmText="Delete"
@@ -346,7 +455,7 @@ export const TemplateOverview = () => {
       <ConfirmDialog
         isOpen={importDialog.isOpen}
         onClose={closeImportDialog}
-        onConfirm={confirmTemplateImport}
+        onConfirm={confirmTemplateImportWithHandler}
         title="Import Template"
         message={
           importDialog.existingTemplate && importDialog.newTemplate

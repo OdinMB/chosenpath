@@ -15,7 +15,7 @@ import {
   createTemplateAssetsZip,
   createAssetZipFromFiles,
 } from "../utils/zipTemplateUtils";
-import { adminTemplateApi } from "admin/adminApi";
+import { templateApi } from "../templateApi";
 
 export const useTemplateImport = (
   templateProcessing: TemplateProcessing,
@@ -64,7 +64,13 @@ export const useTemplateImport = (
 
       // Import assets if there are any
       if (fileCount > 0) {
-        await adminTemplateApi.importTemplateZip(createdTemplate.id, zipBlob);
+        const importResult = await templateApi.importTemplateZip(
+          createdTemplate.id,
+          zipBlob
+        );
+        Logger.Admin.log(
+          `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
+        );
       }
 
       Logger.Admin.log(`Imported template: ${createdTemplate.title}`);
@@ -99,7 +105,13 @@ export const useTemplateImport = (
         zipData,
         templateDir
       );
-      await adminTemplateApi.importTemplateZip(createdTemplate.id, zipBlob);
+      const importResult = await templateApi.importTemplateZip(
+        createdTemplate.id,
+        zipBlob
+      );
+      Logger.Admin.log(
+        `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
+      );
     }
 
     return createdTemplate;

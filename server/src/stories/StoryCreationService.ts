@@ -10,7 +10,7 @@ import { connectionManager } from "server/game/ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { ContentFilterService } from "../game/services/ContentFilterService.js";
 import { Logger } from "shared/logger.js";
-import { AdminTemplateService } from "../templates/AdminTemplateService.js";
+import { TemplateService } from "../templates/TemplateService.js";
 import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 import { AIImageGenerator } from "../images/AIImageGenerator.js";
 import { Story } from "core/models/Story.js";
@@ -300,8 +300,8 @@ export class StoryCreationService {
     Logger.Route.log(
       `Creating story from template: ${templateId} for ${playerCount} players, difficulty: ${difficultyLevel.title}`
     );
-    const adminTemplateService = new AdminTemplateService();
-    const template = await adminTemplateService.getTemplateById(templateId);
+    const templateService = new TemplateService();
+    const template = await templateService.getTemplateById(templateId);
 
     if (!template) {
       sendError(res, "Template not found", 404);

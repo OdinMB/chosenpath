@@ -1,16 +1,16 @@
 import { RouteObject, Navigate } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout.js";
-import { UsersOverview } from "./users/UsersOverview";
-import { TemplateOverview } from "../resources/templates/TemplateOverview.js";
-import { TemplateCarouselManager } from "../resources/templates/TemplateCarouselManager.js";
+import { UsersOverview } from "./users/UsersOverview.js";
 import { StoriesOverview } from "./stories/StoriesOverview.js";
-import { TemplateForm } from "../resources/templates/components/index.js";
-import { AdminRouteGuard } from "./components/AdminRouteGuard";
-import { adminStoryLoader } from "./stories/adminStoryLoader";
-import { adminUsersLoader } from "./users/usersLoader";
-import { adminTemplatesLoader } from "../resources/templates/adminTemplatesLoader.js";
-import { adminTemplateLoader } from "../resources/templates/adminTemplateLoader.js";
-import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
+import { AdminRouteGuard } from "./components/AdminRouteGuard.js";
+import { adminStoryLoader } from "./stories/adminStoryLoader.js";
+import { adminUsersLoader } from "./users/usersLoader.js";
+import { templatesLoader } from "../resources/templates/loaders/templatesLoader.js";
+import { templateLoader } from "../resources/templates/loaders/templateLoader.js";
+import { AdminErrorBoundary } from "./components/AdminErrorBoundary.js";
+import { AdminTemplateList } from "./templates/AdminTemplateList.js";
+import { AdminTemplateEditor } from "./templates/AdminTemplateEditor.js";
+import { TemplateCarouselManager } from "../resources/templates/TemplateCarouselManager.js";
 
 // Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
@@ -39,13 +39,16 @@ export const adminRoutes: RouteObject[] = [
       },
       {
         path: "templates",
-        element: <TemplateOverview />,
-        loader: adminTemplatesLoader,
+        element: <AdminTemplateList />,
+        loader: async () =>
+          templatesLoader({
+            context: "admin",
+          }),
       },
       {
         path: "templates/:id",
-        element: <TemplateForm />,
-        loader: adminTemplateLoader,
+        element: <AdminTemplateEditor />,
+        loader: (args) => templateLoader(args),
       },
       {
         path: "carousel",
