@@ -230,6 +230,47 @@ class UserDbService {
     }
     return result.rowCount ? result.rowCount > 0 : false;
   }
+
+  /**
+   * Get all permissions for a user by their ID.
+   * This fetches permissions associated with the user's role from the role_permissions table.
+   */
+  async getUserPermissions(userId: string): Promise<string[]> {
+    try {
+      const pool = getDb();
+
+      // First, get the user's role
+      const userResult = await pool.query(
+        "SELECT role_id FROM users WHERE id = $1",
+        [userId]
+      );
+
+      if (!userResult.rows[0]) {
+        Logger.DB.warn(
+          `No user found with ID ${userId} when fetching permissions`
+        );
+        return [];
+      }
+
+      const roleId = userResult.rows[0].role_id;
+
+      // Then get all permissions for that role
+      const permissionsResult = await pool.query(
+        "SELECT permission FROM role_permissions WHERE role_id = $1",
+        [roleId]
+      );
+
+      const permissions = permissionsResult.rows.map((row) => row.permission);
+      Logger.DB.log(
+        `Retrieved ${permissions.length} permissions for user ${userId} with role ${roleId}`
+      );
+
+      return permissions;
+    } catch (error) {
+      Logger.DB.error(`Error retrieving permissions for user ${userId}`, error);
+      return [];
+    }
+  }
 }
 
 export const userDbService = new UserDbService();

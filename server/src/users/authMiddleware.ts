@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "./userService.js";
+import { verifyToken, getUserPermissions } from "./userService.js";
 import { Logger } from "../shared/logger.js";
 import { PublicUser } from "core/types/user.js";
 
@@ -9,6 +9,7 @@ declare global {
     interface Request {
       user?: PublicUser;
       token?: string;
+      userPermissions?: string[];
     }
   }
 }
@@ -74,6 +75,10 @@ export function verifyUser(options: AuthOptions = { required: true }) {
       req.user = user;
       req.token = token;
 
+      // Load and attach user permissions
+      const permissions = await getUserPermissions(user.id);
+      req.userPermissions = permissions;
+
       // Check role requirements if specified
       if (options.roles && options.roles.length > 0) {
         if (!options.roles.includes(user.roleId as Role)) {
@@ -108,8 +113,111 @@ export function verifyUser(options: AuthOptions = { required: true }) {
   };
 }
 
+/**
+ * Middleware to check if the user has specific permissions
+ *
+ * @param permissions Array of required permissions
+ * @param requireAll If true, user must have all permissions. If false, any one is sufficient.
+ */
+export function checkPermissions(permissions: string[], requireAll = true) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: "Authentication required",
+        requestId: req.body?.requestId || "unknown",
+      });
+    }
+
+    const userPermissions = req.userPermissions || [];
+
+    if (requireAll) {
+      // User must have ALL specified permissions
+      const hasAllPermissions = permissions.every((permission) =>
+        userPermissions.includes(permission)
+      );
+
+      if (!hasAllPermissions) {
+        Logger.Route.warn(
+          `Permission check failed for user: ${
+            req.user.id
+          }. Required: ${permissions.join(", ")}`
+        );
+        return res.status(403).json({
+          error: "Insufficient permissions",
+          requestId: req.body?.requestId || "unknown",
+        });
+      }
+    } else {
+      // User must have AT LEAST ONE of the specified permissions
+      const hasAnyPermission = permissions.some((permission) =>
+        userPermissions.includes(permission)
+      );
+
+      if (!hasAnyPermission) {
+        Logger.Route.warn(
+          `Permission check failed for user: ${
+            req.user.id
+          }. Required any of: ${permissions.join(", ")}`
+        );
+        return res.status(403).json({
+          error: "Insufficient permissions",
+          requestId: req.body?.requestId || "unknown",
+        });
+      }
+    }
+
+    next();
+  };
+}
+
+/**
+ * Helper function to check if a user has specific permissions
+ * Can be used within route handlers for complex permission logic
+ *
+ * @param req Express request object
+ * @param permissions Array of permissions to check
+ * @param requireAll If true, user must have all permissions. If false, any one is sufficient.
+ * @returns Boolean indicating if user has the required permissions
+ */
+export function hasPermissions(
+  req: Request,
+  permissions: string[],
+  requireAll = true
+): boolean {
+  if (!req.user || !req.userPermissions) {
+    return false;
+  }
+
+  const userPermissions = req.userPermissions;
+
+  if (requireAll) {
+    return permissions.every((permission) =>
+      userPermissions.includes(permission)
+    );
+  } else {
+    return permissions.some((permission) =>
+      userPermissions.includes(permission)
+    );
+  }
+}
+
 // Convenience functions for common use cases
 export const verifyAdmin = () =>
   verifyUser({ required: true, roles: [ROLES.ADMIN] });
 export const verifyRegularUser = () =>
   verifyUser({ required: true, roles: [ROLES.USER] });
+
+// Template permission check functions
+export const canSeeAllTemplates = () => checkPermissions(["templates_see_all"]);
+
+export const canEditAllTemplates = () =>
+  checkPermissions(["templates_edit_all"]);
+
+export const canPublishTemplates = () =>
+  checkPermissions(["templates_publish"]);
+
+export const canManageCarousel = () => checkPermissions(["templates_carousel"]);
+
+export const canCreateTemplates = () => checkPermissions(["templates_create"]);
+
+export const canGenerateImages = () => checkPermissions(["templates_images"]);

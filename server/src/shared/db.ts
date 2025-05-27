@@ -83,12 +83,13 @@ export async function initializeDatabase() {
       `
       INSERT INTO role_permissions (role_id, permission, created_at)
       VALUES 
-        ('role_user', 'user:read', $1),
-        ('role_user', 'user:write', $1),
-        ('role_admin', 'user:read', $1),
-        ('role_admin', 'user:write', $1),
-        ('role_admin', 'admin:read', $1),
-        ('role_admin', 'admin:write', $1)
+        ('role_user', 'templates_create', $1),
+        ('role_admin', 'templates_see_all', $1),
+        ('role_admin', 'templates_edit_all', $1),
+        ('role_admin', 'templates_publish', $1),
+        ('role_admin', 'templates_carousel', $1),
+        ('role_admin', 'templates_create', $1),
+        ('role_admin', 'templates_images', $1)
       ON CONFLICT (role_id, permission) DO NOTHING
     `,
       [nowEpochMs]

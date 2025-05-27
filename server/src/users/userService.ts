@@ -266,3 +266,18 @@ export async function deleteUserById(userId: string): Promise<boolean> {
     throw error;
   }
 }
+
+/**
+ * Get permissions for a user
+ * @param userId User ID
+ * @returns Array of permission strings
+ */
+export async function getUserPermissions(userId: string): Promise<string[]> {
+  try {
+    const permissions = await userDbService.getUserPermissions(userId);
+    return permissions;
+  } catch (error) {
+    Logger.DB.error(`Failed to get permissions for user ${userId}`, error);
+    return [];
+  }
+}
