@@ -464,11 +464,6 @@ export class TemplateService {
         JSON.stringify(fullTemplate, null, 2)
       );
 
-      // Check if template contains images
-      const containsImages = await this.checkTemplateContainsImages(
-        fullTemplate.id
-      );
-
       // Create database entry
       await templateDbService.createTemplateEntry({
         id: fullTemplate.id,
@@ -477,7 +472,7 @@ export class TemplateService {
         carouselOrder: fullTemplate.showOnWelcomeScreen
           ? fullTemplate.order
           : null,
-        containsImages,
+        containsImages: false, // new templates don't have images yet
         title: fullTemplate.title,
         teaser: fullTemplate.teaser,
         gameMode: fullTemplate.gameMode,
