@@ -505,6 +505,8 @@ export const TemplateOverview = ({
         return "bg-amber-100 text-amber-700";
       case PublicationStatus.Published:
         return "bg-green-100 text-green-700";
+      case PublicationStatus.Private:
+        return "bg-purple-100 text-purple-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -512,21 +514,31 @@ export const TemplateOverview = ({
 
   // Filter status options if the user doesn't have publish permission
   const renderStatusColumn = (template: TemplateMetadata) => {
-    // If the template is already published, show it regardless of permissions
-    const isAlreadyPublishedOrReview =
+    // Show the actual status, but limit what users can see based on permissions
+    // If user doesn't have publish permission, hide Published/Review status unless it's already set
+    const isRestrictedStatus =
       template.publicationStatus === PublicationStatus.Published ||
       template.publicationStatus === PublicationStatus.Review;
 
-    // Only show published/review status if the user has permission or it's already set
-    if (!canPublish && !isAlreadyPublishedOrReview) {
+    // If the user doesn't have publish permission and template has restricted status,
+    // only show it if it's already set (don't hide existing published/review templates)
+    if (!canPublish && isRestrictedStatus) {
+      // Still show the actual status even if user can't set it
       return (
-        <span className="inline-block px-2 py-1 text-xs font-medium rounded-md bg-gray-100 text-gray-700">
-          <span className="md:hidden">Draft</span>
-          <span className="hidden md:inline">Draft</span>
+        <span
+          className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
+            template.publicationStatus
+          )}`}
+        >
+          <span className="md:hidden">
+            {template.publicationStatus.substring(0, 5)}
+          </span>
+          <span className="hidden md:inline">{template.publicationStatus}</span>
         </span>
       );
     }
 
+    // Default case: show the actual status
     return (
       <span
         className={`inline-block px-2 py-1 text-xs font-medium rounded-md ${getStatusColor(
