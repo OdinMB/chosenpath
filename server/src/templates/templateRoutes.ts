@@ -3,7 +3,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
-import os from "os";
 import JSZip from "jszip";
 import { Logger } from "shared/logger.js";
 import {
@@ -27,7 +26,6 @@ import { TemplateService } from "./TemplateService.js";
 import { templateDbService } from "./TemplateDbService.js";
 import {
   getStoragePath,
-  extractZip,
   createZipFromDirectory,
   addDirectoryToZip,
 } from "shared/storageUtils.js";
@@ -795,49 +793,24 @@ router.post(
     }
 
     try {
-      // Check if template exists
-      const template = await templateService.getTemplateById(id);
-      if (!template) {
-        return sendNotFound(res, "Template not found", requestId);
-      }
-
-      // Get the template directory path
-      const templatesBasePath = getStoragePath("templates");
-      const templateDir = path.join(templatesBasePath, id);
-
-      // Ensure the template directory exists
-      if (!fsSync.existsSync(templateDir)) {
-        await fs.mkdir(templateDir, { recursive: true });
-      }
-
-      // Create a temporary file for the zip
-      const tempZipPath = path.join(
-        os.tmpdir(),
-        `template-import-${id}-${Date.now()}.zip`
+      // Use the service method to handle the business logic
+      const result = await templateService.importTemplateFiles(
+        id,
+        uploadedFile.buffer,
+        req.user?.id || ""
       );
-      await fs.writeFile(tempZipPath, uploadedFile.buffer);
 
-      // Extract the zip to the template directory
-      const zipEntries = await extractZip(tempZipPath, templateDir);
-
-      // Clean up temporary zip file
-      await fs.unlink(tempZipPath);
-
-      // Update database to reflect if template now contains images
-      const containsImages = await templateService.checkTemplateContainsImages(
-        id
+      Logger.Route.log(
+        `Imported ${result.filesImported} files to template ${id}`
       );
-      await templateDbService.updateTemplateEntry(id, { containsImages });
-
-      Logger.Route.log(`Imported ${zipEntries.length} files to template ${id}`);
 
       // Send typed response
       sendSuccess(
         res,
         {
           success: true,
-          filesImported: zipEntries.length,
-          files: zipEntries,
+          filesImported: result.filesImported,
+          files: result.files,
         },
         requestId
       );

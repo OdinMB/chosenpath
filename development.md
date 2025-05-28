@@ -2,8 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- 1: Preserve creator_id in export/import flow. (Store creator_id in template json.)
 - 5: Enable users to create templates
+- 1: test: creator_id preserved in export/import flow
 - 4: Better explain template elements and admin panel
 - 1: show creator in template list in admin view; filter by "has creator id"
 - 2: review process for storytellers who want to publish on website

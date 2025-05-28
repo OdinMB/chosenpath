@@ -21,6 +21,8 @@ import { templateDbService, TemplateDB } from "./TemplateDbService.js";
 import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
+import os from "os";
+import { extractZip } from "shared/storageUtils.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -464,6 +466,11 @@ export class TemplateService {
         JSON.stringify(fullTemplate, null, 2)
       );
 
+      // Check if template contains images
+      const containsImages = await this.checkTemplateContainsImages(
+        fullTemplate.id
+      );
+
       // Create database entry
       await templateDbService.createTemplateEntry({
         id: fullTemplate.id,
@@ -472,7 +479,7 @@ export class TemplateService {
         carouselOrder: fullTemplate.showOnWelcomeScreen
           ? fullTemplate.order
           : null,
-        containsImages: false, // new templates don't have images yet
+        containsImages,
         title: fullTemplate.title,
         teaser: fullTemplate.teaser,
         gameMode: fullTemplate.gameMode,
@@ -767,5 +774,126 @@ export class TemplateService {
 
     // Convert Set to array
     return Array.from(groups);
+  }
+
+  /**
+   * Import template files from a zip buffer to an existing template
+   * Preserves creator ID if it already exists in the database, otherwise assigns the provided creator ID
+   */
+  async importTemplateFiles(
+    templateId: string,
+    zipBuffer: Buffer,
+    creatorId: string
+  ): Promise<{ filesImported: number; files: string[] }> {
+    try {
+      // Check if template exists
+      const template = await this.getTemplateById(templateId);
+      if (!template) {
+        throw new Error(`Template with ID ${templateId} not found`);
+      }
+
+      // Get the template directory path
+      const templateDir = path.join(this.storagePath, templateId);
+
+      // Ensure the template directory exists
+      if (!fsSync.existsSync(templateDir)) {
+        await fs.mkdir(templateDir, { recursive: true });
+      }
+
+      // Create a temporary file for the zip
+      const tempZipPath = path.join(
+        os.tmpdir(),
+        `template-import-${templateId}-${Date.now()}.zip`
+      );
+      await fs.writeFile(tempZipPath, zipBuffer);
+
+      // Extract the zip to the template directory
+      const zipEntries = await extractZip(tempZipPath, templateDir);
+
+      // Clean up temporary zip file
+      await fs.unlink(tempZipPath);
+
+      // Check if template now contains images
+      const containsImages = await this.checkTemplateContainsImages(templateId);
+
+      // Handle creator ID preservation logic
+      const existingDbEntry = await templateDbService.findTemplateEntryById(
+        templateId
+      );
+      let finalCreatorId: string | null = null;
+
+      if (existingDbEntry) {
+        // If database entry exists and has a creator_id, keep it intact
+        if (existingDbEntry.creatorId) {
+          finalCreatorId = existingDbEntry.creatorId;
+        } else {
+          // If database entry exists but has no creator_id, assign the current user
+          finalCreatorId = creatorId;
+        }
+
+        // Get the updated template data to sync all metadata fields
+        const updatedTemplate = await this.getTemplateById(templateId);
+        if (updatedTemplate) {
+          // Update the existing database entry with all metadata fields
+          await templateDbService.updateTemplateEntry(templateId, {
+            creatorId: finalCreatorId,
+            publicationStatus: updatedTemplate.publicationStatus,
+            carouselOrder: updatedTemplate.showOnWelcomeScreen
+              ? updatedTemplate.order
+              : null,
+            containsImages,
+            title: updatedTemplate.title,
+            teaser: updatedTemplate.teaser,
+            gameMode: updatedTemplate.gameMode,
+            tags: updatedTemplate.tags,
+            playerCountMin: updatedTemplate.playerCountMin,
+            playerCountMax: updatedTemplate.playerCountMax,
+            maxTurnsMin: updatedTemplate.maxTurnsMin,
+            maxTurnsMax: updatedTemplate.maxTurnsMax,
+            showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
+            orderValue: updatedTemplate.order,
+          });
+        }
+      } else {
+        // If no database entry exists, create one with the current user as creator
+        // First, get template data to populate database fields
+        const updatedTemplate = await this.getTemplateById(templateId);
+        if (updatedTemplate) {
+          await templateDbService.createTemplateEntry({
+            id: templateId,
+            creatorId: creatorId,
+            publicationStatus: updatedTemplate.publicationStatus,
+            carouselOrder: updatedTemplate.showOnWelcomeScreen
+              ? updatedTemplate.order
+              : null,
+            containsImages,
+            title: updatedTemplate.title,
+            teaser: updatedTemplate.teaser,
+            gameMode: updatedTemplate.gameMode,
+            tags: updatedTemplate.tags,
+            playerCountMin: updatedTemplate.playerCountMin,
+            playerCountMax: updatedTemplate.playerCountMax,
+            maxTurnsMin: updatedTemplate.maxTurnsMin,
+            maxTurnsMax: updatedTemplate.maxTurnsMax,
+            showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
+            orderValue: updatedTemplate.order,
+          });
+        }
+      }
+
+      this.logger.log(
+        `Imported ${zipEntries.length} files to template ${templateId}`
+      );
+      return {
+        filesImported: zipEntries.length,
+        files: zipEntries,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to import files to template ${templateId}`,
+        error
+      );
+      throw new Error(`Failed to import files to template ${templateId}`);
+    }
   }
 }
