@@ -41,9 +41,22 @@ export const TemplateOverview = ({
   const [templates, setTemplates] =
     useState<TemplateMetadata[]>(initialTemplates);
 
-  // Update local templates state when initialTemplates prop changes
+  // Track when we've made local modifications that shouldn't be overwritten
+  const hasLocalModifications = useRef(false);
+
+  // Update local templates state when initialTemplates prop changes,
+  // but only if we haven't made local modifications
   useEffect(() => {
-    setTemplates(initialTemplates);
+    if (!hasLocalModifications.current) {
+      Logger.UI.log(
+        `Syncing with initialTemplates: ${initialTemplates.length} templates`
+      );
+      setTemplates(initialTemplates);
+    } else {
+      Logger.UI.log(
+        `Skipping sync with initialTemplates due to local modifications`
+      );
+    }
   }, [initialTemplates]);
 
   // Helper function to convert StoryTemplate to TemplateMetadata
@@ -174,14 +187,25 @@ export const TemplateOverview = ({
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
+    Logger.UI.log(
+      `Collection file input changed. File: ${file ? file.name : "none"}`
+    );
+
     if (file) {
       Logger.UI.log(`Processing collection file: ${file.name}`);
       processCollectionFile(file);
+    }
+
+    // Reset the file input so the same file can be selected again
+    if (event.target) {
+      event.target.value = "";
     }
   };
 
   const processCollectionFile = async (file: File) => {
     try {
+      Logger.UI.log(`=== Starting processCollectionFile for: ${file.name} ===`);
+
       if (!file.name.endsWith(".zip")) {
         Logger.UI.error("Collection file must be a ZIP archive");
         return;
@@ -216,6 +240,10 @@ export const TemplateOverview = ({
 
       // Check against existing templates to create summary
       const existingTemplates = templates;
+      Logger.UI.log(
+        `Comparing against ${existingTemplates.length} existing templates`
+      );
+
       const templateInfos = templateFiles.map(({ template }) => {
         const existing = existingTemplates.find((t) => t.id === template.id);
         const isNewer = existing
@@ -248,12 +276,17 @@ export const TemplateOverview = ({
         ).length,
       };
 
+      Logger.UI.log(`Collection summary:`, summary);
+      Logger.UI.log(`Setting collection import dialog to open`);
+
       setCollectionImportDialog({
         isOpen: true,
         file,
         summary,
         templates: templateInfos,
       });
+
+      Logger.UI.log(`=== Finished processCollectionFile ===`);
     } catch (error) {
       Logger.UI.error("Failed to process collection file:", error);
     }
@@ -288,6 +321,9 @@ export const TemplateOverview = ({
             result.isNewTemplate ? "imported new" : "updated"
           } template: ${result.template.title} (${result.filesImported} files)`
         );
+
+        // Refresh the template list from server
+        revalidator.revalidate();
       }
     } catch (error) {
       Logger.UI.error("Failed to import template", error);
@@ -296,7 +332,10 @@ export const TemplateOverview = ({
 
   const confirmCollectionImport = async () => {
     try {
+      Logger.UI.log(`=== Starting confirmCollectionImport ===`);
+
       if (!collectionImportDialog.file || !collectionImportDialog.templates) {
+        Logger.UI.log("No file or templates in collection dialog, returning");
         return;
       }
 
@@ -338,8 +377,13 @@ export const TemplateOverview = ({
         }
       }
 
+      Logger.UI.log(`Import completed. ${results.length} templates imported.`);
+
       // Update local state with imported templates
       if (results.length > 0) {
+        Logger.UI.log("Updating local state with imported templates");
+        hasLocalModifications.current = true;
+
         setTemplates((prevTemplates) => {
           const updatedTemplates = [...prevTemplates];
 
@@ -360,6 +404,9 @@ export const TemplateOverview = ({
             }
           }
 
+          Logger.UI.log(
+            `Local state updated. Total templates: ${updatedTemplates.length}`
+          );
           return updatedTemplates;
         });
       }
@@ -369,6 +416,9 @@ export const TemplateOverview = ({
       Logger.UI.log(
         `Successfully imported ${importedCount} templates from collection`
       );
+      Logger.UI.log(`=== Finished confirmCollectionImport ===`);
+
+      // Note: Removed revalidator.revalidate() to avoid race condition with local state
     } catch (error) {
       Logger.UI.error("Failed to import collection", error);
     }
@@ -377,14 +427,31 @@ export const TemplateOverview = ({
   // Wrap the external handlers with local state management or use default implementations
   const handleDelete = async (templateId: string) => {
     try {
+      Logger.UI.log(`Deleting template: ${templateId}`);
+      Logger.UI.log(`Current templates count: ${templates.length}`);
+
       if (onDelete) {
+        Logger.UI.log("Using external onDelete handler");
         await onDelete(templateId);
       } else {
+        Logger.UI.log("Using default delete implementation");
         // Default implementation
         await templateApi.deleteTemplate(templateId);
-        revalidator.revalidate();
       }
+
+      // Always update local state to immediately remove the deleted template
+      Logger.UI.log("Updating local state to remove deleted template");
+      hasLocalModifications.current = true;
+      setTemplates((prevTemplates) => {
+        const newTemplates = prevTemplates.filter(
+          (template) => template.id !== templateId
+        );
+        Logger.UI.log(`Templates count after deletion: ${newTemplates.length}`);
+        return newTemplates;
+      });
+
       closeDeleteDialog();
+      Logger.UI.log("Delete operation completed");
     } catch (error) {
       Logger.UI.error("Failed to delete template", error);
     }
@@ -646,7 +713,10 @@ export const TemplateOverview = ({
         <h2 className="text-xl font-semibold text-secondary">Templates</h2>
         <div className="flex gap-2">
           <PrimaryButton
-            onClick={revalidator.revalidate}
+            onClick={() => {
+              hasLocalModifications.current = false;
+              revalidator.revalidate();
+            }}
             size="sm"
             variant="outline"
             leftBorder={false}
