@@ -56,6 +56,7 @@ export const AdminTemplateList = () => {
       canPublish={true}
       canExportAll={true}
       canImport={true}
+      showCreatorColumn={true}
     />
   );
 };

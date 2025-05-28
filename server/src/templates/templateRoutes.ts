@@ -23,11 +23,7 @@ import {
 } from "shared/responseUtils.js";
 import { TemplateService } from "./TemplateService.js";
 import { templateDbService } from "./TemplateDbService.js";
-import {
-  getStoragePath,
-  createZipFromDirectory,
-  addDirectoryToZip,
-} from "shared/storageUtils.js";
+import { userDbService } from "../users/UserDbService.js";
 import { verifyUser, hasPermissions } from "../users/authMiddleware.js";
 import {
   verifyTemplateAccess,
@@ -37,6 +33,11 @@ import {
   verifyCarouselPermission,
   verifyImageGenerationPermission,
 } from "./templateMiddleware.js";
+import {
+  getStoragePath,
+  createZipFromDirectory,
+  addDirectoryToZip,
+} from "shared/storageUtils.js";
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -50,7 +51,11 @@ const templateService = new TemplateService();
 // ========================
 
 // Utility function to convert database entry to metadata format
-const convertDbEntryToMetadata = (entry: any, includeCreatorId = false) => {
+const convertDbEntryToMetadata = (
+  entry: any,
+  includeCreatorId = false,
+  creatorUsername?: string
+) => {
   const metadata = {
     id: entry.id,
     title: entry.title,
@@ -72,7 +77,11 @@ const convertDbEntryToMetadata = (entry: any, includeCreatorId = false) => {
   };
 
   if (includeCreatorId) {
-    return { ...metadata, creatorId: entry.creatorId };
+    return {
+      ...metadata,
+      creatorId: entry.creatorId,
+      creatorUsername: creatorUsername || null,
+    };
   }
 
   return metadata;
@@ -207,13 +216,42 @@ router.get("/templates", verifyUser(), async (req, res) => {
     // Get template metadata from database
     const templateEntries = await templateDbService.getAllTemplateEntries();
 
-    // Convert database entries to metadata format (include creator ID for admin)
+    // Get unique creator IDs to fetch usernames
+    const creatorIds = [
+      ...new Set(
+        templateEntries
+          .map((entry) => entry.creatorId)
+          .filter((id) => id !== null)
+      ),
+    ] as string[];
+
+    // Fetch creator usernames
+    const creatorUsernames = new Map<string, string>();
+    for (const creatorId of creatorIds) {
+      try {
+        const user = await userDbService.findUserById(creatorId);
+        if (user) {
+          creatorUsernames.set(creatorId, user.username);
+        }
+      } catch (error) {
+        Logger.Route.warn(
+          `Failed to fetch username for creator ${creatorId}:`,
+          error
+        );
+      }
+    }
+
+    // Convert database entries to metadata format (include creator ID and username for admin)
     const templates = templateEntries.map((entry) =>
-      convertDbEntryToMetadata(entry, true)
+      convertDbEntryToMetadata(
+        entry,
+        true,
+        entry.creatorId ? creatorUsernames.get(entry.creatorId) : undefined
+      )
     );
 
     Logger.Route.log(
-      `Retrieved metadata for all ${templates.length} templates`
+      `Retrieved metadata for all ${templates.length} templates with creator information`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {

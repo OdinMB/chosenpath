@@ -225,6 +225,7 @@ export type TemplateMetadata = {
   createdAt: string;
   updatedAt: string;
   creatorId?: string | null; // Only included for admin endpoints
+  creatorUsername?: string | null; // Only included for admin endpoints when available
 };
 
 // TYPES USED BY APP (not LLM)

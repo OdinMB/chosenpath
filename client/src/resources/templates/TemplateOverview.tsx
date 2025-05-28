@@ -24,6 +24,7 @@ interface TemplateOverviewProps {
   canPublish?: boolean;
   canExportAll?: boolean;
   canImport?: boolean;
+  showCreatorColumn?: boolean;
 }
 
 export const TemplateOverview = ({
@@ -36,6 +37,7 @@ export const TemplateOverview = ({
   canPublish = false,
   canExportAll = false,
   canImport = false,
+  showCreatorColumn = false,
 }: TemplateOverviewProps) => {
   const revalidator = useRevalidator();
   const [templates, setTemplates] =
@@ -427,31 +429,20 @@ export const TemplateOverview = ({
   // Wrap the external handlers with local state management or use default implementations
   const handleDelete = async (templateId: string) => {
     try {
-      Logger.UI.log(`Deleting template: ${templateId}`);
-      Logger.UI.log(`Current templates count: ${templates.length}`);
-
       if (onDelete) {
-        Logger.UI.log("Using external onDelete handler");
         await onDelete(templateId);
       } else {
-        Logger.UI.log("Using default delete implementation");
         // Default implementation
         await templateApi.deleteTemplate(templateId);
       }
 
       // Always update local state to immediately remove the deleted template
-      Logger.UI.log("Updating local state to remove deleted template");
       hasLocalModifications.current = true;
-      setTemplates((prevTemplates) => {
-        const newTemplates = prevTemplates.filter(
-          (template) => template.id !== templateId
-        );
-        Logger.UI.log(`Templates count after deletion: ${newTemplates.length}`);
-        return newTemplates;
-      });
+      setTemplates((prevTemplates) =>
+        prevTemplates.filter((template) => template.id !== templateId)
+      );
 
       closeDeleteDialog();
-      Logger.UI.log("Delete operation completed");
     } catch (error) {
       Logger.UI.error("Failed to delete template", error);
     }
@@ -566,6 +557,20 @@ export const TemplateOverview = ({
       label: "Status",
       render: renderStatusColumn,
     },
+    ...(showCreatorColumn
+      ? [
+          {
+            key: "creatorId" as keyof TemplateMetadata,
+            label: "Creator",
+            className: "py-3 px-4 text-left hidden md:table-cell",
+            render: (template: TemplateMetadata) => (
+              <span className="text-sm text-gray-600">
+                {template.creatorUsername || template.creatorId || "Unknown"}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       key: "tags",
       label: "Tags",
@@ -591,7 +596,9 @@ export const TemplateOverview = ({
     {
       key: "playerCountMin",
       label: "Players",
-      className: "py-3 px-4 text-center hidden md:table-cell",
+      className: `py-3 px-4 text-center hidden ${
+        showCreatorColumn ? "lg:table-cell" : "md:table-cell"
+      }`,
       render: (template) => (
         <>
           {template.playerCountMin === template.playerCountMax
@@ -604,7 +611,9 @@ export const TemplateOverview = ({
       key: "maxTurnsMin",
       label: "Beats",
       filterable: false,
-      className: "py-3 px-4 text-center hidden md:table-cell",
+      className: `py-3 px-4 text-center hidden ${
+        showCreatorColumn ? "lg:table-cell" : "md:table-cell"
+      }`,
       render: (template) => (
         <>
           {template.maxTurnsMin === template.maxTurnsMax
