@@ -17,7 +17,7 @@ export const UserTemplateList = () => {
   const [templates, setTemplates] =
     useState<TemplateMetadata[]>(initialTemplates);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Check if user has templates_create permission
   const hasTemplateCreatePermission =
@@ -51,6 +51,15 @@ export const UserTemplateList = () => {
       Logger.UI.error("Failed to create new template", error);
     }
   };
+
+  // Show loading while authentication is still loading
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="w-8 h-8 border-t-2 border-b-2 border-primary-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   // If user doesn't have permission, show a message
   if (!hasTemplateCreatePermission) {

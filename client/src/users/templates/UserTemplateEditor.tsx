@@ -14,7 +14,7 @@ export const UserTemplateEditor = () => {
   const loaderData = useLoaderData() as { template: StoryTemplate };
   const template = loaderData?.template;
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Check if user has templates_create permission
   const hasTemplateCreatePermission =
@@ -28,6 +28,15 @@ export const UserTemplateEditor = () => {
     return (
       <div className="p-4">
         Error: Template data not found or invalid format.
+      </div>
+    );
+  }
+
+  // Show loading while authentication is still loading
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="w-8 h-8 border-t-2 border-b-2 border-primary-500 rounded-full animate-spin"></div>
       </div>
     );
   }
