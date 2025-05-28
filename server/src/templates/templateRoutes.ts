@@ -13,7 +13,6 @@ import {
   TemplateIterationRequest,
   ExportTemplateAssetsRequest,
   UploadTemplateFileRequest,
-  ImportTemplateFilesRequest,
   PublicationStatus,
 } from "core/types/index.js";
 import {
@@ -710,25 +709,17 @@ router.post(
   }
 );
 
-// Import template files from a zip archive
+// Import template from a zip archive (creates new or updates existing)
 router.post(
-  "/templates/:id/import",
+  "/templates/import",
   verifyUser(),
-  verifyTemplateEditAccess(),
+  (req, res, next) => verifyTemplateCreatePermission(req, res, next),
   upload.single("zip"),
   async (req, res) => {
-    const { id } = req.params;
-    const requestId = req.query.requestId as string;
+    const requestId = (req.query.requestId as string) || "unknown";
 
     // Access file from req.file (type cast to any to bypass TS issues)
     const uploadedFile = (req as any).file;
-
-    // For type safety (client-side will have the full types)
-    const importRequest = {
-      id,
-      requestId,
-      zipFile: uploadedFile,
-    } as unknown as ImportTemplateFilesRequest;
 
     if (!uploadedFile) {
       return sendBadRequest(res, "No zip file provided", requestId);
@@ -744,29 +735,29 @@ router.post(
 
     try {
       // Use the service method to handle the business logic
-      const result = await templateService.importTemplateFiles(
-        id,
+      const result = await templateService.importTemplateFromZip(
         uploadedFile.buffer,
         req.user?.id || ""
       );
 
       Logger.Route.log(
-        `Imported ${result.filesImported} files to template ${id}`
+        `Imported template ${result.template.id}: ${result.template.title} (${result.filesImported} files)`
       );
 
       // Send typed response
       sendSuccess(
         res,
         {
-          success: true,
+          template: result.template,
           filesImported: result.filesImported,
           files: result.files,
+          isNewTemplate: result.isNewTemplate,
         },
         requestId
       );
     } catch (error) {
-      Logger.Route.error(`Error importing files to template ${id}`, error);
-      sendError(res, "Failed to import files", 500, requestId, error);
+      Logger.Route.error(`Error importing template`, error);
+      sendError(res, "Failed to import template", 500, requestId, error);
     }
   }
 );

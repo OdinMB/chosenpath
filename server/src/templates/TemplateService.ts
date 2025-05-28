@@ -18,11 +18,14 @@ import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
+import {
+  extractAndAnalyzeTemplateZip,
+  copyTemplateFiles,
+  cleanupTempFiles,
+} from "./templateZipUtils.js";
 import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
-import os from "os";
-import { extractZip } from "shared/storageUtils.js";
 
 // Create a type that has all StoryTemplate properties except metadata fields
 type TemplateDataInput = Omit<
@@ -777,46 +780,46 @@ export class TemplateService {
   }
 
   /**
-   * Import template files from a zip buffer to an existing template
-   * Preserves creator ID if it already exists in the database, otherwise assigns the provided creator ID
+   * Import template from a zip buffer - extracts template ID from zip structure
+   * Creates new template if it doesn't exist, updates existing template otherwise
    */
-  async importTemplateFiles(
-    templateId: string,
+  async importTemplateFromZip(
     zipBuffer: Buffer,
     creatorId: string
-  ): Promise<{ filesImported: number; files: string[] }> {
+  ): Promise<{
+    template: StoryTemplate;
+    filesImported: number;
+    files: string[];
+    isNewTemplate: boolean;
+  }> {
     try {
-      // Check if template exists
-      const template = await this.getTemplateById(templateId);
-      if (!template) {
-        throw new Error(`Template with ID ${templateId} not found`);
-      }
+      // Extract and analyze the zip structure
+      const { templateId, sourceDir, tempExtractDir, tempZipPath } =
+        await extractAndAnalyzeTemplateZip(zipBuffer);
 
-      // Get the template directory path
+      // Check if template already exists
+      const existingTemplate = await this.getTemplateById(templateId);
+      const isNewTemplate = !existingTemplate;
+
+      // Get the target template directory
       const templateDir = path.join(this.storagePath, templateId);
 
-      // Ensure the template directory exists
-      if (!fsSync.existsSync(templateDir)) {
-        await fs.mkdir(templateDir, { recursive: true });
-      }
+      // Copy files from extracted location to template directory
+      const copiedFiles = await copyTemplateFiles(sourceDir, templateDir);
 
-      // Create a temporary file for the zip
-      const tempZipPath = path.join(
-        os.tmpdir(),
-        `template-import-${templateId}-${Date.now()}.zip`
-      );
-      await fs.writeFile(tempZipPath, zipBuffer);
-
-      // Extract the zip to the template directory
-      const zipEntries = await extractZip(tempZipPath, templateDir);
-
-      // Clean up temporary zip file
-      await fs.unlink(tempZipPath);
+      // Clean up temporary files
+      await cleanupTempFiles(tempZipPath, tempExtractDir);
 
       // Check if template now contains images
       const containsImages = await this.checkTemplateContainsImages(templateId);
 
-      // Handle creator ID preservation logic
+      // Load the updated template
+      const updatedTemplate = await this.getTemplateById(templateId);
+      if (!updatedTemplate) {
+        throw new Error("Failed to load template after import");
+      }
+
+      // Handle database record creation/update
       const existingDbEntry = await templateDbService.findTemplateEntryById(
         templateId
       );
@@ -831,69 +834,63 @@ export class TemplateService {
           finalCreatorId = creatorId;
         }
 
-        // Get the updated template data to sync all metadata fields
-        const updatedTemplate = await this.getTemplateById(templateId);
-        if (updatedTemplate) {
-          // Update the existing database entry with all metadata fields
-          await templateDbService.updateTemplateEntry(templateId, {
-            creatorId: finalCreatorId,
-            publicationStatus: updatedTemplate.publicationStatus,
-            carouselOrder: updatedTemplate.showOnWelcomeScreen
-              ? updatedTemplate.order
-              : null,
-            containsImages,
-            title: updatedTemplate.title,
-            teaser: updatedTemplate.teaser,
-            gameMode: updatedTemplate.gameMode,
-            tags: updatedTemplate.tags,
-            playerCountMin: updatedTemplate.playerCountMin,
-            playerCountMax: updatedTemplate.playerCountMax,
-            maxTurnsMin: updatedTemplate.maxTurnsMin,
-            maxTurnsMax: updatedTemplate.maxTurnsMax,
-            showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
-            orderValue: updatedTemplate.order,
-          });
-        }
+        // Update the existing database entry
+        await templateDbService.updateTemplateEntry(templateId, {
+          creatorId: finalCreatorId,
+          publicationStatus: updatedTemplate.publicationStatus,
+          carouselOrder: updatedTemplate.showOnWelcomeScreen
+            ? updatedTemplate.order
+            : null,
+          containsImages,
+          title: updatedTemplate.title,
+          teaser: updatedTemplate.teaser,
+          gameMode: updatedTemplate.gameMode,
+          tags: updatedTemplate.tags,
+          playerCountMin: updatedTemplate.playerCountMin,
+          playerCountMax: updatedTemplate.playerCountMax,
+          maxTurnsMin: updatedTemplate.maxTurnsMin,
+          maxTurnsMax: updatedTemplate.maxTurnsMax,
+          showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
+          orderValue: updatedTemplate.order,
+        });
       } else {
-        // If no database entry exists, create one with the current user as creator
-        // First, get template data to populate database fields
-        const updatedTemplate = await this.getTemplateById(templateId);
-        if (updatedTemplate) {
-          await templateDbService.createTemplateEntry({
-            id: templateId,
-            creatorId: creatorId,
-            publicationStatus: updatedTemplate.publicationStatus,
-            carouselOrder: updatedTemplate.showOnWelcomeScreen
-              ? updatedTemplate.order
-              : null,
-            containsImages,
-            title: updatedTemplate.title,
-            teaser: updatedTemplate.teaser,
-            gameMode: updatedTemplate.gameMode,
-            tags: updatedTemplate.tags,
-            playerCountMin: updatedTemplate.playerCountMin,
-            playerCountMax: updatedTemplate.playerCountMax,
-            maxTurnsMin: updatedTemplate.maxTurnsMin,
-            maxTurnsMax: updatedTemplate.maxTurnsMax,
-            showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
-            orderValue: updatedTemplate.order,
-          });
-        }
+        // Create new database entry with the current user as creator
+        await templateDbService.createTemplateEntry({
+          id: templateId,
+          creatorId: creatorId,
+          publicationStatus: updatedTemplate.publicationStatus,
+          carouselOrder: updatedTemplate.showOnWelcomeScreen
+            ? updatedTemplate.order
+            : null,
+          containsImages,
+          title: updatedTemplate.title,
+          teaser: updatedTemplate.teaser,
+          gameMode: updatedTemplate.gameMode,
+          tags: updatedTemplate.tags,
+          playerCountMin: updatedTemplate.playerCountMin,
+          playerCountMax: updatedTemplate.playerCountMax,
+          maxTurnsMin: updatedTemplate.maxTurnsMin,
+          maxTurnsMax: updatedTemplate.maxTurnsMax,
+          showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
+          orderValue: updatedTemplate.order,
+        });
       }
 
       this.logger.log(
-        `Imported ${zipEntries.length} files to template ${templateId}`
+        `Imported template ${templateId}: ${updatedTemplate.title} (${
+          copiedFiles.length
+        } files, ${isNewTemplate ? "new" : "updated"})`
       );
+
       return {
-        filesImported: zipEntries.length,
-        files: zipEntries,
+        template: updatedTemplate,
+        filesImported: copiedFiles.length,
+        files: copiedFiles,
+        isNewTemplate,
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to import files to template ${templateId}`,
-        error
-      );
-      throw new Error(`Failed to import files to template ${templateId}`);
+      this.logger.error("Failed to import template from zip", error);
+      throw new Error("Failed to import template from zip");
     }
   }
 }

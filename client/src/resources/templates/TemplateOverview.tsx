@@ -11,6 +11,7 @@ import { useRevalidator } from "react-router-dom";
 import { Logger } from "shared/logger";
 import { templateApi } from "./templateApi.js";
 import { useState, useRef, useEffect } from "react";
+import { StoryTemplate } from "core/types";
 
 interface TemplateOverviewProps {
   initialTemplates: TemplateMetadata[];
@@ -19,7 +20,6 @@ interface TemplateOverviewProps {
   onExport?: (template: TemplateMetadata) => Promise<void>;
   onExportAll?: () => Promise<void>;
   onCreateNew: () => Promise<void>;
-  onImport?: (templateId: string, zipData: Blob) => Promise<unknown>;
   canPublish?: boolean;
   canExportAll?: boolean;
   canImport?: boolean;
@@ -32,7 +32,6 @@ export const TemplateOverview = ({
   onExport,
   onExportAll,
   onCreateNew,
-  onImport,
   canPublish = false,
   canExportAll = false,
   canImport = false,
@@ -45,6 +44,27 @@ export const TemplateOverview = ({
   useEffect(() => {
     setTemplates(initialTemplates);
   }, [initialTemplates]);
+
+  // Helper function to convert StoryTemplate to TemplateMetadata
+  const convertTemplateToMetadata = (
+    template: StoryTemplate
+  ): TemplateMetadata => ({
+    id: template.id,
+    title: template.title,
+    teaser: template.teaser,
+    publicationStatus: template.publicationStatus,
+    tags: template.tags,
+    playerCountMin: template.playerCountMin,
+    playerCountMax: template.playerCountMax,
+    maxTurnsMin: template.maxTurnsMin,
+    maxTurnsMax: template.maxTurnsMax,
+    gameMode: template.gameMode,
+    showOnWelcomeScreen: template.showOnWelcomeScreen,
+    order: template.order,
+    containsImages: false, // Default value since StoryTemplate doesn't have this field
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt,
+  });
 
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -87,9 +107,6 @@ export const TemplateOverview = ({
   // Simple refs for file inputs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const collectionFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Handle imports with custom handler if provided
-  const handleImport = onImport || templateApi.importTemplateZip;
 
   // Date formatting utility
   const formatDateTime = (dateString: string) => {
@@ -164,12 +181,33 @@ export const TemplateOverview = ({
 
   const confirmTemplateImport = async () => {
     try {
-      if (importDialog.file && importDialog.newTemplate?.title) {
-        // Create a temporary template ID for import
-        const tempId = `temp-${Date.now()}`;
-        await handleImport(tempId, importDialog.file);
+      if (importDialog.file) {
+        const result = await templateApi.importTemplateZip(importDialog.file);
+
+        // Update local state to include the new/updated template
+        if (result.isNewTemplate) {
+          // Add new template to the list
+          setTemplates((prevTemplates) => [
+            ...prevTemplates,
+            convertTemplateToMetadata(result.template),
+          ]);
+        } else {
+          // Update existing template in the list
+          setTemplates((prevTemplates) =>
+            prevTemplates.map((template) =>
+              template.id === result.template.id
+                ? convertTemplateToMetadata(result.template)
+                : template
+            )
+          );
+        }
+
         closeImportDialog();
-        revalidator.revalidate();
+        Logger.UI.log(
+          `Successfully ${
+            result.isNewTemplate ? "imported new" : "updated"
+          } template: ${result.template.title} (${result.filesImported} files)`
+        );
       }
     } catch (error) {
       Logger.UI.error("Failed to import template", error);

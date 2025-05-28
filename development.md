@@ -4,6 +4,7 @@ Smaller commits!
 
 - 5: Enable users to create templates
 - 1: test: creator_id preserved in export/import flow
+- 2: add containsImages to StoryTemplate; kill all transformations from StoryTemplate -> TemplateMetadata
 - 4: Better explain template elements and admin panel
 - 1: show creator in template list in admin view; filter by "has creator id"
 - 2: review process for storytellers who want to publish on website

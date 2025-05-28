@@ -63,11 +63,6 @@ export interface UploadTemplateFileRequest extends ClientRequest {
   subdir?: string;
 }
 
-export interface ImportTemplateFilesRequest extends ClientRequest {
-  id: string;
-  zipFile: File;
-}
-
 // AI Generation
 export interface GenerateTemplateRequest extends ClientRequest {
   prompt: string;

@@ -147,29 +147,31 @@ export const templateApi = {
   },
 
   /**
-   * Import a template from a ZIP file
+   * Import a template from a ZIP file (creates new or updates existing based on template ID in zip)
    */
   importTemplateZip: async (
-    templateId: string,
     zipData: Blob
-  ): Promise<{ filesImported: number; files: string[] }> => {
+  ): Promise<{
+    template: StoryTemplate;
+    filesImported: number;
+    files: string[];
+    isNewTemplate: boolean;
+  }> => {
     const formData = new FormData();
-    formData.append("zip", zipData, "assets.zip");
+    formData.append("zip", zipData, "template.zip");
 
     const response = await apiClient.post<{
-      success: boolean;
+      template: StoryTemplate;
       filesImported: number;
       files: string[];
-    }>(`/templates/${templateId}/import`, formData, {
+      isNewTemplate: boolean;
+    }>(`/templates/import`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
 
-    return {
-      filesImported: response.filesImported,
-      files: response.files,
-    };
+    return response;
   },
 
   /**
@@ -273,38 +275,6 @@ export const templateApi = {
     } catch (error) {
       Logger.API.error(
         `Failed to upload file to template ${templateId}`,
-        error
-      );
-      throw error;
-    }
-  },
-
-  /**
-   * Import a zip file of template assets
-   */
-  importTemplateFiles: async (
-    templateId: string,
-    zipFile: File
-  ): Promise<{ filesImported: number; files: string[] }> => {
-    Logger.API.log(`Importing files to template ${templateId}`);
-    try {
-      const formData = new FormData();
-      formData.append("zip", zipFile);
-
-      const response = await apiClient.post<{
-        filesImported: number;
-        files: string[];
-      }>(`/templates/${templateId}/import`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      Logger.API.log(
-        `Successfully imported ${response.filesImported} files to template ${templateId}`
-      );
-      return response;
-    } catch (error) {
-      Logger.API.error(
-        `Failed to import files to template ${templateId}`,
         error
       );
       throw error;

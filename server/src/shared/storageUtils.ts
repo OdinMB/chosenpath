@@ -574,3 +574,38 @@ export function loadStoryImages(storyId: string): Array<ImageStoryState> {
     return []; // Return empty array if there's an error
   }
 }
+
+/**
+ * Recursively copies all contents from source directory to destination directory
+ * @param sourceDir - Source directory path
+ * @param destDir - Destination directory path
+ * @returns Array of relative file paths that were copied
+ */
+export async function copyDirectoryContents(
+  sourceDir: string,
+  destDir: string
+): Promise<string[]> {
+  const copiedFiles: string[] = [];
+
+  if (!fsSync.existsSync(sourceDir)) {
+    return copiedFiles;
+  }
+
+  const items = await fs.readdir(sourceDir, { withFileTypes: true });
+
+  for (const item of items) {
+    const srcPath = path.join(sourceDir, item.name);
+    const destPath = path.join(destDir, item.name);
+
+    if (item.isDirectory()) {
+      await fs.mkdir(destPath, { recursive: true });
+      const subFiles = await copyDirectoryContents(srcPath, destPath);
+      copiedFiles.push(...subFiles.map((f) => path.join(item.name, f)));
+    } else {
+      await fs.copyFile(srcPath, destPath);
+      copiedFiles.push(item.name);
+    }
+  }
+
+  return copiedFiles;
+}

@@ -52,9 +52,6 @@ export const useTemplateImport = (
     zipFiles: string[]
   ): Promise<void> => {
     try {
-      // Create template on server
-      const createdTemplate = await templateCore.createTemplate(templateData);
-
       // Create assets zip for this template
       const { zipBlob, fileCount } = await createTemplateAssetsZip(
         templateDir,
@@ -62,18 +59,17 @@ export const useTemplateImport = (
         zipFiles
       );
 
-      // Import assets if there are any
+      // Import the template and assets together if there are any
       if (fileCount > 0 && zipBlob.size > 0) {
-        const importResult = await templateApi.importTemplateZip(
-          createdTemplate.id,
-          zipBlob
-        );
+        const importResult = await templateApi.importTemplateZip(zipBlob);
         Logger.Admin.log(
-          `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
+          `Imported template: ${importResult.template.title} with ${importResult.filesImported} files`
         );
+      } else {
+        // If no assets, just create the template
+        const createdTemplate = await templateCore.createTemplate(templateData);
+        Logger.Admin.log(`Created template: ${createdTemplate.title}`);
       }
-
-      Logger.Admin.log(`Imported template: ${createdTemplate.title}`);
     } catch (error) {
       Logger.Admin.error(
         `Error importing template from ${templateDir || "root"}`,
@@ -92,9 +88,6 @@ export const useTemplateImport = (
     zipData?: JSZip,
     templateDir: string = ""
   ) => {
-    // Create template on server
-    const createdTemplate = await templateCore.createTemplate(templateData);
-
     // Upload asset files if provided
     if (assetFiles && assetFiles.length > 0 && zipData) {
       Logger.Admin.log(`Uploading ${assetFiles.length} asset files`);
@@ -108,16 +101,16 @@ export const useTemplateImport = (
 
       // Only import if we have a valid zip with content
       if (zipBlob.size > 0) {
-        const importResult = await templateApi.importTemplateZip(
-          createdTemplate.id,
-          zipBlob
-        );
+        const importResult = await templateApi.importTemplateZip(zipBlob);
         Logger.Admin.log(
-          `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
+          `Imported template: ${importResult.template.title} with ${importResult.filesImported} files`
         );
+        return importResult.template;
       }
     }
 
+    // If no assets or empty zip, just create the template
+    const createdTemplate = await templateCore.createTemplate(templateData);
     return createdTemplate;
   };
 
