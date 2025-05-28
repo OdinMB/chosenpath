@@ -12,6 +12,7 @@ import { Logger } from "shared/logger";
 import { templateApi } from "./templateApi.js";
 import { useState, useRef, useEffect } from "react";
 import { StoryTemplate } from "core/types";
+import JSZip from "jszip";
 
 interface TemplateOverviewProps {
   initialTemplates: TemplateMetadata[];
@@ -96,7 +97,12 @@ export const TemplateOverview = ({
       older: number;
       same: number;
     };
-    templates: TemplateMetadata[];
+    templates: Array<{
+      template: StoryTemplate;
+      existingTemplate: TemplateMetadata | null;
+      isNewer: boolean;
+      isSameAge: boolean;
+    }>;
   }>({
     isOpen: false,
     file: null,
@@ -169,13 +175,87 @@ export const TemplateOverview = ({
   ) => {
     const file = event.target.files?.[0];
     if (file) {
-      // For now, just show a simple collection import dialog
+      Logger.UI.log(`Processing collection file: ${file.name}`);
+      processCollectionFile(file);
+    }
+  };
+
+  const processCollectionFile = async (file: File) => {
+    try {
+      if (!file.name.endsWith(".zip")) {
+        Logger.UI.error("Collection file must be a ZIP archive");
+        return;
+      }
+
+      Logger.UI.log("Analyzing collection structure...");
+
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+
+      const templateFiles: { path: string; template: StoryTemplate }[] = [];
+
+      // Look for template.json files in the zip
+      for (const [path, zipEntry] of Object.entries(zip.files)) {
+        if (path.endsWith("template.json") && !zipEntry.dir) {
+          try {
+            const content = await zipEntry.async("text");
+            const templateData = JSON.parse(content) as StoryTemplate;
+            templateFiles.push({ path, template: templateData });
+          } catch (error) {
+            Logger.UI.warn(`Failed to parse template.json at ${path}:`, error);
+          }
+        }
+      }
+
+      if (templateFiles.length === 0) {
+        Logger.UI.error("No valid template.json files found in collection");
+        return;
+      }
+
+      Logger.UI.log(`Found ${templateFiles.length} templates in collection`);
+
+      // Check against existing templates to create summary
+      const existingTemplates = templates;
+      const templateInfos = templateFiles.map(({ template }) => {
+        const existing = existingTemplates.find((t) => t.id === template.id);
+        const isNewer = existing
+          ? new Date(template.updatedAt) > new Date(existing.updatedAt)
+          : false;
+        const isSameAge = existing
+          ? new Date(template.updatedAt).getTime() ===
+            new Date(existing.updatedAt).getTime()
+          : false;
+
+        return {
+          template,
+          existingTemplate: existing || null,
+          isNewer,
+          isSameAge,
+        };
+      });
+
+      const summary = {
+        total: templateInfos.length,
+        new: templateInfos.filter((info) => !info.existingTemplate).length,
+        newer: templateInfos.filter(
+          (info) => info.existingTemplate && info.isNewer
+        ).length,
+        older: templateInfos.filter(
+          (info) => info.existingTemplate && !info.isNewer && !info.isSameAge
+        ).length,
+        same: templateInfos.filter(
+          (info) => info.existingTemplate && info.isSameAge
+        ).length,
+      };
+
       setCollectionImportDialog({
         isOpen: true,
         file,
-        summary: { total: 1, new: 1, newer: 0, older: 0, same: 0 },
-        templates: [],
+        summary,
+        templates: templateInfos,
       });
+    } catch (error) {
+      Logger.UI.error("Failed to process collection file:", error);
     }
   };
 
@@ -216,12 +296,79 @@ export const TemplateOverview = ({
 
   const confirmCollectionImport = async () => {
     try {
-      if (collectionImportDialog.file) {
-        // Handle collection import (simplified)
-        Logger.UI.log("Collection import not fully implemented yet");
-        closeCollectionImportDialog();
-        revalidator.revalidate();
+      if (!collectionImportDialog.file || !collectionImportDialog.templates) {
+        return;
       }
+
+      Logger.UI.log(
+        `Starting import of ${collectionImportDialog.templates.length} templates`
+      );
+
+      let importedCount = 0;
+      const results: Array<{ template: StoryTemplate; isNew: boolean }> = [];
+
+      // Import each template individually using the ZIP API
+      // Note: We can't use the collection file directly because each template
+      // needs to be imported with its own directory structure
+      for (const templateInfo of collectionImportDialog.templates) {
+        // Only import if it's new or newer
+        if (!templateInfo.existingTemplate || templateInfo.isNewer) {
+          try {
+            Logger.UI.log(`Importing template: ${templateInfo.template.title}`);
+
+            // For now, create the template using the template API
+            // TODO: In the future, we could extract individual template directories
+            // from the collection ZIP and import them properly with assets
+            const createdTemplate = await templateApi.createTemplate(
+              templateInfo.template
+            );
+
+            results.push({
+              template: createdTemplate.template,
+              isNew: !templateInfo.existingTemplate,
+            });
+            importedCount++;
+          } catch (error) {
+            Logger.UI.error(
+              `Failed to import template ${templateInfo.template.title}:`,
+              error
+            );
+            // Continue with other templates
+          }
+        }
+      }
+
+      // Update local state with imported templates
+      if (results.length > 0) {
+        setTemplates((prevTemplates) => {
+          const updatedTemplates = [...prevTemplates];
+
+          for (const result of results) {
+            const metadata = convertTemplateToMetadata(result.template);
+
+            if (result.isNew) {
+              // Add new template
+              updatedTemplates.push(metadata);
+            } else {
+              // Update existing template
+              const index = updatedTemplates.findIndex(
+                (t) => t.id === result.template.id
+              );
+              if (index !== -1) {
+                updatedTemplates[index] = metadata;
+              }
+            }
+          }
+
+          return updatedTemplates;
+        });
+      }
+
+      closeCollectionImportDialog();
+
+      Logger.UI.log(
+        `Successfully imported ${importedCount} templates from collection`
+      );
     } catch (error) {
       Logger.UI.error("Failed to import collection", error);
     }
