@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 
 interface UseLibraryBrowserProps {
-  templates: StoryTemplate[];
+  templates: TemplateMetadata[];
   initialTags: string[];
   initialPlayerCount: number | null;
 }
@@ -13,7 +13,7 @@ export function useLibraryBrowser({
   initialPlayerCount,
 }: UseLibraryBrowserProps) {
   const [filteredTemplates, setFilteredTemplates] =
-    useState<StoryTemplate[]>(templates);
+    useState<TemplateMetadata[]>(templates);
   const [showFilters, setShowFilters] = useState(false);
 
   // Get all valid tags from templates
@@ -22,8 +22,8 @@ export function useLibraryBrowser({
     templates.forEach((template) => {
       if (template.tags && Array.isArray(template.tags)) {
         template.tags.forEach((tag) => {
-          if (tag && typeof tag === "string") {
-            uniqueTags.add(tag);
+          if (typeof tag === "string" && tag.trim()) {
+            uniqueTags.add(tag.trim());
           }
         });
       }
@@ -31,16 +31,34 @@ export function useLibraryBrowser({
     return uniqueTags;
   }, [templates]);
 
-  // Filters
-  const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
-    initialPlayerCount
-  );
+  // Get all available player counts from templates
+  const getAvailablePlayerCounts = useCallback(() => {
+    if (!templates || templates.length === 0) {
+      return Array.from({ length: 10 }, (_, i) => i + 1);
+    }
+
+    const playerCounts = new Set<number>();
+    templates.forEach((template) => {
+      for (
+        let count = template.playerCountMin;
+        count <= template.playerCountMax;
+        count++
+      ) {
+        playerCounts.add(count);
+      }
+    });
+    return Array.from(playerCounts).sort((a, b) => a - b);
+  }, [templates]);
 
   // Filter initialTags to only include valid tags that exist in templates
   const [selectedTags, setSelectedTags] = useState<string[]>(() => {
     const validTags = getValidTags();
     return (initialTags || []).filter((tag) => validTags.has(tag));
   });
+
+  const [playerCountFilter, setPlayerCountFilter] = useState<number | null>(
+    initialPlayerCount
+  );
 
   // Update URL with current filters
   const updateUrlWithFilters = useCallback(
@@ -81,10 +99,11 @@ export function useLibraryBrowser({
     [selectedTags, playerCountFilter, getValidTags]
   );
 
-  // Apply filters when they change
+  // Apply filters to templates
   const applyFilters = useCallback(() => {
     let result = [...templates];
 
+    // Filter by player count
     if (playerCountFilter !== null) {
       result = result.filter(
         (template) =>
@@ -120,39 +139,24 @@ export function useLibraryBrowser({
     getValidTags,
   ]);
 
+  // Handle tag toggle
   const handleTagToggle = useCallback((tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   }, []);
 
+  // Clear all filters
   const clearFilters = useCallback(() => {
     setPlayerCountFilter(null);
     setSelectedTags([]);
     updateUrlWithFilters([], null, true);
   }, [updateUrlWithFilters]);
 
+  // Toggle filter visibility
   const toggleShowFilters = useCallback(() => {
     setShowFilters((prev) => !prev);
   }, []);
-
-  // Get all available player counts based on templates
-  const getAvailablePlayerCounts = useCallback(() => {
-    if (!templates || templates.length === 0) {
-      return Array.from({ length: 10 }, (_, i) => i + 1);
-    }
-
-    const minCounts = templates.map((t) => t.playerCountMin);
-    const maxCounts = templates.map((t) => t.playerCountMax);
-
-    const minCount = Math.min(...minCounts);
-    const maxCount = Math.max(...maxCounts);
-
-    return Array.from(
-      { length: maxCount - minCount + 1 },
-      (_, i) => i + minCount
-    );
-  }, [templates]);
 
   return {
     filteredTemplates,

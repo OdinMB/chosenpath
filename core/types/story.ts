@@ -204,6 +204,29 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   order: number;
 };
 
+/**
+ * Template metadata for browsing/listing without full game content
+ * Used for public browsing, user template lists, and admin template management
+ */
+export type TemplateMetadata = {
+  id: string;
+  title: string;
+  teaser: string;
+  gameMode: GameMode;
+  tags: string[];
+  playerCountMin: PlayerCount;
+  playerCountMax: PlayerCount;
+  maxTurnsMin: number;
+  maxTurnsMax: number;
+  publicationStatus: PublicationStatusType;
+  showOnWelcomeScreen: boolean;
+  order: number;
+  containsImages: boolean;
+  createdAt: string;
+  updatedAt: string;
+  creatorId?: string | null; // Only included for admin endpoints
+};
+
 // TYPES USED BY APP (not LLM)
 
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;

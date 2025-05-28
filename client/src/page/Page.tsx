@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PrimaryButton, Icons } from "components/ui";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, LibraryCategoryGrid } from "./components";
 import {
@@ -64,7 +64,7 @@ export function Page() {
   };
 
   // Navigate to template configuration
-  const handleSelectTemplate = (template: StoryTemplate) => {
+  const handleSelectTemplate = (template: TemplateMetadata) => {
     navigate(`/templates/${template.id}/configure`);
   };
 

@@ -1,4 +1,4 @@
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { PrimaryButton, Icons } from "components/ui";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -11,7 +11,7 @@ import { useNavigate, useLoaderData } from "react-router-dom";
 import { useLibraryBrowser } from "../hooks/useLibraryBrowser";
 
 interface LibraryLoaderData {
-  templates: StoryTemplate[];
+  templates: TemplateMetadata[];
   tagCategories: Record<string, string[]>;
   initialTags: string[];
   initialPlayerCount: number | null;
@@ -154,7 +154,7 @@ export function LibraryBrowser() {
   };
 
   const handleSelectTemplate = useCallback(
-    (template: StoryTemplate) => {
+    (template: TemplateMetadata) => {
       navigate(`/templates/${template.id}/configure`);
     },
     [navigate]

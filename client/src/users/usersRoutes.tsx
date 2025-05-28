@@ -37,7 +37,12 @@ export const userRoutes: RouteObject[] = [
       {
         path: "my-worlds/:id",
         element: <UserTemplateEditor />,
-        loader: (args) => templateLoader(args),
+        loader: ({ params }) => {
+          if (!params.id) {
+            throw new Response("Template ID is required", { status: 400 });
+          }
+          return templateLoader(params.id);
+        },
         id: "user-template-editor",
       },
     ],

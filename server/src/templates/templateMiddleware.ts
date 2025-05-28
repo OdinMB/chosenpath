@@ -1,57 +1,57 @@
 import express from "express";
 import { Logger } from "shared/logger.js";
-import { StoryTemplate } from "core/types/index.js";
-
-// Extend StoryTemplate to add missing property
-interface TemplateWithCreator extends StoryTemplate {
-  createdBy?: string;
-  creatorId?: string;
-}
 import { sendError } from "shared/responseUtils.js";
-import { TemplateService } from "./TemplateService.js";
-
-const templateService = new TemplateService();
+import { templateDbService } from "./TemplateDbService.js";
 
 /**
  * Check if user has permission to access a template
  * Permission is granted if:
  * 1. User has 'templates_see_all' permission, OR
- * 2. User is the creator of the template
+ * 2. User is the creator of the template (checked via database), OR
+ * 3. Template is published or private (for read access)
  *
  * @param templateId Template ID to check
  * @param userId User ID making the request
  * @param userPermissions Array of user permissions
+ * @param requireEditAccess If true, only allows access for creators or users with edit_all permission
  * @returns Boolean indicating if user has access
+ * @throws Error with message 'Template not found' if template doesn't exist
  */
 export async function hasTemplateAccess(
   templateId: string,
   userId: string | undefined,
-  userPermissions: string[] = []
+  userPermissions: string[] = [],
+  requireEditAccess: boolean = false
 ): Promise<boolean> {
-  // Admin with templates_see_all can access any template
-  if (userPermissions.includes("templates_see_all")) {
+  // Fetch template from db
+  const templateEntry = await templateDbService.findTemplateEntryById(
+    templateId
+  );
+  if (!templateEntry) {
+    throw new Error("Template not found");
+  }
+  Logger.Route.log(JSON.stringify(templateEntry, null, 2));
+
+  // Read access: public/private, owner, or see_all permission
+  if (
+    !requireEditAccess &&
+    (templateEntry.publicationStatus === "published" ||
+      templateEntry.publicationStatus === "private" ||
+      userPermissions.includes("templates_see_all") ||
+      (userId && userId === templateEntry.creatorId))
+  ) {
     return true;
   }
 
-  // Must have a user ID to check ownership
-  if (!userId) {
-    return false;
+  // Edit access: owner or edit_all permission
+  if (requireEditAccess && userPermissions.includes("templates_edit_all")) {
+    return true;
+  }
+  if (requireEditAccess && userId && templateEntry.creatorId === userId) {
+    return true;
   }
 
-  // Get the template
-  const template = await templateService.getTemplateById(templateId);
-  if (!template) {
-    return false;
-  }
-
-  // Check if user is the creator
-  // Templates might have either createdBy or creatorId field
-  // Cast to our extended type
-  const templateWithCreator = template as unknown as TemplateWithCreator;
-  return (
-    templateWithCreator.createdBy === userId ||
-    templateWithCreator.creatorId === userId
-  );
+  return false;
 }
 
 /**
@@ -76,7 +76,8 @@ export function verifyTemplateAccess() {
       const hasAccess = await hasTemplateAccess(
         id,
         req.user?.id,
-        req.userPermissions || []
+        req.userPermissions || [],
+        false
       );
 
       if (!hasAccess) {
@@ -95,6 +96,10 @@ export function verifyTemplateAccess() {
 
       next();
     } catch (error) {
+      // Check if it's a "Template not found" error
+      if ((error as Error).message === "Template not found") {
+        return sendError(res, "Template not found", 404, requestId);
+      }
       Logger.Route.error(`Error checking template access for ${id}`, error);
       return sendError(res, "Failed to verify template access", 500, requestId);
     }
@@ -139,15 +144,16 @@ export function verifyPublicationStatusPermission(
 
 /**
  * Middleware to verify that a user can change the welcome screen settings
- * If the template has showOnWelcomeScreen or order attributes, user must have templates_carousel permission
+ * Only checks permissions if the template has welcome screen settings that are being CHANGED
  */
-export function verifyCarouselPermission(
+export async function verifyCarouselPermission(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
 ) {
   const requestId = req.body?.requestId || "unknown";
   const template = req.body?.template;
+  const templateId = req.params?.id;
 
   // If template doesn't have welcome screen settings, continue
   if (
@@ -157,20 +163,56 @@ export function verifyCarouselPermission(
     return next();
   }
 
-  // Check if user has templates_carousel permission
-  if (!req.userPermissions?.includes("templates_carousel")) {
-    Logger.Route.warn(
-      `User ${req.user?.id} attempted to modify welcome screen settings without permission`
+  try {
+    // Get the current template from database to compare values
+    const currentTemplate = await templateDbService.findTemplateEntryById(
+      templateId
+    );
+
+    if (!currentTemplate) {
+      return sendError(res, "Template not found", 404, requestId);
+    }
+
+    // Check if carousel-related fields are actually being changed
+    const isShowOnWelcomeScreenChanging =
+      template.showOnWelcomeScreen !== undefined &&
+      template.showOnWelcomeScreen !== currentTemplate.showOnWelcomeScreen;
+
+    const isOrderChanging =
+      template.order !== undefined &&
+      template.order !== currentTemplate.orderValue; // Note: DB field is 'orderValue'
+
+    // If neither field is changing, allow the request to proceed
+    if (!isShowOnWelcomeScreenChanging && !isOrderChanging) {
+      return next();
+    }
+
+    // Check if user has templates_carousel permission
+    if (!req.userPermissions?.includes("templates_carousel")) {
+      Logger.Route.warn(
+        `User ${req.user?.id} attempted to change carousel settings without permission`
+      );
+      return sendError(
+        res,
+        "Insufficient permissions to change carousel settings",
+        403,
+        requestId
+      );
+    }
+
+    next();
+  } catch (error) {
+    Logger.Route.error(
+      `Error checking carousel permission for ${templateId}`,
+      error
     );
     return sendError(
       res,
-      "Insufficient permissions to manage welcome screen carousel",
-      403,
+      "Failed to verify carousel permission",
+      500,
       requestId
     );
   }
-
-  next();
 }
 
 /**
@@ -204,7 +246,7 @@ export function verifyImageGenerationPermission(
  * Middleware to verify a user can edit a template
  * User must either:
  * 1. Have 'templates_edit_all' permission, OR
- * 2. Be the creator of the template
+ * 2. Be the creator of the template (checked via database)
  */
 export function verifyTemplateEditAccess() {
   return async (
@@ -219,27 +261,15 @@ export function verifyTemplateEditAccess() {
       return sendError(res, "Template ID is required", 400, requestId);
     }
 
-    // If user has edit_all permission, allow access
-    if (req.userPermissions?.includes("templates_edit_all")) {
-      return next();
-    }
-
     try {
-      // Otherwise check if user is the creator
-      const template = await templateService.getTemplateById(id);
+      const hasAccess = await hasTemplateAccess(
+        id,
+        req.user?.id,
+        req.userPermissions || [],
+        true // requireEditAccess = true
+      );
 
-      if (!template) {
-        return sendError(res, "Template not found", 404, requestId);
-      }
-
-      // Check if user is the creator
-      // Templates might have either createdBy or creatorId field
-      // Cast to our extended type
-      const templateWithCreator = template as unknown as TemplateWithCreator;
-      if (
-        templateWithCreator.createdBy !== req.user?.id &&
-        templateWithCreator.creatorId !== req.user?.id
-      ) {
+      if (!hasAccess) {
         Logger.Route.warn(
           `User ${
             req.user?.id || "anonymous"
@@ -255,6 +285,10 @@ export function verifyTemplateEditAccess() {
 
       next();
     } catch (error) {
+      // Check if it's a "Template not found" error
+      if ((error as Error).message === "Template not found") {
+        return sendError(res, "Template not found", 404, requestId);
+      }
       Logger.Route.error(
         `Error checking template edit access for ${id}`,
         error

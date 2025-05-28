@@ -64,9 +64,9 @@ export const StatGroupEditor: React.FC<StatGroupEditorProps> = ({
         <div className="flex items-center">
           <h3 className="font-semibold">Stat Groups</h3>
           <InfoIcon
-            tooltipText="Categories to organize stats"
+            tooltipText="Categories to organize stats in the game's user interface"
             position="right"
-            className="ml-2 mt-1"
+            className="ml-2"
           />
         </div>
         {!readOnly && (

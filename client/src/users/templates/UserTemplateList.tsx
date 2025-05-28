@@ -3,14 +3,19 @@ import { TemplateOverview } from "resources/templates/TemplateOverview.js";
 import { createDefaultTemplate } from "resources/templates/utils/templateFactory.js";
 import { Logger } from "shared/logger.js";
 import { templateApi } from "resources/templates/templateApi.js";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { useAuth } from "client/shared/auth/useAuth.js";
+import { useState } from "react";
 
 /**
  * User template list component for users with templates_create permission
  */
 export const UserTemplateList = () => {
-  const { templates } = useLoaderData() as { templates: StoryTemplate[] };
+  const { templates: initialTemplates } = useLoaderData() as {
+    templates: TemplateMetadata[];
+  };
+  const [templates, setTemplates] =
+    useState<TemplateMetadata[]>(initialTemplates);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -21,6 +26,20 @@ export const UserTemplateList = () => {
   // User-specific handlers
   const handleEdit = (templateId: string) => {
     navigate(`/users/my-worlds/${templateId}`);
+  };
+
+  const handleDelete = async (templateId: string) => {
+    try {
+      await templateApi.deleteTemplate(templateId);
+      // Remove the deleted template from local state for immediate UI update
+      setTemplates((prevTemplates) =>
+        prevTemplates.filter((template) => template.id !== templateId)
+      );
+      Logger.UI.log(`Successfully deleted template: ${templateId}`);
+    } catch (error) {
+      Logger.UI.error(`Failed to delete template: ${templateId}`, error);
+      throw error; // Re-throw so the TemplateOverview can handle the error display
+    }
   };
 
   const handleCreateNew = async () => {
@@ -53,6 +72,7 @@ export const UserTemplateList = () => {
     <TemplateOverview
       initialTemplates={templates}
       onEdit={handleEdit}
+      onDelete={handleDelete}
       onCreateNew={handleCreateNew}
       canPublish={false} // Users can't publish templates
       canExportAll={true}

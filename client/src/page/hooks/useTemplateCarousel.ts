@@ -1,5 +1,5 @@
 import { useState, useEffect, RefObject } from "react";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { useLoaderData } from "react-router-dom";
 
 type SwipeHandlers = {
@@ -55,7 +55,7 @@ export function useSwipe(
 }
 
 export function useTemplateCarousel() {
-  const { templates } = useLoaderData() as { templates: StoryTemplate[] };
+  const { templates } = useLoaderData() as { templates: TemplateMetadata[] };
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 

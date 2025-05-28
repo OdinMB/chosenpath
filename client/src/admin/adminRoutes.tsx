@@ -48,7 +48,12 @@ export const adminRoutes: RouteObject[] = [
       {
         path: "templates/:id",
         element: <AdminTemplateEditor />,
-        loader: (args) => templateLoader(args),
+        loader: ({ params }) => {
+          if (!params.id) {
+            throw new Response("Template ID is required", { status: 400 });
+          }
+          return templateLoader(params.id);
+        },
       },
       {
         path: "carousel",

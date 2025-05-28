@@ -1,11 +1,11 @@
 import { useRef } from "react";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { TemplateCard } from "./TemplateCard";
 import { Icons } from "components/ui";
 import { useTemplateCarousel, useSwipe } from "../hooks/useTemplateCarousel";
 
 type TemplateCarouselProps = {
-  onPlay: (template: StoryTemplate) => void;
+  onPlay: (template: TemplateMetadata) => void;
 };
 
 export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {

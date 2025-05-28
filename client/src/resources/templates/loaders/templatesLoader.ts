@@ -1,4 +1,4 @@
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { templateApi } from "../templateApi";
 import { Logger } from "shared/logger";
 
@@ -11,46 +11,49 @@ interface TemplatesLoaderOptions {
 }
 
 /**
- * Unified loader for templates that can be used in different contexts
+ * Unified loader for template metadata that can be used in different contexts
+ * All contexts now return metadata by default for security and performance
  */
 export async function templatesLoader({
   context = "published",
   forWelcomeScreen = false,
   userId,
 }: TemplatesLoaderOptions): Promise<{
-  templates: StoryTemplate[];
+  templates: TemplateMetadata[];
 }> {
   try {
-    let templates: StoryTemplate[] = [];
+    let templates: TemplateMetadata[] = [];
 
     switch (context) {
       case "admin":
-        // Admin context - get all templates with full control
-        templates = await templateApi.getAllTemplates();
-        Logger.App.log(`Admin: Loaded ${templates.length} templates`);
+        // Admin context - get all template metadata
+        templates = await templateApi.getAllTemplateMetadata();
+        Logger.App.log(`Admin: Loaded ${templates.length} template metadata`);
         break;
 
       case "user":
-        // User context - get templates for the current user or a specific user
+        // User context - get template metadata for the current user or a specific user
         if (userId) {
-          templates = await templateApi.getUserTemplatesByUserId(userId);
+          templates = await templateApi.getUserTemplateMetadataByUserId(userId);
           Logger.App.log(
-            `User: Loaded ${templates.length} templates for user ${userId}`
+            `User: Loaded ${templates.length} template metadata for user ${userId}`
           );
         } else {
-          templates = await templateApi.getUserTemplates();
+          templates = await templateApi.getUserTemplateMetadata();
           Logger.App.log(
-            `User: Loaded ${templates.length} templates for current user`
+            `User: Loaded ${templates.length} template metadata for current user`
           );
         }
         break;
 
       case "published":
       default:
-        // Public context - only published templates
-        templates = await templateApi.getPublishedTemplates(forWelcomeScreen);
+        // Public context - only published template metadata
+        templates = await templateApi.getPublishedTemplateMetadata(
+          forWelcomeScreen
+        );
         Logger.App.log(
-          `Public: Loaded ${templates.length} published templates${
+          `Public: Loaded ${templates.length} published template metadata${
             forWelcomeScreen ? " for welcome screen" : ""
           }`
         );
@@ -59,7 +62,10 @@ export async function templatesLoader({
 
     return { templates };
   } catch (error) {
-    Logger.App.error(`Failed to load templates in ${context} context`, error);
+    Logger.App.error(
+      `Failed to load template metadata in ${context} context`,
+      error
+    );
     return { templates: [] };
   }
 }

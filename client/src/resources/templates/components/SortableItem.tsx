@@ -1,12 +1,12 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { Icons } from "components/ui";
 
 interface SortableItemProps {
   id: string;
-  template: StoryTemplate;
+  template: TemplateMetadata;
 }
 
 export const SortableItem: React.FC<SortableItemProps> = ({ id, template }) => {

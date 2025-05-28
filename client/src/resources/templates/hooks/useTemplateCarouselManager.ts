@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { StoryTemplate, PublicationStatus } from "core/types";
+import { TemplateMetadata, PublicationStatus } from "core/types";
 import { Logger } from "shared/logger";
 import { templateApi } from "../templateApi";
 import { UpdateTemplateRequest } from "core/types/admin";
 
 export const useTemplateCarouselManager = () => {
-  const [templates, setTemplates] = useState<StoryTemplate[]>([]);
+  const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -19,16 +19,16 @@ export const useTemplateCarouselManager = () => {
       setError(null);
 
       try {
-        const response = await templateApi.getAllTemplates();
+        const response = await templateApi.getAllTemplateMetadata();
 
         // Filter for published templates marked for welcome screen
         const welcomeScreenTemplates = response
           .filter(
-            (template: StoryTemplate) =>
+            (template: TemplateMetadata) =>
               template.publicationStatus === PublicationStatus.Published &&
               template.showOnWelcomeScreen
           )
-          .map((template: StoryTemplate) => ({
+          .map((template: TemplateMetadata) => ({
             ...template,
             // Ensure all templates have an order value
             order:
@@ -36,7 +36,9 @@ export const useTemplateCarouselManager = () => {
                 ? template.order
                 : Number.MAX_SAFE_INTEGER,
           }))
-          .sort((a: StoryTemplate, b: StoryTemplate) => a.order - b.order);
+          .sort(
+            (a: TemplateMetadata, b: TemplateMetadata) => a.order - b.order
+          );
 
         Logger.Admin.log(
           `Loaded ${welcomeScreenTemplates.length} templates for carousel management, sorted by position`

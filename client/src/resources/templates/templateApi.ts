@@ -1,4 +1,4 @@
-import { StoryTemplate } from "core/types";
+import { StoryTemplate, TemplateMetadata } from "core/types";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 import {
@@ -12,14 +12,14 @@ import {
  */
 export const templateApi = {
   /**
-   * Get published templates, optionally filtered for welcome screen
+   * Get published template metadata for browsing (public access, no auth required)
    * @param forWelcomeScreen If true, only returns templates marked for welcome screen
    */
-  getPublishedTemplates: async (
+  getPublishedTemplateMetadata: async (
     forWelcomeScreen = false
-  ): Promise<StoryTemplate[]> => {
+  ): Promise<TemplateMetadata[]> => {
     return apiClient
-      .get<{ templates: StoryTemplate[] }>(
+      .get<{ templates: TemplateMetadata[] }>(
         `/templates/published${
           forWelcomeScreen ? "?forWelcomeScreen=true" : ""
         }`
@@ -28,51 +28,52 @@ export const templateApi = {
   },
 
   /**
-   * Get a playable template (public access, no auth required)
-   * Includes both published templates and private templates if user has direct access
+   * Get all template metadata (requires admin permissions)
    */
-  getPlayableTemplate: async (templateId: string): Promise<StoryTemplate> => {
-    const response = await apiClient.get<{ template: StoryTemplate }>(
-      `/templates/playable/${templateId}`
+  getAllTemplateMetadata: async (): Promise<TemplateMetadata[]> => {
+    return apiClient
+      .get<{ templates: TemplateMetadata[] }>("/templates")
+      .then((response) => response.templates);
+  },
+
+  /**
+   * Get template metadata for the current user
+   */
+  getUserTemplateMetadata: async (): Promise<TemplateMetadata[]> => {
+    return apiClient
+      .get<{ templates: TemplateMetadata[] }>("/templates/user")
+      .then((response) => response.templates);
+  },
+
+  /**
+   * Get template metadata for a specific user (requires appropriate permissions)
+   */
+  getUserTemplateMetadataByUserId: async (
+    userId: string
+  ): Promise<TemplateMetadata[]> => {
+    return apiClient
+      .get<{ templates: TemplateMetadata[] }>(`/templates/user/${userId}`)
+      .then((response) => response.templates);
+  },
+
+  /**
+   * Get template metadata by ID (requires basic access)
+   */
+  getTemplateMetadata: async (
+    templateId: string
+  ): Promise<TemplateMetadata> => {
+    const response = await apiClient.get<{ template: TemplateMetadata }>(
+      `/templates/${templateId}`
     );
     return response.template;
   },
 
   /**
-   * Get all templates (requires admin or appropriate permissions)
-   */
-  getAllTemplates: async (): Promise<StoryTemplate[]> => {
-    return apiClient
-      .get<{ templates: StoryTemplate[] }>("/templates")
-      .then((response) => response.templates);
-  },
-
-  /**
-   * Get templates for the current user
-   */
-  getUserTemplates: async (): Promise<StoryTemplate[]> => {
-    return apiClient
-      .get<{ templates: StoryTemplate[] }>("/templates/user")
-      .then((response) => response.templates);
-  },
-
-  /**
-   * Get templates for a specific user (requires appropriate permissions)
-   */
-  getUserTemplatesByUserId: async (
-    userId: string
-  ): Promise<StoryTemplate[]> => {
-    return apiClient
-      .get<{ templates: StoryTemplate[] }>(`/templates/user/${userId}`)
-      .then((response) => response.templates);
-  },
-
-  /**
-   * Get a specific template with access check
+   * Get a specific template with full content (requires edit access)
    */
   getTemplate: async (templateId: string): Promise<StoryTemplate> => {
     const response = await apiClient.get<{ template: StoryTemplate }>(
-      `/templates/${templateId}`
+      `/templates/full/${templateId}`
     );
     return response.template;
   },

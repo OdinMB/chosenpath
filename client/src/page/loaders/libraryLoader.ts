@@ -1,11 +1,11 @@
 import { LoaderFunctionArgs } from "react-router-dom";
 import { Logger } from "../../shared/logger";
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { groupTagsByCategories } from "../../resources/templates/tagCategories";
 import { templateApi } from "../../resources/templates/templateApi.js";
 
 interface LibraryLoaderData {
-  templates: StoryTemplate[];
+  templates: TemplateMetadata[];
   tagCategories: Record<string, string[]>;
   initialTags: string[];
   initialPlayerCount: number | null;
@@ -13,7 +13,7 @@ interface LibraryLoaderData {
 
 /**
  * Loader for the library page and welcome screen
- * Fetches template data and processes URL parameters
+ * Fetches template metadata and processes URL parameters
  * For welcome screen (path: "/"), only returns templates without tag processing
  */
 export async function libraryLoader({
@@ -32,11 +32,13 @@ export async function libraryLoader({
   // );
 
   try {
-    // Fetch templates based on context
-    const templates = await templateApi.getPublishedTemplates(isWelcomeScreen);
+    // Fetch template metadata based on context
+    const templates = await templateApi.getPublishedTemplateMetadata(
+      isWelcomeScreen
+    );
 
     Logger.App.log(
-      `Loaded ${templates.length} templates for ${
+      `Loaded ${templates.length} template metadata for ${
         isWelcomeScreen ? "welcome screen" : "library"
       }`
     );
@@ -53,7 +55,7 @@ export async function libraryLoader({
 
     // For library page, process tags and other data
     const uniqueTags = new Set<string>();
-    templates.forEach((template: StoryTemplate) => {
+    templates.forEach((template: TemplateMetadata) => {
       if (template.tags) {
         template.tags.forEach((tag) => uniqueTags.add(tag));
       }
@@ -87,7 +89,7 @@ export async function libraryLoader({
       initialPlayerCount,
     };
   } catch (error) {
-    Logger.App.error("Failed to load templates", error);
+    Logger.App.error("Failed to load template metadata", error);
 
     // Return appropriate empty structure based on context
     return isWelcomeScreen

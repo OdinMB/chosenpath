@@ -1,7 +1,7 @@
 import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
 import { templatesLoader } from "../resources/templates/loaders/templatesLoader";
-import { templateLoader } from "../resources/templates/loaders/templateLoader";
+import { configurableTemplateLoader } from "../resources/templates/loaders/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
@@ -58,7 +58,12 @@ export const pageRoutes: RouteObject[] = [
         children: [
           {
             path: "/templates/:id/configure",
-            loader: (args) => templateLoader(args, { mode: "playable" }),
+            loader: ({ params }) => {
+              if (!params.id) {
+                throw new Response("Template ID is required", { status: 400 });
+              }
+              return configurableTemplateLoader(params.id);
+            },
             element: <TemplateConfigurator />,
             id: "template-config",
           },

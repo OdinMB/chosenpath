@@ -1,44 +1,79 @@
-import { LoaderFunctionArgs } from "react-router-dom";
-import { StoryTemplate } from "core/types";
+import { StoryTemplate, TemplateMetadata } from "core/types";
 import { templateApi } from "../templateApi";
 import { Logger } from "shared/logger";
 
 /**
- * Loader for fetching a single template
- * @param mode "normal" (default) for templates with access check, "playable" for public/shared access
+ * Loader for a single template with full content (for editing)
+ * Uses the /templates/full/:id endpoint which requires edit access
  */
-export async function templateLoader(
-  { params }: LoaderFunctionArgs,
-  { mode = "normal" }: { mode?: "normal" | "playable" } = {}
-): Promise<{
-  template: StoryTemplate;
+export async function templateLoader(templateId: string): Promise<{
+  template: StoryTemplate | null;
 }> {
-  const templateId = params.id;
-  if (!templateId) {
-    Logger.App.error("Template ID is required");
-    throw new Response("Template ID is required", { status: 400 });
-  }
-
   try {
-    let template: StoryTemplate;
-
-    if (mode === "playable") {
-      // Playable mode doesn't require authentication, used for public access
-      template = await templateApi.getPlayableTemplate(templateId);
-      Logger.App.log(`Loaded playable template: ${template.title}`);
-    } else {
-      // Normal mode requires appropriate access permissions
-      template = await templateApi.getTemplate(templateId);
-      Logger.App.log(
-        `Loaded template with ID ${templateId}: ${template.title}`
-      );
-    }
-
+    Logger.App.log(`Loading full template content for ${templateId}`);
+    const template = await templateApi.getTemplate(templateId);
+    Logger.App.log(`Loaded full template: ${template.title}`);
     return { template };
   } catch (error) {
-    Logger.App.error(`Failed to load template with ID ${templateId}`, error);
-    throw new Response("Template not found or you don't have access", {
-      status: 404,
-    });
+    Logger.App.error(`Failed to load full template ${templateId}`, error);
+    return { template: null };
+  }
+}
+
+/**
+ * Loader for template metadata (public access)
+ * Uses the /templates/:id endpoint for basic template information
+ * Note: This returns metadata only, not full template content
+ */
+export async function playableTemplateLoader(templateId: string): Promise<{
+  template: TemplateMetadata | null;
+}> {
+  try {
+    Logger.App.log(`Loading template metadata ${templateId}`);
+    const template = await templateApi.getTemplateMetadata(templateId);
+    Logger.App.log(`Loaded template metadata: ${template.title}`);
+    return { template };
+  } catch (error) {
+    Logger.App.error(`Failed to load template metadata ${templateId}`, error);
+    return { template: null };
+  }
+}
+
+/**
+ * Loader for template configuration (metadata + configuration options)
+ * Uses both endpoints to get metadata for display and full template for configuration
+ */
+export async function configurableTemplateLoader(templateId: string): Promise<{
+  template:
+    | (TemplateMetadata & {
+        difficultyLevels?: Array<{ modifier: number; title: string }>;
+      })
+    | null;
+}> {
+  try {
+    Logger.App.log(`Loading configurable template data for ${templateId}`);
+
+    // Get both metadata and full template
+    const [metadata, fullTemplate] = await Promise.all([
+      templateApi.getTemplateMetadata(templateId),
+      templateApi.getTemplate(templateId),
+    ]);
+
+    // Combine metadata with configuration fields
+    const configurableTemplate = {
+      ...metadata,
+      difficultyLevels: fullTemplate.difficultyLevels || [],
+    };
+
+    Logger.App.log(
+      `Loaded configurable template: ${configurableTemplate.title}`
+    );
+    return { template: configurableTemplate };
+  } catch (error) {
+    Logger.App.error(
+      `Failed to load configurable template ${templateId}`,
+      error
+    );
+    return { template: null };
   }
 }

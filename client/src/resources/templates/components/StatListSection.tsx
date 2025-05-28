@@ -55,11 +55,7 @@ export function StatListSection({
             ></span>
             {title}
           </h3>
-          <InfoIcon
-            tooltipText={tooltip}
-            position="right"
-            className="ml-2 mt-1"
-          />
+          <InfoIcon tooltipText={tooltip} position="right" className="ml-2" />
         </div>
         {!readOnly && (
           <PrimaryButton

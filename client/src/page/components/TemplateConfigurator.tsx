@@ -1,21 +1,30 @@
 import { useState } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
-import { PlayerCount, DifficultyLevel } from "core/types";
+import { PlayerCount, DifficultyLevel, TemplateMetadata } from "core/types";
 import { PrimaryButton, Icons, InfoIcon } from "components/ui";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
-import { StoryTemplate } from "core/types";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
 import { RateLimitedResponse } from "core/types/api";
 import { notificationService } from "shared/notifications/notificationService";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
 
+type ConfigurableTemplate = TemplateMetadata & {
+  difficultyLevels?: Array<{ modifier: number; title: string }>;
+};
+
 interface TemplateConfigLoaderData {
-  template: StoryTemplate;
+  template: ConfigurableTemplate;
+}
+
+// Minimal template interface for PlayerCodes component
+interface MinimalTemplate {
+  id: string;
+  title: string;
 }
 
 export function TemplateConfigurator() {
@@ -107,12 +116,20 @@ export function TemplateConfigurator() {
   };
 
   if (storyId && playerCodes) {
+    // PlayerCodes only needs basic template fields
+    const playerCodesTemplate: MinimalTemplate = {
+      id: template.id,
+      title: template.title,
+    };
+
     return (
       <PlayerCodes
         codes={playerCodes}
         onCodeSubmit={handleCodeSubmit}
         storyReady={storyReady}
-        template={template}
+        template={
+          playerCodesTemplate as unknown as import("core/types").StoryTemplate
+        }
       />
     );
   }

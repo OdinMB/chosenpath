@@ -1,11 +1,11 @@
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { PrimaryButton } from "components/ui";
 import { sortTagsByCategory } from "client/resources/templates/tagCategories";
 import { CoverCard } from "shared/components";
 
 type TemplateCardProps = {
-  template: StoryTemplate;
-  onPlay: (template: StoryTemplate) => void;
+  template: TemplateMetadata;
+  onPlay: (template: TemplateMetadata) => void;
   showPlayButton?: boolean;
   size?: "default" | "large";
   className?: string;
@@ -67,7 +67,7 @@ export const TemplateCard = ({
       </div>
 
       {/* Teaser */}
-      <p className={`${sizeClasses.teaser} text-primary-600 mb-4 line-clamp-3`}>
+      <p className={`${sizeClasses.teaser} text-primary-600 leading-relaxed`}>
         {template.teaser}
       </p>
 

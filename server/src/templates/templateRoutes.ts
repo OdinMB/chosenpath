@@ -50,7 +50,36 @@ const templateService = new TemplateService();
 // PUBLIC TEMPLATE ROUTES (NO AUTH)
 // ========================
 
-// Get all published templates (public endpoint)
+// Utility function to convert database entry to metadata format
+const convertDbEntryToMetadata = (entry: any, includeCreatorId = false) => {
+  const metadata = {
+    id: entry.id,
+    title: entry.title,
+    teaser: entry.teaser,
+    gameMode: entry.gameMode,
+    tags: entry.tags
+      ? entry.tags.split(",").filter((tag: string) => tag.trim())
+      : [],
+    playerCountMin: entry.playerCountMin,
+    playerCountMax: entry.playerCountMax,
+    maxTurnsMin: entry.maxTurnsMin,
+    maxTurnsMax: entry.maxTurnsMax,
+    publicationStatus: entry.publicationStatus,
+    showOnWelcomeScreen: entry.showOnWelcomeScreen,
+    order: entry.orderValue,
+    containsImages: entry.containsImages,
+    createdAt: new Date(entry.createdAt).toISOString(),
+    updatedAt: new Date(entry.updatedAt).toISOString(),
+  };
+
+  if (includeCreatorId) {
+    return { ...metadata, creatorId: entry.creatorId };
+  }
+
+  return metadata;
+};
+
+// Get published template metadata for browsing (public endpoint)
 router.get("/templates/published", async (req, res) => {
   const requestId = req.query.requestId as string;
 
@@ -58,55 +87,31 @@ router.get("/templates/published", async (req, res) => {
     // Check if the request is for welcome screen templates
     const forWelcomeScreen = req.query.forWelcomeScreen === "true";
 
-    let templates;
+    let templateEntries;
     if (forWelcomeScreen) {
-      // Use the new database-backed method to get carousel templates
-      templates = await templateService.getCarouselTemplates();
+      // Get carousel template metadata from database
+      templateEntries = await templateDbService.getCarouselTemplateEntries();
     } else {
-      // Use the new database-backed method to get published templates
-      templates = await templateService.getTemplatesByStatus(
+      // Get published template metadata from database
+      templateEntries = await templateDbService.getTemplateEntriesByStatus(
         PublicationStatus.Published
       );
     }
 
+    // Convert database entries to public metadata format
+    const templates = templateEntries.map((entry) =>
+      convertDbEntryToMetadata(entry)
+    );
+
     Logger.Route.log(
-      `Returning ${templates.length} published templates${
+      `Returning ${templates.length} published template metadata${
         forWelcomeScreen ? " for welcome screen" : ""
       }`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
-    Logger.Route.error("Failed to load published templates", error);
+    Logger.Route.error("Failed to load published template metadata", error);
     sendError(res, "Failed to load templates", 500, requestId, error);
-  }
-});
-
-// Get template by ID (only if published or private, no auth required)
-router.get("/templates/playable/:id", async (req, res) => {
-  const { id } = req.params;
-  const requestId = req.query.requestId as string;
-
-  try {
-    const template = await templateService.getTemplateById(id);
-
-    if (!template) {
-      return sendNotFound(res, "Template not found", requestId);
-    }
-
-    // Only return the template if it's published or private
-    if (
-      template.publicationStatus !== PublicationStatus.Published &&
-      template.publicationStatus !== PublicationStatus.Private
-    ) {
-      Logger.Route.log(`Template ${id} is not published or private`);
-      return sendNotFound(res, "Template not found", requestId);
-    }
-
-    Logger.Route.log(`Serving playable template ${id}`);
-    sendSuccess(res, { template }, requestId);
-  } catch (error) {
-    Logger.Route.error(`Error retrieving template ${id}`, error);
-    sendError(res, "Failed to retrieve template", 500, requestId, error);
   }
 });
 
@@ -114,7 +119,7 @@ router.get("/templates/playable/:id", async (req, res) => {
 // AUTHENTICATED ROUTES (USER ONLY)
 // ========================
 
-// Get all templates for the current user
+// Get template metadata for the current user
 router.get("/templates/user", verifyUser(), async (req, res) => {
   const requestId = req.query.requestId as string;
 
@@ -123,20 +128,27 @@ router.get("/templates/user", verifyUser(), async (req, res) => {
       return sendError(res, "User not authenticated", 401, requestId);
     }
 
-    // Use the new database-backed method to get templates by creator
-    const templates = await templateService.getTemplatesByCreator(req.user.id);
+    // Get template metadata from database for the user
+    const templateEntries = await templateDbService.getTemplateEntriesByCreator(
+      req.user.id
+    );
+
+    // Convert database entries to metadata format
+    const templates = templateEntries.map((entry) =>
+      convertDbEntryToMetadata(entry)
+    );
 
     Logger.Route.log(
-      `User ${req.user.id} accessed their ${templates.length} templates`
+      `User ${req.user.id} accessed metadata for their ${templates.length} templates`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
-    Logger.Route.error("Failed to load user templates", error);
+    Logger.Route.error("Failed to load user template metadata", error);
     sendError(res, "Failed to load templates", 500, requestId, error);
   }
 });
 
-// Get templates for a specific user
+// Get template metadata for a specific user
 router.get("/templates/user/:userId", verifyUser(), async (req, res) => {
   const { userId } = req.params;
   const requestId = req.query.requestId as string;
@@ -151,15 +163,25 @@ router.get("/templates/user/:userId", verifyUser(), async (req, res) => {
       return sendError(res, "Insufficient permissions", 403, requestId);
     }
 
-    // Use the new database-backed method to get templates by creator
-    const templates = await templateService.getTemplatesByCreator(userId);
+    // Get template metadata from database for the user
+    const templateEntries = await templateDbService.getTemplateEntriesByCreator(
+      userId
+    );
+
+    // Convert database entries to metadata format
+    const templates = templateEntries.map((entry) =>
+      convertDbEntryToMetadata(entry)
+    );
 
     Logger.Route.log(
-      `Retrieved ${templates.length} templates for user ${userId}`
+      `Retrieved ${templates.length} template metadata for user ${userId}`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
-    Logger.Route.error(`Failed to load templates for user ${userId}`, error);
+    Logger.Route.error(
+      `Failed to load template metadata for user ${userId}`,
+      error
+    );
     sendError(res, "Failed to load templates", 500, requestId, error);
   }
 });
@@ -168,7 +190,7 @@ router.get("/templates/user/:userId", verifyUser(), async (req, res) => {
 // ADMIN ROUTES (REQUIRES PERMISSIONS)
 // ========================
 
-// Get all templates (requires templates_see_all permission)
+// Get all template metadata (requires templates_see_all permission)
 router.get("/templates", verifyUser(), async (req, res) => {
   const requestId = req.query.requestId as string;
 
@@ -183,11 +205,20 @@ router.get("/templates", verifyUser(), async (req, res) => {
       );
     }
 
-    const templates = await templateService.getAllTemplates();
-    Logger.Route.log(`Retrieved all ${templates.length} templates`);
+    // Get template metadata from database
+    const templateEntries = await templateDbService.getAllTemplateEntries();
+
+    // Convert database entries to metadata format (include creator ID for admin)
+    const templates = templateEntries.map((entry) =>
+      convertDbEntryToMetadata(entry, true)
+    );
+
+    Logger.Route.log(
+      `Retrieved metadata for all ${templates.length} templates`
+    );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
-    Logger.Route.error("Error retrieving all templates", error);
+    Logger.Route.error("Error retrieving all template metadata", error);
     sendError(
       res,
       "Failed to retrieve templates",
@@ -198,11 +229,40 @@ router.get("/templates", verifyUser(), async (req, res) => {
   }
 });
 
-// Get template by ID (if user has access)
+// Get template metadata by ID (basic access check)
 router.get(
   "/templates/:id",
   verifyUser(),
   verifyTemplateAccess(),
+  async (req, res) => {
+    const { id } = req.params;
+    const requestId = req.query.requestId as string;
+
+    try {
+      // Get template metadata from database
+      const templateEntry = await templateDbService.findTemplateEntryById(id);
+
+      if (!templateEntry) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
+
+      // Convert database entry to metadata format
+      const template = convertDbEntryToMetadata(templateEntry);
+
+      Logger.Route.log(`User ${req.user?.id} accessed template metadata ${id}`);
+      sendSuccess(res, { template }, requestId);
+    } catch (error) {
+      Logger.Route.error(`Error retrieving template metadata ${id}`, error);
+      sendError(res, "Failed to retrieve template", 500, requestId, error);
+    }
+  }
+);
+
+// Get full template content by ID (requires edit access)
+router.get(
+  "/templates/full/:id",
+  verifyUser(),
+  verifyTemplateEditAccess(),
   async (req, res) => {
     const { id } = req.params;
     const requestId = req.query.requestId as string;
@@ -214,128 +274,20 @@ router.get(
         return sendNotFound(res, "Template not found", requestId);
       }
 
-      Logger.Route.log(`User ${req.user?.id} accessed template ${id}`);
+      Logger.Route.log(
+        `User ${req.user?.id} accessed full template ${id} for editing`
+      );
       sendSuccess(res, { template }, requestId);
     } catch (error) {
-      Logger.Route.error(`Error retrieving template ${id}`, error);
+      Logger.Route.error(`Error retrieving full template ${id}`, error);
       sendError(res, "Failed to retrieve template", 500, requestId, error);
     }
   }
 );
 
-// Export templates by IDs
-router.get("/templates/export", verifyUser(), async (req, res) => {
-  const requestId = req.query.requestId as string;
-  const templateIds = req.query.templateIds as string | undefined;
-  const selectedTemplateIds = templateIds ? templateIds.split(",") : [];
-
-  try {
-    // If no template IDs provided, return error
-    if (!selectedTemplateIds.length) {
-      return sendError(res, "No template IDs provided", 400, requestId);
-    }
-
-    // Check permissions
-    // If the user has the templates_see_all permission, they can export any template
-    const canSeeAll = hasPermissions(req, ["templates_see_all"]);
-
-    // If the user doesn't have the templates_create permission, they can't export any templates
-    if (!hasPermissions(req, ["templates_create"]) && !canSeeAll) {
-      return sendError(
-        res,
-        "Insufficient permissions to export templates",
-        403,
-        requestId
-      );
-    }
-
-    // Create archive with selected templates
-    const zip = new JSZip();
-
-    // Get the templates directory
-    const templatesBasePath = getStoragePath("templates");
-
-    // Check if directory exists
-    if (!fsSync.existsSync(templatesBasePath)) {
-      return sendError(res, "Templates directory not found", 500, requestId);
-    }
-
-    // Get template metadata once for efficient permission checking
-    const templateMetadata =
-      !canSeeAll && req.user ? await templateService.getTemplateMetadata() : [];
-
-    // Process each template directory
-    for (const templateId of selectedTemplateIds) {
-      // Verify template exists and check permissions using database metadata
-      const template = await templateService.getTemplateById(templateId);
-      if (!template) {
-        Logger.Route.warn(`Template ${templateId} not found, skipping`);
-        continue;
-      }
-
-      // Permission checks using database metadata:
-      if (!canSeeAll && req.user) {
-        const templateMeta = templateMetadata.find((t) => t.id === templateId);
-
-        if (templateMeta) {
-          const isCreator = templateMeta.creatorId === req.user.id;
-
-          if (
-            !isCreator &&
-            templateMeta.publicationStatus !== PublicationStatus.Published &&
-            templateMeta.publicationStatus !== PublicationStatus.Private
-          ) {
-            Logger.Route.warn(
-              `User ${req.user.id} doesn't have permission to export template ${templateId}, skipping`
-            );
-            continue;
-          }
-        }
-      }
-
-      const templateDir = path.join(templatesBasePath, templateId);
-
-      // Skip if not a directory or doesn't exist
-      if (
-        !fsSync.existsSync(templateDir) ||
-        !fsSync.statSync(templateDir).isDirectory()
-      ) {
-        continue;
-      }
-
-      try {
-        // Add all files and subdirectories for this template
-        await addDirectoryToZip(templateDir, templateId, zip);
-      } catch (error) {
-        Logger.Route.error(
-          `Error adding template directory ${templateId} to zip`,
-          error
-        );
-        // Continue with other templates
-      }
-    }
-
-    // Generate the zip file
-    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-
-    // Set download headers
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="templates-${
-        new Date().toISOString().split("T")[0]
-      }.zip"`
-    );
-
-    // Send the zip file
-    res.send(zipBuffer);
-
-    Logger.Route.log(`Exported ${selectedTemplateIds.length} templates as zip`);
-  } catch (error) {
-    Logger.Route.error("Error exporting templates", error);
-    sendError(res, "Failed to export templates", 500, requestId, error);
-  }
-});
+// ========================
+// EXPORT ROUTES
+// ========================
 
 // Export templates by IDs - POST endpoint
 router.post("/templates/export", verifyUser(), async (req, res) => {
@@ -376,7 +328,9 @@ router.post("/templates/export", verifyUser(), async (req, res) => {
 
     // Get template metadata once for efficient permission checking
     const templateMetadata =
-      !canSeeAll && req.user ? await templateService.getTemplateMetadata() : [];
+      !canSeeAll && req.user
+        ? await templateDbService.getAllTemplateEntries()
+        : [];
 
     // Process each template directory
     for (const templateId of selectedTemplateIds) {
@@ -394,11 +348,7 @@ router.post("/templates/export", verifyUser(), async (req, res) => {
         if (templateMeta) {
           const isCreator = templateMeta.creatorId === req.user.id;
 
-          if (
-            !isCreator &&
-            templateMeta.publicationStatus !== PublicationStatus.Published &&
-            templateMeta.publicationStatus !== PublicationStatus.Private
-          ) {
+          if (!isCreator) {
             Logger.Route.warn(
               `User ${req.user.id} doesn't have permission to export template ${templateId}, skipping`
             );

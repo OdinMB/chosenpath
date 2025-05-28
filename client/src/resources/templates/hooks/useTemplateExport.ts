@@ -1,4 +1,4 @@
-import { StoryTemplate } from "core/types";
+import { TemplateMetadata } from "core/types";
 import { Logger } from "shared/logger";
 import { templateApi } from "../templateApi";
 import { notificationService } from "shared/notifications/notificationService";
@@ -21,7 +21,7 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
   };
 
   // Export a single template (with its assets) as a ZIP
-  const handleExportTemplate = async (template: StoryTemplate) => {
+  const handleExportTemplate = async (template: TemplateMetadata) => {
     Logger.UI.log(`Exporting template assets: ${template.title}`);
     templateCore.setIsLoading(true);
 
@@ -52,9 +52,9 @@ export const useTemplateExport = (templateCore: TemplateCore) => {
 
     try {
       // Get all templates the user has access to and export them
-      const templates = await templateApi.getAllTemplates();
+      const templates = await templateApi.getAllTemplateMetadata();
       const templateIds = templates.map(
-        (template: StoryTemplate) => template.id
+        (template: TemplateMetadata) => template.id
       );
       const zipBlob = await templateApi.exportTemplates(templateIds);
 
