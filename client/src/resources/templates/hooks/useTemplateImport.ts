@@ -63,7 +63,7 @@ export const useTemplateImport = (
       );
 
       // Import assets if there are any
-      if (fileCount > 0) {
+      if (fileCount > 0 && zipBlob.size > 0) {
         const importResult = await templateApi.importTemplateZip(
           createdTemplate.id,
           zipBlob
@@ -105,13 +105,17 @@ export const useTemplateImport = (
         zipData,
         templateDir
       );
-      const importResult = await templateApi.importTemplateZip(
-        createdTemplate.id,
-        zipBlob
-      );
-      Logger.Admin.log(
-        `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
-      );
+
+      // Only import if we have a valid zip with content
+      if (zipBlob.size > 0) {
+        const importResult = await templateApi.importTemplateZip(
+          createdTemplate.id,
+          zipBlob
+        );
+        Logger.Admin.log(
+          `Imported ${importResult.filesImported} files for template: ${createdTemplate.title}`
+        );
+      }
     }
 
     return createdTemplate;

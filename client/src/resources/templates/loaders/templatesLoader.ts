@@ -33,10 +33,7 @@ export async function templatesLoader({
       case "user":
         // User context - get templates for the current user or a specific user
         if (userId) {
-          // We'd need to implement this method or use a different approach
-          // templates = await templateApi.getUserTemplatesByUserId(userId);
-          // For now, use the more generic endpoint
-          templates = await templateApi.getAllTemplates();
+          templates = await templateApi.getUserTemplatesByUserId(userId);
           Logger.App.log(
             `User: Loaded ${templates.length} templates for user ${userId}`
           );

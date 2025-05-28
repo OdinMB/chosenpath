@@ -8,6 +8,7 @@ import {
   PlayerCount,
   PLAYER_SLOTS,
   PublicationStatus,
+  PublicationStatusType,
   Stat,
   TemplateIterationSections,
   DifficultyLevel,
@@ -16,6 +17,7 @@ import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
 import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
+import { templateDbService, TemplateDB } from "./TemplateDbService.js";
 import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
@@ -126,24 +128,244 @@ export class TemplateService {
   }
 
   /**
-   * Get all templates
+   * Get all templates (now using database for metadata)
    */
   async getAllTemplates(): Promise<StoryTemplate[]> {
     try {
+      // Get template metadata from database
+      const templateEntries = await templateDbService.getAllTemplateEntries();
+
+      if (templateEntries.length === 0) {
+        return [];
+      }
+
+      // Load full template data from files for each database entry
+      const templates: StoryTemplate[] = [];
+      for (const entry of templateEntries) {
+        try {
+          const fullTemplate = await this.getTemplateById(entry.id);
+          if (fullTemplate) {
+            templates.push(fullTemplate);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error loading template ${entry.id} from file`,
+            error
+          );
+          // Continue with other templates instead of failing completely
+        }
+      }
+
+      return templates;
+    } catch (error) {
+      this.logger.error("Failed to get templates", error);
+      throw new Error("Failed to retrieve story templates");
+    }
+  }
+
+  /**
+   * Get templates by publication status
+   */
+  async getTemplatesByStatus(
+    status: PublicationStatusType
+  ): Promise<StoryTemplate[]> {
+    try {
+      const templateEntries =
+        await templateDbService.getTemplateEntriesByStatus(status);
+
+      const templates: StoryTemplate[] = [];
+      for (const entry of templateEntries) {
+        try {
+          const fullTemplate = await this.getTemplateById(entry.id);
+          if (fullTemplate) {
+            templates.push(fullTemplate);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error loading template ${entry.id} from file`,
+            error
+          );
+        }
+      }
+
+      return templates;
+    } catch (error) {
+      this.logger.error(`Failed to get templates by status ${status}`, error);
+      throw new Error(`Failed to retrieve templates by status ${status}`);
+    }
+  }
+
+  /**
+   * Get templates by creator
+   */
+  async getTemplatesByCreator(creatorId: string): Promise<StoryTemplate[]> {
+    try {
+      const templateEntries =
+        await templateDbService.getTemplateEntriesByCreator(creatorId);
+
+      const templates: StoryTemplate[] = [];
+      for (const entry of templateEntries) {
+        try {
+          const fullTemplate = await this.getTemplateById(entry.id);
+          if (fullTemplate) {
+            templates.push(fullTemplate);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error loading template ${entry.id} from file`,
+            error
+          );
+        }
+      }
+
+      return templates;
+    } catch (error) {
+      this.logger.error(
+        `Failed to get templates by creator ${creatorId}`,
+        error
+      );
+      throw new Error(`Failed to retrieve templates by creator ${creatorId}`);
+    }
+  }
+
+  /**
+   * Get carousel templates (templates with carousel_order set)
+   */
+  async getCarouselTemplates(): Promise<StoryTemplate[]> {
+    try {
+      const templateEntries =
+        await templateDbService.getCarouselTemplateEntries();
+
+      const templates: StoryTemplate[] = [];
+      for (const entry of templateEntries) {
+        try {
+          const fullTemplate = await this.getTemplateById(entry.id);
+          if (fullTemplate) {
+            templates.push(fullTemplate);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error loading template ${entry.id} from file`,
+            error
+          );
+        }
+      }
+
+      return templates;
+    } catch (error) {
+      this.logger.error("Failed to get carousel templates", error);
+      throw new Error("Failed to retrieve carousel templates");
+    }
+  }
+
+  /**
+   * Get template metadata only (without loading full template data)
+   */
+  async getTemplateMetadata(): Promise<TemplateDB[]> {
+    try {
+      return await templateDbService.getAllTemplateEntries();
+    } catch (error) {
+      this.logger.error("Failed to get template metadata", error);
+      throw new Error("Failed to retrieve template metadata");
+    }
+  }
+
+  /**
+   * Get template metadata by status
+   */
+  async getTemplateMetadataByStatus(
+    status: PublicationStatusType
+  ): Promise<TemplateDB[]> {
+    try {
+      return await templateDbService.getTemplateEntriesByStatus(status);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get template metadata by status ${status}`,
+        error
+      );
+      throw new Error(
+        `Failed to retrieve template metadata by status ${status}`
+      );
+    }
+  }
+
+  /**
+   * Sync existing templates from filesystem to database
+   * This is a migration function to populate the database with existing templates
+   */
+  async syncExistingTemplatesToDatabase(): Promise<void> {
+    try {
+      this.logger.log("Starting sync of existing templates to database...");
+
       // Get all directories in the template storage path
       const items = await fs.readdir(this.storagePath, { withFileTypes: true });
       const templateDirs = items
         .filter((item) => item.isDirectory())
         .map((item) => item.name);
 
-      if (templateDirs.length === 0) {
-        return [];
+      let syncedCount = 0;
+      let skippedCount = 0;
+
+      for (const templateId of templateDirs) {
+        try {
+          // Check if database entry already exists
+          const existingEntry = await templateDbService.findTemplateEntryById(
+            templateId
+          );
+          if (existingEntry) {
+            this.logger.log(
+              `Template ${templateId} already exists in database, skipping`
+            );
+            skippedCount++;
+            continue;
+          }
+
+          // Load template from file
+          const template = await this.getTemplateById(templateId);
+          if (!template) {
+            this.logger.warn(
+              `Could not load template ${templateId} from file, skipping`
+            );
+            continue;
+          }
+
+          // Check if template contains images
+          const containsImages = await this.checkTemplateContainsImages(
+            templateId
+          );
+
+          // Create database entry
+          await templateDbService.createTemplateEntry({
+            id: template.id,
+            creatorId: null, // We don't know the creator for existing templates
+            publicationStatus: template.publicationStatus,
+            carouselOrder: template.showOnWelcomeScreen ? template.order : null,
+            containsImages,
+            title: template.title,
+            teaser: template.teaser,
+            gameMode: template.gameMode,
+            tags: template.tags,
+            playerCountMin: template.playerCountMin,
+            playerCountMax: template.playerCountMax,
+            maxTurnsMin: template.maxTurnsMin,
+            maxTurnsMax: template.maxTurnsMax,
+            showOnWelcomeScreen: template.showOnWelcomeScreen,
+            orderValue: template.order,
+          });
+
+          syncedCount++;
+          this.logger.log(`Synced template ${templateId}: ${template.title}`);
+        } catch (error) {
+          this.logger.error(`Error syncing template ${templateId}`, error);
+        }
       }
 
-      return this.loadTemplatesFromDirectories(templateDirs);
+      this.logger.log(
+        `Sync completed: ${syncedCount} templates synced, ${skippedCount} skipped`
+      );
     } catch (error) {
-      this.logger.error("Failed to get templates", error);
-      throw new Error("Failed to retrieve story templates");
+      this.logger.error("Failed to sync existing templates to database", error);
+      throw new Error("Failed to sync existing templates to database");
     }
   }
 
@@ -209,7 +431,8 @@ export class TemplateService {
    * Create a new template
    */
   async createTemplate(
-    template: Partial<StoryTemplate>
+    template: Partial<StoryTemplate>,
+    creatorId?: string
   ): Promise<StoryTemplate> {
     try {
       // Only generate a new ID if one doesn't already exist
@@ -240,6 +463,32 @@ export class TemplateService {
         templateFilePath,
         JSON.stringify(fullTemplate, null, 2)
       );
+
+      // Check if template contains images
+      const containsImages = await this.checkTemplateContainsImages(
+        fullTemplate.id
+      );
+
+      // Create database entry
+      await templateDbService.createTemplateEntry({
+        id: fullTemplate.id,
+        creatorId: creatorId || null,
+        publicationStatus: fullTemplate.publicationStatus,
+        carouselOrder: fullTemplate.showOnWelcomeScreen
+          ? fullTemplate.order
+          : null,
+        containsImages,
+        title: fullTemplate.title,
+        teaser: fullTemplate.teaser,
+        gameMode: fullTemplate.gameMode,
+        tags: fullTemplate.tags,
+        playerCountMin: fullTemplate.playerCountMin,
+        playerCountMax: fullTemplate.playerCountMax,
+        maxTurnsMin: fullTemplate.maxTurnsMin,
+        maxTurnsMax: fullTemplate.maxTurnsMax,
+        showOnWelcomeScreen: fullTemplate.showOnWelcomeScreen,
+        orderValue: fullTemplate.order,
+      });
 
       this.logger.log(
         `Created template ${fullTemplate.id}: ${fullTemplate.title}`
@@ -286,6 +535,28 @@ export class TemplateService {
         JSON.stringify(mergedTemplate, null, 2)
       );
 
+      // Check if template contains images
+      const containsImages = await this.checkTemplateContainsImages(id);
+
+      // Update database entry with metadata fields
+      await templateDbService.updateTemplateEntry(id, {
+        publicationStatus: mergedTemplate.publicationStatus,
+        carouselOrder: mergedTemplate.showOnWelcomeScreen
+          ? mergedTemplate.order
+          : null,
+        containsImages,
+        title: mergedTemplate.title,
+        teaser: mergedTemplate.teaser,
+        gameMode: mergedTemplate.gameMode,
+        tags: mergedTemplate.tags,
+        playerCountMin: mergedTemplate.playerCountMin,
+        playerCountMax: mergedTemplate.playerCountMax,
+        maxTurnsMin: mergedTemplate.maxTurnsMin,
+        maxTurnsMax: mergedTemplate.maxTurnsMax,
+        showOnWelcomeScreen: mergedTemplate.showOnWelcomeScreen,
+        orderValue: mergedTemplate.order,
+      });
+
       this.logger.log(`Updated template ${id}: ${mergedTemplate.title}`);
       return mergedTemplate;
     } catch (error) {
@@ -312,6 +583,9 @@ export class TemplateService {
         await fs.rm(templateDir, { recursive: true, force: true });
       }
 
+      // Delete database entry
+      await templateDbService.deleteTemplateEntryById(id);
+
       this.logger.log(`Deleted template ${id}`);
       return true;
     } catch (error) {
@@ -333,7 +607,8 @@ export class TemplateService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel
+    difficultyLevel: DifficultyLevel,
+    creatorId?: string
   ): Promise<StoryTemplate> {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
@@ -382,7 +657,7 @@ export class TemplateService {
         ...playerOptions,
       };
 
-      const generatedTemplate: StoryTemplate = this.createFullTemplateObject({
+      const templatePartial: Partial<StoryTemplate> = {
         id,
         playerCountMin: playerCount,
         playerCountMax: playerCount,
@@ -392,7 +667,13 @@ export class TemplateService {
         difficultyLevels: [difficultyLevel],
         ...templateData,
         tags: [],
-      }) as StoryTemplate;
+      };
+
+      // Use the createTemplate method which will create both file and database entry
+      const generatedTemplate = await this.createTemplate(
+        templatePartial,
+        creatorId
+      );
 
       this.logger.log(
         `Generated template with title: ${generatedTemplate.title}`
@@ -450,6 +731,23 @@ export class TemplateService {
     } catch (error) {
       this.logger.error(`Failed to iterate template ${id}`, error);
       throw new Error(`Failed to iterate template ${id}`);
+    }
+  }
+
+  /**
+   * Check if template contains images by looking for images directory
+   */
+  async checkTemplateContainsImages(templateId: string): Promise<boolean> {
+    try {
+      const imagesDir = path.join(this.storagePath, templateId, "images");
+      const exists = fsSync.existsSync(imagesDir);
+      if (!exists) return false;
+
+      // Check if images directory has any files
+      const items = await fs.readdir(imagesDir);
+      return items.length > 0;
+    } catch (error) {
+      return false;
     }
   }
 

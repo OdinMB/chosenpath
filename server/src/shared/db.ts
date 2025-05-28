@@ -161,6 +161,30 @@ export async function initializeDatabase() {
       )
     `);
 
+    // Create templates table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS templates (
+        id TEXT PRIMARY KEY,
+        creator_id TEXT,
+        publication_status TEXT NOT NULL DEFAULT 'draft',
+        carousel_order INTEGER,
+        contains_images BOOLEAN NOT NULL DEFAULT FALSE,
+        title TEXT NOT NULL,
+        teaser TEXT NOT NULL DEFAULT '',
+        game_mode TEXT NOT NULL,
+        tags TEXT NOT NULL DEFAULT '',
+        player_count_min INTEGER NOT NULL,
+        player_count_max INTEGER NOT NULL,
+        max_turns_min INTEGER NOT NULL,
+        max_turns_max INTEGER NOT NULL,
+        show_on_welcome_screen BOOLEAN NOT NULL DEFAULT FALSE,
+        order_value INTEGER NOT NULL DEFAULT 999,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        FOREIGN KEY (creator_id) REFERENCES users (id) ON DELETE SET NULL
+      )
+    `);
+
     // Create indexes for better performance
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`
@@ -188,6 +212,18 @@ export async function initializeDatabase() {
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_feedback_story_id ON feedback (story_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_templates_creator_id ON templates (creator_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_templates_publication_status ON templates (publication_status)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_templates_game_mode ON templates (game_mode)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_templates_carousel_order ON templates (carousel_order)`
     );
 
     Logger.DB.log("PostgreSQL database initialized successfully");

@@ -57,6 +57,17 @@ export const templateApi = {
   },
 
   /**
+   * Get templates for a specific user (requires appropriate permissions)
+   */
+  getUserTemplatesByUserId: async (
+    userId: string
+  ): Promise<StoryTemplate[]> => {
+    return apiClient
+      .get<{ templates: StoryTemplate[] }>(`/templates/user/${userId}`)
+      .then((response) => response.templates);
+  },
+
+  /**
    * Get a specific template with access check
    */
   getTemplate: async (templateId: string): Promise<StoryTemplate> => {
@@ -142,7 +153,7 @@ export const templateApi = {
     zipData: Blob
   ): Promise<{ filesImported: number; files: string[] }> => {
     const formData = new FormData();
-    formData.append("zip", zipData);
+    formData.append("zip", zipData, "assets.zip");
 
     const response = await apiClient.post<{
       success: boolean;
@@ -167,7 +178,7 @@ export const templateApi = {
     zipData: Blob
   ): Promise<{ templates: StoryTemplate[] }> => {
     const formData = new FormData();
-    formData.append("file", zipData);
+    formData.append("file", zipData, "collection.zip");
 
     return apiClient.post<{ templates: StoryTemplate[] }>(
       "/templates/import-collection",
