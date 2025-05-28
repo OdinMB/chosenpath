@@ -207,6 +207,16 @@ router.post("/auth/logout", verifyUser(), async (req, res) => {
  */
 router.get("/auth/me", verifyUser({ required: false }), (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
+
+  // If user is authenticated, include their permissions
+  if (req.user && req.userPermissions) {
+    const userWithPermissions = {
+      ...req.user,
+      permissions: req.userPermissions,
+    };
+    return sendSuccess(res, { user: userWithPermissions }, requestId);
+  }
+
   return sendSuccess(res, { user: req.user || null }, requestId);
 });
 

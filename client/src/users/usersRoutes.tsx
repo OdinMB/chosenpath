@@ -1,9 +1,13 @@
 import { RouteObject, Navigate } from "react-router-dom";
-import { Users } from "./Users.js";
+import { UsersStories } from "./stories/UsersStories.js";
+import { UserTemplateList } from "./templates/UserTemplateList.js";
+import { UserTemplateEditor } from "./templates/UserTemplateEditor.js";
 import { UserAccountPage } from "./components/UserAccountPage";
 import { UsersLayout } from "./components/UsersLayout";
 import { UserRouteGuard } from "./components/UserRouteGuard";
 import { UsersErrorBoundary } from "./components/UsersErrorBoundary";
+import { userTemplatesLoader } from "./templates/userTemplatesLoader.js";
+import { templateLoader } from "../resources/templates/loaders/templateLoader.js";
 
 export const userRoutes: RouteObject[] = [
   {
@@ -16,19 +20,26 @@ export const userRoutes: RouteObject[] = [
     errorElement: <UsersErrorBoundary />,
     children: [
       {
-        index: true, // Default route for /users, maybe redirect to my-stories or a dashboard
+        index: true, // Default route for /users
         element: <Navigate to="/users/my-stories" replace />,
       },
       {
         path: "my-stories",
-        element: <Users />,
+        element: <UsersStories />,
         id: "user-stories",
       },
-      // You can add other user-specific child routes here, e.g., account settings
-      // {
-      //   path: "settings",
-      //   element: <UserSettingsPage />,
-      // },
+      {
+        path: "my-worlds",
+        element: <UserTemplateList />,
+        loader: userTemplatesLoader,
+        id: "user-templates",
+      },
+      {
+        path: "my-worlds/:id",
+        element: <UserTemplateEditor />,
+        loader: (args) => templateLoader(args),
+        id: "user-template-editor",
+      },
     ],
   },
   {

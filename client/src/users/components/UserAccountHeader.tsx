@@ -79,10 +79,10 @@ export function UserAccountHeader() {
                 </button>
               )}
               <button
-                onClick={() => handleNavigate("/users/my-stories")}
+                onClick={() => handleNavigate("/users")}
                 className="text-slate-700 hover:text-primary-600 hover:underline py-1"
               >
-                My Stories
+                Account
               </button>
               {/* Story Counts Display */}
               {!isSessionLoading && derivedCounts && (
