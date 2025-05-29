@@ -73,7 +73,7 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
               <InfoIcon
                 tooltipText={tooltipText}
                 position="right"
-                className="ml-2 mt-1"
+                className="ml-2"
               />
             )}
           </div>

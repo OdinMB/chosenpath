@@ -87,8 +87,19 @@ export function Page() {
             distant galaxies or serving croissants in a Parisian café.
           </p>
           <p>
-            Everything is free during the beta phase. No account required. Jump
-            in, share your feedback, and say hello on{" "}
+            Everything is free during the beta phase. No account required
+            (unless you want to use advanced{" "}
+            <a
+              href="/for-storytellers"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/for-storytellers");
+              }}
+              className="text-link"
+            >
+              storytelling features
+            </a>
+            ). Jump in, share your feedback, and say hello on{" "}
             <a
               href={config.discordUrl}
               target="_blank"
@@ -195,6 +206,16 @@ export function Page() {
             <span>Sonnenallee 50, 12045 Berlin</span>
           </div>
           <div>
+            <a
+              href="/for-storytellers"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/for-storytellers");
+              }}
+              className="footer-link mr-3"
+            >
+              For Storytellers
+            </a>
             <a
               href="/privacy"
               onClick={(e) => {
