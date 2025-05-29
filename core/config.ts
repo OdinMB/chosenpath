@@ -30,6 +30,8 @@ export const RATE_LIMITED_ACTIONS = [
   "join_game",
   "login",
   "imageGeneration",
+  "templateGeneration",
+  "templateIteration",
 ] as const;
 export type RateLimitedAction = (typeof RATE_LIMITED_ACTIONS)[number];
 
@@ -73,6 +75,14 @@ export const RATE_LIMITS: Record<
   imageGeneration: {
     windowMs: 60 * 60 * 1000, // 1 hour
     maxRequests: 50, // 50 attempts per 1 hour
+  },
+  templateGeneration: {
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    maxRequests: 20, // 20 template generations per 24 hours
+  },
+  templateIteration: {
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    maxRequests: 40, // 40 template iterations per 24 hours
   },
 };
 

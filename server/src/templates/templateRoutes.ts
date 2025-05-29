@@ -20,11 +20,16 @@ import {
   sendError,
   sendBadRequest,
   sendNotFound,
+  sendRateLimited,
 } from "shared/responseUtils.js";
 import { TemplateService } from "./TemplateService.js";
 import { templateDbService } from "./TemplateDbService.js";
 import { userDbService } from "../users/UserDbService.js";
-import { verifyUser, hasPermissions } from "../users/authMiddleware.js";
+import {
+  verifyUser,
+  hasPermissions,
+  verifyAdmin,
+} from "../users/authMiddleware.js";
 import {
   verifyTemplateAccess,
   verifyTemplateEditAccess,
@@ -39,6 +44,10 @@ import {
   createZipFromDirectory,
   addDirectoryToZip,
 } from "shared/storageUtils.js";
+import {
+  checkRateLimitForRequest,
+  incrementRateLimitForRequest,
+} from "shared/rateLimiter.js";
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -600,6 +609,15 @@ router.post(
     const requestId = req.body?.requestId || "unknown";
     const generateRequest = req.body as GenerateTemplateRequest;
 
+    // Check rate limit for non-admin users
+    const isAdmin = req.user?.roleId === "role_admin";
+    if (!isAdmin) {
+      const rateLimit = checkRateLimitForRequest(req, "templateGeneration");
+      if (rateLimit.isLimited) {
+        return sendRateLimited(res, rateLimit, requestId);
+      }
+    }
+
     try {
       const {
         prompt,
@@ -634,6 +652,11 @@ router.post(
         creatorUsername
       );
 
+      // Increment rate limit for non-admin users
+      if (!isAdmin) {
+        incrementRateLimitForRequest(req, "templateGeneration");
+      }
+
       Logger.Route.log(
         `Generated template: ${generatedTemplate.title} for user ${creatorId}`
       );
@@ -650,11 +673,20 @@ router.post(
   "/templates/:id/iterate",
   verifyUser(),
   verifyTemplateEditAccess(),
-  (req, res, next) => verifyImageGenerationPermission(req, res, next),
+  (req, res, next) => verifyTemplateCreatePermission(req, res, next),
   async (req, res) => {
     const { id } = req.params;
     const requestId = req.body?.requestId || "unknown";
     const iterationRequest = req.body as TemplateIterationRequest;
+
+    // Check rate limit for non-admin users
+    const isAdmin = req.user?.roleId === "role_admin";
+    if (!isAdmin) {
+      const rateLimit = checkRateLimitForRequest(req, "templateIteration");
+      if (rateLimit.isLimited) {
+        return sendRateLimited(res, rateLimit, requestId);
+      }
+    }
 
     try {
       const { feedback, sections, gameMode, playerCount, maxTurns } =
@@ -689,6 +721,11 @@ router.post(
         playerCount,
         maxTurns
       );
+
+      // Increment rate limit for non-admin users
+      if (!isAdmin) {
+        incrementRateLimitForRequest(req, "templateIteration");
+      }
 
       Logger.Route.log(`Generated iteration for template ${id}`);
       sendSuccess(res, { templateUpdate }, requestId);
