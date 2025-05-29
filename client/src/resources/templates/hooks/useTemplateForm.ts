@@ -264,6 +264,9 @@ export function useTemplateForm({
   };
 
   // AI-assisted drafting of template content
+  // IMPORTANT: This function updates the existing template with AI-generated content while keeping the same ID.
+  // It generates content via the AI API, extracts the content, updates the existing template, and cleans up
+  // the temporary generated template to prevent duplicates.
   const handleAIDraftSetup = async (options: {
     prompt: string;
     playerCount: PlayerCount;
@@ -291,17 +294,19 @@ export function useTemplateForm({
     };
 
     try {
+      // Generate AI content first (this creates a temporary template that we'll extract content from)
       const result = await templateApi.generateTemplate(requestData);
       const generatedTemplateData = result.template;
 
       Logger.UI.log("AI Draft generated data:", generatedTemplateData);
 
+      // Extract the generated content to update our existing template
       // Prepare player-specific updates separately for better type handling
       const playerSpecificUpdates: {
         [K in (typeof PLAYER_SLOTS)[number]]?: PlayerOptionsGeneration;
       } = {};
       PLAYER_SLOTS.forEach((slot) => {
-        const key = slot as keyof StoryTemplate; // key is one of 'player1', 'player2', etc.
+        const key = slot as keyof StoryTemplate;
         if (Object.prototype.hasOwnProperty.call(generatedTemplateData, key)) {
           playerSpecificUpdates[slot] = generatedTemplateData[
             key
@@ -309,26 +314,27 @@ export function useTemplateForm({
         }
       });
 
-      // Merge generated data into existing formData, keeping existing ID, etc.
-      setFormData((prev) => ({
-        ...prev, // Keep existing ID, created/updated timestamps, publication status etc.
-        title: generatedTemplateData.title || prev.title,
-        teaser: generatedTemplateData.teaser || prev.teaser,
+      // Update our existing template with the generated content (keeping the same ID)
+      const updatedTemplateData: StoryTemplate = {
+        ...formData, // Keep existing ID, createdAt, publicationStatus, etc.
+        // Override with generated content
+        title: generatedTemplateData.title || formData.title,
+        teaser: generatedTemplateData.teaser || formData.teaser,
         imageInstructions:
-          generatedTemplateData.imageInstructions || prev.imageInstructions,
-        guidelines: generatedTemplateData.guidelines || prev.guidelines,
+          generatedTemplateData.imageInstructions || formData.imageInstructions,
+        guidelines: generatedTemplateData.guidelines || formData.guidelines,
         storyElements:
-          generatedTemplateData.storyElements || prev.storyElements,
+          generatedTemplateData.storyElements || formData.storyElements,
         sharedOutcomes:
-          generatedTemplateData.sharedOutcomes || prev.sharedOutcomes,
-        statGroups: generatedTemplateData.statGroups || prev.statGroups,
-        sharedStats: generatedTemplateData.sharedStats || prev.sharedStats,
-        playerStats: generatedTemplateData.playerStats || prev.playerStats,
+          generatedTemplateData.sharedOutcomes || formData.sharedOutcomes,
+        statGroups: generatedTemplateData.statGroups || formData.statGroups,
+        sharedStats: generatedTemplateData.sharedStats || formData.sharedStats,
+        playerStats: generatedTemplateData.playerStats || formData.playerStats,
         characterSelectionIntroduction:
           generatedTemplateData.characterSelectionIntroduction ||
-          prev.characterSelectionIntroduction,
-        ...playerSpecificUpdates, // Spread the prepared player-specific updates
-        // Update gameMode, playerCount, maxTurns from the generation options as these define the structure
+          formData.characterSelectionIntroduction,
+        ...playerSpecificUpdates,
+        // Update gameMode, playerCount, maxTurns from the generation options
         gameMode: options.gameMode,
         playerCountMin: options.playerCount,
         playerCountMax: options.playerCount,
@@ -336,11 +342,41 @@ export function useTemplateForm({
         maxTurnsMax: options.maxTurns,
         difficultyLevels: difficultyToUse
           ? [difficultyToUse]
-          : prev.difficultyLevels, // Populate difficultyLevels
-      }));
+          : formData.difficultyLevels,
+        updatedAt: new Date().toISOString(),
+      };
 
-      // Switch to a relevant tab after drafting, e.g., basic info or guidelines
+      // Update the existing template on the server
+      if (formData.id) {
+        await templateApi.updateTemplate(formData.id, updatedTemplateData);
+        Logger.UI.log(
+          `Updated existing template ${formData.id} with AI-generated content`
+        );
+      }
+
+      // Delete the temporary generated template since we only needed its content
+      if (generatedTemplateData.id !== formData.id) {
+        try {
+          await templateApi.deleteTemplate(generatedTemplateData.id);
+          Logger.UI.log(
+            `Deleted temporary AI-generated template ${generatedTemplateData.id}`
+          );
+        } catch (deleteError) {
+          Logger.UI.warn(
+            `Failed to delete temporary template ${generatedTemplateData.id}:`,
+            deleteError
+          );
+        }
+      }
+
+      // Update the form data with our merged template
+      setFormData(updatedTemplateData);
+
+      // Switch to a relevant tab after drafting
       setActiveTab("basic");
+
+      // No need to navigate since we're keeping the same template ID
+
       // Optionally, show a success notification
     } catch (err) {
       Logger.Admin.error("Error during AI draft generation:", err);
