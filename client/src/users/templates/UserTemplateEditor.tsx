@@ -20,7 +20,6 @@ export const UserTemplateEditor = () => {
   const hasTemplateCreatePermission =
     user?.permissions?.includes("templates_create") || false;
 
-  // Log the template data for debugging
   Logger.UI.log("Template data loaded:", template);
 
   if (!template) {
@@ -32,7 +31,7 @@ export const UserTemplateEditor = () => {
     );
   }
 
-  // Show loading while authentication is still loading
+  // Show loading while authentication is in progress
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">

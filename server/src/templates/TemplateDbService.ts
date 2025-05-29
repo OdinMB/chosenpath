@@ -6,6 +6,7 @@ import { GameMode, PublicationStatusType } from "core/types/index.js";
 export interface TemplateDB {
   id: string;
   creatorId: string | null;
+  creatorUsername: string | null;
   publicationStatus: PublicationStatusType;
   carouselOrder: number | null;
   containsImages: boolean;
@@ -28,6 +29,7 @@ function mapRowToTemplateDB(row: any): TemplateDB {
   return {
     id: row.id,
     creatorId: row.creator_id,
+    creatorUsername: row.creator_username || null,
     publicationStatus: row.publication_status as PublicationStatusType,
     carouselOrder: row.carousel_order,
     containsImages: row.contains_images,
@@ -48,21 +50,22 @@ function mapRowToTemplateDB(row: any): TemplateDB {
 
 class TemplateDbService {
   /**
-   * Get all template entries from the database, ordered by updated_at DESC
+   * Get all template entries from the database with creator usernames, ordered by updated_at DESC
    */
   async getAllTemplateEntries(): Promise<TemplateDB[]> {
     const pool = getDb();
     try {
       const result = await pool.query(
-        `SELECT id, creator_id, publication_status, carousel_order, contains_images, 
-                title, teaser, game_mode, tags, player_count_min, player_count_max, 
-                max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
-                created_at, updated_at 
-         FROM templates 
-         ORDER BY updated_at DESC`
+        `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
+                t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
+                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.created_at, t.updated_at, u.username as creator_username
+         FROM templates t
+         LEFT JOIN users u ON t.creator_id = u.id
+         ORDER BY t.updated_at DESC`
       );
       Logger.Transaction.log(
-        `Fetched ${result.rows.length} template entries from DB`
+        `Fetched ${result.rows.length} template entries with creator usernames from DB`
       );
       return result.rows.map(mapRowToTemplateDB);
     } catch (error) {
@@ -72,7 +75,7 @@ class TemplateDbService {
   }
 
   /**
-   * Get template entries by publication status
+   * Get template entries by publication status with creator usernames
    */
   async getTemplateEntriesByStatus(
     status: PublicationStatusType
@@ -80,17 +83,18 @@ class TemplateDbService {
     const pool = getDb();
     try {
       const result = await pool.query(
-        `SELECT id, creator_id, publication_status, carousel_order, contains_images, 
-                title, teaser, game_mode, tags, player_count_min, player_count_max, 
-                max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
-                created_at, updated_at 
-         FROM templates 
-         WHERE publication_status = $1 
-         ORDER BY updated_at DESC`,
+        `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
+                t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
+                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.created_at, t.updated_at, u.username as creator_username
+         FROM templates t
+         LEFT JOIN users u ON t.creator_id = u.id
+         WHERE t.publication_status = $1 
+         ORDER BY t.updated_at DESC`,
         [status]
       );
       Logger.Transaction.log(
-        `Fetched ${result.rows.length} template entries with status ${status} from DB`
+        `Fetched ${result.rows.length} template entries with status ${status} and creator usernames from DB`
       );
       return result.rows.map(mapRowToTemplateDB);
     } catch (error) {
@@ -103,22 +107,23 @@ class TemplateDbService {
   }
 
   /**
-   * Get template entries for carousel (where carousel_order is not null)
+   * Get template entries for carousel (where carousel_order is not null) with creator usernames
    */
   async getCarouselTemplateEntries(): Promise<TemplateDB[]> {
     const pool = getDb();
     try {
       const result = await pool.query(
-        `SELECT id, creator_id, publication_status, carousel_order, contains_images, 
-                title, teaser, game_mode, tags, player_count_min, player_count_max, 
-                max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
-                created_at, updated_at 
-         FROM templates 
-         WHERE carousel_order IS NOT NULL 
-         ORDER BY carousel_order ASC`
+        `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
+                t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
+                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.created_at, t.updated_at, u.username as creator_username
+         FROM templates t
+         LEFT JOIN users u ON t.creator_id = u.id
+         WHERE t.carousel_order IS NOT NULL 
+         ORDER BY t.carousel_order ASC`
       );
       Logger.Transaction.log(
-        `Fetched ${result.rows.length} carousel template entries from DB`
+        `Fetched ${result.rows.length} carousel template entries with creator usernames from DB`
       );
       return result.rows.map(mapRowToTemplateDB);
     } catch (error) {
@@ -131,23 +136,24 @@ class TemplateDbService {
   }
 
   /**
-   * Get template entries by creator
+   * Get template entries by creator with creator username
    */
   async getTemplateEntriesByCreator(creatorId: string): Promise<TemplateDB[]> {
     const pool = getDb();
     try {
       const result = await pool.query(
-        `SELECT id, creator_id, publication_status, carousel_order, contains_images, 
-                title, teaser, game_mode, tags, player_count_min, player_count_max, 
-                max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
-                created_at, updated_at 
-         FROM templates 
-         WHERE creator_id = $1 
-         ORDER BY updated_at DESC`,
+        `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
+                t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
+                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.created_at, t.updated_at, u.username as creator_username
+         FROM templates t
+         LEFT JOIN users u ON t.creator_id = u.id
+         WHERE t.creator_id = $1 
+         ORDER BY t.updated_at DESC`,
         [creatorId]
       );
       Logger.Transaction.log(
-        `Fetched ${result.rows.length} template entries for creator ${creatorId} from DB`
+        `Fetched ${result.rows.length} template entries for creator ${creatorId} with username from DB`
       );
       return result.rows.map(mapRowToTemplateDB);
     } catch (error) {
@@ -160,22 +166,25 @@ class TemplateDbService {
   }
 
   /**
-   * Find a template entry by ID
+   * Find a template entry by ID with creator username
    */
   async findTemplateEntryById(id: string): Promise<TemplateDB | undefined> {
     const pool = getDb();
     try {
       const result = await pool.query(
-        `SELECT id, creator_id, publication_status, carousel_order, contains_images, 
-                title, teaser, game_mode, tags, player_count_min, player_count_max, 
-                max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
-                created_at, updated_at 
-         FROM templates 
-         WHERE id = $1`,
+        `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
+                t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
+                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.created_at, t.updated_at, u.username as creator_username
+         FROM templates t
+         LEFT JOIN users u ON t.creator_id = u.id
+         WHERE t.id = $1`,
         [id]
       );
       if (result.rows[0]) {
-        Logger.Transaction.log(`Found template entry ${id} in DB`);
+        Logger.Transaction.log(
+          `Found template entry ${id} with creator username in DB`
+        );
         return mapRowToTemplateDB(result.rows[0]);
       } else {
         Logger.Transaction.log(`Template entry ${id} not found in DB`);
@@ -222,7 +231,6 @@ class TemplateDbService {
         created_at, updated_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING *
     `;
 
     const values = [
@@ -246,11 +254,19 @@ class TemplateDbService {
     ];
 
     try {
-      const result = await pool.query(query, values);
+      await pool.query(query, values);
       Logger.Transaction.log(
         `Created template entry: ${templateData.title} (${templateData.id})`
       );
-      return mapRowToTemplateDB(result.rows[0]);
+
+      // Fetch the created record with creator username
+      const created = await this.findTemplateEntryById(templateData.id);
+      if (!created) {
+        throw new Error(
+          `Failed to fetch created template entry ${templateData.id}`
+        );
+      }
+      return created;
     } catch (error) {
       Logger.Transaction.error(
         `Error creating template entry ${templateData.id}:`,
@@ -323,14 +339,14 @@ class TemplateDbService {
       UPDATE templates 
       SET ${updateFields.join(", ")} 
       WHERE id = $${paramIndex}
-      RETURNING *
     `;
 
     try {
       const result = await pool.query(query, values);
-      if (result.rows[0]) {
+      if (result.rowCount && result.rowCount > 0) {
         Logger.Transaction.log(`Updated template entry: ${id}`);
-        return mapRowToTemplateDB(result.rows[0]);
+        // Fetch the updated record with creator username
+        return await this.findTemplateEntryById(id);
       } else {
         Logger.Transaction.log(`Template entry ${id} not found for update`);
         return undefined;

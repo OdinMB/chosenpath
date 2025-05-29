@@ -189,6 +189,8 @@ export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N> & {
 
 export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   id: string;
+  creatorId?: string;
+  creatorUsername?: string;
   createdAt: string;
   updatedAt: string;
   gameMode: GameMode;
@@ -202,6 +204,7 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   publicationStatus: PublicationStatusType;
   showOnWelcomeScreen: boolean;
   order: number;
+  containsImages: boolean;
 };
 
 /**
@@ -210,6 +213,8 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
  */
 export type TemplateMetadata = {
   id: string;
+  creatorId?: string;
+  creatorUsername?: string;
   title: string;
   teaser: string;
   gameMode: GameMode;
@@ -224,8 +229,6 @@ export type TemplateMetadata = {
   containsImages: boolean;
   createdAt: string;
   updatedAt: string;
-  creatorId?: string | null; // Only included for admin endpoints
-  creatorUsername?: string | null; // Only included for admin endpoints when available
 };
 
 // TYPES USED BY APP (not LLM)

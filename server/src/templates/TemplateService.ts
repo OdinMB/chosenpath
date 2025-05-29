@@ -87,12 +87,17 @@ export class TemplateService {
       updatedAt: baseTemplate.updatedAt || now,
       title: baseTemplate.title || "",
       teaser: baseTemplate.teaser || "",
+      creatorId: baseTemplate.creatorId || undefined,
+      creatorUsername: baseTemplate.creatorUsername || undefined,
+      containsImages: baseTemplate.containsImages || false,
       imageInstructions: baseTemplate.imageInstructions || {
         visualStyle: "",
         atmosphere: "",
         colorPalette: "",
         settingDetails: "",
         characterStyle: "",
+        artInfluences: "",
+        coverPrompt: "",
       },
       publicationStatus:
         baseTemplate.publicationStatus || PublicationStatus.Draft,
@@ -437,7 +442,8 @@ export class TemplateService {
    */
   async createTemplate(
     template: Partial<StoryTemplate>,
-    creatorId?: string
+    creatorId?: string,
+    creatorUsername?: string
   ): Promise<StoryTemplate> {
     try {
       // Only generate a new ID if one doesn't already exist
@@ -447,6 +453,17 @@ export class TemplateService {
 
       const fullTemplate: StoryTemplate =
         this.createFullTemplateObject(template);
+
+      // Set creator information on creation
+      if (creatorId) {
+        fullTemplate.creatorId = creatorId;
+        fullTemplate.creatorUsername = creatorUsername || undefined;
+      }
+
+      // Set containsImages to false by default on creation
+      if (fullTemplate.containsImages === undefined) {
+        fullTemplate.containsImages = false;
+      }
 
       // Keep existing timestamps if provided
       if (template.createdAt) {
@@ -469,15 +486,13 @@ export class TemplateService {
         JSON.stringify(fullTemplate, null, 2)
       );
 
-      // Check if template contains images
-      const containsImages = await this.checkTemplateContainsImages(
-        fullTemplate.id
-      );
+      // Use the containsImages value from the template itself
+      const containsImages = fullTemplate.containsImages;
 
       // Create database entry
       await templateDbService.createTemplateEntry({
         id: fullTemplate.id,
-        creatorId: creatorId || null,
+        creatorId: fullTemplate.creatorId || null,
         publicationStatus: fullTemplate.publicationStatus,
         carouselOrder: fullTemplate.showOnWelcomeScreen
           ? fullTemplate.order
@@ -506,11 +521,13 @@ export class TemplateService {
   }
 
   /**
-   * Update an existing template
+   * Update a template
    */
   async updateTemplate(
     id: string,
-    template: Partial<StoryTemplate>
+    template: Partial<StoryTemplate>,
+    currentUserId?: string,
+    currentUsername?: string
   ): Promise<StoryTemplate> {
     try {
       // Check if template exists
@@ -527,6 +544,19 @@ export class TemplateService {
         updatedAt: new Date().toISOString(),
       };
 
+      // Handle creator information on update
+      if (currentUserId) {
+        if (!mergedTemplate.creatorId) {
+          // If creatorId is empty, set to current user
+          mergedTemplate.creatorId = currentUserId;
+          mergedTemplate.creatorUsername = currentUsername;
+        } else if (mergedTemplate.creatorId === currentUserId) {
+          // If creatorId is current user's id, update username to current username
+          mergedTemplate.creatorUsername = currentUsername;
+        }
+        // Otherwise leave creator information as is
+      }
+
       // Ensure the template directory exists
       const templateDir = path.join(this.storagePath, id);
       if (!fsSync.existsSync(templateDir)) {
@@ -540,11 +570,12 @@ export class TemplateService {
         JSON.stringify(mergedTemplate, null, 2)
       );
 
-      // Check if template contains images
-      const containsImages = await this.checkTemplateContainsImages(id);
+      // Use the containsImages value from the template itself
+      const containsImages = mergedTemplate.containsImages || false;
 
       // Update database entry with metadata fields
       await templateDbService.updateTemplateEntry(id, {
+        creatorId: mergedTemplate.creatorId || null,
         publicationStatus: mergedTemplate.publicationStatus,
         carouselOrder: mergedTemplate.showOnWelcomeScreen
           ? mergedTemplate.order
@@ -613,7 +644,8 @@ export class TemplateService {
     maxTurns: number,
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel,
-    creatorId?: string
+    creatorId?: string,
+    creatorUsername?: string
   ): Promise<StoryTemplate> {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
@@ -677,7 +709,8 @@ export class TemplateService {
       // Use the createTemplate method which will create both file and database entry
       const generatedTemplate = await this.createTemplate(
         templatePartial,
-        creatorId
+        creatorId,
+        creatorUsername
       );
 
       this.logger.log(
@@ -810,14 +843,14 @@ export class TemplateService {
       // Clean up temporary files
       await cleanupTempFiles(tempZipPath, tempExtractDir);
 
-      // Check if template now contains images
-      const containsImages = await this.checkTemplateContainsImages(templateId);
-
       // Load the updated template
       const updatedTemplate = await this.getTemplateById(templateId);
       if (!updatedTemplate) {
         throw new Error("Failed to load template after import");
       }
+
+      // Use the template's containsImages value instead of checking filesystem
+      const containsImages = updatedTemplate.containsImages || false;
 
       // Handle database record creation/update
       const existingDbEntry = await templateDbService.findTemplateEntryById(

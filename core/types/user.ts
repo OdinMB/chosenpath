@@ -45,7 +45,7 @@ export interface PublicUser {
   roleId: string;
   createdAt: number;
   lastLoginAt: number | null;
-  permissions?: string[];
+  permissions: string[];
 }
 
 /**

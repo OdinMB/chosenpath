@@ -32,6 +32,7 @@ import {
   verifyPublicationStatusPermission,
   verifyCarouselPermission,
   verifyImageGenerationPermission,
+  hasTemplateAccess,
 } from "./templateMiddleware.js";
 import {
   getStoragePath,
@@ -50,7 +51,41 @@ const templateService = new TemplateService();
 // PUBLIC TEMPLATE ROUTES (NO AUTH)
 // ========================
 
-// Utility function to convert database entry to metadata format
+// Utility function to convert template data to metadata format
+const extractMetadataFromTemplate = (
+  template: any,
+  includeCreatorInfo = false
+) => {
+  const metadata = {
+    id: template.id,
+    title: template.title,
+    teaser: template.teaser,
+    gameMode: template.gameMode,
+    tags: template.tags || [],
+    playerCountMin: template.playerCountMin,
+    playerCountMax: template.playerCountMax,
+    maxTurnsMin: template.maxTurnsMin,
+    maxTurnsMax: template.maxTurnsMax,
+    publicationStatus: template.publicationStatus,
+    showOnWelcomeScreen: template.showOnWelcomeScreen,
+    order: template.order,
+    containsImages: template.containsImages,
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt,
+  };
+
+  if (includeCreatorInfo) {
+    return {
+      ...metadata,
+      creatorId: template.creatorId,
+      creatorUsername: template.creatorUsername,
+    };
+  }
+
+  return metadata;
+};
+
+// Utility function to convert database entry to metadata format (fallback when template file doesn't exist)
 const convertDbEntryToMetadata = (
   entry: any,
   includeCreatorId = false,
@@ -76,7 +111,7 @@ const convertDbEntryToMetadata = (
     updatedAt: new Date(entry.updatedAt).toISOString(),
   };
 
-  if (includeCreatorId) {
+  if (includeCreatorId || creatorUsername) {
     return {
       ...metadata,
       creatorId: entry.creatorId,
@@ -85,6 +120,38 @@ const convertDbEntryToMetadata = (
   }
 
   return metadata;
+};
+
+// Helper function to get template metadata with creator info from full template data
+const getTemplateMetadataWithCreators = async (
+  templateIds: string[],
+  includeCreatorInfo = false
+): Promise<any[]> => {
+  const templates: any[] = [];
+
+  for (const id of templateIds) {
+    try {
+      const fullTemplate = await templateService.getTemplateById(id);
+      if (fullTemplate) {
+        templates.push(
+          extractMetadataFromTemplate(fullTemplate, includeCreatorInfo)
+        );
+      } else {
+        // Fallback to database if template file doesn't exist
+        Logger.Route.warn(
+          `Template file not found for ${id}, using database metadata`
+        );
+        const dbEntry = await templateDbService.findTemplateEntryById(id);
+        if (dbEntry) {
+          templates.push(convertDbEntryToMetadata(dbEntry, includeCreatorInfo));
+        }
+      }
+    } catch (error) {
+      Logger.Route.error(`Error loading template ${id}:`, error);
+    }
+  }
+
+  return templates;
 };
 
 // Get published template metadata for browsing (public endpoint)
@@ -106,15 +173,14 @@ router.get("/templates/published", async (req, res) => {
       );
     }
 
-    // Convert database entries to public metadata format
-    const templates = templateEntries.map((entry) =>
-      convertDbEntryToMetadata(entry)
-    );
+    // Get template IDs and fetch full template data (includes creator usernames)
+    const templateIds = templateEntries.map((entry) => entry.id);
+    const templates = await getTemplateMetadataWithCreators(templateIds, false); // don't include creatorId for public
 
     Logger.Route.log(
       `Returning ${templates.length} published template metadata${
         forWelcomeScreen ? " for welcome screen" : ""
-      }`
+      } with creator information from template files`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
@@ -141,13 +207,12 @@ router.get("/templates/user", verifyUser(), async (req, res) => {
       req.user.id
     );
 
-    // Convert database entries to metadata format
-    const templates = templateEntries.map((entry) =>
-      convertDbEntryToMetadata(entry)
-    );
+    // Get template IDs and fetch full template data (includes creator usernames)
+    const templateIds = templateEntries.map((entry) => entry.id);
+    const templates = await getTemplateMetadataWithCreators(templateIds, true); // include creator info
 
     Logger.Route.log(
-      `User ${req.user.id} accessed metadata for their ${templates.length} templates`
+      `User ${req.user.id} accessed metadata for their ${templates.length} templates from template files`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
@@ -176,13 +241,12 @@ router.get("/templates/user/:userId", verifyUser(), async (req, res) => {
       userId
     );
 
-    // Convert database entries to metadata format
-    const templates = templateEntries.map((entry) =>
-      convertDbEntryToMetadata(entry)
-    );
+    // Get template IDs and fetch full template data (includes creator usernames)
+    const templateIds = templateEntries.map((entry) => entry.id);
+    const templates = await getTemplateMetadataWithCreators(templateIds, true); // include creator info
 
     Logger.Route.log(
-      `Retrieved ${templates.length} template metadata for user ${userId}`
+      `Retrieved ${templates.length} template metadata for user ${userId} from template files`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
@@ -216,42 +280,12 @@ router.get("/templates", verifyUser(), async (req, res) => {
     // Get template metadata from database
     const templateEntries = await templateDbService.getAllTemplateEntries();
 
-    // Get unique creator IDs to fetch usernames
-    const creatorIds = [
-      ...new Set(
-        templateEntries
-          .map((entry) => entry.creatorId)
-          .filter((id) => id !== null)
-      ),
-    ] as string[];
-
-    // Fetch creator usernames
-    const creatorUsernames = new Map<string, string>();
-    for (const creatorId of creatorIds) {
-      try {
-        const user = await userDbService.findUserById(creatorId);
-        if (user) {
-          creatorUsernames.set(creatorId, user.username);
-        }
-      } catch (error) {
-        Logger.Route.warn(
-          `Failed to fetch username for creator ${creatorId}:`,
-          error
-        );
-      }
-    }
-
-    // Convert database entries to metadata format (include creator ID and username for admin)
-    const templates = templateEntries.map((entry) =>
-      convertDbEntryToMetadata(
-        entry,
-        true,
-        entry.creatorId ? creatorUsernames.get(entry.creatorId) : undefined
-      )
-    );
+    // Get template IDs and fetch full template data (includes creator usernames)
+    const templateIds = templateEntries.map((entry) => entry.id);
+    const templates = await getTemplateMetadataWithCreators(templateIds, true); // include creator info
 
     Logger.Route.log(
-      `Retrieved metadata for all ${templates.length} templates with creator information`
+      `Retrieved metadata for all ${templates.length} templates from template files (no database username lookups needed)`
     );
     sendSuccess(res, { templates }, requestId);
   } catch (error) {
@@ -363,34 +397,38 @@ router.post("/templates/export", verifyUser(), async (req, res) => {
       return sendError(res, "Templates directory not found", 500, requestId);
     }
 
-    // Get template metadata once for efficient permission checking
-    const templateMetadata =
-      !canSeeAll && req.user
-        ? await templateDbService.getAllTemplateEntries()
-        : [];
-
     // Process each template directory
     for (const templateId of selectedTemplateIds) {
-      // Verify template exists and check permissions using database metadata
+      // Get full template data (includes creator information)
       const template = await templateService.getTemplateById(templateId);
       if (!template) {
         Logger.Route.warn(`Template ${templateId} not found, skipping`);
         continue;
       }
 
-      // Permission checks using database metadata:
+      // Use optimized permission check with full template data (no database lookup needed)
       if (!canSeeAll && req.user) {
-        const templateMeta = templateMetadata.find((t) => t.id === templateId);
+        try {
+          const hasAccess = await hasTemplateAccess(
+            templateId,
+            req.user.id,
+            req.userPermissions || [],
+            false, // read access
+            template // provide full template data to avoid database lookup
+          );
 
-        if (templateMeta) {
-          const isCreator = templateMeta.creatorId === req.user.id;
-
-          if (!isCreator) {
+          if (!hasAccess) {
             Logger.Route.warn(
               `User ${req.user.id} doesn't have permission to export template ${templateId}, skipping`
             );
             continue;
           }
+        } catch (error) {
+          Logger.Route.error(
+            `Error checking permissions for template ${templateId}`,
+            error
+          );
+          continue;
         }
       }
 
@@ -458,11 +496,13 @@ router.post(
         return sendBadRequest(res, "Missing template data", requestId);
       }
 
-      // Pass creator ID to the service method
+      // Pass creator ID and username to the service method
       const creatorId = req.user?.id;
+      const creatorUsername = req.user?.username;
       const createdTemplate = await templateService.createTemplate(
         template,
-        creatorId
+        creatorId,
+        creatorUsername
       );
 
       Logger.Route.log(
@@ -494,9 +534,13 @@ router.put(
         return sendBadRequest(res, "Missing template data", requestId);
       }
 
+      const currentUserId = req.user?.id;
+      const currentUsername = req.user?.username;
       const updatedTemplate = await templateService.updateTemplate(
         id,
-        template
+        template,
+        currentUserId,
+        currentUsername
       );
 
       Logger.Route.log(`Updated template ${id}: ${updatedTemplate.title}`);
@@ -547,12 +591,11 @@ router.delete(
 // AI GENERATION ROUTES
 // ========================
 
-// Generate a template using AI
+// Generate a new template using AI
 router.post(
   "/templates/generate",
   verifyUser(),
   (req, res, next) => verifyTemplateCreatePermission(req, res, next),
-  (req, res, next) => verifyImageGenerationPermission(req, res, next),
   async (req, res) => {
     const requestId = req.body?.requestId || "unknown";
     const generateRequest = req.body as GenerateTemplateRequest;
@@ -567,35 +610,34 @@ router.post(
         difficultyLevel,
       } = generateRequest;
 
-      if (
-        !prompt ||
-        !playerCount ||
-        !maxTurns ||
-        !gameMode ||
-        !difficultyLevel
-      ) {
-        return sendBadRequest(
-          res,
-          "Missing required fields: prompt, playerCount, maxTurns, gameMode, difficultyLevel",
-          requestId
-        );
+      if (!prompt || !playerCount || !maxTurns || !gameMode) {
+        return sendBadRequest(res, "Missing required fields", requestId);
       }
 
-      Logger.Route.log(`Generating template with prompt: ${prompt}`);
-
       const creatorId = req.user?.id;
-      const template = await templateService.generateTemplate(
+      const creatorUsername = req.user?.username;
+
+      // Provide a default difficulty level if none is specified
+      const finalDifficultyLevel = difficultyLevel || {
+        modifier: 0,
+        title: "Standard Experience",
+      };
+
+      const generatedTemplate = await templateService.generateTemplate(
         prompt,
         generateImages || false,
         playerCount,
         maxTurns,
         gameMode,
-        difficultyLevel,
-        creatorId
+        finalDifficultyLevel,
+        creatorId,
+        creatorUsername
       );
 
-      Logger.Route.log(`Generated template: ${template.title}`);
-      sendSuccess(res, { template }, requestId, 201);
+      Logger.Route.log(
+        `Generated template: ${generatedTemplate.title} for user ${creatorId}`
+      );
+      sendSuccess(res, { template: generatedTemplate }, requestId, 201);
     } catch (error) {
       Logger.Route.error("Error generating template", error);
       sendError(res, "Failed to generate template", 500, requestId, error);

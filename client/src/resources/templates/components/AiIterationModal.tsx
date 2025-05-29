@@ -265,6 +265,8 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               imageInstructions={iterationData.imageInstructions}
               setImageInstructions={() => {}}
               canGenerateImages={false}
+              containsImages={iterationData.containsImages || false}
+              setContainsImages={() => {}}
             />
           </div>
         )}

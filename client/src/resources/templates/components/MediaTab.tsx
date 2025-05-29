@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { ImageInstructions } from "core/types";
-import { TextArea } from "components/ui";
+import { TextArea, Checkbox, InfoIcon } from "components/ui";
 import { CoverImageEditor } from "./CoverImageEditor";
 
 interface MediaTabProps {
   templateId?: string;
   imageInstructions: ImageInstructions;
   setImageInstructions: (instructions: ImageInstructions) => void;
+  containsImages: boolean;
+  setContainsImages: (contains: boolean) => void;
   canGenerateImages?: boolean;
 }
 
@@ -14,6 +16,8 @@ export const MediaTab: React.FC<MediaTabProps> = ({
   templateId,
   imageInstructions,
   setImageInstructions,
+  containsImages,
+  setContainsImages,
   canGenerateImages = true,
 }) => {
   const [expandedSections, setExpandedSections] = useState<{
@@ -43,6 +47,25 @@ export const MediaTab: React.FC<MediaTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Contains Images */}
+      <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="flex items-center">
+          <Checkbox
+            id="contains-images"
+            checked={containsImages}
+            onChange={(e) => setContainsImages(e.target.checked)}
+          />
+          <label htmlFor="contains-images" className="ml-2 text-sm font-medium">
+            Contains Images
+          </label>
+          <InfoIcon
+            tooltipText="Check this if the template contains images that should be used during gameplay."
+            position="right"
+            className="ml-2"
+          />
+        </div>
+      </div>
+
       <div className="bg-white p-6 rounded-lg border border-gray-200">
         <h3 className="text-lg font-semibold mb-4">Cover Image</h3>
 

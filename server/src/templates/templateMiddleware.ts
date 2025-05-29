@@ -2,18 +2,19 @@ import express from "express";
 import { Logger } from "shared/logger.js";
 import { sendError } from "shared/responseUtils.js";
 import { templateDbService } from "./TemplateDbService.js";
+import { TemplateService } from "./TemplateService.js";
+import { StoryTemplate } from "core/types/index.js";
+
+// Initialize template service for optimized access
+const templateService = new TemplateService();
 
 /**
  * Check if user has permission to access a template
- * Permission is granted if:
- * 1. User has 'templates_see_all' permission, OR
- * 2. User is the creator of the template (checked via database), OR
- * 3. Template is published or private (for read access)
- *
  * @param templateId Template ID to check
  * @param userId User ID making the request
  * @param userPermissions Array of user permissions
  * @param requireEditAccess If true, only allows access for creators or users with edit_all permission
+ * @param fullTemplate Optional full template data to avoid database lookup
  * @returns Boolean indicating if user has access
  * @throws Error with message 'Template not found' if template doesn't exist
  */
@@ -21,24 +22,46 @@ export async function hasTemplateAccess(
   templateId: string,
   userId: string | undefined,
   userPermissions: string[] = [],
-  requireEditAccess: boolean = false
+  requireEditAccess: boolean = false,
+  fullTemplate?: StoryTemplate
 ): Promise<boolean> {
-  // Fetch template from db
-  const templateEntry = await templateDbService.findTemplateEntryById(
-    templateId
-  );
-  if (!templateEntry) {
-    throw new Error("Template not found");
+  let templateData: {
+    publicationStatus: string;
+    creatorId: string | null;
+    title?: string;
+  };
+
+  if (fullTemplate) {
+    // Use provided full template data (no database lookup needed)
+    templateData = {
+      publicationStatus: fullTemplate.publicationStatus,
+      creatorId: fullTemplate.creatorId || null,
+      title: fullTemplate.title,
+    };
+    Logger.Route.log(
+      `Using cached template data for ${templateId} (${templateData.title})`
+    );
+  } else {
+    // Fall back to database lookup
+    const templateEntry = await templateDbService.findTemplateEntryById(
+      templateId
+    );
+    if (!templateEntry) {
+      throw new Error("Template not found");
+    }
+    templateData = templateEntry;
+    Logger.Route.log(
+      `Database lookup for template ${templateId} permission check`
+    );
   }
-  Logger.Route.log(JSON.stringify(templateEntry, null, 2));
 
   // Read access: public/private, owner, or see_all permission
   if (
     !requireEditAccess &&
-    (templateEntry.publicationStatus === "published" ||
-      templateEntry.publicationStatus === "private" ||
+    (templateData.publicationStatus === "published" ||
+      templateData.publicationStatus === "private" ||
       userPermissions.includes("templates_see_all") ||
-      (userId && userId === templateEntry.creatorId))
+      (userId && userId === templateData.creatorId))
   ) {
     return true;
   }
@@ -47,7 +70,7 @@ export async function hasTemplateAccess(
   if (requireEditAccess && userPermissions.includes("templates_edit_all")) {
     return true;
   }
-  if (requireEditAccess && userId && templateEntry.creatorId === userId) {
+  if (requireEditAccess && userId && templateData.creatorId === userId) {
     return true;
   }
 

@@ -52,7 +52,7 @@ export const UserTemplateList = () => {
     }
   };
 
-  // Show loading while authentication is still loading
+  // Show loading while authentication is in progress
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">

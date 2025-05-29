@@ -76,6 +76,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handlePublicationStatusChange,
     handleTagsChange,
     handleShowOnWelcomeScreenChange,
+    handleContainsImagesChange,
     handleImageInstructionsChange,
     handleDifficultyLevelsChange,
     // New helper functions
@@ -308,6 +309,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                 }
               }
               setImageInstructions={handleImageInstructionsChange}
+              containsImages={formData.containsImages || false}
+              setContainsImages={handleContainsImagesChange}
               canGenerateImages={canGenerateImages}
             />
           )}

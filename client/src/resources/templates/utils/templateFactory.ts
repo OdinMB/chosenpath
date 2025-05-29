@@ -26,6 +26,7 @@ export function createDefaultTemplate(): StoryTemplate {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     title: "",
+    containsImages: false,
     imageInstructions: {
       visualStyle: "",
       atmosphere: "",

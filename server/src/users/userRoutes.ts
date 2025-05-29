@@ -4,6 +4,7 @@ import {
   authenticateUser,
   logoutUser,
   updatePassword,
+  refreshTokenPermissions,
 } from "users/userService.js";
 import { verifyRegularUser, verifyUser } from "users/authMiddleware.js";
 import { Logger } from "shared/logger.js";
@@ -208,15 +209,7 @@ router.post("/auth/logout", verifyUser(), async (req, res) => {
 router.get("/auth/me", verifyUser({ required: false }), (req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
 
-  // If user is authenticated, include their permissions
-  if (req.user && req.userPermissions) {
-    const userWithPermissions = {
-      ...req.user,
-      permissions: req.userPermissions,
-    };
-    return sendSuccess(res, { user: userWithPermissions }, requestId);
-  }
-
+  // User is now always returned with permissions included from verifyToken
   return sendSuccess(res, { user: req.user || null }, requestId);
 });
 
@@ -299,5 +292,44 @@ router.get(
     }
   }
 );
+
+/**
+ * Refresh user permissions in JWT token
+ * POST /auth/refresh-permissions
+ */
+router.post("/auth/refresh-permissions", verifyUser(), async (req, res) => {
+  const requestId = req.body?.requestId || "unknown";
+  const token = req.cookies.authToken;
+
+  if (!token) {
+    return sendUnauthorized(res, "No active session", requestId);
+  }
+
+  try {
+    const result = await refreshTokenPermissions(token);
+
+    if (!result) {
+      return sendUnauthorized(res, "Unable to refresh permissions", requestId);
+    }
+
+    // Update the cookie with the new token
+    res.cookie("authToken", result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      expires: new Date(result.expiresAt),
+      path: "/",
+      domain:
+        process.env.NODE_ENV === "production"
+          ? `.${API_CONFIG.DEFAULT_DOMAIN}`
+          : undefined,
+    });
+
+    return sendSuccess(res, { user: result.user }, requestId);
+  } catch (error) {
+    Logger.Route.error("Permission refresh failed", error);
+    return sendError(res, "Failed to refresh permissions", 500, requestId);
+  }
+});
 
 export default router;

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken, getUserPermissions } from "./userService.js";
+import { verifyToken } from "./userService.js";
 import { Logger } from "../shared/logger.js";
 import { PublicUser } from "core/types/user.js";
 
@@ -75,9 +75,8 @@ export function verifyUser(options: AuthOptions = { required: true }) {
       req.user = user;
       req.token = token;
 
-      // Load and attach user permissions
-      const permissions = await getUserPermissions(user.id);
-      req.userPermissions = permissions;
+      // User permissions are now included in the user object from verifyToken
+      req.userPermissions = user.permissions || [];
 
       // Check role requirements if specified
       if (options.roles && options.roles.length > 0) {

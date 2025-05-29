@@ -21,6 +21,7 @@ export function AdminRouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Check if user is admin (could also check specific admin permissions if needed)
     if (user?.roleId !== "role_admin") {
       notificationService.addNotification({
         type: "error",

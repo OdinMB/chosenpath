@@ -43,6 +43,9 @@ export async function createUser(
       defaultRoleId
     );
 
+    // Get permissions for the newly created user
+    const permissions = await getUserPermissions(newUserEntry.id);
+
     return {
       id: newUserEntry.id,
       email: newUserEntry.email,
@@ -50,6 +53,7 @@ export async function createUser(
       roleId: newUserEntry.roleId,
       createdAt: newUserEntry.createdAt,
       lastLoginAt: newUserEntry.lastLoginAt ?? null,
+      permissions,
     };
   } catch (error) {
     Logger.DB.error("Failed to create user (service layer)", error);
@@ -94,15 +98,28 @@ export async function authenticateUser(
     const expiresAt =
       now +
       (remember ? SESSION_DURATION.REMEMBERED : SESSION_DURATION.STANDARD);
-    const token = jwt.sign(
-      { userId: user.id, exp: Math.floor(expiresAt / 1000) },
-      JWT_SECRET
-    );
+
+    // Get user permissions to include in both JWT and response
+    const permissions = await getUserPermissions(user.id);
+
+    // Enhanced JWT payload with permissions and role
+    const jwtPayload = {
+      userId: user.id,
+      username: user.username,
+      roleId: user.roleId,
+      permissions,
+      exp: Math.floor(expiresAt / 1000),
+      iat: Math.floor(now / 1000), // Issued at time for cache validation
+    };
+
+    const token = jwt.sign(jwtPayload, JWT_SECRET);
 
     await userDbService.createSessionEntry(token, user.id, expiresAt, remember);
     await userDbService.updateUserLastLogin(user.id, now);
 
-    Logger.DB.log(`User logged in: ${user.username} (${user.id})`);
+    Logger.DB.log(
+      `User logged in: ${user.username} (${user.id}) with ${permissions.length} permissions (cached in JWT)`
+    );
 
     return {
       user: {
@@ -112,6 +129,7 @@ export async function authenticateUser(
         roleId: user.roleId,
         createdAt: user.createdAt,
         lastLoginAt: now,
+        permissions,
       },
       token,
       expiresAt,
@@ -123,7 +141,7 @@ export async function authenticateUser(
 }
 
 /**
- * Verify a user's token
+ * Verify a user's token with optimized permission caching
  * @param token The JWT token to verify
  */
 export async function verifyToken(token: string): Promise<PublicUser | null> {
@@ -132,8 +150,9 @@ export async function verifyToken(token: string): Promise<PublicUser | null> {
 
     if (!session) return null;
 
+    let decoded: any;
     try {
-      jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, JWT_SECRET);
     } catch (e) {
       await userDbService.deleteSessionByToken(token);
       return null;
@@ -146,14 +165,40 @@ export async function verifyToken(token: string): Promise<PublicUser | null> {
       return null;
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      roleId: user.roleId,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt ?? null,
-    };
+    // Use cached permissions from JWT (no fallback needed)
+    if (decoded.permissions && decoded.roleId && decoded.username) {
+      // Verify the role hasn't changed (basic security check)
+      if (decoded.roleId === user.roleId) {
+        // Use cached permissions from JWT
+        Logger.DB.log(
+          `Using cached permissions for user ${user.id} (${decoded.permissions.length} permissions)`
+        );
+
+        return {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          roleId: user.roleId,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt ?? null,
+          permissions: decoded.permissions,
+        };
+      } else {
+        // Role changed, need to refresh token
+        Logger.DB.warn(
+          `Role mismatch for user ${user.id}: JWT has ${decoded.roleId}, DB has ${user.roleId}. Invalidating token.`
+        );
+        await userDbService.deleteSessionByToken(token);
+        return null;
+      }
+    } else {
+      // Invalid token format, force re-login
+      Logger.DB.warn(
+        `Token missing required fields for user ${user.id}, invalidating session`
+      );
+      await userDbService.deleteSessionByToken(token);
+      return null;
+    }
   } catch (error) {
     Logger.DB.error("Token verification failed (service layer)", error);
     return null;
@@ -232,14 +277,24 @@ export async function cleanupExpiredSessions(): Promise<number> {
 export async function getAllUsers(): Promise<PublicUser[]> {
   try {
     const users = await userDbService.getAllUserEntries();
-    return users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      roleId: user.roleId,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt ?? null,
-    }));
+
+    // Get permissions for all users
+    const usersWithPermissions = await Promise.all(
+      users.map(async (user) => {
+        const permissions = await getUserPermissions(user.id);
+        return {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          roleId: user.roleId,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt ?? null,
+          permissions,
+        };
+      })
+    );
+
+    return usersWithPermissions;
   } catch (error) {
     Logger.DB.error("Failed to get all users (service layer)", error);
     throw error;
@@ -277,7 +332,92 @@ export async function getUserPermissions(userId: string): Promise<string[]> {
     const permissions = await userDbService.getUserPermissions(userId);
     return permissions;
   } catch (error) {
-    Logger.DB.error(`Failed to get permissions for user ${userId}`, error);
+    Logger.DB.error(`Error getting permissions for user ${userId}`, error);
     return [];
+  }
+}
+
+/**
+ * Invalidate all sessions for a user (useful when permissions/role change)
+ * @param userId User ID
+ */
+export async function invalidateUserSessions(userId: string): Promise<void> {
+  try {
+    await userDbService.deleteAllUserSessions(userId);
+    Logger.DB.log(
+      `Invalidated all sessions for user ${userId} due to permission changes`
+    );
+  } catch (error) {
+    Logger.DB.error(`Failed to invalidate sessions for user ${userId}`, error);
+    throw error;
+  }
+}
+
+/**
+ * Refresh JWT permissions for active session without requiring re-login
+ * @param currentToken Current JWT token
+ * @returns New token with refreshed permissions, or null if unable to refresh
+ */
+export async function refreshTokenPermissions(
+  currentToken: string
+): Promise<{ token: string; expiresAt: number; user: PublicUser } | null> {
+  try {
+    const session = await userDbService.findSessionByToken(currentToken);
+    if (!session) return null;
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(currentToken, JWT_SECRET);
+    } catch (e) {
+      return null;
+    }
+
+    const user = await userDbService.findUserById(session.userId);
+    if (!user) return null;
+
+    // Get fresh permissions
+    const permissions = await getUserPermissions(user.id);
+
+    // Create new token with same expiration as current session
+    const jwtPayload = {
+      userId: user.id,
+      username: user.username,
+      roleId: user.roleId,
+      permissions,
+      exp: decoded.exp, // Keep same expiration
+      iat: Math.floor(Date.now() / 1000), // New issued time
+    };
+
+    const newToken = jwt.sign(jwtPayload, JWT_SECRET);
+
+    // Update session token in database
+    await userDbService.deleteSessionByToken(currentToken);
+    await userDbService.createSessionEntry(
+      newToken,
+      user.id,
+      session.expiresAt,
+      session.isRemembered
+    );
+
+    Logger.DB.log(
+      `Refreshed permissions for user ${user.id} (${permissions.length} permissions)`
+    );
+
+    return {
+      token: newToken,
+      expiresAt: session.expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        roleId: user.roleId,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt ?? null,
+        permissions,
+      },
+    };
+  } catch (error) {
+    Logger.DB.error("Failed to refresh token permissions", error);
+    return null;
   }
 }

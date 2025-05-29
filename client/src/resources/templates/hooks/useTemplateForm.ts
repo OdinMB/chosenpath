@@ -417,6 +417,14 @@ export function useTemplateForm({
     }));
   };
 
+  // Handle contains images
+  const handleContainsImagesChange = (containsImages: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      containsImages,
+    }));
+  };
+
   // Return all the handlers and state needed by the UI component
   return {
     // Core state
@@ -477,5 +485,6 @@ export function useTemplateForm({
     handleSubmit,
     getPlayerOptionsFromStoryTemplate,
     handleAIDraftSetup,
+    handleContainsImagesChange,
   };
 }

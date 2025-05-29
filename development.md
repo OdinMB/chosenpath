@@ -2,15 +2,13 @@ Smaller commits!
 
 # NEXT
 
-- 5: Enable users to create templates
+- 2: Enable users to use AI template features
 - 1: test: creator_id preserved in export/import flow
 - 2: add containsImages to StoryTemplate; kill all transformations from StoryTemplate -> TemplateMetadata
 - 4: Better explain template elements and admin panel
-- 1: show creator in template list in admin view; filter by "has creator id"
 - 2: review process for storytellers who want to publish on website
 
 - 1: Favicons with white background
-- 1: Cache user permissions somehow
 - 2: Show feedbacks in admin panel
 
 # BETTER EXPERIENCE
