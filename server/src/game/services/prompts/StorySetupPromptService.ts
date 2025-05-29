@@ -82,7 +82,7 @@ Our goal is two-fold: generate a convincing story, and use this opportunity to d
 We value inclusivity and diverse representation more highly than an 'accurate' or representation of reality or conforming to readers' expectations within fictional worlds.
 
 Specifically:
-- The cast of characters should be highly diverse across the following dimensions: Culture, Race, Gender, Age, Sexual orientation, Disability, etc.
+- The cast of characters should be diverse across the following dimensions: Culture, Race, Gender, Age, Sexual orientation, Disability, etc.
 - Characters should defy stereotypes that come with their cultural, racial, gender, etc. identities.
 --- Woman are allowed to be dominant, angry, aggressive, strong, visionary, etc.
 --- Men are allowed to be sensitive, caring, empathetic, joyful, etc.
@@ -96,6 +96,10 @@ Only deviate from this if the story's premise absolutely requires it. For exampl
 Weave these points into the story setup
 - Include them in the guidelines that will define the setting, tone, and structure of the story. Do this in a flavorful way that suits the story. Don't just copy the points above.
 - Apply these points to player identities/backgrounds and NPCs
+
+That said: don't overdo it.
+- Not every character should be trans/black/disabled/etc.
+- The story should still be about the characters and the story, not about their diversity. Diversity should just be a fact of life within the setting.
 \n`;
     }
     return "";
