@@ -72,7 +72,7 @@ export const TemplateCard = ({
       </p>
 
       {/* Flex spacer */}
-      <div className="flex-grow"></div>
+      <div className="flex-grow mb-4"></div>
 
       {/* Tags */}
       {sortedTags.length > 0 && (
