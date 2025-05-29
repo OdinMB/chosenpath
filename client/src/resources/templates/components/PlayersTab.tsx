@@ -21,6 +21,7 @@ interface PlayersTabProps {
   readOnly?: boolean;
   templateId: string;
   imageInstructions?: ImageInstructions;
+  canGenerateImages?: boolean;
 }
 
 export const PlayersTab: React.FC<PlayersTabProps> = ({
@@ -32,6 +33,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   readOnly = false,
   templateId,
   imageInstructions,
+  canGenerateImages = true,
 }) => {
   const {
     editingPlayers,
@@ -115,6 +117,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             readOnly={readOnly}
             templateId={templateId}
             imageInstructions={imageInstructions}
+            canGenerateImages={canGenerateImages}
           />
         );
       })}

@@ -3,8 +3,6 @@ Smaller commits!
 # NEXT
 
 - 2: Enable users to use AI template features
-- 1: test: creator_id preserved in export/import flow
-- 2: add containsImages to StoryTemplate; kill all transformations from StoryTemplate -> TemplateMetadata
 - 4: Better explain template elements and admin panel
 - 2: review process for storytellers who want to publish on website
 

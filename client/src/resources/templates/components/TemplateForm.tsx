@@ -110,12 +110,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     { id: "outcomes" as TabType, label: "Outcomes" },
     { id: "stats" as TabType, label: "Stats" },
     { id: "players" as TabType, label: "Players" },
-    ...(canGenerateImages
-      ? [
-          { id: "ai-draft" as TabType, label: "Draft" },
-          { id: "ai-iterate" as TabType, label: "Iteration" },
-        ]
-      : []),
+    { id: "ai-draft" as TabType, label: "Draft" },
+    { id: "ai-iterate" as TabType, label: "Iteration" },
   ];
 
   const handleAcceptSectionUpdate = (
@@ -360,6 +356,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               onChange={handleStoryElementsChange}
               templateId={formData.id}
               imageInstructions={formData.imageInstructions}
+              canGenerateImages={canGenerateImages}
             />
           )}
 
@@ -387,6 +384,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               playerStats={formData.playerStats || []}
               templateId={formData.id}
               imageInstructions={formData.imageInstructions}
+              canGenerateImages={canGenerateImages}
               characterSelectionIntroduction={
                 formData.characterSelectionIntroduction || {
                   title: "",
@@ -399,7 +397,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             />
           )}
 
-          {activeTab === "ai-draft" && canGenerateImages && (
+          {activeTab === "ai-draft" && (
             <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-2">
                 <div className="flex items-start">
@@ -432,7 +430,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       </form>
 
       {/* Render the AI-iterate tab outside the main form */}
-      {canGenerateImages && renderAiIterationSection()}
+      {renderAiIterationSection()}
 
       {/* Add the AI iteration modal */}
       <AiIterationModal

@@ -251,7 +251,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
       renderEditForm={renderElementForm}
       isSaveDisabled={(element) => !element.name || !element.id}
       readOnly={readOnly}
-      actionIcons={canGenerateImages ? [generateImageIcon] : []}
+      actionIcons={canGenerateImages && !readOnly ? [generateImageIcon] : []}
     />
   );
 };

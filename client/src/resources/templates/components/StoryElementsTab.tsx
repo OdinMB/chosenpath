@@ -11,6 +11,7 @@ interface StoryElementsTabProps {
   readOnly?: boolean;
   templateId?: string;
   imageInstructions?: ImageInstructions;
+  canGenerateImages?: boolean;
 }
 
 export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
@@ -19,6 +20,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   readOnly = false,
   templateId: propTemplateId,
   imageInstructions,
+  canGenerateImages = true,
 }) => {
   // Get templateId from URL if not provided as prop
   const { templateId: urlTemplateId } = useParams<{ templateId: string }>();
@@ -92,6 +94,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           readOnly={readOnly}
           templateId={templateId || ""}
           imageInstructions={imageInstructions}
+          canGenerateImages={canGenerateImages}
         />
       ))}
     </div>

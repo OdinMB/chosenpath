@@ -217,7 +217,7 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
       renderEditForm={renderIdentityForm}
       isSaveDisabled={() => false}
       readOnly={readOnly}
-      actionIcons={canGenerateImages ? [generateImageIcon] : []}
+      actionIcons={canGenerateImages && !readOnly ? [generateImageIcon] : []}
     />
   );
 };

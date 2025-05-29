@@ -99,6 +99,7 @@ interface PlayerEditorProps {
   readOnly?: boolean;
   templateId: string;
   imageInstructions?: ImageInstructions;
+  canGenerateImages?: boolean;
 }
 
 export const PlayerEditor: React.FC<PlayerEditorProps> = ({
@@ -128,6 +129,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
   readOnly = false,
   templateId,
   imageInstructions,
+  canGenerateImages = true,
 }) => {
   // Render form for the ExpandableItem component
   const renderPlayerForm = (
@@ -170,6 +172,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
               readOnly={readOnly}
               templateId={templateId}
               imageInstructions={imageInstructions}
+              canGenerateImages={canGenerateImages}
             />
           ))}
         </div>
