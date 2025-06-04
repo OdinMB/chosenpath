@@ -1,6 +1,10 @@
 import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
-import { GameMode, PublicationStatusType } from "core/types/index.js";
+import {
+  GameMode,
+  PublicationStatusType,
+  DifficultyLevel,
+} from "core/types/index.js";
 
 // Database record type for templates
 export interface TemplateDB {
@@ -18,6 +22,7 @@ export interface TemplateDB {
   playerCountMax: number;
   maxTurnsMin: number;
   maxTurnsMax: number;
+  difficultyLevels?: DifficultyLevel[];
   showOnWelcomeScreen: boolean;
   orderValue: number;
   createdAt: number;
@@ -41,6 +46,9 @@ function mapRowToTemplateDB(row: any): TemplateDB {
     playerCountMax: row.player_count_max,
     maxTurnsMin: row.max_turns_min,
     maxTurnsMax: row.max_turns_max,
+    difficultyLevels: Array.isArray(row.difficulty_levels)
+      ? row.difficulty_levels
+      : JSON.parse(row.difficulty_levels || "[]"),
     showOnWelcomeScreen: row.show_on_welcome_screen,
     orderValue: row.order_value,
     createdAt: parseInt(row.created_at, 10),
@@ -58,7 +66,7 @@ class TemplateDbService {
       const result = await pool.query(
         `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
                 t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
-                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.max_turns_min, t.max_turns_max, t.difficulty_levels, t.show_on_welcome_screen, t.order_value, 
                 t.created_at, t.updated_at, u.username as creator_username
          FROM templates t
          LEFT JOIN users u ON t.creator_id = u.id
@@ -85,7 +93,7 @@ class TemplateDbService {
       const result = await pool.query(
         `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
                 t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
-                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.max_turns_min, t.max_turns_max, t.difficulty_levels, t.show_on_welcome_screen, t.order_value, 
                 t.created_at, t.updated_at, u.username as creator_username
          FROM templates t
          LEFT JOIN users u ON t.creator_id = u.id
@@ -115,7 +123,7 @@ class TemplateDbService {
       const result = await pool.query(
         `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
                 t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
-                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.max_turns_min, t.max_turns_max, t.difficulty_levels, t.show_on_welcome_screen, t.order_value, 
                 t.created_at, t.updated_at, u.username as creator_username
          FROM templates t
          LEFT JOIN users u ON t.creator_id = u.id
@@ -144,7 +152,7 @@ class TemplateDbService {
       const result = await pool.query(
         `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
                 t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
-                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.max_turns_min, t.max_turns_max, t.difficulty_levels, t.show_on_welcome_screen, t.order_value, 
                 t.created_at, t.updated_at, u.username as creator_username
          FROM templates t
          LEFT JOIN users u ON t.creator_id = u.id
@@ -174,7 +182,7 @@ class TemplateDbService {
       const result = await pool.query(
         `SELECT t.id, t.creator_id, t.publication_status, t.carousel_order, t.contains_images, 
                 t.title, t.teaser, t.game_mode, t.tags, t.player_count_min, t.player_count_max, 
-                t.max_turns_min, t.max_turns_max, t.show_on_welcome_screen, t.order_value, 
+                t.max_turns_min, t.max_turns_max, t.difficulty_levels, t.show_on_welcome_screen, t.order_value, 
                 t.created_at, t.updated_at, u.username as creator_username
          FROM templates t
          LEFT JOIN users u ON t.creator_id = u.id
@@ -216,21 +224,25 @@ class TemplateDbService {
     playerCountMax: number;
     maxTurnsMin: number;
     maxTurnsMax: number;
+    difficultyLevels?: DifficultyLevel[];
     showOnWelcomeScreen: boolean;
     orderValue: number;
   }): Promise<TemplateDB> {
     const pool = getDb();
     const now = Date.now();
     const tagsString = templateData.tags.join(",");
+    const difficultyLevelsJson = JSON.stringify(
+      templateData.difficultyLevels || []
+    );
 
     const query = `
       INSERT INTO templates (
         id, creator_id, publication_status, carousel_order, contains_images, 
         title, teaser, game_mode, tags, player_count_min, player_count_max, 
-        max_turns_min, max_turns_max, show_on_welcome_screen, order_value, 
+        max_turns_min, max_turns_max, difficulty_levels, show_on_welcome_screen, order_value, 
         created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     `;
 
     const values = [
@@ -247,6 +259,7 @@ class TemplateDbService {
       templateData.playerCountMax,
       templateData.maxTurnsMin,
       templateData.maxTurnsMax,
+      difficultyLevelsJson,
       templateData.showOnWelcomeScreen,
       templateData.orderValue,
       now,
@@ -294,6 +307,7 @@ class TemplateDbService {
       playerCountMax: number;
       maxTurnsMin: number;
       maxTurnsMax: number;
+      difficultyLevels?: DifficultyLevel[];
       showOnWelcomeScreen: boolean;
       orderValue: number;
     }>
@@ -308,10 +322,13 @@ class TemplateDbService {
 
     Object.entries(updates).forEach(([key, value]) => {
       if (value !== undefined) {
-        // Handle special case for tags array
+        // Handle special cases for array fields
         if (key === "tags" && Array.isArray(value)) {
           updateFields.push(`tags = $${paramIndex}`);
           values.push(value.join(","));
+        } else if (key === "difficultyLevels" && Array.isArray(value)) {
+          updateFields.push(`difficulty_levels = $${paramIndex}`);
+          values.push(JSON.stringify(value));
         } else {
           // Convert camelCase to snake_case for database fields
           const dbField = key.replace(/([A-Z])/g, "_$1").toLowerCase();

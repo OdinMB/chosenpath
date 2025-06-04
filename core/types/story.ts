@@ -223,6 +223,7 @@ export type TemplateMetadata = {
   playerCountMax: PlayerCount;
   maxTurnsMin: number;
   maxTurnsMax: number;
+  difficultyLevels?: DifficultyLevel[];
   publicationStatus: PublicationStatusType;
   showOnWelcomeScreen: boolean;
   order: number;

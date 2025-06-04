@@ -41,34 +41,23 @@ export async function playableTemplateLoader(templateId: string): Promise<{
 
 /**
  * Loader for template configuration (metadata + configuration options)
- * Uses both endpoints to get metadata for display and full template for configuration
+ * Uses metadata endpoint which now includes difficulty levels
  */
 export async function configurableTemplateLoader(templateId: string): Promise<{
-  template:
-    | (TemplateMetadata & {
-        difficultyLevels?: Array<{ modifier: number; title: string }>;
-      })
-    | null;
+  template: TemplateMetadata | null;
 }> {
   try {
     Logger.App.log(`Loading configurable template data for ${templateId}`);
 
-    // Get both metadata and full template
-    const [metadata, fullTemplate] = await Promise.all([
-      templateApi.getTemplateMetadata(templateId),
-      templateApi.getTemplate(templateId),
-    ]);
-
-    // Combine metadata with configuration fields
-    const configurableTemplate = {
-      ...metadata,
-      difficultyLevels: fullTemplate.difficultyLevels || [],
-    };
+    // Get metadata (now includes difficulty levels)
+    const metadata = await templateApi.getTemplateMetadata(templateId);
 
     Logger.App.log(
-      `Loaded configurable template: ${configurableTemplate.title}`
+      `Loaded configurable template: ${metadata.title} with ${
+        metadata.difficultyLevels?.length || 0
+      } difficulty levels`
     );
-    return { template: configurableTemplate };
+    return { template: metadata };
   } catch (error) {
     Logger.App.error(
       `Failed to load configurable template ${templateId}`,

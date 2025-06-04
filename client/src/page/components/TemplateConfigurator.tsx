@@ -13,9 +13,7 @@ import { notificationService } from "shared/notifications/notificationService";
 import { getDefaultDifficultyLevel } from "core/utils/difficultyUtils.ts";
 import { DifficultySlider } from "./DifficultySlider";
 
-type ConfigurableTemplate = TemplateMetadata & {
-  difficultyLevels?: Array<{ modifier: number; title: string }>;
-};
+type ConfigurableTemplate = TemplateMetadata;
 
 interface TemplateConfigLoaderData {
   template: ConfigurableTemplate;

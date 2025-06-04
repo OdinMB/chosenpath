@@ -308,7 +308,14 @@ export class TemplateService {
 
       if (fsSync.existsSync(templateFilePath)) {
         const content = await fs.readFile(templateFilePath, "utf-8");
-        return JSON.parse(content) as StoryTemplate;
+        const template = JSON.parse(content) as StoryTemplate;
+
+        // Ensure difficulty levels is always an array (backward compatibility)
+        if (!Array.isArray(template.difficultyLevels)) {
+          template.difficultyLevels = [];
+        }
+
+        return template;
       }
 
       return null;
@@ -390,6 +397,7 @@ export class TemplateService {
         playerCountMax: fullTemplate.playerCountMax,
         maxTurnsMin: fullTemplate.maxTurnsMin,
         maxTurnsMax: fullTemplate.maxTurnsMax,
+        difficultyLevels: fullTemplate.difficultyLevels,
         showOnWelcomeScreen: fullTemplate.showOnWelcomeScreen,
         orderValue: fullTemplate.order,
       });
@@ -473,6 +481,7 @@ export class TemplateService {
         playerCountMax: mergedTemplate.playerCountMax,
         maxTurnsMin: mergedTemplate.maxTurnsMin,
         maxTurnsMax: mergedTemplate.maxTurnsMax,
+        difficultyLevels: mergedTemplate.difficultyLevels,
         showOnWelcomeScreen: mergedTemplate.showOnWelcomeScreen,
         orderValue: mergedTemplate.order,
       });
@@ -767,6 +776,7 @@ export class TemplateService {
           playerCountMax: updatedTemplate.playerCountMax,
           maxTurnsMin: updatedTemplate.maxTurnsMin,
           maxTurnsMax: updatedTemplate.maxTurnsMax,
+          difficultyLevels: updatedTemplate.difficultyLevels,
           showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
           orderValue: updatedTemplate.order,
         });
@@ -788,6 +798,7 @@ export class TemplateService {
           playerCountMax: updatedTemplate.playerCountMax,
           maxTurnsMin: updatedTemplate.maxTurnsMin,
           maxTurnsMax: updatedTemplate.maxTurnsMax,
+          difficultyLevels: updatedTemplate.difficultyLevels,
           showOnWelcomeScreen: updatedTemplate.showOnWelcomeScreen,
           orderValue: updatedTemplate.order,
         });

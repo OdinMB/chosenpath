@@ -177,6 +177,7 @@ export async function initializeDatabase() {
         player_count_max INTEGER NOT NULL,
         max_turns_min INTEGER NOT NULL,
         max_turns_max INTEGER NOT NULL,
+        difficulty_levels JSON NOT NULL DEFAULT '[]',
         show_on_welcome_screen BOOLEAN NOT NULL DEFAULT FALSE,
         order_value INTEGER NOT NULL DEFAULT 999,
         created_at BIGINT NOT NULL,

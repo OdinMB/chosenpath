@@ -38,6 +38,7 @@ Focus: Text/Images, English, Multiplayer
 # SERIOUS PROJECT
 
 - 1: Export stories
+- 5: Barrierefreiheit (try eye-able.com)
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 4: Images: thumbnail versions (especially for cover images); load full version in modals
 - 5: Credits system for generating stories
