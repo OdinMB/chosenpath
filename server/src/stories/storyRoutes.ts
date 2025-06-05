@@ -13,10 +13,12 @@ import {
 import {
   CreateStoryRequest,
   CreateStoryFromTemplateRequest,
+  UpdateStoryStatusRequest,
 } from "core/types/api.js";
 import { PlayerCount } from "core/types/index.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
+import { storyDbService } from "./StoryDbService.js";
 
 const router = Router();
 
@@ -132,5 +134,50 @@ router.get("/stories/:id/status", async (req, res) => {
     sendError(res, "Failed to check story status", 500, requestId, error);
   }
 });
+
+// Update story status (archive or delete)
+router.put(
+  "/stories/status",
+  verifyUser({ required: true }),
+  async (req, res) => {
+    const requestId = req.body?.requestId || "unknown";
+
+    try {
+      const { storyId, playerSlot, status } =
+        req.body as UpdateStoryStatusRequest;
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        sendError(res, "Authentication required", 401, requestId);
+        return;
+      }
+
+      // Verify that the user has permission to update this story's status
+      const hasPermission = await storyDbService.verifyUserCanUpdateStoryStatus(
+        userId,
+        storyId,
+        playerSlot
+      );
+
+      if (!hasPermission) {
+        sendError(res, "Unauthorized to update this story", 403, requestId);
+        return;
+      }
+
+      await storyDbService.updatePlayerStatus(storyId, playerSlot, status);
+
+      Logger.Route.log(
+        `Updated story ${storyId} player ${playerSlot} status to ${status}`
+      );
+      sendSuccess(res, { success: true }, requestId);
+    } catch (error) {
+      Logger.Route.error(
+        `Failed to update story status: ${req.body.storyId}`,
+        error
+      );
+      sendError(res, "Failed to update story status", 500, requestId, error);
+    }
+  }
+);
 
 export default router;

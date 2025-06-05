@@ -15,6 +15,8 @@ import {
   GetUserStoryFeedResponse,
   SubmitFeedbackRequest,
   SubmitFeedbackResponse,
+  UpdateStoryStatusRequest,
+  UpdateStoryStatusResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -326,16 +328,26 @@ export const userStoriesApi = {
   /**
    * Get the story feed for the current user and/or specified story codes.
    * @param clientStoryCodes Optional array of story codes (story IDs) to fetch.
+   * @param status Optional status filter ("active" or "archived"). Defaults to "active".
    */
   getUserStoryFeed: async (
-    clientStoryCodes?: string[]
+    clientStoryCodes?: string[],
+    status: "active" | "archived" = "active"
   ): Promise<{ stories: ExtendedStoryMetadata[] }> => {
-    let url = "/users/stories/feed";
+    const params = new URLSearchParams();
+
     if (clientStoryCodes && clientStoryCodes.length > 0) {
-      const params = new URLSearchParams();
       params.append("clientStoryCodes", clientStoryCodes.join(","));
-      url += `?${params.toString()}`;
     }
+
+    if (status !== "active") {
+      params.append("status", status);
+    }
+
+    const url = params.toString()
+      ? `/users/stories/feed?${params.toString()}`
+      : "/users/stories/feed";
+
     // apiClient.get<T> is typed to return Promise<T> (the unwrapped data from the interceptor).
     // We want T to be GetUserStoryFeedResponse['data'], which is { stories: ExtendedStoryMetadata[] }.
     return apiClient.get<GetUserStoryFeedResponse["data"]>(url);
@@ -371,6 +383,18 @@ export const storyApi = {
   ): Promise<{ status: "queued" | "ready" }> => {
     return apiClient.get<{ status: "queued" | "ready" }>(
       `/stories/${storyId}/status`
+    );
+  },
+
+  /**
+   * Update story status (archive or delete)
+   */
+  updateStoryStatus: async (
+    data: UpdateStoryStatusRequest
+  ): Promise<{ success: boolean }> => {
+    return apiClient.put<UpdateStoryStatusResponse["data"]>(
+      "/stories/status",
+      data
     );
   },
 };

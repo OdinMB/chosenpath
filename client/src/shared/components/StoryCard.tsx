@@ -11,23 +11,30 @@ type StoryCardProps = {
   story: ExtendedStoryMetadata;
   onPlay?: (storyId: string, code?: string) => void;
   onDelete?: (storyId: string) => void;
+  onArchive?: (storyId: string) => void;
+  onResume?: (storyId: string) => void;
   showPlayButton?: boolean;
   size?: "default" | "large";
   className?: string;
   children?: React.ReactNode;
+  showArchivedContent?: boolean;
 };
 
 export const StoryCard = ({
   story,
   onPlay,
   onDelete,
+  onArchive,
+  onResume,
   showPlayButton = true,
   size = "default",
   className = "",
   children,
+  showArchivedContent = false,
 }: StoryCardProps) => {
   const { user } = useAuth();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
 
   const players = story.players;
 
@@ -84,6 +91,23 @@ export const StoryCard = ({
     setIsConfirmDialogOpen(false);
   };
 
+  const handleArchive = () => {
+    setIsArchiveDialogOpen(true);
+  };
+
+  const confirmArchive = () => {
+    if (onArchive) {
+      onArchive(story.id);
+    }
+    setIsArchiveDialogOpen(false);
+  };
+
+  const handleResume = () => {
+    if (onResume) {
+      onResume(story.id);
+    }
+  };
+
   const shouldShowImage = story.generateImages === true || story.templateId;
   const imageSource = story.templateId ? "template" : "story";
   const imageSourceId = story.templateId || story.id;
@@ -108,6 +132,15 @@ export const StoryCard = ({
         title="Delete Story"
         message="Are you sure you want to delete this story? This action cannot be undone."
         confirmText="Delete"
+        cancelText="Cancel"
+      />
+      <ConfirmDialog
+        isOpen={isArchiveDialogOpen}
+        onClose={() => setIsArchiveDialogOpen(false)}
+        onConfirm={confirmArchive}
+        title="Archive Story"
+        message="Are you sure you want to archive this story? You can restore it later from your archived stories."
+        confirmText="Archive"
         cancelText="Cancel"
       />
       <CoverCard
@@ -137,33 +170,84 @@ export const StoryCard = ({
         </h3>
 
         <div className="flex flex-col gap-1 text-primary-500 mb-3">
-          <div className="flex items-center flex-wrap">
-            <span className={`${sizeClasses.info} font-semibold`}>
-              {typeof story.currentBeat === "number"
-                ? `${story.currentBeat} / `
-                : ""}
-              {story.maxTurns} turns
-            </span>
-            {story.difficultyLevel && (
-              <span className="flex items-center ml-3">
-                <span className={`${sizeClasses.info} font-semibold mr-2`}>
-                  {story.difficultyLevel.title}
-                </span>
-                <InfoIcon
-                  tooltipText={getDifficultyDescription(
-                    story.difficultyLevel.modifier
-                  )}
-                  position="top"
-                  className="mb-1"
-                />
+          <div className="flex items-center flex-wrap justify-between">
+            <div className="flex items-center flex-wrap">
+              <span className={`${sizeClasses.info} font-semibold`}>
+                {typeof story.currentBeat === "number"
+                  ? `${story.currentBeat} / `
+                  : ""}
+                {story.maxTurns} turns
               </span>
-            )}
-            <InfoIcon
-              tooltipText={infoTooltip}
-              position="top"
-              className="ml-4 mb-1"
-              icon={Icons.Clock}
-            />
+              {story.difficultyLevel && (
+                <span className="flex items-center ml-3">
+                  <span className={`${sizeClasses.info} font-semibold mr-2`}>
+                    {story.difficultyLevel.title}
+                  </span>
+                  <InfoIcon
+                    tooltipText={getDifficultyDescription(
+                      story.difficultyLevel.modifier
+                    )}
+                    position="top"
+                    className="mb-1"
+                  />
+                </span>
+              )}
+              <InfoIcon
+                tooltipText={infoTooltip}
+                position="top"
+                className="ml-4 mb-1"
+                icon={Icons.Clock}
+              />
+            </div>
+
+            {(onDelete ||
+              (onArchive && user && !showArchivedContent) ||
+              (onResume && showArchivedContent)) &&
+              (story.creatorId === user?.id ||
+                (user &&
+                  story.players.some(
+                    (p) =>
+                      p.userId === user.id &&
+                      (showArchivedContent
+                        ? p.status === "archived"
+                        : p.status === "active")
+                  ))) && (
+                <div className="flex gap-2 ml-2">
+                  {showArchivedContent && onResume && user && (
+                    <Tooltip content="Resume story" position="top">
+                      <button
+                        onClick={handleResume}
+                        className="text-green-600 hover:text-green-700 focus:outline-none flex items-center"
+                        aria-label="Resume story"
+                      >
+                        <Icons.Refresh className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {!showArchivedContent && onArchive && user && (
+                    <Tooltip content="Archive story" position="top">
+                      <button
+                        onClick={handleArchive}
+                        className="text-orange-600 hover:text-orange-700 focus:outline-none flex items-center"
+                        aria-label="Archive story"
+                      >
+                        <Icons.Download className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {onDelete && (
+                    <Tooltip content="Delete story" position="top">
+                      <button
+                        onClick={handleDelete}
+                        className="text-red-600 hover:text-red-700 focus:outline-none flex items-center"
+                        aria-label="Delete story"
+                      >
+                        <Icons.Trash className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
           </div>
         </div>
 
@@ -201,14 +285,24 @@ export const StoryCard = ({
                     className={`font-medium text-primary-600 ${nameFontSizeClass} truncate`}
                   >
                     {nameLabel}
-                  </span>
-                  <div className="text-xs text-left w-[70px]">
-                    {isMultiplayerStory && player.isPending && (
-                      <span className="text-yellow-600 font-semibold">
-                        Pending
+                    {player.status === "archived" && (
+                      <span className="text-orange-600 text-xs ml-1">
+                        (archived)
                       </span>
                     )}
-                    {showWaiting && (
+                    {player.status === "deleted" && (
+                      <span className="text-red-600 text-xs ml-1">(left)</span>
+                    )}
+                  </span>
+                  <div className="text-xs text-left w-[70px]">
+                    {isMultiplayerStory &&
+                      player.isPending &&
+                      player.status === "active" && (
+                        <span className="text-yellow-600 font-semibold">
+                          Pending
+                        </span>
+                      )}
+                    {showWaiting && player.status === "active" && (
                       <span className="text-primary-500 font-semibold">
                         Waiting
                       </span>
@@ -228,19 +322,6 @@ export const StoryCard = ({
         )}
         {children}
         <div className="flex-grow"></div>
-        {onDelete && story.creatorId === user?.id && (
-          <div className="absolute bottom-3 right-3">
-            <Tooltip content="Delete story" position="left">
-              <button
-                onClick={handleDelete}
-                className="text-red-600 hover:text-red-700 focus:outline-none flex items-center"
-                aria-label="Delete story"
-              >
-                <Icons.Trash />
-              </button>
-            </Tooltip>
-          </div>
-        )}
       </CoverCard>
     </>
   );

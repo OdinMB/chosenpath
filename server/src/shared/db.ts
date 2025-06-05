@@ -138,9 +138,11 @@ export async function initializeDatabase() {
         user_id TEXT,
         last_played_at BIGINT,
         is_pending BOOLEAN NOT NULL DEFAULT TRUE,
+        status TEXT NOT NULL DEFAULT 'active',
         PRIMARY KEY (story_id, player_slot),
         FOREIGN KEY (story_id) REFERENCES stories (id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
+        CHECK (status IN ('active', 'archived', 'deleted'))
       )
     `);
 
@@ -207,6 +209,9 @@ export async function initializeDatabase() {
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_story_players_user_id ON story_players (user_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_story_players_status ON story_players (status)`
     );
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback (user_id)`

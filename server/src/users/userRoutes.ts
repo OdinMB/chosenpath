@@ -261,7 +261,9 @@ router.post("/auth/password", verifyRegularUser(), async (req, res) => {
 /**
  * Get story feed for the current user or based on client story codes
  * GET /users/stories/feed
- * Query params: clientStoryCodes (optional, comma-separated string of story codes)
+ * Query params:
+ *   - clientStoryCodes (optional, comma-separated string of story codes)
+ *   - status (optional, "active" or "archived", defaults to "active")
  * Returns: GetUserStoryFeedResponse
  */
 router.get(
@@ -272,6 +274,9 @@ router.get(
     const clientStoryCodesQuery = req.query.clientStoryCodes as
       | string
       | undefined;
+    const statusQuery = req.query.status as "active" | "archived" | undefined;
+    const playerStatus = statusQuery === "archived" ? "archived" : "active";
+
     const clientStoryCodes = clientStoryCodesQuery
       ? clientStoryCodesQuery
           .split(",")
@@ -282,7 +287,11 @@ router.get(
     try {
       const authUserId = req.user?.id;
 
-      const stories = await getStoryFeed(authUserId, clientStoryCodes);
+      const stories = await getStoryFeed(
+        authUserId,
+        clientStoryCodes,
+        playerStatus
+      );
       return sendSuccess(res, { stories }, requestId);
     } catch (error) {
       Logger.Route.error("Failed to get user story feed", error);

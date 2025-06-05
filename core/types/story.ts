@@ -303,4 +303,9 @@ export type AdminStoriesListItem = {
   currentBeat: number;
   templateId?: string | null;
   error?: string; // Optional error message if story JSON couldn't be fully processed
+  playerStatusCounts?: {
+    active: number;
+    archived: number;
+    deleted: number;
+  };
 };

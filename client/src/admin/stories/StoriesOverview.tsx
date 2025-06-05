@@ -11,6 +11,11 @@ import {
 import { AdminStoriesListItem } from "core/types/story.js";
 import { formatDate } from "core/utils/dateUtils";
 
+// Extended type for stories with computed status
+type AdminStoriesListItemWithStatus = AdminStoriesListItem & {
+  status: string;
+};
+
 export const StoriesOverview = () => {
   const stories = useLoaderData() as AdminStoriesListItem[];
   const navigate = useNavigate();
@@ -36,6 +41,32 @@ export const StoriesOverview = () => {
     }
   };
 
+  // Helper function to compute status from playerStatusCounts
+  const computeStatus = (
+    counts: { active: number; archived: number; deleted: number } | undefined
+  ): string => {
+    if (!counts) return "N/A";
+
+    const activeCount = Number(counts.active) || 0;
+    const archivedCount = Number(counts.archived) || 0;
+    const deletedCount = Number(counts.deleted) || 0;
+    const totalPlayers = activeCount + archivedCount + deletedCount;
+
+    if (totalPlayers === 0) return "No players";
+    if (archivedCount > 0) return "Archived";
+    if (activeCount === totalPlayers) return "Active";
+    if (deletedCount === totalPlayers) return "Deleted";
+    return "Abandoned";
+  };
+
+  // Add computed status field to stories for sorting/filtering
+  const storiesWithStatus: AdminStoriesListItemWithStatus[] = stories.map(
+    (story) => ({
+      ...story,
+      status: computeStatus(story.playerStatusCounts),
+    })
+  );
+
   const openDeleteDialog = (storyId: string) => {
     setDeleteDialog({
       isOpen: true,
@@ -50,7 +81,7 @@ export const StoriesOverview = () => {
     });
   };
 
-  const tableColumns: ColumnOption<AdminStoriesListItem>[] = [
+  const tableColumns: ColumnOption<AdminStoriesListItemWithStatus>[] = [
     {
       key: "title",
       label: "Title",
@@ -58,8 +89,24 @@ export const StoriesOverview = () => {
       render: (story) => (
         <div>
           <span className={story.error ? "text-tertiary" : "font-medium"}>
-            {story.title ||
-              (story.error ? "Error Loading Title" : "[Untitled Story]")}
+            <span className="sm:hidden">
+              {/* Truncate title on small screens */}
+              {(
+                story.title ||
+                (story.error ? "Error Loading Title" : "[Untitled Story]")
+              ).length > 15
+                ? `${(
+                    story.title ||
+                    (story.error ? "Error Loading Title" : "[Untitled Story]")
+                  ).substring(0, 15)}...`
+                : story.title ||
+                  (story.error ? "Error Loading Title" : "[Untitled Story]")}
+            </span>
+            <span className="hidden sm:inline">
+              {/* Full title on larger screens */}
+              {story.title ||
+                (story.error ? "Error Loading Title" : "[Untitled Story]")}
+            </span>
           </span>
         </div>
       ),
@@ -71,8 +118,43 @@ export const StoriesOverview = () => {
       className: "py-3 px-4 text-left hidden md:table-cell",
     },
     {
+      key: "status" as keyof AdminStoriesListItemWithStatus,
+      label: "Status",
+      sortable: true,
+      filterable: true,
+      className: "py-3 px-4 text-left",
+      render: (story) => {
+        const counts = story.playerStatusCounts;
+        if (!counts) return "N/A";
+
+        // Convert to numbers to avoid string concatenation
+        const activeCount = Number(counts.active) || 0;
+        const archivedCount = Number(counts.archived) || 0;
+        const deletedCount = Number(counts.deleted) || 0;
+        const totalPlayers = activeCount + archivedCount + deletedCount;
+
+        if (totalPlayers === 0) return "No players";
+
+        // Determine overall status
+        if (archivedCount > 0) {
+          // If any player is archived, the story is archived
+          return <span className="text-orange-600 font-medium">Archived</span>;
+        } else if (activeCount === totalPlayers) {
+          // All players are active
+          return <span className="text-green-600 font-medium">Active</span>;
+        } else if (deletedCount === totalPlayers) {
+          // All players are deleted
+          return <span className="text-red-600 font-medium">Deleted</span>;
+        } else {
+          // Some active, some deleted (no archived)
+          return <span className="text-gray-600 font-medium">Abandoned</span>;
+        }
+      },
+    },
+    {
       key: "currentBeat",
       label: "Beat",
+      className: "py-3 px-4 text-left hidden md:table-cell whitespace-nowrap",
       render: (story) => (
         <>
           {story.characterSelectionCompleted ? story.currentBeat || 1 : 0} /{" "}
@@ -83,16 +165,17 @@ export const StoriesOverview = () => {
     {
       key: "createdAt",
       label: "Created",
-      className: "py-3 px-4 text-left hidden md:table-cell",
+      className: "py-3 px-4 text-left hidden lg:table-cell whitespace-nowrap",
       render: (story) => formatDate(story.createdAt || story.updatedAt),
     },
     {
       key: "updatedAt",
       label: "Updated",
+      className: "py-3 px-4 text-left whitespace-nowrap",
       render: (story) => formatDate(story.updatedAt),
     },
     {
-      key: "id" as keyof AdminStoriesListItem,
+      key: "id" as keyof AdminStoriesListItemWithStatus,
       label: "Actions",
       sortable: false,
       filterable: false,
@@ -119,7 +202,7 @@ export const StoriesOverview = () => {
     removeFilter,
     clearFilters,
   } = useTableFilterSort({
-    data: stories,
+    data: storiesWithStatus,
     initialSort: { key: "updatedAt", direction: "desc" },
   });
 

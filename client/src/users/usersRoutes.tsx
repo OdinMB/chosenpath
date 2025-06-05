@@ -1,5 +1,6 @@
 import { RouteObject, Navigate } from "react-router-dom";
 import { UsersStories } from "./stories/UsersStories.js";
+import { UsersArchive } from "./stories/UsersArchive.js";
 import { UserTemplateList } from "./templates/UserTemplateList.js";
 import { UserTemplateEditor } from "./templates/UserTemplateEditor.js";
 import { UserAccountPage } from "./components/UserAccountPage";
@@ -27,6 +28,11 @@ export const userRoutes: RouteObject[] = [
         path: "my-stories",
         element: <UsersStories />,
         id: "user-stories",
+      },
+      {
+        path: "archive",
+        element: <UsersArchive />,
+        id: "user-archive",
       },
       {
         path: "my-worlds",

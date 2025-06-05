@@ -1,5 +1,5 @@
 import { storyRepository } from "./StoryRepository.js";
-import { Logger } from "shared/logger.js";
+import { Logger } from "../shared/logger.js";
 import { Story } from "core/models/Story.js";
 import {
   storyDbService,
@@ -50,6 +50,13 @@ export class AdminStoryService {
             );
           }
 
+          // Get player status information for admin display
+          const playerStatusCounts = {
+            active: dbStory.active_count,
+            archived: dbStory.archived_count,
+            deleted: dbStory.deleted_count,
+          };
+
           // Prefer title from Story model if available and DB title is null, otherwise use DB title.
           // If both are null, it remains null.
           const finalTitle =
@@ -73,6 +80,7 @@ export class AdminStoryService {
             currentBeat: dbStory.current_beat,
             templateId: dbStory.template_id,
             error: storyJsonError,
+            playerStatusCounts,
           };
         })
       );

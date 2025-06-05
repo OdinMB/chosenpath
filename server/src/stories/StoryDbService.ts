@@ -21,6 +21,9 @@ export interface StoryDbOverviewItem {
   player_count: number;
   difficulty_title: string;
   difficulty_modifier: number;
+  active_count: number;
+  archived_count: number;
+  deleted_count: number;
 }
 
 class StoryDbService {
@@ -75,8 +78,8 @@ class StoryDbService {
     const db = getDb();
     // lastPlayedAt is initially null and will be set upon first action
     const query = `
-      INSERT INTO story_players (story_id, player_slot, code, user_id, last_played_at, is_pending)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO story_players (story_id, player_slot, code, user_id, last_played_at, is_pending, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
     `;
     try {
       await db.query(query, [
@@ -86,6 +89,7 @@ class StoryDbService {
         null, // userId
         null, // lastPlayedAt
         initialIsPending,
+        "active", // status
       ]);
       Logger.Transaction.log(
         `Created story player entry in DB for story ${storyId}, slot ${playerSlot}`
@@ -106,8 +110,8 @@ class StoryDbService {
   ): Promise<void> {
     const db = getDb();
     const playerInsertQuery = `
-      INSERT INTO story_players (story_id, player_slot, code, user_id, last_played_at, is_pending)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO story_players (story_id, player_slot, code, user_id, last_played_at, is_pending, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
     `;
     // Note: pg library doesn't directly support batching multiple inserts into one query
     // like some ORMs. A transaction is appropriate here.
@@ -124,6 +128,7 @@ class StoryDbService {
           null, // userId
           null, // lastPlayedAt
           initialIsPending,
+          "active", // status
         ]);
       }
       await db.query("COMMIT");
@@ -192,6 +197,44 @@ class StoryDbService {
   async updatePlayerStatus(
     storyId: string,
     playerSlot: PlayerSlot,
+    status: "active" | "archived" | "deleted"
+  ): Promise<void> {
+    const db = getDb();
+    const now = Date.now();
+    const playerQuery =
+      "UPDATE story_players SET status = $1, last_played_at = $2 WHERE story_id = $3 AND player_slot = $4";
+    const storyQuery = "UPDATE stories SET updated_at = $1 WHERE id = $2";
+    try {
+      await db.query("BEGIN");
+      Logger.Transaction.log(
+        `BEGIN: Update player ${playerSlot} status to ${status} for story ${storyId}`
+      );
+      await db.query(playerQuery, [status, now, storyId, playerSlot]);
+      await db.query(storyQuery, [now, storyId]); // Update story's updated_at to reflect this activity
+      await db.query("COMMIT");
+      Logger.Transaction.log(
+        `COMMIT: Update player ${playerSlot} status to ${status} for story ${storyId}`
+      );
+      Logger.Transaction.log(
+        `Updated player ${playerSlot} status to ${status} for story ${storyId} in DB.`
+      );
+    } catch (error) {
+      await db.query("ROLLBACK");
+      Logger.Transaction.error(
+        `ROLLBACK: Update player ${playerSlot} status to ${status} for story ${storyId}`,
+        error
+      );
+      Logger.Transaction.error(
+        `Error updating player ${playerSlot} status to ${status} for story ${storyId} in DB:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  async updatePlayerPendingStatus(
+    storyId: string,
+    playerSlot: PlayerSlot,
     isPending: boolean
   ): Promise<void> {
     const db = getDb();
@@ -202,25 +245,25 @@ class StoryDbService {
     try {
       await db.query("BEGIN");
       Logger.Transaction.log(
-        `BEGIN: Update player ${playerSlot} status for story ${storyId}`
+        `BEGIN: Update player ${playerSlot} pending status for story ${storyId}`
       );
       await db.query(playerQuery, [isPending, now, storyId, playerSlot]);
       await db.query(storyQuery, [now, storyId]); // Update story's updated_at to reflect this activity
       await db.query("COMMIT");
       Logger.Transaction.log(
-        `COMMIT: Update player ${playerSlot} status for story ${storyId}`
+        `COMMIT: Update player ${playerSlot} pending status for story ${storyId}`
       );
       Logger.Transaction.log(
-        `Updated player ${playerSlot} status to isPending=${isPending} and story ${storyId} updated_at in DB.`
+        `Updated player ${playerSlot} pending status to isPending=${isPending} for story ${storyId} in DB.`
       );
     } catch (error) {
       await db.query("ROLLBACK");
       Logger.Transaction.error(
-        `ROLLBACK: Update player ${playerSlot} status for story ${storyId}`,
+        `ROLLBACK: Update player ${playerSlot} pending status for story ${storyId}`,
         error
       );
       Logger.Transaction.error(
-        `Error updating player ${playerSlot} status or story ${storyId} updated_at in DB:`,
+        `Error updating player ${playerSlot} pending status for story ${storyId} in DB:`,
         error
       );
       throw error;
@@ -354,7 +397,10 @@ class StoryDbService {
         s.template_id,
         s.difficulty_title,
         s.difficulty_modifier,
-        COUNT(sp.player_slot) as player_count
+        COUNT(sp.player_slot) as player_count,
+        COUNT(CASE WHEN sp.status = 'active' THEN 1 END) as active_count,
+        COUNT(CASE WHEN sp.status = 'archived' THEN 1 END) as archived_count,
+        COUNT(CASE WHEN sp.status = 'deleted' THEN 1 END) as deleted_count
       FROM stories s
       LEFT JOIN story_players sp ON s.id = sp.story_id
       GROUP BY s.id, s.title, s.created_at, s.updated_at, s.current_beat, s.max_turns, s.template_id, s.difficulty_title, s.difficulty_modifier
@@ -474,6 +520,32 @@ class StoryDbService {
         error
       );
       throw error;
+    }
+  }
+
+  async verifyUserCanUpdateStoryStatus(
+    userId: string,
+    storyId: string,
+    playerSlot: PlayerSlot
+  ): Promise<boolean> {
+    const db = getDb();
+    try {
+      // Check if user is the story creator or owns the specific player slot
+      const query = `
+        SELECT 1 FROM stories s 
+        WHERE s.id = $1 AND s.creator_id = $2
+        UNION
+        SELECT 1 FROM story_players sp
+        WHERE sp.story_id = $1 AND sp.player_slot = $3 AND sp.user_id = $2
+      `;
+      const result = await db.query(query, [storyId, userId, playerSlot]);
+      return result.rows.length > 0;
+    } catch (error) {
+      Logger.Transaction.error(
+        `Error verifying user access for story ${storyId}, user ${userId}:`,
+        error
+      );
+      return false;
     }
   }
 }

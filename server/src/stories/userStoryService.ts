@@ -67,6 +67,7 @@ interface StoryFeedDbRow {
   sp_user_id: string | null;
   sp_last_played_at: string | null;
   sp_is_pending: boolean | null;
+  sp_status: string | null; // Added status field
   sp_username: string | null; // Added for player username
 }
 
@@ -75,7 +76,8 @@ interface StoryFeedDbRow {
  */
 export async function getStoryFeed(
   authUserId?: string,
-  clientPlayerCodes?: string[]
+  clientPlayerCodes?: string[],
+  playerStatus: "active" | "archived" = "active"
 ): Promise<ExtendedStoryMetadata[]> {
   const pool = getDb();
   const finalQueryParams: (string | string[])[] = [];
@@ -84,18 +86,24 @@ export async function getStoryFeed(
   let paramIdx = 1;
   if (authUserId) {
     finalQueryParams.push(authUserId);
+    finalQueryParams.push(playerStatus);
+    // Show stories where the user has the specified status participation
     unionClauses.push(
-      `SELECT id as story_id FROM stories WHERE creator_id = $${paramIdx}`
+      `SELECT story_id FROM story_players WHERE user_id = $${paramIdx} AND status = $${
+        paramIdx + 1
+      }`
     );
-    unionClauses.push(
-      `SELECT story_id FROM story_players WHERE user_id = $${paramIdx}`
-    );
-    paramIdx++;
+    paramIdx += 2;
   }
-  if (clientPlayerCodes && clientPlayerCodes.length > 0) {
+  if (
+    clientPlayerCodes &&
+    clientPlayerCodes.length > 0 &&
+    playerStatus === "active"
+  ) {
+    // Only check local codes for active stories (archived stories are user-specific)
     finalQueryParams.push(clientPlayerCodes);
     unionClauses.push(
-      `SELECT story_id FROM story_players WHERE code = ANY($${paramIdx}::TEXT[])`
+      `SELECT story_id FROM story_players WHERE code = ANY($${paramIdx}::TEXT[]) AND status = 'active'`
     );
     paramIdx++;
   }
@@ -134,6 +142,7 @@ export async function getStoryFeed(
       sp.user_id as sp_user_id,
       sp.last_played_at as sp_last_played_at,
       sp.is_pending as sp_is_pending,
+      sp.status as sp_status,
       u.username as sp_username
     FROM stories s
     JOIN RelevantStoryIDs rsi ON s.id = rsi.story_id
@@ -203,6 +212,8 @@ export async function getStoryFeed(
         isPending: row.sp_is_pending || false,
         isCurrentUser: isCurrentUsersPlayerEntry,
         username: row.sp_username || undefined,
+        status:
+          (row.sp_status as "active" | "archived" | "deleted") || "active",
       };
       // Ensure player is not added multiple times if story appears due to multiple reasons in CTE (though JOIN rsi should handle distinct stories)
       if (!story.players.find((p) => p.playerSlot === playerEntry.playerSlot)) {

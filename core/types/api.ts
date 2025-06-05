@@ -194,6 +194,7 @@ export interface StoryPlayerEntry {
   isPending?: boolean;
   isCurrentUser?: boolean;
   username?: string;
+  status?: "active" | "archived" | "deleted";
 }
 
 export interface ExtendedStoryMetadata extends StoryMetadata {
@@ -235,3 +236,12 @@ export interface SubmitFeedbackRequest extends ClientRequest {
 
 export interface SubmitFeedbackResponse
   extends SuccessResponse<{ feedbackId: string }> {}
+
+export interface UpdateStoryStatusRequest extends ClientRequest {
+  storyId: string;
+  playerSlot: string;
+  status: "active" | "archived" | "deleted";
+}
+
+export interface UpdateStoryStatusResponse
+  extends SuccessResponse<{ success: boolean }> {}

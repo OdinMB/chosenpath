@@ -231,13 +231,13 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     await this.updateAndBroadcastStory(gameId, storyWithBeatResolution);
 
     // --- DB Integration: Update story_players for the player who made a choice ---
-    // stories.updatedAt is handled by updatePlayerStatus
+    // stories.updatedAt is handled by updatePlayerPendingStatus
     try {
-      await storyDbService.updatePlayerStatus(gameId, playerSlot, false); // isPending = false
+      await storyDbService.updatePlayerPendingStatus(gameId, playerSlot, false); // isPending = false
       // Logger.Queue.log(...); // Logging by service
     } catch (dbError) {
       Logger.Queue.error(
-        `DB service error updating player ${playerSlot} status for ${gameId}:`,
+        `DB service error updating player ${playerSlot} pending status for ${gameId}:`,
         dbError
       );
     }
@@ -368,13 +368,13 @@ export class GameQueueProcessor extends BaseQueueProcessor<
     );
 
     // --- DB Integration: Update story_players for the player who selected a character ---
-    // stories.updatedAt is handled by updatePlayerStatus
+    // stories.updatedAt is handled by updatePlayerPendingStatus
     try {
-      await storyDbService.updatePlayerStatus(gameId, playerSlot, false); // isPending = false
+      await storyDbService.updatePlayerPendingStatus(gameId, playerSlot, false); // isPending = false
       // Logger.Queue.log(...); // Logging by service
     } catch (dbError) {
       Logger.Queue.error(
-        `DB service error updating player ${playerSlot} status for ${gameId} (char select):`,
+        `DB service error updating player ${playerSlot} pending status for ${gameId} (char select):`,
         dbError
       );
     }
