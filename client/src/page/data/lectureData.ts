@@ -155,18 +155,149 @@ export const lectures: Lecture[] = [
       </p>
     `,
   },
+
   {
     id: "switches-threads",
     title: "Narrative Structure: Switches and Threads",
     summary:
       "Tweak the structure and pacing of stories. A Switch gives players control over the next Thread. A Thread is a mini-chapter that establishes a Milestone and brings an Outcome closer to its resolution.",
     imagePath: "/academy/switches-threads.jpeg",
+    videoEmbedUrl:
+      "https://iframe.mediadelivery.net/embed/451846/084d81c6-65a9-4a7d-a763-1f706a24a847?autoplay=false&loop=false&muted=false&preload=false&responsive=true",
     content: `
-      <p class="mb-4">
-        asdf
+      <p class="mt-4 mb-4">
+        <strong>Switches give players control over the direction of the story.</strong>
       </p>
       <p class="mb-4">
-asdf
+        Understanding how Switches and Threads work together is key to creating engaging, player-driven narratives in your World. Let's break down how this system creates meaningful choice and narrative momentum.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">The Basic Flow: Switch → Thread → Milestone</h3>
+      <p class="mb-4">
+        As we learned in the previous lecture, Milestones are added after each mini-chapter (Thread). Here's how it works:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <ol class="list-decimal list-inside space-y-3 ml-4">
+          <li><strong>Switch:</strong> 1 Beat to find out what the next mini-chapter will be<br/>
+          <em>Example: Meet Sir Bram, leader of the local Hero Guild</em></li>
+          <li><strong>Thread:</strong> 2-4 Beats to find out which Milestone will be added<br/>
+          <em>Example: Rikkit fails to convince Sir Bram.</em></li>
+          <li><strong>Milestone:</strong> The result is recorded<br/>
+          <em>Example: Unfavorable: Sir Bram keeps the anti-Goblin policies of his Guild in place.</em></li>
+        </ol>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Two Types of Switches</h3>
+      <p class="mb-4">
+        There are two types of Switches that give players different kinds of control:
+      </p>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Topic Switch</h4>
+      <p class="mb-2">
+        <strong>Which Outcome should we drive toward a Resolution next?</strong>
+      </p>
+      <div class="bg-blue-50 p-3 rounded-lg mb-4">
+        <ul class="list-disc list-inside space-y-1 ml-4">
+          <li>Meet Sir Bram, leader of the Hero Guild</li>
+          <li>Print posters to identify supporters</li>
+          <li>Prepare a hideout in case things get ugly</li>
+        </ul>
+      </div>
+      <p class="mb-4">
+        <strong>Topic Switches give the player more freedom.</strong> They are provided to the player whenever possible.
+      </p>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Flavor Switch</h4>
+      <p class="mb-2">
+        <strong>How should the next Thread for a predefined Outcome look like?</strong>
+      </p>
+      <div class="bg-green-50 p-3 rounded-lg mb-4">
+        <ul class="list-disc list-inside space-y-1 ml-4">
+          <li>Show up to the trial</li>
+          <li>Organize a protest to stop the trial</li>
+          <li>Escape the trial</li>
+        </ul>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">When Flavor Switches Are Generated</h3>
+      <p class="mb-4">
+        Flavor Switches are generated in three specific scenarios:
+      </p>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Urgency:</strong> Something happened that requires the character's immediate attention.<br/>
+        <em>Example: Someone launches a personal attack on Rikkit. The next Thread must address this.</em></li>
+        <li><strong>Continuation:</strong> Narratively, we simply must follow up on the previous Thread.<br/>
+        <em>Example: After seizing the Hero Guild, we must address the aftermath.</em></li>
+        <li><strong>Missing Milestones:</strong> The story is coming to an end, and an Outcome is still missing Milestones.</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Two Types of Threads</h3>
+      <p class="mb-4">
+        Threads can be either exploratory or focused on success vs. failure:
+      </p>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Exploration Thread</h4>
+      <p class="mb-2">
+        <strong>Resolution depends on player preferences</strong>
+      </p>
+      <ul class="list-disc list-inside space-y-2 ml-4 mb-4">
+        <li>Peaceful protest, civil disobedience, or violent sabotage?</li>
+        <li>How does Rikkit feel about their actions?</li>
+        <li>Which allies does Rikkit want to engage?</li>
+      </ul>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Challenge Thread</h4>
+      <p class="mb-2">
+        <strong>Resolution is a matter of success vs. failure</strong>
+      </p>
+      <ul class="list-disc list-inside space-y-2 ml-4 mb-4">
+        <li>Does Rikkit mobilize enough support for a rally?</li>
+        <li>Does Rikkit convince Zelda to join the movement?</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Thread Beat Progression</h3>
+      <p class="mb-4">
+        Threads come with a <strong>pre-defined beat progression</strong>. The progression is laid out by the AI before the first beat of the Thread is generated.
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Example Thread: "Meet Sir Bram"</strong></p>
+        <ol class="list-decimal list-inside space-y-2 ml-4">
+          <li>What is Sir Bram's first impression of Rikkit?</li>
+          <li>Does Rikkit find leverage in the negotiation?</li>
+          <li>Does Rikkit convince Sir Bram?</li>
+        </ol>
+        <p class="mt-3"><em>After Beat 3: Milestone is added</em></p>
+        <p class="mt-2"><em>Beats 1-3 build momentum toward the Thread's climax.</em></p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Fine-tuning Switches and Threads</h3>
+      <p class="mb-4">
+        You can control the flow of your stories by adjusting several aspects:
+      </p>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Selection of potential Threads:</strong> <em>Public protests, secret negotiations, public speeches, ...</em></li>
+        <li><strong>Variety:</strong> <em>Alternate between public action Threads and private, personal Threads.</em></li>
+        <li><strong>Length:</strong> <em>As a default, keep the length of personal Threads to 2 beats.</em></li>
+        <li><strong>Sequencing:</strong> <em>If the player ever gets hurt physically, the next Thread must be about healing their wounds.</em></li>
+        <li><strong>Surprises:</strong> <em>Around beat 13-16 / 25, introduce a personal attack on the player (social or physical).</em></li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Key Concepts Summary</h3>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Topic Switches</strong> allow players to choose which Outcome should be addressed. They are offered to the player whenever possible.</li>
+        <li><strong>Flavor Switches</strong> allow players to choose how a predefined Outcome should be addressed. They are offered to the player if we cannot give the player control over the topic of the next Thread.</li>
+        <li><strong>Challenge Threads</strong> are a matter of success vs. failure.</li>
+        <li><strong>Exploration Threads</strong> are not.</li>
+        <li><strong>Threads</strong> come with pre-defined beat progressions and end with new Milestones.</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Design Tip: Provide Different Ways for Players Engage with your World</h3>
+      <p class="mb-4">
+        In our sample World "Goblin Rights Now!", we expanded the list of possible Threads to include encounters with friends and maybe even romantic interests. We also allowed violent protests as a viable strategy for the activists.
+      </p>
+      <h3 class="text-lg font-semibold mb-3 mt-6">Design Tip: Think about Pacing</h3>
+      <p class="mb-4">
+        We instructed the AI to make personal Threads shorter than public Threads (2 vs. 3 Beats by default), and to switch between public activist Threads and personal Threads about reflections and relationships. That way, the focus is still on the activist struggle, with personal Threads acting as breathers.
       </p>
     `,
   },
