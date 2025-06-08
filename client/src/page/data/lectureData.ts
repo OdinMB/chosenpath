@@ -327,7 +327,7 @@ export const lectures: Lecture[] = [
   },
   {
     id: "stats",
-    title: "Stats Model the World",
+    title: "Stats: Modeling the World",
     summary:
       "From the integrity of a spaceship to the relationship between two characters: Stats tell the AI what to monitor and integrate into your stories.",
     imagePath: "/academy/stats.jpeg",

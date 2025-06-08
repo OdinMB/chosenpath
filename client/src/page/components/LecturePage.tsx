@@ -110,6 +110,7 @@ export function LecturePage() {
               size="sm"
               variant="outline"
               leftBorder={false}
+              textAlign="left"
               rightIcon={<Icons.ArrowRight className="h-4 w-4" />}
             >
               {nextLecture.title}

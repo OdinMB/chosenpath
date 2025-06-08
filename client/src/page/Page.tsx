@@ -82,12 +82,12 @@ export function Page() {
       <div className="max-w-md mx-auto p-4 font-lora">
         <div className="mb-8 text-primary-800">
           <p className="mb-2">
-            Dive into immersive stories. Play alone or invite friends to shape a
-            story with multiple characters — whether you're exploring distant
+            Dive into interactive stories. Play alone or invite friends to shape
+            a story with multiple characters — whether you're exploring distant
             galaxies or serving croissants in a Parisian café.
           </p>
           <p className="mb-2">
-            Creators can use Chosen Path as a{" "}
+            For creators, Chosen Path is a{" "}
             <a
               href="/academy"
               onClick={(e) => {
@@ -98,9 +98,9 @@ export function Page() {
             >
               Story Engine
             </a>
-            . Define Worlds with setting, characters, conflicts, stats,
-            mechanics, possible endings, and much more. Chosen Path writes the
-            prose, reacts to player choices, applies mechanics, and coordinates
+            . Define Worlds with setting, characters, conflicts, mechanics,
+            possible endings, and much more. Chosen Path generates prose and
+            images, reacts to player choices, applies mechanics, and coordinates
             multiplayer.
             {/* <a
               href="/users/signin"
@@ -112,7 +112,7 @@ export function Page() {
             >
               Sign in
             </a>{" "} */}{" "}
-            Visit our{" "}
+            Visit{" "}
             <a
               href="/academy"
               onClick={(e) => {
