@@ -61,18 +61,97 @@ export const lectures: Lecture[] = [
       </ul>
     `,
   },
+
   {
     id: "outcomes-milestones-resolutions",
     title: "The Drivers: Outcomes, Milestones, Resolutions",
     summary:
       'Outcomes are questions that stories in your World will answer. ("Will the crew find the treasure?") Learn how to define Outcomes and how they drive your stories forward.',
     imagePath: "/academy/outcomes-resolutions.jpeg",
+    videoEmbedUrl:
+      "https://iframe.mediadelivery.net/embed/451846/a804a0a4-fe1f-45d7-bd14-1b5f8b0e6b3f?autoplay=false&loop=false&muted=false&preload=false&responsive=true",
     content: `
-      <p class="mb-4">
-        asdf
+      <p class="mt-4 mb-4">
+        <strong>Stories answer questions.</strong>
       </p>
       <p class="mb-4">
-        adsf
+        At the heart of every engaging story in your World lies a set of <strong>Outcomes</strong> — central questions that drive the narrative forward and determine how the story will end.
+      </p>
+      
+      <h3 class="text-lg font-semibold mb-3 mt-6">Outcomes and Resolutions</h3>
+      <p class="mb-4">
+        Consider this example from our sample World "Goblin Rights Now!":
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Outcome:</strong> Will the Hero Guilds reform their anti-goblin policies?</p>
+        <p class="mb-2"><strong>Possible Resolutions:</strong></p>
+        <ul class="list-disc list-inside space-y-2 ml-4">
+          <li><strong>Favorable:</strong> The Hero Guilds adopt new codes that protect goblin rights and punish violence against them.</li>
+          <li><strong>Mixed:</strong> Some reforms are enacted, but enforcement is weak and many heroes resist change.</li>
+          <li><strong>Unfavorable:</strong> The Hero Guilds double down on anti-goblin violence, forcing goblins further underground.</li>
+        </ul>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Resolving Outcomes</h3>
+      <p class="mb-4">
+        <strong>Milestones</strong> get us closer to an answer. They are the significant moments that move the story toward one resolution or another.
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-4">
+          <strong>Outcome:</strong> "Will the Hero Guilds reform their anti-goblin policies?"
+        </p>
+        <ul class="list-disc list-inside space-y-2 ml-4">
+          <li><strong>Milestone 1 - Unfavorable:</strong> Sir Bram doesn't budge.</li>
+          <li><strong>Milestone 2 - Favorable:</strong> Protests happen in Elderglen.</li>
+        </ul>
+      </div>
+      <p class="mb-4">
+        Outcomes can have 2-4 milestones. The more milestones an Outcome has, the more weight it has in the story.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">How Milestones are Added</h3>
+      <p class="mb-4">
+        Milestones are added after each mini-chapter (called a <strong>Thread</strong>). See the lecture "Narrative Structure: Switches and Threads" for more details. Here's the basic flow:
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <ol class="list-decimal list-inside space-y-3 ml-4">
+          <li><strong>Switch:</strong> 1 Beat to find out what the next mini-chapter will be<br/>
+          <em>Example: Meet Sir Bram, leader of the local Hero Guild</em></li>
+          <li><strong>Thread:</strong> 2-4 Beats to find out which Milestone will be added<br/>
+          <em>Example: Rikkit fails to convince Sir Bram.</em></li>
+          <li><strong>Milestone:</strong> The result is recorded<br/>
+          <em>Example: Unfavorable: Sir Bram keeps the anti-Goblin policies of his Guild in place.</em></li>
+        </ol>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Shared vs. Player Outcomes</h3>
+      <p class="mb-4">
+        Outcomes come in two types:
+      </p>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Shared Outcomes</strong> apply to all players in the story. These address the big questions that affect everyone. You can adjust these in the <strong>"Outcomes" tab</strong> in the Worldbuilding interface.</li>
+        <li><strong>Player Outcomes</strong> only apply to a single player. These focus on individual character arcs and personal stakes. You can adjust these in the <strong>"Players" tab</strong> in the Worldbuilding interface.</li>
+      </ul>
+      <p class="mb-4">
+        We will discuss Shared Outcomes in more detail in the lecture on Multiplayer.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Recommended Structure</h3>
+      <p class="mb-4">
+        For a story with <strong>25 Beats</strong>, we recommend having <strong>3 Outcomes</strong> per player (among Shared and Player Outcomes) with a total of approximately <strong>7 Milestones</strong>. This provides enough narrative momentum without overwhelming the story structure.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Key Concepts Summary</h3>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Outcome:</strong> A question that will define the ending of the story</li>
+        <li><strong>Resolution:</strong> The answer to that question</li>
+        <li><strong>Milestone:</strong> A step towards an Outcome's Resolution</li>
+        <li><strong>Thread:</strong> Mini-chapter that establishes a Milestone</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Design Tip: Balance Outcomes for richer and more engaging stories</h3>
+      <p class="mb-4">
+        In our sample World "Goblin Rights Now!", the AI Worldbuilding Assistant had defined three Outcomes that were all directly related to the characters' activist struggle. We kept the main Outcome about the Hero Guilds' policy changes, but replaced the other two with questions about the main character's self-identity and relationships. This way, stories in our World explore both the <strong>public</strong> (social reform) and <strong>private</strong> (personal journey) sides of our activist characters.
       </p>
     `,
   },
