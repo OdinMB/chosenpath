@@ -90,10 +90,10 @@ export function Page() {
             Everything is free during the beta phase. No account required
             (unless you want to use advanced{" "}
             <a
-              href="/for-storytellers"
+              href="/academy"
               onClick={(e) => {
                 e.preventDefault();
-                navigate("/for-storytellers");
+                navigate("/academy");
               }}
               className="text-link"
             >
@@ -207,10 +207,10 @@ export function Page() {
           </div>
           <div>
             <a
-              href="/for-storytellers"
+              href="/academy"
               onClick={(e) => {
                 e.preventDefault();
-                navigate("/for-storytellers");
+                navigate("/academy");
               }}
               className="footer-link mr-3"
             >

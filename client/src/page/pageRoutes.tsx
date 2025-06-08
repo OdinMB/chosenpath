@@ -9,7 +9,8 @@ import { StoryInitializer } from "./components/StoryInitializer";
 import { PageLayout } from "./PageLayout";
 import { Credits } from "./components/Credits";
 import { Privacy } from "./components/Privacy";
-import { ForStorytellers } from "./components/ForStorytellers";
+import { Academy } from "./components/Academy";
+import { LecturePage } from "./components/LecturePage";
 import { ScrollRestoration } from "react-router-dom";
 import { libraryLoader } from "./loaders/libraryLoader";
 
@@ -54,9 +55,14 @@ export const pageRoutes: RouteObject[] = [
         id: "privacy",
       },
       {
-        path: "/for-storytellers",
-        element: <ForStorytellers />,
-        id: "for-storytellers",
+        path: "/academy",
+        element: <Academy />,
+        id: "academy",
+      },
+      {
+        path: "/academy/:lectureId",
+        element: <LecturePage />,
+        id: "academy-lecture",
       },
       // Group template-related routes under a shared error boundary
       {

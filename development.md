@@ -3,6 +3,7 @@ Smaller commits!
 # NEXT
 
 - 10: Better explain shit to storytellers
+- 2: fix empty player stats if stat is not part of player backgrounds?
 - 2: review process for storytellers who want to publish on website
 
 - 1: Favicons with white background

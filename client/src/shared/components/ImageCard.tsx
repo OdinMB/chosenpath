@@ -5,6 +5,7 @@ import { constructImageUrl } from "shared/utils/imageUtils";
 
 interface ImageCardProps {
   imageRef?: ImageReference;
+  publicImagePath?: string; // For public directory images
   title: string;
   size?: "default" | "large";
   onClick?: () => void;
@@ -14,6 +15,7 @@ interface ImageCardProps {
 
 export const ImageCard = ({
   imageRef,
+  publicImagePath,
   title,
   size = "default",
   onClick,
@@ -23,17 +25,19 @@ export const ImageCard = ({
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Load image from the image reference if available
+  // Load image from either public path or image reference
   useEffect(() => {
-    if (!imageRef) {
+    if (publicImagePath) {
+      // For public directory images, just use the path directly
+      setImageSrc(publicImagePath);
+    } else if (imageRef) {
+      // Use the utility function to construct the image URL for server images
+      const imagePath = constructImageUrl(imageRef);
+      setImageSrc(imagePath);
+    } else {
       setImageSrc(null);
-      return;
     }
-
-    // Use the utility function to construct the image URL
-    const imagePath = constructImageUrl(imageRef);
-    setImageSrc(imagePath);
-  }, [imageRef]);
+  }, [imageRef, publicImagePath]);
 
   // Handle image load success
   const handleImageLoad = () => {
