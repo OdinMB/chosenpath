@@ -5,6 +5,7 @@ Allow: /
 Allow: /library
 Allow: /credits
 Allow: /privacy
+Allow: /academy
 
 # Disallow admin routes
 Disallow: /admin/

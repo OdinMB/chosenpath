@@ -37,6 +37,9 @@ export function LibraryCategoryGrid({
 
   return (
     <div className="space-y-4">
+      <PrimaryButton onClick={() => onBrowseLibrary()} fullWidth size="lg">
+        Browse Entire Library
+      </PrimaryButton>
       <div className="rounded-lg overflow-hidden border border-primary-100">
         <div className="grid grid-cols-2">
           {categories.map((category, index) => (
@@ -56,9 +59,6 @@ export function LibraryCategoryGrid({
           ))}
         </div>
       </div>
-      <PrimaryButton onClick={() => onBrowseLibrary()} fullWidth size="lg">
-        Browse Entire Library
-      </PrimaryButton>
     </div>
   );
 }

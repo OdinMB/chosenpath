@@ -11,8 +11,11 @@ export function Academy() {
           className="w-full object-cover"
         />
       </div>
-      <div className="flex mb-6">
-        <p>
+      <div className="mb-6">
+        <p className="mb-2">
+          Use Chosen Path as your Story Engine. Define Worlds with setting,
+          characters, conflicts, stats, mechanics, possible endings, and much
+          more. Worldbuilding Academy teaches you how.{" "}
           <a href="/users/signin" className="text-link font-semibold">
             Sign in
           </a>{" "}

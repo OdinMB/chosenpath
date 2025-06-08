@@ -82,13 +82,37 @@ export function Page() {
       <div className="max-w-md mx-auto p-4 font-lora">
         <div className="mb-8 text-primary-800">
           <p className="mb-2">
-            Dive into immersive stories. Play alone or invite friends to shape
-            the story with multiple characters — whether you're exploring
-            distant galaxies or serving croissants in a Parisian café.
+            Dive into immersive stories. Play alone or invite friends to shape a
+            story with multiple characters — whether you're exploring distant
+            galaxies or serving croissants in a Parisian café.
           </p>
-          <p>
-            Everything is free during the beta phase. No account required
-            (unless you want to use advanced{" "}
+          <p className="mb-2">
+            Creators can use Chosen Path as a{" "}
+            <a
+              href="/academy"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/academy/story-engine-not-writing-tool");
+              }}
+              className="text-link"
+            >
+              Story Engine
+            </a>
+            . Define Worlds with setting, characters, conflicts, stats,
+            mechanics, possible endings, and much more. Chosen Path writes the
+            prose, reacts to player choices, applies mechanics, and coordinates
+            multiplayer.
+            {/* <a
+              href="/users/signin"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/users/signin");
+              }}
+              className="text-link"
+            >
+              Sign in
+            </a>{" "} */}{" "}
+            Visit our{" "}
             <a
               href="/academy"
               onClick={(e) => {
@@ -97,9 +121,13 @@ export function Page() {
               }}
               className="text-link"
             >
-              storytelling features
-            </a>
-            ). Jump in, share your feedback, and say hello on{" "}
+              Worldbuilding Academy
+            </a>{" "}
+            to learn more.
+          </p>
+          <p>
+            Everything is free during the beta phase. Jump in, share your
+            feedback, and say hello on{" "}
             <a
               href={config.discordUrl}
               target="_blank"
@@ -124,6 +152,14 @@ export function Page() {
             </>
           )}
 
+          {/* TemplateCarousel likely fetches its own templates or uses a global state */}
+          <TemplateCarousel onPlay={handleSelectTemplate} />
+
+          <OrDivider />
+          <LibraryCategoryGrid onBrowseLibrary={handleBrowseWithCategory} />
+
+          <OrDivider />
+
           <PrimaryButton
             onClick={handleNewStory}
             fullWidth
@@ -132,10 +168,6 @@ export function Page() {
           >
             Create Your Own Story
           </PrimaryButton>
-
-          <OrDivider />
-
-          <LibraryCategoryGrid onBrowseLibrary={handleBrowseWithCategory} />
 
           <OrDivider />
 
@@ -158,11 +190,6 @@ export function Page() {
               </PrimaryButton>
             </div>
           </form>
-
-          <OrDivider />
-
-          {/* TemplateCarousel likely fetches its own templates or uses a global state */}
-          <TemplateCarousel onPlay={handleSelectTemplate} />
         </div>
 
         {/* Newsletter Modal */}
@@ -207,6 +234,16 @@ export function Page() {
           </div>
           <div>
             <a
+              href="/academy/story-engine-not-writing-tool"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/academy/story-engine-not-writing-tool");
+              }}
+              className="footer-link mr-3"
+            >
+              For Storytellers
+            </a>
+            <a
               href="/academy"
               onClick={(e) => {
                 e.preventDefault();
@@ -214,7 +251,7 @@ export function Page() {
               }}
               className="footer-link mr-3"
             >
-              For Storytellers
+              Worldbuilding Academy
             </a>
             <a
               href="/privacy"
