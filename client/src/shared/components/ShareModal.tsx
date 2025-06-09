@@ -30,7 +30,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Share Story" width="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Share Link" width="md">
       <div className="mb-4">
         <div className="flex items-stretch">
           <input

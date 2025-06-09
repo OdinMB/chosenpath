@@ -2,7 +2,9 @@ Smaller commits!
 
 # NEXT
 
-- 10: Better explain shit to storytellers
+- 1: Link to relevant academy lectures in the template form sections
+- 1: include the lectures in the sitemap
+
 - 2: fix empty player stats if stat is not part of player backgrounds?
 - 2: review process for storytellers who want to publish on website
 

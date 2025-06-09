@@ -33,7 +33,7 @@ export const ShareLink: React.FC<ShareLinkProps> = ({
           onClick={handleOpenModal}
           className={`text-secondary hover:text-secondary-700 transition-colors ${className}`}
           aria-label="Share this template"
-          title="Share this template"
+          title="Share this World"
           type="button"
         >
           <Icons.Share className="h-5 w-5" />
