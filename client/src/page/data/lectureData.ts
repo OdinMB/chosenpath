@@ -307,10 +307,68 @@ export const lectures: Lecture[] = [
     summary:
       "Define both high-level guidelines (world, tonality, types of conflicts) and concrete elements for your World (characters, locations, factions, rumors, etc.)",
     imagePath: "/academy/setting.jpeg",
+    videoEmbedUrl:
+      "https://iframe.mediadelivery.net/embed/451846/f3b033df-c045-4ff0-8698-349b787ef63c?autoplay=false&loop=false&muted=false&preload=false&responsive=true",
     content: `
-      <p class="mb-4">
-        Coming soon
+      <p class="mt-4 mb-4">
+        Your World's setting consists of three main components: <strong>Guidelines</strong> that establish the high-level framework, <strong>Story Elements</strong> that populate your world with specific details, and <strong>Player Identities and Backgrounds</strong> that represent starting points for the players in your story.
       </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Guidelines</h3>
+      <p class="mb-4">
+        Guidelines flesh out the premise and provide key instructions to the AI about how stories in your World should unfold. They establish the foundation upon which all narratives will be built.
+      </p>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-3"><strong>The World and its Rules.</strong> Define the fundamental laws and social structures that govern your world. These rules create the constraints and opportunities that drive conflict.<br/>
+        <em>Heroes are legally permitted to kill goblins for fame and fortune.</em></p>
+        
+        <p class="mb-3"><strong>Tonality.</strong> Set the emotional atmosphere and narrative voice for your stories. Tonality guides how the AI approaches dialogue, descriptions, and the overall feel of the experience.<br/>
+        <em>Moments of dark humor and satire, especially regarding the hypocrisy of 'heroic' culture.</em></p>
+        
+        <p class="mb-3"><strong>Conflicts and Decisions.</strong> Identify the core dilemmas that characters will face repeatedly throughout stories in your World. These aren't specific plot points, but rather the types of moral and strategic choices that define your setting.<br/>
+        <em>Deciding when to compromise and when to stand firm.</em></p>
+        
+        <p class="mb-3"><strong>Types of Scenes.</strong> Specify the kinds of dramatic situations that should appear in your stories. This helps the AI understand what sorts of Threads to generate and ensures variety in the narrative experience.<br/>
+        <em>Public protest or demonstration; Secret negotiation with a powerful figure.</em></p>
+        
+        <p class="mb-0"><strong>Pacing.</strong> Provide instructions for how the AI should structure the flow of events across multiple Threads. Good pacing guidelines help create emotional rhythm and prevent stories from becoming monotonous.<br/>
+        <em>Alternate between public action Threads and private, personal Threads.</em></p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Story Elements</h3>
+      <p class="mb-4">
+        <strong>Story Elements add specific ingredients to your World.</strong>
+      </p>
+      <p class="mb-4">
+        Characters, locations, items, rumors, factions, events, phenomena, ... You define an initial set of elements. The AI will add additional elements as needed as the story progresses.
+      </p>
+
+      <h4 class="text-md font-semibold mb-2 mt-4">Example: Gruk</h4>
+      <div class="bg-gray-50 p-4 rounded-lg mb-4">
+        <p class="mb-2"><strong>Role:</strong> Leader of the largest goblin enclave in the city, Gruk is a pragmatic organizer who sometimes clashes with more radical activists.</p>
+        <p class="mb-2"><strong>Instructions to the AI:</strong> Gruk can mobilize goblins for protests or provide sanctuary, but expects loyalty and dislikes reckless risks.</p>
+        <p class="mb-2"><strong>Appearance (optional, also used for images):</strong> A broad-shouldered goblin with a missing ear, intricate tattoos, and a commanding presence.</p>
+        <p class="mb-2"><strong>Facts (AI adds more as the story progresses):</strong> Has a secret truce with a local hero, which he keeps hidden from most goblins.</p>
+      </div>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Player Characters</h3>
+      <p class="mb-4">
+        Player characters are defined by <strong>Identities</strong> and <strong>Backgrounds</strong>.
+      </p>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Identities:</strong> pronouns, appearance, mannerisms</li>
+        <li><strong>Backgrounds:</strong> initial stats (see the video on Stats for more details), the role of the character in the World</li>
+      </ul>
+      <p class="mb-4">
+        Each player chooses one Identity and one Background.
+      </p>
+
+      <h3 class="text-lg font-semibold mb-3 mt-6">Summary</h3>
+      <ul class="list-disc list-inside space-y-3 ml-4 mb-4">
+        <li><strong>Guidelines</strong> contain high-level descriptions about the world and the conflicts in the story, as well as instructions for scenes and pacing.</li>
+        <li><strong>Story Elements</strong> define an initial set of characters, locations, items, rumors, etc.</li>
+        <li><strong>Player Identities and Backgrounds</strong> define starting points for the player characters.</li>
+      </ul>
     `,
   },
   {
@@ -319,6 +377,8 @@ export const lectures: Lecture[] = [
     summary:
       "Understand how Chosen Path determines chances of success and failure, and how you can use difficulty levels and Stats to tweak these systems.",
     imagePath: "/academy/success-failure.jpeg",
+    videoEmbedUrl:
+      "https://iframe.mediadelivery.net/embed/451846/a92ef20f-e07a-49e6-8f0e-ec925011b47f?autoplay=false&loop=false&muted=false&preload=false&responsive=true",
     content: `
       <p class="mb-4">
         Coming soon
@@ -329,8 +389,10 @@ export const lectures: Lecture[] = [
     id: "stats",
     title: "Stats: Modeling the World",
     summary:
-      "From the integrity of a spaceship to the relationship between two characters: Stats tell the AI what to monitor and integrate into your stories.",
+      "From the integrity of a spaceship to the relationship between two characters: Stats tell the AI what your stories are about, what to monitor, and how to influence chances of success and failure.",
     imagePath: "/academy/stats.jpeg",
+    videoEmbedUrl:
+      "https://iframe.mediadelivery.net/embed/451846/a74529eb-f935-4084-9f07-c35ff3e774c1?autoplay=false&loop=false&muted=false&preload=false&responsive=true",
     content: `
       <p class="mb-4">
         Coming soon
@@ -340,22 +402,22 @@ export const lectures: Lecture[] = [
   {
     id: "multiplayer",
     title: "Multiplayer",
-    summary: "Features are available, lecture coming soon",
+    summary: "Features are available. Lecture is coming soon.",
     imagePath: "/academy/multiplayer.jpeg",
     content: `
       <p class="mb-4">
-        Coming soon
+        Multiplayer features are available. Lecture is coming soon.
       </p>
     `,
   },
   {
     id: "images",
     title: "Images",
-    summary: "Features are available, lecture coming soon",
+    summary: "Features are available. Lecture is coming soon.",
     imagePath: "/academy/images.jpeg",
     content: `
       <p class="mb-4">
-        Coming soon
+        Image features are available. Lecture is coming soon.
       </p>
     `,
   },
