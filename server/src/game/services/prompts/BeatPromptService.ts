@@ -60,7 +60,7 @@ export class BeatPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 5-6 paragraphs of 4-5 sentences each followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of 3-5 sentences each followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.${
       story.getCurrentBeatType() === "thread"
         ? "\nBeats in threads that have a favorable/unfavorable or sideA/sideB wins format are resolved to end in a favorable/mixed/unfavorable result." +
@@ -357,11 +357,15 @@ Example: If the player decided to organize a vote, describe what they do, how th
 --- Players will see the options below the beat text. Talking about them in the beat text is redundant.
 --- Avoid these kinds of formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options carefully', 'the complexity of your decision ...'
 
+These are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!
+
 Image tags
 ${
   story.hasImages() || story.generatesImages()
     ? "You can include image tags in the beat text to show images from the story's image library:\n" +
-      "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in. No image tags at the end of the beat text.\n" +
+      "- Add an '[image]' tag at the beginning of the paragraph that you want to show the image in.\n" +
+      "--- A good distribution is an image tag for the first paragraph and one for the third or fourth paragraph.\n" +
+      "--- No image tags for the last paragraph, and no image tags after the last paragraph.\n" +
       "- Parameters:\n" +
       "--- id: the id of the image from the story's image library. The id must match exactly. Only use ids that are listed in the image library" +
       (story.generatesImages()

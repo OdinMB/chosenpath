@@ -213,15 +213,16 @@ export const createBeatGenerationSchema = (
   // Add image-specific instructions based on generateImages flag
   const imageInstructions =
     generateImages || hasImages
-      ? "- You can add 1 or ideally 2 image tags to the beat text (3 are already too many).\n" +
+      ? "- You can add 1 or ideally 2 image tags to the beat text (3 are too many).\n" +
         "--- Format: '[image id=mrs_sukuhashi source=template desc=\"Mrs. Sukuhashi\" float=right]'.\n" +
         "--- You can ONLY use images that are listed in the story state's image library" +
         (generateImages ? " and that you just requested to be generated" : "") +
         ". No other images exist.\n" +
         "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
+        "--- A good distribution is to have one image tag right before the first paragraph and one on the third or fourth paragraph. Avoid using image tags in or right in front of the last paragraph.\n" +
         "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
         (generateImages
-          ? "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n"
+          ? "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text (third or fourth paragraph). That way, we buy some time for the image generation to finish.\n"
           : "")
       : "- Do NOT include any image tags in the beat text. This story does not support images.\n";
 
@@ -229,7 +230,7 @@ export const createBeatGenerationSchema = (
   const closingInstructions =
     "- Never introduce, talk about, or even hint at the player's options in the beat text.\n" +
     "--- Avoid all of these and similar formulations: 'The path before you ...', 'Will you do X, or will you do Y?', 'You must decide: ...', 'You weigh your options', 'The complexity of your decision ...'\n" +
-    "- Remember: 5-6 paragraphs, 3-5 sentences each!";
+    "\nThese are a lot of instructions, so let me repeat the most important one: You MUST write 5-6 paragraphs with 3-5 sentences each! Otherwise, there simply isn't enough text to move the story forward with enough depth and detail. So again: 5-6 paragraphs, 3-5 sentences each!";
 
   const fullTextDescription =
     baseTextDescription + imageInstructions + closingInstructions;
