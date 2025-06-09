@@ -19,7 +19,7 @@ import {
   TemplateIterationSections,
   GameModes,
 } from "core/types";
-import { PrimaryButton, Icons, Select, Tabs } from "components/ui";
+import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
@@ -225,20 +225,47 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         <div className="flex items-center gap-3 mb-4">
           {/* Allow all users to select a publication status, but restrict 'Published' option if !canPublish */}
-          <Select
-            value={formData.publicationStatus || PublicationStatus.Draft}
-            onChange={handlePublicationStatusChange}
-            variant="default"
-            size="sm"
-            className="w-40"
-          >
-            <option value={PublicationStatus.Draft}>Draft</option>
-            <option value={PublicationStatus.Review}>Review</option>
-            {canPublish && (
-              <option value={PublicationStatus.Published}>Published</option>
-            )}
-            <option value={PublicationStatus.Private}>Private</option>
-          </Select>
+          <div className="flex items-center">
+            <Select
+              value={formData.publicationStatus || PublicationStatus.Draft}
+              onChange={handlePublicationStatusChange}
+              variant="default"
+              size="sm"
+              className="w-40"
+            >
+              <option value={PublicationStatus.Draft}>Draft</option>
+              <option value={PublicationStatus.Review}>Review</option>
+              {canPublish && (
+                <option value={PublicationStatus.Published}>Published</option>
+              )}
+              <option value={PublicationStatus.Private}>Private</option>
+            </Select>
+            <InfoIcon
+              tooltipText={
+                <div className="text-sm">
+                  <div className="mb-2">
+                    <strong>Draft:</strong> nobody can see this World or play
+                    stories in it
+                  </div>
+                  <div className="mb-2">
+                    <strong>Private:</strong> the World is not listed on
+                    chosenpath.ai, but you can share a link to it to allow
+                    players to play stories in it.
+                  </div>
+                  <div className="mb-2">
+                    <strong>Review:</strong> flagging the World to be reviewed
+                    for public display on chosenpath.ai.
+                  </div>
+                  <div>
+                    <strong>Published:</strong> lists the story on
+                    chosenpath.ai. Can only be set by admins.
+                  </div>
+                </div>
+              }
+              position="right"
+              className="ml-2"
+            />
+          </div>
 
           {formData.id &&
             (formData.publicationStatus === PublicationStatus.Published ||

@@ -6,7 +6,7 @@ import { templateApi } from "resources/templates/templateApi.js";
 import { TemplateMetadata } from "core/types";
 import { useAuth } from "client/shared/auth/useAuth.js";
 import { useState } from "react";
-import { DiscordButton } from "client/shared/components/DiscordButton.js";
+import { config } from "client/config.js";
 
 /**
  * User template list component for users with templates_create permission
@@ -97,42 +97,25 @@ export const UserTemplateList = () => {
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">
-              Learn how to create and tweak story environments
-            </h3>
-            <div className="mt-2 text-sm text-blue-700">
-              <div className="space-y-1">
-                <div>
-                  <a
-                    href="https://www.loom.com/share/1b12f539294f441a9ca3209de5467b9a"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Part 1/2: (Playing Your Story, Guidelines, Media, Story
-                    Elements)
-                  </a>
-                </div>
-                <div>
-                  <a
-                    href="https://www.loom.com/share/b350dbd863d2475c880723515807812a"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Part 2/2: (Switches/Threads/Outcomes, Players, AI Features)
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-blue-700 mt-3">
-                <span>You have questions? Join our Discord!</span>
-                <DiscordButton
-                  variant="outline"
-                  showText={true}
-                  className="ml-4"
-                />
-              </div>
-            </div>
+            <p className="text-sm font-medium text-blue-800">
+              Learn how to create Worlds in our{" "}
+              <a
+                href="/academy"
+                className="font-medium text-blue-600 hover:text-blue-800 underline"
+              >
+                Worldbuilding Academy
+              </a>
+              . Join our{" "}
+              <a
+                href={config.discordUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-blue-600 hover:text-blue-800 underline"
+              >
+                Discord
+              </a>{" "}
+              to meet other students and faculty.
+            </p>
           </div>
         </div>
       </div>
