@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { PlayerCount, DifficultyLevel, TemplateMetadata } from "core/types";
 import { PrimaryButton, Icons, InfoIcon } from "components/ui";
@@ -26,28 +26,15 @@ interface MinimalTemplate {
 }
 
 export function TemplateConfigurator() {
-  const { template } = useLoaderData() as TemplateConfigLoaderData;
+  const loaderData = useLoaderData() as TemplateConfigLoaderData;
+  const { template } = loaderData;
   const navigate = useNavigate();
-  const [playerCount, setPlayerCount] = useState<PlayerCount>(
-    template.playerCountMin
-  );
-  const [maxTurns, setMaxTurns] = useState(template.maxTurnsMin);
+
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(1);
+  const [maxTurns, setMaxTurns] = useState(10);
   const [generateImages, setGenerateImages] = useState(false);
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
-      if (template.difficultyLevels && template.difficultyLevels.length > 0) {
-        const levels = template.difficultyLevels;
-        // Sort by modifier ascending (easier to harder)
-        const sortedLevels = [...levels].sort(
-          (a, b) => a.modifier - b.modifier
-        );
-        // For even number of levels, choose the more difficult of the two middle options
-        const midIndex = Math.floor(sortedLevels.length / 2);
-        // If even number of levels, use midIndex directly (which is the more difficult option)
-        // Since options are sorted by modifier ascending (easier to harder)
-        const adjustedIndex = midIndex;
-        return sortedLevels[adjustedIndex];
-      }
       return getDefaultDifficultyLevel();
     });
   const [rateLimit, setRateLimit] = useState<
@@ -62,6 +49,48 @@ export function TemplateConfigurator() {
     createStoryFromTemplate,
     handleCodeSubmit,
   } = useStoryCreation();
+
+  // Initialize state with actual template data (only if template is valid)
+  useEffect(() => {
+    if (template && template.playerCountMin !== undefined) {
+      setPlayerCount(template.playerCountMin);
+      setMaxTurns(template.maxTurnsMin || 10);
+
+      if (template.difficultyLevels && template.difficultyLevels.length > 0) {
+        const levels = template.difficultyLevels;
+        const sortedLevels = [...levels].sort(
+          (a, b) => a.modifier - b.modifier
+        );
+        const midIndex = Math.floor(sortedLevels.length / 2);
+        setSelectedDifficultyLevel(sortedLevels[midIndex]);
+      }
+    }
+  }, [template]);
+
+  // Check for template validity - fail fast if data is missing or invalid
+  if (
+    !template ||
+    !template.id ||
+    template.playerCountMin === undefined ||
+    template.playerCountMax === undefined
+  ) {
+    return (
+      <div className="p-4 md:p-6 font-lora">
+        <div className="max-w-2xl mx-auto text-center">
+          <h1 className="text-2xl font-bold text-primary-800 mb-4">
+            Template Error
+          </h1>
+          <p className="text-primary-600 mb-6">
+            This template has invalid or missing data and cannot be displayed.
+            Please try another template.
+          </p>
+          <PrimaryButton onClick={() => navigate("/library")}>
+            Browse Library
+          </PrimaryButton>
+        </div>
+      </div>
+    );
+  }
 
   // Determine if configuration is needed for each option
   const needsPlayerConfig = template.playerCountMin !== template.playerCountMax;

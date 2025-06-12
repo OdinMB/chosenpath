@@ -602,8 +602,8 @@ export const TemplateOverview = ({
       render: (template) => (
         <>
           {template.playerCountMin === template.playerCountMax
-            ? template.playerCountMin
-            : `${template.playerCountMin}-${template.playerCountMax}`}
+            ? template.playerCountMin ?? 1
+            : `${template.playerCountMin ?? 1}-${template.playerCountMax ?? 1}`}
         </>
       ),
     },

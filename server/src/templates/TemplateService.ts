@@ -455,42 +455,103 @@ export class TemplateService {
         await fs.mkdir(templateDir, { recursive: true });
       }
 
-      // Write updated template.json to the template directory
-      const templateFilePath = path.join(templateDir, "template.json");
-      await fs.writeFile(
-        templateFilePath,
-        JSON.stringify(mergedTemplate, null, 2)
-      );
-
       // Use the containsImages value from the template itself
       const containsImages = mergedTemplate.containsImages || false;
 
-      // Update database entry with metadata fields
-      await templateDbService.updateTemplateEntry(id, {
-        creatorId: mergedTemplate.creatorId || null,
-        publicationStatus: mergedTemplate.publicationStatus,
-        carouselOrder: mergedTemplate.showOnWelcomeScreen
-          ? mergedTemplate.order
-          : null,
-        containsImages,
-        title: mergedTemplate.title,
-        teaser: mergedTemplate.teaser,
-        gameMode: mergedTemplate.gameMode,
-        tags: mergedTemplate.tags,
-        playerCountMin: mergedTemplate.playerCountMin,
-        playerCountMax: mergedTemplate.playerCountMax,
-        maxTurnsMin: mergedTemplate.maxTurnsMin,
-        maxTurnsMax: mergedTemplate.maxTurnsMax,
-        difficultyLevels: mergedTemplate.difficultyLevels,
-        showOnWelcomeScreen: mergedTemplate.showOnWelcomeScreen,
-        orderValue: mergedTemplate.order,
-      });
+      // TRANSACTION SAFETY: Update database entry FIRST
+      // If this fails, we don't want to update the file
+      try {
+        await templateDbService.updateTemplateEntry(id, {
+          creatorId: mergedTemplate.creatorId || null,
+          publicationStatus: mergedTemplate.publicationStatus,
+          carouselOrder: mergedTemplate.showOnWelcomeScreen
+            ? mergedTemplate.order
+            : null,
+          containsImages,
+          title: mergedTemplate.title,
+          teaser: mergedTemplate.teaser,
+          gameMode: mergedTemplate.gameMode,
+          tags: mergedTemplate.tags,
+          playerCountMin: mergedTemplate.playerCountMin,
+          playerCountMax: mergedTemplate.playerCountMax,
+          maxTurnsMin: mergedTemplate.maxTurnsMin,
+          maxTurnsMax: mergedTemplate.maxTurnsMax,
+          difficultyLevels: mergedTemplate.difficultyLevels,
+          showOnWelcomeScreen: mergedTemplate.showOnWelcomeScreen,
+          orderValue: mergedTemplate.order,
+        });
 
-      this.logger.log(`Updated template ${id}: ${mergedTemplate.title}`);
+        this.logger.log(`Database entry updated for template ${id}`);
+      } catch (dbError) {
+        this.logger.error(`Database update failed for template ${id}`, dbError);
+        throw new Error(
+          `Failed to update template metadata in database: ${
+            (dbError as Error).message
+          }`
+        );
+      }
+
+      // Only update the file if database update succeeded
+      try {
+        const templateFilePath = path.join(templateDir, "template.json");
+        await fs.writeFile(
+          templateFilePath,
+          JSON.stringify(mergedTemplate, null, 2)
+        );
+
+        this.logger.log(
+          `File updated for template ${id}: ${mergedTemplate.title}`
+        );
+      } catch (fileError) {
+        this.logger.error(`File update failed for template ${id}`, fileError);
+
+        // ROLLBACK: Try to revert database changes by updating with original template data
+        try {
+          await templateDbService.updateTemplateEntry(id, {
+            creatorId: existingTemplate.creatorId || null,
+            publicationStatus: existingTemplate.publicationStatus,
+            carouselOrder: existingTemplate.showOnWelcomeScreen
+              ? existingTemplate.order
+              : null,
+            containsImages: existingTemplate.containsImages || false,
+            title: existingTemplate.title,
+            teaser: existingTemplate.teaser,
+            gameMode: existingTemplate.gameMode,
+            tags: existingTemplate.tags,
+            playerCountMin: existingTemplate.playerCountMin,
+            playerCountMax: existingTemplate.playerCountMax,
+            maxTurnsMin: existingTemplate.maxTurnsMin,
+            maxTurnsMax: existingTemplate.maxTurnsMax,
+            difficultyLevels: existingTemplate.difficultyLevels,
+            showOnWelcomeScreen: existingTemplate.showOnWelcomeScreen,
+            orderValue: existingTemplate.order,
+          });
+          this.logger.log(`Rolled back database changes for template ${id}`);
+        } catch (rollbackError) {
+          this.logger.error(
+            `Rollback failed for template ${id}`,
+            rollbackError
+          );
+          // This is a critical error - database and file are now out of sync
+          throw new Error(
+            `Critical error: Template ${id} is now in an inconsistent state. File update failed and rollback also failed.`
+          );
+        }
+
+        throw new Error(
+          `Failed to update template file: ${(fileError as Error).message}`
+        );
+      }
+
+      this.logger.log(
+        `Successfully updated template ${id}: ${mergedTemplate.title}`
+      );
       return mergedTemplate;
     } catch (error) {
       this.logger.error(`Failed to update template ${id}`, error);
-      throw new Error(`Failed to update story template ${id}`);
+      throw new Error(
+        `Failed to update story template ${id}: ${(error as Error).message}`
+      );
     }
   }
 

@@ -52,11 +52,13 @@ export const TemplateCard = ({
       <div className="flex flex-col gap-1 text-primary-500 mb-4">
         <div className="flex items-center gap-8">
           <span className={`${sizeClasses.info} font-semibold`}>
-            {template.playerCountMin === template.playerCountMax
-              ? `${template.playerCountMin} player${
-                  template.playerCountMin > 1 ? "s" : ""
+            {(template.playerCountMin ?? 1) === (template.playerCountMax ?? 1)
+              ? `${template.playerCountMin ?? 1} player${
+                  (template.playerCountMin ?? 1) > 1 ? "s" : ""
                 }`
-              : `${template.playerCountMin}-${template.playerCountMax} players`}
+              : `${template.playerCountMin ?? 1}-${
+                  template.playerCountMax ?? 1
+                } players`}
           </span>
           <span className={`${sizeClasses.info} font-semibold`}>
             {template.maxTurnsMin === template.maxTurnsMax

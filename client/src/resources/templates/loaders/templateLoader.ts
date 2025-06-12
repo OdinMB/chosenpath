@@ -31,10 +31,27 @@ export async function playableTemplateLoader(templateId: string): Promise<{
   try {
     Logger.App.log(`Loading template metadata ${templateId}`);
     const template = await templateApi.getTemplateMetadata(templateId);
+
+    // Validate template has required properties
+    if (
+      !template.id ||
+      template.playerCountMin === undefined ||
+      template.playerCountMax === undefined
+    ) {
+      Logger.App.error(`Template ${templateId} has invalid metadata`, template);
+      return { template: null };
+    }
+
     Logger.App.log(`Loaded template metadata: ${template.title}`);
     return { template };
   } catch (error) {
     Logger.App.error(`Failed to load template metadata ${templateId}`, error);
+
+    // Throw specific errors for route error boundary to handle
+    if (error && typeof error === "object" && "status" in error) {
+      throw error; // Re-throw HTTP errors for proper error boundary handling
+    }
+
     return { template: null };
   }
 }
@@ -52,6 +69,21 @@ export async function configurableTemplateLoader(templateId: string): Promise<{
     // Get metadata (now includes difficulty levels)
     const metadata = await templateApi.getTemplateMetadata(templateId);
 
+    // Validate template has required properties for configuration
+    if (
+      !metadata.id ||
+      metadata.playerCountMin === undefined ||
+      metadata.playerCountMax === undefined
+    ) {
+      Logger.App.error(
+        `Template ${templateId} has invalid configuration data`,
+        metadata
+      );
+      throw new Error(
+        `Template configuration is invalid. Missing required player count information.`
+      );
+    }
+
     Logger.App.log(
       `Loaded configurable template: ${metadata.title} with ${
         metadata.difficultyLevels?.length || 0
@@ -63,6 +95,13 @@ export async function configurableTemplateLoader(templateId: string): Promise<{
       `Failed to load configurable template ${templateId}`,
       error
     );
-    return { template: null };
+
+    // Throw specific errors for route error boundary to handle
+    if (error && typeof error === "object" && "status" in error) {
+      throw error; // Re-throw HTTP errors for proper error boundary handling
+    }
+
+    // Throw our own error for validation failures
+    throw error;
   }
 }
