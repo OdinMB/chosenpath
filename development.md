@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 1: Link to relevant academy lectures in the template form sections
+- 1: Link to relevant lectures in the template form sections
 - 1: include the lectures in the sitemap
 
 - 2: fix empty player stats if stat is not part of player backgrounds?
@@ -32,7 +32,7 @@ Focus: Text/Images, English, Multiplayer
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
 - 30: Different languages
 - 10: Resolution animation elements (thread, group)
-- 5: Setting to deactivate the resolution animations
+- 2: Setting to deactivate the resolution animations
 - 10: Create story based on kids' drawings
 - 10: creation/template setting: jokers to see risky/safe or even modifiers
 - 20: Music (OpenAI's new API?)
@@ -50,6 +50,43 @@ Focus: Text/Images, English, Multiplayer
 - 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images generated in template-based stories to the template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
+
+# MOBILE APPS
+
+My Updated Recommendation: Expo with Web Support
+This approach gives you the best of both worlds:
+Migration Strategy
+Phase 1: Setup Expo Universal App
+Apply to development....
+Run
+Phase 2: Gradual Migration
+Move shared code to universal app
+Create platform-aware components:
+Apply to development....
+Adapt navigation:
+Apply to development....
+Phase 3: Platform-Specific Optimization
+Apply to development....
+Key Benefits for Your Situation
+Your existing web app logic (contexts, hooks, services) can be copied almost verbatim
+WebSocket service will work unchanged
+API client needs minimal changes
+Game state management transfers directly
+Single deployment pipeline for all platforms
+Code Reuse Reality Check
+With this approach:
+Business logic: ~98% reuse
+API/WebSocket code: ~95% reuse
+UI components: ~60-70% reuse (platform differences)
+Navigation: ~80% reuse (similar concepts)
+Overall: ~85-90% code reuse
+Migration Path
+Week 1-2: Set up Expo universal app
+Week 3-4: Move your shared/ folder logic
+Week 5-6: Recreate key UI components for mobile
+Week 7-8: Get basic mobile app working
+Week 9+: Add mobile-specific features and polish
+Would you like me to help you set up the initial Expo universal app structure and show you how to migrate your first shared components?
 
 # TECHNICALITIES
 

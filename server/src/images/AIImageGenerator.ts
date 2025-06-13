@@ -27,6 +27,7 @@ import fs from "fs";
 import path from "path";
 import { getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
+import sharp from "sharp";
 dotenv.config();
 
 export class AIImageGenerator {
@@ -118,16 +119,19 @@ export class AIImageGenerator {
 
     Logger.Story.log("Generating cover image");
 
-    // Generate the image
-    const imageBuffer = await this.generateImage(
+    // Generate the image at original size
+    const originalImageBuffer = await this.generateImage(
       prompt,
       undefined, // No references
-      size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers
+      size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
       quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
     );
 
-    // Save the image with 'cover' as the ID
-    return this.saveImageToTemplate("cover", templateId, imageBuffer);
+    // Resize cover images to square format for better main page display
+    const resizedImageBuffer = await this.resizeCoverImage(originalImageBuffer);
+
+    // Save the resized image with 'cover' as the ID
+    return this.saveImageToTemplate("cover", templateId, resizedImageBuffer);
   }
 
   public getImagePrompt(
@@ -171,6 +175,42 @@ export class AIImageGenerator {
     prompt += `Text: Don't include any title or caption texts in the image.`;
 
     return prompt;
+  }
+
+  /**
+   * Resize cover images from portrait (1024x1536) to smaller portrait (683x1024) format
+   * for better display on the main page where multiple covers are shown
+   */
+  private async resizeCoverImage(imageBuffer: Buffer): Promise<Buffer> {
+    try {
+      Logger.Story.log("Resizing cover image to smaller portrait format");
+
+      // Calculate target dimensions maintaining aspect ratio
+      // Original: 1024x1536, Target height: 768px
+      // Target width: 768 * (1024/1536) = 683px (rounded)
+      const targetWidth = Math.round(768 * (1024 / 1536));
+      const targetHeight = 768;
+
+      const resizedBuffer = await sharp(imageBuffer)
+        .resize(targetWidth, targetHeight, {
+          fit: "inside", // Resize to fit within dimensions, maintaining aspect ratio
+          withoutEnlargement: true,
+        })
+        .jpeg({
+          quality: IMAGE_GENERATION_OUTPUT_COMPRESSION,
+          progressive: true,
+        })
+        .toBuffer();
+
+      Logger.Story.log(
+        `Cover image resized successfully to ${targetWidth}x${targetHeight}`
+      );
+      return resizedBuffer;
+    } catch (error) {
+      Logger.Story.error("Error resizing cover image:", error);
+      // Return original buffer if resizing fails
+      return imageBuffer;
+    }
   }
 
   private async generateImage(
