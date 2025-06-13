@@ -8,7 +8,7 @@ Smaller commits!
 - 2: fix empty player stats if stat is not part of player backgrounds?
 - 2: review process for storytellers who want to publish on website
 
-- 1: Favicons with white background
+- 2: compress images (page, template covers)
 - 2: Show feedbacks in admin panel
 
 # BETTER EXPERIENCE
