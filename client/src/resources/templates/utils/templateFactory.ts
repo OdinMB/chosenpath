@@ -7,6 +7,7 @@ import {
   StoryElement,
 } from "core/types";
 import { MAX_PLAYERS } from "core/config";
+import { DEFAULT_DIFFICULTY_LEVELS } from "core/utils/difficultyUtils";
 
 /**
  * Creates a default empty template for a single player game
@@ -22,7 +23,9 @@ export function createDefaultTemplate(): StoryTemplate {
     maxTurnsMax: 15,
     teaser: "",
     tags: [],
-    difficultyLevels: [],
+    difficultyLevels: [
+      DEFAULT_DIFFICULTY_LEVELS.find((level) => level.modifier === 0)!,
+    ],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     title: "",

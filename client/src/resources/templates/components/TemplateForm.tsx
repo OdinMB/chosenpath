@@ -18,6 +18,7 @@ import {
   StoryElement,
   TemplateIterationSections,
   GameModes,
+  PlayerCount,
 } from "core/types";
 import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
@@ -28,17 +29,80 @@ import { Logger } from "shared/logger";
 interface TemplateFormProps {
   initialTemplate: StoryTemplate;
   onSave: (template: StoryTemplate) => Promise<void>;
-  onCancel: () => void;
   canPublish?: boolean;
   canSetWelcomeScreen?: boolean;
   canManageTags?: boolean;
   canGenerateImages?: boolean;
 }
 
+// Custom hook for AI draft form state management
+const useAiDraftForm = (
+  title?: string,
+  teaser?: string,
+  playerCountMax?: PlayerCount
+) => {
+  const [aiDraftPrompt, setAiDraftPrompt] = React.useState<string>("");
+  const [hasUserSetAiDraftPrompt, setHasUserSetAiDraftPrompt] =
+    React.useState(false);
+
+  const [aiDraftPlayerCount, setAiDraftPlayerCount] = React.useState<
+    PlayerCount | undefined
+  >(undefined);
+  const [lastSetupPlayerCount, setLastSetupPlayerCount] = React.useState<
+    PlayerCount | undefined
+  >(undefined);
+
+  // Update AI draft prompt based on form data when user hasn't manually set it
+  React.useEffect(() => {
+    const constructedPrompt =
+      title || teaser
+        ? `${title || ""}${title && teaser ? " - " : ""}${teaser || ""}`.trim()
+        : "";
+
+    if (constructedPrompt && !hasUserSetAiDraftPrompt) {
+      setAiDraftPrompt(constructedPrompt);
+    }
+  }, [title, teaser, hasUserSetAiDraftPrompt]);
+
+  // Handle player count changes from setup
+  React.useEffect(() => {
+    if (playerCountMax !== undefined) {
+      // If setup value changed, always update draft
+      if (playerCountMax !== lastSetupPlayerCount) {
+        setAiDraftPlayerCount(playerCountMax);
+        setLastSetupPlayerCount(playerCountMax);
+      }
+      // If no draft value set yet, use setup value
+      else if (aiDraftPlayerCount === undefined) {
+        setAiDraftPlayerCount(playerCountMax);
+        setLastSetupPlayerCount(playerCountMax);
+      }
+    }
+  }, [playerCountMax, lastSetupPlayerCount, aiDraftPlayerCount]);
+
+  // Handle AI draft form prompt change callback
+  const handleAiDraftPromptChange = (prompt: string) => {
+    setAiDraftPrompt(prompt);
+    setHasUserSetAiDraftPrompt(true);
+  };
+
+  // Handle AI draft player count change callback
+  const handleAiDraftPlayerCountChange = (playerCount: PlayerCount) => {
+    setAiDraftPlayerCount(playerCount);
+    // Don't update lastSetupPlayerCount here - we want to track setup changes separately
+  };
+
+  return {
+    aiDraftPrompt,
+    aiDraftPlayerCount,
+    handleAiDraftPromptChange,
+    handleAiDraftPlayerCountChange,
+  };
+};
+
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   initialTemplate,
   onSave,
-  onCancel,
   canPublish = false,
   canSetWelcomeScreen = false,
   canManageTags = false,
@@ -91,6 +155,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     onSave,
   });
 
+  // AI draft form hook
+  const {
+    aiDraftPrompt,
+    aiDraftPlayerCount,
+    handleAiDraftPromptChange,
+    handleAiDraftPlayerCountChange,
+  } = useAiDraftForm(formData.title, formData.teaser, formData.playerCountMax);
+
   // Add these hooks for AI iteration
   const {
     isModalOpen,
@@ -104,14 +176,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Define tab navigation items
   const tabItems = [
     { id: "basic" as TabType, label: "Setup" },
+    { id: "ai-draft" as TabType, label: "AI Draft" },
     { id: "media" as TabType, label: "Media" },
     { id: "guidelines" as TabType, label: "Guidelines" },
     { id: "elements" as TabType, label: "Elements" },
     { id: "outcomes" as TabType, label: "Outcomes" },
     { id: "stats" as TabType, label: "Stats" },
     { id: "players" as TabType, label: "Players" },
-    { id: "ai-draft" as TabType, label: "Draft" },
-    { id: "ai-iterate" as TabType, label: "Iteration" },
+    { id: "ai-iterate" as TabType, label: "AI Iteration" },
   ];
 
   const handleAcceptSectionUpdate = (
@@ -204,15 +276,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           </h2>
           <div className="flex gap-2">
             <PrimaryButton
-              type="button"
-              onClick={onCancel}
-              variant="outline"
-              size="lg"
-              disabled={isLoading}
-            >
-              Cancel
-            </PrimaryButton>
-            <PrimaryButton
               type="submit"
               disabled={isLoading}
               isLoading={isLoading}
@@ -248,9 +311,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     stories in it
                   </div>
                   <div className="mb-2">
-                    <strong>Private:</strong> the World is not listed on
-                    chosenpath.ai, but you can share a link to it to allow
-                    players to play stories in it.
+                    <strong>Private:</strong> you can share a link to your World
+                    to allow players to play stories in it.
                   </div>
                   <div className="mb-2">
                     <strong>Review:</strong> flagging the World to be reviewed
@@ -426,16 +488,17 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
           {activeTab === "ai-draft" && (
             <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-2">
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
                 <div className="flex items-start">
-                  <Icons.Warning className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
+                  <Icons.Info className="h-5 w-5 text-blue-400 mr-2 mt-0.5" />
                   <div>
-                    <p className="text-sm text-yellow-700 font-medium">
-                      Warning
+                    <p className="text-sm text-blue-700 mb-3">
+                      Drop your ideas into this form to get a full draft of your
+                      World. This can be a premise, loose ideas, or a detailed
+                      outline.
                     </p>
-                    <p className="text-sm text-yellow-600">
-                      Generating a new template will override any existing
-                      information in this form.
+                    <p className="text-sm text-blue-700 font-medium">
+                      Warning: Generating a draft will override your World.
                     </p>
                   </div>
                 </div>
@@ -443,13 +506,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               <StoryInitializer
                 onSetup={handleAIDraftSetup}
                 onBack={() => setActiveTab("basic")}
-                initialPlayerCount={formData.playerCountMin}
+                initialPlayerCount={
+                  aiDraftPlayerCount || formData.playerCountMax
+                }
                 initialMaxTurns={formData.maxTurnsMin}
                 initialGameMode={formData.gameMode || GameModes.Cooperative}
                 showBackButton={false}
                 isLoading={isLoading}
                 templateMode={true}
-                showDifficultySlider={true}
+                showDifficultySlider={false}
+                initialPrompt={aiDraftPrompt}
+                onPlayerCountChange={handleAiDraftPlayerCountChange}
+                onPromptChange={handleAiDraftPromptChange}
               />
             </div>
           )}

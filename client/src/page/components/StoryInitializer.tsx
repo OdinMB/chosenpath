@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { PlayerCount, GameMode, GameModes, DifficultyLevel } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { Logger } from "shared/logger";
@@ -30,6 +30,9 @@ interface StoryInitializerProps {
   isLoading?: boolean;
   templateMode?: boolean;
   showDifficultySlider?: boolean;
+  initialPrompt?: string;
+  onPlayerCountChange?: (playerCount: PlayerCount) => void;
+  onPromptChange?: (prompt: string) => void;
 }
 
 export const StoryInitializer = ({
@@ -42,8 +45,11 @@ export const StoryInitializer = ({
   isLoading: externalIsLoading,
   templateMode = false,
   showDifficultySlider = true,
+  initialPrompt,
+  onPlayerCountChange,
+  onPromptChange,
 }: StoryInitializerProps) => {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt || "");
   const [playerCount, setPlayerCount] = useState<PlayerCount>(
     initialPlayerCount || MIN_PLAYERS
   );
@@ -57,7 +63,22 @@ export const StoryInitializer = ({
   );
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(getDefaultDifficultyLevel());
+
   const navigate = useNavigate();
+
+  // Handle changes to initialPlayerCount prop
+  useEffect(() => {
+    if (initialPlayerCount !== undefined) {
+      setPlayerCount(initialPlayerCount);
+    }
+  }, [initialPlayerCount]);
+
+  // Handle changes to initialPrompt prop
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   const {
     isLoading: internalIsLoading,
@@ -170,6 +191,10 @@ export const StoryInitializer = ({
   const handleSuggestion = () => {
     const newPrompt = getRandomPrompt();
     setPrompt(newPrompt);
+
+    if (onPromptChange) {
+      onPromptChange(newPrompt);
+    }
   };
 
   const handleDifficultyChange = (difficultyLevel: DifficultyLevel) => {
@@ -219,17 +244,6 @@ export const StoryInitializer = ({
     }
   };
 
-  const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(e.target.value);
-    setPlayerCount(value as PlayerCount);
-    Logger.App.log(`Updated player count to: ${value}`);
-
-    // Reset game mode to cooperative if switching to single player
-    if (value === 1) {
-      setGameMode(GameModes.Cooperative);
-    }
-  };
-
   const handleGameModeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     let mode: GameMode;
@@ -244,6 +258,14 @@ export const StoryInitializer = ({
 
     setGameMode(mode);
     Logger.App.log(`Updated game mode to: ${mode}`);
+  };
+
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrompt(e.target.value);
+
+    if (onPromptChange) {
+      onPromptChange(e.target.value);
+    }
   };
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
@@ -283,7 +305,18 @@ export const StoryInitializer = ({
               min={MIN_PLAYERS}
               max={MAX_PLAYERS}
               value={playerCount}
-              onChange={handlePlayerCountChange}
+              onChange={(e) => {
+                const value = Number(e.target.value) as PlayerCount;
+                setPlayerCount(value);
+                // Reset game mode to cooperative if switching to single player
+                if (value === 1) {
+                  setGameMode(GameModes.Cooperative);
+                }
+                Logger.App.log(`Updated player count to: ${value}`);
+                if (onPlayerCountChange) {
+                  onPlayerCountChange(value);
+                }
+              }}
               className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
             />
             <div className="flex justify-between text-xs md:text-sm text-primary-600">
@@ -353,7 +386,7 @@ export const StoryInitializer = ({
           <textarea
             id="prompt"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={handlePromptChange}
             className={`w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
             placeholder={getPlaceholderText()}
             disabled={currentIsLoading}
@@ -419,7 +452,7 @@ export const StoryInitializer = ({
             fullWidth
             className="font-semibold text-lg"
           >
-            {templateMode ? "Draft Content" : "Create Story"}
+            {templateMode ? "Draft World" : "Create Story"}
           </PrimaryButton>
         </div>
       </FormWrapper>
