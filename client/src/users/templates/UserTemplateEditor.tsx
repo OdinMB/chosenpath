@@ -1,4 +1,4 @@
-import { useLoaderData, useNavigate } from "react-router-dom";
+import { useLoaderData } from "react-router-dom";
 import { TemplateForm } from "resources/templates/components/TemplateForm.js";
 import { StoryTemplate } from "core/types/index.js";
 import { Logger } from "shared/logger.js";
@@ -13,7 +13,6 @@ export const UserTemplateEditor = () => {
   // The loader returns { template } so we need to extract it
   const loaderData = useLoaderData() as { template: StoryTemplate };
   const template = loaderData?.template;
-  const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
   // Check if user has templates_create permission
@@ -80,15 +79,10 @@ export const UserTemplateEditor = () => {
     }
   };
 
-  const handleCancel = () => {
-    navigate("/users/my-worlds");
-  };
-
   return (
     <TemplateForm
       initialTemplate={template}
       onSave={handleSave}
-      onCancel={handleCancel}
       canPublish={false} // Users can't publish templates
       canSetWelcomeScreen={false} // Users can't set welcome screen
       canManageTags={true}

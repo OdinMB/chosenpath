@@ -1,4 +1,4 @@
-import { useLoaderData, useNavigate } from "react-router-dom";
+import { useLoaderData } from "react-router-dom";
 import { TemplateForm } from "resources/templates/components/TemplateForm.js";
 import { StoryTemplate } from "core/types/index.js";
 import { Logger } from "shared/logger.js";
@@ -13,7 +13,6 @@ export const AdminTemplateEditor = () => {
   // The loader returns { template } so we need to extract it
   const loaderData = useLoaderData() as { template: StoryTemplate };
   const template = loaderData?.template;
-  const navigate = useNavigate();
 
   // Log the template data for debugging
   Logger.Admin.log("Template data loaded:", template);
@@ -51,15 +50,10 @@ export const AdminTemplateEditor = () => {
     }
   };
 
-  const handleCancel = () => {
-    navigate("/admin/templates");
-  };
-
   return (
     <TemplateForm
       initialTemplate={template}
       onSave={handleSave}
-      onCancel={handleCancel}
       canPublish={true}
       canSetWelcomeScreen={true}
       canManageTags={true}
