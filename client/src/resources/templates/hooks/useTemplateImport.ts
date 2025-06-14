@@ -88,18 +88,29 @@ export const useTemplateImport = (
     zipData?: JSZip,
     templateDir: string = ""
   ) => {
-    // Upload asset files if provided
-    if (assetFiles && assetFiles.length > 0 && zipData) {
-      Logger.Admin.log(`Uploading ${assetFiles.length} asset files`);
+    // Always try to create a ZIP if we have zipData, even without explicit asset files
+    if (zipData) {
+      Logger.Admin.log(
+        `Creating ZIP import with template data and any available assets`
+      );
 
-      // Create and upload the asset zip
+      // Ensure template.json is included in the file list
+      const allFiles = assetFiles || [];
+      const templateJsonPath = templateDir
+        ? `${templateDir}/template.json`
+        : "template.json";
+      if (!allFiles.includes(templateJsonPath)) {
+        allFiles.push(templateJsonPath);
+      }
+
+      // Create ZIP with template.json and any assets
       const zipBlob = await createAssetZipFromFiles(
-        assetFiles,
+        allFiles,
         zipData,
         templateDir
       );
 
-      // Only import if we have a valid zip with content
+      // Use ZIP import for proper media file handling
       if (zipBlob.size > 0) {
         const importResult = await templateApi.importTemplateZip(zipBlob);
         Logger.Admin.log(
@@ -109,7 +120,8 @@ export const useTemplateImport = (
       }
     }
 
-    // If no assets or empty zip, just create the template
+    // Only fall back to JSON creation if we have no ZIP data at all
+    Logger.Admin.log(`No ZIP data available, creating template via JSON`);
     const createdTemplate = await templateCore.createTemplate(templateData);
     return createdTemplate;
   };
@@ -311,8 +323,7 @@ export const useTemplateImport = (
           }
         }
       } else {
-        // JSON array import
-        // Iterate over the templates the user saw and confirmed in the dialog
+        // JSON array import - create individual ZIPs for each template
         for (const dialogTemplateInfo of collectionImportDialog.templates) {
           // Only import if it's new or newer
           if (
@@ -320,7 +331,19 @@ export const useTemplateImport = (
             dialogTemplateInfo.isNewer
           ) {
             try {
-              await templateCore.createTemplate(dialogTemplateInfo.template);
+              // Create a minimal ZIP with just the template.json for consistency
+              const templateZip = new JSZip();
+              templateZip.file(
+                "template.json",
+                JSON.stringify(dialogTemplateInfo.template, null, 2)
+              );
+              const zipBlob = await templateZip.generateAsync({ type: "blob" });
+
+              // Use ZIP import for consistency with other imports
+              const importResult = await templateApi.importTemplateZip(zipBlob);
+              Logger.Admin.log(
+                `Imported template: ${importResult.template.title} from JSON array`
+              );
               importedCount++;
             } catch (error) {
               Logger.Admin.error(
