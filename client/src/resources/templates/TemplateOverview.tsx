@@ -117,6 +117,7 @@ export const TemplateOverview = ({
       existingTemplate: TemplateMetadata | null;
       isNewer: boolean;
       isSameAge: boolean;
+      path: string;
     }>;
   }>({
     isOpen: false,
@@ -246,7 +247,7 @@ export const TemplateOverview = ({
         `Comparing against ${existingTemplates.length} existing templates`
       );
 
-      const templateInfos = templateFiles.map(({ template }) => {
+      const templateInfos = templateFiles.map(({ path, template }) => {
         const existing = existingTemplates.find((t) => t.id === template.id);
         const isNewer = existing
           ? new Date(template.updatedAt) > new Date(existing.updatedAt)
@@ -261,6 +262,7 @@ export const TemplateOverview = ({
           existingTemplate: existing || null,
           isNewer,
           isSameAge,
+          path, // Preserve the path information
         };
       });
 
@@ -348,24 +350,54 @@ export const TemplateOverview = ({
       let importedCount = 0;
       const results: Array<{ template: StoryTemplate; isNew: boolean }> = [];
 
-      // Import each template individually using the ZIP API
-      // Note: We can't use the collection file directly because each template
-      // needs to be imported with its own directory structure
+      // Re-load the original ZIP to extract assets for each template
+      const arrayBuffer = await collectionImportDialog.file.arrayBuffer();
+      const originalZip = await JSZip.loadAsync(arrayBuffer);
+
+      // Import each template individually with its assets
       for (const templateInfo of collectionImportDialog.templates) {
         // Only import if it's new or newer
         if (!templateInfo.existingTemplate || templateInfo.isNewer) {
           try {
             Logger.UI.log(`Importing template: ${templateInfo.template.title}`);
 
-            // Create a minimal ZIP for the template to use the proper import endpoint
+            // Find the template directory from the original path
+            const templateDir = templateInfo.path.replace("/template.json", "");
+
+            // Create a new ZIP with template.json and all assets from this template's directory
             const templateZip = new JSZip();
+
+            // Add template.json
             templateZip.file(
               "template.json",
               JSON.stringify(templateInfo.template, null, 2)
             );
-            const zipBlob = await templateZip.generateAsync({ type: "blob" });
 
-            // Use the proper ZIP import endpoint instead of JSON-only creation
+            // Add all asset files from the template's directory
+            let assetCount = 0;
+            for (const [filePath, zipEntry] of Object.entries(
+              originalZip.files
+            )) {
+              // Skip directories and template.json
+              if (zipEntry.dir || filePath.endsWith("template.json")) {
+                continue;
+              }
+
+              // Include files from this template's directory
+              if (templateDir && filePath.startsWith(`${templateDir}/`)) {
+                const relativePath = filePath.substring(templateDir.length + 1);
+                const fileData = await zipEntry.async("blob");
+                templateZip.file(relativePath, fileData);
+                assetCount++;
+              }
+            }
+
+            const zipBlob = await templateZip.generateAsync({ type: "blob" });
+            Logger.UI.log(
+              `Created ZIP with ${assetCount} asset files for template: ${templateInfo.template.title}`
+            );
+
+            // Use the proper ZIP import endpoint with assets included
             const importResult = await templateApi.importTemplateZip(zipBlob);
 
             results.push({
