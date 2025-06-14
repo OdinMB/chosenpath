@@ -413,6 +413,110 @@ export class TemplateService {
   }
 
   /**
+   * Create or update a template (upsert operation)
+   */
+  async createOrUpdateTemplate(
+    template: Partial<StoryTemplate>,
+    creatorId?: string,
+    creatorUsername?: string
+  ): Promise<StoryTemplate> {
+    try {
+      // Generate ID if not provided
+      if (!template.id) {
+        template.id = uuidv4();
+      }
+
+      // Check if template already exists
+      const existingTemplate = await this.getTemplateById(template.id);
+      const existingDbEntry = await templateDbService.findTemplateEntryById(
+        template.id
+      );
+
+      if (existingTemplate || existingDbEntry) {
+        // Template exists, update it
+        this.logger.log(`Template ${template.id} already exists, updating`);
+        return await this.updateTemplate(
+          template.id,
+          template,
+          creatorId,
+          creatorUsername
+        );
+      } else {
+        // Template doesn't exist, create it (inline to avoid circular dependency)
+        this.logger.log(`Template ${template.id} doesn't exist, creating new`);
+
+        const fullTemplate: StoryTemplate =
+          this.createFullTemplateObject(template);
+
+        // Set creator information on creation
+        if (creatorId) {
+          fullTemplate.creatorId = creatorId;
+          fullTemplate.creatorUsername = creatorUsername || undefined;
+        }
+
+        // Set containsImages to false by default on creation
+        if (fullTemplate.containsImages === undefined) {
+          fullTemplate.containsImages = false;
+        }
+
+        // Keep existing timestamps if provided
+        if (template.createdAt) {
+          fullTemplate.createdAt = template.createdAt;
+        }
+        if (template.updatedAt) {
+          fullTemplate.updatedAt = template.updatedAt;
+        }
+
+        // Create directory for this template
+        const templateDir = path.join(this.storagePath, fullTemplate.id);
+        if (!fsSync.existsSync(templateDir)) {
+          await fs.mkdir(templateDir, { recursive: true });
+        }
+
+        // Write template.json to the template directory
+        const templateFilePath = path.join(templateDir, "template.json");
+        await fs.writeFile(
+          templateFilePath,
+          JSON.stringify(fullTemplate, null, 2)
+        );
+
+        // Use the containsImages value from the template itself
+        const containsImages = fullTemplate.containsImages;
+
+        // Create database entry
+        await templateDbService.createTemplateEntry({
+          id: fullTemplate.id,
+          creatorId: fullTemplate.creatorId || null,
+          publicationStatus: fullTemplate.publicationStatus,
+          carouselOrder: fullTemplate.showOnWelcomeScreen
+            ? fullTemplate.order
+            : null,
+          containsImages,
+          title: fullTemplate.title,
+          teaser: fullTemplate.teaser,
+          gameMode: fullTemplate.gameMode,
+          tags: fullTemplate.tags,
+          playerCountMin: fullTemplate.playerCountMin,
+          playerCountMax: fullTemplate.playerCountMax,
+          maxTurnsMin: fullTemplate.maxTurnsMin,
+          maxTurnsMax: fullTemplate.maxTurnsMax,
+          difficultyLevels: fullTemplate.difficultyLevels,
+          showOnWelcomeScreen: fullTemplate.showOnWelcomeScreen,
+          orderValue: fullTemplate.order,
+        });
+
+        this.logger.log(
+          `Created template ${fullTemplate.id}: ${fullTemplate.title}`
+        );
+        return fullTemplate;
+      }
+    } catch (error) {
+      this.logger.error("Failed to create or update template", error);
+      throw new Error("Failed to create or update story template");
+    }
+  }
+
+  /**
    * Update a template
    */
   async updateTemplate(

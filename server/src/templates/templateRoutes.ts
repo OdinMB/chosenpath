@@ -476,14 +476,14 @@ router.post(
       // Pass creator ID and username to the service method
       const creatorId = req.user?.id;
       const creatorUsername = req.user?.username;
-      const createdTemplate = await templateService.createTemplate(
+      const createdTemplate = await templateService.createOrUpdateTemplate(
         template,
         creatorId,
         creatorUsername
       );
 
       Logger.Route.log(
-        `Created template ${createdTemplate.id}: ${createdTemplate.title}`
+        `Created/Updated template ${createdTemplate.id}: ${createdTemplate.title}`
       );
       sendSuccess(res, { template: createdTemplate }, requestId, 201);
     } catch (error) {
