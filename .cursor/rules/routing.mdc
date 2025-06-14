@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Client routing
+
+1. URL Structure: Feature/Role-based first, Resource-based second
+Use semantic URLs starting with the feature or role and continuing with the relevant resource. Examples: /admin/templates, page/templates/:id, etc.
+2. State Management: React Router Loaders & Actions
+Use loaders to fetch data needed for routes before components render
+Use actions to handle mutations (form submissions, state changes)
+Access data via useLoaderData() in components
+3. Transition Logic: Unified Loader Checks
+All conditional navigation logic goes in route loaders
+Create reusable check functions for common conditions
+Components focus purely on rendering UI based on loader data
+4. Authentication: Loader-Based Auth Checks
+Verify authentication in route loaders before components render
+Use redirects to send unauthorized users to login
+Encapsulate auth checks in reusable functions
+5. Nested Routing: Logical Feature Grouping
+Group related routes by feature: /stories/*, /templates, /admin
+Use shared layouts for route groups
+Create index routes for feature landing pages
+6. Route Naming: Kebab-Case and Resource-Focused
+Use consistent kebab-case for URL paths
+Focus on resources rather than actions: /templates vs /browse-templates
+Keep URLs clear and concise
+7. Code Organization: Feature-Based Routing
+Define routes within feature folders (game/gameRoutes.tsx)
+Compose the main router from these feature-specific route definitions
+Keep routes close to their related components
+8. Error Handling: Nested Error Boundaries
+Define error boundaries at different levels of the route hierarchy
+Handle specific errors contextually (e.g., template not found)
+Use a global fallback for unhandled errors
+

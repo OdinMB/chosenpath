@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# UI
+
+- UI elements ([index.ts](mdc:client/src/shared/components/ui/index.ts)) are in the client/shared/components/ui directory. Import from 'components/ui' (using directory aliases)
+- Particularly relevant: PrimaryButton for buttons and [Modal.tsx](mdc:client/src/shared/components/ui/Modal.tsx) for modals.
+- Design conventions are in [tailwind.config.js](mdc:client/tailwind.config.js)
+- All icons must be stored in and consumed via components/ui/Icons.tsx
