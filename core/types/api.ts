@@ -237,6 +237,33 @@ export interface SubmitFeedbackRequest extends ClientRequest {
 export interface SubmitFeedbackResponse
   extends SuccessResponse<{ feedbackId: string }> {}
 
+/**
+ * Admin Feedback types
+ */
+export interface FeedbackItem {
+  id: string;
+  type: FeedbackType;
+  rating: FeedbackRating;
+  comment: string;
+  storyId?: string;
+  storyTitle?: string;
+  contactInfo?: string;
+  storyText?: string;
+  userId?: string;
+  username?: string;
+  createdAt: number;
+}
+
+export interface GetAdminFeedbackResponse
+  extends SuccessResponse<{ feedback: FeedbackItem[] }> {}
+
+export interface DeleteFeedbackRequest extends ClientRequest {
+  feedbackId: string;
+}
+
+export interface DeleteFeedbackResponse
+  extends SuccessResponse<{ success: boolean }> {}
+
 export interface UpdateStoryStatusRequest extends ClientRequest {
   storyId: string;
   playerSlot: string;

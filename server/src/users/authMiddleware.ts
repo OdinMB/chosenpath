@@ -220,3 +220,7 @@ export const canManageCarousel = () => checkPermissions(["templates_carousel"]);
 export const canCreateTemplates = () => checkPermissions(["templates_create"]);
 
 export const canGenerateImages = () => checkPermissions(["templates_images"]);
+
+export const canViewFeedback = () => checkPermissions(["feedback_view"]);
+
+export const canDeleteFeedback = () => checkPermissions(["feedback_delete"]);

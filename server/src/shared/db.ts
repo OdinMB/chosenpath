@@ -89,7 +89,9 @@ export async function initializeDatabase() {
         ('role_admin', 'templates_publish', $1),
         ('role_admin', 'templates_carousel', $1),
         ('role_admin', 'templates_create', $1),
-        ('role_admin', 'templates_images', $1)
+        ('role_admin', 'templates_images', $1),
+        ('role_admin', 'feedback_view', $1),
+        ('role_admin', 'feedback_delete', $1)
       ON CONFLICT (role_id, permission) DO NOTHING
     `,
       [nowEpochMs]

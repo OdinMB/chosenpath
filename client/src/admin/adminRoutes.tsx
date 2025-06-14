@@ -11,6 +11,8 @@ import { AdminErrorBoundary } from "./components/AdminErrorBoundary.js";
 import { AdminTemplateList } from "./templates/AdminTemplateList.js";
 import { AdminTemplateEditor } from "./templates/AdminTemplateEditor.js";
 import { TemplateCarouselManager } from "../resources/templates/TemplateCarouselManager.js";
+import { FeedbackOverview } from "../resources/feedback/FeedbackOverview.js";
+import { feedbackLoader } from "../resources/feedback/loaders/feedbackLoader.js";
 
 // Define routes for the admin section
 export const adminRoutes: RouteObject[] = [
@@ -58,6 +60,11 @@ export const adminRoutes: RouteObject[] = [
       {
         path: "carousel",
         element: <TemplateCarouselManager />,
+      },
+      {
+        path: "feedback",
+        element: <FeedbackOverview />,
+        loader: feedbackLoader,
       },
     ],
   },

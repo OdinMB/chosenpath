@@ -1,6 +1,6 @@
 import { UserListItem } from "core/types";
 import { AdminStoriesListItem } from "core/types/story.js";
-import { GetAdminStoriesResponseData } from "core/types/api.js";
+import { GetAdminStoriesResponseData, FeedbackItem } from "core/types/api.js";
 import { apiClient } from "shared/apiClient";
 import { Logger } from "shared/logger";
 
@@ -50,6 +50,36 @@ export const adminUsersApi = {
       Logger.Admin.log(`Successfully deleted user: ${userId}`);
     } catch (error) {
       Logger.Admin.error(`Failed to delete user: ${userId}`, error);
+      throw error;
+    }
+  },
+};
+
+// Admin Feedback API functions
+export const adminFeedbackApi = {
+  getFeedback: async (): Promise<FeedbackItem[]> => {
+    Logger.Admin.log("Fetching feedback from admin API");
+    try {
+      const response = await apiClient.get<{ feedback: FeedbackItem[] }>(
+        `/admin/feedback`
+      );
+      Logger.Admin.log(
+        `Successfully fetched ${response.feedback.length} feedback submissions`
+      );
+      return response.feedback;
+    } catch (error) {
+      Logger.Admin.error("Failed to fetch feedback from admin API", error);
+      throw error;
+    }
+  },
+
+  deleteFeedback: async (feedbackId: string): Promise<void> => {
+    Logger.Admin.log(`Deleting feedback: ${feedbackId}`);
+    try {
+      await apiClient.delete(`/admin/feedback/${feedbackId}`);
+      Logger.Admin.log(`Successfully deleted feedback: ${feedbackId}`);
+    } catch (error) {
+      Logger.Admin.error(`Failed to delete feedback: ${feedbackId}`, error);
       throw error;
     }
   },

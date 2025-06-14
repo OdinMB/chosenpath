@@ -1,7 +1,7 @@
 import { Tabs } from "components/ui";
 import { useNavigate, useLocation } from "react-router-dom";
 
-type AdminTab = "templates" | "carousel" | "stories" | "users";
+type AdminTab = "templates" | "carousel" | "stories" | "users" | "feedback";
 
 export const AdminHeader = () => {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export const AdminHeader = () => {
     { id: "carousel" as AdminTab, label: "Template Carousel" },
     { id: "stories" as AdminTab, label: "Stories" },
     { id: "users" as AdminTab, label: "Users" },
+    { id: "feedback" as AdminTab, label: "Feedback" },
   ];
 
   const getActiveTab = (): AdminTab => {
