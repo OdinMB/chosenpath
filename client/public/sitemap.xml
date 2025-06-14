@@ -1,68 +1,69 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- NOTE: Domain is chosenpath.ai (NOT chosenpath.com) - previous use of .com led to errors -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://chosenpath.com/</loc>
+    <loc>https://chosenpath.ai/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/library</loc>
+    <loc>https://chosenpath.ai/library</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy</loc>
+    <loc>https://chosenpath.ai/academy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <!-- Academy Lectures -->
   <url>
-    <loc>https://chosenpath.com/academy/story-engine-not-writing-tool</loc>
+    <loc>https://chosenpath.ai/academy/story-engine-not-writing-tool</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/outcomes-milestones-resolutions</loc>
+    <loc>https://chosenpath.ai/academy/outcomes-milestones-resolutions</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/switches-threads</loc>
+    <loc>https://chosenpath.ai/academy/switches-threads</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/setting</loc>
+    <loc>https://chosenpath.ai/academy/setting</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/success-failure</loc>
+    <loc>https://chosenpath.ai/academy/success-failure</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/stats</loc>
+    <loc>https://chosenpath.ai/academy/stats</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/multiplayer</loc>
+    <loc>https://chosenpath.ai/academy/multiplayer</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/academy/images</loc>
+    <loc>https://chosenpath.ai/academy/images</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/credits</loc>
+    <loc>https://chosenpath.ai/credits</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://chosenpath.com/privacy</loc>
+    <loc>https://chosenpath.ai/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
