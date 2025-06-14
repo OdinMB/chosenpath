@@ -20,6 +20,8 @@ export const AdminTemplateList = () => {
 
   // Admin-specific handlers
   const handleEdit = (templateId: string) => {
+    // Scroll to top before navigating to ensure the edit view starts at the top
+    window.scrollTo(0, 0);
     navigate(`/admin/templates/${templateId}`);
   };
 

@@ -26,6 +26,8 @@ export const UserTemplateList = () => {
 
   // User-specific handlers
   const handleEdit = (templateId: string) => {
+    // Scroll to top before navigating to ensure the edit view starts at the top
+    window.scrollTo(0, 0);
     navigate(`/users/my-worlds/${templateId}`);
   };
 
