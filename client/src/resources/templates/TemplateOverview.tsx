@@ -357,15 +357,19 @@ export const TemplateOverview = ({
           try {
             Logger.UI.log(`Importing template: ${templateInfo.template.title}`);
 
-            // For now, create the template using the template API
-            // TODO: In the future, we could extract individual template directories
-            // from the collection ZIP and import them properly with assets
-            const createdTemplate = await templateApi.createTemplate(
-              templateInfo.template
+            // Create a minimal ZIP for the template to use the proper import endpoint
+            const templateZip = new JSZip();
+            templateZip.file(
+              "template.json",
+              JSON.stringify(templateInfo.template, null, 2)
             );
+            const zipBlob = await templateZip.generateAsync({ type: "blob" });
+
+            // Use the proper ZIP import endpoint instead of JSON-only creation
+            const importResult = await templateApi.importTemplateZip(zipBlob);
 
             results.push({
-              template: createdTemplate.template,
+              template: importResult.template,
               isNew: !templateInfo.existingTemplate,
             });
             importedCount++;
