@@ -2,11 +2,15 @@ Smaller commits!
 
 # NEXT
 
+- 4: AI Drafts: bespoke forms for use cases (fiction, satire, kids, imagine future self, education)
+- Use case: visualize your life in 5 years
+
 - 1: Link to relevant lectures in the template form sections
-- 1: include the lectures in the sitemap
 
 - 2: fix empty player stats if stat is not part of player backgrounds?
 - 2: review process for storytellers who want to publish on website
+
+- ?: Bild bei Draft mit hochladen
 
 # BETTER EXPERIENCE
 
@@ -38,11 +42,14 @@ Focus: Text/Images, English, Multiplayer
 # SERIOUS PROJECT
 
 - 1: Export stories
+- ?: Für Worldbuilders: Lizenz-Auswahl
 - 5: Barrierefreiheit (try eye-able.com)
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 4: Images: thumbnail versions (especially for cover images); load full version in modals
 - 5: Credits system for generating stories
 - 15: Stripe integration
+- ?: Eigene Bilder hochladen (für Elemente)
+- ?: iFrame whitelabel?
 - 15: System to view/navigate save files
 - 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images generated in template-based stories to the template
