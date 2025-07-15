@@ -47,7 +47,7 @@ Focus: Text/Images, English, Multiplayer
 - 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 4: Images: thumbnail versions (especially for cover images); load full version in modals
 - 5: Credits system for generating stories
-- 15: Stripe integration
+- 15: Stripe / checkout.com integration
 - ?: Eigene Bilder hochladen (für Elemente)
 - ?: iFrame whitelabel?
 - 15: System to view/navigate save files
