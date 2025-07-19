@@ -23,6 +23,12 @@ npm run dev
 # Client linting
 cd client && npm run lint
 
+# Client unit tests
+cd client && npm test
+
+# Run specific test files
+cd client && npm test -- --testPathPatterns=myTest.test.ts
+
 # Server development with hot reload
 cd server && npm run dev
 
@@ -145,8 +151,28 @@ React SPA with:
 ## Testing Approach
 
 - **Server**: Mocha + Chai for API testing (see package.json scripts)
-- **Client**: ESLint for code quality, built-in React error boundaries
+- **Client**: Jest for unit testing, ESLint for code quality, built-in React error boundaries
 - **Integration**: Manual testing of WebSocket flows and AI integrations
+
+### Unit Testing Setup (Client)
+```bash
+# Run all tests
+cd client && npm test
+
+# Run tests for specific file
+cd client && npm test -- --testPathPatterns=fileName.test.ts
+
+# Run tests in watch mode
+cd client && npm test -- --watch
+```
+
+**Test Configuration:**
+- **Framework**: Jest with TypeScript support via `jest.config.js`
+- **Location**: Tests located in `/client/tests/` directory
+- **Import Pattern**: Tests use relative paths like `../../../src/path/to/module.js` (Jest moduleNameMapper configured but aliases not yet working)
+- **File Extensions**: **IMPORTANT**: All test imports must use `.js` extensions (e.g., `'../../../src/game/utils/module.js'`) due to Node16/NodeNext module resolution
+- **File Naming**: Use `.test.ts` suffix for test files
+- **Jest Module Mapping**: Module mappers configured for `components`, `client`, `shared`, `core`, `admin`, `game`, `page`, `users`, `resources` (requires further debugging to work with ts-jest)
 
 ## Environment Setup
 
@@ -200,6 +226,12 @@ VITE_WS_PORT=3000
 - **Resources**: Cross-context features in `/client/src/resources/RESOURCE`
 - **Shared**: Common utilities in `/client/src/shared/` and `/server/src/shared/`
 - **Core**: Types and utilities shared between client/server in `/core/`
+
+### Import Aliases
+- **Client**: Use Vite aliases (`game/*`, `core/*`, `shared/*`, etc.) instead of relative paths (configured in `vite.config.ts`)
+- **Server**: Use TypeScript path mapping (`core/*`, `server/*`, `shared/*`, etc.) instead of relative paths (configured in `tsconfig.json`)
+- **Tests**: Currently use relative paths with `.js` extensions (e.g., `'../../../src/game/utils/module.js'`) due to Node16/NodeNext module resolution requirements
+- **File Extensions**: When importing TypeScript files in tests, always use `.js` extensions in import paths, not `.ts`
 
 ### Content Management
 - Lecture pages must stay synchronized with `/client/public/sitemap.xml`

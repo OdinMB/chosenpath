@@ -7,6 +7,7 @@ import {
 } from "shared/utils/imageUtils.js";
 import { StoryImage } from "shared/components/StoryImage";
 import { ClientStateManager } from "core/models/ClientStateManager.js";
+import { optimizeImagePositions } from "./imageRepositioning";
 
 // Types used within the utility
 interface ImageElement {
@@ -14,62 +15,162 @@ interface ImageElement {
   element: React.ReactNode;
   placeholder: string;
   paragraphIndex: number;
-  renderPosition?: number;
   targetPosition?: number;
-  originalPosition?: number;
 }
 
-interface TextSegment {
+export interface TextSegment {
   type: "text" | "image";
   content: string | React.ReactNode;
 }
 
+interface ParagraphPosition {
+  start: number;
+  end: number;
+}
+
 /**
- * Processes story text to handle image placeholders and proper positioning
- *
- * @param text The original story text with image placeholders
- * @param storyState The client story state containing image data
- * @returns An array of text and image segments ready for rendering
+ * Normalizes text for proper paragraph handling
+ * Ensures images don't create orphaned paragraphs
  */
-export function processStoryText(
-  text: string,
-  storyState: ClientStoryState
-): TextSegment[] {
-  // Fix potential encoding issues by normalizing the text
+export function normalizeStoryText(text: string): string {
+  // Fix potential encoding issues
   text = text.normalize();
 
-  const stateManager = new ClientStateManager();
+  // First, protect image placeholders that are at the end of paragraphs
+  text = text.replace(/(\[image[^\]]*\])(?:\s*\n)/g, '$1'); // Remove trailing newlines after images
+  
+  // Convert single \n to double \n\n, except around image tags
+  text = text.replace(/(?<!\]\s*)\n(?!\n)(?!\s*\[image)/g, '\n\n').replace(/\n{3,}/g, '\n\n');
+  
+  // Ensure images at the end of text don't create orphaned paragraphs - attach to previous paragraph
+  text = text.replace(/\n\n(\[image[^\]]*\])\s*$/, ' $1');
 
-  // Check if text contains image placeholders
-  const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
+  return text;
+}
 
-  // If no matches found, return a single text segment
-  if (!matches) {
-    return [{ type: "text", content: text }];
-  }
-
-  // Count paragraphs in the text
+/**
+ * Splits text into paragraphs and calculates their positions
+ */
+export function calculateParagraphPositions(text: string): ParagraphPosition[] {
   const paragraphs = text.split(/\n\s*\n/);
-
-  // Only apply spacing logic if we have at least 3 paragraphs and 2 images
-  const shouldApplyImageSpacing = paragraphs.length >= 3 && matches.length >= 2;
-
-  // First, locate all paragraphs and their positions
-  const paragraphPositions: { start: number; end: number }[] = [];
+  const positions: ParagraphPosition[] = [];
   let currentPos = 0;
 
   paragraphs.forEach((paragraph) => {
     const start = text.indexOf(paragraph, currentPos);
     const end = start + paragraph.length;
-    paragraphPositions.push({ start, end });
+    positions.push({ start, end });
     currentPos = end;
   });
 
-  // First, render all images and store them with their positions
+  return positions;
+}
+
+/**
+ * Finds which paragraph an image position belongs to
+ */
+export function findImageParagraphIndex(
+  imagePosition: number, 
+  paragraphPositions: ParagraphPosition[]
+): number {
+  for (let i = 0; i < paragraphPositions.length; i++) {
+    if (imagePosition >= paragraphPositions[i].start && imagePosition <= paragraphPositions[i].end) {
+      return i;
+    }
+  }
+  // If not found, attach to last paragraph (common for end-of-text images)
+  return Math.max(0, paragraphPositions.length - 1);
+}
+
+/**
+ * Identifies text-only paragraphs (paragraphs that contain actual text, not just images)
+ */
+export function findTextParagraphs(
+  text: string, 
+  paragraphPositions: ParagraphPosition[]
+): Array<{ index: number; hasText: boolean }> {
+  return paragraphPositions.map((pos, index) => {
+    const content = text.substring(pos.start, pos.end);
+    const textWithoutImages = content.replace(IMAGE_PLACEHOLDER_REGEX, '').trim();
+    return {
+      index,
+      hasText: textWithoutImages.length > 0
+    };
+  });
+}
+
+/**
+ * Handles orphaned images (images in paragraphs with no text) by attaching them to nearby text paragraphs
+ */
+export function attachOrphanedImages(
+  imageElements: ImageElement[],
+  text: string,
+  paragraphPositions: ParagraphPosition[]
+): void {
+  const textParagraphs = findTextParagraphs(text, paragraphPositions)
+    .filter(p => p.hasText);
+  
+  const lastTextParagraphIndex = textParagraphs[textParagraphs.length - 1]?.index ?? paragraphPositions.length - 1;
+
+  imageElements.forEach((imageEl) => {
+    // Safety check for paragraph index bounds
+    if (imageEl.paragraphIndex >= paragraphPositions.length) {
+      imageEl.paragraphIndex = Math.max(0, paragraphPositions.length - 1);
+    }
+    
+    const paragraphContent = text.substring(
+      paragraphPositions[imageEl.paragraphIndex].start,
+      paragraphPositions[imageEl.paragraphIndex].end
+    );
+    const textWithoutImages = paragraphContent.replace(IMAGE_PLACEHOLDER_REGEX, '').trim();
+    
+    if (textWithoutImages.length === 0) {
+      // This paragraph contains only images - find nearest text paragraph
+      let targetParagraph = imageEl.paragraphIndex;
+      
+      // First try the previous paragraph
+      if (imageEl.paragraphIndex > 0) {
+        const prevParagraph = textParagraphs.find(p => p.index === imageEl.paragraphIndex - 1);
+        if (prevParagraph) {
+          targetParagraph = prevParagraph.index;
+        }
+      }
+      
+      // If no previous text paragraph, try the next one  
+      if (targetParagraph === imageEl.paragraphIndex && imageEl.paragraphIndex < textParagraphs.length - 1) {
+        const nextParagraph = textParagraphs.find(p => p.index === imageEl.paragraphIndex + 1);
+        if (nextParagraph) {
+          targetParagraph = nextParagraph.index;
+        }
+      }
+      
+      // If still no text paragraph found, attach to the last available text paragraph
+      if (targetParagraph === imageEl.paragraphIndex && textParagraphs.length > 0) {
+        targetParagraph = textParagraphs[textParagraphs.length - 1].index;
+      }
+      
+      imageEl.paragraphIndex = Math.max(0, Math.min(targetParagraph, lastTextParagraphIndex));
+    }
+  });
+}
+
+/**
+ * Creates image elements from image placeholders in text
+ */
+export function createImageElements(
+  text: string,
+  storyState: ClientStoryState,
+  paragraphPositions: ParagraphPosition[]
+): ImageElement[] {
+  const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
+  if (!matches) return [];
+
+  const stateManager = new ClientStateManager();
   const imageElements: ImageElement[] = [];
 
   matches.forEach((match, index) => {
     const imagePlaceholder: ImagePlaceholder = parseImagePlaceholder(match);
+    const position = text.indexOf(match);
 
     // Check if the image exists in the library if generateImages is false
     const imageExists = stateManager.hasImage(
@@ -80,8 +181,6 @@ export function processStoryText(
 
     // Skip if the image doesn't exist and generateImages is false
     if (!storyState.generateImages && !imageExists) {
-      // Record the position for removal but don't create an element
-      const position = text.indexOf(match);
       imageElements.push({
         position,
         placeholder: match,
@@ -96,22 +195,8 @@ export function processStoryText(
       storyState
     );
 
-    // Always record the position of the placeholder for removal, even if the image can't be created
-    const position = text.indexOf(match);
-
-    // Only add to imageElements if we have a valid image
     if (finalImage) {
-      // Determine which paragraph this image belongs to
-      let paragraphIndex = 0;
-      for (let i = 0; i < paragraphPositions.length; i++) {
-        if (
-          position >= paragraphPositions[i].start &&
-          position <= paragraphPositions[i].end
-        ) {
-          paragraphIndex = i;
-          break;
-        }
-      }
+      const paragraphIndex = findImageParagraphIndex(position, paragraphPositions);
 
       imageElements.push({
         position,
@@ -132,106 +217,74 @@ export function processStoryText(
       imageElements.push({
         position,
         placeholder: match,
-        paragraphIndex: 0, // This doesn't matter since we're not rendering an image
-        element: null, // No element to render
+        paragraphIndex: 0,
+        element: null,
       });
     }
   });
 
-  // Sort the valid image elements by their original position in the text
-  const validImageElements = imageElements
-    .filter((el) => el.element !== null)
-    .sort((a, b) => a.position - b.position);
+  return imageElements;
+}
 
-  // Apply spacing rules if needed (avoid images being too close)
-  if (shouldApplyImageSpacing && validImageElements.length >= 2) {
-    // Make a working copy of the image positions for planning purposes
-    const workingElements = validImageElements.map((img) => ({
-      ...img,
-      renderPosition: img.paragraphIndex,
-    }));
+/**
+ * Applies image repositioning using the tested logic from imageRepositioning.ts
+ */
+export function applyImageRepositioning(
+  imageElements: ImageElement[],
+  text: string,
+  paragraphPositions: ParagraphPosition[]
+): void {
+  // First handle orphaned images
+  attachOrphanedImages(imageElements, text, paragraphPositions);
 
-    // Identify and fix spacing issues one pair at a time
-    for (let i = 0; i < workingElements.length - 1; i++) {
-      const currentImage = workingElements[i];
-      const nextImage = workingElements[i + 1];
+  // Extract current positions (1-indexed for imageRepositioning.ts)
+  const currentPositions = imageElements.map(img => img.paragraphIndex + 1);
+  const totalParagraphs = paragraphPositions.length;
 
-      // Calculate paragraph gap between consecutive images
-      const paragraphGap =
-        nextImage.renderPosition! - currentImage.renderPosition!;
+  // Use the tested repositioning logic
+  const optimizedPositions = optimizeImagePositions(currentPositions, totalParagraphs);
 
-      // Only adjust if images are too close (less than 2 paragraphs apart)
-      if (paragraphGap < 2) {
-        // Calculate distance for each option
-        const moveNextForward = {
-          targetParagraph: currentImage.renderPosition! + 2,
-          distance: 2 - paragraphGap,
-        };
-
-        const moveCurrentBackward = {
-          targetParagraph: nextImage.renderPosition! - 2,
-          distance: 2 - paragraphGap,
-        };
-
-        // Evaluate options based on feasibility and minimal movement
-        let chosenOption = null;
-
-        // Option 1: Move next image forward
-        if (moveNextForward.targetParagraph < paragraphPositions.length) {
-          chosenOption = {
-            imageIndex: i + 1,
-            targetParagraph: moveNextForward.targetParagraph,
-            direction: "forward",
-          };
-        }
-
-        // Option 2: Move current image backward if it would be minimal
-        if (moveCurrentBackward.targetParagraph >= 0) {
-          // If no option chosen yet, or backward is minimal
-          if (!chosenOption) {
-            chosenOption = {
-              imageIndex: i,
-              targetParagraph: moveCurrentBackward.targetParagraph,
-              direction: "backward",
-            };
-          }
-        }
-
-        // Apply the chosen repositioning
-        if (chosenOption) {
-          const imageToReposition = workingElements[chosenOption.imageIndex];
-          const originalImage = validImageElements[chosenOption.imageIndex];
-
-          // Set the target position for the actual image
-          originalImage.targetPosition =
-            paragraphPositions[chosenOption.targetParagraph].start;
-          originalImage.originalPosition = originalImage.position;
-
-          // Update working copy for next iteration
-          imageToReposition.renderPosition = chosenOption.targetParagraph;
-
-          // console.log(
-          //   `Repositioning image from paragraph ${originalImage.paragraphIndex} to ${chosenOption.targetParagraph} (${chosenOption.direction}) for proper spacing`
-          // );
-        }
+  // Apply the optimized positions back to image elements
+  optimizedPositions.forEach((newPosition, index) => {
+    if (index < imageElements.length) {
+      const imageEl = imageElements[index];
+      const newParagraphIndex = newPosition - 1; // Convert back to 0-indexed
+      
+      if (newParagraphIndex !== imageEl.paragraphIndex && newParagraphIndex < paragraphPositions.length) {
+        imageEl.targetPosition = paragraphPositions[newParagraphIndex].start;
+        imageEl.paragraphIndex = newParagraphIndex;
       }
     }
-  }
+  });
+}
 
-  // Start with a segment containing all text
-  const segments: TextSegment[] = [
-    {
-      type: "text",
-      content: text,
-    },
-  ];
+/**
+ * Removes image placeholders from text segments
+ */
+export function removePlaceholders(segments: TextSegment[], placeholders: string[]): void {
+  placeholders.forEach((placeholder) => {
+    const textSegmentIndex = segments.findIndex(
+      (segment) =>
+        segment.type === "text" &&
+        (segment.content as string).includes(placeholder)
+    );
 
-  // Process each image to either:
-  // 1. Replace its placeholder in-place, or
-  // 2. Remove its placeholder and position the image at a better location
-  validImageElements.forEach((imageEl) => {
-    // Skip if no placeholder is defined
-    if (!imageEl.placeholder) return;
+    if (textSegmentIndex !== -1) {
+      const textSegment = segments[textSegmentIndex].content as string;
+      segments[textSegmentIndex].content = textSegment.replace(placeholder, "");
+    }
+  });
+}
+
+/**
+ * Inserts images into text segments at their target positions
+ */
+export function insertImages(
+  segments: TextSegment[],
+  imageElements: ImageElement[]
+): void {
+  imageElements.forEach((imageEl) => {
+    if (!imageEl.placeholder || !imageEl.element) return;
 
     // Find the text segment containing this image placeholder
     const textSegmentIndex = segments.findIndex(
@@ -261,10 +314,8 @@ export function processStoryText(
         content: beforeOriginal + afterOriginal,
       };
 
-      // Then find the right segment to insert the image at target position
+      // Find the target position and insert the image at paragraph start
       const targetPosition = imageEl.targetPosition;
-
-      // Find which text segment contains the target position
       let currentPos = 0;
       let targetSegmentIndex = -1;
       let relativeTargetPos = -1;
@@ -280,57 +331,17 @@ export function processStoryText(
             relativeTargetPos = targetPosition - currentPos;
             break;
           }
-
           currentPos = segmentEnd;
         }
       }
 
-      // Target position may change slightly after other images are processed
-      // So make sure we insert at a paragraph boundary if possible
       if (targetSegmentIndex !== -1 && relativeTargetPos !== -1) {
         const targetSegment = segments[targetSegmentIndex].content as string;
-        let relativePosition = relativeTargetPos;
+        
+        // Insert at the beginning of the target paragraph
+        const beforeTarget = targetSegment.substring(0, relativeTargetPos);
+        const afterTarget = targetSegment.substring(relativeTargetPos);
 
-        // Find the closest paragraph start or end to the target position
-        // First, split the segment into paragraphs
-        const paragraphRanges: Array<{ start: number; end: number }> = [];
-        let lastEnd = 0;
-
-        // Find all paragraph boundaries in this segment
-        const paragraphSplits = targetSegment.split(/(\n\s*\n)/);
-        for (let i = 0; i < paragraphSplits.length; i++) {
-          if (i % 2 === 0) {
-            // Even indices contain paragraph content
-            const paragraphStart = lastEnd;
-            const paragraphEnd = paragraphStart + paragraphSplits[i].length;
-            paragraphRanges.push({ start: paragraphStart, end: paragraphEnd });
-            lastEnd = paragraphEnd;
-          } else {
-            // Odd indices contain paragraph separators (\n\n)
-            lastEnd += paragraphSplits[i].length;
-          }
-        }
-
-        // Find the closest paragraph start to our target position
-        let closestDistance = Number.MAX_SAFE_INTEGER;
-        let bestPosition = relativeTargetPos;
-
-        paragraphRanges.forEach((range) => {
-          // Check paragraph start
-          const distToStart = Math.abs(range.start - relativeTargetPos);
-          if (distToStart < closestDistance) {
-            closestDistance = distToStart;
-            bestPosition = range.start;
-          }
-        });
-
-        // Use the best position found
-        relativePosition = bestPosition;
-
-        const beforeTarget = targetSegment.substring(0, relativePosition);
-        const afterTarget = targetSegment.substring(relativePosition);
-
-        // Split the target segment and insert image
         segments.splice(
           targetSegmentIndex,
           1,
@@ -350,36 +361,61 @@ export function processStoryText(
       segments.splice(
         textSegmentIndex,
         1,
-        ...([
+        ...(([
           beforeText ? { type: "text", content: beforeText } : null,
           imageEl.element ? { type: "image", content: imageEl.element } : null,
           afterText ? { type: "text", content: afterText } : null,
-        ].filter(Boolean) as TextSegment[])
+        ]).filter(Boolean) as TextSegment[])
       );
     }
   });
+}
 
-  // Also remove any remaining image placeholders from all imageElements (including non-valid ones)
-  // This handles cases where images couldn't be displayed (null element)
-  imageElements.forEach((imageEl) => {
-    if (!imageEl.element && imageEl.placeholder) {
-      // Find if any text segment still contains this placeholder
-      const textSegmentIndex = segments.findIndex(
-        (segment) =>
-          segment.type === "text" &&
-          (segment.content as string).includes(imageEl.placeholder)
-      );
+/**
+ * Processes story text to handle image placeholders and proper positioning
+ *
+ * @param text The original story text with image placeholders
+ * @param storyState The client story state containing image data
+ * @returns An array of text and image segments ready for rendering
+ */
+export function processStoryText(
+  text: string,
+  storyState: ClientStoryState
+): TextSegment[] {
+  // Step 1: Normalize text and handle paragraph breaks
+  text = normalizeStoryText(text);
 
-      if (textSegmentIndex !== -1) {
-        const textSegment = segments[textSegmentIndex].content as string;
-        // Simply remove the placeholder text
-        segments[textSegmentIndex].content = textSegment.replace(
-          imageEl.placeholder,
-          ""
-        );
-      }
-    }
-  });
+  // Step 2: Check if text contains image placeholders
+  const matches = text.match(IMAGE_PLACEHOLDER_REGEX);
+  if (!matches) {
+    return [{ type: "text", content: text }];
+  }
+
+  // Step 3: Calculate paragraph positions
+  const paragraphPositions = calculateParagraphPositions(text);
+
+  // Step 4: Create image elements from placeholders
+  const imageElements = createImageElements(text, storyState, paragraphPositions);
+
+  // Step 5: Apply image repositioning using tested logic
+  const validImageElements = imageElements
+    .filter((el) => el.element !== null)
+    .sort((a, b) => a.position - b.position);
+
+  applyImageRepositioning(validImageElements, text, paragraphPositions);
+
+  // Step 6: Build segments starting with all text
+  const segments: TextSegment[] = [{ type: "text", content: text }];
+
+  // Step 7: Insert images at their final positions
+  insertImages(segments, validImageElements);
+
+  // Step 8: Remove any remaining placeholders for images that couldn't be displayed
+  const nonValidPlaceholders = imageElements
+    .filter(el => !el.element && el.placeholder)
+    .map(el => el.placeholder);
+  
+  removePlaceholders(segments, nonValidPlaceholders);
 
   return segments;
 }

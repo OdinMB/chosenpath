@@ -3,11 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGameSession } from "./useGameSession";
 import { gameService } from "./GameService";
 import { wsService } from "./WebSocketService";
-import { Logger } from "../shared/logger";
+import { Logger } from "shared/logger";
 import { GameLayout } from "./components/GameLayout";
 import { useAuth } from "client/shared/auth/useAuth";
-import { useSession } from "../shared/session/useSession";
-import { addCodeSetToStorage } from "../shared/utils/codeSetUtils";
+import { useSession } from "shared/session/useSession";
+import { addCodeSetToStorage } from "shared/utils/codeSetUtils";
 
 // Placeholder for actual game UI components
 const ConnectingView = () => (

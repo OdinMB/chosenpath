@@ -3,13 +3,10 @@ Smaller commits!
 # NEXT
 
 - 4: AI Drafts: bespoke forms for use cases (fiction, satire, kids, imagine future self, education)
-- Use case: visualize your life in 5 years
+- 2: fix empty player stats if stat is not part of player backgrounds?
 
 - 1: Link to relevant lectures in the template form sections
-
-- 2: fix empty player stats if stat is not part of player backgrounds?
 - 2: review process for storytellers who want to publish on website
-
 - ?: Bild bei Draft mit hochladen
 
 # BETTER EXPERIENCE
