@@ -47,6 +47,7 @@ Focus: Text/Images, English, Multiplayer
 - 15: Stripe / checkout.com integration
 - ?: Eigene Bilder hochladen (für Elemente)
 - ?: iFrame whitelabel?
+- 10: Atomic Transaction System for editing templates (for undo/redo and checks)
 - 15: System to view/navigate save files
 - 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images generated in template-based stories to the template

@@ -400,13 +400,27 @@ export const StatEditor: React.FC<StatEditorProps> = ({
         isOpen={showPartOfBackgroundsConfirm}
         onClose={handleCancelPartOfBackgroundsChange}
         onConfirm={handleConfirmPartOfBackgroundsChange}
-        title={`Change Background Status`}
+        title={pendingPartOfBackgroundsValue ? `Add to Backgrounds` : `Remove from Backgrounds`}
         message={
           pendingPartOfBackgroundsValue
-            ? `This will add ${localStat.name} to all character backgrounds with default values. Do you want to continue?`
-            : `This will remove ${localStat.name} from all character backgrounds. This action cannot be undone. Do you want to continue?`
+            ? `Adding "${localStat.name}" to character backgrounds will:
+            
+• Add this stat to ALL character backgrounds
+• Use preserved values if available, otherwise default values
+• Allow different starting values per background
+• This stat will no longer use a universal initial value
+
+This change can be reversed later.`
+            : `Removing "${localStat.name}" from character backgrounds will:
+            
+• Remove this stat from ALL character backgrounds  
+• Switch to using a universal initial value for all players
+• Preserve your current initial value if set
+• Any background-specific values will be lost permanently
+
+⚠️ Background-specific values cannot be recovered once removed.`
         }
-        confirmText="Confirm"
+        confirmText={pendingPartOfBackgroundsValue ? "Add to Backgrounds" : "Remove from Backgrounds"}
         cancelText="Cancel"
       />
     </div>

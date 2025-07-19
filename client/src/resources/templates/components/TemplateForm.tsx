@@ -150,6 +150,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     getMaxTurnsOptions,
     gameModeOptions,
     getGameModeValue,
+    // Validation
+    validationResult,
+    autoFixIssues,
   } = useTemplateForm({
     initialTemplate,
     onSave,
@@ -285,6 +288,48 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             </PrimaryButton>
           </div>
         </div>
+
+        {/* Validation Status */}
+        {validationResult && validationResult.stats.totalIssues > 0 && (
+          <div className={`p-3 rounded-lg border ${
+            validationResult.stats.errors > 0 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-yellow-50 border-yellow-200'
+          } mb-4`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icons.AlertCircle className={`h-5 w-5 ${
+                  validationResult.stats.errors > 0 ? 'text-red-600' : 'text-yellow-600'
+                }`} />
+                <span className={`font-medium ${
+                  validationResult.stats.errors > 0 ? 'text-red-800' : 'text-yellow-800'
+                }`}>
+                  {validationResult.stats.errors > 0 
+                    ? `${validationResult.stats.errors} Error${validationResult.stats.errors > 1 ? 's' : ''} Found`
+                    : `${validationResult.stats.warnings} Warning${validationResult.stats.warnings > 1 ? 's' : ''} Found`
+                  }
+                </span>
+              </div>
+              <PrimaryButton
+                onClick={autoFixIssues}
+                variant="outline"
+                size="sm"
+              >
+                Auto-Fix Issues
+              </PrimaryButton>
+            </div>
+            {validationResult.issues.slice(0, 3).map((issue, index) => (
+              <div key={index} className="mt-2 text-sm text-gray-700">
+                • {issue.message}
+              </div>
+            ))}
+            {validationResult.issues.length > 3 && (
+              <div className="mt-2 text-sm text-gray-500">
+                +{validationResult.issues.length - 3} more issues
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-4">
           {/* Allow all users to select a publication status, but restrict 'Published' option if !canPublish */}

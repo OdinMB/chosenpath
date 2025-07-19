@@ -1,4 +1,4 @@
-import { Stat, PlayerSlot, PlayerOptionsGeneration } from "core/types";
+import { Stat, PlayerSlot, PlayerOptionsGeneration, StatValueEntry } from "core/types";
 import { useState, useEffect } from "react";
 
 interface StatEditorHelperProps {
@@ -27,6 +27,39 @@ export const useStatEditorHelpers = ({
   setEditingStats,
   readOnly = false,
 }: StatEditorHelperProps) => {
+  // Store preserved values for stats when toggling partOfPlayerBackgrounds
+  const [preservedValues, setPreservedValues] = useState<Map<string, {
+    backgroundValues?: StatValueEntry[];
+    initialValue?: string | number | string[];
+  }>>(new Map());
+  // Helper function to preserve current stat values before changes
+  const preserveStatValues = (statId: string, currentStat: Stat) => {
+    // Collect all current background values for this stat
+    const backgroundValues: StatValueEntry[] = [];
+    Object.values(playerOptions).forEach(playerOption => {
+      playerOption.possibleCharacterBackgrounds.forEach(background => {
+        const statValue = background.initialPlayerStatValues.find(sv => sv.statId === statId);
+        if (statValue) {
+          backgroundValues.push({ ...statValue });
+        }
+      });
+    });
+
+    // Store preserved values
+    setPreservedValues(prev => new Map(prev).set(statId, {
+      backgroundValues: backgroundValues.length > 0 ? backgroundValues : undefined,
+      initialValue: currentStat.initialValue
+    }));
+  };
+
+  // Helper function to restore preserved values when possible
+  const restorePreservedValues = (statId: string) => {
+    const preserved = preservedValues.get(statId);
+    if (!preserved) return null;
+
+    return preserved;
+  };
+
   // Helper function to update player stat references when an ID changes
   const updatePlayerStatReferences = (oldId: string, newId: string) => {
     const updatedPlayerOptions = { ...playerOptions };
@@ -148,6 +181,9 @@ export const useStatEditorHelpers = ({
           `Player stat ${oldStat.name} partOfPlayerBackgrounds changed from ${oldStat.partOfPlayerBackgrounds} to ${updates.partOfPlayerBackgrounds}`
         );
 
+        // Preserve current values before making changes
+        preserveStatValues(oldStat.id, oldStat);
+
         if (
           updates.partOfPlayerBackgrounds === true &&
           oldStat.partOfPlayerBackgrounds === false
@@ -155,7 +191,8 @@ export const useStatEditorHelpers = ({
           // Adding stat to player backgrounds
           const updatedPlayerOptions = addStatToPlayerBackgrounds(
             oldStat.id,
-            oldStat.type
+            oldStat.type,
+            oldStat
           );
           onChange({
             playerStats: updated,
@@ -170,8 +207,19 @@ export const useStatEditorHelpers = ({
           const updatedPlayerOptions = removeStatFromPlayerBackgrounds(
             oldStat.id
           );
+          
+          // Try to restore preserved initialValue if available
+          const preserved = restorePreservedValues(oldStat.id);
+          const finalUpdated = updated.map((stat, i) => {
+            if (i === index && preserved?.initialValue !== undefined) {
+              console.log(`Restoring preserved initialValue for ${stat.name}: ${JSON.stringify(preserved.initialValue)}`);
+              return { ...stat, initialValue: preserved.initialValue };
+            }
+            return stat;
+          });
+          
           onChange({
-            playerStats: updated,
+            playerStats: finalUpdated,
             playerOptions: updatedPlayerOptions,
           });
           return;
@@ -199,11 +247,14 @@ export const useStatEditorHelpers = ({
   // Helper function to add a stat to all player backgrounds
   const addStatToPlayerBackgrounds = (
     statId: string,
-    statType: Stat["type"]
+    statType: Stat["type"],
+    preservedStat?: Stat
   ) => {
     console.log(`Adding ${statId} to player backgrounds`);
     const updatedPlayerOptions = { ...playerOptions };
+    const preserved = restorePreservedValues(statId);
 
+    let backgroundIndex = 0;
     // Add the stat to each character background's initial values
     Object.keys(updatedPlayerOptions).forEach((playerSlot) => {
       const player = updatedPlayerOptions[playerSlot as PlayerSlot];
@@ -213,13 +264,25 @@ export const useStatEditorHelpers = ({
         if (
           !background.initialPlayerStatValues.some((sv) => sv.statId === statId)
         ) {
-          // Add the stat with an initial value
+          // Try to restore preserved value for this specific background
+          let valueToUse;
+          if (preserved?.backgroundValues && preserved.backgroundValues[backgroundIndex]) {
+            valueToUse = preserved.backgroundValues[backgroundIndex].value;
+            console.log(`Restored preserved value for ${statId} in background ${backgroundIndex}: ${JSON.stringify(valueToUse)}`);
+          } else {
+            // Use default value based on type
+            valueToUse = preservedStat?.initialValue ?? (
+              statType === "string" ? "" : statType === "string[]" ? [] : 50
+            );
+          }
+
+          // Add the stat with the determined value
           background.initialPlayerStatValues.push({
             statId: statId,
-            value:
-              statType === "string" ? "" : statType === "string[]" ? [] : 50,
+            value: valueToUse,
           });
         }
+        backgroundIndex++;
       });
     });
 
@@ -249,6 +312,63 @@ export const useStatEditorHelpers = ({
     });
 
     return hasChanges ? updatedPlayerOptions : playerOptions;
+  };
+
+  // Helper function to ensure all backgrounds have complete stat coverage
+  const ensureBackgroundCompleteness = (
+    updatedPlayerOptions: Record<PlayerSlot, PlayerOptionsGeneration>,
+    requiredStats: Stat[]
+  ) => {
+    const result = { ...updatedPlayerOptions };
+    let hasChanges = false;
+
+    // Get stats that should be in backgrounds
+    const backgroundStatIds = requiredStats
+      .filter(stat => stat.partOfPlayerBackgrounds !== false)
+      .map(stat => stat.id);
+
+    // For each player option
+    Object.keys(result).forEach(playerSlot => {
+      const player = result[playerSlot as PlayerSlot];
+
+      // For each background in this player option
+      player.possibleCharacterBackgrounds.forEach(background => {
+        const existingStatIds = new Set(
+          background.initialPlayerStatValues.map(sv => sv.statId)
+        );
+
+        // Add missing stats
+        backgroundStatIds.forEach(statId => {
+          if (!existingStatIds.has(statId)) {
+            const stat = requiredStats.find(s => s.id === statId);
+            if (stat) {
+              const defaultValue = stat.type === "string" ? "" : 
+                                 stat.type === "string[]" ? [] : 50;
+              
+              background.initialPlayerStatValues.push({
+                statId,
+                value: defaultValue
+              });
+              hasChanges = true;
+              console.log(`Added missing stat ${statId} to background ${background.title}`);
+            }
+          }
+        });
+
+        // Remove stats that shouldn't be in backgrounds
+        const originalLength = background.initialPlayerStatValues.length;
+        background.initialPlayerStatValues = background.initialPlayerStatValues.filter(
+          sv => backgroundStatIds.includes(sv.statId)
+        );
+        
+        if (background.initialPlayerStatValues.length !== originalLength) {
+          hasChanges = true;
+          console.log(`Removed invalid stats from background ${background.title}`);
+        }
+      });
+    });
+
+    return hasChanges ? result : updatedPlayerOptions;
   };
 
   const handleRemoveStat = (type: "shared" | "player", index: number) => {
@@ -394,6 +514,7 @@ export const useStatEditorHelpers = ({
     handleUpdateStat,
     handleRemoveStat,
     handleConvertStat,
+    ensureBackgroundCompleteness,
     readOnly,
   };
 };

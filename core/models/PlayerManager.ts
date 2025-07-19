@@ -287,18 +287,20 @@ export class PlayerManager {
     }
 
     // Initial player stats: background stats + player stats that are not part of backgrounds
-    let initialStatValues = background.initialPlayerStatValues;
-    initialStatValues.push(
-      ...state.playerStats
-        .filter((stat) => stat.partOfPlayerBackgrounds === false)
-        .map(
-          (stat) =>
-            ({
-              statId: stat.id,
-              value: stat.initialValue,
-            } as StatValueEntry)
-        )
-    );
+    // Create a copy to avoid mutating the original background object
+    const backgroundStatValues = [...background.initialPlayerStatValues];
+    const universalStatValues = state.playerStats
+      .filter((stat) => stat.partOfPlayerBackgrounds === false)
+      .map(
+        (stat) =>
+          ({
+            statId: stat.id,
+            value: stat.initialValue,
+          } as StatValueEntry)
+      );
+    
+    // Combine stats, ensuring no duplicates
+    const initialStatValues = this.mergeStatValues(backgroundStatValues, universalStatValues);
 
     // Update player with selected character information
     const updatedPlayer = {
@@ -388,5 +390,26 @@ export class PlayerManager {
       );
       return null;
     }
+  }
+
+  /**
+   * Merges stat values arrays, avoiding duplicates.
+   * If a stat ID exists in both arrays, the first array takes precedence.
+   */
+  private mergeStatValues(
+    backgroundStats: StatValueEntry[], 
+    universalStats: StatValueEntry[]
+  ): StatValueEntry[] {
+    const result = [...backgroundStats];
+    const existingStatIds = new Set(backgroundStats.map(stat => stat.statId));
+    
+    // Add universal stats that don't already exist in background stats
+    for (const universalStat of universalStats) {
+      if (!existingStatIds.has(universalStat.statId)) {
+        result.push(universalStat);
+      }
+    }
+    
+    return result;
   }
 }

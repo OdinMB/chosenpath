@@ -7,7 +7,7 @@
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
-    "boiler": "README.md, jest.config.js, .npmrc, render.yaml, index.ts, eslint.config.js, config.ts, index.css, vite-env.d.ts, index.html, package-lock.json, package.json, postcss.config.js, tailwind.config.js, tsconfig.app.json, tsconfig.json, tsconfig.node.json, vite.config.ts, .env, .env-sample, .gitignore"
+    "boiler": "README.md, docker-compose.yml, jest.config.js, .npmrc, render.yaml, index.ts, eslint.config.js, config.ts, index.css, vite-env.d.ts, index.html, package-lock.json, package.json, postcss.config.js, tailwind.config.js, tsconfig.app.json, tsconfig.json, tsconfig.node.json, vite.config.ts, .env, .env-sample, .gitignore"
   },
   "files.exclude": {
     "**/__pycache__": true,

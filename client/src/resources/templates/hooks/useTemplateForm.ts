@@ -23,6 +23,7 @@ import { useTabs } from "components/ui/useTabs";
 import { GenerateTemplateRequest } from "core/types/admin";
 import { useNavigate } from "react-router-dom";
 import { notificationService } from "shared/notifications/notificationService";
+import { validateTemplateIntegrity, autoFixTemplate, ValidationResult } from "../utils/templateValidation";
 
 // Define the TabType type
 export type TabType =
@@ -49,6 +50,7 @@ export function useTemplateForm({
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
   const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const navigate = useNavigate();
 
   // Use specialized hooks
@@ -118,6 +120,16 @@ export function useTemplateForm({
     // Ensure player stats have assigned initial values
     updatePlayerBackgroundStats(initialTemplate);
   }, [initialTemplate]);
+
+  // Validate template integrity whenever formData changes
+  useEffect(() => {
+    const validation = validateTemplateIntegrity(formData);
+    setValidationResult(validation);
+    
+    if (validation.stats.errors > 0) {
+      console.warn(`Template validation found ${validation.stats.errors} errors:`, validation.issues.filter(i => i.type === 'error'));
+    }
+  }, [formData]);
 
   // Extracted function to update player background stats
   const updatePlayerBackgroundStats = (template: StoryTemplate) => {
@@ -522,5 +534,14 @@ export function useTemplateForm({
     getPlayerOptionsFromStoryTemplate,
     handleAIDraftSetup,
     handleContainsImagesChange,
+    // Validation
+    validationResult,
+    autoFixIssues: () => {
+      if (validationResult) {
+        const fixedTemplate = autoFixTemplate(formData, validationResult.issues);
+        setFormData(fixedTemplate);
+        console.log("Auto-fixed template issues");
+      }
+    },
   };
 }
