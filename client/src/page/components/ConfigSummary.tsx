@@ -52,7 +52,7 @@ export const ConfigSummary = ({
             </span>
           </div>
           {showPlayerInfo && (
-            <div className="flex flex-wrap gap-4 text-xs text-primary-600">
+            <div className="flex flex-wrap gap-4 gap-y-1 text-xs text-primary-600">
               <div>
                 <span>Players:</span>{" "}
                 <span className="font-medium text-primary">{playerCount}</span>

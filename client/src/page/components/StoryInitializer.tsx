@@ -4,7 +4,7 @@ import { PrimaryButton, Icons, ColoredBox, TextArea } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
 import {
@@ -67,26 +67,98 @@ export const StoryInitializer = ({
   onPlayerCountChange,
   onPromptChange,
 }: StoryInitializerProps) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [prompt, setPrompt] = useState(initialPrompt || "");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Parse URL parameters
+  const urlStep = parseInt(searchParams.get("step") || "1", 10);
+  const urlCategory = searchParams.get("category") as PromptCategory | null;
+  const urlPlayerCount = parseInt(
+    searchParams.get("players") || "",
+    10
+  ) as PlayerCount;
+  const urlGameMode = searchParams.get("mode") as GameMode | null;
+  const urlImages = searchParams.get("images") === "true";
+  const urlPrompt = searchParams.get("prompt");
+  const urlDifficulty = searchParams.get("difficulty");
+
+  // Parse category-specific fields from URL
+  const urlCategoryFields = useMemo(() => {
+    const fields: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      if (key.startsWith("field_")) {
+        fields[key.replace("field_", "")] = value;
+      }
+    });
+    return fields;
+  }, [searchParams]);
+
+  // Initialize state with URL params or defaults
+  const [currentStep, setCurrentStep] = useState(
+    urlStep >= 1 && urlStep <= 3 ? urlStep : 1
+  );
+  const [prompt, setPrompt] = useState(urlPrompt || initialPrompt || "");
   const [playerCount, setPlayerCount] = useState<PlayerCount>(
-    initialPlayerCount || MIN_PLAYERS
+    urlPlayerCount >= MIN_PLAYERS && urlPlayerCount <= MAX_PLAYERS
+      ? urlPlayerCount
+      : initialPlayerCount || MIN_PLAYERS
   );
   const [maxTurns] = useState<number>(initialMaxTurns || DEFAULT_TURNS);
-  const [generateImages, setGenerateImages] = useState(false);
+  const [generateImages, setGenerateImages] = useState(urlImages || false);
   const [gameMode, setGameMode] = useState<GameMode>(
-    initialGameMode || GameModes.Cooperative
+    urlGameMode && Object.values(GameModes).includes(urlGameMode)
+      ? urlGameMode
+      : initialGameMode || GameModes.Cooperative
   );
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
-    useState<DifficultyLevel>(getDefaultDifficultyLevel());
-  const [selectedCategory, setSelectedCategory] =
-    useState<PromptCategory>("enjoy-fiction");
-  const [categoryFields, setCategoryFields] = useState<Record<string, string>>(
-    {}
+    useState<DifficultyLevel>(
+      urlDifficulty
+        ? DEFAULT_DIFFICULTY_LEVELS.find(
+            (level) => level.modifier === Number(urlDifficulty)
+          ) || getDefaultDifficultyLevel()
+        : getDefaultDifficultyLevel()
+    );
+  const [selectedCategory, setSelectedCategory] = useState<PromptCategory>(
+    urlCategory &&
+      [
+        "flexible",
+        "enjoy-fiction",
+        "vent-about-reality",
+        "pretend-to-be",
+        "see-your-future-self",
+        "read-with-kids",
+        "learn-something",
+      ].includes(urlCategory)
+      ? urlCategory
+      : "enjoy-fiction"
   );
-  const [shownSuggestions, setShownSuggestions] = useState<Record<string, Set<number>>>({});
+  const [categoryFields, setCategoryFields] = useState<Record<string, string>>(
+    Object.keys(urlCategoryFields).length > 0 ? urlCategoryFields : {}
+  );
+  const [shownSuggestions, setShownSuggestions] = useState<
+    Record<string, Set<number>>
+  >({});
+  const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState<
+    Record<string, number>
+  >({});
 
-  const navigate = useNavigate();
+  // Update URL when relevant state changes
+  const updateURLParams = useCallback(
+    (updates: Record<string, string | number | boolean | null>) => {
+      const params = new URLSearchParams(searchParams);
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === "") {
+          params.delete(key);
+        } else {
+          params.set(key, String(value));
+        }
+      });
+
+      navigate(`/setup?${params.toString()}`, { replace: true });
+    },
+    [navigate, searchParams]
+  );
 
   const categoryConfigs: Record<PromptCategory, CategoryConfig> = useMemo(
     () => ({
@@ -124,7 +196,7 @@ export const StoryInitializer = ({
             key: "role",
             label: "What role do you want to experience?",
             placeholder: "a deaf person",
-            type: "inline",
+            type: "textarea",
           },
           {
             key: "aspects",
@@ -254,49 +326,86 @@ export const StoryInitializer = ({
       // Create a key for this category + game mode combination
       const suggestionKey = `${category}-${currentPlayerCount}-${currentGameMode}`;
       const shownSet = shownSuggestions[suggestionKey] || new Set<number>();
-      
-      // Filter out the first item and already shown suggestions
+      const currentIndex = currentSuggestionIndex[suggestionKey];
+
+      // Filter out the first item, already shown suggestions, and current suggestion
       const availableIndices = relevantSuggestions
         .map((_, index) => index)
-        .filter(index => index > 0 && !shownSet.has(index));
-      
+        .filter((index) => {
+          return (
+            index > 0 && // Skip first item
+            !shownSet.has(index) && // Skip already shown
+            index !== currentIndex
+          ); // Skip current suggestion
+        });
+
       // If no available suggestions, reset the shown set and try again
       if (availableIndices.length === 0) {
-        setShownSuggestions(prev => ({
+        setShownSuggestions((prev) => ({
           ...prev,
-          [suggestionKey]: new Set()
+          [suggestionKey]: new Set(),
         }));
-        
-        // Retry with reset suggestions
+
+        // Retry with reset suggestions, but still exclude current suggestion
         const retryIndices = relevantSuggestions
           .map((_, index) => index)
-          .filter(index => index > 0);
-        
-        if (retryIndices.length === 0) return relevantSuggestions[0] || {};
-        
-        const randomIndex = retryIndices[Math.floor(Math.random() * retryIndices.length)];
-        
-        // Mark this suggestion as shown
-        setShownSuggestions(prev => ({
+          .filter((index) => index > 0 && index !== currentIndex);
+
+        // If we still have no options (only 1 suggestion available), try to find any different option
+        if (retryIndices.length === 0) {
+          const anyOtherIndex = relevantSuggestions
+            .map((_, index) => index)
+            .find((index) => index !== currentIndex);
+
+          if (anyOtherIndex !== undefined) {
+            setCurrentSuggestionIndex((prev) => ({
+              ...prev,
+              [suggestionKey]: anyOtherIndex,
+            }));
+            setShownSuggestions((prev) => ({
+              ...prev,
+              [suggestionKey]: new Set([anyOtherIndex]),
+            }));
+            return relevantSuggestions[anyOtherIndex];
+          }
+
+          // Fallback to first available suggestion if no other options
+          return relevantSuggestions[0] || {};
+        }
+
+        const randomIndex =
+          retryIndices[Math.floor(Math.random() * retryIndices.length)];
+
+        // Mark this suggestion as shown and current
+        setCurrentSuggestionIndex((prev) => ({
           ...prev,
-          [suggestionKey]: new Set([randomIndex])
+          [suggestionKey]: randomIndex,
         }));
-        
+        setShownSuggestions((prev) => ({
+          ...prev,
+          [suggestionKey]: new Set([randomIndex]),
+        }));
+
         return relevantSuggestions[randomIndex];
       }
-      
+
       // Choose randomly from available suggestions
-      const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-      
-      // Mark this suggestion as shown
-      setShownSuggestions(prev => ({
+      const randomIndex =
+        availableIndices[Math.floor(Math.random() * availableIndices.length)];
+
+      // Mark this suggestion as shown and current
+      setCurrentSuggestionIndex((prev) => ({
         ...prev,
-        [suggestionKey]: new Set([...shownSet, randomIndex])
+        [suggestionKey]: randomIndex,
       }));
-      
+      setShownSuggestions((prev) => ({
+        ...prev,
+        [suggestionKey]: new Set([...shownSet, randomIndex]),
+      }));
+
       return relevantSuggestions[randomIndex];
     },
-    [shownSuggestions]
+    [shownSuggestions, currentSuggestionIndex]
   );
 
   const handleSuggestion = () => {
@@ -314,6 +423,20 @@ export const StoryInitializer = ({
     // Set all the category-specific fields
     setCategoryFields(coordinatedSuggestions);
 
+    // Update URL parameters for all the new values
+    const urlUpdates: Record<string, string | null> = {
+      prompt: newPrompt || null,
+    };
+
+    // Add category field updates to URL
+    Object.entries(coordinatedSuggestions).forEach(([key, value]) => {
+      if (key !== "instructions" && typeof value === "string") {
+        urlUpdates[`field_${key}`] = value || null;
+      }
+    });
+
+    updateURLParams(urlUpdates);
+
     if (onPromptChange) {
       onPromptChange(newPrompt);
     }
@@ -325,17 +448,31 @@ export const StoryInitializer = ({
     // Clear fields when switching categories - user needs to click "Get suggestion" to populate
     setCategoryFields({});
     setPrompt("");
-    
+
+    // Update URL
+    updateURLParams({ category, prompt: null });
+
     // Reset suggestion history for this category when switching
-    setShownSuggestions(prev => {
+    setShownSuggestions((prev) => {
       const newShown = { ...prev };
       // Clear all suggestion history for this category
-      Object.keys(newShown).forEach(key => {
+      Object.keys(newShown).forEach((key) => {
         if (key.startsWith(`${category}-`)) {
           delete newShown[key];
         }
       });
       return newShown;
+    });
+
+    // Also reset current suggestion index for this category
+    setCurrentSuggestionIndex((prev) => {
+      const newCurrent = { ...prev };
+      Object.keys(newCurrent).forEach((key) => {
+        if (key.startsWith(`${category}-`)) {
+          delete newCurrent[key];
+        }
+      });
+      return newCurrent;
     });
   };
 
@@ -344,6 +481,9 @@ export const StoryInitializer = ({
     // Reset game mode to cooperative if switching to single player
     if (value === 1) {
       setGameMode(GameModes.Cooperative);
+      updateURLParams({ players: value, mode: null });
+    } else {
+      updateURLParams({ players: value });
     }
     Logger.App.log(`Updated player count to: ${value}`);
     if (onPlayerCountChange) {
@@ -353,18 +493,22 @@ export const StoryInitializer = ({
 
   const handleStep1Continue = () => {
     setCurrentStep(2);
+    updateURLParams({ step: 2 });
   };
 
   const handleStep2Continue = () => {
     setCurrentStep(3);
+    updateURLParams({ step: 3 });
   };
 
   const handleBackToStep1 = () => {
     setCurrentStep(1);
+    updateURLParams({ step: 1 });
   };
 
   const handleBackToStep2 = () => {
     setCurrentStep(2);
+    updateURLParams({ step: 2 });
   };
 
   const handleCategoryFieldChange = (fieldKey: string, value: string) => {
@@ -372,6 +516,7 @@ export const StoryInitializer = ({
       ...prev,
       [fieldKey]: value,
     }));
+    updateURLParams({ [`field_${fieldKey}`]: value });
   };
 
   const buildMergedPrompt = () => {
@@ -401,6 +546,7 @@ export const StoryInitializer = ({
 
   const handleDifficultyChange = (difficultyLevel: DifficultyLevel) => {
     setSelectedDifficultyLevel(difficultyLevel);
+    updateURLParams({ difficulty: difficultyLevel.modifier });
     Logger.App.log(
       `Updated difficulty level to: ${difficultyLevel.title} (${difficultyLevel.modifier})`
     );
@@ -462,14 +608,17 @@ export const StoryInitializer = ({
     }
 
     setGameMode(mode);
+    updateURLParams({ mode });
     Logger.App.log(`Updated game mode to: ${mode}`);
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPrompt(e.target.value);
+    const value = e.target.value;
+    setPrompt(value);
+    updateURLParams({ prompt: value });
 
     if (onPromptChange) {
-      onPromptChange(e.target.value);
+      onPromptChange(value);
     }
   };
 
@@ -575,7 +724,7 @@ export const StoryInitializer = ({
 
   const renderStep2 = () => {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <ConfigSummary
           selectedCategory={selectedCategory}
           categoryConfigs={categoryConfigs}
@@ -659,7 +808,10 @@ export const StoryInitializer = ({
                 id="generate-images"
                 type="checkbox"
                 checked={generateImages}
-                onChange={(e) => setGenerateImages(e.target.checked)}
+                onChange={(e) => {
+                  setGenerateImages(e.target.checked);
+                  updateURLParams({ images: e.target.checked });
+                }}
                 className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
                 disabled={currentIsLoading}
               />
@@ -673,7 +825,7 @@ export const StoryInitializer = ({
           </div>
         )}
 
-        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-2">
+        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-1 sm:pt-2">
           <PrimaryButton
             type="button"
             size="lg"
@@ -703,8 +855,8 @@ export const StoryInitializer = ({
 
   const renderStep3 = () => {
     return (
-      <div className="space-y-6">
-        <div className="mb-8">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="mb-4 sm:mb-8">
           <ConfigSummary
             selectedCategory={selectedCategory}
             categoryConfigs={categoryConfigs}
@@ -717,147 +869,160 @@ export const StoryInitializer = ({
         </div>
 
         {/* Story Prompt Box */}
-        <div className="relative p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-          {/* Get suggestion button positioned over top border */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 -top-4 z-10">
+        <div className="relative bg-white rounded-lg border border-primary-100 shadow-md">
+          {/* Idea button floated to top-right */}
+          <div className="float-right -mt-px -mr-px">
             <PrimaryButton
               type="button"
               onClick={handleSuggestion}
               variant="outline"
               size="sm"
               leftBorder={false}
-              className="!bg-white !text-secondary hover:!bg-gray-100 active:!bg-gray-200 !border-secondary px-4 py-2 shadow-sm !transition-colors !opacity-100 hover:!opacity-100 active:!opacity-100"
+              className="!bg-white !text-secondary hover:!bg-gray-100 active:!bg-gray-200 !border-primary-100 px-2 py-1 shadow-sm !transition-colors !opacity-100 hover:!opacity-100 active:!opacity-100 !rounded-tl-none !rounded-br-none !rounded-tr-lg !rounded-bl-md text-sm sm:text-sm"
               disabled={currentIsLoading}
+              leftIcon={<Icons.LightBulb className="h-4 w-4 sm:h-4 sm:w-4" />}
             >
-              Get suggestion
+              Idea
             </PrimaryButton>
           </div>
 
-          {/* Category-specific fields */}
-          {selectedCategory !== "flexible" &&
-            categoryConfigs[selectedCategory].fields.length > 0 && (
-              <div className="space-y-6 mt-6">
-                {categoryConfigs[selectedCategory].fields.map((field) => (
-                  <div key={field.key} className="space-y-2">
-                    {field.type === "inline" ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                        <label
-                          htmlFor={`category-${field.key}`}
-                          className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
-                        >
-                          {field.label}
-                        </label>
-                        <input
-                          id={`category-${field.key}`}
-                          type="text"
-                          value={categoryFields[field.key] || ""}
-                          onChange={(e) =>
-                            handleCategoryFieldChange(field.key, e.target.value)
-                          }
-                          className="flex-1 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                          placeholder={field.placeholder}
-                          disabled={currentIsLoading}
-                        />
-                      </div>
-                    ) : field.type === "number" ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                        <label
-                          htmlFor={`category-${field.key}`}
-                          className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
-                        >
-                          {field.label}
-                        </label>
-                        <input
-                          id={`category-${field.key}`}
-                          type="text"
-                          value={categoryFields[field.key] || ""}
-                          onChange={(e) =>
-                            handleCategoryFieldChange(field.key, e.target.value)
-                          }
-                          className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                          placeholder={field.placeholder}
-                          disabled={currentIsLoading}
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <label
-                          htmlFor={`category-${field.key}`}
-                          className="text-sm md:text-base font-medium text-primary"
-                        >
-                          {field.label}
-                        </label>
-                        <TextArea
-                          id={`category-${field.key}`}
-                          value={categoryFields[field.key] || ""}
-                          onChange={(e) =>
-                            handleCategoryFieldChange(field.key, e.target.value)
-                          }
-                          className="min-h-[80px] sm:min-h-[120px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                          placeholder={field.placeholder}
-                          disabled={currentIsLoading}
-                          autoHeight
-                        />
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Content container with proper spacing */}
+          <div className="p-4 space-y-6">
+            {/* Category-specific fields */}
+            {selectedCategory !== "flexible" &&
+              categoryConfigs[selectedCategory].fields.length > 0 && (
+                <div className="space-y-6">
+                  {categoryConfigs[selectedCategory].fields.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      {field.type === "inline" ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                          <label
+                            htmlFor={`category-${field.key}`}
+                            className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
+                          >
+                            {field.label}
+                          </label>
+                          <input
+                            id={`category-${field.key}`}
+                            type="text"
+                            value={categoryFields[field.key] || ""}
+                            onChange={(e) =>
+                              handleCategoryFieldChange(
+                                field.key,
+                                e.target.value
+                              )
+                            }
+                            className="flex-1 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            placeholder={field.placeholder}
+                            disabled={currentIsLoading}
+                          />
+                        </div>
+                      ) : field.type === "number" ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                          <label
+                            htmlFor={`category-${field.key}`}
+                            className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
+                          >
+                            {field.label}
+                          </label>
+                          <input
+                            id={`category-${field.key}`}
+                            type="text"
+                            value={categoryFields[field.key] || ""}
+                            onChange={(e) =>
+                              handleCategoryFieldChange(
+                                field.key,
+                                e.target.value
+                              )
+                            }
+                            className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            placeholder={field.placeholder}
+                            disabled={currentIsLoading}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <label
+                            htmlFor={`category-${field.key}`}
+                            className="text-sm md:text-base font-medium text-primary"
+                          >
+                            {field.label}
+                          </label>
+                          <TextArea
+                            id={`category-${field.key}`}
+                            value={categoryFields[field.key] || ""}
+                            onChange={(e) =>
+                              handleCategoryFieldChange(
+                                field.key,
+                                e.target.value
+                              )
+                            }
+                            className="min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            placeholder={field.placeholder}
+                            disabled={currentIsLoading}
+                            autoHeight
+                          />
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          <div className="space-y-2">
-            <label
-              htmlFor="prompt"
-              className="text-sm md:text-base font-medium text-primary"
-            >
-              {(() => {
-                if (selectedCategory === "flexible") {
-                  return "What kind of story would you like to experience?";
-                }
-                if (
-                  selectedCategory === "enjoy-fiction" ||
-                  selectedCategory === "read-with-kids"
-                ) {
-                  return "What kind of story would you like to experience?";
-                }
-                if (selectedCategory === "learn-something") {
-                  return "Any instructions for the story? (optional)";
-                }
-                return "Anything else we should consider? (optional)";
-              })()}
-            </label>
-            <TextArea
-              id="prompt"
-              value={prompt}
-              onChange={handlePromptChange}
-              className={`min-h-[80px] sm:min-h-[120px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
-              placeholder={(() => {
-                if (
-                  selectedCategory === "enjoy-fiction" ||
-                  selectedCategory === "read-with-kids"
-                ) {
-                  return selectedCategory === "read-with-kids"
-                    ? "We go on adventures with our underwater friends. There should be a pink octopus girl called 'Tessa'."
-                    : getPlaceholderText();
-                }
-                if (selectedCategory === "vent-about-reality") {
-                  return "I'm poor soul who tries to find an apartment";
-                }
-                if (selectedCategory === "pretend-to-be") {
-                  return "Let the story play in Los Angeles";
-                }
-                if (selectedCategory === "see-your-future-self") {
-                  return "My cat 'Einstein' should occur in the story.";
-                }
-                if (selectedCategory === "learn-something") {
-                  return "I want a whistleblower scenario with leaked documents of varying authenticity (some real, some forged).";
-                }
-                return getPlaceholderText();
-              })()}
-              disabled={currentIsLoading}
-              required
-              autoHeight
-            />
+            <div className="space-y-2">
+              <label
+                htmlFor="prompt"
+                className="text-sm md:text-base font-medium text-primary"
+              >
+                {(() => {
+                  if (selectedCategory === "flexible") {
+                    return "What kind of story would you like to experience?";
+                  }
+                  if (
+                    selectedCategory === "enjoy-fiction" ||
+                    selectedCategory === "read-with-kids"
+                  ) {
+                    return "What kind of story would you like to experience?";
+                  }
+                  if (selectedCategory === "learn-something") {
+                    return "Any instructions for the story? (optional)";
+                  }
+                  return "Anything else we should consider? (optional)";
+                })()}
+              </label>
+              <TextArea
+                id="prompt"
+                value={prompt}
+                onChange={handlePromptChange}
+                className={`min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
+                placeholder={(() => {
+                  if (
+                    selectedCategory === "enjoy-fiction" ||
+                    selectedCategory === "read-with-kids"
+                  ) {
+                    return selectedCategory === "read-with-kids"
+                      ? "We go on adventures with our underwater friends. There should be a pink octopus girl called 'Tessa'."
+                      : getPlaceholderText();
+                  }
+                  if (selectedCategory === "vent-about-reality") {
+                    return "I'm poor soul who tries to find an apartment";
+                  }
+                  if (selectedCategory === "pretend-to-be") {
+                    return "Let the story play in Los Angeles";
+                  }
+                  if (selectedCategory === "see-your-future-self") {
+                    return "My cat 'Einstein' should occur in the story.";
+                  }
+                  if (selectedCategory === "learn-something") {
+                    return "I want a whistleblower scenario with leaked documents of varying authenticity (some real, some forged).";
+                  }
+                  return getPlaceholderText();
+                })()}
+                disabled={currentIsLoading}
+                required
+                autoHeight
+              />
+            </div>
           </div>
         </div>
 
@@ -875,7 +1040,7 @@ export const StoryInitializer = ({
           </div>
         )}
 
-        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-2">
+        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-1 sm:pt-2">
           <PrimaryButton
             type="button"
             size="lg"
@@ -892,7 +1057,7 @@ export const StoryInitializer = ({
             onClick={templateMode ? handleSubmit : undefined}
             size="lg"
             disabled={currentIsLoading}
-            className="font-semibold text-lg flex-1 sm:flex-none sm:min-w-[160px]"
+            className="font-semibold flex-1 sm:flex-none sm:min-w-[120px]"
           >
             {templateMode ? "Draft World" : "Create Story"}
           </PrimaryButton>

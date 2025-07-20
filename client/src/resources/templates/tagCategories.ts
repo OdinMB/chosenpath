@@ -6,7 +6,7 @@ export type TagCategory = {
 export const TAG_CATEGORIES: TagCategory[] = [
   {
     name: "Category",
-    tags: ["Fiction", "Kids", "Satire", "Pretend to be"],
+    tags: ["Fiction", "Kids", "Satire", "Pretend to be", "Learning"],
   },
   {
     name: "Genre",
