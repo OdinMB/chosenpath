@@ -241,3 +241,19 @@ VITE_WS_PORT=3000
   - Client linting: `cd client && npm run lint`
   - Fix all TypeScript errors, ESLint warnings, and other linting issues
   - Tasks are not complete until all linting passes successfully
+
+### Lint Configuration & Common Issues
+**ESLint Rules to Watch For:**
+- `@typescript-eslint/no-unused-vars` - Remove unused variables, imports, and function parameters
+- `@typescript-eslint/no-explicit-any` - Avoid `any` types, use specific types instead
+- `@typescript-eslint/no-unsafe-*` - Avoid unsafe operations on `any` types
+- Property access errors - Use optional chaining (`?.`) or proper type guards
+- Array/object method errors - Ensure arrays/objects exist before calling `.length`, `.map()`, etc.
+- Missing return types on functions - Add explicit return types for exported functions
+
+**Type Safety Patterns:**
+- Use proper TypeScript types instead of `any`
+- Add type guards when accessing potentially undefined properties
+- Use array checks before calling `.length` or array methods
+- Define proper interfaces for complex objects
+- Use generic types for reusable components

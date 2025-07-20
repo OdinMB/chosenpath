@@ -37,15 +37,16 @@ export const lectures: Lecture[] = [
         fiction. It also has an <strong>AI Worldbuilding Assistant</strong> that can help you iterate and fill in the details of your Worlds in seconds.
       </p>
       <p class="mb-4">
-        This makes the platform intereting for different types of creators:
+        This makes the platform interesting for different types of creators:
       </p>
       <div class="bg-gray-50 p-4 rounded-lg mb-4">
-        <p class="mb-2"><strong>Architects:</strong> Love crafting settings and mechanics and don't want to write entire books and story logic to turn their creations into interactive fiction. Architects use every feature available to create Worlds that work exactly as they want them to.</p>
-        <p class="mb-2"><strong>Dreamers:</strong> Want to test new ideas quickly. They use the AI Worldbuilding Assistant to create playable experiences in minutes.</p>
-        <p class="mb-2"><strong>Game Designers:</strong> Create multiplayer experiences without having to manage story trees that are even larger than for single-player stories.</p>
-        <p class="mb-2"><strong>Satirists:</strong> See the absurd and unjust in the world. They create short, interactive experiences that highlight these issues. (See our <a href="/library?tags=Satire" target="_blank" style=>Library</a> for examples.)</p>
-        <p class="mb-2"><strong>Futurists:</strong> Bring their scenarios to life without having to know anything about the intricacies of interactive fiction.</p>
-        <p class="mb-0"><strong>Teachers:</strong> Use Chosen Path to teach students about storytelling and to create interactive simulations (History, Social Studies, Politics).</p>
+        <p class="mb-2"><strong>Architects</strong> love crafting settings and mechanics and don't want to write entire books and story logic to turn their creations into interactive fiction. Architects use every feature available to create Worlds that work exactly as they want them to.</p>
+        <p class="mb-2"><strong>Dreamers</strong> want to test new ideas quickly. They use the AI Worldbuilding Assistant to create playable experiences in minutes.</p>
+        <p class="mb-2"><strong>Game Designers</strong> create multiplayer experiences without having to manage story trees that are even larger than for single-player stories.</p>
+        <p class="mb-2"><strong>Satirists</strong> see the absurd and unjust in the world. They create short, interactive experiences that highlight these issues. (See our <a href="/library?tags=Satire" target="_blank" style=>Library</a> for examples.)</p>
+        <p class="mb-2"><strong>Futurists</strong> bring their scenarios to life without having to know anything about the intricacies of interactive fiction.</p>
+        <p class="mb-2"><strong>Teachers</strong> use Chosen Path to teach students about storytelling and to create interactive simulations (History, Social Studies, Politics).</p>
+        <p class="mb-0"><strong>Coaches</strong> help their clients envision their future selfs in detailed and realistic scenarios.</p>
       </div>
     `,
   },

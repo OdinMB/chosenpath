@@ -136,6 +136,7 @@ export function useStoryCreation() {
     setIsLoading(true);
     pollingStartTimeRef.current = null;
     Logger.App.log("Starting story creation process (prompt-based)");
+    console.log('Story creation request data:', data);
     let tempCodesForCleanup: string[] | null = null;
 
     try {

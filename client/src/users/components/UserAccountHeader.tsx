@@ -147,14 +147,23 @@ export function UserAccountHeader() {
               </button>
             </>
           ) : (
-            <button
-              onClick={openLoginModal}
-              disabled={authIsLoading}
-              className="text-primary-600 hover:underline text-sm py-1 flex items-center space-x-1"
-            >
-              <Icons.User className="h-4 w-4" />
-              <span>{authIsLoading ? "Loading..." : "Sign In"}</span>
-            </button>
+            <>
+              <button
+                onClick={() => handleNavigate("/")}
+                className="text-slate-700 hover:text-primary-600 py-1 flex items-center"
+                aria-label="Home"
+              >
+                Home
+              </button>
+              <button
+                onClick={openLoginModal}
+                disabled={authIsLoading}
+                className="text-primary-600 hover:underline text-sm py-1 flex items-center space-x-1"
+              >
+                <Icons.User className="h-4 w-4" />
+                <span>{authIsLoading ? "Loading..." : "Sign In"}</span>
+              </button>
+            </>
           )}
         </div>
       </div>

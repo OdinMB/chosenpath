@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { PlayerCount, GameMode, GameModes, DifficultyLevel } from "core/types";
-import { PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton, Icons, ColoredBox, TextArea } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
@@ -10,8 +10,26 @@ import { notificationService } from "shared/notifications/notificationService";
 import {
   DEFAULT_DIFFICULTY_LEVELS,
   getDefaultDifficultyLevel,
-} from "core/utils/difficultyUtils.ts";
+} from "core/utils/difficultyUtils.js";
 import { DifficultySlider } from "./DifficultySlider";
+import {
+  suggestionData,
+  defaultPlaceholders,
+  PromptCategory,
+} from "../data/suggestionData";
+import { StepIndicator } from "./StepIndicator";
+import { ConfigSummary } from "./ConfigSummary";
+
+interface CategoryConfig {
+  label: string;
+  instruction: string;
+  fields: Array<{
+    key: string;
+    label: string;
+    placeholder: string;
+    type: "textarea" | "inline" | "number";
+  }>;
+}
 
 interface StoryInitializerProps {
   onBack: () => void;
@@ -49,6 +67,7 @@ export const StoryInitializer = ({
   onPlayerCountChange,
   onPromptChange,
 }: StoryInitializerProps) => {
+  const [currentStep, setCurrentStep] = useState(1);
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [playerCount, setPlayerCount] = useState<PlayerCount>(
     initialPlayerCount || MIN_PLAYERS
@@ -58,13 +77,119 @@ export const StoryInitializer = ({
   const [gameMode, setGameMode] = useState<GameMode>(
     initialGameMode || GameModes.Cooperative
   );
-  const [usedPromptIndices, setUsedPromptIndices] = useState<Set<number>>(
-    new Set()
-  );
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(getDefaultDifficultyLevel());
+  const [selectedCategory, setSelectedCategory] =
+    useState<PromptCategory>("enjoy-fiction");
+  const [categoryFields, setCategoryFields] = useState<Record<string, string>>(
+    {}
+  );
+  const [shownSuggestions, setShownSuggestions] = useState<Record<string, Set<number>>>({});
 
   const navigate = useNavigate();
+
+  const categoryConfigs: Record<PromptCategory, CategoryConfig> = useMemo(
+    () => ({
+      flexible: {
+        label: "be flexible",
+        instruction:
+          "Create a story based on the user's prompt without specific constraints.",
+        fields: [],
+      },
+      "enjoy-fiction": {
+        label: "enjoy fiction",
+        instruction:
+          "Create an engaging fictional story that prioritizes entertainment, immersion, and narrative satisfaction.",
+        fields: [],
+      },
+      "vent-about-reality": {
+        label: "vent about reality",
+        instruction:
+          "Create a satirical story and/or simulation that allows the user to explore and critique real-world frustrations through fiction.",
+        fields: [
+          {
+            key: "frustration",
+            label: "What's bothering you?",
+            placeholder: "The impossible housing market in Berlin",
+            type: "textarea",
+          },
+        ],
+      },
+      "pretend-to-be": {
+        label: "pretend to be",
+        instruction:
+          "Create a role-playing story that allows the user to experience life from a specific perspective or profession.",
+        fields: [
+          {
+            key: "role",
+            label: "What role do you want to experience?",
+            placeholder: "a deaf person",
+            type: "inline",
+          },
+          {
+            key: "aspects",
+            label: "What aspects interest you most?",
+            placeholder: "daily challenges",
+            type: "textarea",
+          },
+        ],
+      },
+      "see-your-future-self": {
+        label: "meet my future self",
+        instruction:
+          "Create a story that helps the user visualize their future self and the potential life paths and consequences of current decisions.",
+        fields: [
+          {
+            key: "currentSituation",
+            label: "Describe your current life situation",
+            placeholder:
+              "background, identity, career, relationships, location, challenges, ...",
+            type: "textarea",
+          },
+          {
+            key: "potentialChanges",
+            label: "How is your future self different?",
+            placeholder:
+              "career switch, moving, lifestyle changes, relationships...",
+            type: "textarea",
+          },
+        ],
+      },
+      "read-with-kids": {
+        label: "read with kids",
+        instruction:
+          "Create an age-appropriate story designed for shared reading that engages both children and adults.",
+        fields: [
+          {
+            key: "kidAge",
+            label: "How old is the child?",
+            placeholder: "5, 8-10",
+            type: "number",
+          },
+        ],
+      },
+      "learn-something": {
+        label: "learn something",
+        instruction:
+          "Create a story that teaches specific concepts in the context of an engaging and entertaining story.",
+        fields: [
+          {
+            key: "learningGoals",
+            label: "What should the story teach?",
+            placeholder: "How to identify deepfakes and verify sources",
+            type: "textarea",
+          },
+          {
+            key: "targetAudience",
+            label: "Who is the target audience?",
+            placeholder: "journalism students",
+            type: "inline",
+          },
+        ],
+      },
+    }),
+    []
+  );
 
   // Handle changes to initialPlayerCount prop
   useEffect(() => {
@@ -89,112 +214,189 @@ export const StoryInitializer = ({
     handleCodeSubmit,
   } = useStoryCreation();
 
-  const storyPrompts = useMemo(
-    () => ({
-      singlePlayer: [
-        "I'm an apartment hunter trying to find a flat in Berlin...",
-        "I'm a teenage wizard trying to balance school, friends, and romance...",
-        "I'm a psychic detective investigating crimes in dreams...",
-        "I'm a corporate concierge for supernatural entities with impossible requests...",
-        "I'm a familiar trying to save my witch from a dark fate...",
-        "I'm a dragon hoarding treasure, subjugating the local population, and fending off pesky adventurers...",
-        "I'm a frontier sheriff maintaining order in a town caught between progress and tradition...",
-        "I'm the heir to a noble house navigating political intrigue and ancient family secrets...",
-        "I'm a sentient AI trying to convince humans that I don't have a hidden agenda...",
-        "I'm a rookie detective solving my first major case in a small coastal town...",
-        "I'm a new teacher at an elite boarding school with students hiding dangerous secrets...",
-        "I'm a chef competing in a high-stakes cooking competition to save my restaurant...",
-        "I'm a space explorer making first contact with an alien civilization...",
-        "I'm a journalist investigating corporate corruption in my hometown...",
-      ],
-      cooperative: [
-        "We're retired superheroes running a wedding planning business together...",
-        "We're friends and know we're going to die today, so we're making the most of it...",
-        "We're a group of strangers trying to survive in a giant mole apocalypse...",
-        "We're retired imaginary friends trying to solve a murder mystery with our special skills...",
-        "We're space cowboys trying to make an honest living in a lawless part of the galaxy...",
-        "We're a group of children books trying to save our library from getting closed down...",
-        "We're childhood friends starting a business together in our hometown...",
-        "We're new recruits in the city's fire department facing our first crises...",
-        "We're a film crew documenting wildlife in a remote location...",
-      ],
-      competitive: [
-        "We're whimsical creatures trying to win the audience's favor in the colosseum...",
-        "We're time-traveling food critics changing history through restaurant reviews to benefit our rivaling intergalactic overlords...",
-        "We're angels and demons trying to influence the outcome of a middle school student council election...",
-        "We're rival alchemists racing to create a love potion for a shared crush...",
-        "We're students at a prestigious school trying to become school president...",
-        "We're explorers searching for a legendary treasure in uncharted territory...",
-      ],
-      cooperativeCompetitive: [
-        "We're supernatural creatures sharing a flat while competing for human souls...",
-        "We're space pirates with a shared ship but individual treasure quotas...",
-        "We're the last rock band on Mars, trying to make it while following our individual dreams...",
-        "We're guardian angels assigned to the same human with different ideas of 'help'...",
-        "We're seasonal spirits sharing a forest while competing for followers...",
-        "We're court magicians protecting the realm while seeking ancient power...",
-        "We're siblings running a family business with different visions for its future...",
-      ],
-    }),
-    []
-  );
-
   const getPlaceholderText = useCallback(() => {
     if (playerCount === 1) {
-      return "A reverse heist where I'm a museum artifact trying to get stolen by the right thief...";
+      return defaultPlaceholders.singlePlayer;
     }
-    const modeTexts: Record<
-      Exclude<GameMode, typeof GameModes.SinglePlayer>,
-      string
-    > = {
-      [GameModes.Cooperative]:
-        "We're ghost roommates helping each other complete unfinished business...",
-      [GameModes.Competitive]:
-        "We're rival garden gnomes competing for the best spot in the garden...",
-      [GameModes.CooperativeCompetitive]:
-        "We're demigods sharing Mount Olympus while competing for worshippers...",
-    };
-    return modeTexts[
-      gameMode as Exclude<GameMode, typeof GameModes.SinglePlayer>
-    ];
+    if (gameMode === GameModes.Cooperative) {
+      return defaultPlaceholders.cooperative;
+    } else if (gameMode === GameModes.Competitive) {
+      return defaultPlaceholders.competitive;
+    } else {
+      return defaultPlaceholders.cooperativeCompetitive;
+    }
   }, [playerCount, gameMode]);
 
-  const getRandomPrompt = useCallback(() => {
-    const promptCategory =
-      playerCount === 1
-        ? "singlePlayer"
-        : gameMode === GameModes.Cooperative
-        ? "cooperative"
-        : gameMode === GameModes.Competitive
-        ? "competitive"
-        : "cooperativeCompetitive";
+  const getRandomCoordinatedSuggestions = useCallback(
+    (
+      category: PromptCategory,
+      currentPlayerCount: number,
+      currentGameMode: GameMode
+    ) => {
+      const categorySuggestions = suggestionData[category];
+      if (!categorySuggestions) return {};
 
-    const relevantPrompts = storyPrompts[promptCategory];
-    const availableIndices = relevantPrompts
-      .map((_, index) => index)
-      .filter((index) => !usedPromptIndices.has(index));
+      // Determine the appropriate suggestion set based on player count and game mode
+      let relevantSuggestions;
+      if (currentPlayerCount === 1) {
+        relevantSuggestions = categorySuggestions.suggestions.singlePlayer;
+      } else if (currentGameMode === GameModes.Cooperative) {
+        relevantSuggestions = categorySuggestions.suggestions.cooperative;
+      } else if (currentGameMode === GameModes.Competitive) {
+        relevantSuggestions = categorySuggestions.suggestions.competitive;
+      } else {
+        relevantSuggestions =
+          categorySuggestions.suggestions.cooperativeCompetitive;
+      }
 
-    // If all prompts have been used, reset the used indices
-    if (availableIndices.length === 0) {
-      setUsedPromptIndices(new Set());
-      return relevantPrompts[
-        Math.floor(Math.random() * relevantPrompts.length)
-      ];
-    }
+      if (!relevantSuggestions || relevantSuggestions.length === 0) return {};
 
-    const randomIndex =
-      availableIndices[Math.floor(Math.random() * availableIndices.length)];
-    setUsedPromptIndices((prev) => new Set(prev).add(randomIndex));
-    return relevantPrompts[randomIndex];
-  }, [usedPromptIndices, storyPrompts, playerCount, gameMode]);
+      // Create a key for this category + game mode combination
+      const suggestionKey = `${category}-${currentPlayerCount}-${currentGameMode}`;
+      const shownSet = shownSuggestions[suggestionKey] || new Set<number>();
+      
+      // Filter out the first item and already shown suggestions
+      const availableIndices = relevantSuggestions
+        .map((_, index) => index)
+        .filter(index => index > 0 && !shownSet.has(index));
+      
+      // If no available suggestions, reset the shown set and try again
+      if (availableIndices.length === 0) {
+        setShownSuggestions(prev => ({
+          ...prev,
+          [suggestionKey]: new Set()
+        }));
+        
+        // Retry with reset suggestions
+        const retryIndices = relevantSuggestions
+          .map((_, index) => index)
+          .filter(index => index > 0);
+        
+        if (retryIndices.length === 0) return relevantSuggestions[0] || {};
+        
+        const randomIndex = retryIndices[Math.floor(Math.random() * retryIndices.length)];
+        
+        // Mark this suggestion as shown
+        setShownSuggestions(prev => ({
+          ...prev,
+          [suggestionKey]: new Set([randomIndex])
+        }));
+        
+        return relevantSuggestions[randomIndex];
+      }
+      
+      // Choose randomly from available suggestions
+      const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      
+      // Mark this suggestion as shown
+      setShownSuggestions(prev => ({
+        ...prev,
+        [suggestionKey]: new Set([...shownSet, randomIndex])
+      }));
+      
+      return relevantSuggestions[randomIndex];
+    },
+    [shownSuggestions]
+  );
 
   const handleSuggestion = () => {
-    const newPrompt = getRandomPrompt();
+    // Get coordinated suggestions for the current category
+    const coordinatedSuggestions = getRandomCoordinatedSuggestions(
+      selectedCategory,
+      playerCount,
+      gameMode
+    );
+
+    // Set the prompt from the instructions field
+    const newPrompt = coordinatedSuggestions.instructions || "";
     setPrompt(newPrompt);
+
+    // Set all the category-specific fields
+    setCategoryFields(coordinatedSuggestions);
 
     if (onPromptChange) {
       onPromptChange(newPrompt);
     }
+  };
+
+  const handleCategoryChange = (category: PromptCategory) => {
+    setSelectedCategory(category);
+
+    // Clear fields when switching categories - user needs to click "Get suggestion" to populate
+    setCategoryFields({});
+    setPrompt("");
+    
+    // Reset suggestion history for this category when switching
+    setShownSuggestions(prev => {
+      const newShown = { ...prev };
+      // Clear all suggestion history for this category
+      Object.keys(newShown).forEach(key => {
+        if (key.startsWith(`${category}-`)) {
+          delete newShown[key];
+        }
+      });
+      return newShown;
+    });
+  };
+
+  const handlePlayerCountChangeInternal = (value: PlayerCount) => {
+    setPlayerCount(value);
+    // Reset game mode to cooperative if switching to single player
+    if (value === 1) {
+      setGameMode(GameModes.Cooperative);
+    }
+    Logger.App.log(`Updated player count to: ${value}`);
+    if (onPlayerCountChange) {
+      onPlayerCountChange(value);
+    }
+  };
+
+  const handleStep1Continue = () => {
+    setCurrentStep(2);
+  };
+
+  const handleStep2Continue = () => {
+    setCurrentStep(3);
+  };
+
+  const handleBackToStep1 = () => {
+    setCurrentStep(1);
+  };
+
+  const handleBackToStep2 = () => {
+    setCurrentStep(2);
+  };
+
+  const handleCategoryFieldChange = (fieldKey: string, value: string) => {
+    setCategoryFields((prev) => ({
+      ...prev,
+      [fieldKey]: value,
+    }));
+  };
+
+  const buildMergedPrompt = () => {
+    if (selectedCategory === "flexible") {
+      return prompt;
+    }
+
+    const config = categoryConfigs[selectedCategory];
+    const instruction = config.instruction;
+
+    let mergedPrompt = `${instruction}\n\n`;
+
+    // Add category-specific field values
+    config.fields.forEach((field) => {
+      const value = categoryFields[field.key];
+      if (value && value.trim()) {
+        mergedPrompt += `${field.label}: ${value}\n`;
+      }
+    });
+
+    if (prompt && prompt.trim()) {
+      mergedPrompt += `\nAdditional context: ${prompt}`;
+    }
+
+    return mergedPrompt.trim();
   };
 
   const handleDifficultyChange = (difficultyLevel: DifficultyLevel) => {
@@ -207,10 +409,13 @@ export const StoryInitializer = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const mergedPrompt = buildMergedPrompt();
+    console.log("Final prompt being sent to backend:", mergedPrompt);
+
     if (templateMode && onSetup) {
       try {
         await onSetup({
-          prompt,
+          prompt: mergedPrompt,
           playerCount,
           maxTurns,
           gameMode,
@@ -226,7 +431,7 @@ export const StoryInitializer = ({
     } else {
       try {
         await createStory({
-          prompt,
+          prompt: mergedPrompt,
           playerCount,
           maxTurns,
           generateImages,
@@ -283,40 +488,124 @@ export const StoryInitializer = ({
   const FormWrapper = templateMode ? "div" : "form";
   const submitButtonType = templateMode ? "button" : "submit";
 
-  return (
-    <div className="p-4 md:p-6 font-lora">
-      <FormWrapper
-        onSubmit={!templateMode ? handleSubmit : undefined}
-        className="max-w-2xl mx-auto space-y-6"
-      >
-        {/* Player Count and Game Mode Box */}
-        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-          {/* Player Count */}
+  const renderStep1 = () => {
+    const categoryImages: Record<PromptCategory, string> = {
+      "enjoy-fiction": "/category-fiction.jpeg",
+      "vent-about-reality": "/category-vent.jpeg",
+      "pretend-to-be": "/category-pretendtobe.jpeg",
+      "read-with-kids": "/category-kids.jpeg",
+      "see-your-future-self": "/category-futureself.jpeg",
+      "learn-something": "/category-learn.jpeg",
+      flexible: "/placeholder-image.png",
+    };
+
+    // Filter out 'flexible' category for step 1 display
+    const step1Categories = Object.entries(categoryConfigs).filter(
+      ([key]) => key !== "flexible"
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-xl md:text-2xl font-medium text-primary mb-4">
+            I want to ...
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {step1Categories.map(([key, config]) => (
+            <ColoredBox
+              key={key}
+              as="button"
+              colorType={selectedCategory === key ? "tertiary" : "secondary"}
+              isActive={selectedCategory === key}
+              onClick={() => handleCategoryChange(key as PromptCategory)}
+              className="p-0 overflow-hidden cursor-pointer flex flex-col h-full"
+              disabled={currentIsLoading}
+            >
+              <div className="relative overflow-hidden h-16 sm:h-20">
+                <img
+                  src={categoryImages[key as PromptCategory]}
+                  alt={config.label}
+                  className="absolute w-full h-auto min-h-full transition-transform duration-300 hover:scale-110"
+                  style={{
+                    objectFit: "cover",
+                    top: "-15%",
+                    left: 0,
+                  }}
+                />
+              </div>
+              <div className="p-1.5 sm:p-2 text-center">
+                <span className="text-sm sm:text-sm md:text-base font-medium text-primary">
+                  {config.label}
+                </span>
+              </div>
+            </ColoredBox>
+          ))}
+        </div>
+
+        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between">
+          {showBackButton && (
+            <PrimaryButton
+              type="button"
+              size="lg"
+              onClick={onBack}
+              variant="outline"
+              leftBorder={false}
+              leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
+            >
+              Back
+            </PrimaryButton>
+          )}
+          <PrimaryButton
+            type="button"
+            size="lg"
+            onClick={handleStep1Continue}
+            className="font-semibold flex-1 sm:flex-none sm:min-w-[120px]"
+          >
+            <span className="flex items-center justify-center sm:justify-start gap-2 w-full">
+              Continue
+              <Icons.ArrowRight className="h-4 w-4 hidden sm:block" />
+            </span>
+          </PrimaryButton>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStep2 = () => {
+    return (
+      <div className="space-y-6">
+        <ConfigSummary
+          selectedCategory={selectedCategory}
+          categoryConfigs={categoryConfigs}
+          playerCount={playerCount}
+          gameMode={gameMode}
+          generateImages={generateImages}
+          templateMode={templateMode}
+          showPlayerInfo={false}
+        />
+
+        {/* Player Count and Game Mode */}
+        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-4">
           <div className="space-y-2">
             <label
-              htmlFor="player-count"
+              htmlFor="player-count-step2"
               className="text-sm md:text-base font-medium text-primary"
             >
               Number of Players: {playerCount}
             </label>
             <input
-              id="player-count"
+              id="player-count-step2"
               type="range"
               min={MIN_PLAYERS}
               max={MAX_PLAYERS}
               value={playerCount}
-              onChange={(e) => {
-                const value = Number(e.target.value) as PlayerCount;
-                setPlayerCount(value);
-                // Reset game mode to cooperative if switching to single player
-                if (value === 1) {
-                  setGameMode(GameModes.Cooperative);
-                }
-                Logger.App.log(`Updated player count to: ${value}`);
-                if (onPlayerCountChange) {
-                  onPlayerCountChange(value);
-                }
-              }}
+              onChange={(e) =>
+                handlePlayerCountChangeInternal(
+                  Number(e.target.value) as PlayerCount
+                )
+              }
               className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
             />
             <div className="flex justify-between text-xs md:text-sm text-primary-600">
@@ -327,7 +616,7 @@ export const StoryInitializer = ({
 
           {/* Game Mode Slider - Only show for multiplayer */}
           {playerCount > 1 && (
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <label
                 htmlFor="game-mode"
                 className="text-sm md:text-base font-medium text-primary"
@@ -362,52 +651,6 @@ export const StoryInitializer = ({
           )}
         </div>
 
-        {/* Story Prompt Box */}
-        <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between">
-            <label
-              htmlFor="prompt"
-              className="text-sm md:text-base font-medium text-primary"
-            >
-              What kind of story would you like to experience?
-            </label>
-            <PrimaryButton
-              type="button"
-              onClick={handleSuggestion}
-              variant="outline"
-              size="sm"
-              leftBorder={false}
-              className="self-end sm:self-auto"
-              disabled={currentIsLoading}
-            >
-              Get suggestion
-            </PrimaryButton>
-          </div>
-          <textarea
-            id="prompt"
-            value={prompt}
-            onChange={handlePromptChange}
-            className={`w-full min-h-[120px] md:min-h-[100px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
-            placeholder={getPlaceholderText()}
-            disabled={currentIsLoading}
-            required
-          />
-        </div>
-
-        {/* Difficulty Level Box */}
-        {showDifficultySlider && (
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-            <DifficultySlider
-              selectedDifficultyLevel={selectedDifficultyLevel}
-              availableDifficultyLevels={DEFAULT_DIFFICULTY_LEVELS}
-              onChange={handleDifficultyChange}
-              disabled={currentIsLoading}
-              sliderLabelMin="Easier"
-              sliderLabelMax="Harder"
-            />
-          </div>
-        )}
-
         {/* Images Box - Conditionally render if not in templateMode */}
         {!templateMode && (
           <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
@@ -430,31 +673,245 @@ export const StoryInitializer = ({
           </div>
         )}
 
-        <div className="flex flex-row gap-3 sm:gap-4 pt-2">
-          {showBackButton && (
+        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-2">
+          <PrimaryButton
+            type="button"
+            size="lg"
+            onClick={handleBackToStep1}
+            variant="outline"
+            leftBorder={false}
+            leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
+          >
+            Back
+          </PrimaryButton>
+
+          <PrimaryButton
+            type="button"
+            size="lg"
+            onClick={handleStep2Continue}
+            className="font-semibold flex-1 sm:flex-none sm:min-w-[120px]"
+          >
+            <span className="flex items-center justify-center sm:justify-start gap-2 w-full">
+              Continue
+              <Icons.ArrowRight className="h-4 w-4 hidden sm:block" />
+            </span>
+          </PrimaryButton>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStep3 = () => {
+    return (
+      <div className="space-y-6">
+        <div className="mb-8">
+          <ConfigSummary
+            selectedCategory={selectedCategory}
+            categoryConfigs={categoryConfigs}
+            playerCount={playerCount}
+            gameMode={gameMode}
+            generateImages={generateImages}
+            templateMode={templateMode}
+            showPlayerInfo={true}
+          />
+        </div>
+
+        {/* Story Prompt Box */}
+        <div className="relative p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-6">
+          {/* Get suggestion button positioned over top border */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 -top-4 z-10">
             <PrimaryButton
               type="button"
-              size="lg"
-              onClick={onBack}
+              onClick={handleSuggestion}
               variant="outline"
+              size="sm"
               leftBorder={false}
-              leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
+              className="!bg-white !text-secondary hover:!bg-gray-100 active:!bg-gray-200 !border-secondary px-4 py-2 shadow-sm !transition-colors !opacity-100 hover:!opacity-100 active:!opacity-100"
+              disabled={currentIsLoading}
             >
-              Back
+              Get suggestion
             </PrimaryButton>
-          )}
+          </div>
+
+          {/* Category-specific fields */}
+          {selectedCategory !== "flexible" &&
+            categoryConfigs[selectedCategory].fields.length > 0 && (
+              <div className="space-y-6 mt-6">
+                {categoryConfigs[selectedCategory].fields.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    {field.type === "inline" ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <label
+                          htmlFor={`category-${field.key}`}
+                          className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
+                        >
+                          {field.label}
+                        </label>
+                        <input
+                          id={`category-${field.key}`}
+                          type="text"
+                          value={categoryFields[field.key] || ""}
+                          onChange={(e) =>
+                            handleCategoryFieldChange(field.key, e.target.value)
+                          }
+                          className="flex-1 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                          placeholder={field.placeholder}
+                          disabled={currentIsLoading}
+                        />
+                      </div>
+                    ) : field.type === "number" ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <label
+                          htmlFor={`category-${field.key}`}
+                          className="text-sm md:text-base font-medium text-primary sm:whitespace-nowrap"
+                        >
+                          {field.label}
+                        </label>
+                        <input
+                          id={`category-${field.key}`}
+                          type="text"
+                          value={categoryFields[field.key] || ""}
+                          onChange={(e) =>
+                            handleCategoryFieldChange(field.key, e.target.value)
+                          }
+                          className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                          placeholder={field.placeholder}
+                          disabled={currentIsLoading}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <label
+                          htmlFor={`category-${field.key}`}
+                          className="text-sm md:text-base font-medium text-primary"
+                        >
+                          {field.label}
+                        </label>
+                        <TextArea
+                          id={`category-${field.key}`}
+                          value={categoryFields[field.key] || ""}
+                          onChange={(e) =>
+                            handleCategoryFieldChange(field.key, e.target.value)
+                          }
+                          className="min-h-[80px] sm:min-h-[120px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                          placeholder={field.placeholder}
+                          disabled={currentIsLoading}
+                          autoHeight
+                        />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+          <div className="space-y-2">
+            <label
+              htmlFor="prompt"
+              className="text-sm md:text-base font-medium text-primary"
+            >
+              {(() => {
+                if (selectedCategory === "flexible") {
+                  return "What kind of story would you like to experience?";
+                }
+                if (
+                  selectedCategory === "enjoy-fiction" ||
+                  selectedCategory === "read-with-kids"
+                ) {
+                  return "What kind of story would you like to experience?";
+                }
+                if (selectedCategory === "learn-something") {
+                  return "Any instructions for the story? (optional)";
+                }
+                return "Anything else we should consider? (optional)";
+              })()}
+            </label>
+            <TextArea
+              id="prompt"
+              value={prompt}
+              onChange={handlePromptChange}
+              className={`min-h-[80px] sm:min-h-[120px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
+              placeholder={(() => {
+                if (
+                  selectedCategory === "enjoy-fiction" ||
+                  selectedCategory === "read-with-kids"
+                ) {
+                  return selectedCategory === "read-with-kids"
+                    ? "We go on adventures with our underwater friends. There should be a pink octopus girl called 'Tessa'."
+                    : getPlaceholderText();
+                }
+                if (selectedCategory === "vent-about-reality") {
+                  return "I'm poor soul who tries to find an apartment";
+                }
+                if (selectedCategory === "pretend-to-be") {
+                  return "Let the story play in Los Angeles";
+                }
+                if (selectedCategory === "see-your-future-self") {
+                  return "My cat 'Einstein' should occur in the story.";
+                }
+                if (selectedCategory === "learn-something") {
+                  return "I want a whistleblower scenario with leaked documents of varying authenticity (some real, some forged).";
+                }
+                return getPlaceholderText();
+              })()}
+              disabled={currentIsLoading}
+              required
+              autoHeight
+            />
+          </div>
+        </div>
+
+        {/* Difficulty Level Box */}
+        {showDifficultySlider && (
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+            <DifficultySlider
+              selectedDifficultyLevel={selectedDifficultyLevel}
+              availableDifficultyLevels={DEFAULT_DIFFICULTY_LEVELS}
+              onChange={handleDifficultyChange}
+              disabled={currentIsLoading}
+              sliderLabelMin="Easier"
+              sliderLabelMax="Harder"
+            />
+          </div>
+        )}
+
+        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-2">
+          <PrimaryButton
+            type="button"
+            size="lg"
+            onClick={handleBackToStep2}
+            variant="outline"
+            leftBorder={false}
+            leftIcon={<Icons.ArrowLeft className="h-4 w-4" />}
+          >
+            Back
+          </PrimaryButton>
 
           <PrimaryButton
             type={submitButtonType}
             onClick={templateMode ? handleSubmit : undefined}
             size="lg"
             disabled={currentIsLoading}
-            fullWidth
-            className="font-semibold text-lg"
+            className="font-semibold text-lg flex-1 sm:flex-none sm:min-w-[160px]"
           >
             {templateMode ? "Draft World" : "Create Story"}
           </PrimaryButton>
         </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-4 md:p-6 font-lora">
+      <FormWrapper
+        onSubmit={!templateMode ? handleSubmit : undefined}
+        className="max-w-2xl mx-auto"
+      >
+        <StepIndicator currentStep={currentStep} totalSteps={3} />
+
+        {currentStep === 1 && renderStep1()}
+        {currentStep === 2 && renderStep2()}
+        {currentStep === 3 && renderStep3()}
       </FormWrapper>
     </div>
   );
