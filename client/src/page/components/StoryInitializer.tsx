@@ -145,6 +145,9 @@ export const StoryInitializer = ({
   // Update URL when relevant state changes
   const updateURLParams = useCallback(
     (updates: Record<string, string | number | boolean | null>) => {
+      // Don't update URL parameters when in template mode
+      if (templateMode) return;
+
       const params = new URLSearchParams(searchParams);
 
       Object.entries(updates).forEach(([key, value]) => {
@@ -157,7 +160,7 @@ export const StoryInitializer = ({
 
       navigate(`/setup?${params.toString()}`, { replace: true });
     },
-    [navigate, searchParams]
+    [navigate, searchParams, templateMode]
   );
 
   const categoryConfigs: Record<PromptCategory, CategoryConfig> = useMemo(

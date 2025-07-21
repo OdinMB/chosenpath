@@ -2,8 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: deep links for /setup to pre-populate the setup form
-- 1: add "meet future self" and "learn something" to Page with deep links into /setup
 - 2: improve the entries in the suggestion database
   - don't define any specific names and identities (the players will be able to choose a name and identity in the game)
   - one specific age for singleplayer kids stories
