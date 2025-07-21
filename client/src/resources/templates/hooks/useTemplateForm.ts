@@ -150,7 +150,7 @@ export function useTemplateForm({
               (sv) => sv.statId
             );
             const missingStats = template.playerStats.filter(
-              (stat) => !existingStatIds.includes(stat.id)
+              (stat) => stat.partOfPlayerBackgrounds !== false && !existingStatIds.includes(stat.id)
             );
 
             if (missingStats.length > 0) {

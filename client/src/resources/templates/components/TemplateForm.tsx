@@ -532,22 +532,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           )}
 
           {activeTab === "ai-draft" && (
-            <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
-                <div className="flex items-start">
-                  <Icons.Info className="h-5 w-5 text-blue-400 mr-2 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-blue-700 mb-3">
-                      Drop your ideas into this form to get a full draft of your
-                      World. This can be a premise, loose ideas, or a detailed
-                      outline.
-                    </p>
-                    <p className="text-sm text-blue-700 font-medium">
-                      Warning: Generating a draft will override your World.
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="mt-10">
               <StoryInitializer
                 onSetup={handleAIDraftSetup}
                 onBack={() => setActiveTab("basic")}

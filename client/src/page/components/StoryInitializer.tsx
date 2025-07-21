@@ -210,13 +210,13 @@ export const StoryInitializer = ({
         ],
       },
       "see-your-future-self": {
-        label: "meet my future self",
+        label: templateMode ? "meet their future self" : "meet my future self",
         instruction:
           "Create a story that helps the user visualize their future self and the potential life paths and consequences of current decisions.",
         fields: [
           {
             key: "currentSituation",
-            label: "Describe your current life situation",
+            label: "Describe your life situation",
             placeholder:
               "background, identity, career, relationships, location, challenges, ...",
             type: "textarea",
@@ -263,7 +263,7 @@ export const StoryInitializer = ({
         ],
       },
     }),
-    []
+    [templateMode]
   );
 
   // Handle changes to initialPlayerCount prop
@@ -660,7 +660,7 @@ export const StoryInitializer = ({
       <div className="space-y-6">
         <div className="text-center">
           <h2 className="text-xl md:text-2xl font-medium text-primary mb-4">
-            I want to ...
+            {templateMode ? "I want players to ..." : "I want to ..."}
           </h2>
         </div>
 
@@ -689,14 +689,19 @@ export const StoryInitializer = ({
               </div>
               <div className="p-1.5 sm:p-2 text-center">
                 <span className="text-sm sm:text-sm md:text-base font-medium text-primary">
-                  {config.label}
+                  <span className="sm:hidden">
+                    {key === "see-your-future-self" && templateMode ? "meet future self" : config.label}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {config.label}
+                  </span>
                 </span>
               </div>
             </ColoredBox>
           ))}
         </div>
 
-        <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between">
+        <div className="flex flex-row gap-3 sm:gap-4 justify-between">
           {showBackButton && (
             <PrimaryButton
               type="button"
@@ -713,7 +718,7 @@ export const StoryInitializer = ({
             type="button"
             size="lg"
             onClick={handleStep1Continue}
-            className="font-semibold flex-1 sm:flex-none sm:min-w-[120px]"
+            className="font-semibold flex-1 sm:flex-none sm:min-w-[120px] sm:ml-auto"
           >
             <span className="flex items-center justify-center sm:justify-start gap-2 w-full">
               Continue
@@ -1070,10 +1075,10 @@ export const StoryInitializer = ({
   };
 
   return (
-    <div className="p-4 md:p-6 font-lora">
+    <div className={`${templateMode ? "" : "p-4 md:p-6"} font-lora`}>
       <FormWrapper
         onSubmit={!templateMode ? handleSubmit : undefined}
-        className="max-w-2xl mx-auto"
+        className={templateMode ? "" : "max-w-4xl mx-auto"}
       >
         <StepIndicator currentStep={currentStep} totalSteps={3} />
 

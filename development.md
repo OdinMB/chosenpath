@@ -13,7 +13,6 @@ Smaller commits!
 - 2: meet future self should only have one possible identity
 - 1: waiting for story in /setup: keep polling, don't show "probably ready" message (that made sense when we still had websocket connections that can break)
 
-- 1: bug: creating template draft, when player stat is marked as "not part of player backgrounds", getting warning that there are orphaned player stats that are not part of player backgrounds.
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 20: option for single-player games to pre-generate beats to save time
 

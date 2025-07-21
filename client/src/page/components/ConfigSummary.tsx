@@ -46,9 +46,11 @@ export const ConfigSummary = ({
         {/* Configurations */}
         <div className="flex-1 space-y-1">
           <div className="text-base">
-            <span className="text-primary-600">I want to</span>{" "}
+            <span className="text-primary-600">{templateMode ? "I want players to" : "I want to"}</span>{" "}
             <span className="font-medium text-primary">
-              {categoryConfigs[selectedCategory].label}
+              {selectedCategory === "see-your-future-self" && templateMode 
+                ? "meet their future self" 
+                : categoryConfigs[selectedCategory].label}
             </span>
           </div>
           {showPlayerInfo && (
