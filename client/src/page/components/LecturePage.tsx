@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { getLectureById, lectures } from "../data/lectureData";
 import { Icons, PrimaryButton } from "../../shared/components/ui";
+import { Footer } from "./Footer";
 
 export function LecturePage() {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export function LecturePage() {
             Back to Academy
           </button>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -118,6 +120,8 @@ export function LecturePage() {
           )}
         </div>
       )}
+
+      <Footer />
     </div>
   );
 }

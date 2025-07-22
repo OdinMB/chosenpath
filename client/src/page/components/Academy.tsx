@@ -1,5 +1,6 @@
 import { config } from "../../config.js";
 import { LectureGrid } from "./LectureGrid.js";
+import { Footer } from "./Footer";
 
 export function Academy() {
   return (
@@ -38,6 +39,8 @@ export function Academy() {
         </h2>
         <LectureGrid />
       </div>
+
+      <Footer />
     </div>
   );
 }
