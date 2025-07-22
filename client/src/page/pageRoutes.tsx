@@ -7,8 +7,9 @@ import { LibraryBrowser } from "./components/LibraryBrowser";
 import { TemplateConfigurator } from "./components/TemplateConfigurator";
 import { StoryInitializer } from "./components/StoryInitializer";
 import { PageLayout } from "./PageLayout";
-import { Credits } from "./components/Credits";
-import { Privacy } from "./components/Privacy";
+import { Credits } from "./static/Credits";
+import { Privacy } from "./static/Privacy";
+import { ForStorytellers } from "./static/ForStorytellers";
 import { Academy } from "./components/Academy";
 import { LecturePage } from "./components/LecturePage";
 import { ScrollRestoration } from "react-router-dom";
@@ -53,6 +54,11 @@ export const pageRoutes: RouteObject[] = [
         path: "/privacy",
         element: <Privacy />,
         id: "privacy",
+      },
+      {
+        path: "/for-storytellers",
+        element: <ForStorytellers />,
+        id: "for-storytellers",
       },
       {
         path: "/academy",

@@ -19,3 +19,4 @@ export {
   type TableFilterSortProps,
 } from "./TableFilterSort";
 export { DiscordButton } from "./DiscordButton";
+export { AcademyButton } from "./AcademyButton";

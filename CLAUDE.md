@@ -245,6 +245,7 @@ VITE_WS_PORT=3000
 ### Lint Configuration & Common Issues
 **ESLint Rules to Watch For:**
 - `@typescript-eslint/no-unused-vars` - Remove unused variables, imports, and function parameters
+- **Unused imports** - Remove unused React imports (use `import { useState } from "react"` instead of `import React, { useState } from "react"` when React itself isn't used)
 - `@typescript-eslint/no-explicit-any` - Avoid `any` types, use specific types instead
 - `@typescript-eslint/no-unsafe-*` - Avoid unsafe operations on `any` types
 - Property access errors - Use optional chaining (`?.`) or proper type guards

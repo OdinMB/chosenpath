@@ -1,15 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import { OrDivider, LibraryCategoryGrid } from "./components";
-import {
-  NewsletterButton,
-  NewsletterModal,
-  useNewsletter,
-} from "resources/newsletter";
-import { DiscordButton } from "shared/components";
+import { OrDivider, LibraryCategoryGrid, Footer } from "./components";
 import { ResumableStories } from "resources/stories/ResumableStories.js";
 import { useAuth } from "client/shared/auth/useAuth.js";
 import { Logger } from "shared/logger";
@@ -20,12 +14,6 @@ export function Page() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [code, setCode] = useState("");
-  const {
-    isNewsletterModalOpen,
-    openNewsletterModal,
-    closeNewsletterModal,
-    handleSubscribe,
-  } = useNewsletter();
 
   const [showResumableSection, setShowResumableSection] = useState(true);
   const previousUserIdRef = useRef<string | undefined | null>(user?.id);
@@ -192,89 +180,7 @@ export function Page() {
           </form>
         </div>
 
-        {/* Newsletter Modal */}
-        <NewsletterModal
-          isOpen={isNewsletterModalOpen}
-          onClose={closeNewsletterModal}
-          onSubmit={handleSubscribe}
-        />
-
-        <footer className="mt-12 pt-4 border-t border-primary-100 text-xs text-primary-400">
-          <div className="mb-4 flex items-center gap-4">
-            <NewsletterButton onClick={openNewsletterModal} />
-            <DiscordButton />
-          </div>
-
-          <p className="mb-2">
-            Looking for collaborators. Are you a writer, storyteller, designer,
-            or world builder? Reach out!
-          </p>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span>Odin Mühlenbein</span>
-            <div className="flex gap-2">
-              <a
-                href="https://odin.muehlenbein.de"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center hover:text-primary-600"
-              >
-                <Icons.Globe />
-              </a>
-              <a
-                href="https://www.linkedin.com/in/odinmuehlenbein/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center hover:text-primary-600"
-              >
-                <Icons.LinkedIn />
-              </a>
-            </div>
-            <span>Sonnenallee 50, 12045 Berlin</span>
-          </div>
-          <div>
-            <a
-              href="/academy/story-engine-not-writing-tool"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate("/academy/story-engine-not-writing-tool");
-              }}
-              className="footer-link mr-3"
-            >
-              For Storytellers
-            </a>
-            <a
-              href="/academy"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate("/academy");
-              }}
-              className="footer-link mr-3"
-            >
-              Worldbuilding Academy
-            </a>
-            <a
-              href="/privacy"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate("/privacy");
-              }}
-              className="footer-link mr-3"
-            >
-              Privacy
-            </a>
-            <a
-              href="/credits"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate("/credits");
-              }}
-              className="footer-link"
-            >
-              Credits
-            </a>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </>
   );

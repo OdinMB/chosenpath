@@ -9,7 +9,8 @@
       "Bash(npx eslint:*)",
       "Bash(npm run lint:*)",
       "Bash(grep:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

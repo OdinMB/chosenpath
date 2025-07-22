@@ -1,31 +1,14 @@
-import { useRef } from "react";
 import { TemplateMetadata } from "core/types";
 import { TemplateCard } from "./TemplateCard";
-import { Icons } from "components/ui";
-import { useTemplateCarousel, useSwipe } from "../hooks/useTemplateCarousel";
+import { useLoaderData } from "react-router-dom";
+import { Carousel } from "./Carousel";
 
 type TemplateCarouselProps = {
   onPlay: (template: TemplateMetadata) => void;
 };
 
 export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
-  const {
-    templates,
-    currentIndex,
-    isTransitioning,
-    prevTemplate,
-    nextTemplate,
-    selectTemplateByIndex,
-    handleTransitionEnd,
-  } = useTemplateCarousel();
-
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  // Add swipe gesture support
-  useSwipe(carouselRef, {
-    onSwipeLeft: nextTemplate,
-    onSwipeRight: prevTemplate,
-  });
+  const { templates } = useLoaderData() as { templates: TemplateMetadata[] };
 
   if (templates.length === 0) {
     return (
@@ -35,61 +18,18 @@ export const TemplateCarousel = ({ onPlay }: TemplateCarouselProps) => {
     );
   }
 
-  return (
-    <div className="relative w-full max-w-md mx-auto">
-      <div className="overflow-hidden">
-        <div
-          ref={carouselRef}
-          className="flex transition-transform duration-300 ease-in-out touch-pan-x"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-          onTransitionEnd={handleTransitionEnd}
-        >
-          {templates.map((template) => (
-            <div key={template.id} className="w-full flex-shrink-0">
-              <div className="h-full">
-                <TemplateCard
-                  template={template}
-                  onPlay={() => onPlay(template)}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {templates.length > 1 && (
-        <div className="flex justify-between mt-2">
-          <button
-            onClick={prevTemplate}
-            disabled={isTransitioning || templates.length <= 1}
-            className="p-2 rounded-full hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Previous template"
-          >
-            <Icons.ArrowLeft className="h-4 w-4" />
-          </button>
-
-          <div className="flex items-center gap-2">
-            {templates.map((_, index) => (
-              <button
-                key={index}
-                className={`w-2 h-2 rounded-full ${
-                  index === currentIndex ? "bg-primary-600" : "bg-primary-200"
-                }`}
-                onClick={() => selectTemplateByIndex(index)}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={nextTemplate}
-            disabled={isTransitioning || templates.length <= 1}
-            className="p-2 rounded-full hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Next template"
-          >
-            <Icons.ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+  const templateItems = templates.map((template) => (
+    <div key={template.id} className="h-full">
+      <TemplateCard template={template} onPlay={() => onPlay(template)} />
     </div>
+  ));
+
+  return (
+    <Carousel
+      items={templateItems}
+      showControls={true}
+      showDots={true}
+      className="max-w-md mx-auto"
+    />
   );
 };

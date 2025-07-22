@@ -28,7 +28,12 @@ export function NewsletterButton({
       title="Subscribe to newsletter"
       leftIcon={<Icons.Mail className="w-4 h-4" />}
     >
-      {showText ? "Newsletter" : null}
+      {showText ? (
+        <>
+          <span className="md:hidden">News</span>
+          <span className="hidden md:inline">Newsletter</span>
+        </>
+      ) : null}
     </PrimaryButton>
   );
 }

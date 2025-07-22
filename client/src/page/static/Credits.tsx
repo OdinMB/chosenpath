@@ -1,6 +1,8 @@
+import { Footer } from "../components/Footer";
+
 export function Credits() {
   return (
-    <div className="max-w-md mx-auto p-4 font-lora">
+    <div className="max-w-2xl mx-auto p-4 font-lora">
       <div className="mb-6">
         <img
           src="/thank-you.jpeg"
@@ -256,6 +258,8 @@ export function Credits() {
           </div>
         </section>
       </div>
+      
+      <Footer />
     </div>
   );
 }
