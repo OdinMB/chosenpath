@@ -121,6 +121,12 @@ export function useTemplateForm({
     updatePlayerBackgroundStats(initialTemplate);
   }, [initialTemplate]);
 
+  // Auto-fix player background stats when player stats change
+  useEffect(() => {
+    updatePlayerBackgroundStats(formData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.playerStats]); // Only depend on playerStats to avoid infinite loops
+
   // Validate template integrity whenever formData changes
   useEffect(() => {
     const validation = validateTemplateIntegrity(formData);
@@ -137,6 +143,11 @@ export function useTemplateForm({
     const updatedPlayerOptions: Record<string, PlayerOptionsGeneration> = {};
     let needsUpdate = false;
 
+    // Get stats that should be in backgrounds
+    const backgroundStatIds = template.playerStats
+      .filter((stat) => stat.partOfPlayerBackgrounds !== false)
+      .map((stat) => stat.id);
+
     relevantPlayerSlots.forEach((slot) => {
       const playerOption = template[
         slot as keyof StoryTemplate
@@ -145,42 +156,57 @@ export function useTemplateForm({
       if (playerOption && playerOption.possibleCharacterBackgrounds) {
         const updatedBackgrounds =
           playerOption.possibleCharacterBackgrounds.map((background) => {
-            // Check if background has all the current playerStats
             const existingStatIds = background.initialPlayerStatValues.map(
               (sv) => sv.statId
             );
-            const missingStats = template.playerStats.filter(
-              (stat) => stat.partOfPlayerBackgrounds !== false && !existingStatIds.includes(stat.id)
+
+            // Check for missing stats
+            const missingStats = backgroundStatIds.filter(
+              (id) => !existingStatIds.includes(id)
             );
 
+            // Check for orphaned stats (stats that shouldn't be in backgrounds)
+            const orphanedStats = existingStatIds.filter(
+              (id) => !backgroundStatIds.includes(id)
+            );
+
+            let newStatValues = [...background.initialPlayerStatValues];
+
+            // Add missing stats with default values
             if (missingStats.length > 0) {
               needsUpdate = true;
-              // Add missing stats with default values
-              const newStatValues = [...background.initialPlayerStatValues];
+              missingStats.forEach((statId) => {
+                const stat = template.playerStats.find(s => s.id === statId);
+                if (stat) {
+                  let defaultValue: number | string | string[];
+                  if (stat.type === "string") {
+                    defaultValue = "";
+                  } else if (stat.type === "string[]") {
+                    defaultValue = [];
+                  } else {
+                    defaultValue = 50; // Default for number/percentage/opposites
+                  }
 
-              missingStats.forEach((stat) => {
-                let defaultValue: number | string | string[];
-                if (stat.type === "string") {
-                  defaultValue = "";
-                } else if (stat.type === "string[]") {
-                  defaultValue = [];
-                } else {
-                  defaultValue = 50; // Default for number/percentage/opposites
+                  newStatValues.push({
+                    statId,
+                    value: defaultValue,
+                  });
                 }
-
-                newStatValues.push({
-                  statId: stat.id,
-                  value: defaultValue,
-                });
               });
-
-              return {
-                ...background,
-                initialPlayerStatValues: newStatValues,
-              };
             }
 
-            return background;
+            // Remove orphaned stats
+            if (orphanedStats.length > 0) {
+              needsUpdate = true;
+              newStatValues = newStatValues.filter(
+                (sv) => backgroundStatIds.includes(sv.statId)
+              );
+            }
+
+            return {
+              ...background,
+              initialPlayerStatValues: newStatValues,
+            };
           });
 
         if (needsUpdate) {
