@@ -40,7 +40,7 @@ export const lectures: Lecture[] = [
         This makes the platform interesting for different types of creators:
       </p>
       <div class="bg-gray-50 p-4 rounded-lg mb-4">
-        <p class="mb-2"><strong>Architects</strong> love crafting settings and mechanics and don't want to write entire books and story logic to turn their creations into interactive fiction. Architects use every feature available to create Worlds that work exactly as they want them to.</p>
+        <p class="mb-2"><strong>Architects</strong> use every advanced feature available to create Worlds that work exactly as they want them to.</p>
         <p class="mb-2"><strong>Dreamers</strong> want to test new ideas quickly. They use the AI Worldbuilding Assistant to create playable experiences in minutes.</p>
         <p class="mb-2"><strong>Game Designers</strong> create multiplayer experiences without having to manage story trees that are even larger than for single-player stories.</p>
         <p class="mb-2"><strong>Satirists</strong> see the absurd and unjust in the world. They create short, interactive experiences that highlight these issues. (See our <a href="/library?tags=Satire" target="_blank" style=>Library</a> for examples.)</p>

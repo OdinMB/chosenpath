@@ -216,7 +216,7 @@ export const StoryInitializer = ({
         fields: [
           {
             key: "currentSituation",
-            label: "Describe your life situation",
+            label: "Describe yourself and your situation",
             placeholder:
               "background, identity, career, relationships, location, challenges, ...",
             type: "textarea",
@@ -690,11 +690,11 @@ export const StoryInitializer = ({
               <div className="p-1.5 sm:p-2 text-center">
                 <span className="text-sm sm:text-sm md:text-base font-medium text-primary">
                   <span className="sm:hidden">
-                    {key === "see-your-future-self" && templateMode ? "meet future self" : config.label}
+                    {key === "see-your-future-self" && templateMode
+                      ? "meet future self"
+                      : config.label}
                   </span>
-                  <span className="hidden sm:inline">
-                    {config.label}
-                  </span>
+                  <span className="hidden sm:inline">{config.label}</span>
                 </span>
               </div>
             </ColoredBox>
@@ -994,6 +994,9 @@ export const StoryInitializer = ({
                   }
                   if (selectedCategory === "learn-something") {
                     return "Any instructions for the story? (optional)";
+                  }
+                  if (selectedCategory === "see-your-future-self") {
+                    return "What do you want to visualize/experience? (optional)";
                   }
                   return "Anything else we should consider? (optional)";
                 })()}
