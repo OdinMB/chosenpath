@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { LoadingSpinner, PrimaryButton } from "components/ui";
 import { PlayerCode } from "shared/components";
 import { StoryTemplate } from "core/types";
@@ -9,7 +8,6 @@ interface PlayerCodesProps {
   codes: Record<string, string>;
   onCodeSubmit: (code: string) => void;
   storyReady: boolean;
-  onGoToWelcome?: () => void;
   template?: StoryTemplate;
 }
 
@@ -17,30 +15,10 @@ export function PlayerCodes({
   codes,
   onCodeSubmit,
   storyReady,
-  onGoToWelcome,
   template,
 }: PlayerCodesProps) {
-  const [timeSinceLoad, setTimeSinceLoad] = useState(0);
-
-  const FALLBACK_READY_TIME = 105; // in seconds
-
-  // If the story isn't marked ready by the server after 60 seconds,
-  // assume it's probably ready but we missed the notification
-  const isLikelyReady = !storyReady && timeSinceLoad >= FALLBACK_READY_TIME;
-
-  // Story is ready to join only if explicitly marked ready or fallback timeout reached
-  const isReadyToJoin = storyReady || isLikelyReady;
-
-  useEffect(() => {
-    // Don't start the timer if the story is already ready
-    if (isReadyToJoin) return;
-
-    const interval = setInterval(() => {
-      setTimeSinceLoad((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isReadyToJoin]);
+  // Story is ready to join only when the server confirms it
+  const isReadyToJoin = storyReady;
 
   const formatPlayerName = (slot: string) => {
     // Convert "player1" to "Player 1"
@@ -102,42 +80,13 @@ export function PlayerCodes({
     return null;
   };
 
-  // Warning when story is likely ready but not confirmed
-  const renderLikelyReadyWarning = () => {
-    if (isLikelyReady) {
-      return (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Icons.Warning className="h-5 w-5 text-yellow-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                Your story is probably ready, but we couldn't confirm with the
-                server. Try joining now, or{" "}
-                <button
-                  onClick={onGoToWelcome}
-                  className="text-accent underline hover:text-accent-dark"
-                >
-                  return to Welcome screen
-                </button>{" "}
-                and try again in one minute. Your access code has been saved to
-                your browser and will remain valid.
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Loading spinner when story is not ready
   const renderLoadingSpinner = () => {
     if (!isReadyToJoin) {
       return (
         <div className="mb-4 text-center">
-          <LoadingSpinner message="Creating your story. This should take 60-90 seconds." />
+          <LoadingSpinner message="Creating your story. This may take a few minutes." />
         </div>
       );
     }
@@ -182,7 +131,6 @@ export function PlayerCodes({
   return (
     <div className="p-4 font-lora">
       <div className="max-w-2xl mx-auto">
-        {renderLikelyReadyWarning()}
 
         {template ? (
           <CoverCard

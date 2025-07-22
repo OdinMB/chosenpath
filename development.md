@@ -2,21 +2,14 @@ Smaller commits!
 
 # NEXT
 
-- 2: improve the entries in the suggestion database
-  - don't define any specific names and identities (the players will be able to choose a name and identity in the game)
-  - one specific age for singleplayer kids stories
-  - learn category - what to learn field: no story/setting information (those can be added in another field). More specific concepts: "campaign dynamics" good, "democratic processes" bad; "predator-prey relationships" good, "conservation and sustainability" bad
-  - future self - anything else field: shouldn't repeat what's already mentioned in the other fields. Instead, mention what the fictional user might want to achieve by playing the story. ("I want to find out if I still like this job when it becomes challenging.")
-  - pretend to be - aspects: don't mention specific story contexts, but only general challenges/situations/dynamics. Bad: "building trust with whistleblowers and sources while uncovering corporate corruption in hostile environments where powerful interests want to silence you". Good: "how to deal with powerful interests that try to silence me"
-  - pretend to be: add scenarios around diversity and empathy, like being a member of the LGBTQ community, being a migrant, having a disability, etc.
-  - vent - anything else field: don't spell out the full story context. Just mention a few general pointers, like the role that the player should have in the story / whether this is supposed to be a simulation / a particular emotion that the interactive experience should evoke. Add more variety in how the experience is structured. The player doesn't always have to play the evil person responsible for whatever the user is trying to make fun of. Users can, for example, also experience the nonsense or injustice.
-- 2: meet future self should only have one possible identity
-- 1: waiting for story in /setup: keep polling, don't show "probably ready" message (that made sense when we still had websocket connections that can break)
+- 3: landing pages for storytellers, scenario planners, coaches, educators
+- 2: update dependencies as per https://github.com/OdinMB/ai-story-game/pulls
 
+- 1: Link to relevant lectures in the template form sections
+- 2: meet future self should only have one possible identity
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 20: option for single-player games to pre-generate beats to save time
 
-- 1: Link to relevant lectures in the template form sections
 - 2: review process for storytellers who want to publish on website
 - ?: Bild bei Draft mit hochladen
 
