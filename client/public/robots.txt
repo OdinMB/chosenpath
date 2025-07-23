@@ -6,6 +6,9 @@ Allow: /library
 Allow: /credits
 Allow: /privacy
 Allow: /academy
+Allow: /for-storytellers
+Allow: /for-coaches
+Allow: /for-educators
 
 # Disallow admin routes
 Disallow: /admin/
@@ -21,4 +24,4 @@ Disallow: /setup
 Disallow: /templates/*/configure
 
 # Sitemap location
-Sitemap: https://chosenpath.com/sitemap.xml 
+Sitemap: https://chosenpath.ai/sitemap.xml 

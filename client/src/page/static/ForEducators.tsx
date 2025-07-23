@@ -11,71 +11,65 @@ import {
 export function ForEducators() {
   const exampleScenarios = [
     {
+      title: "Magical Science Lab",
       learningGoals: "Hypothesis formation and data analysis",
       targetAudience: "elementary science students",
       instructions:
         "I'm a student wizard using the scientific method to solve why levitation spells keep failing - forming hypotheses, testing variables, and analyzing results...",
     },
     {
+      title: "Eco-Entrepreneur Simulation",
       learningGoals: "Market research and ethical sourcing",
       targetAudience: "high school business students",
       instructions:
         "We're starting an eco-friendly business together, collaborating on market research, cost analysis, and ethical sourcing decisions...",
     },
     {
-      learningGoals: "Academic ethics and peer review",
-      targetAudience: "college science students",
+      title: "Government Campaign Challenge",
+      learningGoals: "Media influence and coalition building",
+      targetAudience: "high school government students",
       instructions:
-        "We're graduate students collaborating on research while competing for publication recognition...",
+        "We're competing campaign managers trying to get our candidate elected as student body president...",
     },
   ];
 
   const benefits = [
     {
       imageSrc: "/landing/enter-door.jpeg",
-      title: "Learners Need Active Participation",
+      title: "Learning Needs Engagement",
       description:
-        "Transform passive reading into active participation where learners make choices, solve problems, and experience consequences. Use multiplayer scenarios for collaborative learning — groups can work together on historical simulations, team problem-solving, or explore different perspectives on complex issues.",
+        "Learners enter an entire World around a topic, make choices, and experience consequences. In multiplayer scenarios, groups can even work together in historical simulations or experience moral dilemmas from different perspectives.",
     },
     {
-      imageSrc: "/landing/digging-deep.jpeg",
-      title: "You Need Ultimate Flexibility",
+      imageSrc: "/landing/fast-iteration2.jpeg",
+      title: "You Want Flexibility",
       description:
-        "Stories adjust for language complexity, reading level, and cognitive load. Teach scientific method through wizard experiments, explore historical decision-making through crisis simulations, or practice reading comprehension through detective mysteries. The same learning framework works for elementary vocabulary or college-level ethics.",
+        "Teach anything from basic reading comprehension to the scientific method. Finetune pedagogical instructions and add elements that will show up in the stories. Adjust language complexity and tonality to match your learners' needs.",
     },
     {
-      imageSrc: "/landing/protective-bubble.jpeg",
-      title: "You Want Understanding, Not Memorization",
+      imageSrc: "/landing/stories-out-of-open-book.jpeg",
+      title: "We Learn through Stories",
       description:
-        "Students discover 'why' through lived experience — understanding historical motivations by facing the same dilemmas, grasping scientific concepts by testing hypotheses, or learning ethics by experiencing moral consequences firsthand.",
+        "Students remember historical motivations by facing the same dilemmas, or even version control for software development by managing the government codebase of the fictional city of Gitopia. Stories stick.",
     },
   ];
 
   const process = [
     {
       number: 1,
-      title: "Define Learning Goal, Audience, and Context",
+      title: "Define Learning Goals, Audience, and Context",
       description:
-        "Specify exactly what learners should achieve, who your target audience is (age group, experience level, subject), and any specific context the AI should consider — historical period, reading level, or learning objectives.",
-      imageSrc: "/landing/people-over-map.jpeg",
+        "Specify what learners should understand (concepts, skills), who your target audience is (age group, experience level), and any context the AI should consider (historical period, reading level, elements you want to include in the stories).",
+      imageSrc: "/landing/bulls-eye.jpeg",
     },
     {
       number: 2,
-      title: "Quick Setup or Custom World Creation",
+      title: "Customize the AI Draft",
       description: (
         <>
-          Send learners directly to our{" "}
-          <a
-            href="/setup?step=3&category=learn-something&players=1&images=true"
-            className="text-link"
-          >
-            learning scenarios page
-          </a>{" "}
-          for immediate exploration, or{" "}
-          <a href="/users/signin" className="text-link">
-            create custom educational Worlds
-          </a>{" "}
-          tailored to your curriculum and learning objectives.
+          Customize the initial draft by the AI Worldbuilding Assistant however
+          you want. Modify the setting, game mechanics, difficulty, narrative
+          style, instructions for images, and many other aspects.
         </>
       ),
       imageSrc: "/academy/story-engine.jpeg",
@@ -93,7 +87,7 @@ export function ForEducators() {
     {
       question: "How does this differ from traditional educational games?",
       answer:
-        "Unlike fixed educational games, Chosen Path creates dynamic, personalized learning experiences. Each learner's choices lead to unique outcomes, encouraging multiple playthroughs and deeper exploration of concepts.",
+        "There are amazing educational games out there. Their limitation: they only work for a specific learning goal for a specific audience. With Chosen Path, you can conjure up interactive stories for many different learning outcomes and easily adjust them to the needs of different audiences. Without any coding, hosting, etc.",
     },
     {
       question: "Is this complicated to set up?",
@@ -101,7 +95,7 @@ export function ForEducators() {
         <>
           Not at all! Simply share a story link with your learners — they can
           play immediately on their mobile phones, tablets, or computers. No
-          accounts or downloads required. For custom content, our{" "}
+          accounts or downloads required. To customize your stories, our{" "}
           <a href="/users/signin" className="text-link">
             World-building interface
           </a>{" "}
@@ -119,12 +113,8 @@ export function ForEducators() {
       question: "Can I share my educational Worlds with other educators?",
       answer: (
         <>
-          Absolutely! Educational story Worlds can be shared between educators,
-          creating a collaborative resource library. Visit our{" "}
-          <a href="/academy" className="text-link">
-            Academy
-          </a>{" "}
-          to learn about sharing and collaboration features.
+          Absolutely! Educational story Worlds can be shared between educators
+          or even on the chosenpath.ai platform.
         </>
       ),
     },
@@ -133,8 +123,8 @@ export function ForEducators() {
   return (
     <div className="max-w-2xl mx-auto p-4 font-lora">
       <LandingHero
-        headline="Transform Education Through Interactive Storytelling"
-        subheadline="Chosen Path helps educators create immersive learning experiences where learners actively engage with curriculum through AI-powered interactive stories that adapt to different learning levels and educational goals."
+        headline="Bring Learning to Life Through Interactive Stories"
+        subheadline="Chosen Path generates interactive stories tailored to your teaching goals. Created for classroom teachers, homeschool families, and professional trainers, it helps learners discover knowledge through experience — making education both effective and enjoyable."
         ctaPrimary={{
           text: "Give It a Try",
           link: "/setup?step=3&category=learn-something&players=1&images=true",
@@ -163,7 +153,7 @@ export function ForEducators() {
               className="bg-white rounded-lg border border-primary-100 p-6 h-full"
             >
               <h4 className="font-semibold text-primary-800 mb-4 text-lg">
-                {scenario.learningGoals}
+                {scenario.title}
               </h4>
               <div className="space-y-3">
                 <div>
