@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { Icons } from "components/ui";
 
 interface FAQItem {
   question: string;
-  answer: string;
+  answer: string | ReactNode;
 }
 
 interface LandingFAQProps {

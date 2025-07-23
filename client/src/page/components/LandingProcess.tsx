@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 
 interface ProcessStep {
   number: number;
   title: string;
-  description: string;
+  description: string | ReactNode;
   imageSrc?: string;
 }
 
@@ -45,7 +45,7 @@ export function LandingProcess({ steps }: LandingProcessProps) {
               <h3 className="text-lg font-semibold mb-2 text-primary-800">
                 {step.number}. {step.title}
               </h3>
-              <p className="text-primary-600">{step.description}</p>
+              <div className="text-primary-600">{step.description}</div>
             </div>
           </div>
         </div>

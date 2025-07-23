@@ -33,6 +33,7 @@ export function LibraryCategoryGrid({
     {
       id: "futureself",
       title: "Meet your Future Self",
+      mobileTitle: "Meet Future Self",
       image: "/category-futureself.jpeg",
       isDeepLink: true,
       deepLinkUrl: "/setup?step=3&category=see-your-future-self&players=1&images=true",
@@ -79,6 +80,7 @@ export function LibraryCategoryGrid({
                 <CategoryTile
                   image={category.image}
                   title={category.title}
+                  mobileTitle={category.mobileTitle}
                   onClick={handleClick}
                 />
               </div>

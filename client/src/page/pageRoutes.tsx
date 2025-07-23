@@ -10,6 +10,7 @@ import { PageLayout } from "./PageLayout";
 import { Credits } from "./static/Credits";
 import { Privacy } from "./static/Privacy";
 import { ForStorytellers } from "./static/ForStorytellers";
+import { ForCoaches } from "./static/ForCoaches";
 import { Academy } from "./components/Academy";
 import { LecturePage } from "./components/LecturePage";
 import { ScrollRestoration } from "react-router-dom";
@@ -59,6 +60,11 @@ export const pageRoutes: RouteObject[] = [
         path: "/for-storytellers",
         element: <ForStorytellers />,
         id: "for-storytellers",
+      },
+      {
+        path: "/for-coaches",
+        element: <ForCoaches />,
+        id: "for-coaches",
       },
       {
         path: "/academy",

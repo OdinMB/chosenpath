@@ -1,10 +1,11 @@
 interface CategoryTileProps {
   image: string;
   title: string;
+  mobileTitle?: string;
   onClick: () => void;
 }
 
-export function CategoryTile({ image, title, onClick }: CategoryTileProps) {
+export function CategoryTile({ image, title, mobileTitle, onClick }: CategoryTileProps) {
   // The percentage to offset from the top
   const topOffset = "15%";
 
@@ -26,7 +27,14 @@ export function CategoryTile({ image, title, onClick }: CategoryTileProps) {
         />
       </div>
       <div className="p-1.5 text-center font-medium text-primary-700">
-        {title}
+        {mobileTitle ? (
+          <>
+            <span className="md:hidden">{mobileTitle}</span>
+            <span className="hidden md:inline">{title}</span>
+          </>
+        ) : (
+          title
+        )}
       </div>
     </div>
   );
