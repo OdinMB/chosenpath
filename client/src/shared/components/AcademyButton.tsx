@@ -43,8 +43,7 @@ export function AcademyButton({
     >
       {showText ? (
         <span className={rightIcon ? "font-semibold text-sm mr-4" : ""}>
-          <span className="md:hidden">Academy</span>
-          <span className="hidden md:inline">Worldbuilding Academy</span>
+          Academy
         </span>
       ) : null}
     </PrimaryButton>
