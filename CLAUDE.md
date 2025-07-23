@@ -80,6 +80,20 @@ React SPA with:
 - **Validation**: Zod schemas shared between client/server
 - **Build**: Workspace-based monorepo with TypeScript compilation
 
+## Deployment & Workspace Dependencies
+
+This monorepo deploys successfully to platforms like Render using workspace isolation:
+
+### Production Build Process
+- **Server**: TypeScript compilation resolves `core/*` imports via tsconfig paths, then copies core's built files into `server/dist/core/` making the deployment self-contained
+- **Client**: Vite build process bundles core code directly into the client bundle via alias resolution
+- **Individual package-lock.json files**: Not needed - workspace dependencies are managed at root level, but build processes copy/bundle core at build time
+
+### Render Configuration
+- **Root Directory**: Set to `server/` for server deployment, `client/` for client deployment
+- **Build commands work**: Despite isolation, builds succeed because core gets copied/bundled during compilation
+- **Workspace dependency resolution**: Works through TypeScript path mapping and build-time bundling
+
 ## Communication Patterns
 
 ### HTTP API (Server Port 3000)
