@@ -44,12 +44,12 @@ export function Footer() {
           >
             For Coaches
           </button>
-          <button
-            onClick={() => navigate("/for-teachers")}
+          {/* <button
+            onClick={() => navigate("/for-educators")}
             className="px-3 py-1.5 text-xs font-medium bg-white border border-primary-200 rounded text-primary-700 hover:bg-primary-50 transition-colors"
           >
-            For Teachers
-          </button>
+            For Educators
+          </button> */}
         </div>
 
         <p className="mb-2">

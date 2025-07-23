@@ -2,7 +2,7 @@ Smaller commits!
 
 # NEXT
 
-- 3: landing pages for storytellers, scenario planners, coaches, educators
+- 3: landing pages for scenario planners, educators (then add all for-x pages to sitemap)
 - 2: update dependencies as per https://github.com/OdinMB/ai-story-game/pulls
 
 - 1: Link to relevant lectures in the template form sections

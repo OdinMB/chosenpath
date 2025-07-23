@@ -11,6 +11,7 @@ import { Credits } from "./static/Credits";
 import { Privacy } from "./static/Privacy";
 import { ForStorytellers } from "./static/ForStorytellers";
 import { ForCoaches } from "./static/ForCoaches";
+import { ForEducators } from "./static/ForEducators";
 import { Academy } from "./components/Academy";
 import { LecturePage } from "./components/LecturePage";
 import { ScrollRestoration } from "react-router-dom";
@@ -65,6 +66,11 @@ export const pageRoutes: RouteObject[] = [
         path: "/for-coaches",
         element: <ForCoaches />,
         id: "for-coaches",
+      },
+      {
+        path: "/for-educators",
+        element: <ForEducators />,
+        id: "for-educators",
       },
       {
         path: "/academy",
