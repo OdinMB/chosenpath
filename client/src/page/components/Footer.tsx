@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Icons } from "components/ui";
 import {
@@ -24,8 +23,7 @@ export function Footer() {
           <NewsletterButton onClick={openNewsletterModal} />
           <DiscordButton />
           <AcademyButton
-            onClick={(e) => {
-              e.preventDefault();
+            onClick={() => {
               navigate("/academy");
             }}
           />
@@ -53,8 +51,8 @@ export function Footer() {
         </div>
 
         <p className="mb-2">
-          Looking for collaborators. Are you a writer, storyteller, designer,
-          or world builder? Reach out!
+          Looking for collaborators. Are you a writer, storyteller, designer, or
+          world builder? Reach out!
         </p>
 
         <div className="flex items-center gap-2 mb-2">
@@ -79,7 +77,7 @@ export function Footer() {
           </div>
           <span>Sonnenallee 50, 12045 Berlin</span>
         </div>
-        
+
         <div>
           <a
             href="/privacy"

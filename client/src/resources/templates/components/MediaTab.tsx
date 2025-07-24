@@ -38,7 +38,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             onChange={(e) => setContainsImages(e.target.checked)}
           />
           <label htmlFor="contains-images" className="ml-2 text-sm font-medium">
-            Contains Images
+            Use pre-generated images in stories
           </label>
           <InfoIcon
             tooltipText="Check this if the template contains images that should be used during gameplay."

@@ -2,8 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 2: update dependencies as per https://github.com/OdinMB/ai-story-game/pulls
-
 - 1: Link to relevant lectures in the template form sections
 - 2: meet future self should only have one possible identity
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
