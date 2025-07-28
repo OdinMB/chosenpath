@@ -249,6 +249,7 @@ VITE_WS_PORT=3000
 
 ### Content Management
 - Lecture pages must stay synchronized with `/client/public/sitemap.xml`
+- Update `/client/src/page/static/Privacy.tsx` whenever any tools or practices change that need to be disclosed to users
 
 ### Quality Assurance
 - **CRITICAL**: Before considering any task complete, ALWAYS run linting commands and fix all issues:

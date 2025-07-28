@@ -20,6 +20,15 @@ export function Privacy() {
             we don't even need a cookie banner.
           </p>
 
+          <p className="mb-4">
+            We use <b>Simple Analytics</b>, a privacy-first analytics service that:
+            • Does not track users across websites
+            • Does not store cookies
+            • Does not collect personal data
+            • Respects Do Not Track settings
+            This helps us understand basic usage patterns while fully respecting your privacy.
+          </p>
+
           <div className="my-6">
             <img
               src="/no-cookies_medium.jpeg"
