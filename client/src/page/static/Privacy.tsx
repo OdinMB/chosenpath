@@ -22,16 +22,17 @@ export function Privacy() {
 
           <div className="mb-4">
             <p className="mb-2">
-              We use <b>Simple Analytics</b>, a privacy-first analytics service that:
+              We use <b>Simple Analytics</b>, a privacy-first analytics service
+              that:
             </p>
             <ul className="list-disc list-inside space-y-1 ml-4">
               <li>Does not track users across websites</li>
               <li>Does not store cookies</li>
               <li>Does not collect personal data</li>
-              <li>Respects Do Not Track settings</li>
             </ul>
             <p className="mt-2">
-              This helps us understand basic usage patterns while fully respecting your privacy.
+              This helps us understand basic usage patterns while fully
+              respecting your privacy.
             </p>
           </div>
 
@@ -103,7 +104,7 @@ export function Privacy() {
           </div>
         </section>
       </div>
-      
+
       <Footer />
     </div>
   );
