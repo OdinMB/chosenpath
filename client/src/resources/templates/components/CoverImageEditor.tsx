@@ -3,7 +3,7 @@ import { TextArea, PrimaryButton } from "components/ui";
 import { Icons } from "components/ui/Icons";
 import { ImageInstructions, ImageUI } from "core/types";
 import { useImageGeneration } from "client/resources/templates/hooks/useImageGeneration";
-import { StoryImage } from "shared/components/StoryImage";
+import { ImagePlaceholder } from "./ImagePlaceholder";
 
 interface CoverImageEditorProps {
   templateId?: string;
@@ -60,21 +60,26 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row gap-6">
         {/* Cover Image Preview */}
-        <div className="w-full md:w-1/3 flex flex-col">
+        <div className="w-full md:w-2/5 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image</h3>
-          <div className="aspect-[2/3] rounded-md overflow-hidden max-w-[240px] w-full mx-auto">
-            <StoryImage
+          <div className="aspect-[2/3] rounded-md overflow-hidden max-w-[320px] w-full mx-auto flex items-center justify-center">
+            <ImagePlaceholder
               image={coverImage}
               alt="Cover Image"
-              className="w-full h-full object-cover"
-              responsivePosition={false}
-              objectPosition="center"
+              isGenerating={localIsGenerating}
+              canGenerateImages={canGenerateImages && !readOnly}
+              hasAppearance={!!imageInstructions?.coverPrompt}
+              onGenerateClick={handleGenerateCoverImage}
+              size="large"
+              className="!w-full !h-full !max-w-none"
+              imageClassName="w-full h-full object-cover"
+              missingContentMessage="Add a cover image prompt to generate an image"
             />
           </div>
         </div>
 
         {/* Cover Prompt Input */}
-        <div className="w-full md:w-2/3 flex flex-col">
+        <div className="w-full md:w-3/5 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image Prompt</h3>
           <div className="flex flex-col">
             <div className="flex items-start gap-2 mb-2">

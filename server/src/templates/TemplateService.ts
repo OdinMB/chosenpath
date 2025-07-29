@@ -69,7 +69,8 @@ export class TemplateService {
    * Create a template object with common properties
    */
   private createFullTemplateObject(
-    baseTemplate: Partial<StoryTemplate>
+    baseTemplate: Partial<StoryTemplate>,
+    userPermissions: string[] = []
   ): StoryTemplate {
     const now = new Date().toISOString();
 
@@ -89,7 +90,7 @@ export class TemplateService {
       teaser: baseTemplate.teaser || "",
       creatorId: baseTemplate.creatorId || undefined,
       creatorUsername: baseTemplate.creatorUsername || undefined,
-      containsImages: baseTemplate.containsImages || false,
+      containsImages: baseTemplate.containsImages ?? userPermissions.includes("templates_images"),
       imageInstructions: baseTemplate.imageInstructions || {
         visualStyle: "",
         atmosphere: "",
@@ -334,7 +335,8 @@ export class TemplateService {
   async createTemplate(
     template: Partial<StoryTemplate>,
     creatorId?: string,
-    creatorUsername?: string
+    creatorUsername?: string,
+    userPermissions: string[] = []
   ): Promise<StoryTemplate> {
     try {
       // Only generate a new ID if one doesn't already exist
@@ -343,7 +345,7 @@ export class TemplateService {
       }
 
       const fullTemplate: StoryTemplate =
-        this.createFullTemplateObject(template);
+        this.createFullTemplateObject(template, userPermissions);
 
       // Set creator information on creation
       if (creatorId) {
@@ -351,9 +353,9 @@ export class TemplateService {
         fullTemplate.creatorUsername = creatorUsername || undefined;
       }
 
-      // Set containsImages to false by default on creation
+      // Set containsImages default based on user permissions
       if (fullTemplate.containsImages === undefined) {
-        fullTemplate.containsImages = false;
+        fullTemplate.containsImages = userPermissions.includes("templates_images");
       }
 
       // Keep existing timestamps if provided
@@ -418,7 +420,8 @@ export class TemplateService {
   async createOrUpdateTemplate(
     template: Partial<StoryTemplate>,
     creatorId?: string,
-    creatorUsername?: string
+    creatorUsername?: string,
+    userPermissions: string[] = []
   ): Promise<StoryTemplate> {
     try {
       // Generate ID if not provided
@@ -446,7 +449,7 @@ export class TemplateService {
         this.logger.log(`Template ${template.id} doesn't exist, creating new`);
 
         const fullTemplate: StoryTemplate =
-          this.createFullTemplateObject(template);
+          this.createFullTemplateObject(template, userPermissions);
 
         // Set creator information on creation
         if (creatorId) {
@@ -454,9 +457,9 @@ export class TemplateService {
           fullTemplate.creatorUsername = creatorUsername || undefined;
         }
 
-        // Set containsImages to false by default on creation
+        // Set containsImages default based on user permissions
         if (fullTemplate.containsImages === undefined) {
-          fullTemplate.containsImages = false;
+          fullTemplate.containsImages = userPermissions.includes("templates_images");
         }
 
         // Keep existing timestamps if provided
@@ -703,7 +706,8 @@ export class TemplateService {
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel,
     creatorId?: string,
-    creatorUsername?: string
+    creatorUsername?: string,
+    userPermissions: string[] = []
   ): Promise<StoryTemplate> {
     try {
       this.logger.log(`Generating template with prompt: ${prompt}`);
@@ -768,7 +772,8 @@ export class TemplateService {
       const generatedTemplate = await this.createTemplate(
         templatePartial,
         creatorId,
-        creatorUsername
+        creatorUsername,
+        userPermissions
       );
 
       this.logger.log(

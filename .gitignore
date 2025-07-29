@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Editor directories and files
 !.vscode/extensions.json
@@ -28,9 +30,6 @@ dist-ssr
 .vite
 .vite/**
 
-# project docs
-DOCS/**
-
 # Server data directories
 # Exclude story checkpoints (local development only)
 data/story_checkpoints/**
@@ -40,7 +39,8 @@ data/mocks/**
 data/stories/**
 data/templates/**
 
-
+# project docs
+DOCS/**
 backup/
-research.txt
 notes.txt
+dev-screenshot.png

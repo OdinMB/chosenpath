@@ -21,7 +21,7 @@ import {
   incrementRateLimitForRequest,
 } from "../shared/rateLimiter.js";
 import { sendRateLimited, sendError } from "../shared/responseUtils.js";
-import { verifyAdmin } from "../users/authMiddleware.js";
+import { verifyUser, checkPermissions } from "../users/authMiddleware.js";
 
 const router = express.Router();
 const IMAGE_GENERATION_ACTION_TYPE = "imageGeneration";
@@ -91,9 +91,13 @@ const validateImageQuality = (quality?: string): string | null => {
  */
 router.post(
   "/image-generation/template/element",
-  verifyAdmin(),
+  verifyUser(),
+  checkPermissions(["templates_images"]),
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
+    Logger.Story.log(
+      `Image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+    );
     try {
       const rateLimit = checkRateLimitForRequest(
         req,
@@ -174,9 +178,13 @@ router.post(
  */
 router.post(
   "/image-generation/template/player",
-  verifyAdmin(),
+  verifyUser(),
+  checkPermissions(["templates_images"]),
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
+    Logger.Story.log(
+      `Player image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+    );
     try {
       const rateLimit = checkRateLimitForRequest(
         req,
@@ -271,9 +279,13 @@ router.post(
  */
 router.post(
   "/image-generation/template/cover",
-  verifyAdmin(),
+  verifyUser(),
+  checkPermissions(["templates_images"]),
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
+    Logger.Story.log(
+      `Cover image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+    );
     try {
       const rateLimit = checkRateLimitForRequest(
         req,

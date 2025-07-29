@@ -73,7 +73,8 @@ export async function initializeDatabase() {
       INSERT INTO roles (id, name, description, created_at, updated_at)
       VALUES 
         ('role_user', 'user', 'Regular user with basic permissions', $1, $1),
-        ('role_admin', 'admin', 'Administrator with full system access', $1, $1)
+        ('role_admin', 'admin', 'Administrator with full system access', $1, $1),
+        ('role_worldbuilder', 'worldbuilder', 'User with permission to generate images', $1, $1)
       ON CONFLICT (id) DO NOTHING
     `,
       [nowEpochMs]
@@ -91,7 +92,9 @@ export async function initializeDatabase() {
         ('role_admin', 'templates_create', $1),
         ('role_admin', 'templates_images', $1),
         ('role_admin', 'feedback_view', $1),
-        ('role_admin', 'feedback_delete', $1)
+        ('role_admin', 'feedback_delete', $1),
+        ('role_worldbuilder', 'templates_create', $1),
+        ('role_worldbuilder', 'templates_images', $1)
       ON CONFLICT (role_id, permission) DO NOTHING
     `,
       [nowEpochMs]

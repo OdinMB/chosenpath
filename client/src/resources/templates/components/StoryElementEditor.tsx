@@ -9,7 +9,7 @@ import { Input, TextArea } from "components/ui";
 import { ArrayField, ExpandableItem } from "components";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { Icons } from "shared/components/ui/Icons";
-import { StoryImage } from "shared/components/StoryImage";
+import { ImagePlaceholder } from "./ImagePlaceholder";
 
 interface StoryElementEditorProps {
   element: StoryElement;
@@ -100,15 +100,15 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   // Create element image for the collapsed view
   const elementImageComponent = (
     <div className="relative">
-      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-        <StoryImage
-          image={elementImage}
-          alt={element.name || "Element"}
-          className="w-full h-full object-cover"
-          responsivePosition={false}
-          objectPosition="center center"
-        />
-      </div>
+      <ImagePlaceholder
+        image={elementImage}
+        alt={element.name || "Element"}
+        isGenerating={isGenerating}
+        canGenerateImages={canGenerateImages && !readOnly}
+        hasAppearance={!!element.appearance}
+        onGenerateClick={handleGenerateImage}
+        size="small"
+      />
     </div>
   );
 

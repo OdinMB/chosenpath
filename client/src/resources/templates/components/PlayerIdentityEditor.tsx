@@ -8,9 +8,9 @@ import {
   ImageStatus,
 } from "core/types";
 import { Icons } from "shared/components/ui/Icons";
-import { StoryImage } from "shared/components/StoryImage";
 import { useImageGeneration } from "client/resources/templates/hooks/useImageGeneration";
 import { createPlayerIdentityImage } from "shared/utils/imageUtils";
+import { ImagePlaceholder } from "./ImagePlaceholder";
 
 interface PlayerIdentityEditorProps {
   identity: CharacterIdentity;
@@ -170,15 +170,15 @@ export const PlayerIdentityEditor: React.FC<PlayerIdentityEditorProps> = ({
 
   const identityImage = (
     <div className="relative">
-      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-        <StoryImage
-          image={playerImage}
-          alt={identity.name || `Character ${index + 1}`}
-          className="w-full h-full"
-          responsivePosition={false}
-          objectPosition="center center"
-        />
-      </div>
+      <ImagePlaceholder
+        image={playerImage}
+        alt={identity.name || `Character ${index + 1}`}
+        isGenerating={isGeneratingImage}
+        canGenerateImages={canGenerateImages && !readOnly}
+        hasAppearance={!!identity.appearance}
+        onGenerateClick={handleGenerateImage}
+        size="small"
+      />
     </div>
   );
 

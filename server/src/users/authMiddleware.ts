@@ -92,9 +92,7 @@ export function verifyUser(options: AuthOptions = { required: true }) {
       }
 
       Logger.Route.log(
-        `Authentication passed for user: ${user.username} (${user.id}): ${
-          options.roles ? options.roles.join(", ") : "no roles required"
-        }`
+        `Authentication passed for user: ${user.username} (${user.id}), role: ${user.roleId}, permissions: [${req.userPermissions.join(", ")}]`
       );
       next();
     } catch (error) {
@@ -121,6 +119,7 @@ export function verifyUser(options: AuthOptions = { required: true }) {
 export function checkPermissions(permissions: string[], requireAll = true) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
+      Logger.Route.warn(`Permission check failed: No authenticated user found for route ${req.path}`);
       return res.status(401).json({
         error: "Authentication required",
         requestId: req.body?.requestId || "unknown",
@@ -129,6 +128,12 @@ export function checkPermissions(permissions: string[], requireAll = true) {
 
     const userPermissions = req.userPermissions || [];
 
+    Logger.Route.log(
+      `Checking permissions for user: ${req.user.username} (${req.user.id}). ` +
+      `User has: [${userPermissions.join(", ")}], ` +
+      `Required: [${permissions.join(", ")}] (${requireAll ? "all" : "any"})`
+    );
+
     if (requireAll) {
       // User must have ALL specified permissions
       const hasAllPermissions = permissions.every((permission) =>
@@ -136,10 +141,10 @@ export function checkPermissions(permissions: string[], requireAll = true) {
       );
 
       if (!hasAllPermissions) {
+        const missingPermissions = permissions.filter(p => !userPermissions.includes(p));
         Logger.Route.warn(
-          `Permission check failed for user: ${
-            req.user.id
-          }. Required: ${permissions.join(", ")}`
+          `Permission check failed for user: ${req.user.username} (${req.user.id}). ` +
+          `Missing permissions: [${missingPermissions.join(", ")}]`
         );
         return res.status(403).json({
           error: "Insufficient permissions",
@@ -154,9 +159,8 @@ export function checkPermissions(permissions: string[], requireAll = true) {
 
       if (!hasAnyPermission) {
         Logger.Route.warn(
-          `Permission check failed for user: ${
-            req.user.id
-          }. Required any of: ${permissions.join(", ")}`
+          `Permission check failed for user: ${req.user.username} (${req.user.id}). ` +
+          `User has none of the required permissions: [${permissions.join(", ")}]`
         );
         return res.status(403).json({
           error: "Insufficient permissions",
@@ -165,6 +169,9 @@ export function checkPermissions(permissions: string[], requireAll = true) {
       }
     }
 
+    Logger.Route.log(
+      `Permission check passed for user: ${req.user.username} (${req.user.id})`
+    );
     next();
   };
 }

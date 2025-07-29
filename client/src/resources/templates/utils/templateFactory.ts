@@ -19,17 +19,19 @@ export function createDefaultTemplate(): StoryTemplate {
     gameMode: GameModes.Cooperative,
     playerCountMin: 1 as PlayerCount,
     playerCountMax: 1 as PlayerCount,
-    maxTurnsMin: 10,
-    maxTurnsMax: 15,
+    maxTurnsMin: 20,
+    maxTurnsMax: 25,
     teaser: "",
     tags: [],
     difficultyLevels: [
-      DEFAULT_DIFFICULTY_LEVELS.find((level) => level.modifier === 0)!,
+      DEFAULT_DIFFICULTY_LEVELS.find((level) => level.modifier === 0)!, // Balanced
+      DEFAULT_DIFFICULTY_LEVELS.find((level) => level.modifier === 10)!, // Relaxed
+      DEFAULT_DIFFICULTY_LEVELS.find((level) => level.modifier === -10)!, // Challenging
     ],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     title: "",
-    containsImages: false,
+    // containsImages will be set by server based on user permissions
     imageInstructions: {
       visualStyle: "",
       atmosphere: "",

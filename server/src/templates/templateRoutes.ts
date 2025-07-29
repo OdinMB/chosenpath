@@ -473,13 +473,15 @@ router.post(
         return sendBadRequest(res, "Missing template data", requestId);
       }
 
-      // Pass creator ID and username to the service method
+      // Pass creator ID, username, and permissions to the service method
       const creatorId = req.user?.id;
       const creatorUsername = req.user?.username;
+      const userPermissions = req.userPermissions || [];
       const createdTemplate = await templateService.createOrUpdateTemplate(
         template,
         creatorId,
-        creatorUsername
+        creatorUsername,
+        userPermissions
       );
 
       Logger.Route.log(
@@ -617,7 +619,8 @@ router.post(
         gameMode,
         finalDifficultyLevel,
         creatorId,
-        creatorUsername
+        creatorUsername,
+        req.userPermissions || []
       );
 
       // Increment rate limit for non-admin users

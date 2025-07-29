@@ -139,7 +139,7 @@ export class AIImageGenerator {
     imageInstructions?: ImageInstructions
   ) {
     let prompt: string = "";
-    prompt += `Generate an image that can accompany the following scene or story element in a story book\n\n`;
+    prompt += `Generate an image that can accompany the following scene or story element\n\n`;
     prompt += `==========\n${description}\n==========`;
     if (imageInstructions) {
       prompt += `\n\n${this.getPromptSectionFromImageInstructions(

@@ -36,16 +36,28 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             id="contains-images"
             checked={containsImages}
             onChange={(e) => setContainsImages(e.target.checked)}
+            disabled={!canGenerateImages}
           />
-          <label htmlFor="contains-images" className="ml-2 text-sm font-medium">
-            Use pre-generated images in stories
+          <label 
+            htmlFor="contains-images" 
+            className={`ml-2 text-sm font-medium ${!canGenerateImages ? 'text-gray-400' : ''}`}
+          >
+            Use the pre-generated images in stories
           </label>
           <InfoIcon
-            tooltipText="Check this if the template contains images that should be used during gameplay."
+            tooltipText={canGenerateImages 
+              ? "Check this if the template contains images that should be used during gameplay." 
+              : "You don't have permission to use images in templates."
+            }
             position="right"
             className="ml-2"
           />
         </div>
+        {!canGenerateImages && (
+          <p className="text-sm text-gray-500 mt-2">
+            You need the templates_images permission to use images in templates.
+          </p>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200">

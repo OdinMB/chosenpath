@@ -14,7 +14,8 @@
       "Bash(find:*)",
       "Bash(dir:*)",
       "Bash(ls:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(claude code connect)"
     ],
     "deny": []
   }
