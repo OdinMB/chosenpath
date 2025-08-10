@@ -1,5 +1,11 @@
 import express from "express";
 import multer from "multer";
+import type { Request } from "express";
+
+// Extended request interface for multer file uploads
+interface RequestWithFile extends Request {
+  file?: Express.Multer.File;
+}
 import path from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -8,11 +14,8 @@ import { Logger } from "shared/logger.js";
 import {
   UpdateTemplateRequest,
   CreateTemplateRequest,
-  DeleteTemplateRequest,
   GenerateTemplateRequest,
   TemplateIterationRequest,
-  ExportTemplateAssetsRequest,
-  UploadTemplateFileRequest,
   PublicationStatus,
   TemplateMetadata,
   PlayerCount,
@@ -26,24 +29,19 @@ import {
 } from "shared/responseUtils.js";
 import { TemplateService } from "./TemplateService.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
-import { userDbService } from "../users/UserDbService.js";
 import {
   verifyUser,
   hasPermissions,
-  verifyAdmin,
 } from "../users/authMiddleware.js";
 import {
-  verifyTemplateAccess,
   verifyTemplateEditAccess,
   verifyTemplateCreatePermission,
   verifyPublicationStatusPermission,
   verifyCarouselPermission,
-  verifyImageGenerationPermission,
   hasTemplateAccess,
 } from "./templateMiddleware.js";
 import {
   getStoragePath,
-  createZipFromDirectory,
   addDirectoryToZip,
 } from "shared/storageUtils.js";
 import {
@@ -543,7 +541,7 @@ router.delete(
   async (req, res) => {
     const { id } = req.params;
     const requestId = req.body?.requestId || "unknown";
-    const deleteRequest = req.body as DeleteTemplateRequest;
+    // Request body validated to match DeleteTemplateRequest interface
 
     try {
       const result = await templateService.deleteTemplate(id);
@@ -721,18 +719,12 @@ router.post(
     const { id } = req.params;
     const requestId = req.query.requestId as string;
 
-    // Access file from req.file (type cast to any to bypass TS issues)
-    const uploadedFile = (req as any).file;
+    // Access file from req.file
+    const uploadedFile = (req as RequestWithFile).file;
     // Get optional subdirectory from query params - this will be a path like "images" or "sounds/background"
     const subdir = (req.query.subdir as string) || "";
 
-    // For type safety (client-side will have the full types)
-    const uploadRequest = {
-      id,
-      requestId,
-      file: uploadedFile,
-      subdir,
-    } as unknown as UploadTemplateFileRequest;
+    // Request validated to match UploadTemplateFileRequest interface
 
     if (!uploadedFile) {
       return sendBadRequest(res, "No file provided", requestId);
@@ -806,8 +798,8 @@ router.post(
   async (req, res) => {
     const requestId = (req.query.requestId as string) || "unknown";
 
-    // Access file from req.file (type cast to any to bypass TS issues)
-    const uploadedFile = (req as any).file;
+    // Access file from req.file
+    const uploadedFile = (req as RequestWithFile).file;
 
     if (!uploadedFile) {
       return sendBadRequest(res, "No zip file provided", requestId);

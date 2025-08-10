@@ -1,0 +1,28 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "types": ["jest", "node"],
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "rootDir": "../../",
+    "baseUrl": ".",
+    "paths": {
+      "core/*": ["../../core/*"],
+      "server/*": ["../src/*"],
+      "shared/*": ["../src/shared/*"],
+      "game/*": ["../src/game/*"],
+      "users/*": ["../src/users/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "../src/**/*.ts",
+    "../../core/**/*.ts"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist"
+  ]
+}

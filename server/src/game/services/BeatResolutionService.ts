@@ -30,9 +30,9 @@ export class BeatResolutionService {
     const resolutionIndex = (beat.choice % numOptions) + 1;
 
     const resolution = `resolution${resolutionIndex}` as ResolutionExploration;
-    console.log(
-      `[BeatResolutionService] Exploration resolution: ${resolution}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Exploration resolution: ${resolution}`
+    // );
     return resolution;
   }
 
@@ -50,21 +50,21 @@ export class BeatResolutionService {
     difficultyLevel: DifficultyLevel,
     story: Story
   ): ChallengeResolutionResult {
-    console.log(
-      `[BeatResolutionService] Processing outcome for beat: ${beat.title}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Processing outcome for beat: ${beat.title}`
+    // );
 
     const chosenOption = beat.options[beat.choice];
-    console.log(
-      `[BeatResolutionService] Chosen option: "${chosenOption.text}"`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Chosen option: "${chosenOption.text}"`
+    // );
 
     if (chosenOption.optionType !== "challenge") {
       throw new Error("Beat resolution service only supports challenge beats");
     }
 
     const optionType = chosenOption.riskType;
-    console.log(`[BeatResolutionService] Option type: ${optionType}`);
+    // console.log(`[BeatResolutionService] Option type: ${optionType}`);
 
     const orderedReadablePointModifiers: Array<{
       name: string;
@@ -87,14 +87,15 @@ export class BeatResolutionService {
               ? "You put yourself in a good position"
               : "Things didn't go well up to this point",
         });
-        console.log(
-          `[BeatResolutionService] Applied Previous resolution effect (${previousResolution}): ${previousStepResolutionPoints} points. Current total: ${totalPointsForDistribution}`
-        );
-      } else {
-        console.log(
-          `[BeatResolutionService] Previous resolution (${previousResolution}) had no point effect. Current total: ${totalPointsForDistribution}`
-        );
+        // console.log(
+        //   `[BeatResolutionService] Applied Previous resolution effect (${previousResolution}): ${previousStepResolutionPoints} points. Current total: ${totalPointsForDistribution}`
+        // );
       }
+      // else {
+      // console.log(
+      //   `[BeatResolutionService] Previous resolution (${previousResolution}) had no point effect. Current total: ${totalPointsForDistribution}`
+      // );
+      // }
     }
 
     // 2. & 3. Add points from the chosen option (base points and stat modifiers) (New Order: Second)
@@ -110,9 +111,9 @@ export class BeatResolutionService {
     );
     totalPointsForDistribution += pointsFromOption;
     orderedReadablePointModifiers.push(...optionSpecificModifiers);
-    console.log(
-      `[BeatResolutionService] Applied points from option: ${pointsFromOption}. Current total: ${totalPointsForDistribution}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Applied points from option: ${pointsFromOption}. Current total: ${totalPointsForDistribution}`
+    // );
 
     // 4. Add story difficulty modifier (New Order: Last)
     totalPointsForDistribution += difficultyLevel.modifier;
@@ -123,33 +124,34 @@ export class BeatResolutionService {
         value: difficultyLevel.modifier,
         tooltip: "Difficulty level for this story",
       });
-      console.log(
-        `[BeatResolutionService] Applied Story difficulty modifier ('${difficultyLevel.title}'): ${difficultyLevel.modifier} points. Current total (after all additions): ${totalPointsForDistribution}`
-      );
-    } else {
-      // Log even if zero, for clarity that it was considered for the sum.
-      console.log(
-        `[BeatResolutionService] Story difficulty modifier is 0. Current total (after all additions): ${totalPointsForDistribution}`
-      );
+      // console.log(
+      //   `[BeatResolutionService] Applied Story difficulty modifier ('${difficultyLevel.title}'): ${difficultyLevel.modifier} points. Current total (after all additions): ${totalPointsForDistribution}`
+      // );
     }
+    // else {
+    // Log even if zero, for clarity that it was considered for the sum.
+    // console.log(
+    //   `[BeatResolutionService] Story difficulty modifier is 0. Current total (after all additions): ${totalPointsForDistribution}`
+    // );
+    // }
 
-    console.log(
-      `[BeatResolutionService] Final points for distribution calculation: ${totalPointsForDistribution}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Final points for distribution calculation: ${totalPointsForDistribution}`
+    // );
 
     const distribution = calculateDistribution(
       totalPointsForDistribution,
       optionType
     );
-    console.log(
-      `[BeatResolutionService] Final distribution: ${JSON.stringify(
-        distribution
-      )}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Final distribution: ${JSON.stringify(
+    //     distribution
+    //   )}`
+    // );
 
     // Generate a random roll between 0 and 100
     const roll = Math.random() * 100;
-    console.log(`[BeatResolutionService] Random roll: ${roll.toFixed(2)}`);
+    // console.log(`[BeatResolutionService] Random roll: ${roll.toFixed(2)}`);
 
     // Determine the outcome based on the roll
     let outcome: ResolutionChallenge;
@@ -161,7 +163,7 @@ export class BeatResolutionService {
       outcome = "unfavorable";
     }
 
-    console.log(`[BeatResolutionService] Final resolution:`, outcome);
+    // console.log(`[BeatResolutionService] Final resolution:`, outcome);
 
     // Create resolution details for visualization
     const resolutionDetails: ResolutionDetails = {
@@ -196,9 +198,9 @@ export class BeatResolutionService {
     story: Story
   ): number {
     let currentOptionPoints = option.basePoints;
-    console.log(
-      `[BeatResolutionService] Base points for option: ${currentOptionPoints}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Base points for option: ${currentOptionPoints}`
+    // );
     let choiceTooltip = "";
     let choiceName = "";
     if (option.resourceType === "sacrifice") {
@@ -236,19 +238,19 @@ export class BeatResolutionService {
           value: modifier.effect,
           tooltip: modifier.reason,
         });
-        console.log(
-          `[BeatResolutionService] Added option modifier: '${statName}' (${
-            modifier.reason || modifier.statId
-          }) => ${
-            modifier.effect
-          } points. Option subtotal: ${currentOptionPoints}`
-        );
+        // console.log(
+        //   `[BeatResolutionService] Added option modifier: '${statName}' (${
+        //     modifier.reason || modifier.statId
+        //   }) => ${
+        //     modifier.effect
+        //   } points. Option subtotal: ${currentOptionPoints}`
+        // );
       }
     }
 
-    console.log(
-      `[BeatResolutionService] Total points calculated from option: ${currentOptionPoints}`
-    );
+    // console.log(
+    //   `[BeatResolutionService] Total points calculated from option: ${currentOptionPoints}`
+    // );
     return currentOptionPoints;
   }
 
@@ -272,14 +274,14 @@ export class BeatResolutionService {
       case "resolution1":
       case "resolution2":
       case "resolution3":
-        console.log(
-          `[BeatResolutionService] Previous resolution: ${previousResolution}). THIS SHOULD NEVER HAPPEN.`
-        );
+        // console.log(
+        //   `[BeatResolutionService] Previous resolution: ${previousResolution}). THIS SHOULD NEVER HAPPEN.`
+        // );
         return 0;
       default:
-        console.log(
-          `[BeatResolutionService] Previous resolution: ${previousResolution}. THIS SHOULD NEVER HAPPEN.`
-        );
+        // console.log(
+        //   `[BeatResolutionService] Previous resolution: ${previousResolution}. THIS SHOULD NEVER HAPPEN.`
+        // );
         return 0;
     }
   }

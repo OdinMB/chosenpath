@@ -12,7 +12,7 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT || "5432", 10),
 });
 
-pool.on("error", (err, client) => {
+pool.on("error", (err) => {
   Logger.DB.error("Unexpected error on idle client", err);
   process.exit(-1);
 });
@@ -119,6 +119,7 @@ export async function initializeDatabase() {
         template_id TEXT,
         creator_id TEXT,
         generate_images BOOLEAN NOT NULL DEFAULT TRUE,
+        pregenerate_beats BOOLEAN NOT NULL DEFAULT FALSE,
         max_turns INTEGER NOT NULL,
         difficulty_modifier INTEGER,
         difficulty_title TEXT,
@@ -242,22 +243,6 @@ export async function initializeDatabase() {
   } catch (error) {
     Logger.DB.error("Failed to initialize PostgreSQL database", error);
     throw error;
-  }
-}
-
-/**
- * Check if a table exists in the database
- */
-async function tableExists(tableName: string): Promise<boolean> {
-  try {
-    const result = await pool.query(
-      "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1 AND table_schema = 'public')",
-      [tableName]
-    );
-    return result.rows[0].exists;
-  } catch (error) {
-    Logger.DB.error(`Failed to check if table ${tableName} exists`, error);
-    return false; // Or throw, depending on desired error handling
   }
 }
 

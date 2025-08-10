@@ -73,7 +73,7 @@ export async function saveFeedback({
       timestamp,
     ];
 
-    const result = await db.query(query, values);
+    await db.query(query, values);
     Logger.DB.log(`Feedback saved with ID: ${feedbackId}`);
     return feedbackId;
   } catch (error) {

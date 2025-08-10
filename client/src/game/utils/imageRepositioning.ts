@@ -106,7 +106,7 @@ export function enforceSpacingWithConstraints(
       const current = result[i];
       const next = result[i + 1];
       
-      if (next - current < 2) {
+      if (current !== undefined && next !== undefined && next - current < 2) {
         // Try moving next image forward first (minimize moves)
         const targetPosition = current + 2;
         
@@ -174,7 +174,8 @@ export function enforceLastParagraphConstraint(
     
     // If next position would exceed bounds, just use next available
     if (currentPos > actualMaxUsable && i < totalImages - 1) {
-      currentPos = result[result.length - 1] + 1;
+      const lastResult = result[result.length - 1];
+      currentPos = (lastResult ?? 0) + 1;
     }
   }
   
@@ -207,7 +208,8 @@ export function calculateMoveDistance(
   const sortedOptimized = [...optimized].sort((a, b) => a - b);
   
   return sortedOriginal.reduce((totalDistance, originalPos, index) => {
-    return totalDistance + Math.abs(originalPos - sortedOptimized[index]);
+    const optimizedPos = sortedOptimized[index];
+    return totalDistance + Math.abs(originalPos - (optimizedPos ?? 0));
   }, 0);
 }
 
@@ -231,8 +233,10 @@ export function validateConstraints(
   // Check soft constraint - spacing between images
   const sortedPositions = [...positions].sort((a, b) => a - b);
   for (let i = 0; i < sortedPositions.length - 1; i++) {
-    if (sortedPositions[i + 1] - sortedPositions[i] < 2) {
-      violations.push(`Images too close: ${sortedPositions[i]} and ${sortedPositions[i + 1]}`);
+    const current = sortedPositions[i];
+    const next = sortedPositions[i + 1];
+    if (current !== undefined && next !== undefined && next - current < 2) {
+      violations.push(`Images too close: ${current} and ${next}`);
     }
   }
   

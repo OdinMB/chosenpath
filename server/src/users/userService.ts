@@ -5,6 +5,16 @@ import { PublicUser } from "core/types/user.js";
 import { SESSION_DURATION } from "../config.js";
 import { userDbService } from "./UserDbService.js";
 
+// JWT payload interface
+interface JwtUserPayload {
+  userId: string;
+  username: string;
+  roleId: string;
+  permissions: string[];
+  exp: number;
+  iat: number;
+}
+
 // JWT secret should be in environment variables in production
 const JWT_SECRET = process.env.JWT_SECRET || "development-jwt-secret";
 const SALT_ROUNDS = 10;
@@ -150,10 +160,14 @@ export async function verifyToken(token: string): Promise<PublicUser | null> {
 
     if (!session) return null;
 
-    let decoded: any;
+    let decoded: JwtUserPayload;
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (e) {
+      const verifyResult = jwt.verify(token, JWT_SECRET);
+      if (typeof verifyResult === 'string') {
+        throw new Error('Invalid token format');
+      }
+      decoded = verifyResult as JwtUserPayload;
+    } catch {
       await userDbService.deleteSessionByToken(token);
       return null;
     }
@@ -365,10 +379,14 @@ export async function refreshTokenPermissions(
     const session = await userDbService.findSessionByToken(currentToken);
     if (!session) return null;
 
-    let decoded: any;
+    let decoded: JwtUserPayload;
     try {
-      decoded = jwt.verify(currentToken, JWT_SECRET);
-    } catch (e) {
+      const verifyResult = jwt.verify(currentToken, JWT_SECRET);
+      if (typeof verifyResult === 'string') {
+        throw new Error('Invalid token format');
+      }
+      decoded = verifyResult as JwtUserPayload;
+    } catch {
       return null;
     }
 

@@ -185,7 +185,15 @@ export function getRateLimitInfo(ip: string): Record<
   ip = normalizeIP(ip);
   Logger.Route.log(`[RateLimiter] Getting rate limit info for ${ip}`);
 
-  const result: Record<RateLimitedAction, any> = {} as any;
+  const result: Record<RateLimitedAction, {
+    requestsRemaining: number;
+    maxRequests: number;
+    resetsAt: number;
+  }> = {} as Record<RateLimitedAction, {
+    requestsRemaining: number;
+    maxRequests: number;
+    resetsAt: number;
+  }>;
   const now = Date.now();
 
   // For each action type, get the current status

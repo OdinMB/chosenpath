@@ -1,32 +1,9 @@
 import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
 import {
-  StoryMetadata,
   ExtendedStoryMetadata,
   StoryPlayerEntry,
 } from "core/types/api.js";
-
-// DB Row Types for StoryMetadata and StoryPlayerEntry (if still needed by getStoryFeed or other functions)
-interface StoryMetadataDbRow {
-  id: string;
-  title: string;
-  template_id?: string;
-  created_at: string;
-  updated_at: string;
-  max_turns: number;
-  generate_images: boolean;
-  creator_id: string | null;
-  current_beat: number;
-}
-
-interface StoryPlayerEntryDbRow {
-  story_id: string;
-  player_slot: string;
-  code: string;
-  user_id: string | null;
-  last_played_at: string | null;
-  is_pending: boolean;
-}
 
 // Interface for StoryPlayerDetail (used by getStoryPlayerByCode)
 interface StoryPlayerDetailDbRow {

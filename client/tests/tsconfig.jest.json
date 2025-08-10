@@ -1,0 +1,33 @@
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "types": ["jest", "node"],
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "baseUrl": "..",
+    "paths": {
+      "client/*": ["src/*"],
+      "core/*": ["../core/dist/*"],
+      "shared/*": ["src/shared/*"],
+      "components": ["src/shared/components"],
+      "components/*": ["src/shared/components/*"],
+      "admin/*": ["src/admin/*"],
+      "game/*": ["src/game/*"],
+      "page/*": ["src/page/*"],
+      "users/*": ["src/users/*"],
+      "resources/*": ["src/resources/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../src/**/*.ts",
+    "../src/**/*.tsx"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist"
+  ]
+}

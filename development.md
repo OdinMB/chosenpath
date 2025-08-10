@@ -2,13 +2,13 @@ Smaller commits!
 
 # NEXT
 
+- 3: Fix: start new story without being logged in; log in; story no longer shows up visually, but in the number of games at the top
+
 - 1: Link to relevant lectures in the template form sections
 - 2: meet future self should only have one possible identity
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
-- 20: option for single-player games to pre-generate beats to save time
-
 - 2: review process for storytellers who want to publish on website
-- ?: Bild bei Draft mit hochladen
+- ?: Bild bei Draft mit hochladen (especially for kids stories)
 
 # BETTER EXPERIENCE
 
@@ -26,7 +26,6 @@ Focus: Text/Images, English, Multiplayer
 - 25: Multiplayer switch type with voting mechanism to decide which direction to take
 - 3: story setting: # paragraphs / beat (shorter for kids/roleplaying mode)
 - 20: Dynamically add new outcomes for longer stories
-- 5: Play with Gemini 2.5 Pro once integrated in Langchain
 - 30: Audio version
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
 - 30: Different languages
@@ -35,7 +34,6 @@ Focus: Text/Images, English, Multiplayer
 - 10: Create story based on kids' drawings
 - 10: creation/template setting: jokers to see risky/safe or even modifiers
 - 20: Music (OpenAI's new API?)
-- 20: Streaming text
 
 # SERIOUS PROJECT
 
@@ -51,7 +49,7 @@ Focus: Text/Images, English, Multiplayer
 - 10: Atomic Transaction System for editing templates (for undo/redo and checks)
 - 15: System to view/navigate save files
 - 3: users can lock codes to then require this user to be logged in to be used
-- 7: system to add useful images generated in template-based stories to the template
+- 7: system to add useful images from stories to the underlying template
 - 30: Multiplayer mode: shared perspective (majority vote, lottery, voting threshold)
 
 # MOBILE APPS

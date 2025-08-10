@@ -87,11 +87,11 @@ imageRouter.get("/templates/:templateId/:path(*)", async (req, res) => {
     }
 
     // For cover.jpeg in the root, we need to look in the images subdirectory
-    let subPath = path.join(templateId, "images", filePath);
+    const subPath = path.join(templateId, "images", filePath);
 
     // Check if file exists
-    let fileExists = storageFileExists("templates", subPath);
-    let imagePath = getStorageFilePath("templates", subPath);
+    const fileExists = storageFileExists("templates", subPath);
+    const imagePath = getStorageFilePath("templates", subPath);
 
     if (!fileExists) {
       // Logger.Route.error(`Template image not found: ${templateId}/${filePath}`);

@@ -212,10 +212,7 @@ export const BeatContent: React.FC<BeatContentProps> = ({
       return (
         <div className="h-full flex items-center justify-center py-8">
           <div className="text-center p-6 bg-white rounded-lg border border-primary-100 shadow-md">
-            <LoadingSpinner
-              size="large"
-              message="First story beat is being generated..."
-            />
+            <LoadingSpinner size="large" message="Setting up the story..." />
           </div>
         </div>
       );

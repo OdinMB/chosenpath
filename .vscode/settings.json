@@ -11,7 +11,8 @@
   },
   "files.exclude": {
     "**/__pycache__": true,
-    "**/node_modules": true
+    "**/node_modules": true,
+    "**/dist": true
   },
   "workbench.tree.renderIndentGuides": "always",
   "explorer.decorations.badges": true,

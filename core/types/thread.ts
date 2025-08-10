@@ -7,7 +7,7 @@ export type ThreadType = (typeof THREAD_TYPE)[number];
 export const getThreadType = (thread: Thread): ThreadType => {
   if (thread.playersSideB.length > 0) {
     return "contest";
-  } else if ("favorable" in thread.progression[0].possibleResolutions) {
+  } else if (thread.progression[0] && "favorable" in thread.progression[0].possibleResolutions) {
     return "challenge";
   } else {
     return "exploration";

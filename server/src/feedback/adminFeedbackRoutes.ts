@@ -3,7 +3,6 @@ import { Logger } from "shared/logger.js";
 import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminFeedbackService } from "server/feedback/AdminFeedbackService.js";
 import { DeleteFeedbackRequest } from "core/types/api.js";
-import { GetAdminFeedbackResponse } from "core/types/api.js";
 import {
   verifyAdmin,
   canViewFeedback,
@@ -48,11 +47,9 @@ router.delete(
     const requestId = (req.query.requestId as string) || uuidv4();
     const feedbackId = req.params.id;
 
-    // Validate the request matches DeleteFeedbackRequest type
-    const deleteRequest: DeleteFeedbackRequest = {
-      feedbackId,
-      requestId,
-    };
+    // Validate the request matches DeleteFeedbackRequest type (validation only)
+    const _validateRequest: DeleteFeedbackRequest = { feedbackId, requestId };
+    void _validateRequest;
 
     try {
       Logger.Route.log(`[${requestId}] Deleting feedback: ${feedbackId}`);

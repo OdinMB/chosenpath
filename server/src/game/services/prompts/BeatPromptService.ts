@@ -470,21 +470,21 @@ ${
 
   private static createGameWorldInstructions(story: Story): string {
     if (story.isFirstBeat()) {
-      return this.createIntroductionInstructions(story);
+      return this.createIntroductionInstructions();
     } else if (story.getCurrentBeatType() === "ending") {
-      return this.createEndingInstructions(story);
+      return this.createEndingInstructions();
     } else {
       return this.createNormalBeatInstructions(story);
     }
   }
 
-  private static createEndingInstructions(story: Story): string {
+  private static createEndingInstructions(): string {
     return `This is the ending of the story. DON'T ADD ANY NEW STORY ELEMENTS. Let's just give the player a proper ending.
 - Tie the ending to the individual and shared outcomes that affect the player.
 - Use references to important story elements and things that happened to the player.`;
   }
 
-  private static createIntroductionInstructions(story: Story): string {
+  private static createIntroductionInstructions(): string {
     return `This is the first beat of the story. DON'T ADD ANY NEW STORY ELEMENTS OR NEW FACTS. Let's just give the player a proper introduction to the existing story state.
 - Required: Introduce the player itself.
 - Required: Introduce the other players and their relationship to the player.

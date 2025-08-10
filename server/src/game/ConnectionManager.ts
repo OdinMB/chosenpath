@@ -261,7 +261,7 @@ export class ConnectionManager {
       let hasConnectedPlayers = false;
 
       // Check if any player has active socket connections
-      for (const [_, player] of session.players) {
+      for (const [, player] of session.players) {
         if (player.socketIds.size > 0) {
           hasConnectedPlayers = true;
           break;

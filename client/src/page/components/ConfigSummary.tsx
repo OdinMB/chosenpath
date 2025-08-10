@@ -8,6 +8,7 @@ interface ConfigSummaryProps {
   playerCount: number;
   gameMode?: GameMode;
   generateImages?: boolean;
+  pregenerateBeats?: boolean;
   templateMode?: boolean;
   showPlayerInfo?: boolean;
 }
@@ -18,6 +19,7 @@ export const ConfigSummary = ({
   playerCount,
   gameMode,
   generateImages,
+  pregenerateBeats,
   templateMode = false,
   showPlayerInfo = false,
 }: ConfigSummaryProps) => {
@@ -72,6 +74,14 @@ export const ConfigSummary = ({
                   <span>Images:</span>{" "}
                   <span className="font-medium text-primary">
                     {generateImages ? "Yes" : "No"}
+                  </span>
+                </div>
+              )}
+              {!templateMode && pregenerateBeats !== undefined && (
+                <div>
+                  <span>Pregeneration:</span>{" "}
+                  <span className="font-medium text-primary">
+                    {pregenerateBeats ? "Yes" : "No"}
                   </span>
                 </div>
               )}

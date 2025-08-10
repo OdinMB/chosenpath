@@ -1,5 +1,11 @@
 import { getThreadType, GameModes } from "core/types/index.js";
-import type { Stat, StatValueEntry, Thread, Beat } from "core/types/index.js";
+import type {
+  Stat,
+  StatValueEntry,
+  Thread,
+  Beat,
+  Outcome,
+} from "core/types/index.js";
 import { Story } from "core/models/Story.js";
 
 export interface SectionConfig {
@@ -173,7 +179,7 @@ ${modeDescriptions[story.getGameMode()]}
   private static createImageLibrarySection(story: Story): string {
     if (!story.includesImages()) return "";
 
-    let imageSource = story.isBasedOnTemplate() ? "template" : "story";
+    const imageSource = story.isBasedOnTemplate() ? "template" : "story";
     let text = "IMAGE LIBRARY:\n";
     if (!story.hasImages()) {
       text += "No non-player images yet.";
@@ -210,18 +216,29 @@ ${modeDescriptions[story.getGameMode()]}
     return text;
   }
 
-  private static formatStatValue(stat: { type?: string; value?: any }): string {
-    if (!stat.type || stat.value === undefined) return "";
+  private static formatStatValue(stat: {
+    type?: string;
+    value?: unknown;
+  }): string {
+    if (!stat.type || stat.value === undefined || stat.value === null)
+      return "";
 
     switch (stat.type) {
       case "percentage":
-        return `${stat.value}%`;
+        return typeof stat.value === "number"
+          ? `${stat.value}%`
+          : String(stat.value);
       case "opposite":
-        return `${stat.value}|${100 - stat.value}`;
+        if (typeof stat.value === "number") {
+          return `${stat.value}|${100 - stat.value}`;
+        }
+        return String(stat.value);
       case "string[]":
-        return Array.isArray(stat.value) ? stat.value.join(", ") : stat.value;
+        return Array.isArray(stat.value)
+          ? stat.value.join(", ")
+          : String(stat.value);
       default:
-        return stat.value;
+        return String(stat.value);
     }
   }
 
@@ -289,7 +306,7 @@ ${modeDescriptions[story.getGameMode()]}
     ].join("\n");
   }
 
-  private static createOutcomesListSection(outcomes: any[]): string {
+  private static createOutcomesListSection(outcomes: Outcome[]): string {
     return outcomes
       .map((outcome) => {
         const resolutions = this.formatResolutions(outcome.possibleResolutions);
@@ -389,7 +406,7 @@ ${modeDescriptions[story.getGameMode()]}
     );
   }
 
-  private static createBeatHistorySection(beatHistory: any[]): string {
+  private static createBeatHistorySection(beatHistory: Beat[]): string {
     if (!beatHistory || beatHistory.length === 0) {
       return "No beats yet.";
     }
@@ -549,10 +566,11 @@ ${modeDescriptions[story.getGameMode()]}
         const threadType = getThreadType(thread);
 
         // Determine thread type
-        let threadTypeString = getThreadType(thread).toUpperCase() + " THREAD";
+        const threadTypeString =
+          getThreadType(thread).toUpperCase() + " THREAD";
 
         // Get the outcome that will receive a milestone
-        let outcome = story.getOutcomeById(thread.outcomeId);
+        const outcome = story.getOutcomeById(thread.outcomeId);
         if (!outcome) {
           console.log(
             "[StoryStatePromptService] ERROR: Outcome not found for thread " +
@@ -563,33 +581,34 @@ ${modeDescriptions[story.getGameMode()]}
           ? `\nRelated Outcome: ${outcome.question} (${outcome.id})`
           : `\nRelated Outcome: Unknown (ID: ${thread.outcomeId})`;
 
+        const pm = thread.possibleMilestones as Record<string, string>;
         const milestonesSection =
-          threadType === "exploration"
+          threadType === "exploration" && "resolution1" in pm
             ? [
                 `Players: ${thread.playersSideA.join(", ")}`,
                 outcomeInfo,
                 `Possible milestones:`,
-                `1. ${thread.possibleMilestones["resolution1"]}`,
-                `2. ${thread.possibleMilestones["resolution2"]}`,
-                `3. ${thread.possibleMilestones["resolution3"]}`,
+                `1. ${pm["resolution1"]}`,
+                `2. ${pm["resolution2"]}`,
+                `3. ${pm["resolution3"]}`,
               ].join("\n")
-            : threadType === "contest"
+            : threadType === "contest" && "sideAWins" in pm
             ? [
                 `Side A (${thread.playersSideA.join(", ")})`,
                 `Side B (${thread.playersSideB.join(", ")})`,
                 outcomeInfo,
                 `Possible milestones:`,
-                `- If Side A wins: ${thread.possibleMilestones["sideAWins"]}`,
-                `- Mixed result: ${thread.possibleMilestones["mixed"]}`,
-                `- If Side B wins: ${thread.possibleMilestones["sideBWins"]}`,
+                `- If Side A wins: ${pm["sideAWins"]}`,
+                `- Mixed result: ${pm["mixed"]}`,
+                `- If Side B wins: ${pm["sideBWins"]}`,
               ].join("\n")
             : [
                 `Players: ${thread.playersSideA.join(", ")}`,
                 outcomeInfo,
                 `Possible milestones:`,
-                `- Favorable: ${thread.possibleMilestones["favorable"]}`,
-                `- Mixed: ${thread.possibleMilestones["mixed"]}`,
-                `- Unfavorable: ${thread.possibleMilestones["unfavorable"]}`,
+                `- Favorable: ${pm["favorable"] ?? ""}`,
+                `- Mixed: ${pm["mixed"] ?? ""}`,
+                `- Unfavorable: ${pm["unfavorable"] ?? ""}`,
               ].join("\n");
 
         // Add thread resolution and milestone if available
@@ -713,11 +732,10 @@ ${modeDescriptions[story.getGameMode()]}
                 }`
               : "No resolution";
 
+            const resMap = beat.possibleResolutions as Record<string, string>;
             const resolutionDescription =
-              beat.resolution &&
-              beat.possibleResolutions &&
-              beat.resolution in beat.possibleResolutions
-                ? beat.possibleResolutions[beat.resolution]
+              beat.resolution && resMap && beat.resolution in resMap
+                ? resMap[beat.resolution]
                 : "";
 
             return `Beat ${beatNumber}/${totalBeats}: ${beat.title}\n\n${
@@ -797,14 +815,9 @@ ${modeDescriptions[story.getGameMode()]}
 
         // For completed beats, include the resolution description if available
         let resolutionDescription = "";
-        if (
-          beat.resolution &&
-          beat.possibleResolutions &&
-          beat.resolution in beat.possibleResolutions
-        ) {
-          resolutionDescription = ` ${
-            beat.possibleResolutions[beat.resolution]
-          }`;
+        const resDescMap = beat.possibleResolutions as Record<string, string>;
+        if (beat.resolution && resDescMap && beat.resolution in resDescMap) {
+          resolutionDescription = ` ${resDescMap[beat.resolution]}`;
         }
 
         // For the current beat, show possible outcomes
@@ -817,23 +830,24 @@ ${modeDescriptions[story.getGameMode()]}
 
           let outcomes: string[] = [];
 
+          const res = beat.possibleResolutions as Record<string, string>;
           if (hasContestedOutcomes) {
             outcomes = [
-              `  - If Side A wins: ${beat.possibleResolutions["sideAWins"]}`,
-              `  - Mixed result: ${beat.possibleResolutions["mixed"]}`,
-              `  - If Side B wins: ${beat.possibleResolutions["sideBWins"]}`,
+              `  - If Side A wins: ${res["sideAWins"]}`,
+              `  - Mixed result: ${res["mixed"]}`,
+              `  - If Side B wins: ${res["sideBWins"]}`,
             ];
           } else if (hasStandardOutcomes) {
             outcomes = [
-              `  - Favorable: ${beat.possibleResolutions["favorable"]}`,
-              `  - Mixed: ${beat.possibleResolutions["mixed"]}`,
-              `  - Unfavorable: ${beat.possibleResolutions["unfavorable"]}`,
+              `  - Favorable: ${res["favorable"]}`,
+              `  - Mixed: ${res["mixed"]}`,
+              `  - Unfavorable: ${res["unfavorable"]}`,
             ];
           } else if (hasExploratoryOutcomes) {
             outcomes = [
-              `  - Resolution 1: ${beat.possibleResolutions["resolution1"]}`,
-              `  - Resolution 2: ${beat.possibleResolutions["resolution2"]}`,
-              `  - Resolution 3: ${beat.possibleResolutions["resolution3"]}`,
+              `  - Resolution 1: ${res["resolution1"]}`,
+              `  - Resolution 2: ${res["resolution2"]}`,
+              `  - Resolution 3: ${res["resolution3"]}`,
             ];
           }
 
@@ -855,7 +869,9 @@ ${modeDescriptions[story.getGameMode()]}
       .join("\n");
   }
 
-  private static formatResolutions(resolutions: any): string {
+  private static formatResolutions(
+    resolutions: Record<string, string>
+  ): string {
     // Standard resolutions (favorable/unfavorable/mixed)
     if ("favorable" in resolutions) {
       return [

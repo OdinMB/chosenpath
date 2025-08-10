@@ -1,6 +1,5 @@
 import type { Story } from "core/models/Story.js";
 import type {
-  Beat,
   GameMode,
   PlayerCount,
   PlayerSlot,
@@ -66,10 +65,30 @@ export interface GameOperations {
     };
     story: Story;
   };
-  generateImages: {
+  attachImageToStory: {
     input: {
-      beatsNeedingImages: Record<string, Beat>;
+      imageId: string;
+      caption: string;
+    };
+    story: Story;
+  };
+  pregenerateStoryState: {
+    input: {
       story: Story;
+      playerSlot: PlayerSlot;
+      optionIndex: number;
+      turn: number;
+    };
+    story: Story;
+  };
+  bulkPregenerateStoryStates: {
+    input: {
+      story: Story;
+      turn: number;
+      playersAndOptions: Array<{
+        playerSlot: PlayerSlot;
+        optionIndices: number[];
+      }>;
     };
     story: Story;
   };

@@ -13,11 +13,9 @@ import crypto from "crypto";
 dotenv.config();
 
 // Extend Express Request type to include csrfToken
-declare global {
-  namespace Express {
-    interface Request {
-      csrfToken(): string;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    csrfToken(): string;
   }
 }
 

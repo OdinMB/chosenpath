@@ -1,9 +1,15 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { PlayerCount, GameMode, GameModes, DifficultyLevel } from "core/types";
-import { PrimaryButton, Icons, ColoredBox, TextArea } from "components/ui";
+import {
+  PrimaryButton,
+  Icons,
+  ColoredBox,
+  TextArea,
+  InfoIcon,
+} from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
-import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS } from "core/config";
+import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS, DISABLE_PREGENERATION_FOR_MULTIPLAYER } from "core/config";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
@@ -39,6 +45,7 @@ interface StoryInitializerProps {
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
+    pregenerateBeats?: boolean;
     difficultyLevel?: DifficultyLevel;
   }) => Promise<void>;
   initialPlayerCount?: PlayerCount;
@@ -79,6 +86,7 @@ export const StoryInitializer = ({
   ) as PlayerCount;
   const urlGameMode = searchParams.get("mode") as GameMode | null;
   const urlImages = searchParams.get("images") === "true";
+  const urlPregenerate = searchParams.get("pregenerate") === "true";
   const urlPrompt = searchParams.get("prompt");
   const urlDifficulty = searchParams.get("difficulty");
 
@@ -105,6 +113,9 @@ export const StoryInitializer = ({
   );
   const [maxTurns] = useState<number>(initialMaxTurns || DEFAULT_TURNS);
   const [generateImages, setGenerateImages] = useState(urlImages || false);
+  const [pregenerateBeats, setPregenerateBeats] = useState(
+    urlPregenerate !== undefined ? urlPregenerate : true
+  );
   const [gameMode, setGameMode] = useState<GameMode>(
     urlGameMode && Object.values(GameModes).includes(urlGameMode)
       ? urlGameMode
@@ -488,6 +499,13 @@ export const StoryInitializer = ({
     } else {
       updateURLParams({ players: value });
     }
+    
+    // Disable pregeneration for multiplayer if config is set
+    if (DISABLE_PREGENERATION_FOR_MULTIPLAYER && value >= 2 && pregenerateBeats) {
+      setPregenerateBeats(false);
+      updateURLParams({ pregenerate: false });
+    }
+    
     Logger.App.log(`Updated player count to: ${value}`);
     if (onPlayerCountChange) {
       onPlayerCountChange(value);
@@ -561,6 +579,11 @@ export const StoryInitializer = ({
     const mergedPrompt = buildMergedPrompt();
     console.log("Final prompt being sent to backend:", mergedPrompt);
 
+    // Ensure pregeneration is disabled for multiplayer if config is set
+    const finalPregenerateBeats = DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2 
+      ? false 
+      : pregenerateBeats;
+
     if (templateMode && onSetup) {
       try {
         await onSetup({
@@ -569,6 +592,7 @@ export const StoryInitializer = ({
           maxTurns,
           gameMode,
           generateImages,
+          pregenerateBeats: finalPregenerateBeats,
           difficultyLevel: selectedDifficultyLevel,
         });
       } catch (error) {
@@ -584,6 +608,7 @@ export const StoryInitializer = ({
           playerCount,
           maxTurns,
           generateImages,
+          pregenerateBeats: finalPregenerateBeats,
           gameMode,
           difficultyLevel: selectedDifficultyLevel,
         });
@@ -739,6 +764,7 @@ export const StoryInitializer = ({
           playerCount={playerCount}
           gameMode={gameMode}
           generateImages={generateImages}
+          pregenerateBeats={pregenerateBeats}
           templateMode={templateMode}
           showPlayerInfo={false}
         />
@@ -808,9 +834,9 @@ export const StoryInitializer = ({
           )}
         </div>
 
-        {/* Images Box - Conditionally render if not in templateMode */}
+        {/* Images and Pregeneration Box - Conditionally render if not in templateMode */}
         {!templateMode && (
-          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
+          <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md space-y-4">
             <div className="items-center flex">
               <input
                 id="generate-images"
@@ -828,6 +854,39 @@ export const StoryInitializer = ({
                 className="ml-3 md:ml-4 text-sm md:text-base font-medium text-primary"
               >
                 Generate images for this story
+              </label>
+            </div>
+
+            <div className="items-center flex">
+              <input
+                id="pregenerate-beats"
+                type="checkbox"
+                checked={pregenerateBeats}
+                onChange={(e) => {
+                  setPregenerateBeats(e.target.checked);
+                  updateURLParams({ pregenerate: e.target.checked });
+                }}
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                disabled={currentIsLoading || (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)}
+              />
+              <label
+                htmlFor="pregenerate-beats"
+                className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
+                  DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                    ? "text-gray-400"
+                    : "text-primary"
+                }`}
+              >
+                Reduce wait time after making a choice
+                <InfoIcon
+                  tooltipText={
+                    DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                      ? "Pregeneration is currently unavailable for multiplayer games."
+                      : "Creates story content in advance for each possible choice. More expensive but eliminates waiting."
+                  }
+                  className="ml-2 -mt-0.5"
+                  position="top"
+                />
               </label>
             </div>
           </div>
@@ -871,6 +930,7 @@ export const StoryInitializer = ({
             playerCount={playerCount}
             gameMode={gameMode}
             generateImages={generateImages}
+            pregenerateBeats={pregenerateBeats}
             templateMode={templateMode}
             showPlayerInfo={true}
           />

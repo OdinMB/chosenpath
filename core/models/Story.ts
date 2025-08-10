@@ -456,6 +456,23 @@ export class Story {
     return this.state.generateImages;
   }
 
+  pregeneratesBeats(): boolean {
+    return this.state.pregenerateBeats;
+  }
+
+  shouldPregenerateBeats(): boolean {
+    // Check if pregeneration is enabled
+    if (!this.pregeneratesBeats()) {
+      return false;
+    }
+    
+    // Check if all players except the last one have submitted their choices
+    // For single-player games, this is always true
+    // For multiplayer games, check if only one player is still pending
+    const pendingPlayers = this.getPendingPlayers();
+    return pendingPlayers.length <= 1;
+  }
+
   getImages() {
     return this.imageManager.getImages(this.state);
   }

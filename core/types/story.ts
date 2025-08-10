@@ -236,6 +236,17 @@ export type TemplateMetadata = {
 
 export type StoryPhase = SwitchAnalysis | ThreadAnalysis;
 
+// Pregeneration state tracking
+export type PregeneratedState = {
+  storyId: string;
+  turn: number;
+  playerSlot: PlayerSlot;
+  optionIndex: number;
+  storyState: StoryState;
+  createdAt: number; // timestamp
+  status: 'pending' | 'completed' | 'failed';
+};
+
 // Direct type definition for StoryState
 export type StoryState = {
   id: string;
@@ -261,6 +272,7 @@ export type StoryState = {
   >;
   characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;
+  pregenerateBeats: boolean;
   images: ImageLibrary;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };

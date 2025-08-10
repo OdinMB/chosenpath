@@ -33,6 +33,7 @@ class StoryDbService {
     templateId: string | null,
     maxTurns: number,
     generateImages: boolean,
+    pregenerateBeats: boolean,
     creatorId: string | undefined,
     difficultyTitle: string | null,
     difficultyModifier: number | null,
@@ -41,8 +42,8 @@ class StoryDbService {
     const db = getDb();
     const now = Date.now();
     const query = `
-      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, creator_id, current_beat, difficulty_title, difficulty_modifier)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      INSERT INTO stories (id, title, template_id, created_at, updated_at, max_turns, generate_images, pregenerate_beats, creator_id, current_beat, difficulty_title, difficulty_modifier)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `; // Renamed current_turn to current_beat in SQL
     try {
       await db.query(query, [
@@ -53,6 +54,7 @@ class StoryDbService {
         now, // updated_at
         maxTurns,
         generateImages,
+        pregenerateBeats,
         creatorId,
         initialBeat, // Renamed from initialTurn
         difficultyTitle,

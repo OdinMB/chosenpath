@@ -1,4 +1,5 @@
 import { Router, Request } from "express";
+import type * as Express from "express";
 import { Logger } from "shared/logger.js";
 import {
   sendSuccess,
@@ -44,15 +45,17 @@ router.post(
         playerCount,
         maxTurns,
         generateImages,
+        pregenerateBeats = false, // Default to false for now
         gameMode,
         difficultyLevel,
       } = req.body as CreateStoryRequest;
 
-      const creatorId = (req as any).user?.id;
+      const creatorId = (req as Express.Request & { user?: { id: string } }).user?.id;
 
       await storyCreationService.createStory(
         prompt,
         generateImages,
+        pregenerateBeats,
         playerCount as PlayerCount,
         maxTurns,
         gameMode,
@@ -95,17 +98,19 @@ router.post(
         playerCount: reqPlayerCount,
         maxTurns: reqMaxTurns,
         generateImages: reqGenerateImages,
+        pregenerateBeats: reqPregenerateBeats = false, // Default to false for now
         difficultyLevel: reqDifficultyLevel,
       } = req.body as CreateStoryFromTemplateRequest;
       Logger.Route.log("Creating story from template");
 
-      const creatorId = (req as any).user?.id;
+      const creatorId = (req as Express.Request & { user?: { id: string } }).user?.id;
 
       await storyCreationService.createStoryFromTemplate(
         templateId,
         reqPlayerCount as PlayerCount,
         reqMaxTurns,
         reqGenerateImages,
+        reqPregenerateBeats,
         reqDifficultyLevel,
         res,
         creatorId
@@ -145,7 +150,7 @@ router.put(
     try {
       const { storyId, playerSlot, status } =
         req.body as UpdateStoryStatusRequest;
-      const userId = (req as any).user?.id;
+      const userId = (req as Express.Request & { user?: { id: string } }).user?.id;
 
       if (!userId) {
         sendError(res, "Authentication required", 401, requestId);

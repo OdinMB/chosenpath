@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["jest", "node"],
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "baseUrl": ".",
+    "paths": {
+      "core/*": ["../../core/dist/*"],
+      "server/*": ["../src/*"],
+      "shared/*": ["../src/shared/*"],
+      "game/*": ["../src/game/*"],
+      "users/*": ["../src/users/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": [
+    "../node_modules/**/*",
+    "../dist/**/*",
+    "../../node_modules/**/*"
+  ],
+  "ts-node": {
+    "esm": true
+  }
+}

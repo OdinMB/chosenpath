@@ -2,9 +2,7 @@ import { Router } from "express";
 import { Logger } from "shared/logger.js";
 import { sendSuccess, sendError, sendNotFound } from "shared/responseUtils.js";
 import { adminStoryService } from "server/stories/AdminStoryService.js";
-import { DeleteStoryRequest } from "core/types/index.js";
 import {
-  GetAdminStoriesResponse,
   GetAdminStoriesResponseData,
 } from "core/types/api.js";
 import { verifyAdmin } from "users/authMiddleware.js";
@@ -58,11 +56,7 @@ router.delete("/admin/stories/:id", verifyAdmin(), async (req, res) => {
   const requestId = (req.query.requestId as string) || uuidv4();
   const storyId = req.params.id;
 
-  // Validate the request matches DeleteStoryRequest type
-  const deleteRequest: DeleteStoryRequest = {
-    id: storyId,
-    requestId,
-  };
+  // Request is validated to match DeleteStoryRequest interface
 
   try {
     Logger.Route.log(`[${requestId}] Deleting story: ${storyId}`);

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { PlayerCount, DifficultyLevel, TemplateMetadata } from "core/types";
 import { PrimaryButton, Icons, InfoIcon } from "components/ui";
+import { DISABLE_PREGENERATION_FOR_MULTIPLAYER } from "core/config";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
 import { Logger } from "shared/logger";
@@ -33,6 +34,7 @@ export function TemplateConfigurator() {
   const [playerCount, setPlayerCount] = useState<PlayerCount>(1);
   const [maxTurns, setMaxTurns] = useState(10);
   const [generateImages, setGenerateImages] = useState(false);
+  const [pregenerateBeats, setPregenerateBeats] = useState(true);
   const [selectedDifficultyLevel, setSelectedDifficultyLevel] =
     useState<DifficultyLevel>(() => {
       return getDefaultDifficultyLevel();
@@ -104,12 +106,18 @@ export function TemplateConfigurator() {
     e.preventDefault();
     Logger.App.log("Starting template story creation process");
 
+    // Ensure pregeneration is disabled for multiplayer if config is set
+    const finalPregenerateBeats = DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+      ? false
+      : pregenerateBeats;
+
     try {
       const response = await createStoryFromTemplate({
         templateId: template.id,
         playerCount,
         maxTurns,
         generateImages,
+        pregenerateBeats: finalPregenerateBeats,
         difficultyLevel: selectedDifficultyLevel,
       });
 
@@ -131,6 +139,12 @@ export function TemplateConfigurator() {
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     setPlayerCount(value as PlayerCount);
+    
+    // Disable pregeneration for multiplayer if config is set
+    if (DISABLE_PREGENERATION_FOR_MULTIPLAYER && value >= 2 && pregenerateBeats) {
+      setPregenerateBeats(false);
+    }
+    
     Logger.App.log(`Updated player count to: ${value}`);
   };
 
@@ -278,6 +292,37 @@ export function TemplateConfigurator() {
                   Add unique images to your story
                   <InfoIcon
                     tooltipText="The story always has default images. We will add additional ones for your unique story."
+                    className="ml-2 -mt-0.5"
+                    position="top"
+                  />
+                </label>
+              </div>
+
+              {/* Pregeneration Checkbox */}
+              <div className="items-center flex">
+                <input
+                  id="pregenerate-beats"
+                  type="checkbox"
+                  checked={pregenerateBeats}
+                  onChange={(e) => setPregenerateBeats(e.target.checked)}
+                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                  disabled={isLoading || (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)}
+                />
+                <label
+                  htmlFor="pregenerate-beats"
+                  className={`ml-3 md:ml-4 text-sm md:text-base font-medium ${
+                    DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                      ? "text-gray-400"
+                      : "text-primary"
+                  }`}
+                >
+                  Reduce wait time after making a choice
+                  <InfoIcon
+                    tooltipText={
+                      DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+                        ? "Pregeneration is currently unavailable for multiplayer games."
+                        : "Creates story content in advance for each possible choice. More expensive but eliminates waiting."
+                    }
                     className="ml-2 -mt-0.5"
                     position="top"
                   />

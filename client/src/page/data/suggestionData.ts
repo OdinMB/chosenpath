@@ -725,6 +725,11 @@ export const suggestionData: SuggestionData = {
             "I'm an apprentice wizard learning to control my color-magic at the academy, where spells gone wrong turn homework rainbow-colored...",
         },
         {
+          kidAge: "8",
+          instructions:
+            "I'm Susan. My stuffed animals come to life at night for magical adventures - there's Mr. Buttons the brown teddy bear with one missing eye, Princess Sparkles the purple unicorn with a glittery horn, and Chompers the small green dinosaur with felt spikes...",
+        },
+        {
           kidAge: "12",
           instructions:
             "I'm a young fox trying to solve the mystery of why all the forest berries taste like vanilla suddenly...",
@@ -745,6 +750,11 @@ export const suggestionData: SuggestionData = {
           kidAge: "7-10",
           instructions:
             "We're the animal rescue squad saving forest friends from getting lost during the Big Storm using our different skills...",
+        },
+        {
+          kidAge: "5-9",
+          instructions:
+            "We're a collection of beloved stuffed animals who come alive to go on magical adventures together - there's Patches the gray elephant with big floppy ears, Captain Whiskers the orange tabby cat with a tiny sailor hat, Snuggles the white bunny with one ear that's shorter than the other, and Roary the golden lion with a magnificent mane...",
         },
         {
           kidAge: "4-12",
@@ -769,6 +779,11 @@ export const suggestionData: SuggestionData = {
             "We're student magicians from different magical schools competing in the Goodwill Games, where showing good sportsmanship earns extra points...",
         },
         {
+          kidAge: "6-10",
+          instructions:
+            "We're beloved stuffed animals from different children competing to see whose kid loves them most - there's Honey Bear the golden teddy with a red ribbon, Midnight the black cat with green button eyes, Giggles the rainbow-colored monkey with long arms, and Squeaky the small pink pig with a curly tail - only to discover that all children's love is special and unique...",
+        },
+        {
           kidAge: "7-11",
           instructions:
             "We're young explorers from different clubs racing to find the legendary Friendship Treasure, discovering that sharing clues helps everyone...",
@@ -789,6 +804,11 @@ export const suggestionData: SuggestionData = {
           kidAge: "7-13",
           instructions:
             "We're classmates working on group projects while also competing for the Student of the Month award through individual achievements...",
+        },
+        {
+          kidAge: "4-8",
+          instructions:
+            "We're a child's collection of stuffed animals working together to organize the perfect birthday surprise while each hoping to be the birthday hero who gets the biggest hug - there's Cuddles the extra-large brown bear, Twinkle the star-shaped pillow with silver sparkles, Biscuit the golden retriever puppy with floppy ears, and Waddles the blue penguin with an orange beak...",
         },
         {
           kidAge: "5-11",

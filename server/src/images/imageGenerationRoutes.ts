@@ -10,7 +10,21 @@ import {
   GenerateCoverImageRequest,
   GenerateImageResponse,
   ImageInstructions,
+  ImageSize,
+  ImageQuality,
+  ClientRequest,
 } from "core/types/index.js";
+
+// Request interface for player image generation
+interface GeneratePlayerImageRequest extends ClientRequest {
+  templateId: string;
+  playerSlot: string;
+  identityIndex: number;
+  appearance: string;
+  imageInstructions?: ImageInstructions;
+  size?: ImageSize;
+  quality?: ImageQuality;
+}
 import {
   IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
   IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
@@ -68,7 +82,7 @@ const validateImageInstructions = (
 };
 
 const validateImageSize = (size?: string): string | null => {
-  if (size && !Object.values(IMAGE_SIZES).includes(size as any)) {
+  if (size && !Object.values(IMAGE_SIZES).includes(size as ImageSize)) {
     return `Invalid image size provided. Valid sizes are: ${Object.values(
       IMAGE_SIZES
     ).join(", ")}`;
@@ -77,7 +91,7 @@ const validateImageSize = (size?: string): string | null => {
 };
 
 const validateImageQuality = (quality?: string): string | null => {
-  if (quality && !Object.values(IMAGE_QUALITIES).includes(quality as any)) {
+  if (quality && !Object.values(IMAGE_QUALITIES).includes(quality as ImageQuality)) {
     return `Invalid image quality provided. Valid qualities are: ${Object.values(
       IMAGE_QUALITIES
     ).join(", ")}`;
@@ -194,7 +208,6 @@ router.post(
         return sendRateLimited(res, rateLimit, requestId);
       }
 
-      // TODO: Define GeneratePlayerImageRequest type if available
       const {
         templateId,
         playerSlot,
@@ -203,7 +216,7 @@ router.post(
         imageInstructions,
         size,
         quality,
-      } = req.body as any;
+      } = req.body as GeneratePlayerImageRequest;
 
       // Input Validation
       let validationError = validateStringInput(templateId, "templateId", 255);

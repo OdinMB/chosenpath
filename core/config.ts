@@ -19,6 +19,15 @@ export const POINTS_FOR_REWARD = -30;
 
 export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = 0;
 
+// Pregeneration configuration
+// When true, disables the pregeneration option for multiplayer games (2+ players)
+// This can be used to reduce server load or when pregeneration is not stable for multiplayer
+export const DISABLE_PREGENERATION_FOR_MULTIPLAYER = true;
+
+// Maximum number of options for which we will pregenerate story states
+// If a player has more options than this, pregeneration will be skipped for that beat
+export const MAX_OPTIONS_FOR_PREGENERATION = 4;
+
 // Interval for checking if user is waiting in multiplayer stories
 export const MULTIPLAYER_STORY_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 

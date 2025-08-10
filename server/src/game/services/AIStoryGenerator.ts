@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
 // import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type {
@@ -38,12 +37,16 @@ import {
   MOCK_STORIES_DELAY_MS,
 } from "core/config.js";
 import {
+  MODEL_BASE_REASONING,
   GENERATION_MODEL_NAME,
   GENERATION_MODEL_TEMPERATURE,
+  GENERATION_MODEL_REASONING_EFFORT,
   TEXT_MODEL_NAME,
   TEXT_MODEL_TEMPERATURE,
+  TEXT_MODEL_REASONING_EFFORT,
   SWITCH_THREAD_MODEL_NAME,
   SWITCH_THREAD_MODEL_TEMPERATURE,
+  SWITCH_THREAD_MODEL_REASONING_EFFORT,
 } from "server/config.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
@@ -53,57 +56,36 @@ import { templateIterationSections } from "core/utils/templateIterationSections.
 dotenv.config();
 
 export class AIStoryGenerator {
-  // private textModel: ChatAnthropic;
-  // private switchThreadModel: ChatAnthropic;
-  // private generationModel: ChatAnthropic;
   private textModel: ChatOpenAI;
   private switchThreadModel: ChatOpenAI;
   private generationModel: ChatOpenAI;
-  // private textModel: ChatGoogleGenerativeAI;
-  // private switchThreadModel: ChatGoogleGenerativeAI;
-  // private generationModel: ChatGoogleGenerativeAI;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
 
-    // this.textModel = new ChatAnthropic({
-    //   model: TEXT_MODEL_NAME as string,
-    //   temperature: TEXT_MODEL_TEMPERATURE as number,
-    // });
-    // this.switchThreadModel = new ChatAnthropic({
-    //   model: SWITCH_THREAD_MODEL_NAME as string,
-    //   temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
-    // });
-    // this.generationModel = new ChatAnthropic({
-    //   model: GENERATION_MODEL_NAME as string,
-    //   temperature: GENERATION_MODEL_TEMPERATURE as number,
-    // });
     this.textModel = new ChatOpenAI({
-      modelName: TEXT_MODEL_NAME as string,
+      model: TEXT_MODEL_NAME as string,
       temperature: TEXT_MODEL_TEMPERATURE as number,
+      modelKwargs: MODEL_BASE_REASONING
+        ? { reasoning_effort: TEXT_MODEL_REASONING_EFFORT }
+        : {},
     });
     this.switchThreadModel = new ChatOpenAI({
-      modelName: SWITCH_THREAD_MODEL_NAME as string,
+      model: SWITCH_THREAD_MODEL_NAME as string,
       temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
+      modelKwargs: MODEL_BASE_REASONING
+        ? { reasoning_effort: SWITCH_THREAD_MODEL_REASONING_EFFORT }
+        : {},
     });
     this.generationModel = new ChatOpenAI({
-      modelName: GENERATION_MODEL_NAME as string,
+      model: GENERATION_MODEL_NAME as string,
       temperature: GENERATION_MODEL_TEMPERATURE as number,
+      modelKwargs: MODEL_BASE_REASONING
+        ? { reasoning_effort: GENERATION_MODEL_REASONING_EFFORT }
+        : {},
     });
-    // this.textModel = new ChatGoogleGenerativeAI({
-    //   model: TEXT_MODEL_NAME as string,
-    //   temperature: TEXT_MODEL_TEMPERATURE as number,
-    // });
-    // this.switchThreadModel = new ChatGoogleGenerativeAI({
-    //   model: SWITCH_THREAD_MODEL_NAME as string,
-    //   temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
-    // });
-    // this.generationModel = new ChatGoogleGenerativeAI({
-    //   model: GENERATION_MODEL_NAME as string,
-    //   temperature: GENERATION_MODEL_TEMPERATURE as number,
-    // });
   }
 
   public async createInitialState(
@@ -161,6 +143,7 @@ export class AIStoryGenerator {
       ),
       characterSelectionIntroduction: setup.characterSelectionIntroduction,
       generateImages,
+      pregenerateBeats: false, // Default to false - will be set by client/user preference
       images: [],
       playerCodes: {},
     };
@@ -242,7 +225,8 @@ export class AIStoryGenerator {
       );
 
       const result = await structuredModel.invoke(setupPrompt);
-      Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
+      // Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
+      Logger.Story.log("Story setup generated");
 
       // If mock stories are enabled, save the result to a file for later use
       if (mockStoriesEnabled) {
@@ -259,6 +243,7 @@ export class AIStoryGenerator {
       }
 
       // Create a new object without the characterSelectionPlan property
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { characterSelectionPlan, ...storySetupData } = result;
 
       return storySetupData as StorySetupGeneration<typeof playerCount>;
@@ -276,7 +261,8 @@ export class AIStoryGenerator {
     const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
-    Logger.Story.log(JSON.stringify(response, null, 2));
+    // Logger.Story.log(JSON.stringify(response, null, 2));
+    Logger.Story.log("Switches generated");
 
     const currentBeatIndex = story.getCurrentTurn() - 1;
     const firstBeatIndexOfSwitch = currentBeatIndex + 1;
@@ -297,7 +283,8 @@ export class AIStoryGenerator {
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
-    Logger.Story.log(JSON.stringify(response, null, 2));
+    // Logger.Story.log(JSON.stringify(response, null, 2));
+    Logger.Story.log("Threads generated");
 
     const currentBeatIndex = story.getCurrentTurn() - 1;
     const firstBeatIndexOfThread = currentBeatIndex + 1;
@@ -329,7 +316,7 @@ export class AIStoryGenerator {
     };
 
     // Modify players' previousTypesOfThreads to include the new thread type
-    let updatedStory =
+    const updatedStory =
       story.updatePlayerPreviousThreadTypes(transformedThreads);
 
     // Add the phase to the updated story
@@ -337,13 +324,15 @@ export class AIStoryGenerator {
   }
 
   async generateBeats(
-    story: Story
+    story: Story,
+    skipImageRequests: boolean = false
   ): Promise<[Story, Change[], ImageRequest[]]> {
     try {
       const response = await this.generateBeatsResponse(story);
       const [updatedStory, imageRequests] = this.processBeatsResponse(
         story,
-        response
+        response,
+        skipImageRequests
       );
       const mergedChanges = this.mergeChanges(response);
 
@@ -379,7 +368,8 @@ export class AIStoryGenerator {
       BeatPromptService.createBeatPrompt(story)
     )) as SetOfBeatGenerationSchema;
 
-    Logger.Story.log(JSON.stringify(response, null, 2));
+    // Logger.Story.log(JSON.stringify(response, null, 2));
+    Logger.Story.log("Beats generated");
     return response;
   }
 
@@ -390,7 +380,8 @@ export class AIStoryGenerator {
 
   private processBeatsResponse(
     story: Story,
-    response: SetOfBeatGenerationSchema
+    response: SetOfBeatGenerationSchema,
+    skipImageRequests: boolean = false
   ): [Story, ImageRequest[]] {
     let updatedStory = story.clone();
     const imageRequests: ImageRequest[] = [];
@@ -410,8 +401,9 @@ export class AIStoryGenerator {
           updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
 
           // If the imageRequest is an object, add it to the imageRequests array
-          // Only collect image requests if generateImages is true
+          // Only collect image requests if generateImages is true AND we're not skipping them
           if (
+            !skipImageRequests &&
             story.generatesImages() &&
             beat.imageRequest &&
             typeof beat.imageRequest === "object"
@@ -436,7 +428,7 @@ export class AIStoryGenerator {
   private mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
     const playerBeats = Object.entries(response)
       .filter(([key]) => this.isPlayerBeat(key))
-      .map(([_, value]) => value as BeatGeneration);
+      .map(([, value]) => value as BeatGeneration);
 
     const allEstablishedFacts = playerBeats.flatMap(
       (beat) => beat.plan.establishedFacts || []
@@ -513,7 +505,7 @@ export class AIStoryGenerator {
         this.generationModel.withStructuredOutput(partialSchema);
       const result = await structuredModel.invoke(prompt);
 
-      Logger.Story.log("Result:", JSON.stringify(result, null, 2));
+      // Logger.Story.log("Result:", JSON.stringify(result, null, 2));
       Logger.Story.log("Partial template update generated");
 
       return result;

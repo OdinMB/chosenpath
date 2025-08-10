@@ -6,14 +6,13 @@ import {
   StateUpdateNotification,
   VerifyCodeResponse,
   ErrorResponse,
-  PlayerCount,
+  ClientStoryState,
 } from "core/types/index.js";
 import { connectionManager } from "./ConnectionManager.js";
 import {
   RateLimitedAction,
   SOCKET_CONFIG,
   GAME_SESSION_CONFIG,
-  getApiConfig,
 } from "core/config.js";
 import {
   checkRateLimit,
@@ -21,7 +20,7 @@ import {
   getClientIP,
 } from "shared/rateLimiter.js";
 import { Logger } from "shared/logger.js";
-import { isDevelopment, API_CONFIG } from "../config.js";
+import { API_CONFIG } from "../config.js";
 
 export class GameWebSocketServer {
   private io: Server;
@@ -503,7 +502,7 @@ export class GameWebSocketServer {
   }
 
   // Format and send the state update to clients
-  public sendStateUpdate(storyId: string, state: any, trigger: string): void {
+  public sendStateUpdate(storyId: string, state: ClientStoryState, trigger: string): void {
     this.io.to(storyId).emit("state_update_notification", {
       state,
       trigger,
@@ -543,7 +542,7 @@ export class GameWebSocketServer {
   }
 
   // Helper method to broadcast state updates to all players in a game
-  public broadcastToGame(storyId: string, event: string, data: any): void {
+  public broadcastToGame(storyId: string, event: string, data: unknown): void {
     this.io.to(storyId).emit(event, data);
   }
 

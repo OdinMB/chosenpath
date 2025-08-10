@@ -369,7 +369,7 @@ export function GameLayout({
               />
               <LoadingSpinner
                 size="medium"
-                message="First story beat is being generated..."
+                message="Setting up the story..."
                 messageSize="large"
               />
 

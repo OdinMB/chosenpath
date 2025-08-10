@@ -6,6 +6,29 @@ import {
   DifficultyLevel,
 } from "core/types/index.js";
 
+// Database row interface (snake_case from DB)
+interface TemplateDbRow {
+  id: string;
+  creator_id: string | null;
+  creator_username: string | null;
+  publication_status: string;
+  carousel_order: number | null;
+  contains_images: boolean;
+  title: string;
+  teaser: string;
+  game_mode: string;
+  tags: string;
+  player_count_min: number;
+  player_count_max: number;
+  max_turns_min: number;
+  max_turns_max: number;
+  difficulty_levels: string;
+  show_on_welcome_screen: boolean;
+  order_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database record type for templates
 export interface TemplateDB {
   id: string;
@@ -30,7 +53,7 @@ export interface TemplateDB {
 }
 
 // Helper to map snake_case DB row to camelCase TemplateDB
-function mapRowToTemplateDB(row: any): TemplateDB {
+function mapRowToTemplateDB(row: TemplateDbRow): TemplateDB {
   return {
     id: row.id,
     creatorId: row.creator_id,
@@ -75,7 +98,7 @@ class TemplateDbService {
       Logger.Transaction.log(
         `Fetched ${result.rows.length} template entries with creator usernames from DB`
       );
-      return result.rows.map(mapRowToTemplateDB);
+      return result.rows.map(row => mapRowToTemplateDB(row as TemplateDbRow));
     } catch (error) {
       Logger.Transaction.error("Error fetching all template entries:", error);
       throw error;
@@ -104,7 +127,7 @@ class TemplateDbService {
       Logger.Transaction.log(
         `Fetched ${result.rows.length} template entries with status ${status} and creator usernames from DB`
       );
-      return result.rows.map(mapRowToTemplateDB);
+      return result.rows.map(row => mapRowToTemplateDB(row as TemplateDbRow));
     } catch (error) {
       Logger.Transaction.error(
         `Error fetching template entries by status ${status}:`,
@@ -133,7 +156,7 @@ class TemplateDbService {
       Logger.Transaction.log(
         `Fetched ${result.rows.length} carousel template entries with creator usernames from DB`
       );
-      return result.rows.map(mapRowToTemplateDB);
+      return result.rows.map(row => mapRowToTemplateDB(row as TemplateDbRow));
     } catch (error) {
       Logger.Transaction.error(
         "Error fetching carousel template entries:",
@@ -163,7 +186,7 @@ class TemplateDbService {
       Logger.Transaction.log(
         `Fetched ${result.rows.length} template entries for creator ${creatorId} with username from DB`
       );
-      return result.rows.map(mapRowToTemplateDB);
+      return result.rows.map(row => mapRowToTemplateDB(row as TemplateDbRow));
     } catch (error) {
       Logger.Transaction.error(
         `Error fetching template entries by creator ${creatorId}:`,
@@ -193,7 +216,7 @@ class TemplateDbService {
         Logger.Transaction.log(
           `Found template entry ${id} with creator username in DB`
         );
-        return mapRowToTemplateDB(result.rows[0]);
+        return mapRowToTemplateDB(result.rows[0] as TemplateDbRow);
       } else {
         Logger.Transaction.log(`Template entry ${id} not found in DB`);
         return undefined;
@@ -317,7 +340,7 @@ class TemplateDbService {
 
     // Build dynamic update query
     const updateFields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     Object.entries(updates).forEach(([key, value]) => {

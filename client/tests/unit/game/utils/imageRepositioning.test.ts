@@ -4,7 +4,7 @@ import {
   enforceSpacingConstraint,
   calculateMoveDistance,
   validateConstraints
-} from '../../../src/game/utils/imageRepositioning.js';
+} from '../../../../src/game/utils/imageRepositioning';
 
 describe('imageRepositioning', () => {
   describe('optimizeImagePositions', () => {

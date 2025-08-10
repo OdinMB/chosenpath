@@ -7,7 +7,7 @@ import { Logger } from "shared/logger.js";
 export interface SubscriptionResult {
   success: boolean;
   message: string;
-  data?: any;
+  data?: MailjetContactResponse;
 }
 
 /**

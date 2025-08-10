@@ -60,9 +60,9 @@ export class ChangeService {
     story: Story,
     change: Change & { type: "addIntroductionOfStoryElement" }
   ): Story {
-    console.log(
-      `Adding introduction of story element ${change.storyElementId} for player ${change.player}`
-    );
+    // console.log(
+    //   `Adding introduction of story element ${change.storyElementId} for player ${change.player}`
+    // );
 
     const state = story.getState();
     const player = state.players[change.player];
@@ -73,9 +73,9 @@ export class ChangeService {
     }
 
     if (player.knownStoryElements.includes(change.storyElementId)) {
-      console.log(
-        `Story element ${change.storyElementId} is already known to player ${change.player}`
-      );
+      // console.log(
+      //   `Story element ${change.storyElementId} is already known to player ${change.player}`
+      // );
       return story;
     }
 
@@ -99,9 +99,9 @@ export class ChangeService {
     story: Story,
     change: Change & { type: "newMilestone" }
   ): Story {
-    console.log(
-      `Adding milestone to outcome ${change.outcome} (${change.outcomeGroup}): ${change.newMilestone}`
-    );
+    // console.log(
+    //   `Adding milestone to outcome ${change.outcome} (${change.outcomeGroup}): ${change.newMilestone}`
+    // );
 
     const state = story.getState();
 
@@ -154,7 +154,7 @@ export class ChangeService {
     const state = story.getState();
 
     if (change.group === "shared") {
-      console.log(`Applying stat change to shared stat: ${change.stat}`);
+      // console.log(`Applying stat change to shared stat: ${change.stat}`);
       return this.updateStatValues(
         story,
         state.sharedStatValues,
@@ -174,9 +174,9 @@ export class ChangeService {
       return story;
     }
 
-    console.log(
-      `Applying stat change to player ${playerSlot}'s stat: ${change.stat}`
-    );
+    // console.log(
+    //  `Applying stat change to player ${playerSlot}'s stat: ${change.stat}`
+    //);
     return this.updateStatValues(
       story,
       player.statValues,
@@ -225,13 +225,13 @@ export class ChangeService {
       return story;
     }
 
-    console.log(
-      `Updated stat ${statDef.id} ${
-        change.group === "shared" ? "(shared)" : `for player ${change.group}`
-      } from ${JSON.stringify(statValue.value)} to ${JSON.stringify(
-        updatedStatValue.value
-      )}`
-    );
+    // console.log(
+    //   `Updated stat ${statDef.id} ${
+    //     change.group === "shared" ? "(shared)" : `for player ${change.group}`
+    //   } from ${JSON.stringify(statValue.value)} to ${JSON.stringify(
+    //     updatedStatValue.value
+    //   )}`
+    // );
 
     const updatedStatValues = [...statValues];
     updatedStatValues[statValueIndex] = updatedStatValue;
@@ -279,7 +279,7 @@ export class ChangeService {
           statDef.type === "percentage" ||
           statDef.type === "opposites"
         ) {
-          console.log(`Setting number stat ${statDef.id} to ${change.value}`);
+          // console.log(`Setting number stat ${statDef.id} to ${change.value}`);
           let newValue = change.value as number;
 
           // Clamp percentage and opposites values between 0 and 100
@@ -329,7 +329,7 @@ export class ChangeService {
     story: Story,
     change: Change & { type: "newFact" }
   ): Story {
-    console.log(`Adding new fact to ${change.storyElementId}: ${change.fact}`);
+    // console.log(`Adding new fact to ${change.storyElementId}: ${change.fact}`);
 
     const state = story.getState();
 
@@ -372,7 +372,7 @@ export class ChangeService {
     story: Story,
     change: Change & { type: "newStoryElement" }
   ): Story {
-    console.log(`Adding new story element: ${JSON.stringify(change.element)}`);
+    // console.log(`Adding new story element: ${JSON.stringify(change.element)}`);
 
     const state = story.getState();
 

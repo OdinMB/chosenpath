@@ -78,7 +78,7 @@ async function findTemplateIdAndSource(
       sourceDir = extractDir; // Files are at root level
       logger.log(`Found template.json at root level with ID: ${templateId}`);
       return { templateId, sourceDir };
-    } catch (error) {
+    } catch {
       logger.warn(
         "Failed to parse template.json at root level, checking subdirectories"
       );
@@ -106,7 +106,7 @@ async function findTemplateIdAndSource(
           `Found template.json in subdirectory '${dir}' with ID: ${templateId}`
         );
         return { templateId, sourceDir };
-      } catch (error) {
+      } catch {
         logger.warn(`Failed to parse template.json in directory ${dir}`);
       }
     }

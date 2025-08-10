@@ -21,7 +21,7 @@ const COLORS = {
  */
 function createLogger(serviceName: string, color: string) {
   return {
-    log(message: string, ...args: any[]): void {
+    log(message: string, ...args: unknown[]): void {
       if (args.length > 0) {
         const formattedArgs = args.map((arg) =>
           typeof arg === "object"
@@ -37,7 +37,7 @@ function createLogger(serviceName: string, color: string) {
       }
     },
 
-    warn(message: string, ...args: any[]): void {
+    warn(message: string, ...args: unknown[]): void {
       if (args.length > 0) {
         const formattedArgs = args.map((arg) =>
           typeof arg === "object"
@@ -53,7 +53,7 @@ function createLogger(serviceName: string, color: string) {
       }
     },
 
-    error(message: string, error?: any): void {
+    error(message: string, error?: unknown): void {
       if (error) {
         const formattedError =
           typeof error === "object"

@@ -65,6 +65,7 @@ export interface RateLimitedResponse extends BaseServerResponse {
 export interface CreateStoryRequest extends ClientRequest {
   prompt: string;
   generateImages: boolean;
+  pregenerateBeats?: boolean;
   playerCount: number;
   maxTurns: number;
   gameMode: GameMode;
@@ -75,6 +76,7 @@ export interface CreateStoryFromTemplateRequest extends ClientRequest {
   playerCount: number;
   maxTurns: number;
   generateImages: boolean;
+  pregenerateBeats?: boolean;
   difficultyLevel: DifficultyLevel;
 }
 export interface CreateStoryInfo {

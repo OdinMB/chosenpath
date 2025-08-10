@@ -27,22 +27,7 @@ import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
 
-// Create a type that has all StoryTemplate properties except metadata fields
-type TemplateDataInput = Omit<
-  StoryTemplate,
-  | "id"
-  | "createdAt"
-  | "updatedAt"
-  | "gameMode"
-  | "playerCountMin"
-  | "playerCountMax"
-  | "maxTurnsMin"
-  | "maxTurnsMax"
-  | "tags"
->;
 
-// Create a type that makes all fields optional for updates
-type TemplateDataUpdate = Partial<TemplateDataInput>;
 
 export class TemplateService {
   private storagePath: string;
@@ -847,7 +832,7 @@ export class TemplateService {
       // Check if images directory has any files
       const items = await fs.readdir(imagesDir);
       return items.length > 0;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

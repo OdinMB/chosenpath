@@ -99,7 +99,7 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
         <div className="mt-2">
           <LoadingSpinner
             size="medium"
-            message="First story beat is being generated..."
+            message="Setting up the story..."
             messageSize="large"
           />
         </div>

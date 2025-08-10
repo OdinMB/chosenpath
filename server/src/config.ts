@@ -31,41 +31,39 @@ export const STORAGE_PATHS = {
   },
 };
 
+export const MODEL_BASE_REASONING = false;
+const OPENAI_MODEL_BASE = "gpt-4.1";
+const OPENAI_MODEL_BASE_TEMPERATURE = 0.2;
+const OPENAI_MODEL_BASE_REASONING_EFFORT = "minimal";
+
 // Model settings
-// export const GENERATION_MODEL_NAME =
-//   process.env.GENERATION_MODEL_NAME || "claude-sonnet-4-20250514";
 export const GENERATION_MODEL_NAME =
-  process.env.GENERATION_MODEL_NAME || "gpt-4.1";
-// export const GENERATION_MODEL_NAME =
-//   process.env.GENERATION_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
+  process.env.GENERATION_MODEL_NAME || `${OPENAI_MODEL_BASE}`;
 export const GENERATION_MODEL_TEMPERATURE =
-  process.env.GENERATION_MODEL_TEMPERATURE || 0.3;
+  process.env.GENERATION_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
+export const GENERATION_MODEL_REASONING_EFFORT =
+  process.env.GENERATION_MODEL_REASONING_EFFORT ||
+  OPENAI_MODEL_BASE_REASONING_EFFORT;
 
-// export const SWITCH_THREAD_MODEL_NAME =
-//   process.env.SWITCH_THREAD_MODEL_NAME || "claude-sonnet-4-20250514";
 export const SWITCH_THREAD_MODEL_NAME =
-  process.env.SWITCH_THREAD_MODEL_NAME || "gpt-4.1-mini";
-// export const SWITCH_THREAD_MODEL_NAME =
-//   process.env.SWITCH_THREAD_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
+  process.env.SWITCH_THREAD_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
 export const SWITCH_THREAD_MODEL_TEMPERATURE =
-  process.env.SWITCH_THREAD_MODEL_TEMPERATURE || 0.1;
+  process.env.SWITCH_THREAD_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
+export const SWITCH_THREAD_MODEL_REASONING_EFFORT =
+  process.env.SWITCH_THREAD_MODEL_REASONING_EFFORT ||
+  OPENAI_MODEL_BASE_REASONING_EFFORT;
 
-// export const TEXT_MODEL_NAME =
-//   process.env.TEXT_MODEL_NAME || "claude-opus-4-20250514";
-export const TEXT_MODEL_NAME = process.env.TEXT_MODEL_NAME || "gpt-4.1-mini";
-// export const TEXT_MODEL_NAME =
-//   process.env.TEXT_MODEL_NAME || "gemini-2.5-pro-preview-05-06";
-export const TEXT_MODEL_TEMPERATURE = process.env.TEXT_MODEL_TEMPERATURE || 0.3;
-
-// export const IMAGE_QUERY_MODEL_NAME =
-//   process.env.IMAGE_QUERY_MODEL_NAME || "gpt-4.1-mini";
-// export const IMAGE_QUERY_MODEL_TEMPERATURE =
-//   process.env.IMAGE_QUERY_MODEL_TEMPERATURE || 0.1;
+export const TEXT_MODEL_NAME =
+  process.env.TEXT_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
+export const TEXT_MODEL_TEMPERATURE =
+  process.env.TEXT_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
+export const TEXT_MODEL_REASONING_EFFORT =
+  process.env.TEXT_MODEL_REASONING_EFFORT || OPENAI_MODEL_BASE_REASONING_EFFORT;
 
 export const CONTENT_FILTER_MODEL_NAME =
-  process.env.CONTENT_FILTER_MODEL_NAME || "gpt-4.1-mini";
+  process.env.CONTENT_FILTER_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
 export const CONTENT_FILTER_MODEL_TEMPERATURE =
-  process.env.CONTENT_FILTER_MODEL_TEMPERATURE || 0;
+  process.env.CONTENT_FILTER_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
 
 // Image generation settings
 export const IMAGE_GENERATION_MODEL =

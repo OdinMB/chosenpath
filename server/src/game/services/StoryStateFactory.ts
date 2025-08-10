@@ -4,6 +4,7 @@ import {
   StoryTemplate,
   DifficultyLevel,
   PlayerCount,
+  Outcome,
 } from "core/types/index.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
 
@@ -14,6 +15,7 @@ import { loadTemplateImages } from "shared/storageUtils.js";
  * @param playerCount The number of players
  * @param maxTurns The maximum number of turns
  * @param generateImages Whether to generate images
+ * @param pregenerateBeats Whether to pregenerate story beats
  * @param difficultyLevel The chosen difficulty level for this story
  * @param playerCodes The player codes to include in the state
  * @returns A complete StoryState ready to be used in a Story instance
@@ -24,10 +26,11 @@ export function createStoryStateFromTemplate(
   playerCount: PlayerCount,
   maxTurns: number,
   generateImages: boolean,
+  pregenerateBeats: boolean,
   difficultyLevel: DifficultyLevel,
   playerCodes: Record<PlayerSlot, string> // also used to determine the number of players
 ): StoryState {
-  let sharedStatValues = template.sharedStats.map((stat) => ({
+  const sharedStatValues = template.sharedStats.map((stat) => ({
     statId: stat.id,
     value: stat.initialValue,
   }));
@@ -54,6 +57,7 @@ export function createStoryStateFromTemplate(
     characterSelectionOptions: {},
     characterSelectionIntroduction: template.characterSelectionIntroduction,
     generateImages: generateImages,
+    pregenerateBeats: pregenerateBeats,
     images: loadTemplateImages(template.id),
     playerCodes,
   };
@@ -102,7 +106,7 @@ export function createStoryStateFromTemplate(
  * @param outcomes The outcomes to include for the player
  * @returns An empty player state
  */
-export function createEmptyPlayerState(outcomes: any[] = []) {
+export function createEmptyPlayerState(outcomes: Outcome[] = []) {
   return {
     name: "",
     pronouns: {

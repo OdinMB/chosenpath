@@ -19,7 +19,6 @@ import {
   RegisterUserRequest,
   LoginUserRequest,
   PasswordUpdateRequest,
-  GetUserStoryFeedResponse,
 } from "core/types/api.js";
 import { getStoryFeed } from "server/stories/userStoryService.js";
 import {
@@ -37,7 +36,7 @@ const hasLowercase = (pw: string) => /[a-z]/.test(pw);
 const hasUppercase = (pw: string) => /[A-Z]/.test(pw);
 const hasNumber = (pw: string) => /\d/.test(pw);
 const hasSpecialChar = (pw: string) =>
-  /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(pw);
+  /[!@#$%^&*()_+\-=[\]{};':"|,.<>/?]/.test(pw);
 
 /**
  * Register a new user
@@ -77,11 +76,11 @@ router.post("/auth/register", async (req, res) => {
 
   if (!passwordCheck.minLength || criteriaMetCount < 3) {
     // Construct a detailed message or a generic one
-    let errorDetail: string[] = [];
+    const errorDetail: string[] = [];
     if (!passwordCheck.minLength)
       errorDetail.push(`be at least ${MIN_PASSWORD_LENGTH} characters`);
     if (criteriaMetCount < 3) {
-      let unmetSubCriteria: string[] = [];
+      const unmetSubCriteria: string[] = [];
       if (!passwordCheck.lowercase) unmetSubCriteria.push("lowercase letter");
       if (!passwordCheck.uppercase) unmetSubCriteria.push("uppercase letter");
       if (!passwordCheck.number) unmetSubCriteria.push("number");

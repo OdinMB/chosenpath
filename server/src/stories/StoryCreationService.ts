@@ -61,6 +61,7 @@ export class StoryCreationService {
     playerCodes: Record<string, string>,
     maxTurns: number,
     generateImages: boolean,
+    pregenerateBeats: boolean,
     difficultyTitle: string | null,
     difficultyModifier: number | null,
     creatorId?: string
@@ -75,6 +76,7 @@ export class StoryCreationService {
         templateId,
         maxTurns,
         generateImages,
+        pregenerateBeats,
         creatorId,
         difficultyTitle,
         difficultyModifier
@@ -101,6 +103,7 @@ export class StoryCreationService {
   async createStory(
     prompt: string,
     generateImages: boolean,
+    pregenerateBeats: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
@@ -142,6 +145,7 @@ export class StoryCreationService {
       playerCodes,
       maxTurns,
       generateImages,
+      pregenerateBeats,
       difficultyLevel?.title || null, // Pass null if undefined
       difficultyLevel?.modifier || null, // Pass null if undefined
       creatorId
@@ -160,12 +164,13 @@ export class StoryCreationService {
       storyId,
       prompt,
       generateImages,
+      pregenerateBeats,
       playerCount,
       maxTurns,
       gameMode,
       difficultyLevel, // Pass original difficultyLevel (could be undefined)
-      playerCodes,
-      creatorId
+      playerCodes
+      // creatorId - currently unused
     ).catch((error) => {
       Logger.Route.error(
         `Failed to generate story state for ${storyId}:`,
@@ -185,12 +190,14 @@ export class StoryCreationService {
     storyId: string,
     prompt: string,
     generateImages: boolean,
+    pregenerateBeats: boolean,
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel | undefined,
-    playerCodes: Record<string, string>,
-    creatorId?: string
+    playerCodes: Record<string, string>
+    // creatorId is currently unused but may be needed for future features like story ownership tracking
+    // creatorId?: string
   ): Promise<void> {
     try {
       Logger.Route.log(`Starting story generation for ${storyId}`);
@@ -224,10 +231,15 @@ export class StoryCreationService {
 
       const story = Story.create(storyState);
 
-      // Add player codes to state
+      // Add player codes and pregeneration setting to state
       const storyWithCodes = story.clone({
         playerCodes,
+        pregenerateBeats,
       });
+
+      console.log(
+        `[StoryCreationService] Setting pregenerateBeats to ${pregenerateBeats} for story ${storyId}`
+      );
 
       // Store the story
       await storyRepository.storeStory(storyId, storyWithCodes);
@@ -293,6 +305,7 @@ export class StoryCreationService {
     playerCount: PlayerCount,
     maxTurns: number,
     generateImages: boolean,
+    pregenerateBeats: boolean,
     difficultyLevel: DifficultyLevel,
     res: Response,
     creatorId?: string
@@ -340,6 +353,7 @@ export class StoryCreationService {
         playerCodes,
         maxTurns,
         generateImages,
+        pregenerateBeats,
         difficultyLevel.title,
         difficultyLevel.modifier,
         creatorId
@@ -359,10 +373,14 @@ export class StoryCreationService {
         playerCount,
         maxTurns,
         generateImages,
+        pregenerateBeats,
         difficultyLevel,
         playerCodes
       );
       Logger.Route.log(`Created story state from template for: ${storyId}`);
+      console.log(
+        `[StoryCreationService] Template story - pregenerateBeats: ${pregenerateBeats}, story ${storyId}`
+      );
 
       const story = Story.create(storyState);
 

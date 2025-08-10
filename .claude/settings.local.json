@@ -15,7 +15,15 @@
       "Bash(dir:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(claude code connect)"
+      "Bash(claude code connect)",
+      "Bash(npm run test:lint)",
+      "Bash(npm run test:all:*)",
+      "Bash(npm run:*)",
+      "Bash(npx jest:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(tsc:*)",
+      "Bash(eslint:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

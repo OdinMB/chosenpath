@@ -268,8 +268,8 @@ export function createImageFromPlaceholder(
       return null;
     }
 
-    const playerIdentity =
-      storyState.players[placeholder.id as PlayerSlot].identityChoice;
+    const player = storyState.players[placeholder.id as PlayerSlot];
+    const playerIdentity = player?.identityChoice ?? 0;
     return createPlayerIdentityImage(
       placeholder.id as PlayerSlot,
       playerIdentity,
@@ -280,15 +280,15 @@ export function createImageFromPlaceholder(
   }
 
   // Create the image object
-  const image = {
+  const image: ImageUI = {
     id: placeholder.id,
     source: placeholder.source as "template" | "story",
-    sourceId: sourceId || undefined,
-    subDirectory: undefined,
-    description: placeholder.desc,
+    sourceId: sourceId,
+    subDirectory: placeholder.subDir || "",
+    description: placeholder.desc || "",
     fileType: (placeholder.fileType || "jpeg") as "jpeg" | "png",
     status: "ready" as ImageStatus,
-  } as ImageUI;
+  };
 
   return image;
 }

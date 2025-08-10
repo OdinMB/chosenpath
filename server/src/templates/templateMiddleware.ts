@@ -2,11 +2,8 @@ import express from "express";
 import { Logger } from "shared/logger.js";
 import { sendError } from "shared/responseUtils.js";
 import { templateDbService } from "./TemplateDbService.js";
-import { TemplateService } from "./TemplateService.js";
 import { StoryTemplate } from "core/types/index.js";
 
-// Initialize template service for optimized access
-const templateService = new TemplateService();
 
 /**
  * Check if user has permission to access a template

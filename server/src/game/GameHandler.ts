@@ -22,7 +22,7 @@ export class GameHandler {
     string,
     { resolve: () => void; codes: Record<PlayerSlot, string>; socketId: string }
   >();
-  private operationErrorHandler: (event: any) => void;
+  private operationErrorHandler: (event: OperationErrorEvent) => void;
 
   constructor() {
     this.storyRepository = StoryRepository.getInstance();
@@ -107,9 +107,9 @@ export class GameHandler {
       case "moveStoryForward":
         userFriendlyMessage = "Unable to continue the story. Please try again.";
         break;
-      case "generateImages":
+      case "attachImageToStory":
         userFriendlyMessage =
-          "Unable to generate images. The story will continue without images.";
+          "Unable to attach the generated image. The story will continue without it.";
         break;
       default:
         userFriendlyMessage = `Something went wrong with operation ${event.operationType}. Please try again.`;
@@ -177,7 +177,7 @@ export class GameHandler {
       }
 
       // Validate player state and choice
-      this.validateChoice(socket.id, story, playerInfo.playerSlot, optionIndex);
+      this.validateChoice(socket.id, story, playerInfo.playerSlot);
 
       // Queue the validated choice
       const operationId = await gameQueueProcessor.addOperation({
@@ -361,8 +361,7 @@ export class GameHandler {
   private validateChoice(
     socketId: string,
     story: Story,
-    playerSlot: PlayerSlot,
-    optionIndex: number
+    playerSlot: PlayerSlot
   ): void {
     const playerInfo = connectionManager.getPlayerBySocket(socketId);
     if (!playerInfo) {

@@ -1,5 +1,5 @@
 import path from "path";
-import { STORAGE_PATHS } from "../config.js";
+import { STORAGE_PATHS } from "server/config.js";
 import fs from "fs/promises";
 import fsSync from "fs";
 import JSZip from "jszip";
@@ -59,6 +59,24 @@ export function getStoryFilePath(storyId: string): string {
 }
 
 /**
+ * Gets the pregenerated story file path
+ * @param storyId - The story ID
+ * @param turn - The turn number
+ * @param playerSlot - The player slot (e.g., "player1")
+ * @param optionIndex - The option index (0, 1, or 2)
+ * @returns The full path to the pregenerated story file
+ */
+export function getPregeneratedStoryFilePath(
+  storyId: string,
+  turn: number,
+  playerSlot: string,
+  optionIndex: number
+): string {
+  const filename = `pregeneration_${turn}_${playerSlot}_${optionIndex}.json`;
+  return path.join(getStoryDirectoryPath(storyId), filename);
+}
+
+/**
  * Gets the images directory path for a specific story
  * @param storyId - The story ID
  * @returns The full path to the story's images directory
@@ -114,11 +132,7 @@ export async function writeStoryFile(
   await ensureStoryDirectoryStructure(storyId);
   const filePath = getStoryFilePath(storyId);
 
-  try {
-    await fs.writeFile(filePath, data);
-  } catch (error) {
-    throw error;
-  }
+  await fs.writeFile(filePath, data);
 }
 
 /**
@@ -157,6 +171,100 @@ export async function deleteStoryDirectory(storyId: string): Promise<void> {
     // If directory doesn't exist, don't treat it as an error
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       throw error;
+    }
+  }
+}
+
+/**
+ * Lists all pregenerated story files for a given story
+ * @param storyId - The story ID
+ * @returns Array of pregenerated file info
+ */
+export async function listPregeneratedStoryFiles(storyId: string): Promise<
+  Array<{
+    filename: string;
+    turn: number;
+    playerSlot: string;
+    optionIndex: number;
+  }>
+> {
+  const dirPath = getStoryDirectoryPath(storyId);
+
+  try {
+    const files = await fs.readdir(dirPath);
+    const pregeneratedFiles: Array<{
+      filename: string;
+      turn: number;
+      playerSlot: string;
+      optionIndex: number;
+    }> = [];
+
+    for (const file of files) {
+      // Match pattern: pregeneration_<turn>_<playerSlot>_<optionIndex>.json
+      const match = file.match(/^pregeneration_(\d+)_(\w+)_(\d+)\.json$/);
+      if (match && match[1] && match[2] && match[3]) {
+        pregeneratedFiles.push({
+          filename: file,
+          turn: parseInt(match[1], 10),
+          playerSlot: match[2],
+          optionIndex: parseInt(match[3], 10),
+        });
+      }
+    }
+
+    return pregeneratedFiles;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Deletes all pregenerated story files for a given story
+ * @param storyId - The story ID
+ */
+export async function deleteAllPregeneratedStoryFiles(
+  storyId: string
+): Promise<void> {
+  const pregeneratedFiles = await listPregeneratedStoryFiles(storyId);
+
+  for (const file of pregeneratedFiles) {
+    const filePath = path.join(getStoryDirectoryPath(storyId), file.filename);
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      // If file doesn't exist, don't treat it as an error
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
+ * Deletes pregenerated story files for a specific turn
+ * @param storyId - The story ID
+ * @param turn - The turn number
+ */
+export async function deletePregeneratedStoryFilesForTurn(
+  storyId: string,
+  turn: number
+): Promise<void> {
+  const pregeneratedFiles = await listPregeneratedStoryFiles(storyId);
+
+  for (const file of pregeneratedFiles) {
+    if (file.turn === turn) {
+      const filePath = path.join(getStoryDirectoryPath(storyId), file.filename);
+      try {
+        await fs.unlink(filePath);
+      } catch (error) {
+        // If file doesn't exist, don't treat it as an error
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw error;
+        }
+      }
     }
   }
 }
@@ -273,7 +381,7 @@ export async function deleteStorageFile(
 export async function getStorageFileStats(
   pathType: keyof typeof STORAGE_PATHS.development,
   fileName: string
-): Promise<ReturnType<typeof fs.stat>> {
+): Promise<import("fs").Stats> {
   const dirPath = getStoragePath(pathType);
   const filePath = path.join(dirPath, fileName);
 
@@ -412,8 +520,8 @@ export async function extractZip(
   for (const entryPath of zipEntries) {
     const entry = zip.files[entryPath];
 
-    // Skip directories
-    if (entry.dir) continue;
+    // Skip if entry doesn't exist or is a directory
+    if (!entry || entry.dir) continue;
 
     // Security check to prevent directory traversal
     if (entryPath.includes("..")) {

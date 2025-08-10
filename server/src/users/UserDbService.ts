@@ -3,15 +3,36 @@ import { getDb } from "../shared/db.js";
 import { Logger } from "../shared/logger.js";
 import { UserDB, UserSession } from "core/types/user.js";
 
+// Database row interfaces (snake_case from DB)
+interface UserDbRow {
+  id: string;
+  email: string;
+  username: string;
+  password_hash: string;
+  role_id: string;
+  remember_token: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserSessionDbRow {
+  token: string;
+  user_id: string;
+  expires_at: string;
+  is_remembered: boolean;
+  created_at: string;
+}
+
 // Helper to map snake_case DB row to camelCase UserDB
-function mapRowToUserDB(row: any): UserDB {
+function mapRowToUserDB(row: UserDbRow): UserDB {
   return {
     id: row.id,
     email: row.email,
     username: row.username,
     passwordHash: row.password_hash,
     roleId: row.role_id,
-    rememberToken: row.remember_token,
+    rememberToken: row.remember_token || undefined,
     lastLoginAt: row.last_login_at ? parseInt(row.last_login_at, 10) : null,
     createdAt: parseInt(row.created_at, 10),
     updatedAt: parseInt(row.updated_at, 10),
@@ -19,7 +40,7 @@ function mapRowToUserDB(row: any): UserDB {
 }
 
 // Helper to map snake_case DB row to camelCase UserSession
-function mapRowToUserSession(row: any): UserSession {
+function mapRowToUserSession(row: UserSessionDbRow): UserSession {
   return {
     token: row.token,
     userId: row.user_id,
@@ -57,7 +78,7 @@ class UserDbService {
     queryText += conditions.join(" OR ");
 
     const result = await pool.query(queryText, values);
-    return result.rows[0] ? mapRowToUserDB(result.rows[0]) : undefined;
+    return result.rows[0] ? mapRowToUserDB(result.rows[0] as UserDbRow) : undefined;
   }
 
   async findUserByEmail(email: string): Promise<UserDB | undefined> {
@@ -66,7 +87,7 @@ class UserDbService {
       "SELECT id, email, username, password_hash, role_id, remember_token, last_login_at, created_at, updated_at FROM users WHERE email = $1",
       [email.toLowerCase()]
     );
-    return result.rows[0] ? mapRowToUserDB(result.rows[0]) : undefined;
+    return result.rows[0] ? mapRowToUserDB(result.rows[0] as UserDbRow) : undefined;
   }
 
   async findUserById(userId: string): Promise<UserDB | undefined> {
@@ -75,7 +96,7 @@ class UserDbService {
       "SELECT id, email, username, password_hash, role_id, remember_token, last_login_at, created_at, updated_at FROM users WHERE id = $1",
       [userId]
     );
-    return result.rows[0] ? mapRowToUserDB(result.rows[0]) : undefined;
+    return result.rows[0] ? mapRowToUserDB(result.rows[0] as UserDbRow) : undefined;
   }
 
   /**
@@ -106,7 +127,7 @@ class UserDbService {
     ];
     const result = await pool.query(query, values);
     Logger.Transaction.log(`Created new user entry: ${username} (${userId})`);
-    return mapRowToUserDB(result.rows[0]);
+    return mapRowToUserDB(result.rows[0] as UserDbRow);
   }
 
   /**
@@ -148,7 +169,7 @@ class UserDbService {
       "SELECT token, user_id, expires_at, is_remembered, created_at FROM sessions WHERE token = $1 AND expires_at > $2",
       [token, Date.now()]
     );
-    return result.rows[0] ? mapRowToUserSession(result.rows[0]) : undefined;
+    return result.rows[0] ? mapRowToUserSession(result.rows[0] as UserSessionDbRow) : undefined;
   }
 
   /**
@@ -212,7 +233,7 @@ class UserDbService {
     const result = await pool.query(
       "SELECT id, email, username, role_id, created_at, last_login_at, updated_at, password_hash, remember_token FROM users ORDER BY created_at DESC"
     );
-    return result.rows.map(mapRowToUserDB);
+    return result.rows.map(row => mapRowToUserDB(row as UserDbRow));
   }
 
   /**

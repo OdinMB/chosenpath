@@ -3,14 +3,14 @@ import type {
   QueueableOperation,
   QueueEvents,
   OperationErrorEvent,
+  GameOperationType,
 } from "game/queue.js";
 import EventEmitter from "events";
 import { Logger } from "shared/logger.js";
 import { setImmediate } from "timers";
 
 export abstract class BaseQueueProcessor<
-  TOperation extends QueueableOperation,
-  TState
+  TOperation extends QueueableOperation
 > {
   private operations: Map<string, TOperation> = new Map();
   private queues: Map<string, string[]> = new Map();
@@ -88,11 +88,11 @@ export abstract class BaseQueueProcessor<
   protected handleOperationError(operation: TOperation, error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
-    const details = error instanceof Error ? (error as any).cause : undefined;
+    const details = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
 
     // Log the error (fix argument count)
     Logger.Queue.error(
-      `Failed ${(operation as any).type} operation ${operation.id.slice(
+      `Failed ${(operation as TOperation & { type?: string }).type || 'unknown'} operation ${operation.id.slice(
         -5
       )}: ${errorMessage}`
     );
@@ -108,12 +108,12 @@ export abstract class BaseQueueProcessor<
     // Create error event with detailed information
     const errorEvent: OperationErrorEvent = {
       queueId: this.getQueueId(operation),
-      operationId: operation.id,
-      gameId: (operation as any).gameId,
-      operationType: (operation as any).type,
+      operationId: operation.id || 'unknown',
+      gameId: (operation as TOperation & { gameId?: string }).gameId || 'unknown',
+      operationType: ((operation as TOperation & { type?: string }).type as GameOperationType) || 'moveStoryForward',
       error: errorMessage,
-      details: details ? String(details) : undefined,
-      stack,
+      details: details ? String(details) : '',
+      stack: stack || '',
     };
 
     // Emit error event
@@ -167,11 +167,12 @@ export abstract class BaseQueueProcessor<
 
       // Process the first operation in this queue
       const operationId = queue[0];
+      if (!operationId) return;
       const operation = this.operations.get(operationId);
       if (!operation) return;
 
       Logger.Queue.log(
-        `Processing ${(operation as any).type} operation ${operationId.slice(
+        `Processing ${(operation as TOperation & { type?: string }).type || 'unknown'} operation ${(operationId || 'unknown').slice(
           -5
         )} from queue ${queueId.slice(-5)}`
       );
@@ -184,7 +185,7 @@ export abstract class BaseQueueProcessor<
         operation.status = "completed";
         operation.completedAt = new Date();
         Logger.Queue.log(
-          `Completed ${(operation as any).type} operation ${operationId.slice(
+          `Completed ${(operation as TOperation & { type?: string }).type || 'unknown'} operation ${(operationId || 'unknown').slice(
             -5
           )}`
         );

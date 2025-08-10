@@ -20,88 +20,108 @@ export function printZodSchema(
 
   // Handle different schema types
   if (typeName === "ZodObject") {
-    const shape = (schema as z.ZodObject<any>).shape;
+    const shape = (schema as z.ZodObject<z.ZodRawShape>).shape;
     Logger.Story.log(`${indent}Properties:`);
     Object.entries(shape).forEach(([key, fieldSchema]) => {
       printZodSchema(fieldSchema as z.ZodTypeAny, key, level + 1);
     });
   } else if (typeName === "ZodArray") {
-    const elementSchema = (schema as z.ZodArray<any>).element;
+    const elementSchema = (schema as z.ZodArray<z.ZodTypeAny>).element;
     Logger.Story.log(`${indent}Element Type:`);
     printZodSchema(elementSchema, "element", level + 1);
   } else if (typeName === "ZodUnion") {
-    const options = (schema._def as any).options;
+    const options = (schema._def as { options: z.ZodTypeAny[] }).options;
     Logger.Story.log(`${indent}Union Options:`);
     options.forEach((option: z.ZodTypeAny, index: number) => {
       printZodSchema(option, `option_${index}`, level + 1);
     });
   } else if (typeName === "ZodEnum") {
-    const values = (schema._def as any).values;
+    const values = (schema._def as { values: unknown }).values;
     Logger.Story.log(`${indent}Enum Values: ${JSON.stringify(values)}`);
   } else if (typeName === "ZodRecord") {
     Logger.Story.log(`${indent}Record:`);
-    const keySchema = (schema._def as any).keyType;
-    const valueSchema = (schema._def as any).valueType;
+    const { keyType: keySchema, valueType: valueSchema } = schema._def as {
+      keyType: z.ZodTypeAny;
+      valueType: z.ZodTypeAny;
+    };
     printZodSchema(keySchema, "key", level + 1);
     printZodSchema(valueSchema, "value", level + 1);
   } else if (typeName === "ZodTuple") {
-    const items = (schema._def as any).items;
+    const items = (schema._def as { items: z.ZodTypeAny[] }).items;
     Logger.Story.log(`${indent}Tuple Items:`);
     items.forEach((item: z.ZodTypeAny, index: number) => {
       printZodSchema(item, `item_${index}`, level + 1);
     });
   } else if (typeName === "ZodIntersection") {
     Logger.Story.log(`${indent}Intersection:`);
-    const left = (schema._def as any).left;
-    const right = (schema._def as any).right;
+    const { left, right } = schema._def as {
+      left: z.ZodTypeAny;
+      right: z.ZodTypeAny;
+    };
     printZodSchema(left, "left", level + 1);
     printZodSchema(right, "right", level + 1);
   }
 }
 
+type SchemaStructure = {
+  typeName: string;
+  description?: string;
+  properties?: Record<string, SchemaStructure>;
+  items?: SchemaStructure | SchemaStructure[];
+  options?: SchemaStructure[];
+  values?: unknown;
+  keyType?: SchemaStructure;
+  valueType?: SchemaStructure;
+  left?: SchemaStructure;
+  right?: SchemaStructure;
+};
+
 /**
  * A simpler utility that returns a structured representation of a Zod schema
  * Useful for detailed logging with JSON.stringify
  */
-export function getZodSchemaStructure(schema: z.ZodTypeAny): any {
+export function getZodSchemaStructure(schema: z.ZodTypeAny): SchemaStructure {
   const typeName = schema._def.typeName;
-  const result: any = {
+  const result: SchemaStructure = {
     typeName,
     ...(schema.description ? { description: schema.description } : {}),
   };
 
   // Handle different schema types
   if (typeName === "ZodObject") {
-    const shape = (schema as z.ZodObject<any>).shape;
-    result.properties = {};
+    const shape = (schema as z.ZodObject<z.ZodRawShape>).shape;
+    result.properties = {} as Record<string, SchemaStructure>;
     Object.entries(shape).forEach(([key, fieldSchema]) => {
-      result.properties[key] = getZodSchemaStructure(
-        fieldSchema as z.ZodTypeAny
-      );
+      (result.properties as Record<string, SchemaStructure>)[key] =
+        getZodSchemaStructure(fieldSchema as z.ZodTypeAny);
     });
   } else if (typeName === "ZodArray") {
-    const elementSchema = (schema as z.ZodArray<any>).element;
+    const elementSchema = (schema as z.ZodArray<z.ZodTypeAny>).element;
     result.items = getZodSchemaStructure(elementSchema);
   } else if (typeName === "ZodUnion") {
-    const options = (schema._def as any).options;
+    const options = (schema._def as { options: z.ZodTypeAny[] }).options;
     result.options = options.map((option: z.ZodTypeAny) =>
       getZodSchemaStructure(option)
     );
   } else if (typeName === "ZodEnum") {
-    result.values = (schema._def as any).values;
+    result.values = (schema._def as { values: unknown }).values;
   } else if (typeName === "ZodRecord") {
-    const keySchema = (schema._def as any).keyType;
-    const valueSchema = (schema._def as any).valueType;
+    const { keyType: keySchema, valueType: valueSchema } = schema._def as {
+      keyType: z.ZodTypeAny;
+      valueType: z.ZodTypeAny;
+    };
     result.keyType = getZodSchemaStructure(keySchema);
     result.valueType = getZodSchemaStructure(valueSchema);
   } else if (typeName === "ZodTuple") {
-    const items = (schema._def as any).items;
+    const items = (schema._def as { items: z.ZodTypeAny[] }).items;
     result.items = items.map((item: z.ZodTypeAny) =>
       getZodSchemaStructure(item)
     );
   } else if (typeName === "ZodIntersection") {
-    const left = (schema._def as any).left;
-    const right = (schema._def as any).right;
+    const { left, right } = schema._def as {
+      left: z.ZodTypeAny;
+      right: z.ZodTypeAny;
+    };
     result.left = getZodSchemaStructure(left);
     result.right = getZodSchemaStructure(right);
   }

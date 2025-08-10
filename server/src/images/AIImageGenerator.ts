@@ -30,6 +30,17 @@ import { Logger } from "shared/logger.js";
 import sharp from "sharp";
 dotenv.config();
 
+// OpenAI API response interfaces
+interface OpenAIImageResponse {
+  data: Array<{
+    b64_json?: string;
+    url?: string;
+  }>;
+}
+
+// Import the proper Uploadable type from OpenAI
+import type { Uploadable } from "openai/uploads";
+
 export class AIImageGenerator {
   private openai: OpenAI;
 
@@ -234,27 +245,27 @@ export class AIImageGenerator {
       };
 
       // Generate the image using either generate or edit API endpoint
-      let referenceImages: any[] = [];
+      let referenceImages: Uploadable[] = [];
       let withReferences: boolean = false;
       if (references && references.length > 0) {
         referenceImages = await this.loadReferenceImages(references);
         withReferences = true;
       }
 
-      let imageResponse: any;
+      let imageResponse: OpenAIImageResponse;
       if (withReferences) {
         const imageParams = {
           ...baseParams,
           image: referenceImages,
         } as ImageEditParams;
         Logger.Story.log("Generating image with references");
-        imageResponse = await this.openai.images.edit(imageParams);
+        imageResponse = await this.openai.images.edit(imageParams) as OpenAIImageResponse;
       } else {
         const imageParams = {
           ...baseParams,
         } as ImageGenerateParams;
         Logger.Story.log("Generating image without references");
-        imageResponse = await this.openai.images.generate(imageParams);
+        imageResponse = await this.openai.images.generate(imageParams) as OpenAIImageResponse;
       }
 
       let imageBuffer: Buffer;
@@ -278,11 +289,11 @@ export class AIImageGenerator {
    */
   private async loadReferenceImages(
     references: ImageReference[]
-  ): Promise<any[]> {
+  ): Promise<Uploadable[]> {
     const templatesBasePath = getStoragePath("templates");
     const storiesBasePath = getStoragePath("stories");
 
-    const referenceImages: any[] = [];
+    const referenceImages: Uploadable[] = [];
     for (const reference of references) {
       const imageBaseDir =
         reference.source === "template" ? templatesBasePath : storiesBasePath;

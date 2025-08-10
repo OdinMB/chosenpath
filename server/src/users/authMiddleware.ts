@@ -4,13 +4,11 @@ import { Logger } from "../shared/logger.js";
 import { PublicUser } from "core/types/user.js";
 
 // Extend Express Request to include user property
-declare global {
-  namespace Express {
-    interface Request {
-      user?: PublicUser;
-      token?: string;
-      userPermissions?: string[];
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: PublicUser;
+    token?: string;
+    userPermissions?: string[];
   }
 }
 

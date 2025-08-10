@@ -22,20 +22,9 @@ npm run install:all
 
 2. Create environment files
 
-Create `.env` in the server directory:
+Create `.env` based on `.env.sample` in the server directory.
 
-```
-OPENAI_API_KEY=your_openai_api_key
-PORT=3000
-CORS_ORIGIN=http://localhost:5173
-NODE_ENV=development
-```
-
-Create `.env` in the client directory:
-
-```
-VITE_WS_PORT=3000
-```
+Create `.env` based on `.env.sample` in the client directory.
 
 3. Start the development servers
 
@@ -68,13 +57,7 @@ This will start:
      - Environment: `Node`
      - Build Command: `npm install && npm run build`
      - Start Command: `npm start`
-     - Environment Variables:
-       ```
-       OPENAI_API_KEY=your_openai_api_key
-       PORT=3000
-       CORS_ORIGIN=https://your-frontend-url.onrender.com
-       NODE_ENV=production
-       ```
+     - Environment Variables as per `.env` file
 
 2. Create a Static Site for the Frontend
    - Click "New +" and select "Static Site"
@@ -84,9 +67,9 @@ This will start:
      - Root Directory: `client`
      - Build Command: `npm install && npm run build`
      - Publish Directory: `dist`
-     - Environment Variables:
-       ```
-       VITE_WS_PORT=443
-       ```
+     - Environment Variables as per `.env` file
 
 Your application will be accessible through the Render-provided URLs once deployment is complete.
+
+Despite isolation, builds succeed because core gets copied/bundled during compilation
+Workspace dependency resolution: Works through TypeScript path mapping and build-time bundling
