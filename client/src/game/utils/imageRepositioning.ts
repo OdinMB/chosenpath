@@ -32,8 +32,21 @@ export function optimizeImagePositions(
   // Step 3: Hard constraint - no images in last paragraph
   const maxUsableParagraph = totalParagraphs - 1;
   positions = enforceNoLastParagraph(positions, totalParagraphs);
+
+  // Step 4: Single-image optimization for mobile generation time
+  // If there's only one image, it is attached to the 1st or 2nd paragraph,
+  // and there are 4 or more paragraphs, move it to the middle (or the next middle when even)
+  if (positions.length === 1 && totalParagraphs >= 4) {
+    const onlyPosition = positions[0];
+    if (onlyPosition === 1 || onlyPosition === 2) {
+      const preferredMiddle = Math.floor(totalParagraphs / 2) + 1;
+      // Ensure we still never place in the last paragraph
+      const safeMiddle = Math.min(preferredMiddle, maxUsableParagraph);
+      positions = [safeMiddle];
+    }
+  }
   
-  // Step 4: Soft constraint - spacing between images (only if it doesn't violate hard constraints)
+  // Step 5: Soft constraint - spacing between images (only if it doesn't violate hard constraints)
   positions = enforceSpacingWithConstraints(positions, maxUsableParagraph);
   
   return positions;

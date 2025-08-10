@@ -12,8 +12,8 @@ describe('imageRepositioning', () => {
       expect(optimizeImagePositions([], 5)).toEqual([]);
     });
 
-    test('should handle single image', () => {
-      expect(optimizeImagePositions([2], 5)).toEqual([2]);
+    test('should handle single image - reposition early image to middle (odd total)', () => {
+      expect(optimizeImagePositions([2], 5)).toEqual([3]);
     });
 
     test('should move image from last paragraph', () => {
@@ -57,6 +57,28 @@ describe('imageRepositioning', () => {
       // In this impossible case, prefer "no last paragraph" over "one per paragraph"
       // So result should be [1] (remove one image rather than violate hard constraints)
       expect(optimizeImagePositions([1, 2], 2)).toEqual([1]);
+    });
+  });
+
+  describe('single image optimization - mobile generation time', () => {
+    test('repositions single image from 1st paragraph to middle for odd total', () => {
+      expect(optimizeImagePositions([1], 5)).toEqual([3]);
+    });
+
+    test('repositions single image from 2nd paragraph to middle for odd total', () => {
+      expect(optimizeImagePositions([2], 5)).toEqual([3]);
+    });
+
+    test('repositions single image from 1st paragraph to next middle for even total', () => {
+      expect(optimizeImagePositions([1], 4)).toEqual([3]);
+    });
+
+    test('repositions single image from 2nd paragraph to next middle for even total', () => {
+      expect(optimizeImagePositions([2], 6)).toEqual([4]);
+    });
+
+    test('does not reposition single image when not in first or second paragraph', () => {
+      expect(optimizeImagePositions([3], 5)).toEqual([3]);
     });
   });
 
