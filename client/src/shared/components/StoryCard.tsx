@@ -6,6 +6,10 @@ import { PlayerCode } from "./PlayerCode";
 import { useAuth } from "client/shared/auth/useAuth";
 import { useState } from "react";
 import { getDifficultyDescription } from "core/utils/difficultyUtils.ts";
+import { getAllUniqueCodesFromStorage } from "shared/utils/codeSetUtils";
+import { userStoriesApi } from "client/shared/apiClient";
+import { Logger } from "shared/logger";
+import { useSession } from "client/shared/session/useSession";
 
 type StoryCardProps = {
   story: ExtendedStoryMetadata;
@@ -33,6 +37,7 @@ export const StoryCard = ({
   showArchivedContent = false,
 }: StoryCardProps) => {
   const { user } = useAuth();
+  const { fetchStoryFeed } = useSession();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
 
@@ -320,6 +325,53 @@ export const StoryCard = ({
             })}
           </div>
         )}
+
+        {/* Link to my account button for local-code stories not yet linked to user */}
+        {user &&
+          !showArchivedContent &&
+          (() => {
+            const localCodes = getAllUniqueCodesFromStorage();
+            const linkableCodes = players
+              .filter(
+                (p) =>
+                  p.code &&
+                  localCodes.includes(p.code) &&
+                  (!p.userId || p.userId !== user.id) &&
+                  p.status === "active"
+              )
+              .map((p) => p.code!)
+              .filter(Boolean);
+            if (linkableCodes.length === 0) return null;
+            return (
+              <div className="mt-3 flex justify-center">
+                <Tooltip
+                  content="The story code is stored on your device, but not yet linked to your account."
+                  position="top"
+                >
+                  <PrimaryButton
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        for (const code of linkableCodes) {
+                          try {
+                            await userStoriesApi.linkStoryToAccount(code);
+                          } catch (e) {
+                            Logger.App.warn("Failed to link code", code, e);
+                          }
+                        }
+                        await fetchStoryFeed();
+                      } catch (e) {
+                        Logger.App.error("Failed to link story to account", e);
+                      }
+                    }}
+                  >
+                    Link to my account
+                  </PrimaryButton>
+                </Tooltip>
+              </div>
+            );
+          })()}
         {children}
         <div className="flex-grow"></div>
       </CoverCard>

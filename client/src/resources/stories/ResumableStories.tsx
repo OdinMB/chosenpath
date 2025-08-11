@@ -97,25 +97,24 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
 
       const relevantStories = allStoriesFromFeed.filter(
         (story: ExtendedStoryMetadata) => {
-          // The backend already filters for active user participation,
-          // but we still need to check local codes for unauthenticated users
-          if (user) {
-            // For authenticated users, backend handles filtering
-            // But we need to check if this story has the user's participation in the right status
-            const userPlayer = story.players.find((p) => p.userId === user.id);
-
-            // Show only stories where user has active participation (default behavior)
-            return userPlayer && userPlayer.status === "active";
-          }
-
-          // For unauthenticated users, check local codes (only show active)
+          // Always include stories if any player has a matching local code and is active
           const localCodePlayers = story.players.filter(
             (p: StoryPlayerEntry) =>
               p.code &&
               allMyUniqueLocalCodes.includes(p.code) &&
               p.status === "active"
           );
-          return localCodePlayers.length > 0;
+          if (localCodePlayers.length > 0) {
+            return true;
+          }
+
+          // Additionally include authenticated user's active stories
+          if (user) {
+            const userPlayer = story.players.find((p) => p.userId === user.id);
+            return !!(userPlayer && userPlayer.status === "active");
+          }
+
+          return false;
         }
       );
 
@@ -436,6 +435,7 @@ export const ResumableStories: React.FC<ResumableStoriesProps> = ({
           />
         );
       })}
+      {/* Per-request: move link action into each StoryCard; no global button here */}
     </div>
   );
 };

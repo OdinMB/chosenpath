@@ -210,6 +210,19 @@ export interface GetUserStoryFeedResponse
   extends SuccessResponse<{ stories: ExtendedStoryMetadata[] }> {}
 
 /**
+ * Link local story code(s) to authenticated user
+ */
+export interface LinkStoryToUserRequest extends ClientRequest {
+  code: string;
+}
+export interface LinkStoryToUserResponse
+  extends SuccessResponse<{
+    success: boolean;
+    storyId: string;
+    playerSlot: string;
+  }> {}
+
+/**
  * Admin specific types
  */
 import { AdminStoriesListItem } from "./story.js";

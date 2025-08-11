@@ -17,6 +17,7 @@ import {
   SubmitFeedbackResponse,
   UpdateStoryStatusRequest,
   UpdateStoryStatusResponse,
+  LinkStoryToUserResponse,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -351,6 +352,15 @@ export const userStoriesApi = {
     // apiClient.get<T> is typed to return Promise<T> (the unwrapped data from the interceptor).
     // We want T to be GetUserStoryFeedResponse['data'], which is { stories: ExtendedStoryMetadata[] }.
     return apiClient.get<GetUserStoryFeedResponse["data"]>(url);
+  },
+  /**
+   * Link a local story code to the authenticated user
+   */
+  linkStoryToAccount: async (
+    code: string
+  ): Promise<{ success: boolean; storyId: string; playerSlot: string }> => {
+    const url = "/users/stories/link";
+    return apiClient.post<LinkStoryToUserResponse["data"]>(url, { code });
   },
 };
 

@@ -20,7 +20,11 @@ import {
   LoginUserRequest,
   PasswordUpdateRequest,
 } from "core/types/api.js";
-import { getStoryFeed } from "server/stories/userStoryService.js";
+import {
+  getStoryFeed,
+  getStoryPlayerByCode,
+} from "server/stories/userStoryService.js";
+import { storyDbService } from "server/stories/StoryDbService.js";
 import {
   checkRateLimitForRequest,
   incrementRateLimitForRequest,
@@ -300,6 +304,48 @@ router.get(
     }
   }
 );
+
+/**
+ * Link a story code to the authenticated user
+ * POST /users/stories/link
+ * body: { code: string }
+ */
+router.post("/users/stories/link", verifyUser(), async (req, res) => {
+  const requestId = req.body?.requestId || "unknown";
+  const code = (req.body?.code as string) || "";
+  if (!code || typeof code !== "string") {
+    return sendBadRequest(res, "Missing or invalid code", requestId);
+  }
+
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return sendUnauthorized(res, "Authentication required", requestId);
+    }
+
+    const player = await getStoryPlayerByCode(code);
+    if (!player) {
+      return sendBadRequest(res, "Invalid code", requestId);
+    }
+
+    await storyDbService.assignUserToPlayerSlot(
+      player.storyId,
+      player.playerSlot,
+      userId
+    );
+
+    return sendSuccess(
+      res,
+      { success: true, storyId: player.storyId, playerSlot: player.playerSlot },
+      requestId
+    );
+  } catch (error) {
+    Logger.Route.error("Failed to link story code to user", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to link story code";
+    return sendError(res, errorMessage, 500, requestId);
+  }
+});
 
 /**
  * Refresh user permissions in JWT token

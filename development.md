@@ -2,8 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 3: Fix: start new story without being logged in; log in; story no longer shows up visually, but in the number of games at the top
-
 - 1: Link to relevant lectures in the template form sections
 - 2: meet future self should only have one possible identity
 - 2: add difficulty level to story generation
