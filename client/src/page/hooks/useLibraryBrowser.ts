@@ -14,7 +14,13 @@ export function useLibraryBrowser({
 }: UseLibraryBrowserProps) {
   const [filteredTemplates, setFilteredTemplates] =
     useState<TemplateMetadata[]>(templates);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    if (window.matchMedia) {
+      return window.matchMedia("(min-width: 768px)").matches;
+    }
+    return window.innerWidth >= 768;
+  });
 
   // Get all valid tags from templates
   const getValidTags = useCallback(() => {

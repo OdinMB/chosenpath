@@ -1,40 +1,15 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
-import { OrDivider, LibraryCategoryGrid, Footer } from "./components";
-import { ResumableStories } from "resources/stories/ResumableStories.js";
-import { useAuth } from "client/shared/auth/useAuth.js";
-import { Logger } from "shared/logger";
+import { OrDivider, Footer, CategoryTile } from "./components";
 import { config } from "../config";
 
 // Page component refactored to use React Router
 export function Page() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [code, setCode] = useState("");
-
-  const [showResumableSection, setShowResumableSection] = useState(true);
-  const previousUserIdRef = useRef<string | undefined | null>(user?.id);
-
-  useEffect(() => {
-    const currentUserId = user?.id;
-    if (previousUserIdRef.current !== currentUserId) {
-      Logger.App.debug(
-        `Page.tsx: User changed (effect). Prev: ${previousUserIdRef.current}, Curr: ${currentUserId}. Forcing showResumableSection to true.`
-      );
-      setShowResumableSection(true);
-    }
-    previousUserIdRef.current = currentUserId;
-  }, [user?.id]);
-
-  const handleResumableContent = useCallback(
-    (hasContent: boolean) => {
-      setShowResumableSection(hasContent);
-    },
-    [setShowResumableSection]
-  );
 
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,14 +31,49 @@ export function Page() {
     navigate(`/templates/${template.id}/configure`);
   };
 
-  // Navigate to library with optional category tag
-  const handleBrowseWithCategory = (categoryTag?: string) => {
-    if (categoryTag) {
-      navigate(`/library?tags=${categoryTag}`);
-    } else {
-      navigate("/library");
-    }
+  const handleBrowseLibrary = () => {
+    navigate("/library");
   };
+
+  const categoryTiles = [
+    {
+      id: "enjoy-fiction",
+      title: "Enjoy Fiction",
+      image: "/category-fiction.jpeg",
+      url: "/setup?step=3&category=enjoy-fiction&players=1&images=true&pregenerate=true",
+    },
+    {
+      id: "vent-about-reality",
+      title: "Vent about Reality",
+      image: "/category-vent.jpeg",
+      url: "/setup?step=3&category=vent-about-reality&players=1&images=true&pregenerate=true",
+    },
+    {
+      id: "pretend-to-be",
+      title: "Pretend to be",
+      image: "/category-pretendtobe.jpeg",
+      url: "/setup?step=3&category=pretend-to-be&players=1&images=true&pregenerate=true",
+    },
+    {
+      id: "read-with-kids",
+      title: "Read with Kids",
+      image: "/category-kids.jpeg",
+      url: "/setup?step=3&category=read-with-kids&players=1&images=true&pregenerate=true",
+    },
+    {
+      id: "see-your-future-self",
+      title: "Meet your Future Self",
+      mobileTitle: "Meet Future Self",
+      image: "/category-futureself.jpeg",
+      url: "/setup?step=3&category=see-your-future-self&players=1&images=true&pregenerate=true",
+    },
+    {
+      id: "learn-something",
+      title: "Learn Something",
+      image: "/category-learn.jpeg",
+      url: "/setup?step=3&category=learn-something&players=1&images=true&pregenerate=true",
+    },
+  ];
 
   return (
     <>
@@ -129,25 +139,16 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
-          {showResumableSection && (
-            <>
-              <ResumableStories
-                key={user?.id || "loggedOut"}
-                onSetHasContent={handleResumableContent}
-                forceSingleColumn={true}
-              />
-              <OrDivider />
-            </>
-          )}
-
-          {/* TemplateCarousel likely fetches its own templates or uses a global state */}
+          {/* Carousel + Browse Entire Library */}
           <TemplateCarousel onPlay={handleSelectTemplate} />
 
-          <OrDivider />
-          <LibraryCategoryGrid onBrowseLibrary={handleBrowseWithCategory} />
+          <PrimaryButton onClick={handleBrowseLibrary} fullWidth size="lg">
+            Browse Entire Library
+          </PrimaryButton>
 
           <OrDivider />
 
+          {/* Create Your Own Story + 6 tiles */}
           <PrimaryButton
             onClick={handleNewStory}
             fullWidth
@@ -157,8 +158,36 @@ export function Page() {
             Create Your Own Story
           </PrimaryButton>
 
+          <div className="rounded-lg overflow-hidden border border-primary-100">
+            <div className="grid grid-cols-2">
+              {categoryTiles.map((tile, index) => (
+                <div
+                  key={tile.id}
+                  className={`
+                    ${index % 2 !== 0 ? "border-l border-primary-100" : ""}
+                    ${
+                      Math.floor(index / 2) <
+                      Math.floor((categoryTiles.length - 1) / 2)
+                        ? "border-b border-primary-100"
+                        : ""
+                    }
+                  `}
+                  onClick={() => navigate(tile.url)}
+                >
+                  <CategoryTile
+                    image={tile.image}
+                    title={tile.title}
+                    mobileTitle={tile.mobileTitle}
+                    onClick={() => navigate(tile.url)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           <OrDivider />
 
+          {/* Join game */}
           <form onSubmit={handleJoinGame} className="space-y-4">
             <div className="flex flex-row gap-3 w-full">
               <input

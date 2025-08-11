@@ -9,7 +9,12 @@ import {
 } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
-import { MIN_PLAYERS, MAX_PLAYERS, DEFAULT_TURNS, DISABLE_PREGENERATION_FOR_MULTIPLAYER } from "core/config";
+import {
+  MIN_PLAYERS,
+  MAX_PLAYERS,
+  DEFAULT_TURNS,
+  DISABLE_PREGENERATION_FOR_MULTIPLAYER,
+} from "core/config";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { notificationService } from "shared/notifications/notificationService";
@@ -86,7 +91,9 @@ export const StoryInitializer = ({
   ) as PlayerCount;
   const urlGameMode = searchParams.get("mode") as GameMode | null;
   const urlImages = searchParams.get("images") === "true";
+  const urlHasImages = searchParams.has("images");
   const urlPregenerate = searchParams.get("pregenerate") === "true";
+  const urlHasPregenerate = searchParams.has("pregenerate");
   const urlPrompt = searchParams.get("prompt");
   const urlDifficulty = searchParams.get("difficulty");
 
@@ -112,9 +119,11 @@ export const StoryInitializer = ({
       : initialPlayerCount || MIN_PLAYERS
   );
   const [maxTurns] = useState<number>(initialMaxTurns || DEFAULT_TURNS);
-  const [generateImages, setGenerateImages] = useState(urlImages || false);
-  const [pregenerateBeats, setPregenerateBeats] = useState(
-    urlPregenerate !== undefined ? urlPregenerate : true
+  const [generateImages, setGenerateImages] = useState<boolean>(
+    urlHasImages ? urlImages : true
+  );
+  const [pregenerateBeats, setPregenerateBeats] = useState<boolean>(
+    urlHasPregenerate ? urlPregenerate : true
   );
   const [gameMode, setGameMode] = useState<GameMode>(
     urlGameMode && Object.values(GameModes).includes(urlGameMode)
@@ -499,13 +508,17 @@ export const StoryInitializer = ({
     } else {
       updateURLParams({ players: value });
     }
-    
+
     // Disable pregeneration for multiplayer if config is set
-    if (DISABLE_PREGENERATION_FOR_MULTIPLAYER && value >= 2 && pregenerateBeats) {
+    if (
+      DISABLE_PREGENERATION_FOR_MULTIPLAYER &&
+      value >= 2 &&
+      pregenerateBeats
+    ) {
       setPregenerateBeats(false);
       updateURLParams({ pregenerate: false });
     }
-    
+
     Logger.App.log(`Updated player count to: ${value}`);
     if (onPlayerCountChange) {
       onPlayerCountChange(value);
@@ -580,9 +593,10 @@ export const StoryInitializer = ({
     console.log("Final prompt being sent to backend:", mergedPrompt);
 
     // Ensure pregeneration is disabled for multiplayer if config is set
-    const finalPregenerateBeats = DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2 
-      ? false 
-      : pregenerateBeats;
+    const finalPregenerateBeats =
+      DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+        ? false
+        : pregenerateBeats;
 
     if (templateMode && onSetup) {
       try {
@@ -867,7 +881,10 @@ export const StoryInitializer = ({
                   updateURLParams({ pregenerate: e.target.checked });
                 }}
                 className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-                disabled={currentIsLoading || (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)}
+                disabled={
+                  currentIsLoading ||
+                  (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
+                }
               />
               <label
                 htmlFor="pregenerate-beats"

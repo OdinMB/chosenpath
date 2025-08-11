@@ -104,6 +104,17 @@ export function LibraryBrowser() {
     initialPlayerCount,
   });
 
+  // Expand filters by default on non-mobile devices
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isNonMobile = window.matchMedia
+      ? window.matchMedia("(min-width: 768px)").matches
+      : window.innerWidth >= 768;
+    if (isNonMobile && !showFilters) {
+      toggleShowFilters();
+    }
+  }, [showFilters, toggleShowFilters]);
+
   // State for Share Modal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
