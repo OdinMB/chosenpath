@@ -114,7 +114,18 @@ export class AIStoryGenerator {
         } as StatValueEntry)
     );
 
-    const finalDifficultyLevel = difficultyLevel || setup.difficultyLevel;
+    // Prefer user-provided difficulty if given; otherwise use AI-provided from setup
+    let finalDifficultyLevel = difficultyLevel || setup.difficultyLevel;
+    // Safety: if AI provided an out-of-range modifier, normalize to default Balanced
+    if (!difficultyLevel) {
+      const allowedModifiers = new Set([-20, -10, 0, 10, 20]);
+      if (!allowedModifiers.has(finalDifficultyLevel.modifier)) {
+        Logger.Story.warn(
+          `AI provided invalid difficulty modifier (${finalDifficultyLevel.modifier}). Falling back to Balanced (0).`
+        );
+        finalDifficultyLevel = { modifier: 0, title: "Balanced" };
+      }
+    }
 
     const initialState: StoryState = {
       id: gameId,

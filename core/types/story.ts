@@ -59,7 +59,7 @@ export const difficultyLevelSchema = z.object({
   modifier: z
     .number()
     .describe(
-      "Modifier that will be applied to all random number checks in the story. Between +20 and -30. Use steps of 10. Default is 0. At that level, players tend to achieve most but not all of their goals in the end. At -20, players tend to achieve only a few of their goals, and the story features many failures."
+      "Modifier that will be applied to all random number checks in the story. Use steps of 10. Default is 0."
     ),
   title: z
     .string()
@@ -68,6 +68,25 @@ export const difficultyLevelSchema = z.object({
     ),
 });
 export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
+
+// For single-story generation (not templates), constrain to allowed values only
+const storyDifficultyModifierSchema = z.union([
+  z.literal(-20),
+  z.literal(-10),
+  z.literal(0),
+  z.literal(10),
+  z.literal(20),
+]);
+const storyDifficultyLevelSchema = z.object({
+  modifier: storyDifficultyModifierSchema.describe(
+    "Modifier must be one of: -20, -10, 0, 10, 20. Keep most stories within -10 to +10."
+  ),
+  title: z
+    .string()
+    .describe(
+      "Short, flavorful title for the difficulty level appropriate to the story's setting."
+    ),
+});
 
 export const guidelinesSchema = z
   .object({
@@ -131,8 +150,8 @@ export const createStorySetupSchema = (
       guidelines: guidelinesSchema,
       ...(mode === "story"
         ? {
-            difficultyLevel: difficultyLevelSchema.describe(
-              "Difficulty level that will be used in the story. Choose a modifier that works for the story. Default modifier is 0. A harsh survival story might have -20; a satire about billionaires doing whatever they want might have 10; a cozy kids story might have +20."
+            difficultyLevel: storyDifficultyLevelSchema.describe(
+              "Choose exactly one difficulty level for this story: modifier must be -20, -10, 0, 10, or 20. Default is 0 if unclear. Kids and cozy slice-of-life stories should skew easier (+10/+20). Gritty survival/grueling adventures should skew harder (-10/-20). Most stories fall within -10 to +10."
             ),
           }
         : {
@@ -244,7 +263,7 @@ export type PregeneratedState = {
   optionIndex: number;
   storyState: StoryState;
   createdAt: number; // timestamp
-  status: 'pending' | 'completed' | 'failed';
+  status: "pending" | "completed" | "failed";
 };
 
 // Direct type definition for StoryState

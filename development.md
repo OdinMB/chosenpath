@@ -4,7 +4,6 @@ Smaller commits!
 
 - 1: Link to relevant lectures in the template form sections
 - 2: meet future self should only have one possible identity
-- 2: add difficulty level to story generation
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 2: review process for storytellers who want to publish on website

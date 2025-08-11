@@ -688,9 +688,9 @@ Outline generic archetypes that the backgrounds could implement and flesh out.
     if (sections.includes("difficultyLevels")) {
       return `Difficulty Levels
 - Define 3 difficulty levels appropriate for the story.
-- Each difficulty level must have a 'modifier' (number between +20 and -30, in steps of 10) and a 'title' (string).
+- Each difficulty level must have a 'modifier' (number between +20 and -20, in steps of 10) and a 'title' (string).
 - The title should be a short, flavorful term that summarizes the difficulty level within the story's setting. Example: For a survival story, a modifier of -20 could be titled "Unforgiving". For a lighthearted adventure, +10 could be "Friendly Jaunt".
-- +10 means that things tend to go well for the player. 0 means that there are some ups and downs, but things will be OK in the end. -10 features frequent failures, and not all goals will be reached. -20 is playing against the odds, with players typically achieving only a few successes throughout the story. -30 only works if failures are at the core of the story.
+- +10 means that things tend to go well for the player. 0 means that there are some ups and downs, but things will be OK in the end. -10 features frequent failures, and not all goals will be reached. -20 is playing against the odds, with players typically achieving only a few successes throughout the story.
 \n\n`;
     }
     return "";

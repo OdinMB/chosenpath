@@ -17,6 +17,7 @@ import {
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
 import { PlayerCount } from "core/types/index.js";
+import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "core/config.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
 import { storyDbService } from "./StoryDbService.js";
@@ -47,10 +48,19 @@ router.post(
         generateImages,
         pregenerateBeats = false, // Default to false for now
         gameMode,
-        difficultyLevel,
+        difficultyLevel: requestedDifficultyLevel,
       } = req.body as CreateStoryRequest;
 
-      const creatorId = (req as Express.Request & { user?: { id: string } }).user?.id;
+      const creatorId = (req as Express.Request & { user?: { id: string } })
+        .user?.id;
+
+      // Let AI choose difficulty if the client did not make an explicit choice (i.e., still on default).
+      const difficultyToPass =
+        requestedDifficultyLevel &&
+        requestedDifficultyLevel.modifier !==
+          DEFAULT_SELECTED_DIFFICULTY_MODIFIER
+          ? requestedDifficultyLevel
+          : undefined;
 
       await storyCreationService.createStory(
         prompt,
@@ -59,7 +69,7 @@ router.post(
         playerCount as PlayerCount,
         maxTurns,
         gameMode,
-        difficultyLevel,
+        difficultyToPass,
         res,
         creatorId
       );
@@ -103,7 +113,8 @@ router.post(
       } = req.body as CreateStoryFromTemplateRequest;
       Logger.Route.log("Creating story from template");
 
-      const creatorId = (req as Express.Request & { user?: { id: string } }).user?.id;
+      const creatorId = (req as Express.Request & { user?: { id: string } })
+        .user?.id;
 
       await storyCreationService.createStoryFromTemplate(
         templateId,
@@ -150,7 +161,8 @@ router.put(
     try {
       const { storyId, playerSlot, status } =
         req.body as UpdateStoryStatusRequest;
-      const userId = (req as Express.Request & { user?: { id: string } }).user?.id;
+      const userId = (req as Express.Request & { user?: { id: string } }).user
+        ?.id;
 
       if (!userId) {
         sendError(res, "Authentication required", 401, requestId);
