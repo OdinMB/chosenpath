@@ -4,12 +4,14 @@ import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, Footer, CategoryTile } from "./components";
+import { ResumableStories } from "resources/stories/ResumableStories.js";
 import { config } from "../config";
 
 // Page component refactored to use React Router
 export function Page() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
+  const [showResumableSection, setShowResumableSection] = useState(true);
 
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +141,16 @@ export function Page() {
         </div>
 
         <div className="space-y-6">
+          {showResumableSection && (
+            <>
+              <ResumableStories
+                onSetHasContent={setShowResumableSection}
+                forceSingleColumn={true}
+              />
+              <OrDivider />
+            </>
+          )}
+
           {/* Carousel + Browse Entire Library */}
           <TemplateCarousel onPlay={handleSelectTemplate} />
 
