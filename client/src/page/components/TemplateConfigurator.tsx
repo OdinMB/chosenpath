@@ -107,9 +107,10 @@ export function TemplateConfigurator() {
     Logger.App.log("Starting template story creation process");
 
     // Ensure pregeneration is disabled for multiplayer if config is set
-    const finalPregenerateBeats = DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
-      ? false
-      : pregenerateBeats;
+    const finalPregenerateBeats =
+      DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
+        ? false
+        : pregenerateBeats;
 
     try {
       const response = await createStoryFromTemplate({
@@ -139,12 +140,16 @@ export function TemplateConfigurator() {
   const handlePlayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     setPlayerCount(value as PlayerCount);
-    
+
     // Disable pregeneration for multiplayer if config is set
-    if (DISABLE_PREGENERATION_FOR_MULTIPLAYER && value >= 2 && pregenerateBeats) {
+    if (
+      DISABLE_PREGENERATION_FOR_MULTIPLAYER &&
+      value >= 2 &&
+      pregenerateBeats
+    ) {
       setPregenerateBeats(false);
     }
-    
+
     Logger.App.log(`Updated player count to: ${value}`);
   };
 
@@ -306,7 +311,10 @@ export function TemplateConfigurator() {
                   checked={pregenerateBeats}
                   onChange={(e) => setPregenerateBeats(e.target.checked)}
                   className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
-                  disabled={isLoading || (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)}
+                  disabled={
+                    isLoading ||
+                    (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
+                  }
                 />
                 <label
                   htmlFor="pregenerate-beats"
@@ -316,7 +324,7 @@ export function TemplateConfigurator() {
                       : "text-primary"
                   }`}
                 >
-                  Reduce wait time after making a choice
+                  Reduce wait time after choices
                   <InfoIcon
                     tooltipText={
                       DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2

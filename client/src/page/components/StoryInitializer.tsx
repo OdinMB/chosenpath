@@ -894,7 +894,7 @@ export const StoryInitializer = ({
                     : "text-primary"
                 }`}
               >
-                Reduce wait time after making a choice
+                Reduce wait time after choices
                 <InfoIcon
                   tooltipText={
                     DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2
