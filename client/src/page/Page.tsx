@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PrimaryButton } from "components/ui";
 import { TemplateMetadata } from "core/types";
 import { TemplateCarousel } from "./components/TemplateCarousel.js";
 import { OrDivider, Footer, CategoryTile } from "./components";
 import { ResumableStories } from "resources/stories/ResumableStories.js";
+import { useAuth } from "client/shared/auth/useAuth.js";
 import { config } from "../config";
 
 // Page component refactored to use React Router
@@ -12,6 +13,16 @@ export function Page() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [showResumableSection, setShowResumableSection] = useState(true);
+  const { user } = useAuth();
+  const previousUserIdRef = useRef<string | undefined | null>(user?.id);
+
+  useEffect(() => {
+    const currentUserId = user?.id;
+    if (previousUserIdRef.current !== currentUserId) {
+      setShowResumableSection(true);
+    }
+    previousUserIdRef.current = currentUserId;
+  }, [user?.id]);
 
   const handleJoinGame = (e: React.FormEvent) => {
     e.preventDefault();
