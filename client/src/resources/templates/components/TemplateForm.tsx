@@ -176,17 +176,41 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     isLoading: isAiIterating,
   } = useAiIteration();
 
-  // Define tab navigation items
+  // Define tab navigation items with categories and desired order
   const tabItems = [
-    { id: "basic" as TabType, label: "Setup" },
-    { id: "ai-draft" as TabType, label: "AI Draft" },
-    { id: "media" as TabType, label: "Media" },
-    { id: "guidelines" as TabType, label: "Guidelines" },
-    { id: "elements" as TabType, label: "Elements" },
-    { id: "outcomes" as TabType, label: "Outcomes" },
-    { id: "stats" as TabType, label: "Stats" },
-    { id: "players" as TabType, label: "Players" },
-    { id: "ai-iterate" as TabType, label: "AI Iteration" },
+    {
+      id: "ai-draft" as TabType,
+      label: "AI Draft",
+      category: "primary" as const,
+    },
+    {
+      id: "ai-iterate" as TabType,
+      label: "AI Iteration",
+      category: "primary" as const,
+    },
+    { id: "basic" as TabType, label: "Meta", category: "secondary" as const },
+    { id: "media" as TabType, label: "Media", category: "tertiary" as const },
+    {
+      id: "guidelines" as TabType,
+      label: "Guidelines",
+      category: "tertiary" as const,
+    },
+    {
+      id: "elements" as TabType,
+      label: "Elements",
+      category: "tertiary" as const,
+    },
+    {
+      id: "outcomes" as TabType,
+      label: "Outcomes",
+      category: "tertiary" as const,
+    },
+    { id: "stats" as TabType, label: "Stats", category: "tertiary" as const },
+    {
+      id: "players" as TabType,
+      label: "Players",
+      category: "tertiary" as const,
+    },
   ];
 
   const handleAcceptSectionUpdate = (
@@ -270,6 +294,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     await handleFormSubmit(e);
   };
 
+  // Determine initial active tab based on whether story elements exist
+  React.useEffect(() => {
+    const hasStoryElements = (formData?.storyElements || []).length > 0;
+    setActiveTab(hasStoryElements ? "basic" : "ai-draft");
+    // We intentionally run only once on mount to set the initial tab
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -277,7 +309,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           <h2 className="text-xl font-semibold text-gray-800 truncate">
             {formData.title ? formData.title : "New Template"}
           </h2>
-          <div className="flex gap-2">
+          {/* Desktop save button (kept next to title) */}
+          <div className="hidden md:flex gap-2">
             <PrimaryButton
               type="submit"
               disabled={isLoading}
@@ -291,23 +324,36 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         {/* Validation Status */}
         {validationResult && validationResult.stats.totalIssues > 0 && (
-          <div className={`p-3 rounded-lg border ${
-            validationResult.stats.errors > 0 
-              ? 'bg-red-50 border-red-200' 
-              : 'bg-yellow-50 border-yellow-200'
-          } mb-4`}>
+          <div
+            className={`p-3 rounded-lg border ${
+              validationResult.stats.errors > 0
+                ? "bg-red-50 border-red-200"
+                : "bg-yellow-50 border-yellow-200"
+            } mb-4`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icons.AlertCircle className={`h-5 w-5 ${
-                  validationResult.stats.errors > 0 ? 'text-red-600' : 'text-yellow-600'
-                }`} />
-                <span className={`font-medium ${
-                  validationResult.stats.errors > 0 ? 'text-red-800' : 'text-yellow-800'
-                }`}>
-                  {validationResult.stats.errors > 0 
-                    ? `${validationResult.stats.errors} Error${validationResult.stats.errors > 1 ? 's' : ''} Found`
-                    : `${validationResult.stats.warnings} Warning${validationResult.stats.warnings > 1 ? 's' : ''} Found`
-                  }
+                <Icons.AlertCircle
+                  className={`h-5 w-5 ${
+                    validationResult.stats.errors > 0
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                  }`}
+                />
+                <span
+                  className={`font-medium ${
+                    validationResult.stats.errors > 0
+                      ? "text-red-800"
+                      : "text-yellow-800"
+                  }`}
+                >
+                  {validationResult.stats.errors > 0
+                    ? `${validationResult.stats.errors} Error${
+                        validationResult.stats.errors > 1 ? "s" : ""
+                      } Found`
+                    : `${validationResult.stats.warnings} Warning${
+                        validationResult.stats.warnings > 1 ? "s" : ""
+                      } Found`}
                 </span>
               </div>
               <PrimaryButton
@@ -331,9 +377,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-2">
           {/* Allow all users to select a publication status, but restrict 'Published' option if !canPublish */}
-          <div className="flex items-center">
+          <div className="flex items-center w-full md:w-auto">
             <Select
               value={formData.publicationStatus || PublicationStatus.Draft}
               onChange={handlePublicationStatusChange}
@@ -352,43 +398,58 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               tooltipText={
                 <div className="text-sm">
                   <div className="mb-2">
-                    <strong>Draft:</strong> nobody can see this World or play
-                    stories in it
+                    <strong>Draft:</strong> nobody can see this World
                   </div>
                   <div className="mb-2">
-                    <strong>Private:</strong> you can share a link to your World
-                    to allow players to play stories in it.
+                    <strong>Private:</strong> players need a code to play
+                    stories in this World.
                   </div>
                   <div className="mb-2">
-                    <strong>Review:</strong> flagging the World to be reviewed
-                    for public display on chosenpath.ai.
+                    <strong>Review:</strong> suggest the World to be published
+                    on chosenpath.ai.
                   </div>
                   <div>
-                    <strong>Published:</strong> lists the story on
-                    chosenpath.ai. Can only be set by admins.
+                    <strong>Published:</strong> World is listed on
+                    chosenpath.ai.
                   </div>
                 </div>
               }
-              position="right"
-              className="ml-2"
+              position="bottom"
+              className="ml-2 mb-1"
             />
+            {formData.id &&
+              (formData.publicationStatus === PublicationStatus.Published ||
+                formData.publicationStatus === PublicationStatus.Private) && (
+                <div className="ml-2 mt-1">
+                  <ShareLink templateId={formData.id} showText={false} />
+                </div>
+              )}
+            {/* Mobile save button aligned with status */}
+            <div className="ml-auto md:hidden">
+              <PrimaryButton
+                type="submit"
+                disabled={isLoading}
+                isLoading={isLoading}
+                size="sm"
+              >
+                Save
+              </PrimaryButton>
+            </div>
           </div>
 
-          {formData.id &&
-            (formData.publicationStatus === PublicationStatus.Published ||
-              formData.publicationStatus === PublicationStatus.Private) && (
-              <ShareLink templateId={formData.id} showText={false} />
-            )}
+          {/* ShareLink moved inside the status block above for consistent grouping */}
         </div>
 
+        {/* Separate the tabs control from the status/save row and the tab content on mobile */}
         <Tabs
           items={tabItems}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           variant="bordered"
+          collapseToSelectOnMobile={true}
         />
 
-        <div className="mt-6">
+        <div className="mt-4 md:mt-6">
           {activeTab === "basic" && (
             <BasicInfoTab
               title={formData.title || ""}

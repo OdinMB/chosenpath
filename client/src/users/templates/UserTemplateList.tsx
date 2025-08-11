@@ -81,7 +81,7 @@ export const UserTemplateList = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div>
       {/* Introduction Videos Announcement */}
       <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start">
@@ -116,7 +116,7 @@ export const UserTemplateList = () => {
               >
                 Discord
               </a>{" "}
-              to meet other students and faculty.
+              to meet other students.
             </p>
           </div>
         </div>

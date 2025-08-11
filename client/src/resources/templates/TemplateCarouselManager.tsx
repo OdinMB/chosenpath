@@ -51,7 +51,7 @@ export const TemplateCarouselManager: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold mr-2">Welcome Screen Stories</h2>

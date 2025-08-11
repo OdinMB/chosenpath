@@ -56,7 +56,7 @@ export function SortableTable<T extends { id?: string }>({
     <tr key={keyExtractor(item)} className="hover:bg-gray-50">
       {/* Selection checkbox column */}
       {enableSelection && (
-        <td className="py-3 px-4 w-12">
+        <td className="hidden md:table-cell py-3 px-4 w-12">
           <input
             type="checkbox"
             checked={selectedItems.has(keyExtractor(item))}
@@ -96,7 +96,7 @@ export function SortableTable<T extends { id?: string }>({
         onRemoveFilter={onRemoveFilter}
         onClearFilters={onClearFilters}
         renderMode="filters"
-        enableSelection={enableSelection}
+        enableSelection={false}
         selectedItems={selectedItems}
         onToggleAllSelection={onToggleAllSelection}
         visibleItems={data}

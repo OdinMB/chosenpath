@@ -584,13 +584,38 @@ export const TemplateOverview = ({
     {
       key: "title",
       label: "Title",
-      render: (template) => (
-        <span className="font-medium">{template.title}</span>
-      ),
+      render: (template) => {
+        const truncatedTitle = template.title
+          ? template.title.length > 22
+            ? `${template.title.substring(0, 22)}…`
+            : template.title
+          : "";
+
+        return (
+          <div className="md:flex md:items-center">
+            {/* Mobile: render tag and title in a single inline flow to allow proper wrapping */}
+            <span className="md:hidden font-medium leading-snug break-words whitespace-normal">
+              <span
+                className={`inline-flex items-center px-1 py-0 text-[10px] leading-[1rem] font-semibold rounded-sm mr-1 align-middle ${getStatusColor(
+                  template.publicationStatus
+                )}`}
+              >
+                {template.publicationStatus.substring(0, 5)}
+              </span>
+              {truncatedTitle}
+            </span>
+            {/* Desktop: full title */}
+            <span className="hidden md:inline font-medium">
+              {template.title}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: "publicationStatus",
       label: "Status",
+      className: "py-3 px-4 text-left hidden md:table-cell",
       render: renderStatusColumn,
     },
     ...(showCreatorColumn
@@ -675,7 +700,7 @@ export const TemplateOverview = ({
       sortable: false,
       filterable: false,
       render: (template) => (
-        <div className="flex space-x-3">
+        <div className="flex space-x-2 md:space-x-3">
           <button
             onClick={() => onEdit(template.id)}
             className="text-secondary hover:text-secondary-700 transition-colors"
@@ -767,7 +792,9 @@ export const TemplateOverview = ({
   return (
     <div className="pt-4">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-secondary">Templates</h2>
+        <h2 className="text-xl font-semibold text-secondary hidden md:block">
+          Templates
+        </h2>
         <div className="flex gap-2">
           <PrimaryButton
             onClick={() => {
@@ -840,7 +867,7 @@ export const TemplateOverview = ({
             leftIcon={<Icons.Plus className="h-4 w-4" />}
             title="Create new template"
           >
-            New Template
+            New <span className="hidden md:inline">Template</span>
           </PrimaryButton>
         </div>
       </div>
@@ -860,7 +887,7 @@ export const TemplateOverview = ({
         selectedItems={selectedItems}
         onToggleItemSelection={toggleItemSelection}
         onToggleAllSelection={toggleAllSelection}
-        selectionActions={selectionActions}
+        selectionActions={selectedItems.size > 0 ? selectionActions : []}
         getSelectedItems={getSelectedItems}
         allItems={templates}
       />

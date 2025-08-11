@@ -74,11 +74,11 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-primary-100 shadow-md">
+    <div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block font-semibold text-gray-700 mb-2">
-            Sections to regenerate
+            Sections to adjust
           </label>
           <div className="space-y-2">
             <div className="flex items-center">
@@ -180,7 +180,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             htmlFor="feedback"
             className="block font-semibold text-gray-700 mb-2"
           >
-            Feedback or instructions for the AI
+            Feedback and instructions
           </label>
           <TextArea
             id="feedback"
@@ -198,7 +198,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             isLoading={isLoading}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
           >
-            Generate AI Iteration
+            Adjust My World
           </PrimaryButton>
         </div>
       </form>

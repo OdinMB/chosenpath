@@ -142,6 +142,7 @@ export function TableFilterSort<T extends { id?: string }>({
                       onChange={handleFilterKeyChange}
                       placeholder="Filter by..."
                       size="sm"
+                      className="h-8"
                     >
                       <option value="">Filter by...</option>
                       {filterableColumns.map((column) => (
@@ -160,17 +161,18 @@ export function TableFilterSort<T extends { id?: string }>({
                     value={filterValue}
                     onChange={handleFilterValueChange}
                     placeholder="Filter value..."
-                    className="mr-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm p-1"
+                    className="mr-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm p-1 h-8 w-28 sm:w-40 md:w-56"
                     disabled={!filterKey}
                   />
 
                   <button
                     onClick={handleAddFilter}
                     disabled={!filterKey || !filterValue}
-                    className="inline-flex items-center px-3 py-1 text-sm rounded bg-secondary text-white hover:bg-secondary-700 disabled:bg-gray-300 disabled:text-gray-500"
+                    aria-label="Add filter"
+                    className="inline-flex items-center px-2 md:px-3 py-1 h-8 text-sm rounded bg-secondary text-white hover:bg-secondary-700 disabled:bg-gray-300 disabled:text-gray-500"
                   >
-                    <Icons.Plus className="mr-1 h-3 w-3" />
-                    Add
+                    <Icons.Plus className="h-3 w-3 mr-0 md:mr-1" />
+                    <span className="hidden md:inline">Add</span>
                   </button>
                 </div>
 
@@ -188,7 +190,7 @@ export function TableFilterSort<T extends { id?: string }>({
 
             {/* Selection Actions */}
             {enableSelection && selectionActions.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="hidden md:flex flex-wrap items-center gap-2">
                 {currentlySelectedItems.length > 0 && (
                   <span className="text-sm text-gray-600 mr-2">
                     {currentlySelectedItems.length} selected
@@ -247,7 +249,7 @@ export function TableFilterSort<T extends { id?: string }>({
           <tr>
             {/* Selection checkbox column */}
             {enableSelection && (
-              <th className="py-3 px-4 text-left w-12">
+              <th className="hidden md:table-cell py-3 px-4 text-left w-12">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
