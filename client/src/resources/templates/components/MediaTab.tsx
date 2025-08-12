@@ -38,16 +38,19 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             onChange={(e) => setContainsImages(e.target.checked)}
             disabled={!canGenerateImages}
           />
-          <label 
-            htmlFor="contains-images" 
-            className={`ml-2 text-sm font-medium ${!canGenerateImages ? 'text-gray-400' : ''}`}
+          <label
+            htmlFor="contains-images"
+            className={`ml-2 text-sm font-medium ${
+              !canGenerateImages ? "text-gray-400" : ""
+            }`}
           >
             Use the pre-generated images in stories
           </label>
           <InfoIcon
-            tooltipText={canGenerateImages 
-              ? "Check this if the template contains images that should be used during gameplay." 
-              : "You don't have permission to use images in templates."
+            tooltipText={
+              canGenerateImages
+                ? "Check this if the template contains images that should be used during gameplay."
+                : "You don't have permission to use images in templates."
             }
             position="right"
             className="ml-2"
@@ -91,7 +94,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.visualStyle || ""}
               onChange={(e) => handleChange("visualStyle", e.target.value)}
               placeholder="Describe the overall visual style (e.g., 'digital painting', 'watercolor', 'comic book style')"
-              rows={3}
+              autoHeight
             />
           </div>
 
@@ -103,7 +106,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.atmosphere || ""}
               onChange={(e) => handleChange("atmosphere", e.target.value)}
               placeholder="Describe the atmosphere (e.g., 'dark and foreboding', 'bright and hopeful')"
-              rows={3}
+              autoHeight
             />
           </div>
 
@@ -115,7 +118,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.colorPalette || ""}
               onChange={(e) => handleChange("colorPalette", e.target.value)}
               placeholder="Describe your color palette (e.g., 'muted earth tones', 'vibrant primary colors')"
-              rows={3}
+              autoHeight
             />
           </div>
 
@@ -127,7 +130,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.settingDetails || ""}
               onChange={(e) => handleChange("settingDetails", e.target.value)}
               placeholder="Describe setting details to include in images (e.g., 'Victorian architecture', 'futuristic cityscapes')"
-              rows={3}
+              autoHeight
             />
           </div>
 
@@ -139,7 +142,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.characterStyle || ""}
               onChange={(e) => handleChange("characterStyle", e.target.value)}
               placeholder="Describe character style (e.g., 'realistic proportions', 'stylized anime characters')"
-              rows={3}
+              autoHeight
             />
           </div>
 
@@ -151,7 +154,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               value={imageInstructions.artInfluences || ""}
               onChange={(e) => handleChange("artInfluences", e.target.value)}
               placeholder="List artistic influences (e.g., 'Studio Ghibli', 'Art Nouveau', 'cyberpunk aesthetics')"
-              rows={3}
+              autoHeight
             />
           </div>
         </div>

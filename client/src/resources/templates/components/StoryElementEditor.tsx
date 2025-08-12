@@ -158,7 +158,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
             id={`element-role-${data.id}`}
             name={`element-role-${data.id}`}
             className="flex-1"
-            rows={3}
+            autoHeight
             value={data.role}
             onChange={(e) => onChange({ ...data, role: e.target.value })}
             placeholder="What can players do with this element? How does it relate to outcomes?"
@@ -172,7 +172,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
             id={`element-instructions-${data.id}`}
             name={`element-instructions-${data.id}`}
             className="flex-1"
-            rows={3}
+            autoHeight
             value={data.instructions}
             onChange={(e) =>
               onChange({
@@ -191,7 +191,7 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
             id={`element-appearance-${data.id}`}
             name={`element-appearance-${data.id}`}
             className="flex-1"
-            rows={3}
+            autoHeight
             value={data.appearance}
             onChange={(e) =>
               onChange({

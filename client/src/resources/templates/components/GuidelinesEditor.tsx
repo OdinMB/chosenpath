@@ -52,7 +52,7 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
             value={world}
             onChange={(e) => setWorld(e.target.value)}
             className="flex-1"
-            rows={3}
+            autoHeight
             placeholder="Describe the essence of the story world in three sentences"
             disabled={readOnly}
           />

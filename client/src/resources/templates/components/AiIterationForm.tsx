@@ -187,7 +187,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="Describe what you'd like to add or improve in the selected sections..."
-            rows={5}
+            autoHeight
           />
         </div>
 

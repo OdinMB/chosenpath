@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CharacterSelectionIntroduction } from "core/types";
-import { PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton, Icons, TextArea } from "components/ui";
 
 interface CharacterSelectionIntroEditorProps {
   introduction: CharacterSelectionIntroduction;
@@ -91,12 +91,12 @@ export const CharacterSelectionIntroEditor: React.FC<
           >
             Introduction Text
           </label>
-          <textarea
+          <TextArea
             id="intro-text"
             value={localIntroduction.text || ""}
             onChange={(e) => handleChange("text", e.target.value)}
-            rows={5}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className="mt-1"
+            autoHeight
             placeholder="Enter introduction text for the character selection screen"
           />
           <p className="mt-1 text-xs text-gray-500">

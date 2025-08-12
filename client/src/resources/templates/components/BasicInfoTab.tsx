@@ -168,7 +168,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           value={teaser}
           onChange={(e) => setTeaser(e.target.value)}
           placeholder="A short teaser to attract players to your story"
-          rows={3}
+          autoHeight
         />
       </div>
 
