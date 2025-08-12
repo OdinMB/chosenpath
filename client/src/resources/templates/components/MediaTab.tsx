@@ -46,6 +46,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             checked={containsImages}
             onChange={(e) => setContainsImages(e.target.checked)}
             disabled={!canGenerateImages}
+            className="h-5 w-5 md:h-6 md:w-6"
           />
           <label
             htmlFor="contains-images"
@@ -53,7 +54,9 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               !canGenerateImages ? "text-gray-400" : ""
             }`}
           >
-            Use pregenerated World images in stories.
+            <span className="font-semibold">
+              Use pregenerated World images in stories.
+            </span>
           </label>
         </div>
         <div className="mt-3 text-sm text-gray-600">
@@ -77,7 +80,9 @@ export const MediaTab: React.FC<MediaTabProps> = ({
       {/* Image Generation Instructions - Expandable */}
       <ExpandableItem<ImageInstructions>
         id="image-instructions"
-        title="Image Generation Instructions"
+        title={
+          <span className="font-semibold">Image Generation Instructions</span>
+        }
         data={imageInstructions}
         editingSet={editingItems}
         setEditing={setEditingItems}
@@ -198,7 +203,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
       {/* Cover Image - Expandable with image preview on collapsed */}
       <ExpandableItem<ImageInstructions>
         id="cover-image"
-        title="Cover Image"
+        title={<span className="font-semibold">Cover Image</span>}
         data={imageInstructions}
         editingSet={editingItems}
         setEditing={setEditingItems}

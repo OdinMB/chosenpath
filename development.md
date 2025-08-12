@@ -3,8 +3,9 @@ Smaller commits!
 # NEXT
 
 - 1: Link to relevant lectures in the template form sections
-
+- 2: Integrate AI Iterations into the different template sections
 - 2: flag missing images if containsImages = true in Media, Elements, and Players
+- 1: fix tooltip to not go beyond display borders
 
 - 2: meet future self should only have one possible identity
 
