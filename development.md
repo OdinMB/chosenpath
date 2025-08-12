@@ -3,6 +3,9 @@ Smaller commits!
 # NEXT
 
 - 1: Link to relevant lectures in the template form sections
+
+- 2: flag missing images if containsImages = true in Media, Elements, and Players
+
 - 2: meet future self should only have one possible identity
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
@@ -45,6 +48,7 @@ Focus: Text/Images, English, Multiplayer
 - 15: Stripe / checkout.com integration
 - ?: Eigene Bilder hochladen (für Elemente)
 - ?: iFrame whitelabel?
+- 10: template image handling: more flexible than binary yes (assumes images for all elements) vs. no (no template images used at all)
 - 10: Atomic Transaction System for editing templates (for undo/redo and checks)
 - 15: System to view/navigate save files
 - 3: users can lock codes to then require this user to be logged in to be used
