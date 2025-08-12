@@ -1,19 +1,30 @@
 import React from "react";
 import { PrimaryButton, Icons } from "components/ui";
-import { Outcome } from "core/types";
+import { Outcome, PlayerOptionsGeneration, PlayerSlot, Stat } from "core/types";
+// MAX_PLAYERS handled within PlayerOutcomesAll
 import { OutcomeEditor } from "./OutcomeEditor";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
+import { OutcomePlayerSection } from "./PlayerOutcomes";
 
 interface OutcomesTabProps {
   outcomes: Outcome[];
   onChange?: (outcomes: Outcome[]) => void;
   readOnly?: boolean;
+  // Optional: enable listing/editing player-specific outcomes here too
+  playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
+  onPlayerOptionsChange?: (
+    updates: Record<PlayerSlot, PlayerOptionsGeneration>
+  ) => void;
+  playerStats?: Stat[];
 }
 
 export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   outcomes,
   onChange,
   readOnly = false,
+  playerOptions,
+  onPlayerOptionsChange,
+  playerStats,
 }) => {
   const {
     editingOutcomes,
@@ -22,6 +33,10 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
     handleUpdateOutcome,
     handleRemoveOutcome,
   } = useOutcomeEditor(outcomes, onChange, readOnly);
+
+  // Determine whether to render player-specific outcomes
+  const enablePlayerOutcomes =
+    !!playerOptions && !!onPlayerOptionsChange && !!playerStats;
 
   return (
     <div className="space-y-4">
@@ -54,6 +69,21 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
           readOnly={readOnly}
         />
       ))}
+
+      {enablePlayerOutcomes && playerOptions && onPlayerOptionsChange && (
+        <OutcomePlayerSection
+          playerOptions={
+            playerOptions as Record<PlayerSlot, PlayerOptionsGeneration>
+          }
+          onPlayerOptionsChange={
+            onPlayerOptionsChange as (
+              updates: Record<PlayerSlot, PlayerOptionsGeneration>
+            ) => void
+          }
+          playerStats={playerStats as Stat[]}
+          readOnly={readOnly}
+        />
+      )}
     </div>
   );
 };

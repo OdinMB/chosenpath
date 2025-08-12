@@ -9,12 +9,9 @@ import {
   ImageInstructions,
 } from "core/types";
 import { ExpandableItem } from "components";
-import { PrimaryButton, Icons, Select } from "components/ui";
-import {
-  PlayerIdentityEditor,
-  PlayerBackgroundEditor,
-  OutcomeEditor,
-} from "./";
+import { PrimaryButton, Icons } from "components/ui";
+import { PlayerIdentityEditor, PlayerBackgroundEditor } from "./";
+import { OutcomePlayer } from "./PlayerOutcomes";
 
 // Pronoun sets available for character identities
 const PRONOUN_SETS = [
@@ -213,70 +210,18 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
         </div>
 
         {/* Individual Outcomes */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-semibold mb-1">Individual Outcomes</h3>
-            {!readOnly && (
-              <div className="flex gap-2">
-                <PrimaryButton
-                  onClick={() => handleAddPlayerOutcome(playerSlot)}
-                  variant="outline"
-                  leftBorder={false}
-                  size="sm"
-                  leftIcon={<Icons.Plus className="h-4 w-4" />}
-                ></PrimaryButton>{" "}
-                <Select
-                  className="text-sm w-44"
-                  size="sm"
-                  onChange={(e) => {
-                    const [sourcePlayer, outcomeIndex] =
-                      e.target.value.split(":");
-                    handleCopyOutcome(
-                      playerSlot,
-                      sourcePlayer as PlayerSlot,
-                      parseInt(outcomeIndex)
-                    );
-                  }}
-                  value=""
-                >
-                  <option value="">Copy from...</option>
-                  {Object.entries(playerOptions).map(
-                    ([otherSlot, otherOptions]) =>
-                      otherSlot !== playerSlot &&
-                      otherOptions.outcomes.map((outcome, idx) => (
-                        <option
-                          key={`${otherSlot}-${idx}`}
-                          value={`${otherSlot}:${idx}`}
-                        >
-                          Player {otherSlot.replace("player", "")}:{" "}
-                          {outcome.question}
-                        </option>
-                      ))
-                  )}
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {data.outcomes.map((outcome, index) => (
-            <OutcomeEditor
-              key={outcome.id}
-              outcome={outcome}
-              index={index}
-              editingOutcomes={editingOutcomes}
-              setEditingOutcomes={setEditingOutcomes}
-              onDelete={() => handleDeleteOutcome(playerSlot, index)}
-              onUpdate={(idx, updatedOutcome) => {
-                handleUpdateOutcome(playerSlot, idx, updatedOutcome);
-                // Update local data for immediate UI feedback
-                const updated = [...data.outcomes];
-                updated[idx] = updatedOutcome;
-                onChange({ ...data, outcomes: updated });
-              }}
-              readOnly={readOnly}
-            />
-          ))}
-        </div>
+        <OutcomePlayer
+          title="Individual Outcomes"
+          playerSlot={playerSlot}
+          playerOptions={playerOptions}
+          editingOutcomes={editingOutcomes}
+          setEditingOutcomes={setEditingOutcomes}
+          handleAddPlayerOutcome={handleAddPlayerOutcome}
+          handleCopyOutcome={handleCopyOutcome}
+          handleUpdateOutcome={handleUpdateOutcome}
+          handleDeleteOutcome={handleDeleteOutcome}
+          readOnly={readOnly}
+        />
       </div>
     );
   };

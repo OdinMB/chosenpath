@@ -200,12 +200,12 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       label: "Elements",
       category: "tertiary" as const,
     },
+    { id: "stats" as TabType, label: "Stats", category: "tertiary" as const },
     {
       id: "outcomes" as TabType,
       label: "Outcomes",
       category: "tertiary" as const,
     },
-    { id: "stats" as TabType, label: "Stats", category: "tertiary" as const },
     {
       id: "players" as TabType,
       label: "Players",
@@ -559,6 +559,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             <OutcomesTab
               outcomes={formData.sharedOutcomes || []}
               onChange={handleOutcomesChange}
+              // Enable player-specific outcomes in Outcomes tab
+              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
+              onPlayerOptionsChange={handlePlayerChange}
+              playerStats={formData.playerStats || []}
             />
           )}
 

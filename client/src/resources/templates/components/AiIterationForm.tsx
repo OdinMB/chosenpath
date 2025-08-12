@@ -83,6 +83,32 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
           <div className="space-y-2">
             <div className="flex items-center">
               <Checkbox
+                id="difficultyLevels-section"
+                checked={selectedSections.includes("difficultyLevels")}
+                onChange={() => handleSectionToggle("difficultyLevels")}
+              />
+              <label
+                htmlFor="difficultyLevels-section"
+                className="ml-2 text-sm text-gray-700"
+              >
+                Difficulty Levels
+              </label>
+            </div>
+            <div className="flex items-center">
+              <Checkbox
+                id="media-section"
+                checked={selectedSections.includes("media")}
+                onChange={() => handleSectionToggle("media")}
+              />
+              <label
+                htmlFor="media-section"
+                className="ml-2 text-sm text-gray-700"
+              >
+                Media
+              </label>
+            </div>
+            <div className="flex items-center">
+              <Checkbox
                 id="guidelines-section"
                 checked={selectedSections.includes("guidelines")}
                 onChange={() => handleSectionToggle("guidelines")}
@@ -109,19 +135,6 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             </div>
             <div className="flex items-center">
               <Checkbox
-                id="sharedOutcomes-section"
-                checked={selectedSections.includes("sharedOutcomes")}
-                onChange={() => handleSectionToggle("sharedOutcomes")}
-              />
-              <label
-                htmlFor="sharedOutcomes-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Shared Outcomes
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
                 id="stats-section"
                 checked={selectedSections.includes("stats")}
                 onChange={() => handleSectionToggle("stats")}
@@ -135,6 +148,19 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             </div>
             <div className="flex items-center">
               <Checkbox
+                id="sharedOutcomes-section"
+                checked={selectedSections.includes("sharedOutcomes")}
+                onChange={() => handleSectionToggle("sharedOutcomes")}
+              />
+              <label
+                htmlFor="sharedOutcomes-section"
+                className="ml-2 text-sm text-gray-700"
+              >
+                Shared Outcomes
+              </label>
+            </div>
+            <div className="flex items-center">
+              <Checkbox
                 id="players-section"
                 checked={selectedSections.includes("players")}
                 onChange={() => handleSectionToggle("players")}
@@ -143,33 +169,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
                 htmlFor="players-section"
                 className="ml-2 text-sm text-gray-700"
               >
-                Players
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="media-section"
-                checked={selectedSections.includes("media")}
-                onChange={() => handleSectionToggle("media")}
-              />
-              <label
-                htmlFor="media-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Media
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="difficultyLevels-section"
-                checked={selectedSections.includes("difficultyLevels")}
-                onChange={() => handleSectionToggle("difficultyLevels")}
-              />
-              <label
-                htmlFor="difficultyLevels-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Difficulty Levels
+                Players (and individual Outcomes)
               </label>
             </div>
           </div>
