@@ -236,6 +236,41 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
       onDelete={() => {}} // No delete functionality for players
       onSave={() => handleSave(playerSlot)}
       renderEditForm={renderPlayerForm}
+      description={(() => {
+        const identityNames = (options.possibleCharacterIdentities || [])
+          .map((identity) => identity?.name?.trim())
+          .filter((name): name is string => Boolean(name));
+        const backgroundTitles = (options.possibleCharacterBackgrounds || [])
+          .map((background) => background?.title?.trim())
+          .filter((title): title is string => Boolean(title));
+        const outcomeQuestions = (options.outcomes || [])
+          .map((outcome) => outcome?.question?.trim())
+          .filter((q): q is string => Boolean(q));
+
+        if (
+          identityNames.length === 0 &&
+          backgroundTitles.length === 0 &&
+          outcomeQuestions.length === 0
+        ) {
+          return undefined;
+        }
+
+        return (
+          <>
+            {identityNames.length > 0 && <div>{identityNames.join(" / ")}</div>}
+            {backgroundTitles.length > 0 && (
+              <div>{backgroundTitles.join(" / ")}</div>
+            )}
+            {outcomeQuestions.length > 0 && (
+              <div className="mt-1">
+                {outcomeQuestions.map((q, idx) => (
+                  <div key={`outcome-${idx}`}>{q}</div>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
       readOnly={readOnly}
     />
   );
