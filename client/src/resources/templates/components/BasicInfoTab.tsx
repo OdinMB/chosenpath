@@ -75,7 +75,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   getGameModeValue,
 }) => {
   // Debugging TAG_CATEGORIES
-  console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
+  // console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
 
   const allPredefinedTags = useMemo(() => {
     return TAG_CATEGORIES.flatMap((category) => category.tags);

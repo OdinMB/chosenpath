@@ -16,6 +16,11 @@ type TabsProps<T extends string> = {
   size?: "sm" | "md" | "lg";
   // When true, render a mobile-friendly select on small screens
   collapseToSelectOnMobile?: boolean;
+  // Optional: choose the breakpoint below which the tabs collapse to a select.
+  // Defaults to "md" to preserve existing behavior.
+  collapseBelow?: "sm" | "md" | "lg" | "xl" | "2xl";
+  // Optional: customize spacing around the collapsed select container
+  collapsedSelectSpacingClass?: string;
 };
 
 export const Tabs = <T extends string>({
@@ -25,6 +30,8 @@ export const Tabs = <T extends string>({
   variant = "underline",
   size = "md",
   collapseToSelectOnMobile = false,
+  collapseBelow = "md",
+  collapsedSelectSpacingClass = "mt-2 mb-6",
 }: TabsProps<T>) => {
   const [hoveredTab, setHoveredTab] = useState<T | null>(null);
   const getBgClass = (category?: TabCategory) => {
@@ -97,7 +104,17 @@ export const Tabs = <T extends string>({
     <div className="w-full">
       {/* Mobile: show a select dropdown when enabled */}
       {collapseToSelectOnMobile && (
-        <div className="md:hidden mt-2 mb-4">
+        <div
+          className={`${
+            {
+              sm: "sm:hidden",
+              md: "md:hidden",
+              lg: "lg:hidden",
+              xl: "xl:hidden",
+              "2xl": "2xl:hidden",
+            }[collapseBelow]
+          } ${collapsedSelectSpacingClass}`}
+        >
           <select
             aria-label="Tab selector"
             className="block w-full rounded-md border-2 border-secondary-300 bg-white py-2.5 px-3 text-sm font-semibold text-secondary-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-300 cursor-pointer"
@@ -115,7 +132,15 @@ export const Tabs = <T extends string>({
 
       <nav
         className={`flex w-full overflow-x-auto scrollbar-hide ${
-          collapseToSelectOnMobile ? "hidden md:flex" : "flex"
+          collapseToSelectOnMobile
+            ? {
+                sm: "hidden sm:flex",
+                md: "hidden md:flex",
+                lg: "hidden lg:flex",
+                xl: "hidden xl:flex",
+                "2xl": "hidden 2xl:flex",
+              }[collapseBelow]
+            : "flex"
         }`}
       >
         <div className="flex min-w-full md:min-w-0 space-x-1">
@@ -147,7 +172,15 @@ export const Tabs = <T extends string>({
       </nav>
       <div
         className={`h-[1px] w-full bg-gray-200 -mt-px ${
-          collapseToSelectOnMobile ? "hidden md:block" : ""
+          collapseToSelectOnMobile
+            ? {
+                sm: "hidden sm:block",
+                md: "hidden md:block",
+                lg: "hidden lg:block",
+                xl: "hidden xl:block",
+                "2xl": "hidden 2xl:block",
+              }[collapseBelow]
+            : ""
         }`}
       ></div>
     </div>

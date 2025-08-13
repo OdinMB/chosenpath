@@ -447,7 +447,13 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           onTabChange={setActiveTab}
           variant="bordered"
           collapseToSelectOnMobile={true}
+          collapseBelow="lg"
+          collapsedSelectSpacingClass="mt-0 mb-4"
         />
+        {/* Short centered divider shown only when dropdown is visible (below lg) */}
+        <div className="lg:hidden -mt-2 mb-16 flex justify-center">
+          <div className="h-px w-40 bg-gray-200 rounded-full"></div>
+        </div>
 
         <div className="mt-4 md:mt-6">
           {activeTab === "basic" && (
@@ -616,6 +622,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               />
             </div>
           )}
+        </div>
+        {/* Mobile bottom Save button */}
+        <div className="md:hidden mt-6">
+          <PrimaryButton
+            type="submit"
+            disabled={isLoading}
+            isLoading={isLoading}
+            size="md"
+            className="w-full"
+          >
+            Save
+          </PrimaryButton>
         </div>
       </form>
 
