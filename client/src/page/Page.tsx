@@ -109,10 +109,9 @@ export function Page() {
             >
               Story Engine
             </a>
-            . Define Worlds with setting, characters, conflicts, mechanics,
-            possible endings, and much more. Chosen Path generates prose and
-            images, reacts to player choices, applies mechanics, and coordinates
-            multiplayer.
+            . Define characters, conflicts, mechanics, possible endings, and
+            much more. Chosen Path generates prose and images, applies
+            mechanics, and coordinates multiplayer.
             {/* <a
               href="/users/signin"
               onClick={(e) => {
