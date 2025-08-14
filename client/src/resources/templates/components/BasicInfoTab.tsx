@@ -435,7 +435,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                   link="/academy/success-failure"
                 />
               </h3>
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {DEFAULT_DIFFICULTY_LEVELS.map((defaultLevel) => {
                   const active = (data.levels || []).find(
                     (tl) => tl.modifier === defaultLevel.modifier
@@ -447,7 +447,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                   return (
                     <div
                       key={defaultLevel.modifier}
-                      className="p-3 bg-primary-50 rounded-md border border-primary-100"
+                      className="p-3 rounded-md border border-primary-100"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
