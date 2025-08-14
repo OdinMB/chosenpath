@@ -42,9 +42,6 @@ export const UsersHeader: React.FC = () => {
       <div className="container mx-auto px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="w-24"></div> {/* Left spacer */}
-          <h1 className="hidden md:block text-2xl font-bold text-secondary">
-            Account
-          </h1>
           <div className="w-24 flex justify-end">{/* Right spacer */}</div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useAuth } from "client/shared/auth/useAuth.js";
 import { useUserAccountModal } from "../hooks/useUserAccountModal.js";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Icons } from "../../shared/components/ui/Icons";
 import { useMemo } from "react";
 import { useSession } from "client/shared/session/useSession.js";
@@ -10,6 +10,7 @@ export function UserAccountHeader() {
   const { user, isAuthenticated, logout, isLoading: authIsLoading } = useAuth();
   const { openLoginModal, AccountModal } = useUserAccountModal();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { storyFeed, isLoading: isSessionLoading } = useSession();
 
   const derivedCounts = useMemo(() => {
@@ -49,6 +50,11 @@ export function UserAccountHeader() {
     navigate(path);
   };
 
+  const isAdminActive = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isUsersActive =
+    (pathname === "/users" || pathname.startsWith("/users/")) &&
+    pathname !== "/users/signin";
+
   // Basic badge component for pending count
   const NotificationBadge: React.FC<{ count: number }> = ({ count }) => (
     <span className="ml-1 bg-red-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-md flex items-center justify-center min-w-[18px] h-4">
@@ -71,19 +77,31 @@ export function UserAccountHeader() {
               </button>
 
               {user?.roleId === "role_admin" && (
-                <button
-                  onClick={() => handleNavigate("/admin")}
-                  className="text-slate-700 hover:text-primary-600 hover:underline py-1"
+                <a
+                  href="/admin"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNavigate("/admin");
+                  }}
+                  className={`text-slate-700 hover:text-primary-600 py-1 ${
+                    isAdminActive ? "font-semibold text-primary-700" : ""
+                  }`}
                 >
                   Admin
-                </button>
+                </a>
               )}
-              <button
-                onClick={() => handleNavigate("/users")}
-                className="text-slate-700 hover:text-primary-600 hover:underline py-1"
+              <a
+                href="/users"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigate("/users");
+                }}
+                className={`text-slate-700 hover:text-primary-600 py-1 ${
+                  isUsersActive ? "font-semibold text-primary-700" : ""
+                }`}
               >
                 Account
-              </button>
+              </a>
               {/* Story Counts Display */}
               {!isSessionLoading && derivedCounts && (
                 <div className="flex items-center text-slate-700">
