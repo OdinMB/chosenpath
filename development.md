@@ -2,11 +2,13 @@ Smaller commits!
 
 # NEXT
 
-- 1: Link to relevant lectures in the template form sections
+- 1: Link to relevant lectures
 - 2: Integrate AI Iterations into the different template sections
+  If World is sparse: suggest to create an AI draft
 - 2: flag missing images if containsImages = true in Media, Elements, and Players
-- 1: fix tooltip to not go beyond display borders
+- 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
 
+- 1: fix tooltip to not go beyond display borders
 - 2: meet future self should only have one possible identity
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.

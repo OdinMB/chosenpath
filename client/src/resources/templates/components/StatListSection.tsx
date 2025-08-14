@@ -1,4 +1,5 @@
-import { InfoIcon, PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextButton } from "components";
 import { Stat } from "core/types";
 import { StatListItem } from "./StatListItem";
 import { StatEditor } from "./StatEditor";
@@ -26,7 +27,6 @@ interface StatListSectionProps {
 
 export function StatListSection({
   title,
-  tooltip,
   icon,
   iconColor,
   stats,
@@ -47,7 +47,7 @@ export function StatListSection({
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold flex items-center">
             <span
               className={`w-3 h-3 rounded-full ${iconColor} mr-2`}
@@ -55,7 +55,45 @@ export function StatListSection({
             ></span>
             {title}
           </h3>
-          <InfoIcon tooltipText={tooltip} position="right" className="ml-2" />
+          <AcademyContextButton
+            mode="icon"
+            content={
+              type === "shared" ? (
+                <div>
+                  <div className="font-semibold mb-2">Shared Stats</div>
+                  <div className="text-sm mb-2">
+                    Shared stats have the same values for all players. Good for
+                    world conditions, faction relationships, or assets that are
+                    shared by all players.
+                  </div>
+                  <div className="text-sm mb-2">
+                    <em>Examples:</em> Kingdom Wealth, Spaceship Integrity.
+                  </div>
+                  <div className="text-sm">
+                    For more information, see the lecture on "Stats".
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-semibold mb-2">Player Stats</div>
+                  <div className="text-sm mb-2">
+                    Player stats have different values for each player. Good for
+                    personal skills, individual relationships, or
+                    character-specific resources.
+                  </div>
+                  <div className="text-sm mb-2">
+                    <em>Examples:</em> Sanity, Community Standing, Romantic
+                    Interest.
+                  </div>
+                  <div className="text-sm">
+                    For more, see “Shared vs. Player Stats” in the "Stats"
+                    lecture.
+                  </div>
+                </div>
+              )
+            }
+            link="/academy/stats"
+          />
         </div>
         {!readOnly && (
           <PrimaryButton

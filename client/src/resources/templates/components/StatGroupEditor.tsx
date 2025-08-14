@@ -1,5 +1,6 @@
 import React from "react";
-import { InfoIcon, PrimaryButton, Icons, Input } from "components/ui";
+import { PrimaryButton, Icons, Input } from "components/ui";
+import { AcademyContextButton } from "components";
 import { ExpandableItem } from "components";
 import { useStatGroupEditor } from "../hooks/useStatGroupEditor";
 
@@ -61,12 +62,23 @@ export const StatGroupEditor: React.FC<StatGroupEditorProps> = ({
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <h3 className="font-semibold">Stat Groups</h3>
-          <InfoIcon
-            tooltipText="Categories to organize stats in the game's user interface"
-            position="right"
-            className="ml-2"
+          <AcademyContextButton
+            mode="icon"
+            content={
+              <div>
+                <div className="font-semibold mb-2">Stat Groups</div>
+                <div className="text-sm mb-2">
+                  Organize stats into groups for the user interface. This has no
+                  mechanical effect but improves clarity.
+                </div>
+                <div className="text-sm">
+                  See “Stat Groups” in the "Stats" lecture.
+                </div>
+              </div>
+            }
+            link="/academy/stats"
           />
         </div>
         {!readOnly && (

@@ -1,7 +1,8 @@
 import React from "react";
 import { Outcome, ExplorationResolution, ResolutionType } from "core/types";
 import { ExpandableItem } from "components";
-import { InfoIcon, Input, Select } from "components/ui";
+import { Input, Select } from "components/ui";
+import { AcademyContextButton } from "components";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
 
 interface OutcomeEditorProps {
@@ -40,6 +41,30 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
       <div className="flex-1 space-y-4">
         <div className="flex items-center gap-2">
           <span className="font-semibold w-36">Question</span>
+          <AcademyContextButton
+            mode="icon"
+            content={
+              <div>
+                <div className="font-semibold mb-2">Outcome Question</div>
+                <div className="text-sm mb-2">
+                  An Outcome is a central question that drives the narrative and
+                  determines how the story will end.
+                </div>
+                <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+                  <li>Will there be war between Orania and Kelkia?</li>
+                  <li>Will the players identify the murderer?</li>
+                  <li>
+                    How will the relationship with Mia look like in the end?
+                  </li>
+                </ul>
+                <div className="text-sm">
+                  For more information, see the lecture “The Drivers: Outcomes,
+                  Milestones, Resolutions”.
+                </div>
+              </div>
+            }
+            link="/academy/outcomes-milestones-resolutions"
+          />
           <Input
             className="flex-1"
             value={data.question}
@@ -61,17 +86,45 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="font-semibold w-30">Milestones</span>
-          <InfoIcon
-            tooltipText="1 for side-outcomes, 2 as default, 3 for particularly important outcomes"
-            position="right"
-            className="ml-2 mt-1"
+          <span className="font-semibold w-36">Milestones</span>
+          <AcademyContextButton
+            mode="icon"
+            content={
+              <div>
+                <div className="font-semibold mb-2">Milestones</div>
+                <div className="text-sm mb-2">
+                  Milestones are the significant steps that bring an Outcome
+                  closer to its resolution. Use 1 Milestone for side-outcomes, 2
+                  as a default, and 3 for important outcomes. Example for a
+                  mystery story:
+                </div>
+                <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+                  <li>
+                    <strong>1 Milestone:</strong> Will the player reconnect with
+                    their estranged brother?
+                  </li>
+                  <li>
+                    <strong>2 Milestones:</strong> Will the player be able to
+                    stay untouched by the curse?
+                  </li>
+                  <li>
+                    <strong>3 Milestones:</strong> Will the players stop the
+                    Faceless Crows before it's too late?
+                  </li>
+                </ul>
+                <div className="text-sm">
+                  For more information, see the lecture “The Drivers: Outcomes,
+                  Milestones, Resolutions”.
+                </div>
+              </div>
+            }
+            link="/academy/outcomes-milestones-resolutions"
           />
           <Input
             type="number"
             min={1}
             max={3}
-            className="max-w-16"
+            className="flex-1 max-w-16"
             value={data.intendedNumberOfMilestones}
             onChange={(e) =>
               onChange({
@@ -85,12 +138,48 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
 
         <div>
           <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
               <h4 className="font-semibold">Possible Resolutions</h4>
-              <InfoIcon
-                tooltipText="Different ways this outcome could be resolved"
-                position="right"
-                className="ml-2 mt-1"
+              <AcademyContextButton
+                mode="icon"
+                content={
+                  <div>
+                    <div className="font-semibold mb-2">
+                      Possible Resolutions
+                    </div>
+                    <div className="text-sm mb-2">
+                      Possible answers to the question defined above. Challenge
+                      outcomes use Favorable, Mixed, and Unfavorable
+                      resolutions. Exploration outcomes list multiple
+                      qualitative resolutions.
+                    </div>
+                    <div className="text-sm mb-2">
+                      Will the players stop the Faceless Crows before it's too
+                      late?
+                    </div>
+                    <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+                      <li>
+                        <strong>Favorable:</strong> The players bring the
+                        Faceless Crows to justice before they can complete their
+                        ritual.
+                      </li>
+                      <li>
+                        <strong>Unfavorable:</strong> The Faceless Crows perform
+                        their ritual. Castle Traven is destroyed.
+                      </li>
+                      <li>
+                        <strong>Mixed:</strong> The players prevent the Faceless
+                        Crows from performing their ritual, but the members of
+                        the group are still at large.
+                      </li>
+                    </ul>
+                    <div className="text-sm">
+                      For more information, see the lecture “The Drivers:
+                      Outcomes, Milestones, Resolutions”.
+                    </div>
+                  </div>
+                }
+                link="/academy/outcomes-milestones-resolutions"
               />
             </div>
             {!readOnly && (

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { PlayerCount, DifficultyLevel } from "core/types";
+import { PlayerCount, DifficultyLevel, PublicationStatus } from "core/types";
 import {
   Input,
   TextArea,
@@ -8,7 +8,13 @@ import {
   Checkbox,
   // Tooltip, // No longer directly used here for sliders
 } from "components/ui";
-import { ArrayField, TagSelector, ExpandableItem } from "components";
+import {
+  ArrayField,
+  TagSelector,
+  ExpandableItem,
+  AcademyContextButton,
+} from "components";
+import { ShareLink } from "components/ShareLink";
 import { TAG_CATEGORIES } from "client/resources/templates/tagCategories";
 import {
   DEFAULT_DIFFICULTY_LEVELS,
@@ -44,6 +50,11 @@ interface BasicInfoTabProps {
   getMaxTurnsOptions: () => number[];
   gameModeOptions: Array<{ value: number; label: string }>;
   getGameModeValue: () => number;
+  // Publication status (shown only on mobile/mid screens)
+  publicationStatus?: PublicationStatus;
+  onPublicationStatusChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  canPublish?: boolean;
+  templateId?: string;
 }
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
@@ -73,6 +84,10 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   getMaxTurnsOptions,
   gameModeOptions,
   getGameModeValue,
+  publicationStatus,
+  onPublicationStatusChange,
+  canPublish,
+  templateId,
 }) => {
   // Debugging TAG_CATEGORIES
   // console.log("TAG_CATEGORIES:", TAG_CATEGORIES);
@@ -90,8 +105,84 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
   // Data models for ExpandableItem sections documented via inline generics
 
+  const PublicationStatusAcademyContent = (
+    <div>
+      <div className="font-semibold mb-2">Publication Status</div>
+      <div className="text-sm">
+        <strong>Draft:</strong> nobody can see this World
+      </div>
+      <div className="text-sm">
+        <strong>Private:</strong> players need a code to play stories in this
+        World.
+      </div>
+      <div className="text-sm">
+        <strong>Review:</strong> suggest the World to be published on
+        chosenpath.ai.
+      </div>
+      <div className="text-sm">
+        <strong>Published:</strong> World is listed on chosenpath.ai.
+      </div>
+    </div>
+  );
+
+  const DifficultyLevelsAcademyContent = (
+    <div>
+      <div className="font-semibold mb-2">Difficulty Levels</div>
+      <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+        <li>Default (0) is a good default option.</li>
+        <li>
+          Relaxed/Friendly (+10/+20) are useful for kids' and cozy slice of life
+          stories where things tend to work out for the players.
+        </li>
+        <li>
+          Challenging/Struggle (-10/-20) are useful for scenarios where things
+          are supposed to go wrong for the players.
+        </li>
+      </ul>
+      <div>
+        For more information on difficulty levels, visit the lecture on "Success
+        and Failure"
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
+      {/* Publication status shown only on mobile and mid-sized screens */}
+      {onPublicationStatusChange && (
+        <div className="flex items-start gap-2">
+          <div className="w-24 pt-2 flex items-center gap-2">
+            <span className="font-semibold">Status</span>
+            <AcademyContextButton
+              mode="icon"
+              content={PublicationStatusAcademyContent}
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <Select
+              value={publicationStatus || PublicationStatus.Draft}
+              onChange={onPublicationStatusChange}
+              variant="default"
+              size="md"
+              className="w-44 h-10"
+            >
+              <option value={PublicationStatus.Draft}>Draft</option>
+              <option value={PublicationStatus.Review}>Review</option>
+              {canPublish && (
+                <option value={PublicationStatus.Published}>Published</option>
+              )}
+              <option value={PublicationStatus.Private}>Private</option>
+            </Select>
+            {templateId &&
+              (publicationStatus === PublicationStatus.Published ||
+                publicationStatus === PublicationStatus.Private) && (
+                <div className="ml-1">
+                  <ShareLink templateId={templateId} showText={false} />
+                </div>
+              )}
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <span className="font-semibold w-24">Title</span>
         <Input
@@ -174,11 +265,24 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <label className="text-sm text-gray-600 whitespace-nowrap mr-2">
               Mode:
             </label>
-            <InfoIcon
-              tooltipText={
-                "Cooperative: work together toward a shared outcome.\nMixed: cooperate overall but with individual edges.\nCompetitive: compete to win against others."
+            <AcademyContextButton
+              mode="icon"
+              content={
+                <div className="text-sm">
+                  <div>
+                    <strong>Cooperative:</strong> players work together toward
+                    shared outcomes.
+                  </div>
+                  <div>
+                    <strong>Mixed:</strong> players cooperate overall but also
+                    have individual goals that can distract them from shared
+                    goals.
+                  </div>
+                  <div>
+                    <strong>Competitive:</strong> players have competing goals.
+                  </div>
+                </div>
               }
-              position="right"
               className="mr-1"
             />
             <div className={playerCountMax === 1 ? "opacity-50" : ""}>
@@ -255,7 +359,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
       <ExpandableItem<{ levels: DifficultyLevel[] }>
         id="difficulty-levels"
         title={
-          <span className="font-semibold">Available Difficulty Levels</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Available Difficulty Levels</span>
+            <AcademyContextButton
+              mode="icon"
+              content={DifficultyLevelsAcademyContent}
+              link="/academy/success-failure"
+            />
+          </div>
         }
         data={{ levels: difficultyLevels }}
         editingSet={editingBoxes}
@@ -274,6 +385,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             .join(" / ");
           return <div className="text-sm text-gray-600 mt-1">{summary}</div>;
         })()}
+        customActionsRight={undefined}
         renderEditForm={(data, onChange) => {
           const handleLevelCheck = (
             defaultLevel: DifficultyLevel,
@@ -315,20 +427,14 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
           return (
             <div className="space-y-3 pt-1">
-              <h3 className="text-lg font-semibold">
-                Available Difficulty Levels
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <span>Available Difficulty Levels</span>
+                <AcademyContextButton
+                  mode="icon"
+                  content={DifficultyLevelsAcademyContent}
+                  link="/academy/success-failure"
+                />
               </h3>
-              <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
-                <li>Default (0) is a good default option.</li>
-                <li>
-                  Relaxed/Friendly (+10/+20) are useful for kids' and cozy slice
-                  of life stories where things tend to work out for the players.
-                </li>
-                <li>
-                  Challenging/Struggle (-10/-20) are useful for scenarios where
-                  things are supposed to go wrong for the players.
-                </li>
-              </ul>
               <div className="space-y-4">
                 {DEFAULT_DIFFICULTY_LEVELS.map((defaultLevel) => {
                   const active = (data.levels || []).find(

@@ -10,6 +10,7 @@ import {
 } from "core/types";
 import { ExpandableItem } from "components";
 import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextButton } from "components";
 import { PlayerIdentityEditor, PlayerBackgroundEditor } from "./";
 import { OutcomePlayer } from "./PlayerOutcomes";
 
@@ -138,7 +139,42 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
         {/* Character Identities */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="font-semibold mb-1">Character Identities</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">Character Identities</h3>
+              <AcademyContextButton
+                mode="icon"
+                className="align-middle"
+                content={
+                  <div>
+                    <div className="font-semibold mb-2">
+                      Character Identities
+                    </div>
+                    <div className="text-sm mb-2">
+                      At the beginning of a story, players select one Identity
+                      and one Background. Providing three possible Identities
+                      and three possible Backgrounds is a good default.
+                    </div>
+                    <div className="text-sm mb-2">
+                      Identities have no mechanical effects. They should be
+                      consistent with each Background that is available to the
+                      player. For each Identity, define a set of pronouns,
+                      appearance, and mannerisms.
+                    </div>
+                    <div className="text-sm mb-2">
+                      For multiplayer games, make sure that Identities do not
+                      overlap between players. (There shouldn't be two Tommys in
+                      a multiplayer game, nor should there be two lead
+                      guitarists.)
+                    </div>
+                    <div className="text-sm">
+                      For more information, see the lecture “The Setting: Breath
+                      Life Into Your World ”.
+                    </div>
+                  </div>
+                }
+                link="/academy/setting"
+              />
+            </div>
             {!readOnly && (
               <PrimaryButton
                 variant="outline"
@@ -177,7 +213,54 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
         {/* Character Backgrounds */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="font-semibold mb-1">Character Backgrounds</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">Character Backgrounds</h3>
+              <AcademyContextButton
+                mode="icon"
+                className="align-middle"
+                content={
+                  <div>
+                    <div className="font-semibold mb-2">
+                      Character Backgrounds
+                    </div>
+                    <div className="text-sm mb-2">
+                      At the beginning of a story, players select one Identity
+                      and one Background. Providing three possible Identities
+                      and three possible Backgrounds is a good default.
+                    </div>
+                    <div className="text-sm mb-2">
+                      Backgrounds define starting values for player stats. The
+                      combination of starting values should be balanced between
+                      the different Backgrounds.
+                    </div>
+                    <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+                      <li>
+                        <strong>Tech-Savvy Maverick:</strong> 2 helpful skills,
+                        0 contacts, Respected
+                      </li>
+                      <li>
+                        <strong>Networked Advocate:</strong> 1 helpful skills, 2
+                        contact, Unknown
+                      </li>
+                      <li>
+                        <strong>Balanced Urbanite:</strong> 2 helpful skills, 1
+                        contacts, Unknown
+                      </li>
+                    </ul>
+                    <div className="text-sm mb-2">
+                      For multiplayer games, make sure that Backgrounds do not
+                      overlap between players. (There shouldn't be two criminal
+                      bards in a fantasy adventure group.)
+                    </div>
+                    <div className="text-sm">
+                      For more information, see the lecture “Stats: Modeling the
+                      World”.
+                    </div>
+                  </div>
+                }
+                link="/academy/stats"
+              />
+            </div>
             {!readOnly && (
               <PrimaryButton
                 variant="outline"
@@ -211,7 +294,7 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
 
         {/* Individual Outcomes */}
         <OutcomePlayer
-          title="Individual Outcomes"
+          title="Player-specific Outcomes"
           playerSlot={playerSlot}
           playerOptions={playerOptions}
           editingOutcomes={editingOutcomes}

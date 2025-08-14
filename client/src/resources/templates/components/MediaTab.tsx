@@ -55,7 +55,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             }`}
           >
             <span className="font-semibold">
-              Use pregenerated World images in stories.
+              Use pregenerated World images in stories
             </span>
           </label>
         </div>

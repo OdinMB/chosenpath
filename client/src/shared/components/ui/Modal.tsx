@@ -12,6 +12,9 @@ export interface ModalProps {
   showCloseButton?: boolean;
   closeOnBackdropClick?: boolean;
   fullScreen?: boolean;
+  /** Optional image header at the top of the modal */
+  headerImageSrc?: string;
+  headerImageAlt?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -24,6 +27,8 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
   closeOnBackdropClick = true,
   fullScreen = false,
+  headerImageSrc,
+  headerImageAlt = "",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -70,19 +75,38 @@ export const Modal: React.FC<ModalProps> = ({
         ref={modalRef}
         className={`relative bg-white rounded-lg shadow-xl w-full ${widthClasses[width]} ${className}`}
       >
-        {(title || showCloseButton) && (
-          <div className="flex justify-between items-center p-4 border-b">
-            {title && <h2 className="text-lg font-medium">{title}</h2>}
+        {headerImageSrc ? (
+          <div className="relative w-full overflow-hidden rounded-t-lg">
+            <img
+              src={headerImageSrc}
+              alt={headerImageAlt}
+              className="w-full h-28 object-cover"
+            />
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 ml-auto"
+                className="absolute top-3 right-3 bg-white rounded-md shadow p-1 text-gray-700 hover:text-gray-900"
                 aria-label="Close"
               >
                 <Icons.Close className="h-5 w-5" />
               </button>
             )}
           </div>
+        ) : (
+          (title || showCloseButton) && (
+            <div className="flex justify-between items-center p-4 border-b">
+              {title && <h2 className="text-lg font-medium">{title}</h2>}
+              {showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="text-gray-500 hover:text-gray-700 ml-auto"
+                  aria-label="Close"
+                >
+                  <Icons.Close className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          )
         )}
         <div className="p-4">{children}</div>
       </div>

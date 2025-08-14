@@ -1,5 +1,6 @@
 import React from "react";
 import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextButton } from "components";
 import { Outcome, PlayerOptionsGeneration, PlayerSlot, Stat } from "core/types";
 // MAX_PLAYERS handled within PlayerOutcomesAll
 import { OutcomeEditor } from "./OutcomeEditor";
@@ -41,8 +42,40 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Shared Outcomes</h3>
+          <AcademyContextButton
+            mode="icon"
+            content={
+              <div>
+                <div className="font-semibold mb-2">Shared Outcomes</div>
+                <div className="text-sm mb-2">
+                  Apply to all players in the story. Address big questions that
+                  affect everyone. In multiplayer games that are collaborative
+                  (or mixed), all players try to achieve the shared outcomes
+                  together. In competitive games, players compete for shared
+                  outcomes to go their way.
+                </div>
+                <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+                  <li>
+                    <strong>Collaborative:</strong> Will the Hero Guilds reform
+                    their anti-goblin policies? (Assuming all players are Goblin
+                    activists.)
+                  </li>
+                  <li>
+                    <strong>Competitive:</strong> Who will become the King's
+                    Black Hand? (In a World in which players compete for
+                    positions at a royal court.)
+                  </li>
+                </ul>
+                <div className="text-sm">
+                  For more information, see the lecture “The Drivers: Outcomes,
+                  Milestones, Resolutions”.
+                </div>
+              </div>
+            }
+            link="/academy/outcomes-milestones-resolutions"
+          />
         </div>
         {!readOnly && (
           <PrimaryButton

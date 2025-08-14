@@ -310,7 +310,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             {formData.title ? formData.title : "New Template"}
           </h2>
           {/* Desktop save button (kept next to title) */}
-          <div className="hidden md:flex gap-2">
+          <div className="hidden lg:flex gap-2">
             <PrimaryButton
               type="submit"
               disabled={isLoading}
@@ -379,7 +379,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         <div className="flex items-center gap-3 mb-2">
           {/* Allow all users to select a publication status, but restrict 'Published' option if !canPublish */}
-          <div className="flex items-center w-full md:w-auto">
+          <div className="hidden">
             <Select
               value={formData.publicationStatus || PublicationStatus.Draft}
               onChange={handlePublicationStatusChange}
@@ -424,35 +424,49 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                   <ShareLink templateId={formData.id} showText={false} />
                 </div>
               )}
-            {/* Mobile save button aligned with status */}
-            <div className="ml-auto md:hidden">
-              <PrimaryButton
-                type="submit"
-                disabled={isLoading}
-                isLoading={isLoading}
-                size="sm"
-              >
-                Save
-              </PrimaryButton>
-            </div>
           </div>
 
           {/* ShareLink moved inside the status block above for consistent grouping */}
         </div>
 
-        {/* Separate the tabs control from the status/save row and the tab content on mobile */}
-        <Tabs
-          items={tabItems}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          variant="bordered"
-          collapseToSelectOnMobile={true}
-          collapseBelow="lg"
-          collapsedSelectSpacingClass="mt-0 mb-4"
-        />
+        {/* Tabs with mobile save button aligned on the right */}
+        <div className="lg:hidden flex items-center gap-2 mb-2">
+          <div className="flex-1">
+            <Tabs
+              items={tabItems}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              variant="bordered"
+              collapseToSelectOnMobile={true}
+              collapseBelow="lg"
+              collapsedSelectSpacingClass="mt-0"
+            />
+          </div>
+          <PrimaryButton
+            type="submit"
+            disabled={isLoading}
+            isLoading={isLoading}
+            size="sm"
+            className="h-10 px-4"
+          >
+            Save
+          </PrimaryButton>
+        </div>
         {/* Short centered divider shown only when dropdown is visible (below lg) */}
-        <div className="lg:hidden -mt-2 mb-16 flex justify-center">
+        <div className="lg:hidden -mt-1 mb-8 flex justify-center">
           <div className="h-px w-40 bg-gray-200 rounded-full"></div>
+        </div>
+        {/* Desktop/large tabs */}
+        <div className="hidden lg:block">
+          <Tabs
+            items={tabItems}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            variant="bordered"
+            collapseToSelectOnMobile={true}
+            collapseBelow="lg"
+            collapsedSelectSpacingClass="mt-0 mb-4"
+          />
         </div>
 
         <div className="mt-4 md:mt-6">
@@ -488,6 +502,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               }
               difficultyLevels={formData.difficultyLevels || []}
               handleDifficultyLevelsChange={handleDifficultyLevelsChange}
+              // Mobile/mid publication status controls
+              publicationStatus={formData.publicationStatus}
+              onPublicationStatusChange={handlePublicationStatusChange}
+              canPublish={canPublish}
+              templateId={formData.id}
             />
           )}
 
@@ -623,18 +642,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             </div>
           )}
         </div>
-        {/* Mobile bottom Save button */}
-        <div className="md:hidden mt-6">
-          <PrimaryButton
-            type="submit"
-            disabled={isLoading}
-            isLoading={isLoading}
-            size="md"
-            className="w-full"
-          >
-            Save
-          </PrimaryButton>
-        </div>
+        {/* Mobile bottom Save button removed in favor of Save next to tab dropdown */}
       </form>
 
       {/* Render the AI-iterate tab outside the main form */}

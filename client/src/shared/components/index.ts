@@ -20,3 +20,4 @@ export {
 } from "./TableFilterSort";
 export { DiscordButton } from "./DiscordButton";
 export { AcademyButton } from "./AcademyButton";
+export { AcademyContextButton } from "./AcademyContextButton";

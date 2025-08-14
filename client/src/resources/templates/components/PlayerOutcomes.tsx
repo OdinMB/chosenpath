@@ -2,8 +2,33 @@ import React from "react";
 import { PlayerOptionsGeneration, PlayerSlot, Stat, Outcome } from "core/types";
 import { MAX_PLAYERS } from "core/config";
 import { PrimaryButton, Icons, Select } from "components/ui";
+import { AcademyContextButton } from "components";
 import { OutcomeEditor } from "./OutcomeEditor";
 import { usePlayerEditor } from "../hooks/usePlayerEditor";
+
+const PLAYER_OUTCOMES_ACADEMY_LINK = "/academy/outcomes-milestones-resolutions";
+const PlayerOutcomesAcademyContent = (
+  <div>
+    <div className="font-semibold mb-2">Player Outcomes</div>
+    <div className="text-sm mb-2">
+      Apply to a single player. Focus on personal arcs and stakes.
+    </div>
+    <div className="text-sm mb-2">
+      In a collaborative (or mixed) multiplayer game, Player Outcomes can
+      distract players from pursuing shared goals. In a competitive multiplayer
+      game, personal outcomes can distract players from competing over contested
+      (shared) outcomes.
+    </div>
+    <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1 mb-2">
+      <li>How will the relationship with Mia look like in the end?</li>
+      <li>Will the player get their wizard license?</li>
+    </ul>
+    <div className="text-sm">
+      For more information, see the lecture “The Drivers: Outcomes, Milestones,
+      Resolutions”.
+    </div>
+  </div>
+);
 
 // Managed section: renders outcomes for all players and manages its own state via usePlayerEditor
 interface PlayerOutcomesAllProps {
@@ -37,8 +62,14 @@ export const OutcomePlayerSection: React.FC<PlayerOutcomesAllProps> = ({
 
   return (
     <div className="mt-8 space-y-6">
-      <div className="flex items-center">
-        <h3 className="text-lg font-semibold mt-4">Player-specific Outcomes</h3>
+      <div className="flex items-center gap-2 mt-4">
+        <h3 className="text-lg font-semibold">Player-specific Outcomes</h3>
+        <AcademyContextButton
+          mode="icon"
+          className="align-middle"
+          content={PlayerOutcomesAcademyContent}
+          link={PLAYER_OUTCOMES_ACADEMY_LINK}
+        />
       </div>
 
       {Array.from({ length: MAX_PLAYERS }, (_, i) => {
@@ -161,7 +192,15 @@ export const OutcomePlayer: React.FC<PlayerOutcomesForPlayerProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="font-semibold mb-1">{title}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold">{title}</h3>
+          <AcademyContextButton
+            mode="icon"
+            className="align-middle"
+            content={PlayerOutcomesAcademyContent}
+            link={PLAYER_OUTCOMES_ACADEMY_LINK}
+          />
+        </div>
         {!readOnly && (
           <div className="flex gap-2">
             <PrimaryButton

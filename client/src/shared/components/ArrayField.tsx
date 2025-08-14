@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Icons, Input, PrimaryButton, InfoIcon } from "components/ui";
 
 export interface ArrayFieldProps {
-  title?: string;
+  title?: string | React.ReactNode;
   tooltipText?: string;
   items: string[];
   onChange?: (items: string[]) => void;
@@ -15,6 +15,7 @@ export interface ArrayFieldProps {
   showLabel?: boolean;
   inline?: boolean;
   readOnly?: boolean;
+  extraHeaderContent?: React.ReactNode;
 }
 
 export const ArrayField: React.FC<ArrayFieldProps> = ({
@@ -31,6 +32,7 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
   showLabel = true,
   inline = false,
   readOnly = false,
+  extraHeaderContent,
 }) => {
   const [items, setItems] = useState<string[]>(initialItems);
 
@@ -59,15 +61,16 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
     onChange?.(updatedItems);
   };
 
-  const fieldId = title
-    ? title.toLowerCase().replace(/\s+/g, "-")
-    : "array-field";
+  const fieldId =
+    title && typeof title === "string"
+      ? title.toLowerCase().replace(/\s+/g, "-")
+      : "array-field";
 
   return (
     <div className={className}>
       {(title || label) && (
         <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             {showLabel && <h3 className="font-semibold">{title || label}</h3>}
             {tooltipText && (
               <InfoIcon
@@ -76,6 +79,7 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
                 className="ml-2"
               />
             )}
+            {extraHeaderContent}
           </div>
           {!readOnly && (
             <PrimaryButton
@@ -127,9 +131,9 @@ export const ArrayField: React.FC<ArrayFieldProps> = ({
                 type="button"
                 onClick={() => handleRemoveItem(index)}
                 className="text-tertiary hover:text-tertiary-700"
-                aria-label={`Remove ${title ? title.toLowerCase() : "item"} ${
-                  index + 1
-                }`}
+                aria-label={`Remove ${
+                  typeof title === "string" ? title.toLowerCase() : "item"
+                } ${index + 1}`}
               >
                 <Icons.Trash className="h-4 w-4" />
               </button>

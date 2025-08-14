@@ -50,13 +50,22 @@ export const StatsTab = ({
   // Automatically validate and fix background completeness when player stats change
   useEffect(() => {
     if (readOnly || !onChange) return;
-    
-    const validatedPlayerOptions = ensureBackgroundCompleteness(playerOptions, playerStats);
+
+    const validatedPlayerOptions = ensureBackgroundCompleteness(
+      playerOptions,
+      playerStats
+    );
     if (validatedPlayerOptions !== playerOptions) {
       console.log("Auto-correcting background completeness");
       onChange({ playerOptions: validatedPlayerOptions });
     }
-  }, [playerStats, playerOptions, ensureBackgroundCompleteness, onChange, readOnly]);
+  }, [
+    playerStats,
+    playerOptions,
+    ensureBackgroundCompleteness,
+    onChange,
+    readOnly,
+  ]);
 
   const handleUpdateStatGroups = (updatedGroups: string[]) => {
     if (readOnly || !onChange) return;

@@ -1,6 +1,7 @@
 import React from "react";
 import { StoryElement, ImageInstructions } from "core/types";
-import { InfoIcon, PrimaryButton, Icons } from "components/ui";
+import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextButton } from "components";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 import { StoryElementEditor } from "./StoryElementEditor";
 import { useParams } from "react-router-dom";
@@ -63,12 +64,36 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Story Elements</h3>
-          <InfoIcon
-            tooltipText="Objects, characters, or concepts that players can interact with"
-            position="right"
-            className="ml-2 mt-1"
+          <AcademyContextButton
+            mode="icon"
+            content={
+              <div>
+                <div className="font-semibold mb-2">Story Elements</div>
+                <div className="text-sm mb-2">
+                  Story Elements add specific ingredients to your World. You
+                  define an initial set, and the AI will add more as the story
+                  progresses.
+                </div>
+                <div className="text-sm mb-2">
+                  They can be characters, locations, items, rumors, factions,
+                  events, or anything else that matters in your World.
+                </div>
+                <div className="text-sm mb-2">
+                  <em>Example (Gruk):</em> Role: Leader of the largest goblin
+                  enclave. Instructions: Can mobilize goblins or provide
+                  sanctuary; expects loyalty. Appearance: Broad-shouldered
+                  goblin with a missing ear and tattoos. Facts: Has a secret
+                  truce with a local hero.
+                </div>
+                <div className="text-sm">
+                  For more information, see the “Story Elements” section of the
+                  lecture on "The Setting."
+                </div>
+              </div>
+            }
+            link="/academy/setting"
           />
         </div>
         {!readOnly && (

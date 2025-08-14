@@ -50,6 +50,8 @@ interface ExpandableItemProps<T> {
   image?: ReactNode;
   /** Optional description to show in collapsed view */
   description?: ReactNode;
+  /** Optional custom nodes rendered after the built-in action icons (collapsed header) */
+  customActionsRight?: ReactNode;
 }
 
 export function ExpandableItem<T>({
@@ -66,6 +68,7 @@ export function ExpandableItem<T>({
   actionIcons = [],
   image,
   description,
+  customActionsRight,
 }: ExpandableItemProps<T>) {
   const isEditing = editingSet.has(id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -189,7 +192,7 @@ export function ExpandableItem<T>({
           <div className="flex-1">
             <div className="flex justify-between">
               <span className="font-medium">{title}</span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <button
                   onClick={handleStartEditing}
                   className="text-secondary hover:text-secondary-700"
@@ -197,6 +200,8 @@ export function ExpandableItem<T>({
                 >
                   <Icons.Edit className="h-5 w-5" />
                 </button>
+
+                {customActionsRight}
 
                 {/* Render additional action icons */}
                 {actionIcons.map((actionIcon, index) => (
