@@ -60,14 +60,14 @@ export const Modal: React.FC<ModalProps> = ({
     xl: "max-w-xl",
     "2xl": "max-w-2xl",
     "5xl": "max-w-5xl",
-    full: "max-w-full mx-4",
+    full: "max-w-full",
   };
 
   const modalContent = (
     <div
       className={`fixed inset-0 bg-black/50 flex items-center justify-center ${
         fullScreen ? "z-[9999]" : "z-50"
-      } overflow-y-auto`}
+      } overflow-y-auto ${fullScreen ? "" : "px-2 sm:px-0"}`}
       onClick={handleBackdropClick}
       style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}
     >
