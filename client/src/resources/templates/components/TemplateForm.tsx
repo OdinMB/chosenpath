@@ -642,7 +642,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             </div>
           )}
         </div>
-        {/* Mobile bottom Save button removed in favor of Save next to tab dropdown */}
+        {/* Mobile bottom Save button (reintroduced for convenience on small screens) */}
+        <div className="md:hidden mt-8">
+          <PrimaryButton
+            type="submit"
+            disabled={isLoading}
+            isLoading={isLoading}
+            size="lg"
+            className="w-full"
+          >
+            Save
+          </PrimaryButton>
+        </div>
       </form>
 
       {/* Render the AI-iterate tab outside the main form */}
