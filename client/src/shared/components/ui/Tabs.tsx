@@ -12,7 +12,7 @@ type TabsProps<T extends string> = {
   items: TabItem<T>[];
   activeTab: T;
   onTabChange: (tab: T) => void;
-  variant?: "default" | "underline" | "bordered";
+  variant?: "default" | "underline" | "bordered" | "submenu";
   size?: "sm" | "md" | "lg";
   // When true, render a mobile-friendly select on small screens
   collapseToSelectOnMobile?: boolean;
@@ -34,6 +34,32 @@ export const Tabs = <T extends string>({
   collapsedSelectSpacingClass = "mt-2 mb-6",
 }: TabsProps<T>) => {
   const [hoveredTab, setHoveredTab] = useState<T | null>(null);
+
+  // Submenu variant: styled like UserAccountHeader, no underline indicator, no collapse
+  if (variant === "submenu") {
+    return (
+      <div className="bg-slate-25 border-b border-slate-200 px-4 py-1 text-sm">
+        <div className="container mx-auto">
+          <nav className="flex w-full overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap justify-center items-center gap-x-4 md:gap-x-5 h-auto md:h-8 min-h-[32px] mx-auto">
+              {items.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`text-slate-700 hover:text-primary-600 py-1 ${
+                    activeTab === tab.id ? "font-semibold text-primary-700" : ""
+                  }`}
+                  onClick={() => onTabChange(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </nav>
+        </div>
+      </div>
+    );
+  }
   const getBgClass = (category?: TabCategory) => {
     // Unified background for active and inactive states
     switch (category) {

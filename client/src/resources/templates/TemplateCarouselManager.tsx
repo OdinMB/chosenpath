@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableItem } from "./components/SortableItem.js";
-import { PrimaryButton, InfoIcon } from "components/ui";
+import { PrimaryButton } from "components/ui";
 import { useTemplateCarouselManager } from "./hooks/useTemplateCarouselManager.js";
 
 export const TemplateCarouselManager: React.FC = () => {
@@ -54,12 +54,9 @@ export const TemplateCarouselManager: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <h2 className="text-xl font-semibold mr-2">Welcome Screen Stories</h2>
-          <InfoIcon
-            tooltipText="Drag and drop to reorder templates shown on the welcome screen"
-            position="right"
-            className="mt-1"
-          />
+          <h2 className="text-xl font-semibold text-secondary mr-2">
+            Featured Worlds
+          </h2>
         </div>
         <PrimaryButton
           onClick={saveOrder}

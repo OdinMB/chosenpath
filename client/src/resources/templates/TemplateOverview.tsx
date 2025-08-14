@@ -793,7 +793,7 @@ export const TemplateOverview = ({
     <div className="pt-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-secondary hidden md:block">
-          Templates
+          Worlds
         </h2>
         <div className="flex gap-2">
           <PrimaryButton

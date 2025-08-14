@@ -304,7 +304,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-800 truncate">
             {formData.title ? formData.title : "New Template"}
@@ -453,9 +453,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           </PrimaryButton>
         </div>
         {/* Short centered divider shown only when dropdown is visible (below lg) */}
-        <div className="lg:hidden -mt-1 mb-8 flex justify-center">
+        {/* <div className="lg:hidden mt-4 mb-8 flex justify-center">
           <div className="h-px w-40 bg-gray-200 rounded-full"></div>
-        </div>
+        </div> */}
         {/* Desktop/large tabs */}
         <div className="hidden lg:block">
           <Tabs
@@ -469,7 +469,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           />
         </div>
 
-        <div className="mt-4 md:mt-6">
+        <div className="mt-12">
           {activeTab === "basic" && (
             <BasicInfoTab
               title={formData.title || ""}

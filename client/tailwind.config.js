@@ -65,6 +65,10 @@ export default {
           800: "rgba(1, 162, 157, 0.8)",
           900: "rgba(1, 162, 157, 0.9)",
         },
+        slate: {
+          // A -bit- darker than white
+          25: "#fefefe",
+        },
       },
       boxShadow: {
         "glow-accent": "0 0 15px rgba(1, 162, 157, 0.4)",

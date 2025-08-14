@@ -175,9 +175,7 @@ export const FeedbackOverview = () => {
     <div className="space-y-6">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-xl font-semibold text-gray-900">
-            Feedback Management
-          </h1>
+          <h1 className="text-xl font-semibold text-secondary">Feedback</h1>
           <p className="mt-2 text-sm text-gray-700">
             Manage user feedback submissions and reports.
           </p>

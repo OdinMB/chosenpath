@@ -39,22 +39,12 @@ export const UsersHeader: React.FC = () => {
 
   return (
     <header className="">
-      <div className="container mx-auto px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="w-24"></div> {/* Left spacer */}
-          <div className="w-24 flex justify-end">{/* Right spacer */}</div>
-        </div>
-      </div>
-      <div className="container mx-auto px-6">
-        <div className="max-w-6xl mx-auto">
-          <Tabs
-            items={tabItems}
-            activeTab={getActiveTab()}
-            onTabChange={handleTabChange}
-            variant="underline"
-          />
-        </div>
-      </div>
+      <Tabs
+        items={tabItems}
+        activeTab={getActiveTab()}
+        onTabChange={handleTabChange}
+        variant="submenu"
+      />
     </header>
   );
 };
