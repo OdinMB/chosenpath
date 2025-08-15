@@ -3,6 +3,7 @@ import { Icons } from "components/ui";
 import { Stat } from "core/types";
 import { ConfirmDialog } from "components/ui/ConfirmDialog";
 import { ExpandableItem } from "components";
+import { StatEditor } from "./StatEditor";
 
 interface StatListItemProps {
   stat: Stat;
@@ -12,6 +13,7 @@ interface StatListItemProps {
   onConvert: (type: "shared" | "player", index: number) => void;
   onDelete: (type: "shared" | "player", index: number) => void;
   readOnly?: boolean;
+  statGroups?: string[];
 }
 
 export const StatListItem: React.FC<StatListItemProps> = ({
@@ -22,6 +24,7 @@ export const StatListItem: React.FC<StatListItemProps> = ({
   onConvert,
   onDelete,
   readOnly = false,
+  statGroups = [],
 }) => {
   const [showConvertDialog, setShowConvertDialog] = useState(false);
 
@@ -111,8 +114,22 @@ export const StatListItem: React.FC<StatListItemProps> = ({
 
   // Unlike PlayerBackgroundEditor which handles in-place editing with forms,
   // StatListItem delegates editing to a separate StatEditor component controlled by parent.
-  // We just use ExpandableItem for the list item UI consistency.
-  const renderEmptyForm = () => <div />;
+  // For read-only expanded mode, reuse StatEditor with readOnly=true to avoid duplicating UI logic.
+  const renderEmptyForm = () =>
+    readOnly ? (
+      <StatEditor
+        stat={stat}
+        index={index}
+        type={type}
+        onUpdateStat={() => {}}
+        onRemoveStat={() => {}}
+        setEditingStats={() => new Set()}
+        statGroups={statGroups || []}
+        readOnly={true}
+      />
+    ) : (
+      <div />
+    );
 
   return (
     <>

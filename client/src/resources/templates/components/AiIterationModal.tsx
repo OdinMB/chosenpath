@@ -192,6 +192,9 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               outcomes={iterationData.sharedOutcomes}
               onChange={() => {}}
               readOnly={true}
+              playerOptions={playerOptions}
+              onPlayerOptionsChange={() => {}}
+              playerStats={getEffectivePlayerStats()}
             />
           </div>
         )}
