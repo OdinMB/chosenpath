@@ -94,7 +94,7 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             placeholder="Instructions"
             placeholderShort="Instructions"
             selectedSections={["storyElements"]}
-            buttonText="Improve Story Elements"
+            buttonText="Improve Elements"
             isSparse={isSparse}
           />
         </div>

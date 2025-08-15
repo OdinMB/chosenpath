@@ -952,4 +952,21 @@ export const Icons = {
       <path d="M3 21a1 1 0 01-.707-1.707l10-10a1 1 0 011.414 0l2 2a1 1 0 010 1.414l-10 10A1 1 0 013 21zm10.707-12.121l1.414 1.414 1.293-1.293a1 1 0 10-1.414-1.414l-1.293 1.293zM5 8a1 1 0 110-2h1a1 1 0 110 2H5zm11-3a1 1 0 110-2h1a1 1 0 110 2h-1zm3 6a1 1 0 110-2h1a1 1 0 110 2h-1zm-6-5a1 1 0 110-2h1a1 1 0 110 2h-1z" />
     </svg>
   ),
+
+  Undo: ({ className = "h-5 w-5" }: IconProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+      />
+    </svg>
+  ),
 };

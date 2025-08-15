@@ -41,6 +41,11 @@ export type TabType =
   | "ai-draft"
   | "ai-iterate";
 
+interface SaveHistoryEntry {
+  template: StoryTemplate;
+  timestamp: Date;
+}
+
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
   onSave?: (template: StoryTemplate) => Promise<void>;
@@ -58,6 +63,7 @@ export function useTemplateForm({
     useState<ValidationResult | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState<StoryTemplate>(initialTemplate);
+  const [saveHistory, setSaveHistory] = useState<SaveHistoryEntry[]>([]);
   const navigate = useNavigate();
 
   // Use specialized hooks
@@ -198,6 +204,19 @@ export function useTemplateForm({
     setHasUnsavedChanges(hasChanges);
   }, [formData, savedTemplate]);
 
+  // Helper function to update save history
+  const addToSaveHistory = (template: StoryTemplate) => {
+    setSaveHistory(prev => {
+      const newEntry: SaveHistoryEntry = {
+        template: { ...template },
+        timestamp: new Date(),
+      };
+      // Keep only the last 5 saves
+      const updated = [newEntry, ...prev].slice(0, 5);
+      return updated;
+    });
+  };
+
   // Extracted function to update player background stats
   const updatePlayerBackgroundStats = (template: StoryTemplate) => {
     const relevantPlayerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
@@ -328,6 +347,7 @@ export function useTemplateForm({
       if (onSave) {
         // Use the provided onSave handler
         await onSave(templateToSubmit);
+        addToSaveHistory(savedTemplate); // Add current saved state to history before updating
         setSavedTemplate(templateToSubmit); // Update the saved template reference
         setHasUnsavedChanges(false); // Reset unsaved changes after successful save
       } else {
@@ -337,6 +357,7 @@ export function useTemplateForm({
           Logger.Admin.log("Creating new template in form", templateToSubmit);
           const response = await templateApi.createTemplate(templateToSubmit);
           Logger.Admin.log("Template created successfully", response.template);
+          addToSaveHistory(savedTemplate); // Add current saved state to history before updating
           setSavedTemplate(response.template); // Update the saved template reference
           setHasUnsavedChanges(false); // Reset unsaved changes after successful save
           navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
@@ -351,6 +372,7 @@ export function useTemplateForm({
             templateToSubmit
           );
           Logger.Admin.log("Template saved successfully", response.template);
+          addToSaveHistory(savedTemplate); // Add current saved state to history before updating
           setSavedTemplate(templateToSubmit); // Update the saved template reference
           setHasUnsavedChanges(false); // Reset unsaved changes after successful save
           // Optionally, show a success notification
@@ -566,6 +588,22 @@ export function useTemplateForm({
     }));
   };
 
+  // Discard unsaved changes
+  const discardChanges = () => {
+    setFormData(savedTemplate);
+    setHasUnsavedChanges(false);
+  };
+
+  // Revert to a previous save
+  const revertToSave = (historyEntry: SaveHistoryEntry) => {
+    // Add current saved state to history before reverting
+    addToSaveHistory(savedTemplate);
+    // Set the selected history entry as the current state
+    setFormData(historyEntry.template);
+    setSavedTemplate(historyEntry.template);
+    setHasUnsavedChanges(false);
+  };
+
   // Return all the handlers and state needed by the UI component
   return {
     // Core state
@@ -575,6 +613,9 @@ export function useTemplateForm({
     isLoading,
     isSparse,
     hasUnsavedChanges,
+    saveHistory,
+    discardChanges,
+    revertToSave,
     // Expose data from other hooks
     world,
     rules,

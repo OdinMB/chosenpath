@@ -68,7 +68,6 @@ Focus: Text/Images, English, Multiplayer
 - ?: Eigene Bilder hochladen (für Elemente)
 - ?: iFrame whitelabel?
 - 10: template image handling: more flexible than binary yes (assumes images for all elements) vs. no (no template images used at all)
-- 10: Atomic Transaction System for editing templates (for undo/redo and checks)
 - 15: System to view/navigate save files
 - 3: users can lock codes to then require this user to be logged in to be used
 - 7: system to add useful images from stories to the underlying template

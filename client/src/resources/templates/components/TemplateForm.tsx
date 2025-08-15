@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   BasicInfoTab,
   GuidelinesEditor,
@@ -26,6 +26,7 @@ import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
 import { Logger } from "shared/logger";
+import { RevertHistoryModal } from "./RevertHistoryModal";
 
 interface TemplateFormProps {
   initialTemplate: StoryTemplate;
@@ -117,6 +118,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     // expose sparsity for downstream components
     isSparse,
     hasUnsavedChanges,
+    saveHistory,
+    discardChanges,
+    revertToSave,
     tags,
     handleSubmit: handleFormSubmit,
     getPlayerOptionsFromStoryTemplate,
@@ -232,6 +236,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Control visibility of AI Draft initializer when template is not sparse
   const [showAIDraftContent, setShowAIDraftContent] =
     React.useState<boolean>(isSparse);
+  
+  // State for revert history modal
+  const [showRevertModal, setShowRevertModal] = useState(false);
 
   const handleAcceptSectionUpdate = (
     sectionKey: TemplateIterationSections,
@@ -332,6 +339,28 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           </h2>
           {/* Desktop save button (kept next to title) */}
           <div className="hidden lg:flex gap-2">
+            {hasUnsavedChanges && (
+              <PrimaryButton
+                type="button"
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={discardChanges}
+                title="Discard unsaved changes"
+                leftIcon={<Icons.Close className="h-4 w-4" />}
+              />
+            )}
+            {saveHistory.length > 0 && (
+              <PrimaryButton
+                type="button"
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={() => setShowRevertModal(true)}
+                title="Revert to previous save"
+                leftIcon={<Icons.Undo className="h-4 w-4" />}
+              />
+            )}
             <PrimaryButton
               type="submit"
               disabled={isLoading}
@@ -467,18 +496,42 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               collapsedSelectSpacingClass="mt-0"
             />
           </div>
-          <PrimaryButton
-            type="submit"
-            disabled={isLoading}
-            isLoading={isLoading}
-            size="sm"
-            className={`h-10 px-4 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""}`}
-          >
+          <div className="flex gap-1">
             {hasUnsavedChanges && (
-              <span className="inline-block w-1.5 h-1.5 bg-white rounded-full mr-1.5" />
+              <PrimaryButton
+                type="button"
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={discardChanges}
+                title="Discard unsaved changes"
+                leftIcon={<Icons.Close className="h-4 w-4" />}
+              />
             )}
-            Save
-          </PrimaryButton>
+            {saveHistory.length > 0 && (
+              <PrimaryButton
+                type="button"
+                variant="outline"
+                leftBorder={false}
+                size="sm"
+                onClick={() => setShowRevertModal(true)}
+                title="Revert to previous save"
+                leftIcon={<Icons.Undo className="h-4 w-4" />}
+              />
+            )}
+            <PrimaryButton
+              type="submit"
+              disabled={isLoading}
+              isLoading={isLoading}
+              size="sm"
+              className={`h-10 px-4 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""}`}
+            >
+              {hasUnsavedChanges && (
+                <span className="inline-block w-1.5 h-1.5 bg-white rounded-full mr-1.5" />
+              )}
+              Save
+            </PrimaryButton>
+          </div>
         </div>
         {/* Short centered divider shown only when dropdown is visible (below lg) */}
         {/* <div className="lg:hidden mt-4 mb-8 flex justify-center">
@@ -754,18 +807,31 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         {/* Mobile bottom Save button (hide on AI tabs) */}
         {activeTab !== "ai-draft" && activeTab !== "ai-iterate" && (
           <div className="md:hidden mt-8">
-            <PrimaryButton
-              type="submit"
-              disabled={isLoading}
-              isLoading={isLoading}
-              size="lg"
-              className={`w-full ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}`}
-            >
+            <div className="flex gap-2">
               {hasUnsavedChanges && (
-                <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
+                <PrimaryButton
+                  type="button"
+                  variant="outline"
+                  leftBorder={false}
+                  size="md"
+                  onClick={discardChanges}
+                  title="Discard unsaved changes"
+                  leftIcon={<Icons.Close className="h-4 w-4" />}
+                />
               )}
-              Save
-            </PrimaryButton>
+              <PrimaryButton
+                type="submit"
+                disabled={isLoading}
+                isLoading={isLoading}
+                size="md"
+                className={`flex-1 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}`}
+              >
+                {hasUnsavedChanges && (
+                  <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
+                )}
+                Save
+              </PrimaryButton>
+            </div>
           </div>
         )}
       </form>
@@ -781,6 +847,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         onAcceptSection={handleAcceptSectionUpdate}
         playerOptions={getPlayerOptionsFromStoryTemplate(iterationData)}
         originalPlayerStats={formData.playerStats || []}
+      />
+
+      {/* Add the revert history modal */}
+      <RevertHistoryModal
+        isOpen={showRevertModal}
+        onClose={() => setShowRevertModal(false)}
+        saveHistory={saveHistory}
+        onRevert={revertToSave}
       />
     </>
   );
