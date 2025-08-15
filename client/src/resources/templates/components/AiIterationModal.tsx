@@ -149,6 +149,8 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
             <GuidelinesEditor
               guidelines={iterationData.guidelines}
               readOnly={true}
+              /* Hide academy/AI cards inside modal */
+              showContextCards={false}
             />
           </div>
         )}
@@ -169,6 +171,8 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               onChange={() => {}}
               readOnly={true}
               templateId={iterationData.id}
+              /* Hide academy/AI cards inside modal */
+              showContextCards={false}
             />
           </div>
         )}

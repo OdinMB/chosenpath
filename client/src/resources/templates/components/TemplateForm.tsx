@@ -113,6 +113,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     setActiveTab,
     formData,
     isLoading,
+    // expose sparsity for downstream components
+    isSparse,
     tags,
     handleSubmit: handleFormSubmit,
     getPlayerOptionsFromStoryTemplate,
@@ -213,6 +215,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     },
   ];
 
+  // Listen for tab change events (e.g., from AiIterationSuggestDraft)
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ tab?: TabType | string }>;
+      const tab = custom.detail?.tab as TabType | undefined;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener("cp:set-active-tab", handler as EventListener);
+    return () =>
+      window.removeEventListener("cp:set-active-tab", handler as EventListener);
+  }, [setActiveTab]);
+
   const handleAcceptSectionUpdate = (
     sectionKey: TemplateIterationSections,
     data: Partial<StoryTemplate>
@@ -273,6 +287,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   };
 
+  // Special handler for triggering guideline-only iteration from cards
+  const handleGuidelinesIterationRequest = async (
+    feedback: string,
+    sections: Array<TemplateIterationSections>
+  ) => {
+    const uniqueSections = Array.from(new Set(["guidelines", ...sections]));
+    await handleAiIterationSubmit(feedback, uniqueSections);
+  };
+
   // Use a separate AI iteration section that's not inside the main form
   const renderAiIterationSection = () => {
     if (activeTab !== "ai-iterate" || !formData.id) return null;
@@ -294,13 +317,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     await handleFormSubmit(e);
   };
 
-  // Determine initial active tab based on whether story elements exist
-  React.useEffect(() => {
-    const hasStoryElements = (formData?.storyElements || []).length > 0;
-    setActiveTab(hasStoryElements ? "basic" : "ai-draft");
-    // We intentionally run only once on mount to set the initial tab
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Initial active tab is decided in useTemplateForm via isSparse
 
   return (
     <>
@@ -567,6 +584,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     setSwitchAndThreadInstructions(switchAndThreadInstructions);
                 }
               }}
+              onRequestGuidelinesIteration={handleGuidelinesIterationRequest}
+              templateId={formData.id}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
             />
           )}
 
@@ -577,6 +598,21 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               templateId={formData.id}
               imageInstructions={formData.imageInstructions}
               canGenerateImages={canGenerateImages}
+              showContextCards={true}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
+              // Forward AI iteration requests from the Elements card to the
+              // global iteration handler. The card sets selectedSections=["storyElements"].
+              // We ensure "storyElements" is included before dispatching.
+              onRequestElementsIteration={async (
+                feedback: string,
+                sections: Array<TemplateIterationSections>
+              ) => {
+                const uniqueSections = Array.from(
+                  new Set(["storyElements", ...sections])
+                );
+                await handleAiIterationSubmit(feedback, uniqueSections);
+              }}
             />
           )}
 
@@ -588,6 +624,16 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
               onPlayerOptionsChange={handlePlayerChange}
               playerStats={formData.playerStats || []}
+              showContextCards={true}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
+              templateId={formData.id}
+              onRequestOutcomesIteration={async (
+                feedback: string,
+                sections: Array<TemplateIterationSections>
+              ) => {
+                await handleAiIterationSubmit(feedback, sections);
+              }}
             />
           )}
 
@@ -598,6 +644,16 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               playerStats={formData.playerStats || []}
               playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
               onChange={handleStatsChange}
+              showContextCards={true}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
+              templateId={formData.id}
+              onRequestStatsIteration={async (
+                feedback: string,
+                sections: Array<TemplateIterationSections>
+              ) => {
+                await handleAiIterationSubmit(feedback, sections);
+              }}
             />
           )}
 
@@ -609,6 +665,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               templateId={formData.id}
               imageInstructions={formData.imageInstructions}
               canGenerateImages={canGenerateImages}
+              showContextCards={true}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
+              onRequestPlayersIteration={async (
+                feedback: string,
+                sections: Array<TemplateIterationSections>
+              ) => {
+                await handleAiIterationSubmit(feedback, sections);
+              }}
               characterSelectionIntroduction={
                 formData.characterSelectionIntroduction || {
                   title: "",
@@ -642,18 +707,20 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             </div>
           )}
         </div>
-        {/* Mobile bottom Save button (reintroduced for convenience on small screens) */}
-        <div className="md:hidden mt-8">
-          <PrimaryButton
-            type="submit"
-            disabled={isLoading}
-            isLoading={isLoading}
-            size="lg"
-            className="w-full"
-          >
-            Save
-          </PrimaryButton>
-        </div>
+        {/* Mobile bottom Save button (hide on AI tabs) */}
+        {activeTab !== "ai-draft" && activeTab !== "ai-iterate" && (
+          <div className="md:hidden mt-8">
+            <PrimaryButton
+              type="submit"
+              disabled={isLoading}
+              isLoading={isLoading}
+              size="lg"
+              className="w-full"
+            >
+              Save
+            </PrimaryButton>
+          </div>
+        )}
       </form>
 
       {/* Render the AI-iterate tab outside the main form */}

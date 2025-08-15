@@ -135,7 +135,11 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
     onChange: (updatedData: PlayerOptionsGeneration) => void
   ) => {
     return (
-      <div className="flex-1 space-y-12 mr-4">
+      <div className="flex-1 space-y-8 mr-4">
+        <h2 className="text-xl font-semibold">{`Player ${playerSlot.replace(
+          "player",
+          ""
+        )}`}</h2>
         {/* Character Identities */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">

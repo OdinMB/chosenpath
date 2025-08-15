@@ -9,6 +9,9 @@ import {
 import { MAX_PLAYERS } from "core/config";
 import { usePlayerEditor } from "../hooks/usePlayerEditor";
 import { PlayerEditor, CharacterSelectionIntroEditor } from ".";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 
 interface PlayersTabProps {
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
@@ -22,6 +25,13 @@ interface PlayersTabProps {
   templateId: string;
   imageInstructions?: ImageInstructions;
   canGenerateImages?: boolean;
+  showContextCards?: boolean;
+  isAiIterating?: boolean;
+  isSparse?: boolean;
+  onRequestPlayersIteration?: (
+    feedback: string,
+    sections: string[]
+  ) => Promise<void> | void;
 }
 
 export const PlayersTab: React.FC<PlayersTabProps> = ({
@@ -34,6 +44,10 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
   templateId,
   imageInstructions,
   canGenerateImages = true,
+  showContextCards = true,
+  isAiIterating,
+  isSparse = false,
+  onRequestPlayersIteration,
 }) => {
   const {
     editingPlayers,
@@ -61,6 +75,43 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
 
   return (
     <div className="space-y-8">
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref="/academy/setting"
+            blurb="Define possible player characters with Identities, Backgrounds, and personal Outcomes."
+            blurbShort="Define player characters with Identities, Backgrounds, and Outcomes."
+          />
+          {isSparse ? (
+            <AiIterationSuggestDraft
+              onGoToDraft={() =>
+                window.dispatchEvent(
+                  new CustomEvent("cp:set-active-tab", {
+                    detail: { tab: "ai-draft" },
+                  })
+                )
+              }
+            />
+          ) : (
+            <AiIterationCard
+              onRequestIteration={async (feedback, sections) => {
+                if (onRequestPlayersIteration) {
+                  await onRequestPlayersIteration(
+                    feedback,
+                    sections as string[]
+                  );
+                }
+              }}
+              templateId={templateId}
+              isLoading={Boolean(isAiIterating)}
+              placeholder="Instructions"
+              placeholderShort="Instructions"
+              selectedSections={["stats", "sharedOutcomes", "players"]}
+              buttonText="Improve Player Setup"
+            />
+          )}
+        </div>
+      )}
       {characterSelectionIntroduction ? (
         <CharacterSelectionIntroEditor
           introduction={characterSelectionIntroduction}

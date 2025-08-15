@@ -196,7 +196,7 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
             type="submit"
             disabled={isLoading || selectedSections.length === 0}
             isLoading={isLoading}
-            leftIcon={<Icons.Plus className="h-4 w-4" />}
+            leftIcon={<Icons.Wand className="h-4 w-4" />}
           >
             Adjust My World
           </PrimaryButton>

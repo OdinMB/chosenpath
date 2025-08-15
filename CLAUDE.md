@@ -297,4 +297,4 @@ npm test -- --testPathPattern=fileName.test.ts
 - Use array checks before calling `.length` or array methods
 - Define proper interfaces for complex objects
 - Use generic types for reusable components
-- Only use @ts-ignore and @ts-expect-error after explicit consent from the user
+- Only use @ts-ignore and @ts-expect-error and similar "ignore issue" comments after explicit consent from the user

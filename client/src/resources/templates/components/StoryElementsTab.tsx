@@ -1,6 +1,9 @@
 import React from "react";
 import { StoryElement, ImageInstructions } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { AcademyContextButton } from "components";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 import { StoryElementEditor } from "./StoryElementEditor";
@@ -13,6 +16,13 @@ interface StoryElementsTabProps {
   templateId?: string;
   imageInstructions?: ImageInstructions;
   canGenerateImages?: boolean;
+  showContextCards?: boolean;
+  onRequestElementsIteration?: (
+    feedback: string,
+    sections: Array<"storyElements"> | Array<string>
+  ) => Promise<void> | void;
+  isAiIterating?: boolean;
+  isSparse?: boolean;
 }
 
 export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
@@ -22,6 +32,10 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   templateId: propTemplateId,
   imageInstructions,
   canGenerateImages = true,
+  showContextCards = true,
+  onRequestElementsIteration,
+  isAiIterating,
+  isSparse = false,
 }) => {
   // Get templateId from URL if not provided as prop
   const { templateId: urlTemplateId } = useParams<{ templateId: string }>();
@@ -63,6 +77,40 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref="/academy/setting"
+            blurb="In addition to characters and locations, you can also define factions, items, rumors, ..."
+            blurbShort="Characters, locations, factions, items, rumors, ..."
+          />
+          {isSparse ? (
+            <AiIterationSuggestDraft
+              onGoToDraft={() => {
+                window.dispatchEvent(
+                  new CustomEvent("cp:set-active-tab", {
+                    detail: { tab: "ai-draft" },
+                  })
+                );
+              }}
+            />
+          ) : (
+            <AiIterationCard
+              onRequestIteration={async (feedback, sections) => {
+                if (onRequestElementsIteration) {
+                  await onRequestElementsIteration(feedback, sections);
+                }
+              }}
+              templateId={templateId || ""}
+              isLoading={Boolean(isAiIterating)}
+              placeholder="Instructions"
+              placeholderShort="Instructions"
+              selectedSections={["storyElements"]}
+              buttonText="Improve Story Elements"
+            />
+          )}
+        </div>
+      )}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Story Elements</h3>

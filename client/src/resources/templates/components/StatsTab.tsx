@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { Stat, PlayerSlot, PlayerOptionsGeneration } from "core/types";
 import { useStatEditorHelpers } from "../hooks/useStatEditor";
 import { StatGroupEditor } from "./StatGroupEditor";
@@ -16,6 +19,14 @@ type StatsTabProps = {
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => void;
   readOnly?: boolean;
+  showContextCards?: boolean;
+  isAiIterating?: boolean;
+  isSparse?: boolean;
+  templateId?: string;
+  onRequestStatsIteration?: (
+    feedback: string,
+    sections: string[]
+  ) => Promise<void> | void;
 };
 
 export const StatsTab = ({
@@ -25,6 +36,11 @@ export const StatsTab = ({
   playerOptions,
   onChange,
   readOnly = false,
+  showContextCards = true,
+  isAiIterating,
+  isSparse = false,
+  templateId,
+  onRequestStatsIteration,
 }: StatsTabProps) => {
   // Track which stats are being edited by their IDs
   const [editingStats, setEditingStats] = useState<Set<string>>(new Set());
@@ -74,6 +90,40 @@ export const StatsTab = ({
 
   return (
     <div className="space-y-8">
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref="/academy/stats"
+            blurb="Stats model what matters in your World: conditions, resources, abilities, relationships, ..."
+            blurbShort="Model what matters: conditions, resources, abilities, relationships, ..."
+          />
+          {isSparse ? (
+            <AiIterationSuggestDraft
+              onGoToDraft={() =>
+                window.dispatchEvent(
+                  new CustomEvent("cp:set-active-tab", {
+                    detail: { tab: "ai-draft" },
+                  })
+                )
+              }
+            />
+          ) : (
+            <AiIterationCard
+              onRequestIteration={async (feedback, sections) => {
+                if (onRequestStatsIteration) {
+                  await onRequestStatsIteration(feedback, sections as string[]);
+                }
+              }}
+              templateId={templateId}
+              isLoading={Boolean(isAiIterating)}
+              placeholder="Instructions"
+              placeholderShort="Instructions"
+              selectedSections={["stats", "players"]}
+              buttonText="Improve Stats"
+            />
+          )}
+        </div>
+      )}
       {/* Stat Groups */}
       <StatGroupEditor
         statGroups={statGroups}

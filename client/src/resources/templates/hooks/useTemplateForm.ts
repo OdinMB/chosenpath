@@ -1,5 +1,5 @@
 // hooks/useTemplateForm.ts
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   StoryTemplate,
   GameMode,
@@ -23,7 +23,11 @@ import { useTabs } from "components/ui/useTabs";
 import { GenerateTemplateRequest } from "core/types/admin";
 import { useNavigate } from "react-router-dom";
 import { notificationService } from "shared/notifications/notificationService";
-import { validateTemplateIntegrity, autoFixTemplate, ValidationResult } from "../utils/templateValidation";
+import {
+  validateTemplateIntegrity,
+  autoFixTemplate,
+  ValidationResult,
+} from "../utils/templateValidation";
 
 // Define the TabType type
 export type TabType =
@@ -50,7 +54,8 @@ export function useTemplateForm({
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
   const [formData, setFormData] = useState<StoryTemplate>(initialTemplate);
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [validationResult, setValidationResult] =
+    useState<ValidationResult | null>(null);
   const navigate = useNavigate();
 
   // Use specialized hooks
@@ -120,6 +125,48 @@ export function useTemplateForm({
     // Ensure player stats have assigned initial values
     updatePlayerBackgroundStats(initialTemplate);
   }, [initialTemplate]);
+  // Determine if the template is sparse
+  const isSparse = (() => {
+    const noStoryElements = (formData.storyElements || []).length === 0;
+    const noGuidelines =
+      !formData.guidelines ||
+      (!formData.guidelines.world &&
+        (!formData.guidelines.rules ||
+          formData.guidelines.rules.length === 0) &&
+        (!formData.guidelines.tone || formData.guidelines.tone.length === 0) &&
+        (!formData.guidelines.conflicts ||
+          formData.guidelines.conflicts.length === 0) &&
+        (!formData.guidelines.decisions ||
+          formData.guidelines.decisions.length === 0));
+    const noStats =
+      (!formData.sharedStats || formData.sharedStats.length === 0) &&
+      (!formData.playerStats || formData.playerStats.length === 0);
+    const hasNamedIdentity = (() => {
+      // Check player slots for possibleCharacterIdentities with a non-empty name
+      return Object.keys(formData).some((key) => {
+        if (!key.startsWith("player")) return false;
+        const player = (formData as unknown as Record<string, unknown>)[key] as
+          | {
+              possibleCharacterIdentities?: Array<{ name?: string }>;
+            }
+          | undefined;
+        const identities = player?.possibleCharacterIdentities || [];
+        return identities.some(
+          (id) => id?.name && String(id.name).trim().length > 0
+        );
+      });
+    })();
+    const noPlayerIdentityNames = !hasNamedIdentity;
+    return noStoryElements || noPlayerIdentityNames || noGuidelines || noStats;
+  })();
+
+  // Set initial tab based on sparsity (run once when data is ready)
+  const initialTabSetRef = useRef(false);
+  useEffect(() => {
+    if (initialTabSetRef.current) return;
+    initialTabSetRef.current = true;
+    setActiveTab(isSparse ? "ai-draft" : "basic");
+  }, [isSparse, setActiveTab]);
 
   // Auto-fix player background stats when player stats change
   useEffect(() => {
@@ -131,9 +178,12 @@ export function useTemplateForm({
   useEffect(() => {
     const validation = validateTemplateIntegrity(formData);
     setValidationResult(validation);
-    
+
     if (validation.stats.errors > 0) {
-      console.warn(`Template validation found ${validation.stats.errors} errors:`, validation.issues.filter(i => i.type === 'error'));
+      console.warn(
+        `Template validation found ${validation.stats.errors} errors:`,
+        validation.issues.filter((i) => i.type === "error")
+      );
     }
   }, [formData]);
 
@@ -176,7 +226,7 @@ export function useTemplateForm({
             if (missingStats.length > 0) {
               needsUpdate = true;
               missingStats.forEach((statId) => {
-                const stat = template.playerStats.find(s => s.id === statId);
+                const stat = template.playerStats.find((s) => s.id === statId);
                 if (stat) {
                   let defaultValue: number | string | string[];
                   if (stat.type === "string") {
@@ -198,8 +248,8 @@ export function useTemplateForm({
             // Remove orphaned stats
             if (orphanedStats.length > 0) {
               needsUpdate = true;
-              newStatValues = newStatValues.filter(
-                (sv) => backgroundStatIds.includes(sv.statId)
+              newStatValues = newStatValues.filter((sv) =>
+                backgroundStatIds.includes(sv.statId)
               );
             }
 
@@ -506,6 +556,7 @@ export function useTemplateForm({
     setActiveTab,
     formData,
     isLoading,
+    isSparse,
     // Expose data from other hooks
     world,
     rules,
@@ -564,7 +615,10 @@ export function useTemplateForm({
     validationResult,
     autoFixIssues: () => {
       if (validationResult) {
-        const fixedTemplate = autoFixTemplate(formData, validationResult.issues);
+        const fixedTemplate = autoFixTemplate(
+          formData,
+          validationResult.issues
+        );
         setFormData(fixedTemplate);
         console.log("Auto-fixed template issues");
       }

@@ -1,19 +1,35 @@
 import React from "react";
 import { TextArea } from "components/ui";
 import { ArrayField, AcademyContextButton } from "components";
-import { Guidelines } from "core/types";
+import { Guidelines, TemplateIterationSections } from "core/types";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { useGuidelinesEditor } from "../hooks/useGuidelinesEditor";
 
 interface GuidelinesEditorProps {
   guidelines: Guidelines;
   onChange?: (updates: { guidelines: Guidelines }) => void;
   readOnly?: boolean;
+  onRequestGuidelinesIteration?: (
+    feedback: string,
+    sections: Array<TemplateIterationSections>
+  ) => Promise<void> | void;
+  templateId?: string;
+  isAiIterating?: boolean;
+  showContextCards?: boolean;
+  isSparse?: boolean;
 }
 
 export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
   guidelines,
   onChange,
   readOnly = false,
+  onRequestGuidelinesIteration,
+  templateId,
+  isAiIterating,
+  showContextCards = true,
+  isSparse = false,
 }) => {
   const {
     world,
@@ -38,6 +54,38 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Context cards */}
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref="/academy/setting"
+            blurb="Focus on your World's premise and vision. Keep specifics for other sections."
+            blurbShort="Focus on your overall premise and vision."
+          />
+          {onRequestGuidelinesIteration &&
+            (isSparse ? (
+              <AiIterationSuggestDraft
+                onGoToDraft={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("cp:set-active-tab", {
+                      detail: { tab: "ai-draft" },
+                    })
+                  );
+                }}
+              />
+            ) : (
+              <AiIterationCard
+                onRequestIteration={onRequestGuidelinesIteration}
+                templateId={templateId}
+                isLoading={Boolean(isAiIterating)}
+                placeholder="Instructions"
+                placeholderShort="Instructions"
+                selectedSections={["guidelines"]}
+                buttonText="Improve Guidelines"
+              />
+            ))}
+        </div>
+      )}
       <div>
         <div className="flex items-center gap-2">
           <span className="font-semibold leading-none">World and Premise</span>
@@ -51,13 +99,15 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
                   In a few sentences, describe the basic premise of your World.
                 </div>
                 <div className="text-sm mb-2">
-                  <em>Example:</em> The land of Elderglen is a patchwork of
-                  kingdoms where 'heroes' are celebrated for slaying monsters,
-                  but goblins and other so-called 'creatures' are marginalized,
-                  hunted, and misunderstood. In recent years, goblins have begun
-                  to organize and demand recognition, equality, and safety, but
-                  face fierce resistance from both the populace and the hero
-                  guilds.
+                  <em>
+                    The land of Elderglen is a patchwork of kingdoms where
+                    'heroes' are celebrated for slaying monsters, but goblins
+                    and other so-called 'creatures' are marginalized, hunted,
+                    and misunderstood. In recent years, goblins have begun to
+                    organize and demand recognition, equality, and safety, but
+                    face fierce resistance from both the populace and the hero
+                    guilds.
+                  </em>
                 </div>
                 <div className="text-sm">
                   For more information about Guidelines, visit the lecture "The

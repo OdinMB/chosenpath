@@ -1,5 +1,8 @@
 import React from "react";
 import { PrimaryButton, Icons } from "components/ui";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { AcademyContextButton } from "components";
 import { Outcome, PlayerOptionsGeneration, PlayerSlot, Stat } from "core/types";
 // MAX_PLAYERS handled within PlayerOutcomesAll
@@ -17,6 +20,14 @@ interface OutcomesTabProps {
     updates: Record<PlayerSlot, PlayerOptionsGeneration>
   ) => void;
   playerStats?: Stat[];
+  showContextCards?: boolean;
+  isAiIterating?: boolean;
+  isSparse?: boolean;
+  templateId?: string;
+  onRequestOutcomesIteration?: (
+    feedback: string,
+    sections: string[]
+  ) => Promise<void> | void;
 }
 
 export const OutcomesTab: React.FC<OutcomesTabProps> = ({
@@ -26,6 +37,11 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   playerOptions,
   onPlayerOptionsChange,
   playerStats,
+  showContextCards = true,
+  isAiIterating,
+  isSparse = false,
+  templateId,
+  onRequestOutcomesIteration,
 }) => {
   const {
     editingOutcomes,
@@ -41,6 +57,43 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref="/academy/outcomes-milestones-resolutions"
+            blurb="Outcomes are the questions that every story in your World will answer."
+            blurbShort="Outcomes are the questions that every story in your World will answer."
+          />
+          {isSparse ? (
+            <AiIterationSuggestDraft
+              onGoToDraft={() =>
+                window.dispatchEvent(
+                  new CustomEvent("cp:set-active-tab", {
+                    detail: { tab: "ai-draft" },
+                  })
+                )
+              }
+            />
+          ) : (
+            <AiIterationCard
+              onRequestIteration={async (feedback, sections) => {
+                if (onRequestOutcomesIteration) {
+                  await onRequestOutcomesIteration(
+                    feedback,
+                    sections as string[]
+                  );
+                }
+              }}
+              templateId={templateId}
+              isLoading={Boolean(isAiIterating)}
+              placeholder="Instructions"
+              placeholderShort="Instructions"
+              selectedSections={["sharedOutcomes", "players"]}
+              buttonText="Improve Outcomes"
+            />
+          )}
+        </div>
+      )}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Shared Outcomes</h3>

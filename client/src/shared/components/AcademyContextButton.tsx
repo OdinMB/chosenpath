@@ -74,8 +74,7 @@ export const AcademyContextButton: React.FC<AcademyContextButtonProps> = ({
             <div className="flex justify-center pt-2">
               <PrimaryButton
                 onClick={handleVisit}
-                variant="outline"
-                leftBorder={false}
+                variant="primary"
                 leftIcon={<Icons.Academy className="h-4 w-4" />}
               >
                 Visit Lecture
