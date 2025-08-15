@@ -28,6 +28,8 @@ type SortableTableProps<T> = {
   selectionActions?: SelectionAction<T>[];
   getSelectedItems?: (allItems: T[]) => T[];
   allItems?: T[];
+  // Controls whether to render the filter UI above the table
+  showFilters?: boolean;
 };
 
 export function SortableTable<T extends { id?: string }>({
@@ -51,6 +53,7 @@ export function SortableTable<T extends { id?: string }>({
   selectionActions = [],
   getSelectedItems,
   allItems = [],
+  showFilters = true,
 }: SortableTableProps<T>) {
   const renderDefaultRow = (item: T) => (
     <tr key={keyExtractor(item)} className="hover:bg-gray-50">
@@ -86,25 +89,27 @@ export function SortableTable<T extends { id?: string }>({
 
   return (
     <div className={`bg-white rounded-lg shadow ${className}`}>
-      {/* Render only the filter UI above the table */}
-      <TableFilterSort
-        columns={columns}
-        filters={filters}
-        sortConfig={sortConfig}
-        onSort={onSort}
-        onFilter={onFilter}
-        onRemoveFilter={onRemoveFilter}
-        onClearFilters={onClearFilters}
-        renderMode="filters"
-        enableSelection={false}
-        selectedItems={selectedItems}
-        onToggleAllSelection={onToggleAllSelection}
-        visibleItems={data}
-        keyExtractor={keyExtractor}
-        selectionActions={selectionActions}
-        getSelectedItems={getSelectedItems}
-        allItems={allItems}
-      />
+      {/* Render only the filter UI above the table when enabled */}
+      {showFilters && (
+        <TableFilterSort
+          columns={columns}
+          filters={filters}
+          sortConfig={sortConfig}
+          onSort={onSort}
+          onFilter={onFilter}
+          onRemoveFilter={onRemoveFilter}
+          onClearFilters={onClearFilters}
+          renderMode="filters"
+          enableSelection={false}
+          selectedItems={selectedItems}
+          onToggleAllSelection={onToggleAllSelection}
+          visibleItems={data}
+          keyExtractor={keyExtractor}
+          selectionActions={selectionActions}
+          getSelectedItems={getSelectedItems}
+          allItems={allItems}
+        />
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">

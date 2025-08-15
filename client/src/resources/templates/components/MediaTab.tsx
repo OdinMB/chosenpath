@@ -128,7 +128,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
           </div>
           {!canGenerateImages && (
             <p className="text-sm text-amber-600 mt-2">
-              You need permission to use images in Worlds.
+              You need permission to pregenerate images for your Worlds.
             </p>
           )}
         </div>

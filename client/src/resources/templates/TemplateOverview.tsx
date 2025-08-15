@@ -890,6 +890,7 @@ export const TemplateOverview = ({
         selectionActions={selectedItems.size > 0 ? selectionActions : []}
         getSelectedItems={getSelectedItems}
         allItems={templates}
+        showFilters={templates.length > 8}
       />
 
       {/* Delete Template Dialog */}

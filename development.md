@@ -2,9 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1: Link to relevant lectures
-- 2: Integrate AI Iterations into the different template sections
-  If World is sparse: suggest to create an AI draft
 - 2: flag missing images if containsImages = true in Media, Elements, and Players
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
 
