@@ -548,6 +548,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               containsImages={formData.containsImages || false}
               setContainsImages={handleContainsImagesChange}
               canGenerateImages={canGenerateImages}
+              showContextCards={true}
+              isAiIterating={isAiIterating}
+              isSparse={isSparse}
+              onRequestMediaIteration={async (
+                feedback: string,
+                sections: Array<TemplateIterationSections>
+              ) => {
+                await handleAiIterationSubmit(feedback, sections);
+              }}
             />
           )}
 

@@ -271,6 +271,10 @@ export const AiIterationModal: React.FC<AiIterationModalProps> = ({
               canGenerateImages={false}
               containsImages={iterationData.containsImages || false}
               setContainsImages={() => {}}
+              showContextCards={false}
+              readOnly={true}
+              hideUsageSection={true}
+              coverPromptOnly={true}
             />
           </div>
         )}

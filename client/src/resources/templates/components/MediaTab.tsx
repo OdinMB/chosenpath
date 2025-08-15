@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
-import { ImageInstructions, ImageUI } from "core/types";
+import React from "react";
+import { ImageInstructions, TemplateIterationSections } from "core/types";
 import { TextArea, Checkbox } from "components/ui";
 import { CoverImageEditor } from "./CoverImageEditor";
-import { ExpandableItem } from "components";
-import { ImagePlaceholder } from "./ImagePlaceholder";
+import { AcademyContextCard } from "./AcademyContextCard";
+import { AiIterationCard } from "./AiIterationCard";
+import { AcademyContextButton } from "shared/components/AcademyContextButton";
 
 interface MediaTabProps {
   templateId?: string;
@@ -12,6 +13,16 @@ interface MediaTabProps {
   containsImages: boolean;
   setContainsImages: (contains: boolean) => void;
   canGenerateImages?: boolean;
+  showContextCards?: boolean;
+  isAiIterating?: boolean;
+  isSparse?: boolean;
+  onRequestMediaIteration?: (
+    feedback: string,
+    sections: Array<TemplateIterationSections>
+  ) => Promise<void> | void;
+  readOnly?: boolean;
+  hideUsageSection?: boolean;
+  coverPromptOnly?: boolean;
 }
 
 export const MediaTab: React.FC<MediaTabProps> = ({
@@ -21,217 +32,246 @@ export const MediaTab: React.FC<MediaTabProps> = ({
   containsImages,
   setContainsImages,
   canGenerateImages = true,
+  showContextCards = true,
+  isAiIterating = false,
+  isSparse = false,
+  onRequestMediaIteration,
+  readOnly = false,
+  hideUsageSection = false,
+  coverPromptOnly = false,
 }) => {
-  const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
-
-  // Collapsed cover image preview (left side)
-  const coverImageUi: ImageUI = useMemo(
-    () => ({
-      id: "cover",
-      fileType: "jpeg",
-      source: "template",
-      sourceId: templateId || "",
-      status: "ready",
-    }),
-    [templateId]
-  );
-
   return (
     <div className="space-y-6">
-      {/* World Images Usage */}
-      <div className="bg-white p-4 rounded-lg shadow mb-4">
-        <div className="flex items-center">
-          <Checkbox
-            id="contains-images"
-            checked={containsImages}
-            onChange={(e) => setContainsImages(e.target.checked)}
-            disabled={!canGenerateImages}
-            className="h-5 w-5 md:h-6 md:w-6"
+      {/* Context cards */}
+      {showContextCards && !readOnly && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <AcademyContextCard
+            lectureHref={""}
+            blurb="Instructions will be considered both for images pregenerated in this Worldbuilding menu and images created during gameplay."
+            blurbShort="Applies to pregenerated and in-game images."
           />
-          <label
-            htmlFor="contains-images"
-            className={`ml-2 text-base font-medium ${
-              !canGenerateImages ? "text-gray-400" : ""
-            }`}
-          >
-            <span className="font-semibold">
-              Use pregenerated World images in stories
-            </span>
-          </label>
+          <AiIterationCard
+            onRequestIteration={async (feedback, sections) => {
+              if (onRequestMediaIteration) {
+                await onRequestMediaIteration(
+                  feedback,
+                  sections as Array<TemplateIterationSections>
+                );
+              }
+            }}
+            templateId={templateId}
+            isLoading={Boolean(isAiIterating)}
+            placeholder="Instructions"
+            placeholderShort="Instructions"
+            selectedSections={["media"]}
+            buttonText="Improve Media"
+            isSparse={isSparse}
+          />
         </div>
-        <div className="mt-3 text-sm text-gray-600">
-          <div>If enabled, you must generate</div>
-          <ul className="list-disc ml-6 mt-1 space-y-1">
-            <li>a cover</li>
-            <li> images for all player identities</li>
-            <li>
-              images for all story elements (except those that don't have a
-              defined appearance)
-            </li>
-          </ul>
+      )}
+
+      {/* World Images Usage */}
+      {!hideUsageSection && !readOnly && (
+        <div className="bg-white p-4 rounded-lg shadow mb-4">
+          <div className="flex items-center">
+            <Checkbox
+              id="contains-images"
+              checked={containsImages}
+              onChange={(e) => setContainsImages(e.target.checked)}
+              disabled={!canGenerateImages}
+              className="h-5 w-5 md:h-6 md:w-6"
+            />
+            <label
+              htmlFor="contains-images"
+              className={`ml-2 text-base font-medium ${
+                !canGenerateImages ? "text-gray-400" : ""
+              }`}
+            >
+              <span className="font-semibold mr-2">
+                Use pregenerated images in stories
+              </span>
+            </label>
+            <AcademyContextButton
+              mode="icon"
+              content={
+                <div className="text-sm">
+                  <div className="mb-2 font-semibold">
+                    Why pregenerate images?
+                  </div>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>
+                      It gives you control over how player characters and story
+                      elements are depicted.
+                    </li>
+                    <li>
+                      It makes running stories with images in your World
+                      cheaper.
+                    </li>
+                    <li>
+                      It allows players who don't want to generate new images
+                      during gameplay to still see many relevant images.
+                    </li>
+                  </ul>
+                </div>
+              }
+            />
+          </div>
+          <div className="mt-3 text-sm text-gray-600">
+            <div>If enabled, you must generate</div>
+            <ul className="list-disc ml-6 mt-1 space-y-1">
+              <li>a cover</li>
+              <li> images for all player identities</li>
+              <li>
+                images for all story elements (that have a defined appearance)
+              </li>
+            </ul>
+          </div>
+          {!canGenerateImages && (
+            <p className="text-sm text-amber-600 mt-2">
+              You need permission to use images in Worlds.
+            </p>
+          )}
         </div>
-        {!canGenerateImages && (
-          <p className="text-sm text-amber-600 mt-2">
-            You need permission to use images in Worlds.
-          </p>
-        )}
+      )}
+
+      {/* Image Generation Instructions - Box */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="font-semibold mb-3">Image generation instructions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Visual Style
+            </label>
+            <TextArea
+              value={imageInstructions.visualStyle || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  visualStyle: e.target.value,
+                })
+              }
+              placeholder="digital painting, watercolor, comic book style"
+              autoHeight
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Atmosphere & Mood
+            </label>
+            <TextArea
+              value={imageInstructions.atmosphere || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  atmosphere: e.target.value,
+                })
+              }
+              placeholder="dark and foreboding, bright and hopeful"
+              autoHeight
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Color Palette
+            </label>
+            <TextArea
+              value={imageInstructions.colorPalette || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  colorPalette: e.target.value,
+                })
+              }
+              placeholder="muted earth tones, vibrant primary colors"
+              autoHeight
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Setting Details
+            </label>
+            <TextArea
+              value={imageInstructions.settingDetails || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  settingDetails: e.target.value,
+                })
+              }
+              placeholder="Victorian architecture, futuristic cityscapes"
+              autoHeight
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Character Style
+            </label>
+            <TextArea
+              value={imageInstructions.characterStyle || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  characterStyle: e.target.value,
+                })
+              }
+              placeholder="realistic proportions, stylized anime characters"
+              autoHeight
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Art Influences
+            </label>
+            <TextArea
+              value={imageInstructions.artInfluences || ""}
+              onChange={(e) =>
+                setImageInstructions({
+                  ...imageInstructions,
+                  artInfluences: e.target.value,
+                })
+              }
+              placeholder="Art Nouveau, cyberpunk aesthetics"
+              autoHeight
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Image Generation Instructions - Expandable */}
-      <ExpandableItem<ImageInstructions>
-        id="image-instructions"
-        title={
-          <span className="font-semibold">Image Generation Instructions</span>
-        }
-        data={imageInstructions}
-        editingSet={editingItems}
-        setEditing={setEditingItems}
-        onDelete={() => {}}
-        onSave={(updated) => setImageInstructions(updated)}
-        description={(() => {
-          const lines: string[] = [];
-          if (imageInstructions.visualStyle)
-            lines.push(imageInstructions.visualStyle);
-          if (imageInstructions.atmosphere)
-            lines.push(imageInstructions.atmosphere);
-          if (imageInstructions.colorPalette)
-            lines.push(imageInstructions.colorPalette);
-          if (imageInstructions.settingDetails)
-            lines.push(imageInstructions.settingDetails);
-          if (imageInstructions.characterStyle)
-            lines.push(imageInstructions.characterStyle);
-          if (imageInstructions.artInfluences)
-            lines.push(imageInstructions.artInfluences);
-          if (lines.length === 0) return undefined;
-          return (
-            <div className="whitespace-pre-line">
-              {lines.map((line, idx) => (
-                <div key={`instr-${idx}`}>{line}</div>
-              ))}
-            </div>
-          );
-        })()}
-        renderEditForm={(data, onChange) => (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Visual Style
-              </label>
-              <TextArea
-                value={data.visualStyle || ""}
-                onChange={(e) =>
-                  onChange({ ...data, visualStyle: e.target.value })
-                }
-                placeholder="digital painting, watercolor, comic book style"
-                autoHeight
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Atmosphere & Mood
-              </label>
-              <TextArea
-                value={data.atmosphere || ""}
-                onChange={(e) =>
-                  onChange({ ...data, atmosphere: e.target.value })
-                }
-                placeholder="dark and foreboding, bright and hopeful"
-                autoHeight
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Color Palette
-              </label>
-              <TextArea
-                value={data.colorPalette || ""}
-                onChange={(e) =>
-                  onChange({ ...data, colorPalette: e.target.value })
-                }
-                placeholder="muted earth tones, vibrant primary colors"
-                autoHeight
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Setting Details
-              </label>
-              <TextArea
-                value={data.settingDetails || ""}
-                onChange={(e) =>
-                  onChange({ ...data, settingDetails: e.target.value })
-                }
-                placeholder="Victorian architecture, futuristic cityscapes"
-                autoHeight
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Character Style
-              </label>
-              <TextArea
-                value={data.characterStyle || ""}
-                onChange={(e) =>
-                  onChange({ ...data, characterStyle: e.target.value })
-                }
-                placeholder="realistic proportions, stylized anime characters"
-                autoHeight
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Art Influences
-              </label>
-              <TextArea
-                value={data.artInfluences || ""}
-                onChange={(e) =>
-                  onChange({ ...data, artInfluences: e.target.value })
-                }
-                placeholder="Studio Ghibli, Art Nouveau, cyberpunk aesthetics"
-                autoHeight
-              />
-            </div>
-          </div>
-        )}
-      />
-
-      {/* Cover Image - Expandable with image preview on collapsed */}
-      <ExpandableItem<ImageInstructions>
-        id="cover-image"
-        title={<span className="font-semibold">Cover Image</span>}
-        data={imageInstructions}
-        editingSet={editingItems}
-        setEditing={setEditingItems}
-        onDelete={() => {}}
-        onSave={(updated) => setImageInstructions(updated)}
-        image={
-          <ImagePlaceholder
-            image={coverImageUi}
-            alt="Cover"
-            isGenerating={false}
-            canGenerateImages={!!canGenerateImages}
-            hasAppearance={!!imageInstructions.coverPrompt}
-            size="large"
-            className="!w-20 !h-32 md:!w-24 md:!h-36"
+      {/* Cover Image (boxed) */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="font-semibold mb-3">Cover image</h3>
+        {coverPromptOnly ? (
+          <TextArea
+            value={imageInstructions.coverPrompt || ""}
+            onChange={(e) =>
+              setImageInstructions({
+                ...imageInstructions,
+                coverPrompt: e.target.value,
+              })
+            }
+            placeholder="Describe your cover image..."
+            autoHeight
           />
-        }
-        renderEditForm={(data, onChange) => (
+        ) : (
           <CoverImageEditor
             templateId={templateId}
-            imageInstructions={data}
-            coverPrompt={data.coverPrompt || ""}
+            imageInstructions={imageInstructions}
+            coverPrompt={imageInstructions.coverPrompt || ""}
             onCoverPromptChange={(value) =>
-              onChange({ ...data, coverPrompt: value })
+              setImageInstructions({
+                ...imageInstructions,
+                coverPrompt: value,
+              })
             }
             canGenerateImages={canGenerateImages}
           />
         )}
-      />
+      </div>
     </div>
   );
 };

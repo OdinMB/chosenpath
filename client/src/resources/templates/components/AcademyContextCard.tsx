@@ -25,14 +25,18 @@ export const AcademyContextCard: React.FC<AcademyContextCardProps> = ({
         <div className="text-sm text-gray-700 mb-3 hidden sm:block">
           {blurb}
         </div>
-        <div className="text-sm text-gray-700 mb-3 sm:hidden">{blurbShort}</div>
-        <div className="mt-auto flex justify-center">
-          <a href={lectureHref} target="_blank" rel="noopener noreferrer">
-            <PrimaryButton leftIcon={<Icons.Academy className="h-4 w-4" />}>
-              Learn More
-            </PrimaryButton>
-          </a>
+        <div className="text-sm text-gray-700 mb-3 sm:hidden">
+          {blurbShort || blurb}
         </div>
+        {lectureHref && (
+          <div className="mt-auto flex justify-center">
+            <a href={lectureHref} target="_blank" rel="noopener noreferrer">
+              <PrimaryButton leftIcon={<Icons.Academy className="h-4 w-4" />}>
+                Learn More
+              </PrimaryButton>
+            </a>
+          </div>
+        )}
       </div>
     </ImageCard>
   );
