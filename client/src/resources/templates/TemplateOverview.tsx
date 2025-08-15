@@ -704,7 +704,7 @@ export const TemplateOverview = ({
           <button
             onClick={() => onEdit(template.id)}
             className="text-secondary hover:text-secondary-700 transition-colors"
-            title="Edit template"
+            title="Edit World"
           >
             <Icons.Edit className="h-5 w-5" />
           </button>
@@ -715,14 +715,14 @@ export const TemplateOverview = ({
           <button
             onClick={() => handleExport(template)}
             className="text-secondary hover:text-secondary-700 transition-colors"
-            title="Export template"
+            title="Export World"
           >
             <Icons.Export className="h-5 w-5" />
           </button>
           <button
             onClick={() => openDeleteDialog(template.id)}
             className="text-tertiary hover:text-tertiary-700 transition-colors"
-            title="Delete template"
+            title="Delete World"
           >
             <Icons.Trash className="h-5 w-5" />
           </button>
@@ -806,7 +806,7 @@ export const TemplateOverview = ({
             leftBorder={false}
             disabled={revalidator.state === "loading"}
             leftIcon={<Icons.Refresh className="h-4 w-4" />}
-            title="Refresh templates"
+            title="Refresh Worlds"
           ></PrimaryButton>
 
           {canImport && (
@@ -825,7 +825,7 @@ export const TemplateOverview = ({
                 variant="outline"
                 leftBorder={false}
                 leftIcon={<Icons.SingleImport className="h-4 w-4" />}
-                title="Import single template"
+                title="Import single World"
               ></PrimaryButton>
 
               {/* Import Collection */}
@@ -842,7 +842,7 @@ export const TemplateOverview = ({
                 variant="outline"
                 leftBorder={false}
                 leftIcon={<Icons.ImportCollection className="h-4 w-4" />}
-                title="Import template collection"
+                title="Import collection of Worlds"
               ></PrimaryButton>
             </>
           )}
@@ -854,7 +854,7 @@ export const TemplateOverview = ({
               variant="outline"
               leftBorder={false}
               leftIcon={<Icons.ExportAll className="h-4 w-4" />}
-              title="Export all templates"
+              title="Export all Worlds"
             ></PrimaryButton>
           )}
 
@@ -865,9 +865,9 @@ export const TemplateOverview = ({
             variant="primary"
             leftBorder={false}
             leftIcon={<Icons.Plus className="h-4 w-4" />}
-            title="Create new template"
+            title="Create new World"
           >
-            New <span className="hidden md:inline">Template</span>
+            New <span className="hidden md:inline">World</span>
           </PrimaryButton>
         </div>
       </div>
@@ -882,7 +882,7 @@ export const TemplateOverview = ({
         onRemoveFilter={removeFilter}
         onClearFilters={clearFilters}
         isLoading={revalidator.state === "loading"}
-        emptyMessage="No templates found"
+        emptyMessage="No Worlds found"
         enableSelection={true}
         selectedItems={selectedItems}
         onToggleItemSelection={toggleItemSelection}
@@ -897,8 +897,8 @@ export const TemplateOverview = ({
         isOpen={deleteDialog.isOpen}
         onClose={closeDeleteDialog}
         onConfirm={() => handleDelete(deleteDialog.templateId)}
-        title="Delete Template"
-        message="Are you sure you want to delete this template? This action cannot be undone."
+        title="Delete World"
+        message="Are you sure you want to delete this World? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
       />
@@ -908,10 +908,10 @@ export const TemplateOverview = ({
         isOpen={importDialog.isOpen}
         onClose={closeImportDialog}
         onConfirm={confirmTemplateImport}
-        title="Import Template"
+        title="Import World"
         message={
           importDialog.existingTemplate && importDialog.newTemplate
-            ? `A template with ${
+            ? `A World with ${
                 importDialog.existingTemplate.id === importDialog.newTemplate.id
                   ? "the same ID"
                   : "a matching title"
@@ -920,7 +920,7 @@ export const TemplateOverview = ({
 ${importDialog.existingTemplate.title}
 Last updated: ${formatDateTime(importDialog.existingTemplate.updatedAt)}
 
-Your template ${
+Your World ${
                 importDialog.isNewer
                   ? "**is newer** than"
                   : importDialog.existingTemplate.updatedAt ===
@@ -929,8 +929,8 @@ Your template ${
                   : "**is older** than"
               } the existing file.
 
-Do you want to proceed with the import and override the existing template?`
-            : "Are you sure you want to import this template?"
+Do you want to proceed with the import and override the existing World?`
+            : "Are you sure you want to import this World?"
         }
         confirmText="Import"
         cancelText="Cancel"
@@ -941,9 +941,9 @@ Do you want to proceed with the import and override the existing template?`
         isOpen={collectionImportDialog.isOpen}
         onClose={closeCollectionImportDialog}
         onConfirm={confirmCollectionImport}
-        title="Import Template Collection"
-        message={`Found ${collectionImportDialog.summary.total} templates:
-- ${collectionImportDialog.summary.new} new templates
+        title="Import Collection of Worlds"
+        message={`Found ${collectionImportDialog.summary.total} Worlds:
+- ${collectionImportDialog.summary.new} new Worlds
 - ${collectionImportDialog.summary.newer} newer versions
 - ${collectionImportDialog.summary.same} same versions
 - ${collectionImportDialog.summary.older} older versions

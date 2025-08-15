@@ -7,6 +7,7 @@ import { TemplateMetadata } from "core/types";
 import { useAuth } from "client/shared/auth/useAuth.js";
 import { useState } from "react";
 import { config } from "client/config.js";
+import { ImageCard } from "shared/components/ImageCard";
 
 /**
  * User template list component for users with templates_create permission
@@ -70,10 +71,10 @@ export const UserTemplateList = () => {
       <div className="container mx-auto p-4">
         <div className="text-center py-12">
           <h2 className="text-xl font-semibold text-gray-600 mb-4">
-            Template Creation Not Available
+            World Creation Not Available
           </h2>
           <p className="text-gray-500">
-            You don't have permission to create or manage templates.
+            You don't have permission to create or manage Worlds.
           </p>
         </div>
       </div>
@@ -82,45 +83,33 @@ export const UserTemplateList = () => {
 
   return (
     <div>
-      {/* Introduction Videos Announcement */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <svg
-              className="h-5 w-5 text-blue-400 mt-0.5"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-blue-800">
-              Learn how to create Worlds in our{" "}
-              <a
-                href="/academy"
-                className="font-medium text-blue-600 hover:text-blue-800 underline"
-              >
-                Worldbuilding Academy
-              </a>
-              . Join our{" "}
-              <a
-                href={config.discordUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-blue-600 hover:text-blue-800 underline"
-              >
-                Discord
-              </a>{" "}
-              to meet other students.
-            </p>
-          </div>
+      <ImageCard
+        publicImagePath="/hat.jpeg"
+        title="Worldbuilding Academy"
+        className="mb-6 max-w-sm sm:max-w-md mx-auto"
+      >
+        <div className="text-sm sm:text-lg text-gray-700">
+          Learn how to create Worlds in our{" "}
+          <a
+            href="/academy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-blue-600 hover:text-blue-800 underline"
+          >
+            Worldbuilding Academy
+          </a>
+          . Join our{" "}
+          <a
+            href={config.discordUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-blue-600 hover:text-blue-800 underline"
+          >
+            Discord
+          </a>{" "}
+          to meet other students.
         </div>
-      </div>
+      </ImageCard>
 
       <TemplateOverview
         initialTemplates={templates}
