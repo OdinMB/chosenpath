@@ -21,6 +21,7 @@ import {
   PlayerCount,
 } from "core/types";
 import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
+import { ImageCard } from "shared/components/ImageCard";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
@@ -226,6 +227,10 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     return () =>
       window.removeEventListener("cp:set-active-tab", handler as EventListener);
   }, [setActiveTab]);
+
+  // Control visibility of AI Draft initializer when template is not sparse
+  const [showAIDraftContent, setShowAIDraftContent] =
+    React.useState<boolean>(isSparse);
 
   const handleAcceptSectionUpdate = (
     sectionKey: TemplateIterationSections,
@@ -688,22 +693,46 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
           {activeTab === "ai-draft" && (
             <div className="mt-10">
-              <StoryInitializer
-                onSetup={handleAIDraftSetup}
-                onBack={() => setActiveTab("basic")}
-                initialPlayerCount={
-                  aiDraftPlayerCount || formData.playerCountMax
-                }
-                initialMaxTurns={formData.maxTurnsMin}
-                initialGameMode={formData.gameMode || GameModes.Cooperative}
-                showBackButton={false}
-                isLoading={isLoading}
-                templateMode={true}
-                showDifficultySlider={false}
-                initialPrompt={aiDraftPrompt}
-                onPlayerCountChange={handleAiDraftPlayerCountChange}
-                onPromptChange={handleAiDraftPromptChange}
-              />
+              {!showAIDraftContent && (
+                <ImageCard
+                  publicImagePath="/wand.jpeg"
+                  title="AI Worldbuilding Assistant"
+                  className="max-w-md mx-auto"
+                >
+                  <div className="flex flex-col h-full">
+                    <div className="text-base sm:text-lg text-gray-700 mb-3 text-center">
+                      An AI Draft will override your existing World.
+                    </div>
+                    <div className="mt-auto flex justify-center">
+                      <PrimaryButton
+                        type="button"
+                        leftIcon={<Icons.Wand className="h-4 w-4" />}
+                        onClick={() => setShowAIDraftContent(true)}
+                      >
+                        Continue
+                      </PrimaryButton>
+                    </div>
+                  </div>
+                </ImageCard>
+              )}
+              {showAIDraftContent && (
+                <StoryInitializer
+                  onSetup={handleAIDraftSetup}
+                  onBack={() => setActiveTab("basic")}
+                  initialPlayerCount={
+                    aiDraftPlayerCount || formData.playerCountMax
+                  }
+                  initialMaxTurns={formData.maxTurnsMin}
+                  initialGameMode={formData.gameMode || GameModes.Cooperative}
+                  showBackButton={false}
+                  isLoading={isLoading}
+                  templateMode={true}
+                  showDifficultySlider={false}
+                  initialPrompt={aiDraftPrompt}
+                  onPlayerCountChange={handleAiDraftPlayerCountChange}
+                  onPromptChange={handleAiDraftPromptChange}
+                />
+              )}
             </div>
           )}
         </div>
