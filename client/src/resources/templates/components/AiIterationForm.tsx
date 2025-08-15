@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Checkbox, TextArea, PrimaryButton, Icons } from "components/ui";
+import { ImageCard } from "shared/components/ImageCard";
 import { TemplateIterationSections } from "core/types";
 
 interface AiIterationFormProps {
@@ -37,6 +38,25 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia === "undefined"
+    ) {
+      return;
+    }
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
+  }, []);
+
   // Update localStorage when form values change
   useEffect(() => {
     localStorage.setItem(`${storageKey}_feedback`, feedback);
@@ -73,135 +93,101 @@ export const AiIterationForm: React.FC<AiIterationFormProps> = ({
     }
   };
 
-  return (
-    <div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block font-semibold text-gray-700 mb-2">
-            Sections to adjust
-          </label>
+  const sections: Array<{ id: TemplateIterationSections; label: string }> = [
+    { id: "difficultyLevels", label: "Difficulty Levels" },
+    { id: "media", label: "Media" },
+    { id: "guidelines", label: "Guidelines" },
+    { id: "storyElements", label: "Story Elements" },
+    { id: "stats", label: "Stats" },
+    { id: "sharedOutcomes", label: "Shared Outcomes" },
+    { id: "players", label: "Players (and individual Outcomes)" },
+  ];
+
+  const CheckboxRow = ({
+    id,
+    label,
+  }: {
+    id: TemplateIterationSections;
+    label: string;
+  }) => (
+    <div className="flex items-center">
+      <Checkbox
+        id={`${id}-section`}
+        checked={selectedSections.includes(id)}
+        onChange={() => handleSectionToggle(id)}
+      />
+      <label htmlFor={`${id}-section`} className="ml-2 text-sm text-gray-700">
+        {label}
+      </label>
+    </div>
+  );
+
+  const form = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block font-semibold text-gray-700 mb-2">
+          Sections to adjust
+        </label>
+        {isMobile ? (
           <div className="space-y-2">
-            <div className="flex items-center">
-              <Checkbox
-                id="difficultyLevels-section"
-                checked={selectedSections.includes("difficultyLevels")}
-                onChange={() => handleSectionToggle("difficultyLevels")}
-              />
-              <label
-                htmlFor="difficultyLevels-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Difficulty Levels
-              </label>
+            {sections.map((s) => (
+              <CheckboxRow key={s.id} id={s.id} label={s.label} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              {sections.slice(0, 3).map((s) => (
+                <CheckboxRow key={s.id} id={s.id} label={s.label} />
+              ))}
             </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="media-section"
-                checked={selectedSections.includes("media")}
-                onChange={() => handleSectionToggle("media")}
-              />
-              <label
-                htmlFor="media-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Media
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="guidelines-section"
-                checked={selectedSections.includes("guidelines")}
-                onChange={() => handleSectionToggle("guidelines")}
-              />
-              <label
-                htmlFor="guidelines-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Guidelines
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="storyElements-section"
-                checked={selectedSections.includes("storyElements")}
-                onChange={() => handleSectionToggle("storyElements")}
-              />
-              <label
-                htmlFor="storyElements-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Story Elements
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="stats-section"
-                checked={selectedSections.includes("stats")}
-                onChange={() => handleSectionToggle("stats")}
-              />
-              <label
-                htmlFor="stats-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Stats
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="sharedOutcomes-section"
-                checked={selectedSections.includes("sharedOutcomes")}
-                onChange={() => handleSectionToggle("sharedOutcomes")}
-              />
-              <label
-                htmlFor="sharedOutcomes-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Shared Outcomes
-              </label>
-            </div>
-            <div className="flex items-center">
-              <Checkbox
-                id="players-section"
-                checked={selectedSections.includes("players")}
-                onChange={() => handleSectionToggle("players")}
-              />
-              <label
-                htmlFor="players-section"
-                className="ml-2 text-sm text-gray-700"
-              >
-                Players (and individual Outcomes)
-              </label>
+            <div className="space-y-2">
+              {sections.slice(3).map((s) => (
+                <CheckboxRow key={s.id} id={s.id} label={s.label} />
+              ))}
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        <div>
-          <label
-            htmlFor="feedback"
-            className="block font-semibold text-gray-700 mb-2"
-          >
-            Feedback and instructions
-          </label>
-          <TextArea
-            id="feedback"
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Describe what you'd like to add or improve in the selected sections..."
-            autoHeight
-          />
-        </div>
+      <div>
+        <label
+          htmlFor="feedback"
+          className="block font-semibold text-gray-700 mb-2"
+        >
+          Feedback and instructions
+        </label>
+        <TextArea
+          id="feedback"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Describe what you'd like to add or improve in the selected sections..."
+          autoHeight
+        />
+      </div>
 
-        <div className="pt-2">
-          <PrimaryButton
-            type="submit"
-            disabled={isLoading || selectedSections.length === 0}
-            isLoading={isLoading}
-            leftIcon={<Icons.Wand className="h-4 w-4" />}
-          >
-            Adjust My World
-          </PrimaryButton>
-        </div>
-      </form>
-    </div>
+      <div className="pt-2">
+        <PrimaryButton
+          type="submit"
+          disabled={isLoading || selectedSections.length === 0}
+          isLoading={isLoading}
+          leftIcon={<Icons.Wand className="h-4 w-4" />}
+        >
+          Adjust My World
+        </PrimaryButton>
+      </div>
+    </form>
+  );
+
+  return isMobile ? (
+    form
+  ) : (
+    <ImageCard
+      publicImagePath="/wand.jpeg"
+      title="AI Worldbuilding Assistant"
+      className="max-w-2xl mx-auto"
+    >
+      <div className="flex flex-col h-full">{form}</div>
+    </ImageCard>
   );
 };

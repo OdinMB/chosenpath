@@ -306,13 +306,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     if (activeTab !== "ai-iterate" || !formData.id) return null;
 
     return (
-      <div className="p-4 bg-white rounded-lg border border-primary-100 shadow-md">
-        <AiIterationForm
-          onSubmit={handleAiIterationSubmit}
-          isLoading={isAiIterating}
-          templateId={formData.id}
-        />
-      </div>
+      <AiIterationForm
+        onSubmit={handleAiIterationSubmit}
+        isLoading={isAiIterating}
+        templateId={formData.id}
+      />
     );
   };
 
