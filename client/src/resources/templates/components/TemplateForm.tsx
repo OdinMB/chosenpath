@@ -116,6 +116,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     isLoading,
     // expose sparsity for downstream components
     isSparse,
+    hasUnsavedChanges,
     tags,
     handleSubmit: handleFormSubmit,
     getPlayerOptionsFromStoryTemplate,
@@ -336,7 +337,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               disabled={isLoading}
               isLoading={isLoading}
               size="lg"
+              className={hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}
             >
+              {hasUnsavedChanges && (
+                <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
+              )}
               Save
             </PrimaryButton>
           </div>
@@ -467,8 +472,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             disabled={isLoading}
             isLoading={isLoading}
             size="sm"
-            className="h-10 px-4"
+            className={`h-10 px-4 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""}`}
           >
+            {hasUnsavedChanges && (
+              <span className="inline-block w-1.5 h-1.5 bg-white rounded-full mr-1.5" />
+            )}
             Save
           </PrimaryButton>
         </div>
@@ -751,8 +759,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               disabled={isLoading}
               isLoading={isLoading}
               size="lg"
-              className="w-full"
+              className={`w-full ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}`}
             >
+              {hasUnsavedChanges && (
+                <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
+              )}
               Save
             </PrimaryButton>
           </div>

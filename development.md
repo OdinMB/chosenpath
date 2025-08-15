@@ -2,15 +2,34 @@ Smaller commits!
 
 # NEXT
 
-- 2: flag missing images if containsImages = true in Media, Elements, and Players
+- 2: flag missing images if containsImages = true
+- 1: fake progress creating Worlds to not have players worry that things are stuck ("Creating the World", ...)
+- 1: add one sentence each to the AI draft motivation tiles
+- 1: Different multiplayer mode: suggestion to change other sections
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
+- 1: Teaser should be properly generated, not copy/pasted from user query
 
+- 1: resolution animation: good outcomes on the right (as opposed to left)
+- 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 - 1: fix tooltip to not go beyond display borders
-- 2: meet future self should only have one possible identity
+- 1: bigger warning AI draft over existing world
+- 1: on image generation error: give better notes (copyright etc.)
+- 1: content moderation: add copyright issues
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
+- 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
+- 2: meet future self should only have one possible identity
+
+- 1: when linking a locally stored story code to an account, check if that code already belongs to another account
+- 1: for logged-in users: when creating a new story via Page: do you want a one-off story or edit the World?
 - 2: review process for storytellers who want to publish on website
 - ?: Bild bei Draft mit hochladen (especially for kids stories)
+
+Browser tests
+
+- 1: why does Safari not show images in template editor?
+- 1: why does Brave browser not respect background color?
+- 1: Brave doesn't break up paragraphs in frontend fix logic
 
 # BETTER EXPERIENCE
 

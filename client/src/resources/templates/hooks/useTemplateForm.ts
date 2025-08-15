@@ -56,6 +56,8 @@ export function useTemplateForm({
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
   const [validationResult, setValidationResult] =
     useState<ValidationResult | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savedTemplate, setSavedTemplate] = useState<StoryTemplate>(initialTemplate);
   const navigate = useNavigate();
 
   // Use specialized hooks
@@ -121,6 +123,8 @@ export function useTemplateForm({
       initialTemplate.id
     );
     setFormData(initialTemplate);
+    setSavedTemplate(initialTemplate);
+    setHasUnsavedChanges(false); // Reset unsaved changes when template is loaded
 
     // Ensure player stats have assigned initial values
     updatePlayerBackgroundStats(initialTemplate);
@@ -186,6 +190,13 @@ export function useTemplateForm({
       );
     }
   }, [formData]);
+
+  // Compare formData with savedTemplate to detect unsaved changes
+  useEffect(() => {
+    // Deep comparison of the two objects
+    const hasChanges = JSON.stringify(formData) !== JSON.stringify(savedTemplate);
+    setHasUnsavedChanges(hasChanges);
+  }, [formData, savedTemplate]);
 
   // Extracted function to update player background stats
   const updatePlayerBackgroundStats = (template: StoryTemplate) => {
@@ -317,6 +328,8 @@ export function useTemplateForm({
       if (onSave) {
         // Use the provided onSave handler
         await onSave(templateToSubmit);
+        setSavedTemplate(templateToSubmit); // Update the saved template reference
+        setHasUnsavedChanges(false); // Reset unsaved changes after successful save
       } else {
         // Use the default implementation
         if (!templateToSubmit.id) {
@@ -324,6 +337,8 @@ export function useTemplateForm({
           Logger.Admin.log("Creating new template in form", templateToSubmit);
           const response = await templateApi.createTemplate(templateToSubmit);
           Logger.Admin.log("Template created successfully", response.template);
+          setSavedTemplate(response.template); // Update the saved template reference
+          setHasUnsavedChanges(false); // Reset unsaved changes after successful save
           navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
         } else {
           // Update existing template
@@ -336,6 +351,8 @@ export function useTemplateForm({
             templateToSubmit
           );
           Logger.Admin.log("Template saved successfully", response.template);
+          setSavedTemplate(templateToSubmit); // Update the saved template reference
+          setHasUnsavedChanges(false); // Reset unsaved changes after successful save
           // Optionally, show a success notification
           // Revalidation of data for a library view would typically happen there, or if this form closes.
         }
@@ -557,6 +574,7 @@ export function useTemplateForm({
     formData,
     isLoading,
     isSparse,
+    hasUnsavedChanges,
     // Expose data from other hooks
     world,
     rules,

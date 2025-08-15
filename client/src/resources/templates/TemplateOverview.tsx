@@ -867,7 +867,7 @@ export const TemplateOverview = ({
             leftIcon={<Icons.Plus className="h-4 w-4" />}
             title="Create new World"
           >
-            New <span className="hidden md:inline">World</span>
+            New<span className="hidden md:inline"> World</span>
           </PrimaryButton>
         </div>
       </div>
