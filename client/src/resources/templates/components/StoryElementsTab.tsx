@@ -3,7 +3,6 @@ import { StoryElement, ImageInstructions } from "core/types";
 import { PrimaryButton, Icons } from "components/ui";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
-import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { AcademyContextButton } from "components";
 import { useStoryElementsEditor } from "../hooks/useStoryElementsEditor";
 import { StoryElementEditor } from "./StoryElementEditor";
@@ -84,31 +83,20 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
             blurb="In addition to characters and locations, you can also define factions, items, rumors, ..."
             blurbShort="Characters, locations, factions, items, rumors, ..."
           />
-          {isSparse ? (
-            <AiIterationSuggestDraft
-              onGoToDraft={() => {
-                window.dispatchEvent(
-                  new CustomEvent("cp:set-active-tab", {
-                    detail: { tab: "ai-draft" },
-                  })
-                );
-              }}
-            />
-          ) : (
-            <AiIterationCard
-              onRequestIteration={async (feedback, sections) => {
-                if (onRequestElementsIteration) {
-                  await onRequestElementsIteration(feedback, sections);
-                }
-              }}
-              templateId={templateId || ""}
-              isLoading={Boolean(isAiIterating)}
-              placeholder="Instructions"
-              placeholderShort="Instructions"
-              selectedSections={["storyElements"]}
-              buttonText="Improve Story Elements"
-            />
-          )}
+          <AiIterationCard
+            onRequestIteration={async (feedback, sections) => {
+              if (onRequestElementsIteration) {
+                await onRequestElementsIteration(feedback, sections);
+              }
+            }}
+            templateId={templateId || ""}
+            isLoading={Boolean(isAiIterating)}
+            placeholder="Instructions"
+            placeholderShort="Instructions"
+            selectedSections={["storyElements"]}
+            buttonText="Improve Story Elements"
+            isSparse={isSparse}
+          />
         </div>
       )}
       <div className="flex justify-between items-center mb-4">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ImageCard } from "shared/components/ImageCard";
 import { PrimaryButton, TextArea, Icons } from "components/ui";
+import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { TemplateIterationSections } from "core/types";
 
 interface AiIterationCardProps {
@@ -15,6 +16,7 @@ interface AiIterationCardProps {
   placeholderShort?: string;
   selectedSections?: Array<TemplateIterationSections>;
   buttonText?: string;
+  isSparse?: boolean;
 }
 
 export const AiIterationCard: React.FC<AiIterationCardProps> = ({
@@ -26,6 +28,7 @@ export const AiIterationCard: React.FC<AiIterationCardProps> = ({
   placeholderShort = "More personal Threads. Alternate public/personal pacing.",
   selectedSections = ["guidelines"],
   buttonText = "Improve My World",
+  isSparse = false,
 }) => {
   const [feedback, setFeedback] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -52,6 +55,21 @@ export const AiIterationCard: React.FC<AiIterationCardProps> = ({
   const handleSubmit = async () => {
     await onRequestIteration(feedback, selectedSections);
   };
+
+  if (isSparse) {
+    return (
+      <AiIterationSuggestDraft
+        onGoToDraft={() =>
+          window.dispatchEvent(
+            new CustomEvent("cp:set-active-tab", {
+              detail: { tab: "ai-draft" },
+            })
+          )
+        }
+        className={className}
+      />
+    );
+  }
 
   return (
     <ImageCard

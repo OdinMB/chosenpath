@@ -11,7 +11,6 @@ import { usePlayerEditor } from "../hooks/usePlayerEditor";
 import { PlayerEditor, CharacterSelectionIntroEditor } from ".";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
-import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 
 interface PlayersTabProps {
   playerOptions: Record<PlayerSlot, PlayerOptionsGeneration>;
@@ -82,34 +81,20 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             blurb="Define possible player characters with Identities, Backgrounds, and personal Outcomes."
             blurbShort="Define player characters with Identities, Backgrounds, and Outcomes."
           />
-          {isSparse ? (
-            <AiIterationSuggestDraft
-              onGoToDraft={() =>
-                window.dispatchEvent(
-                  new CustomEvent("cp:set-active-tab", {
-                    detail: { tab: "ai-draft" },
-                  })
-                )
+          <AiIterationCard
+            onRequestIteration={async (feedback, sections) => {
+              if (onRequestPlayersIteration) {
+                await onRequestPlayersIteration(feedback, sections as string[]);
               }
-            />
-          ) : (
-            <AiIterationCard
-              onRequestIteration={async (feedback, sections) => {
-                if (onRequestPlayersIteration) {
-                  await onRequestPlayersIteration(
-                    feedback,
-                    sections as string[]
-                  );
-                }
-              }}
-              templateId={templateId}
-              isLoading={Boolean(isAiIterating)}
-              placeholder="Instructions"
-              placeholderShort="Instructions"
-              selectedSections={["stats", "sharedOutcomes", "players"]}
-              buttonText="Improve Player Setup"
-            />
-          )}
+            }}
+            templateId={templateId}
+            isLoading={Boolean(isAiIterating)}
+            placeholder="Instructions"
+            placeholderShort="Instructions"
+            selectedSections={["stats", "sharedOutcomes", "players"]}
+            buttonText="Improve Player Setup"
+            isSparse={isSparse}
+          />
         </div>
       )}
       {characterSelectionIntroduction ? (

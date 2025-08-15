@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
-import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { Stat, PlayerSlot, PlayerOptionsGeneration } from "core/types";
 import { useStatEditorHelpers } from "../hooks/useStatEditor";
 import { StatGroupEditor } from "./StatGroupEditor";
@@ -97,31 +96,20 @@ export const StatsTab = ({
             blurb="Stats model what matters in your World: conditions, resources, abilities, relationships, ..."
             blurbShort="Model what matters: conditions, resources, abilities, relationships, ..."
           />
-          {isSparse ? (
-            <AiIterationSuggestDraft
-              onGoToDraft={() =>
-                window.dispatchEvent(
-                  new CustomEvent("cp:set-active-tab", {
-                    detail: { tab: "ai-draft" },
-                  })
-                )
+          <AiIterationCard
+            onRequestIteration={async (feedback, sections) => {
+              if (onRequestStatsIteration) {
+                await onRequestStatsIteration(feedback, sections as string[]);
               }
-            />
-          ) : (
-            <AiIterationCard
-              onRequestIteration={async (feedback, sections) => {
-                if (onRequestStatsIteration) {
-                  await onRequestStatsIteration(feedback, sections as string[]);
-                }
-              }}
-              templateId={templateId}
-              isLoading={Boolean(isAiIterating)}
-              placeholder="Instructions"
-              placeholderShort="Instructions"
-              selectedSections={["stats", "players"]}
-              buttonText="Improve Stats"
-            />
-          )}
+            }}
+            templateId={templateId}
+            isLoading={Boolean(isAiIterating)}
+            placeholder="Instructions"
+            placeholderShort="Instructions"
+            selectedSections={["stats", "players"]}
+            buttonText="Improve Stats"
+            isSparse={isSparse}
+          />
         </div>
       )}
       {/* Stat Groups */}

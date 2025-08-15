@@ -4,7 +4,6 @@ import { ArrayField, AcademyContextButton } from "components";
 import { Guidelines, TemplateIterationSections } from "core/types";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
-import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { useGuidelinesEditor } from "../hooks/useGuidelinesEditor";
 
 interface GuidelinesEditorProps {
@@ -62,28 +61,18 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
             blurb="Focus on your World's premise and vision. Keep specifics for other sections."
             blurbShort="Focus on your overall premise and vision."
           />
-          {onRequestGuidelinesIteration &&
-            (isSparse ? (
-              <AiIterationSuggestDraft
-                onGoToDraft={() => {
-                  window.dispatchEvent(
-                    new CustomEvent("cp:set-active-tab", {
-                      detail: { tab: "ai-draft" },
-                    })
-                  );
-                }}
-              />
-            ) : (
-              <AiIterationCard
-                onRequestIteration={onRequestGuidelinesIteration}
-                templateId={templateId}
-                isLoading={Boolean(isAiIterating)}
-                placeholder="Instructions"
-                placeholderShort="Instructions"
-                selectedSections={["guidelines"]}
-                buttonText="Improve Guidelines"
-              />
-            ))}
+          {onRequestGuidelinesIteration && (
+            <AiIterationCard
+              onRequestIteration={onRequestGuidelinesIteration}
+              templateId={templateId}
+              isLoading={Boolean(isAiIterating)}
+              placeholder="Instructions"
+              placeholderShort="Instructions"
+              selectedSections={["guidelines"]}
+              buttonText="Improve Guidelines"
+              isSparse={isSparse}
+            />
+          )}
         </div>
       )}
       <div>

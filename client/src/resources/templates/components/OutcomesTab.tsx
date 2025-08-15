@@ -2,7 +2,6 @@ import React from "react";
 import { PrimaryButton, Icons } from "components/ui";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
-import { AiIterationSuggestDraft } from "./AiIterationSuggestDraft";
 import { AcademyContextButton } from "components";
 import { Outcome, PlayerOptionsGeneration, PlayerSlot, Stat } from "core/types";
 // MAX_PLAYERS handled within PlayerOutcomesAll
@@ -64,34 +63,23 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
             blurb="Outcomes are the questions that every story in your World will answer."
             blurbShort="Outcomes are the questions that every story in your World will answer."
           />
-          {isSparse ? (
-            <AiIterationSuggestDraft
-              onGoToDraft={() =>
-                window.dispatchEvent(
-                  new CustomEvent("cp:set-active-tab", {
-                    detail: { tab: "ai-draft" },
-                  })
-                )
+          <AiIterationCard
+            onRequestIteration={async (feedback, sections) => {
+              if (onRequestOutcomesIteration) {
+                await onRequestOutcomesIteration(
+                  feedback,
+                  sections as string[]
+                );
               }
-            />
-          ) : (
-            <AiIterationCard
-              onRequestIteration={async (feedback, sections) => {
-                if (onRequestOutcomesIteration) {
-                  await onRequestOutcomesIteration(
-                    feedback,
-                    sections as string[]
-                  );
-                }
-              }}
-              templateId={templateId}
-              isLoading={Boolean(isAiIterating)}
-              placeholder="Instructions"
-              placeholderShort="Instructions"
-              selectedSections={["sharedOutcomes", "players"]}
-              buttonText="Improve Outcomes"
-            />
-          )}
+            }}
+            templateId={templateId}
+            isLoading={Boolean(isAiIterating)}
+            placeholder="Instructions"
+            placeholderShort="Instructions"
+            selectedSections={["sharedOutcomes", "players"]}
+            buttonText="Improve Outcomes"
+            isSparse={isSparse}
+          />
         </div>
       )}
       <div className="flex justify-between items-center mb-4">
