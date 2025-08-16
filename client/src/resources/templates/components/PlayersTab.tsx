@@ -92,7 +92,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({
             placeholder="Instructions"
             placeholderShort="Instructions"
             selectedSections={["stats", "sharedOutcomes", "players"]}
-            buttonText="Improve Player Setup"
+            buttonText="Improve Players"
             isSparse={isSparse}
           />
         </div>

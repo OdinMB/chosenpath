@@ -294,7 +294,6 @@ npm test -- --testPathPattern=fileName.test.ts
 
 - Use proper TypeScript types instead of `any`
 - Add type guards when accessing potentially undefined properties
-- Use array checks before calling `.length` or array methods
 - Define proper interfaces for complex objects
-- Use generic types for reusable components
+- No "as unknown as" trickery without explicit consent from the user!
 - Only use @ts-ignore and @ts-expect-error and similar "ignore issue" comments after explicit consent from the user

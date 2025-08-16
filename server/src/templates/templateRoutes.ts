@@ -43,7 +43,9 @@ import {
 import {
   getStoragePath,
   addDirectoryToZip,
+  loadTemplateImages,
 } from "shared/storageUtils.js";
+import { generateTemplateImageManifest } from "./templateImageService.js";
 import {
   checkRateLimitForRequest,
   incrementRateLimitForRequest,
@@ -334,6 +336,40 @@ router.get(
     } catch (error) {
       Logger.Route.error(`Error retrieving full template ${id}`, error);
       sendError(res, "Failed to retrieve template", 500, requestId, error);
+    }
+  }
+);
+
+// Get template images manifest and list
+router.get(
+  "/templates/:id/images",
+  verifyUser(),
+  verifyTemplateEditAccess(),
+  async (req, res) => {
+    const { id: templateId } = req.params;
+    const requestId = req.query.requestId as string;
+
+    try {
+      const template = await templateService.getTemplateById(templateId);
+
+      if (!template) {
+        return sendNotFound(res, "Template not found", requestId);
+      }
+
+      // Get list of available images
+      const images = loadTemplateImages(templateId);
+
+      // Generate manifest of what should exist vs what exists
+      const manifest = generateTemplateImageManifest(template, images);
+
+      Logger.Route.log(
+        `User ${req.user?.id} retrieved images for template ${templateId}: ${images.length} images, ${manifest.missingImages.cover ? 1 : 0} missing cover, ${manifest.missingImages.storyElements.length} missing elements, ${manifest.missingImages.playerIdentities.length} missing identities`
+      );
+
+      sendSuccess(res, { images, manifest }, requestId);
+    } catch (error) {
+      Logger.Route.error(`Error retrieving template images ${templateId}`, error);
+      sendError(res, "Failed to retrieve template images", 500, requestId, error);
     }
   }
 );

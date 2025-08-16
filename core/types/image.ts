@@ -76,7 +76,7 @@ export const imageInstructionsSchema = z
     settingDetails: z
       .string()
       .describe(
-        "A few short elements. NOT a list of specific elements, but rather a description of visual motifs in the world. Examples: how magical effects look like, general architectural style, etc."
+        "Visual motifs in the world. Examples: how magical effects look like, general architectural style, etc."
       ),
     characterStyle: z
       .string()

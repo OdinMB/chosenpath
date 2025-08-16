@@ -23,6 +23,7 @@ import {
 import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
 import { ImageCard } from "shared/components/ImageCard";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
+import { ValidationIssue } from "../utils/templateValidation";
 import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
 import { Logger } from "shared/logger";
@@ -160,7 +161,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     getGameModeValue,
     // Validation
     validationResult,
-    autoFixIssues,
+    autoFixSingleIssue,
   } = useTemplateForm({
     initialTemplate,
     onSave,
@@ -309,6 +310,19 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     await handleAiIterationSubmit(feedback, uniqueSections);
   };
 
+  // Handle navigation from validation issues
+  const handleNavigateFromIssue = (issue: ValidationIssue) => {
+    if (issue.category === "images") {
+      if (issue.message.includes("Cover image")) {
+        setActiveTab("media");
+      } else if (issue.message.includes("story elements")) {
+        setActiveTab("elements");
+      } else if (issue.message.includes("Player")) {
+        setActiveTab("players");
+      }
+    }
+  };
+
   // Use a separate AI iteration section that's not inside the main form
   const renderAiIterationSection = () => {
     if (activeTab !== "ai-iterate" || !formData.id) return null;
@@ -378,56 +392,87 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
 
         {/* Validation Status */}
         {validationResult && validationResult.stats.totalIssues > 0 && (
-          <div
-            className={`p-3 rounded-lg border ${
-              validationResult.stats.errors > 0
-                ? "bg-red-50 border-red-200"
-                : "bg-yellow-50 border-yellow-200"
-            } mb-4`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icons.AlertCircle
-                  className={`h-5 w-5 ${
-                    validationResult.stats.errors > 0
-                      ? "text-red-600"
-                      : "text-yellow-600"
-                  }`}
-                />
-                <span
-                  className={`font-medium ${
-                    validationResult.stats.errors > 0
-                      ? "text-red-800"
-                      : "text-yellow-800"
-                  }`}
-                >
-                  {validationResult.stats.errors > 0
-                    ? `${validationResult.stats.errors} Error${
-                        validationResult.stats.errors > 1 ? "s" : ""
-                      } Found`
-                    : `${validationResult.stats.warnings} Warning${
-                        validationResult.stats.warnings > 1 ? "s" : ""
-                      } Found`}
-                </span>
+          <div className="flex justify-center mb-4">
+            <ImageCard
+              publicImagePath="/cracked-earth-horizontal.jpeg"
+              title="Template Issues"
+              className="w-full max-w-2xl"
+            >
+              <div className="flex flex-col h-full space-y-3">
+                {/* Group issues by type */}
+                {validationResult.stats.errors > 0 && (
+                  <div>
+                    <h4 className="font-medium text-red-800 mb-1">
+                      Error{validationResult.stats.errors > 1 ? "s" : ""}
+                    </h4>
+                    <div className="space-y-1">
+                      {validationResult.issues
+                        .filter(issue => issue.type === "error")
+                        .map((issue, index) => (
+                          <div key={`error-${index}`} className="flex items-start justify-between text-sm text-gray-700">
+                            <span>• {issue.message}</span>
+                            {issue.autoFixable && (
+                              <button
+                                onClick={() => autoFixSingleIssue(issue)}
+                                className="ml-2 p-1 text-primary-600 hover:text-primary-800 transition-colors"
+                                title="Fix this issue"
+                              >
+                                <Icons.Wrench className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {validationResult.stats.warnings > 0 && (
+                  <div>
+                    <h4 className="font-medium text-yellow-800 mb-1">
+                      Warning{validationResult.stats.warnings > 1 ? "s" : ""}
+                    </h4>
+                    <div className="space-y-1">
+                      {validationResult.issues
+                        .filter(issue => issue.type === "warning")
+                        .map((issue, index) => (
+                          <div key={`warning-${index}`} className="flex items-start justify-between text-sm text-gray-700">
+                            <span
+                              className={issue.category === "images" ? "cursor-pointer hover:text-primary-600" : ""}
+                              onClick={issue.category === "images" ? () => handleNavigateFromIssue(issue) : undefined}
+                            >
+                              • {issue.message}
+                            </span>
+                            {issue.autoFixable && (
+                              <button
+                                onClick={() => autoFixSingleIssue(issue)}
+                                className="ml-2 p-1 text-primary-600 hover:text-primary-800 transition-colors"
+                                title="Fix this issue"
+                              >
+                                <Icons.Wrench className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {validationResult.stats.info > 0 && (
+                  <div>
+                    <h4 className="font-medium text-blue-800 mb-1">
+                      Note{validationResult.stats.info > 1 ? "s" : ""}
+                    </h4>
+                    <div className="space-y-1">
+                      {validationResult.issues
+                        .filter(issue => issue.type === "info")
+                        .map((issue, index) => (
+                          <div key={`info-${index}`} className="text-sm text-gray-700">
+                            • {issue.message}
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <PrimaryButton
-                onClick={autoFixIssues}
-                variant="outline"
-                size="sm"
-              >
-                Auto-Fix Issues
-              </PrimaryButton>
-            </div>
-            {validationResult.issues.slice(0, 3).map((issue, index) => (
-              <div key={index} className="mt-2 text-sm text-gray-700">
-                • {issue.message}
-              </div>
-            ))}
-            {validationResult.issues.length > 3 && (
-              <div className="mt-2 text-sm text-gray-500">
-                +{validationResult.issues.length - 3} more issues
-              </div>
-            )}
+            </ImageCard>
           </div>
         )}
 

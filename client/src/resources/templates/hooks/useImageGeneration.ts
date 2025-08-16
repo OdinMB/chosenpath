@@ -13,6 +13,7 @@ import {
   GenerateImageResponse,
 } from "core/types/api";
 import { apiClient, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
+import { invalidateTemplateImagesCache } from "./useTemplateImages";
 
 // Using longer timeout for image generation operations which can take significantly longer than normal API calls
 
@@ -101,6 +102,9 @@ export function useImageGeneration(): UseImageGenerationResult {
 
       console.log("Image generation response:", response);
 
+      // Invalidate template images cache so the UI updates
+      invalidateTemplateImagesCache(templateId);
+
       // Handle successful response - apiClient already extracts the data property
       return response;
     } catch (err) {
@@ -160,6 +164,9 @@ export function useImageGeneration(): UseImageGenerationResult {
       );
 
       console.log("Cover image generation response:", response);
+
+      // Invalidate template images cache so the UI updates
+      invalidateTemplateImagesCache(templateId);
 
       // Handle successful response - apiClient already extracts the data property
       return response;
@@ -238,6 +245,9 @@ export function useImageGeneration(): UseImageGenerationResult {
       );
 
       console.log("Player image generation response:", response);
+
+      // Invalidate template images cache so the UI updates
+      invalidateTemplateImagesCache(templateId);
 
       // Handle successful response - apiClient already extracts the data property
       return response;

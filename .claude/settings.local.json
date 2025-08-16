@@ -25,6 +25,7 @@
       "Bash(eslint:*)",
       "Bash(node:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

@@ -27,7 +27,9 @@ import {
   validateTemplateIntegrity,
   autoFixTemplate,
   ValidationResult,
+  ValidationIssue,
 } from "../utils/templateValidation";
+import { useTemplateImages } from "./useTemplateImages";
 
 // Define the TabType type
 export type TabType =
@@ -61,6 +63,12 @@ export function useTemplateForm({
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
   const [validationResult, setValidationResult] =
     useState<ValidationResult | null>(null);
+    
+  // Fetch template images for validation (only when template is saved and containsImages is true)
+  const { data: templateImagesData } = useTemplateImages(
+    formData.id,
+    Boolean(formData.id && formData.containsImages)
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState<StoryTemplate>(initialTemplate);
   const [saveHistory, setSaveHistory] = useState<SaveHistoryEntry[]>([]);
@@ -184,9 +192,12 @@ export function useTemplateForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.playerStats]); // Only depend on playerStats to avoid infinite loops
 
-  // Validate template integrity whenever formData changes
+  // Validate template integrity whenever formData or templateImagesData changes
   useEffect(() => {
-    const validation = validateTemplateIntegrity(formData);
+    const validation = validateTemplateIntegrity(
+      formData, 
+      templateImagesData?.manifest
+    );
     setValidationResult(validation);
 
     if (validation.stats.errors > 0) {
@@ -195,7 +206,7 @@ export function useTemplateForm({
         validation.issues.filter((i) => i.type === "error")
       );
     }
-  }, [formData]);
+  }, [formData, templateImagesData]);
 
   // Compare formData with savedTemplate to detect unsaved changes
   useEffect(() => {
@@ -680,6 +691,16 @@ export function useTemplateForm({
         );
         setFormData(fixedTemplate);
         console.log("Auto-fixed template issues");
+      }
+    },
+    autoFixSingleIssue: (issue: ValidationIssue) => {
+      if (validationResult) {
+        const fixedTemplate = autoFixTemplate(
+          formData,
+          [issue]
+        );
+        setFormData(fixedTemplate);
+        console.log(`Auto-fixed issue: ${issue.message}`);
       }
     },
   };

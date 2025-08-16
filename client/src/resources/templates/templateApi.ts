@@ -5,6 +5,7 @@ import {
   GenerateTemplateRequest,
   TemplateIterationRequest,
 } from "core/types/admin";
+import { GetTemplateImagesResponse } from "core/types/api";
 
 /**
  * Template API functions that can be used in both admin and user contexts.
@@ -275,6 +276,26 @@ export const templateApi = {
     } catch (error) {
       Logger.API.error(
         `Failed to upload file to template ${templateId}`,
+        error
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Get template images and manifest
+   */
+  getTemplateImages: async (templateId: string): Promise<GetTemplateImagesResponse["data"]> => {
+    Logger.API.log(`Getting images for template ${templateId}`);
+    try {
+      const response = await apiClient.get<GetTemplateImagesResponse["data"]>(
+        `/templates/${templateId}/images`
+      );
+      Logger.API.log(`Successfully retrieved images for template ${templateId}`);
+      return response;
+    } catch (error) {
+      Logger.API.error(
+        `Failed to get images for template ${templateId}`,
         error
       );
       throw error;

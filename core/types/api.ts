@@ -2,6 +2,7 @@ import {
   ImageQuality,
   ImageSize,
   ImageInstructions,
+  ImageStoryState,
   DifficultyLevel,
 } from "./index.js";
 import { PublicUser } from "./user.js";
@@ -170,6 +171,30 @@ export interface GenerateElementImageRequest extends ClientRequest {
   size?: ImageSize;
   quality?: ImageQuality;
 }
+
+/**
+ * Template images listing
+ */
+export interface GetTemplateImagesRequest extends ClientRequest {
+  templateId: string;
+}
+
+export interface TemplateImageManifest {
+  cover: boolean;
+  storyElements: Record<string, boolean>; // elementId -> hasImage
+  playerIdentities: Record<string, Record<number, boolean>>; // playerSlot -> identityIndex -> hasImage
+  totalImages: number;
+  missingImages: {
+    cover: boolean;
+    storyElements: string[]; // missing elementIds
+    playerIdentities: Array<{ playerSlot: string; identityIndex: number }>; // missing identities
+  };
+}
+
+export interface GetTemplateImagesResponse extends SuccessResponse<{
+  images: ImageStoryState[];
+  manifest: TemplateImageManifest;
+}> {}
 
 /**
  * Basic story metadata
