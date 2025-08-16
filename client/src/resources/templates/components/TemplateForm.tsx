@@ -9,19 +9,16 @@ import {
   AiIterationForm,
   AiIterationModal,
   MediaTab,
+  AiDraftTab,
 } from "./";
-import { StoryInitializer } from "page/components/StoryInitializer";
 import {
   StoryTemplate,
   PublicationStatus,
   Outcome,
   StoryElement,
   TemplateIterationSections,
-  GameModes,
-  PlayerCount,
 } from "core/types";
 import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
-import { ImageCard } from "shared/components/ImageCard";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ValidationIssue } from "../utils/templateValidation";
 import { ShareLink } from "components/ShareLink";
@@ -31,6 +28,7 @@ import { RevertHistoryModal } from "./RevertHistoryModal";
 import { TemplateWarningModals } from "./TemplateWarningModals";
 import { TemplateValidationCard } from "./TemplateValidationCard";
 import { useTemplateWarnings } from "../hooks/useTemplateWarnings";
+import { useAiDraftForm } from "../hooks/useAiDraftForm";
 
 interface TemplateFormProps {
   initialTemplate: StoryTemplate;
@@ -40,71 +38,6 @@ interface TemplateFormProps {
   canManageTags?: boolean;
   canGenerateImages?: boolean;
 }
-
-// Custom hook for AI draft form state management
-const useAiDraftForm = (
-  title?: string,
-  teaser?: string,
-  playerCountMax?: PlayerCount
-) => {
-  const [aiDraftPrompt, setAiDraftPrompt] = React.useState<string>("");
-  const [hasUserSetAiDraftPrompt, setHasUserSetAiDraftPrompt] =
-    React.useState(false);
-
-  const [aiDraftPlayerCount, setAiDraftPlayerCount] = React.useState<
-    PlayerCount | undefined
-  >(undefined);
-  const [lastSetupPlayerCount, setLastSetupPlayerCount] = React.useState<
-    PlayerCount | undefined
-  >(undefined);
-
-  // Update AI draft prompt based on form data when user hasn't manually set it
-  React.useEffect(() => {
-    const constructedPrompt =
-      title || teaser
-        ? `${title || ""}${title && teaser ? " - " : ""}${teaser || ""}`.trim()
-        : "";
-
-    if (constructedPrompt && !hasUserSetAiDraftPrompt) {
-      setAiDraftPrompt(constructedPrompt);
-    }
-  }, [title, teaser, hasUserSetAiDraftPrompt]);
-
-  // Handle player count changes from setup
-  React.useEffect(() => {
-    if (playerCountMax !== undefined) {
-      // If setup value changed, always update draft
-      if (playerCountMax !== lastSetupPlayerCount) {
-        setAiDraftPlayerCount(playerCountMax);
-        setLastSetupPlayerCount(playerCountMax);
-      }
-      // If no draft value set yet, use setup value
-      else if (aiDraftPlayerCount === undefined) {
-        setAiDraftPlayerCount(playerCountMax);
-        setLastSetupPlayerCount(playerCountMax);
-      }
-    }
-  }, [playerCountMax, lastSetupPlayerCount, aiDraftPlayerCount]);
-
-  // Handle AI draft form prompt change callback
-  const handleAiDraftPromptChange = (prompt: string) => {
-    setAiDraftPrompt(prompt);
-    setHasUserSetAiDraftPrompt(true);
-  };
-
-  // Handle AI draft player count change callback
-  const handleAiDraftPlayerCountChange = (playerCount: PlayerCount) => {
-    setAiDraftPlayerCount(playerCount);
-    // Don't update lastSetupPlayerCount here - we want to track setup changes separately
-  };
-
-  return {
-    aiDraftPrompt,
-    aiDraftPlayerCount,
-    handleAiDraftPromptChange,
-    handleAiDraftPlayerCountChange,
-  };
-};
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({
   initialTemplate,
@@ -268,10 +201,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     return () =>
       window.removeEventListener("cp:set-active-tab", handler as EventListener);
   }, [setActiveTab]);
-
-  // Control visibility of AI Draft initializer when template is not sparse
-  const [showAIDraftContent, setShowAIDraftContent] =
-    React.useState<boolean>(isSparse);
 
   // State for revert history modal
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -774,48 +703,21 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
           )}
 
           {activeTab === "ai-draft" && (
-            <div className="mt-10">
-              {!showAIDraftContent && (
-                <ImageCard
-                  publicImagePath="/wand.jpeg"
-                  title="AI Worldbuilding Assistant"
-                  className="max-w-md mx-auto"
-                >
-                  <div className="flex flex-col h-full">
-                    <div className="text-base sm:text-lg text-gray-700 mb-3 text-center">
-                      An AI Draft will override your existing World.
-                    </div>
-                    <div className="mt-auto flex justify-center">
-                      <PrimaryButton
-                        type="button"
-                        leftIcon={<Icons.Wand className="h-4 w-4" />}
-                        onClick={() => setShowAIDraftContent(true)}
-                      >
-                        Continue
-                      </PrimaryButton>
-                    </div>
-                  </div>
-                </ImageCard>
-              )}
-              {showAIDraftContent && (
-                <StoryInitializer
-                  onSetup={handleAIDraftSetup}
-                  onBack={() => setActiveTab("basic")}
-                  initialPlayerCount={
-                    aiDraftPlayerCount || formData.playerCountMax
-                  }
-                  initialMaxTurns={formData.maxTurnsMin}
-                  initialGameMode={formData.gameMode || GameModes.Cooperative}
-                  showBackButton={false}
-                  isLoading={isLoading}
-                  templateMode={true}
-                  showDifficultySlider={false}
-                  initialPrompt={aiDraftPrompt}
-                  onPlayerCountChange={handleAiDraftPlayerCountChange}
-                  onPromptChange={handleAiDraftPromptChange}
-                />
-              )}
-            </div>
+            <AiDraftTab
+              isSparse={isSparse}
+              isLoading={isLoading}
+              formData={{
+                playerCountMax: formData.playerCountMax,
+                maxTurnsMin: formData.maxTurnsMin || 20,
+                gameMode: formData.gameMode,
+              }}
+              aiDraftPrompt={aiDraftPrompt}
+              aiDraftPlayerCount={aiDraftPlayerCount}
+              handleAIDraftSetup={handleAIDraftSetup}
+              handleAiDraftPromptChange={handleAiDraftPromptChange}
+              handleAiDraftPlayerCountChange={handleAiDraftPlayerCountChange}
+              onBack={() => setActiveTab("basic")}
+            />
           )}
         </div>
         {/* Mobile bottom Save button (hide on AI tabs) */}

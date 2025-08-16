@@ -24,5 +24,6 @@ export { SortableItem } from "./SortableItem";
 export { StoryElementEditor } from "./StoryElementEditor";
 export { AiIterationForm } from "./AiIterationForm";
 export { AiIterationModal } from "./AiIterationModal";
+export { AiDraftTab } from "./AiDraftTab";
 export { TemplateWarningModals } from "./TemplateWarningModals";
 export { TemplateValidationCard } from "./TemplateValidationCard";
