@@ -25,3 +25,4 @@ export { StoryElementEditor } from "./StoryElementEditor";
 export { AiIterationForm } from "./AiIterationForm";
 export { AiIterationModal } from "./AiIterationModal";
 export { TemplateWarningModals } from "./TemplateWarningModals";
+export { TemplateValidationCard } from "./TemplateValidationCard";
