@@ -1,15 +1,8 @@
 import React, { useState } from "react";
 import {
-  BasicInfoTab,
-  GuidelinesEditor,
-  StatsTab,
-  StoryElementsTab,
-  OutcomesTab,
-  PlayersTab,
   AiIterationForm,
   AiIterationModal,
-  MediaTab,
-  AiDraftTab,
+  TemplateTabRenderer,
 } from "./";
 import {
   StoryTemplate,
@@ -272,14 +265,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   };
 
-  // Special handler for triggering guideline-only iteration from cards
-  const handleGuidelinesIterationRequest = async (
-    feedback: string,
-    sections: Array<TemplateIterationSections>
-  ) => {
-    const uniqueSections = Array.from(new Set(["guidelines", ...sections]));
-    await handleAiIterationSubmit(feedback, uniqueSections);
-  };
+  // Special handler for triggering guideline-only iteration from cards is now in TemplateTabRenderer
 
   // Handle navigation from validation issues
   const handleNavigateFromIssue = (issue: ValidationIssue) => {
@@ -494,231 +480,57 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         </div>
 
         <div className="mt-12">
-          {activeTab === "basic" && (
-            <BasicInfoTab
-              title={formData.title || ""}
-              setTitle={handleTitleChange}
-              teaser={formData.teaser || ""}
-              setTeaser={handleTeaserChange}
-              playerCountMin={formData.playerCountMin}
-              playerCountMax={formData.playerCountMax}
-              setPlayerCountMin={handlePlayerCountMinChange}
-              setPlayerCountMax={handlePlayerCountMaxChange}
-              handleGameModeChange={handleGameModeChange}
-              maxTurnsMin={formData.maxTurnsMin || 20}
-              maxTurnsMax={formData.maxTurnsMax || 25}
-              setMaxTurnsMin={handleMaxTurnsMinChange}
-              setMaxTurnsMax={handleMaxTurnsMaxChange}
-              tags={tags}
-              handleTagsChange={canManageTags ? handleTagsChange : undefined}
-              // Helper functions
-              getMinPlayerOptions={getMinPlayerOptions}
-              getMaxPlayerOptions={getMaxPlayerOptions}
-              getMinTurnsOptions={getMinTurnsOptions}
-              getMaxTurnsOptions={getMaxTurnsOptions}
-              gameModeOptions={gameModeOptions}
-              getGameModeValue={getGameModeValue}
-              showOnWelcomeScreen={formData.showOnWelcomeScreen || false}
-              setShowOnWelcomeScreen={
-                canSetWelcomeScreen
-                  ? handleShowOnWelcomeScreenChange
-                  : undefined
-              }
-              difficultyLevels={formData.difficultyLevels || []}
-              handleDifficultyLevelsChange={handleDifficultyLevelsChange}
-              // Mobile/mid publication status controls
-              publicationStatus={formData.publicationStatus}
-              onPublicationStatusChange={handlePublicationStatusChange}
-              canPublish={canPublish}
-              templateId={formData.id}
-            />
-          )}
-
-          {activeTab === "media" && (
-            <MediaTab
-              templateId={formData.id}
-              imageInstructions={
-                formData.imageInstructions || {
-                  visualStyle: "",
-                  atmosphere: "",
-                  colorPalette: "",
-                  settingDetails: "",
-                  characterStyle: "",
-                  artInfluences: "",
-                  coverPrompt: "",
-                }
-              }
-              setImageInstructions={handleImageInstructionsChange}
-              containsImages={formData.containsImages || false}
-              setContainsImages={handleContainsImagesChange}
-              canGenerateImages={canGenerateImages}
-              showContextCards={true}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-              onRequestMediaIteration={async (
-                feedback: string,
-                sections: Array<TemplateIterationSections>
-              ) => {
-                await handleAiIterationSubmit(feedback, sections);
-              }}
-            />
-          )}
-
-          {activeTab === "guidelines" && (
-            <GuidelinesEditor
-              guidelines={
-                formData.guidelines || {
-                  world: "",
-                  rules: [],
-                  tone: [],
-                  conflicts: [],
-                  decisions: [],
-                  typesOfThreads: [],
-                  switchAndThreadInstructions: [],
-                }
-              }
-              onChange={(updates) => {
-                // Delegate to useTemplateForm's update mechanisms
-                if (updates.guidelines) {
-                  const {
-                    world,
-                    rules,
-                    tone,
-                    conflicts,
-                    decisions,
-                    typesOfThreads,
-                    switchAndThreadInstructions,
-                  } = updates.guidelines;
-                  if (world !== undefined) setWorld(world);
-                  if (rules !== undefined) setRules(rules);
-                  if (tone !== undefined) setTone(tone);
-                  if (conflicts !== undefined) setConflicts(conflicts);
-                  if (decisions !== undefined) setDecisions(decisions);
-                  if (typesOfThreads !== undefined)
-                    setTypesOfThreads(typesOfThreads);
-                  if (switchAndThreadInstructions !== undefined)
-                    setSwitchAndThreadInstructions(switchAndThreadInstructions);
-                }
-              }}
-              onRequestGuidelinesIteration={handleGuidelinesIterationRequest}
-              templateId={formData.id}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-            />
-          )}
-
-          {activeTab === "elements" && (
-            <StoryElementsTab
-              elements={formData.storyElements || []}
-              onChange={handleStoryElementsChange}
-              templateId={formData.id}
-              imageInstructions={formData.imageInstructions}
-              canGenerateImages={canGenerateImages}
-              showContextCards={true}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-              // Forward AI iteration requests from the Elements card to the
-              // global iteration handler. The card sets selectedSections=["storyElements"].
-              // We ensure "storyElements" is included before dispatching.
-              onRequestElementsIteration={async (
-                feedback: string,
-                sections: Array<TemplateIterationSections>
-              ) => {
-                const uniqueSections = Array.from(
-                  new Set(["storyElements", ...sections])
-                );
-                await handleAiIterationSubmit(feedback, uniqueSections);
-              }}
-            />
-          )}
-
-          {activeTab === "outcomes" && (
-            <OutcomesTab
-              outcomes={formData.sharedOutcomes || []}
-              onChange={handleOutcomesChange}
-              // Enable player-specific outcomes in Outcomes tab
-              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
-              onPlayerOptionsChange={handlePlayerChange}
-              playerStats={formData.playerStats || []}
-              showContextCards={true}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-              templateId={formData.id}
-              onRequestOutcomesIteration={async (
-                feedback: string,
-                sections: Array<TemplateIterationSections>
-              ) => {
-                await handleAiIterationSubmit(feedback, sections);
-              }}
-            />
-          )}
-
-          {activeTab === "stats" && (
-            <StatsTab
-              statGroups={formData.statGroups || []}
-              sharedStats={formData.sharedStats || []}
-              playerStats={formData.playerStats || []}
-              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
-              onChange={handleStatsChange}
-              showContextCards={true}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-              templateId={formData.id}
-              onRequestStatsIteration={async (
-                feedback: string,
-                sections: Array<TemplateIterationSections>
-              ) => {
-                await handleAiIterationSubmit(feedback, sections);
-              }}
-            />
-          )}
-
-          {activeTab === "players" && (
-            <PlayersTab
-              playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
-              onChange={handlePlayerChange}
-              playerStats={formData.playerStats || []}
-              templateId={formData.id}
-              imageInstructions={formData.imageInstructions}
-              canGenerateImages={canGenerateImages}
-              showContextCards={true}
-              isAiIterating={isAiIterating}
-              isSparse={isSparse}
-              onRequestPlayersIteration={async (
-                feedback: string,
-                sections: Array<TemplateIterationSections>
-              ) => {
-                await handleAiIterationSubmit(feedback, sections);
-              }}
-              characterSelectionIntroduction={
-                formData.characterSelectionIntroduction || {
-                  title: "",
-                  text: "",
-                }
-              }
-              onCharacterSelectionIntroductionChange={
-                handleCharacterSelectionIntroductionChange
-              }
-            />
-          )}
-
-          {activeTab === "ai-draft" && (
-            <AiDraftTab
-              isSparse={isSparse}
-              isLoading={isLoading}
-              formData={{
-                playerCountMax: formData.playerCountMax,
-                maxTurnsMin: formData.maxTurnsMin || 20,
-                gameMode: formData.gameMode,
-              }}
-              aiDraftPrompt={aiDraftPrompt}
-              aiDraftPlayerCount={aiDraftPlayerCount}
-              handleAIDraftSetup={handleAIDraftSetup}
-              handleAiDraftPromptChange={handleAiDraftPromptChange}
-              handleAiDraftPlayerCountChange={handleAiDraftPlayerCountChange}
-              onBack={() => setActiveTab("basic")}
-            />
-          )}
+          <TemplateTabRenderer
+            activeTab={activeTab}
+            formData={formData}
+            isLoading={isLoading}
+            isSparse={isSparse}
+            isAiIterating={isAiIterating}
+            tags={tags}
+            canPublish={canPublish}
+            canSetWelcomeScreen={canSetWelcomeScreen}
+            canManageTags={canManageTags}
+            canGenerateImages={canGenerateImages}
+            handleTitleChange={handleTitleChange}
+            handleTeaserChange={handleTeaserChange}
+            handlePlayerCountMinChange={handlePlayerCountMinChange}
+            handlePlayerCountMaxChange={handlePlayerCountMaxChange}
+            handleGameModeChange={handleGameModeChange}
+            handleMaxTurnsMinChange={handleMaxTurnsMinChange}
+            handleMaxTurnsMaxChange={handleMaxTurnsMaxChange}
+            handleTagsChange={handleTagsChange}
+            handleShowOnWelcomeScreenChange={handleShowOnWelcomeScreenChange}
+            handleDifficultyLevelsChange={handleDifficultyLevelsChange}
+            handlePublicationStatusChange={handlePublicationStatusChange}
+            setWorld={setWorld}
+            setRules={setRules}
+            setTone={setTone}
+            setConflicts={setConflicts}
+            setDecisions={setDecisions}
+            setTypesOfThreads={setTypesOfThreads}
+            setSwitchAndThreadInstructions={setSwitchAndThreadInstructions}
+            handleStatsChange={handleStatsChange}
+            handleStoryElementsChange={handleStoryElementsChange}
+            handleOutcomesChange={handleOutcomesChange}
+            handlePlayerChange={handlePlayerChange}
+            handleCharacterSelectionIntroductionChange={handleCharacterSelectionIntroductionChange}
+            handleImageInstructionsChange={handleImageInstructionsChange}
+            handleContainsImagesChange={handleContainsImagesChange}
+            handleAiIterationSubmit={handleAiIterationSubmit}
+            handleAIDraftSetup={handleAIDraftSetup}
+            aiDraftPrompt={aiDraftPrompt}
+            aiDraftPlayerCount={aiDraftPlayerCount}
+            handleAiDraftPromptChange={handleAiDraftPromptChange}
+            handleAiDraftPlayerCountChange={handleAiDraftPlayerCountChange}
+            getMinPlayerOptions={getMinPlayerOptions}
+            getMaxPlayerOptions={getMaxPlayerOptions}
+            getMinTurnsOptions={getMinTurnsOptions}
+            getMaxTurnsOptions={getMaxTurnsOptions}
+            gameModeOptions={gameModeOptions}
+            getGameModeValue={getGameModeValue}
+            getPlayerOptionsFromStoryTemplate={getPlayerOptionsFromStoryTemplate}
+            setActiveTab={setActiveTab}
+          />
         </div>
         {/* Mobile bottom Save button (hide on AI tabs) */}
         {activeTab !== "ai-draft" && activeTab !== "ai-iterate" && (

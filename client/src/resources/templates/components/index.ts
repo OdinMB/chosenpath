@@ -27,3 +27,4 @@ export { AiIterationModal } from "./AiIterationModal";
 export { AiDraftTab } from "./AiDraftTab";
 export { TemplateWarningModals } from "./TemplateWarningModals";
 export { TemplateValidationCard } from "./TemplateValidationCard";
+export { TemplateTabRenderer } from "./TemplateTabRenderer";
