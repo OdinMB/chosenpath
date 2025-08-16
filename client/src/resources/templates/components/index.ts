@@ -28,3 +28,5 @@ export { AiDraftTab } from "./AiDraftTab";
 export { TemplateWarningModals } from "./TemplateWarningModals";
 export { TemplateValidationCard } from "./TemplateValidationCard";
 export { TemplateTabRenderer } from "./TemplateTabRenderer";
+export { TemplateFormHeader } from "./TemplateFormHeader";
+export { TemplateFormActions } from "./TemplateFormActions";

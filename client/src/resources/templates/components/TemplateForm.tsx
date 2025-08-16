@@ -3,6 +3,8 @@ import {
   AiIterationForm,
   AiIterationModal,
   TemplateTabRenderer,
+  TemplateFormHeader,
+  TemplateFormActions,
 } from "./";
 import {
   StoryTemplate,
@@ -11,7 +13,7 @@ import {
   StoryElement,
   TemplateIterationSections,
 } from "core/types";
-import { PrimaryButton, Icons, Select, Tabs, InfoIcon } from "components/ui";
+import { Select, Tabs, InfoIcon } from "components/ui";
 import { useTemplateForm, TabType } from "../hooks/useTemplateForm";
 import { ValidationIssue } from "../utils/templateValidation";
 import { ShareLink } from "components/ShareLink";
@@ -306,50 +308,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   return (
     <>
       <form onSubmit={handleSubmit}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800 truncate">
-            {formData.title ? formData.title : "New Template"}
-          </h2>
-          {/* Desktop save button (kept next to title) */}
-          <div className="hidden lg:flex gap-2">
-            {hasUnsavedChanges && (
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={discardChanges}
-                title="Discard unsaved changes"
-                leftIcon={<Icons.Close className="h-4 w-4" />}
-              />
-            )}
-            {saveHistory.length > 0 && (
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={() => setShowRevertModal(true)}
-                title="Revert to previous save"
-                leftIcon={<Icons.Undo className="h-4 w-4" />}
-              />
-            )}
-            <PrimaryButton
-              type="submit"
-              disabled={isLoading}
-              isLoading={isLoading}
-              size="lg"
-              className={
-                hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""
-              }
-            >
-              {hasUnsavedChanges && (
-                <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
-              )}
-              Save
-            </PrimaryButton>
-          </div>
-        </div>
+        <TemplateFormHeader
+          title={formData.title || ""}
+          hasUnsavedChanges={hasUnsavedChanges}
+          saveHistoryLength={saveHistory.length}
+          isLoading={isLoading}
+          onDiscardChanges={discardChanges}
+          onShowRevertModal={() => setShowRevertModal(true)}
+        />
 
         {/* Validation Status */}
         <TemplateValidationCard
@@ -423,44 +389,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               collapsedSelectSpacingClass="mt-0"
             />
           </div>
-          <div className="flex gap-1">
-            {hasUnsavedChanges && (
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={discardChanges}
-                title="Discard unsaved changes"
-                leftIcon={<Icons.Close className="h-4 w-4" />}
-              />
-            )}
-            {saveHistory.length > 0 && (
-              <PrimaryButton
-                type="button"
-                variant="outline"
-                leftBorder={false}
-                size="sm"
-                onClick={() => setShowRevertModal(true)}
-                title="Revert to previous save"
-                leftIcon={<Icons.Undo className="h-4 w-4" />}
-              />
-            )}
-            <PrimaryButton
-              type="submit"
-              disabled={isLoading}
-              isLoading={isLoading}
-              size="sm"
-              className={`h-10 px-4 ${
-                hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""
-              }`}
-            >
-              {hasUnsavedChanges && (
-                <span className="inline-block w-1.5 h-1.5 bg-white rounded-full mr-1.5" />
-              )}
-              Save
-            </PrimaryButton>
-          </div>
+          <TemplateFormActions
+            variant="mobile"
+            hasUnsavedChanges={hasUnsavedChanges}
+            saveHistoryLength={saveHistory.length}
+            isLoading={isLoading}
+            onDiscardChanges={discardChanges}
+            onShowRevertModal={() => setShowRevertModal(true)}
+          />
         </div>
         {/* Short centered divider shown only when dropdown is visible (below lg) */}
         {/* <div className="lg:hidden mt-4 mb-8 flex justify-center">
@@ -535,33 +471,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         {/* Mobile bottom Save button (hide on AI tabs) */}
         {activeTab !== "ai-draft" && activeTab !== "ai-iterate" && (
           <div className="md:hidden mt-8">
-            <div className="flex gap-2">
-              {hasUnsavedChanges && (
-                <PrimaryButton
-                  type="button"
-                  variant="outline"
-                  leftBorder={false}
-                  size="md"
-                  onClick={discardChanges}
-                  title="Discard unsaved changes"
-                  leftIcon={<Icons.Close className="h-4 w-4" />}
-                />
-              )}
-              <PrimaryButton
-                type="submit"
-                disabled={isLoading}
-                isLoading={isLoading}
-                size="md"
-                className={`flex-1 ${
-                  hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""
-                }`}
-              >
-                {hasUnsavedChanges && (
-                  <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
-                )}
-                Save
-              </PrimaryButton>
-            </div>
+            <TemplateFormActions
+              variant="bottom"
+              hasUnsavedChanges={hasUnsavedChanges}
+              saveHistoryLength={saveHistory.length}
+              isLoading={isLoading}
+              onDiscardChanges={discardChanges}
+              onShowRevertModal={() => setShowRevertModal(true)}
+            />
           </div>
         )}
       </form>
