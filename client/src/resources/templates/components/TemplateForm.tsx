@@ -28,6 +28,7 @@ import { ShareLink } from "components/ShareLink";
 import { useAiIteration } from "../hooks/useAiIteration";
 import { Logger } from "shared/logger";
 import { RevertHistoryModal } from "./RevertHistoryModal";
+import { AcademyModal } from "shared/components/AcademyModal";
 
 interface TemplateFormProps {
   initialTemplate: StoryTemplate;
@@ -162,9 +163,75 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     // Validation
     validationResult,
     autoFixSingleIssue,
+    // Original handlers for bypassing the warnings
+    handleGameModeChangeOriginal,
+    handlePlayerCountMinChangeOriginal,
+    handlePlayerCountMaxChangeOriginal,
   } = useTemplateForm({
     initialTemplate,
     onSave,
+    onGameModeChange: (newGameMode, oldGameMode, isSparse) => {
+      // Don't show warning for sparse templates
+      if (isSparse) {
+        return;
+      }
+
+      // Store the pending change and show the warning
+      setPendingGameModeChange({
+        newMode: newGameMode,
+        oldMode: oldGameMode,
+        value:
+          newGameMode === GameModes.Cooperative
+            ? 0
+            : newGameMode === GameModes.CooperativeCompetitive
+            ? 1
+            : 2,
+      });
+      setShowMultiplayerWarning(true);
+    },
+    onPlayerCountChange: (
+      newMin,
+      newMax,
+      oldMin,
+      oldMax,
+      isMinChange,
+      isSparse
+    ) => {
+      // Don't show warning for sparse templates
+      if (isSparse) {
+        return;
+      }
+
+      // Store the pending change and show the warning
+      setPendingPlayerCountChange({
+        newMin,
+        newMax,
+        oldMin,
+        oldMax,
+        isMinChange,
+      });
+      setShowPlayerCountWarning(true);
+    },
+    onCompetitiveSingleCheck: (
+      _gameMode,
+      newMin,
+      newMax,
+      isMinChange,
+      isSparse
+    ) => {
+      // Don't show warning for sparse templates
+      if (isSparse) {
+        return;
+      }
+
+      // Store the pending change and show the warning
+      setPendingCompetitiveSingleChange({
+        newMin,
+        newMax,
+        isMinChange,
+      });
+      setShowCompetitiveSingleWarning(true);
+    },
   });
 
   // AI draft form hook
@@ -237,9 +304,37 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
   // Control visibility of AI Draft initializer when template is not sparse
   const [showAIDraftContent, setShowAIDraftContent] =
     React.useState<boolean>(isSparse);
-  
+
   // State for revert history modal
   const [showRevertModal, setShowRevertModal] = useState(false);
+
+  // State for multiplayer mode warning modal
+  const [showMultiplayerWarning, setShowMultiplayerWarning] = useState(false);
+  const [pendingGameModeChange, setPendingGameModeChange] = useState<{
+    newMode: GameModes;
+    oldMode: GameModes;
+    value: number;
+  } | null>(null);
+
+  // State for player count change warning modal
+  const [showPlayerCountWarning, setShowPlayerCountWarning] = useState(false);
+  const [pendingPlayerCountChange, setPendingPlayerCountChange] = useState<{
+    newMin: PlayerCount;
+    newMax: PlayerCount;
+    oldMin: PlayerCount;
+    oldMax: PlayerCount;
+    isMinChange: boolean;
+  } | null>(null);
+
+  // State for competitive single player warning modal
+  const [showCompetitiveSingleWarning, setShowCompetitiveSingleWarning] =
+    useState(false);
+  const [pendingCompetitiveSingleChange, setPendingCompetitiveSingleChange] =
+    useState<{
+      newMin: PlayerCount;
+      newMax: PlayerCount;
+      isMinChange: boolean;
+    } | null>(null);
 
   const handleAcceptSectionUpdate = (
     sectionKey: TemplateIterationSections,
@@ -323,6 +418,66 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   };
 
+  // Handle multiplayer warning modal actions
+  const handleMultiplayerWarningProceed = () => {
+    if (pendingGameModeChange) {
+      // Apply the pending game mode change using the original handler
+      handleGameModeChangeOriginal(pendingGameModeChange.value);
+
+      setPendingGameModeChange(null);
+    }
+    setShowMultiplayerWarning(false);
+  };
+
+  const handleMultiplayerWarningCancel = () => {
+    setPendingGameModeChange(null);
+    setShowMultiplayerWarning(false);
+  };
+
+  // Handle player count warning modal actions
+  const handlePlayerCountWarningProceed = () => {
+    if (pendingPlayerCountChange) {
+      // Apply the pending player count change using the original handlers
+      if (pendingPlayerCountChange.isMinChange) {
+        handlePlayerCountMinChangeOriginal(pendingPlayerCountChange.newMin);
+      } else {
+        handlePlayerCountMaxChangeOriginal(pendingPlayerCountChange.newMax);
+      }
+
+      setPendingPlayerCountChange(null);
+    }
+    setShowPlayerCountWarning(false);
+  };
+
+  const handlePlayerCountWarningCancel = () => {
+    setPendingPlayerCountChange(null);
+    setShowPlayerCountWarning(false);
+  };
+
+  // Handle competitive single player warning modal actions
+  const handleCompetitiveSingleWarningProceed = () => {
+    if (pendingCompetitiveSingleChange) {
+      // Apply the pending player count change using the original handlers
+      if (pendingCompetitiveSingleChange.isMinChange) {
+        handlePlayerCountMinChangeOriginal(
+          pendingCompetitiveSingleChange.newMin
+        );
+      } else {
+        handlePlayerCountMaxChangeOriginal(
+          pendingCompetitiveSingleChange.newMax
+        );
+      }
+
+      setPendingCompetitiveSingleChange(null);
+    }
+    setShowCompetitiveSingleWarning(false);
+  };
+
+  const handleCompetitiveSingleWarningCancel = () => {
+    setPendingCompetitiveSingleChange(null);
+    setShowCompetitiveSingleWarning(false);
+  };
+
   // Use a separate AI iteration section that's not inside the main form
   const renderAiIterationSection = () => {
     if (activeTab !== "ai-iterate" || !formData.id) return null;
@@ -380,7 +535,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               disabled={isLoading}
               isLoading={isLoading}
               size="lg"
-              className={hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}
+              className={
+                hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""
+              }
             >
               {hasUnsavedChanges && (
                 <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
@@ -407,9 +564,12 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     </h4>
                     <div className="space-y-1">
                       {validationResult.issues
-                        .filter(issue => issue.type === "error")
+                        .filter((issue) => issue.type === "error")
                         .map((issue, index) => (
-                          <div key={`error-${index}`} className="flex items-start justify-between text-sm text-gray-700">
+                          <div
+                            key={`error-${index}`}
+                            className="flex items-start justify-between text-sm text-gray-700"
+                          >
                             <span>• {issue.message}</span>
                             {issue.autoFixable && (
                               <button
@@ -421,7 +581,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                               </button>
                             )}
                           </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -432,12 +592,23 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     </h4>
                     <div className="space-y-1">
                       {validationResult.issues
-                        .filter(issue => issue.type === "warning")
+                        .filter((issue) => issue.type === "warning")
                         .map((issue, index) => (
-                          <div key={`warning-${index}`} className="flex items-start justify-between text-sm text-gray-700">
+                          <div
+                            key={`warning-${index}`}
+                            className="flex items-start justify-between text-sm text-gray-700"
+                          >
                             <span
-                              className={issue.category === "images" ? "cursor-pointer hover:text-primary-600" : ""}
-                              onClick={issue.category === "images" ? () => handleNavigateFromIssue(issue) : undefined}
+                              className={
+                                issue.category === "images"
+                                  ? "cursor-pointer hover:text-primary-600"
+                                  : ""
+                              }
+                              onClick={
+                                issue.category === "images"
+                                  ? () => handleNavigateFromIssue(issue)
+                                  : undefined
+                              }
                             >
                               • {issue.message}
                             </span>
@@ -451,7 +622,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                               </button>
                             )}
                           </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -462,12 +633,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                     </h4>
                     <div className="space-y-1">
                       {validationResult.issues
-                        .filter(issue => issue.type === "info")
+                        .filter((issue) => issue.type === "info")
                         .map((issue, index) => (
-                          <div key={`info-${index}`} className="text-sm text-gray-700">
+                          <div
+                            key={`info-${index}`}
+                            className="text-sm text-gray-700"
+                          >
                             • {issue.message}
                           </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -569,7 +743,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
               disabled={isLoading}
               isLoading={isLoading}
               size="sm"
-              className={`h-10 px-4 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""}`}
+              className={`h-10 px-4 ${
+                hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-1" : ""
+              }`}
             >
               {hasUnsavedChanges && (
                 <span className="inline-block w-1.5 h-1.5 bg-white rounded-full mr-1.5" />
@@ -869,7 +1045,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
                 disabled={isLoading}
                 isLoading={isLoading}
                 size="md"
-                className={`flex-1 ${hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""}`}
+                className={`flex-1 ${
+                  hasUnsavedChanges ? "ring-2 ring-secondary ring-offset-2" : ""
+                }`}
               >
                 {hasUnsavedChanges && (
                   <span className="inline-block w-2 h-2 bg-white rounded-full mr-2" />
@@ -900,6 +1078,127 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
         onClose={() => setShowRevertModal(false)}
         saveHistory={saveHistory}
         onRevert={revertToSave}
+      />
+
+      {/* Multiplayer mode change warning modal */}
+      <AcademyModal
+        isOpen={showMultiplayerWarning}
+        onClose={handleMultiplayerWarningCancel}
+        width="lg"
+        showVisitButton={false}
+        content={
+          pendingGameModeChange && (
+            <div className="space-y-4">
+              <div className="font-semibold text-lg text-center">
+                Multiplayer Mode Change Warning
+              </div>
+              <div>
+                Changing the multiplayer mode to{" "}
+                <strong>
+                  {pendingGameModeChange.newMode === GameModes.Cooperative
+                    ? "Cooperative"
+                    : pendingGameModeChange.newMode ===
+                      GameModes.CooperativeCompetitive
+                    ? "Mixed"
+                    : "Competitive"}
+                </strong>{" "}
+                changes the fundamental structure of your World. Chances are
+                that you will have to adjust Guidelines, Story Elements, Stats,
+                and Outcomes to better align with the new setting.
+              </div>
+              <div className="flex gap-2 justify-center pt-4">
+                <PrimaryButton
+                  onClick={handleMultiplayerWarningCancel}
+                  variant="outline"
+                >
+                  Cancel
+                </PrimaryButton>
+                <PrimaryButton
+                  onClick={handleMultiplayerWarningProceed}
+                  variant="primary"
+                >
+                  Continue
+                </PrimaryButton>
+              </div>
+            </div>
+          )
+        }
+      />
+
+      {/* Player count change warning modal */}
+      <AcademyModal
+        isOpen={showPlayerCountWarning}
+        onClose={handlePlayerCountWarningCancel}
+        width="lg"
+        showVisitButton={false}
+        content={
+          pendingPlayerCountChange && (
+            <div className="space-y-4">
+              <div className="font-semibold text-lg text-center">
+                Single to Multiplayer Context Warning
+              </div>
+              <div>
+                Changing the World from a single-player context to a (potential)
+                multiplayer environment means you should create Identities,
+                Backgrounds, and potentially personal Outcomes for Player 2{" "}
+                {pendingPlayerCountChange.newMax > 2 && (
+                  <span>and Player 3</span>
+                )}
+                . Check if you categorized Outcomes correctly as Shared Outcomes
+                vs. Personal Outcomes.
+              </div>
+              <div className="flex gap-2 justify-center pt-4">
+                <PrimaryButton
+                  onClick={handlePlayerCountWarningCancel}
+                  variant="outline"
+                >
+                  Cancel
+                </PrimaryButton>
+                <PrimaryButton
+                  onClick={handlePlayerCountWarningProceed}
+                  variant="primary"
+                >
+                  Continue
+                </PrimaryButton>
+              </div>
+            </div>
+          )
+        }
+      />
+
+      {/* Competitive single player warning modal */}
+      <AcademyModal
+        isOpen={showCompetitiveSingleWarning}
+        onClose={handleCompetitiveSingleWarningCancel}
+        width="lg"
+        showVisitButton={false}
+        content={
+          <div className="space-y-4">
+            <div className="font-semibold text-lg text-center">
+              Competitive Single Player Warning
+            </div>
+            <div>
+              You defined your World as a competitive space for your players. If
+              you want to allow a single player to experience this World, make
+              sure that everything works as intended -- even without another
+              player as a competitor.
+            </div>
+            <div className="flex gap-2 justify-center pt-4">
+              <PrimaryButton
+                onClick={handleCompetitiveSingleWarningCancel}
+                variant="outline"
+              >
+                Cancel
+              </PrimaryButton>
+              <PrimaryButton
+                onClick={handleCompetitiveSingleWarningProceed}
+                variant="primary"
+              >
+                Continue
+              </PrimaryButton>
+            </div>
+          </div>
+        }
       />
     </>
   );

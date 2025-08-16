@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { PrimaryButton, Modal, Icons } from "components/ui";
+import { PrimaryButton, Icons } from "components/ui";
+import { AcademyModal } from "./AcademyModal";
 
 type AcademyContextButtonMode = "button" | "icon";
 
@@ -28,12 +29,6 @@ export const AcademyContextButton: React.FC<AcademyContextButtonProps> = ({
 
   const handleClose = () => setIsOpen(false);
 
-  const handleVisit = () => {
-    if (link) {
-      window.open(link, "_blank", "noopener,noreferrer");
-    }
-  };
-
   const trigger =
     mode === "icon" ? (
       <button
@@ -61,28 +56,12 @@ export const AcademyContextButton: React.FC<AcademyContextButtonProps> = ({
   return (
     <>
       {trigger}
-      <Modal
+      <AcademyModal
         isOpen={isOpen}
         onClose={handleClose}
-        width="lg"
-        headerImageSrc="/worldbuilding-academy.jpeg"
-        headerImageAlt="Worldbuilding Academy"
-      >
-        <div className="space-y-4">
-          <div className="text-primary-800 text-sm">{content}</div>
-          {link && (
-            <div className="flex justify-center pt-2">
-              <PrimaryButton
-                onClick={handleVisit}
-                variant="primary"
-                leftIcon={<Icons.Academy className="h-4 w-4" />}
-              >
-                Visit Lecture
-              </PrimaryButton>
-            </div>
-          )}
-        </div>
-      </Modal>
+        content={content}
+        link={link}
+      />
     </>
   );
 };

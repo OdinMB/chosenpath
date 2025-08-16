@@ -2,10 +2,8 @@ Smaller commits!
 
 # NEXT
 
-- 2: flag missing images if containsImages = true
 - 1: fake progress creating Worlds to not have players worry that things are stuck ("Creating the World", ...)
 - 1: add one sentence each to the AI draft motivation tiles
-- 1: Different multiplayer mode: suggestion to change other sections
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
 - 1: Teaser should be properly generated, not copy/pasted from user query
 

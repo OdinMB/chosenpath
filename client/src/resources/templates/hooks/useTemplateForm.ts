@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   StoryTemplate,
   GameMode,
+  GameModes,
   PLAYER_SLOTS,
   PlayerSlot,
   CharacterSelectionIntroduction,
@@ -51,11 +52,17 @@ interface SaveHistoryEntry {
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
   onSave?: (template: StoryTemplate) => Promise<void>;
+  onGameModeChange?: (newGameMode: GameMode, oldGameMode: GameMode, isSparse: boolean) => void;
+  onPlayerCountChange?: (newMin: PlayerCount, newMax: PlayerCount, oldMin: PlayerCount, oldMax: PlayerCount, isMinChange: boolean, isSparse: boolean) => void;
+  onCompetitiveSingleCheck?: (gameMode: GameMode, newMin: PlayerCount, newMax: PlayerCount, isMinChange: boolean, isSparse: boolean) => void;
 }
 
 export function useTemplateForm({
   initialTemplate,
   onSave,
+  onGameModeChange,
+  onPlayerCountChange,
+  onCompetitiveSingleCheck,
 }: UseTemplateFormProps) {
   // Core state
   const { activeTab, setActiveTab } = useTabs<TabType>("basic");
@@ -79,8 +86,8 @@ export function useTemplateForm({
     tags,
     handleTitleChange,
     handleTeaserChange,
-    handlePlayerCountMinChange,
-    handlePlayerCountMaxChange,
+    handlePlayerCountMinChange: handlePlayerCountMinChangeOriginal,
+    handlePlayerCountMaxChange: handlePlayerCountMaxChangeOriginal,
     handleMaxTurnsMinChange,
     handleMaxTurnsMaxChange,
     handleGameModeChange,
@@ -655,9 +662,84 @@ export function useTemplateForm({
     // Handlers for specific fields
     handleTitleChange,
     handleTeaserChange,
-    handlePlayerCountMinChange,
-    handlePlayerCountMaxChange,
-    handleGameModeChange,
+    handlePlayerCountMinChange: (value: PlayerCount) => {
+      if (onPlayerCountChange || onCompetitiveSingleCheck) {
+        const oldMin = formData.playerCountMin;
+        const oldMax = formData.playerCountMax;
+        
+        // Check for player count change warning (single to multiplayer)
+        if (onPlayerCountChange) {
+          // Check if changing from single-player (min=1, max=1) to multiplayer (max>1)
+          if (oldMin === 1 && oldMax === 1 && (value !== 1 || oldMax > 1)) {
+            onPlayerCountChange(value, oldMax, oldMin, oldMax, true, isSparse);
+            return; // Don't apply change yet, let the callback handle it
+          }
+        }
+        
+        // Check for competitive single player warning
+        if (onCompetitiveSingleCheck) {
+          const gameMode = formData.gameMode;
+          if (gameMode === GameModes.Competitive && value === 1) {
+            onCompetitiveSingleCheck(gameMode, value, oldMax, true, isSparse);
+            return; // Don't apply change yet, let the callback handle it
+          }
+        }
+      }
+      handlePlayerCountMinChangeOriginal(value);
+    },
+    handlePlayerCountMaxChange: (value: PlayerCount) => {
+      if (onPlayerCountChange || onCompetitiveSingleCheck) {
+        const oldMin = formData.playerCountMin;
+        const oldMax = formData.playerCountMax;
+        
+        // Check for player count change warning (single to multiplayer)
+        if (onPlayerCountChange) {
+          // Check if changing from single-player (min=1, max=1) to multiplayer (max>1)
+          if (oldMin === 1 && oldMax === 1 && value > 1) {
+            onPlayerCountChange(oldMin, value, oldMin, oldMax, false, isSparse);
+            return; // Don't apply change yet, let the callback handle it
+          }
+        }
+        
+        // Check for competitive single player warning
+        if (onCompetitiveSingleCheck) {
+          const gameMode = formData.gameMode;
+          if (gameMode === GameModes.Competitive && value === 1) {
+            onCompetitiveSingleCheck(gameMode, oldMin, value, false, isSparse);
+            return; // Don't apply change yet, let the callback handle it
+          }
+        }
+      }
+      handlePlayerCountMaxChangeOriginal(value);
+    },
+    handlePlayerCountMinChangeOriginal,
+    handlePlayerCountMaxChangeOriginal,
+    handleGameModeChange: (value: number) => {
+      if (onGameModeChange) {
+        const currentGameMode = formData.gameMode;
+        let newGameMode: GameMode;
+        switch (value) {
+          case 0:
+            newGameMode = GameModes.Cooperative;
+            break;
+          case 1:
+            newGameMode = GameModes.CooperativeCompetitive;
+            break;
+          case 2:
+            newGameMode = GameModes.Competitive;
+            break;
+          default:
+            newGameMode = GameModes.Cooperative;
+        }
+        
+        if (currentGameMode && currentGameMode !== newGameMode) {
+          onGameModeChange(newGameMode, currentGameMode, isSparse);
+          return; // Don't apply change yet, let the callback handle it
+        }
+      }
+      handleGameModeChange(value);
+    },
+    handleGameModeChangeOriginal: handleGameModeChange,
     handleMaxTurnsMinChange,
     handleMaxTurnsMaxChange,
     handleStatsChange,
