@@ -30,7 +30,7 @@ import {
   ValidationResult,
   ValidationIssue,
 } from "../utils/templateValidation";
-import { useTemplateImages } from "./useTemplateImages";
+import { useTemplateImages, invalidateTemplateImagesCache } from "./useTemplateImages";
 
 // Define the TabType type
 export type TabType =
@@ -71,10 +71,11 @@ export function useTemplateForm({
   const [validationResult, setValidationResult] =
     useState<ValidationResult | null>(null);
     
-  // Fetch template images for validation (only when template is saved and containsImages is true)
-  const { data: templateImagesData } = useTemplateImages(
+  // Fetch template images for validation (when template is saved)
+  // Note: We fetch even when containsImages is false to validate missing images
+  const { data: templateImagesData, refetch: refetchTemplateImages } = useTemplateImages(
     formData.id,
-    Boolean(formData.id && formData.containsImages)
+    Boolean(formData.id) // Fetch whenever we have a saved template ID
   );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState<StoryTemplate>(initialTemplate);
@@ -325,6 +326,56 @@ export function useTemplateForm({
     }
   };
 
+  // Encapsulated save function that handles server requests, error handling, and state updates
+  const saveTemplateToServer = async (templateToSave: StoryTemplate): Promise<StoryTemplate> => {
+    Logger.UI.log("Saving template to server", templateToSave.id);
+    
+    try {
+      let savedTemplate: StoryTemplate;
+      
+      if (onSave) {
+        // Use the provided onSave handler
+        await onSave(templateToSave);
+        savedTemplate = templateToSave;
+        Logger.UI.log("Template saved via onSave handler");
+      } else if (!templateToSave.id) {
+        // Create new template
+        Logger.Admin.log("Creating new template", templateToSave);
+        const response = await templateApi.createTemplate(templateToSave);
+        savedTemplate = response.template;
+        Logger.Admin.log("Template created successfully", savedTemplate);
+        navigate(`/admin/templates/${savedTemplate.id}`); // Navigate to the new template's edit page
+      } else {
+        // Update existing template
+        Logger.Admin.log(`Updating template: ${templateToSave.id}`, templateToSave);
+        const response = await templateApi.updateTemplate(templateToSave.id, templateToSave);
+        savedTemplate = response.template;
+        Logger.Admin.log("Template updated successfully", savedTemplate);
+      }
+      
+      // Update local state with saved template
+      addToSaveHistory(savedTemplate); // Add to save history
+      setSavedTemplate(savedTemplate); // Update the saved template reference
+      setHasUnsavedChanges(false); // Reset unsaved changes after successful save
+      
+      // Refresh template images data for updated validation
+      if (savedTemplate.id) {
+        invalidateTemplateImagesCache(savedTemplate.id);
+        // Trigger refetch to get updated validation data
+        refetchTemplateImages().catch(err => {
+          Logger.UI.warn("Failed to refetch template images after save:", err);
+        });
+      }
+      
+      return savedTemplate;
+    } catch (err) {
+      Logger.Admin.error("Error saving template:", err);
+      const message = err instanceof Error ? err.message : "Failed to save template";
+      notificationService.addErrorNotification(message);
+      throw err; // Re-throw to allow caller to handle it
+    }
+  };
+
   // Get player options for use in UI components
   const getPlayerOptionsFromStoryTemplate = (
     template: Partial<StoryTemplate>
@@ -362,47 +413,8 @@ export function useTemplateForm({
         tags,
       };
 
-      if (onSave) {
-        // Use the provided onSave handler
-        await onSave(templateToSubmit);
-        addToSaveHistory(savedTemplate); // Add current saved state to history before updating
-        setSavedTemplate(templateToSubmit); // Update the saved template reference
-        setHasUnsavedChanges(false); // Reset unsaved changes after successful save
-      } else {
-        // Use the default implementation
-        if (!templateToSubmit.id) {
-          // Create new template
-          Logger.Admin.log("Creating new template in form", templateToSubmit);
-          const response = await templateApi.createTemplate(templateToSubmit);
-          Logger.Admin.log("Template created successfully", response.template);
-          addToSaveHistory(savedTemplate); // Add current saved state to history before updating
-          setSavedTemplate(response.template); // Update the saved template reference
-          setHasUnsavedChanges(false); // Reset unsaved changes after successful save
-          navigate(`/admin/templates/${response.template.id}`); // Navigate to the new template's edit page
-        } else {
-          // Update existing template
-          Logger.Admin.log(
-            `Updating template: ${templateToSubmit.id}`,
-            templateToSubmit
-          );
-          const response = await templateApi.updateTemplate(
-            templateToSubmit.id,
-            templateToSubmit
-          );
-          Logger.Admin.log("Template saved successfully", response.template);
-          addToSaveHistory(savedTemplate); // Add current saved state to history before updating
-          setSavedTemplate(templateToSubmit); // Update the saved template reference
-          setHasUnsavedChanges(false); // Reset unsaved changes after successful save
-          // Optionally, show a success notification
-          // Revalidation of data for a library view would typically happen there, or if this form closes.
-        }
-      }
-    } catch (err) {
-      Logger.Admin.error("Error submitting template form:", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to save template";
-      notificationService.addErrorNotification(message);
-      throw err; // Re-throw to allow the component to handle it
+      // Use the encapsulated save function
+      await saveTemplateToServer(templateToSubmit);
     } finally {
       setIsLoading(false);
     }
@@ -491,14 +503,6 @@ export function useTemplateForm({
         updatedAt: new Date().toISOString(),
       };
 
-      // Update the existing template on the server
-      if (formData.id) {
-        await templateApi.updateTemplate(formData.id, updatedTemplateData);
-        Logger.UI.log(
-          `Updated existing template ${formData.id} with AI-generated content`
-        );
-      }
-
       // Delete the temporary generated template since we only needed its content
       if (generatedTemplateData.id !== formData.id) {
         try {
@@ -516,6 +520,10 @@ export function useTemplateForm({
 
       // Update the form data with our merged template
       setFormData(updatedTemplateData);
+
+      // Save the updated template using the encapsulated save function
+      await saveTemplateToServer(updatedTemplateData);
+      Logger.UI.log("AI-generated template updates saved to server");
 
       // Switch to a relevant tab after drafting
       setActiveTab("basic");

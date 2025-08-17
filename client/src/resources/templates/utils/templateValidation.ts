@@ -38,8 +38,9 @@ export const validateTemplateIntegrity = (
   // Validate stat references
   issues.push(...validateStatReferences(template));
 
-  // Validate image requirements if manifest is provided and containsImages is enabled
-  if (imageManifest && template.containsImages) {
+  // Validate image requirements if manifest is provided
+  // Check images regardless of containsImages flag to catch missing required images
+  if (imageManifest) {
     issues.push(...validateImageRequirements(template, imageManifest));
   }
 
