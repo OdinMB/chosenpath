@@ -109,7 +109,7 @@ const validateTemplateCompleteness = (
       type: "warning",
       category: "general",
       message:
-        "This World needs a bit more love before it's playable. Add some story elements, guidelines, and player identities to make this World ready for play.",
+        "This World needs a bit more love before it's playable. Add story elements, guidelines, and player identities to make this World ready for play.",
       affectedItems: [],
       autoFixable: false,
     });

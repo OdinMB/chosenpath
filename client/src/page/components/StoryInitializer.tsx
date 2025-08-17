@@ -28,8 +28,8 @@ import {
   defaultPlaceholders,
   PromptCategory,
 } from "../data/suggestionData";
-import { StepIndicator } from "./StepIndicator";
 import { ConfigSummary } from "./ConfigSummary";
+import { GenerationProgress } from "./GenerationProgress";
 
 interface CategoryConfig {
   label: string;
@@ -161,6 +161,9 @@ export const StoryInitializer = ({
   const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState<
     Record<string, number>
   >({});
+
+  // Debug mode for testing the animation (development only)
+  const [debugShowProgress, setDebugShowProgress] = useState(false);
 
   // Update URL when relevant state changes
   const updateURLParams = useCallback(
@@ -665,6 +668,7 @@ export const StoryInitializer = ({
   };
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
+  const showGenerationProgress = currentIsLoading || debugShowProgress;
 
   if (storyId && playerCodes) {
     return (
@@ -735,6 +739,19 @@ export const StoryInitializer = ({
                   </span>
                   <span className="hidden sm:inline">{config.label}</span>
                 </span>
+                {/* Short description for each tile */}
+                <p className="text-xs text-primary-600 mt-1 px-1 block">
+                  {key === "enjoy-fiction" &&
+                    "Immersive stories in fictional worlds"}
+                  {key === "vent-about-reality" &&
+                    "Satirical scenarios and simulations"}
+                  {key === "pretend-to-be" &&
+                    "Slice of life stories to promote empathy"}
+                  {key === "see-your-future-self" &&
+                    "Help for personal decision-making"}
+                  {key === "read-with-kids" && "Age-appropriate adventures"}
+                  {key === "learn-something" && "Educational storytelling"}
+                </p>
               </div>
             </ColoredBox>
           ))}
@@ -938,6 +955,52 @@ export const StoryInitializer = ({
   };
 
   const renderStep3 = () => {
+    // Show generation progress when loading or in debug mode
+    if (showGenerationProgress) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center mb-6">
+            <h2 className="text-xl md:text-2xl font-medium text-primary mb-2">
+              {templateMode
+                ? "Crafting your World..."
+                : "Creating your Story..."}
+            </h2>
+          </div>
+
+          <GenerationProgress
+            isVisible={showGenerationProgress}
+            templateMode={templateMode}
+            onComplete={() => {
+              if (debugShowProgress) {
+                // In debug mode, just reset after completion
+                setDebugShowProgress(false);
+              }
+            }}
+          />
+
+          {/* Cancel/Stop button */}
+          <div className="flex justify-center pt-4">
+            <PrimaryButton
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (debugShowProgress) {
+                  setDebugShowProgress(false);
+                } else {
+                  // Reset loading state - implementation depends on your setup
+                  window.location.reload();
+                }
+              }}
+              className="text-sm"
+            >
+              {debugShowProgress ? "Stop Preview" : "Cancel"}
+            </PrimaryButton>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="mb-4 sm:mb-8">
@@ -1128,6 +1191,21 @@ export const StoryInitializer = ({
           </div>
         )}
 
+        {/* Debug button for testing animation (development only) */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="flex justify-center pt-2 pb-4">
+            <PrimaryButton
+              type="button"
+              size="sm"
+              onClick={() => setDebugShowProgress(true)}
+              variant="outline"
+              className="text-xs bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+            >
+              🎬 Preview Generation Animation
+            </PrimaryButton>
+          </div>
+        )}
+
         <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-1 sm:pt-2">
           <PrimaryButton
             type="button"
@@ -1160,8 +1238,6 @@ export const StoryInitializer = ({
         onSubmit={!templateMode ? handleSubmit : undefined}
         className={templateMode ? "" : "max-w-4xl mx-auto"}
       >
-        <StepIndicator currentStep={currentStep} totalSteps={3} />
-
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
