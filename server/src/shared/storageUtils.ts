@@ -616,22 +616,46 @@ export function loadTemplateImages(templateId: string): Array<ImageStoryState> {
       return [];
     }
 
-    // Get files from directory
-    const files = fsSync
-      .readdirSync(templateDir)
-      .filter((file) =>
-        imageExtensions.includes(path.extname(file).toLowerCase())
-      );
+    const images: Array<ImageStoryState> = [];
 
-    // Map files to image objects
-    const images = files.map(
-      (file) =>
-        ({
-          id: path.parse(file).name, // Use filename without extension as ID
+    // Get files from root directory
+    const rootFiles = fsSync
+      .readdirSync(templateDir)
+      .filter((file) => {
+        const filePath = path.join(templateDir, file);
+        return fsSync.statSync(filePath).isFile() && 
+               imageExtensions.includes(path.extname(file).toLowerCase());
+      });
+
+    // Map root files to image objects
+    rootFiles.forEach((file) => {
+      images.push({
+        id: path.parse(file).name, // Use filename without extension as ID
+        source: "template" as const,
+        description: "",
+      } as ImageStoryState);
+    });
+
+    // Check for players subdirectory
+    const playersDir = path.join(templateDir, "players");
+    if (fsSync.existsSync(playersDir)) {
+      const playerFiles = fsSync
+        .readdirSync(playersDir)
+        .filter((file) =>
+          imageExtensions.includes(path.extname(file).toLowerCase())
+        );
+
+      // Map player files to image objects (preserving the expected ID format)
+      playerFiles.forEach((file) => {
+        const imageId = path.parse(file).name;
+        images.push({
+          id: imageId, // Use filename without extension as ID
           source: "template" as const,
           description: "",
-        } as ImageStoryState)
-    );
+        } as ImageStoryState);
+        console.log(`  Loaded player image: ${imageId} from players/${file}`);
+      });
+    }
 
     console.log(`Loaded ${images.length} images from template ${templateId}`);
     return images;

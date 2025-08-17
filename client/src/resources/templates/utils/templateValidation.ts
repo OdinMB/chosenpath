@@ -29,6 +29,9 @@ export const validateTemplateIntegrity = (
 ): ValidationResult => {
   const issues: ValidationIssue[] = [];
 
+  // Check if template is sparse and add warning
+  issues.push(...validateTemplateCompleteness(template));
+
   // Validate stat definitions
   issues.push(...validateStatDefinitions(template));
 
@@ -57,6 +60,62 @@ export const validateTemplateIntegrity = (
     issues,
     stats,
   };
+};
+
+/**
+ * Validates template completeness (checks if template is sparse)
+ */
+const validateTemplateCompleteness = (
+  template: StoryTemplate
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+
+  const noStoryElements = (template.storyElements || []).length === 0;
+  const noGuidelines =
+    !template.guidelines ||
+    (!template.guidelines.world &&
+      (!template.guidelines.rules || template.guidelines.rules.length === 0) &&
+      (!template.guidelines.tone || template.guidelines.tone.length === 0) &&
+      (!template.guidelines.conflicts ||
+        template.guidelines.conflicts.length === 0) &&
+      (!template.guidelines.decisions ||
+        template.guidelines.decisions.length === 0));
+
+  // Check for named player identities (using same logic as useTemplateForm)
+  const hasNamedIdentity = Object.keys(template).some((key) => {
+    if (!key.startsWith("player")) return false;
+    const player = (template as unknown as Record<string, unknown>)[key] as
+      | {
+          possibleCharacterIdentities?: Array<{ name?: string }>;
+        }
+      | undefined;
+    const identities = player?.possibleCharacterIdentities || [];
+    return identities.some(
+      (id) => id?.name && String(id.name).trim().length > 0
+    );
+  });
+
+  // Check for meaningful stats (same logic as useTemplateForm)
+  const noStats =
+    (!template.sharedStats || template.sharedStats.length === 0) &&
+    (!template.playerStats || template.playerStats.length === 0);
+
+  const noPlayerIdentityNames = !hasNamedIdentity;
+  const isSparse =
+    noStoryElements || noPlayerIdentityNames || noGuidelines || noStats;
+
+  if (isSparse) {
+    issues.push({
+      type: "warning",
+      category: "general",
+      message:
+        "This World needs a bit more love before it's playable. Add some story elements, guidelines, and player identities to make this World ready for play.",
+      affectedItems: [],
+      autoFixable: false,
+    });
+  }
+
+  return issues;
 };
 
 /**
@@ -167,63 +226,61 @@ const validateBackgroundCompleteness = (
       const typedPlayerOptions = playerOptions as {
         possibleCharacterBackgrounds: CharacterBackground[];
       };
-      typedPlayerOptions.possibleCharacterBackgrounds.forEach(
-        (background) => {
-          const existingStatIds = background.initialPlayerStatValues.map(
-            (sv) => sv.statId
-          );
+      typedPlayerOptions.possibleCharacterBackgrounds.forEach((background) => {
+        const existingStatIds = background.initialPlayerStatValues.map(
+          (sv) => sv.statId
+        );
 
-          // Check for missing stats
-          const missingStats = backgroundStatIds.filter(
-            (id) => !existingStatIds.includes(id)
-          );
-          if (missingStats.length > 0) {
-            issues.push({
-              type: "error",
-              category: "backgrounds",
-              message: `Background "${
-                background.title
-              }" in ${key} is missing stats: ${missingStats.join(", ")}`,
-              affectedItems: [background.title],
-              autoFixable: true,
-            });
-          }
-
-          // Check for orphaned stats (stats that shouldn't be in backgrounds)
-          const orphanedStats = existingStatIds.filter(
-            (id) => !backgroundStatIds.includes(id)
-          );
-          if (orphanedStats.length > 0) {
-            issues.push({
-              type: "warning",
-              category: "backgrounds",
-              message: `Background "${
-                background.title
-              }" has orphaned stats: ${orphanedStats.join(", ")}`,
-              affectedItems: [background.title],
-              autoFixable: true,
-            });
-          }
-
-          // Check for duplicate stat entries within background
-          const duplicateStatIds = existingStatIds.filter(
-            (id, index) => existingStatIds.indexOf(id) !== index
-          );
-          if (duplicateStatIds.length > 0) {
-            issues.push({
-              type: "error",
-              category: "backgrounds",
-              message: `Background "${
-                background.title
-              }" has duplicate stat entries: ${Array.from(
-                new Set(duplicateStatIds)
-              ).join(", ")}`,
-              affectedItems: [background.title],
-              autoFixable: true,
-            });
-          }
+        // Check for missing stats
+        const missingStats = backgroundStatIds.filter(
+          (id) => !existingStatIds.includes(id)
+        );
+        if (missingStats.length > 0) {
+          issues.push({
+            type: "error",
+            category: "backgrounds",
+            message: `Background "${
+              background.title
+            }" in ${key} is missing stats: ${missingStats.join(", ")}`,
+            affectedItems: [background.title],
+            autoFixable: true,
+          });
         }
-      );
+
+        // Check for orphaned stats (stats that shouldn't be in backgrounds)
+        const orphanedStats = existingStatIds.filter(
+          (id) => !backgroundStatIds.includes(id)
+        );
+        if (orphanedStats.length > 0) {
+          issues.push({
+            type: "warning",
+            category: "backgrounds",
+            message: `Background "${
+              background.title
+            }" has orphaned stats: ${orphanedStats.join(", ")}`,
+            affectedItems: [background.title],
+            autoFixable: true,
+          });
+        }
+
+        // Check for duplicate stat entries within background
+        const duplicateStatIds = existingStatIds.filter(
+          (id, index) => existingStatIds.indexOf(id) !== index
+        );
+        if (duplicateStatIds.length > 0) {
+          issues.push({
+            type: "error",
+            category: "backgrounds",
+            message: `Background "${
+              background.title
+            }" has duplicate stat entries: ${Array.from(
+              new Set(duplicateStatIds)
+            ).join(", ")}`,
+            affectedItems: [background.title],
+            autoFixable: true,
+          });
+        }
+      });
     }
   });
 
@@ -285,7 +342,9 @@ export const autoFixTemplate = (
     // Fix missing initialValue on universal player stats
     if (
       issue.category === "stats" &&
-      issue.message.includes("partOfPlayerBackgrounds=false but no initialValue")
+      issue.message.includes(
+        "partOfPlayerBackgrounds=false but no initialValue"
+      )
     ) {
       fixedTemplate.playerStats = fixedTemplate.playerStats.map((stat) => {
         if (
@@ -314,10 +373,14 @@ export const autoFixTemplate = (
       );
       const definedGroups = new Set(fixedTemplate.statGroups);
       const missingGroups = Array.from(usedGroups).filter(
-        (group) => !definedGroups.has(group) && issue.affectedItems?.includes(group)
+        (group) =>
+          !definedGroups.has(group) && issue.affectedItems?.includes(group)
       );
       if (missingGroups.length > 0) {
-        fixedTemplate.statGroups = [...fixedTemplate.statGroups, ...missingGroups];
+        fixedTemplate.statGroups = [
+          ...fixedTemplate.statGroups,
+          ...missingGroups,
+        ];
         console.log(`Added missing stat groups: ${missingGroups.join(", ")}`);
       }
     }
@@ -340,46 +403,50 @@ export const autoFixTemplate = (
           const typedPlayerOptions = playerOptions as {
             possibleCharacterBackgrounds: CharacterBackground[];
           };
-          
+
           const updatedPlayerOptions = {
             ...typedPlayerOptions,
-            possibleCharacterBackgrounds: typedPlayerOptions.possibleCharacterBackgrounds.map(
-              (background) => {
-                if (issue.affectedItems?.includes(background.title)) {
-                  const existingStatIds = background.initialPlayerStatValues.map(
-                    (sv) => sv.statId
-                  );
-                  const missingStats = backgroundStatIds.filter(
-                    (id) => !existingStatIds.includes(id)
-                  );
-                  
-                  const newStatValues = [...background.initialPlayerStatValues];
-                  missingStats.forEach((statId) => {
-                    const stat = fixedTemplate.playerStats.find((s) => s.id === statId);
-                    if (stat) {
-                      let defaultValue: number | string | string[];
-                      if (stat.type === "string") {
-                        defaultValue = "";
-                      } else if (stat.type === "string[]") {
-                        defaultValue = [];
-                      } else {
-                        defaultValue = 50;
+            possibleCharacterBackgrounds:
+              typedPlayerOptions.possibleCharacterBackgrounds.map(
+                (background) => {
+                  if (issue.affectedItems?.includes(background.title)) {
+                    const existingStatIds =
+                      background.initialPlayerStatValues.map((sv) => sv.statId);
+                    const missingStats = backgroundStatIds.filter(
+                      (id) => !existingStatIds.includes(id)
+                    );
+
+                    const newStatValues = [
+                      ...background.initialPlayerStatValues,
+                    ];
+                    missingStats.forEach((statId) => {
+                      const stat = fixedTemplate.playerStats.find(
+                        (s) => s.id === statId
+                      );
+                      if (stat) {
+                        let defaultValue: number | string | string[];
+                        if (stat.type === "string") {
+                          defaultValue = "";
+                        } else if (stat.type === "string[]") {
+                          defaultValue = [];
+                        } else {
+                          defaultValue = 50;
+                        }
+                        newStatValues.push({
+                          statId,
+                          value: defaultValue,
+                        });
                       }
-                      newStatValues.push({
-                        statId,
-                        value: defaultValue,
-                      });
-                    }
-                  });
-                  
-                  return {
-                    ...background,
-                    initialPlayerStatValues: newStatValues,
-                  };
+                    });
+
+                    return {
+                      ...background,
+                      initialPlayerStatValues: newStatValues,
+                    };
+                  }
+                  return background;
                 }
-                return background;
-              }
-            ),
+              ),
           };
           Object.assign(fixedTemplate, { [key]: updatedPlayerOptions });
         }
@@ -404,22 +471,24 @@ export const autoFixTemplate = (
           const typedPlayerOptions = playerOptions as {
             possibleCharacterBackgrounds: CharacterBackground[];
           };
-          
+
           const updatedPlayerOptions = {
             ...typedPlayerOptions,
-            possibleCharacterBackgrounds: typedPlayerOptions.possibleCharacterBackgrounds.map(
-              (background) => {
-                if (issue.affectedItems?.includes(background.title)) {
-                  return {
-                    ...background,
-                    initialPlayerStatValues: background.initialPlayerStatValues.filter(
-                      (sv) => backgroundStatIds.includes(sv.statId)
-                    ),
-                  };
+            possibleCharacterBackgrounds:
+              typedPlayerOptions.possibleCharacterBackgrounds.map(
+                (background) => {
+                  if (issue.affectedItems?.includes(background.title)) {
+                    return {
+                      ...background,
+                      initialPlayerStatValues:
+                        background.initialPlayerStatValues.filter((sv) =>
+                          backgroundStatIds.includes(sv.statId)
+                        ),
+                    };
+                  }
+                  return background;
                 }
-                return background;
-              }
-            ),
+              ),
           };
           Object.assign(fixedTemplate, { [key]: updatedPlayerOptions });
         }
@@ -434,79 +503,60 @@ export const autoFixTemplate = (
  * Validates image requirements when containsImages is enabled
  */
 const validateImageRequirements = (
-  template: StoryTemplate,
+  _template: StoryTemplate,
   manifest: TemplateImageManifest
 ): ValidationIssue[] => {
   const issues: ValidationIssue[] = [];
 
+  // Create single consolidated missing images warning
+  const missingItems: string[] = [];
+  const affectedItems: string[] = [];
+
   // Check cover image
   if (manifest.missingImages.cover) {
-    issues.push({
-      type: "warning",
-      category: "images",
-      message: "Cover image is required when using pregenerated images",
-      affectedItems: ["cover"],
-      autoFixable: false,
+    missingItems.push("cover");
+    affectedItems.push("cover");
+  }
+
+  // Check missing player identity images
+  if (manifest.missingImages.playerIdentities.length > 0) {
+    // Group missing identities by player slot and count
+    const missingByPlayer = manifest.missingImages.playerIdentities.reduce(
+      (acc, { playerSlot }) => {
+        acc[playerSlot] = (acc[playerSlot] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Create display names with counts if more than one identity is missing per player
+    Object.entries(missingByPlayer).forEach(([playerSlot, count]) => {
+      const playerName = playerSlot.replace("player", "Player ");
+      if (count === 1) {
+        missingItems.push(`${playerName} identity`);
+      } else {
+        missingItems.push(`${playerName} (${count} identities)`);
+      }
+      affectedItems.push(playerSlot);
     });
   }
 
   // Check missing story element images
   if (manifest.missingImages.storyElements.length > 0) {
-    // Map IDs to names for better user experience
-    const missingElementNames = manifest.missingImages.storyElements.map(elementId => {
-      const element = template.storyElements?.find(e => e.id === elementId);
-      return element?.name || elementId;
-    });
-    
+    const elementCount = manifest.missingImages.storyElements.length;
+    missingItems.push(
+      `Element${elementCount > 1 ? "s" : ""} (${elementCount})`
+    );
+    affectedItems.push(...manifest.missingImages.storyElements);
+  }
+
+  // Add single warning if any images are missing
+  if (missingItems.length > 0) {
     issues.push({
       type: "warning",
       category: "images",
-      message: `Missing images for story elements: ${missingElementNames.join(", ")}`,
-      affectedItems: manifest.missingImages.storyElements,
-      autoFixable: false,
-    });
-  }
-
-  // Check missing player identity images
-  if (manifest.missingImages.playerIdentities.length > 0) {
-    // Group missing identities by player slot for more succinct messaging
-    const missingByPlayer = manifest.missingImages.playerIdentities.reduce((acc, { playerSlot }) => {
-      if (!acc.includes(playerSlot)) {
-        acc.push(playerSlot);
-      }
-      return acc;
-    }, [] as string[]);
-    
-    const playerDisplayNames = missingByPlayer.map(slot => 
-      slot.replace('player', 'Player ')
-    );
-    
-    issues.push({
-      type: "warning",
-      category: "images",
-      message: `Missing images for ${playerDisplayNames.join(", ")}`,
-      affectedItems: missingByPlayer,
-      autoFixable: false,
-    });
-  }
-
-  // Info message about total images if all are present
-  const totalRequired = 
-    1 + // cover
-    Object.keys(manifest.storyElements).length +
-    Object.values(manifest.playerIdentities).reduce((sum, identities) => 
-      sum + Object.keys(identities).length, 0
-    );
-  
-  if (manifest.totalImages > 0 && 
-      !manifest.missingImages.cover && 
-      manifest.missingImages.storyElements.length === 0 && 
-      manifest.missingImages.playerIdentities.length === 0) {
-    issues.push({
-      type: "info",
-      category: "images",
-      message: `All ${totalRequired} required images are available`,
-      affectedItems: [],
+      message: `Missing images: ${missingItems.join(", ")}`,
+      affectedItems,
       autoFixable: false,
     });
   }
