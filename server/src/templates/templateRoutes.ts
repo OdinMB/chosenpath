@@ -26,6 +26,7 @@ import {
   sendBadRequest,
   sendNotFound,
   sendRateLimited,
+  sendModerationBlocked,
 } from "shared/responseUtils.js";
 import { TemplateService } from "./TemplateService.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
@@ -46,6 +47,7 @@ import {
   loadTemplateImages,
 } from "shared/storageUtils.js";
 import { generateTemplateImageManifest } from "./templateImageService.js";
+import { ContentFilterService } from "../game/services/ContentFilterService.js";
 import {
   checkRateLimitForRequest,
   incrementRateLimitForRequest,
@@ -57,6 +59,7 @@ const upload = multer({ storage });
 
 const router = express.Router();
 const templateService = new TemplateService();
+const contentFilter = new ContentFilterService();
 
 // ========================
 // PUBLIC TEMPLATE ROUTES (NO AUTH)
@@ -636,6 +639,17 @@ router.post(
         return sendBadRequest(res, "Missing required fields", requestId);
       }
 
+      // Check if the prompt contains inappropriate content or copyright infringement
+      const contentCheck = await contentFilter.isAppropriatePrompt(prompt);
+      if (!contentCheck.isAppropriate) {
+        const moderationInfo = {
+          action: "generate_template" as const,
+          reason: contentCheck.reason || "Inappropriate content detected",
+          prompt,
+        };
+        return sendModerationBlocked(res, moderationInfo, requestId);
+      }
+
       const creatorId = req.user?.id;
       const creatorUsername = req.user?.username;
 
@@ -710,6 +724,17 @@ router.post(
           "Missing required fields: feedback, sections, gameMode, playerCount, maxTurns",
           requestId
         );
+      }
+
+      // Check if the feedback contains inappropriate content or copyright infringement
+      const contentCheck = await contentFilter.isAppropriatePrompt(feedback);
+      if (!contentCheck.isAppropriate) {
+        const moderationInfo = {
+          action: "iterate_template" as const,
+          reason: contentCheck.reason || "Inappropriate content detected",
+          prompt: feedback,
+        };
+        return sendModerationBlocked(res, moderationInfo, requestId);
       }
 
       // Check if template exists

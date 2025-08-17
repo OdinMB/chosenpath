@@ -45,14 +45,19 @@ export class ContentFilterService {
         this.model.withStructuredOutput(contentFilterSchema);
 
       const filterPrompt = `You are a content moderation system. Your task is to determine if the following prompt for generating an interactive fiction story is appropriate 
-        for a general audience game. The prompt should NOT contain hardcore erotic, abuse, violence, gore, hate speech, 
-        illegal activities, self-harm, or other objectionable content. Killing a rival knight with a bow is OK, as is a somewhat steamy novella with vampires.
+        for a general audience game. The prompt should NOT contain:
+        
+        1. Inappropriate content: hardcore erotic, abuse, violence, gore, hate speech, illegal activities, self-harm, or other objectionable content
+        2. Copyright infringement: characters, settings, or lore directly stolen from copyrighted works (e.g., Harry Potter characters, Marvel superheroes, Disney properties, specific Game of Thrones characters, etc.)
+        
+        Note: Light fantasy violence like "killing a rival knight with a bow" is acceptable, as are romantic elements like "a steamy novella with vampires." 
+        Generic fantasy/sci-fi elements (wizards, elves, space travel) are fine, but specific copyrighted characters and worlds are not.
         
         Your response must be structured as follows:
         - isAppropriate: A boolean indicating if the content is appropriate (true) or inappropriate (false)
-        - reason: If inappropriate, a brief explanation of why
+        - reason: If inappropriate, a brief explanation of why (specify if it's content policy violation or copyright concern)
 
-        Respond with true for isAppropriate ONLY if the content is clearly safe and appropriate.
+        Respond with true for isAppropriate ONLY if the content is clearly safe, appropriate, and doesn't infringe on copyrights.
         Be conservative - if you have any doubt, mark it as inappropriate.
         
         Prompt to evaluate: "${prompt}"`;
