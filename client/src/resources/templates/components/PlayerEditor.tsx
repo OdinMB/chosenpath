@@ -11,8 +11,9 @@ import {
 import { ExpandableItem } from "components";
 import { PrimaryButton, Icons } from "components/ui";
 import { AcademyContextButton } from "components";
-import { PlayerIdentityEditor, PlayerBackgroundEditor } from "./";
+import { PlayerIdentityEditor, PlayerBackgroundEditor, ImagePlaceholder } from "./";
 import { OutcomePlayer } from "./PlayerOutcomes";
+import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 
 // Pronoun sets available for character identities
 const PRONOUN_SETS = [
@@ -324,7 +325,8 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
       onSave={() => handleSave(playerSlot)}
       renderEditForm={renderPlayerForm}
       description={(() => {
-        const identityNames = (options.possibleCharacterIdentities || [])
+        const identities = options.possibleCharacterIdentities || [];
+        const identityNames = identities
           .map((identity) => identity?.name?.trim())
           .filter((name): name is string => Boolean(name));
         const backgroundTitles = (options.possibleCharacterBackgrounds || [])
@@ -334,22 +336,69 @@ export const PlayerEditor: React.FC<PlayerEditorProps> = ({
           .map((outcome) => outcome?.question?.trim())
           .filter((q): q is string => Boolean(q));
 
-        if (
-          identityNames.length === 0 &&
-          backgroundTitles.length === 0 &&
-          outcomeQuestions.length === 0
-        ) {
+        const hasContent = 
+          identityNames.length > 0 ||
+          backgroundTitles.length > 0 ||
+          outcomeQuestions.length > 0;
+
+        // Always show images if identities exist
+        const showImages = identities.length > 0;
+
+        if (!hasContent && !showImages) {
           return undefined;
         }
 
         return (
           <>
-            {identityNames.length > 0 && <div>{identityNames.join(" / ")}</div>}
-            {backgroundTitles.length > 0 && (
-              <div>{backgroundTitles.join(" / ")}</div>
+            {/* Show identity images with names if enabled */}
+            {showImages && (
+              <div className="flex gap-3 mb-3">
+                {identities.map((identity, index) => {
+                  // Create image object using the same helper as expanded view
+                  const image = createPlayerIdentityImage(
+                    playerSlot,
+                    index,
+                    "template",
+                    templateId,
+                    identity?.appearance || ""
+                  );
+
+                  return (
+                    <div key={`${playerSlot}_identity_${index}_container`} className="flex flex-col items-center">
+                      <ImagePlaceholder
+                        image={image}
+                        alt={identity?.name || `Identity ${index + 1}`}
+                        isGenerating={false}
+                        canGenerateImages={canGenerateImages} // Use actual permission value
+                        hasAppearance={Boolean(identity?.appearance?.trim())}
+                        size="small"
+                        className="border border-gray-200 mb-1"
+                        missingContentMessage=""
+                      />
+                      <div className="text-xs text-center">
+                        {identity?.name || `Identity ${index + 1}`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
+            
+            {/* Show identity names only if images are not shown */}
+            {!showImages && identityNames.length > 0 && (
+              <div>{identityNames.join(" / ")}</div>
+            )}
+            
+            {/* Show backgrounds with proper spacing */}
+            {backgroundTitles.length > 0 && (
+              <div className={showImages || identityNames.length > 0 ? "mt-2" : ""}>
+                {backgroundTitles.join(" / ")}
+              </div>
+            )}
+            
+            {/* Show outcomes with consistent spacing */}
             {outcomeQuestions.length > 0 && (
-              <div className="mt-1">
+              <div className="mt-2">
                 {outcomeQuestions.map((q, idx) => (
                   <div key={`outcome-${idx}`}>{q}</div>
                 ))}
