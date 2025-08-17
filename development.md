@@ -8,7 +8,6 @@ Smaller commits!
 - 1: resolution animation: good outcomes on the right (as opposed to left)
 - 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 - 1: fix tooltip to not go beyond display borders
-- 1: bigger warning AI draft over existing world
 - 1: on image generation error: give better notes (copyright etc.)
 - 1: content moderation: add copyright issues
 

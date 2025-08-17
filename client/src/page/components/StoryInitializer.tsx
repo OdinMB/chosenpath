@@ -30,6 +30,7 @@ import {
 } from "../data/suggestionData";
 import { ConfigSummary } from "./ConfigSummary";
 import { GenerationProgress } from "./GenerationProgress";
+import { AcademyModal } from "shared/components/AcademyModal";
 
 interface CategoryConfig {
   label: string;
@@ -63,6 +64,7 @@ interface StoryInitializerProps {
   initialPrompt?: string;
   onPlayerCountChange?: (playerCount: PlayerCount) => void;
   onPromptChange?: (prompt: string) => void;
+  isSparse?: boolean;
 }
 
 export const StoryInitializer = ({
@@ -78,6 +80,7 @@ export const StoryInitializer = ({
   initialPrompt,
   onPlayerCountChange,
   onPromptChange,
+  isSparse = true,
 }: StoryInitializerProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -164,6 +167,18 @@ export const StoryInitializer = ({
 
   // Debug mode for testing the animation (development only)
   const [debugShowProgress, setDebugShowProgress] = useState(false);
+  
+  // Modal state for AI Draft warning
+  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+  const [pendingSetupOptions, setPendingSetupOptions] = useState<{
+    prompt: string;
+    playerCount: PlayerCount;
+    maxTurns: number;
+    gameMode: GameMode;
+    generateImages: boolean;
+    pregenerateBeats?: boolean;
+    difficultyLevel?: DifficultyLevel;
+  } | null>(null);
 
   // Update URL when relevant state changes
   const updateURLParams = useCallback(
@@ -602,16 +617,25 @@ export const StoryInitializer = ({
         : pregenerateBeats;
 
     if (templateMode && onSetup) {
+      const setupOptions = {
+        prompt: mergedPrompt,
+        playerCount,
+        maxTurns,
+        gameMode,
+        generateImages,
+        pregenerateBeats: finalPregenerateBeats,
+        difficultyLevel: selectedDifficultyLevel,
+      };
+      
+      // Check if template is not sparse and show warning
+      if (!isSparse) {
+        setPendingSetupOptions(setupOptions);
+        setShowOverrideWarning(true);
+        return;
+      }
+      
       try {
-        await onSetup({
-          prompt: mergedPrompt,
-          playerCount,
-          maxTurns,
-          gameMode,
-          generateImages,
-          pregenerateBeats: finalPregenerateBeats,
-          difficultyLevel: selectedDifficultyLevel,
-        });
+        await onSetup(setupOptions);
       } catch (error) {
         console.error("Error during template AI draft setup:", error);
         notificationService.addErrorNotification(
@@ -1232,16 +1256,77 @@ export const StoryInitializer = ({
     );
   };
 
+  const handleConfirmOverride = async () => {
+    setShowOverrideWarning(false);
+    if (pendingSetupOptions && onSetup) {
+      try {
+        await onSetup(pendingSetupOptions);
+      } catch (error) {
+        console.error("Error during template AI draft setup:", error);
+        notificationService.addErrorNotification(
+          "Failed to draft template content. Please try again."
+        );
+      }
+    }
+    setPendingSetupOptions(null);
+  };
+
+  const handleCancelOverride = () => {
+    setShowOverrideWarning(false);
+    setPendingSetupOptions(null);
+  };
+
   return (
-    <div className={`${templateMode ? "" : "p-4 md:p-6"} font-lora`}>
-      <FormWrapper
-        onSubmit={!templateMode ? handleSubmit : undefined}
-        className={templateMode ? "" : "max-w-4xl mx-auto"}
-      >
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
-      </FormWrapper>
-    </div>
+    <>
+      <div className={`${templateMode ? "" : "p-4 md:p-6"} font-lora`}>
+        <FormWrapper
+          onSubmit={!templateMode ? handleSubmit : undefined}
+          className={templateMode ? "" : "max-w-4xl mx-auto"}
+        >
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep2()}
+          {currentStep === 3 && renderStep3()}
+        </FormWrapper>
+      </div>
+      
+      {/* Override Warning Modal */}
+      <AcademyModal
+        isOpen={showOverrideWarning}
+        onClose={handleCancelOverride}
+        title="AI Draft will override existing World"
+        width="md"
+        showVisitButton={false}
+        content={
+          <div className="space-y-4">
+            <p className="text-base">
+              <strong>Warning:</strong> Running AI Draft will completely replace your existing World content with new AI-generated content.
+            </p>
+            <p className="text-sm">
+              All your current story elements, characters, settings, and configurations will be overwritten. This action cannot be undone.
+            </p>
+            <p className="text-sm font-semibold">
+              Are you sure you want to continue?
+            </p>
+            <div className="flex justify-center gap-4 pt-4">
+              <PrimaryButton
+                onClick={handleCancelOverride}
+                variant="outline"
+                size="sm"
+              >
+                Cancel
+              </PrimaryButton>
+              <PrimaryButton
+                onClick={handleConfirmOverride}
+                variant="primary"
+                size="sm"
+                leftIcon={<Icons.Wand className="h-4 w-4" />}
+              >
+                Continue with AI Draft
+              </PrimaryButton>
+            </div>
+          </div>
+        }
+      />
+    </>
   );
 };

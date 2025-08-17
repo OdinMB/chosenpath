@@ -81,6 +81,7 @@ export const AiDraftTab: React.FC<AiDraftTabProps> = ({
           initialPrompt={aiDraftPrompt}
           onPlayerCountChange={handleAiDraftPlayerCountChange}
           onPromptChange={handleAiDraftPromptChange}
+          isSparse={isSparse}
         />
       )}
     </div>
