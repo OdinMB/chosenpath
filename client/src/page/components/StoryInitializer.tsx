@@ -31,6 +31,7 @@ import {
 import { ConfigSummary } from "./ConfigSummary";
 import { GenerationProgress } from "./GenerationProgress";
 import { AcademyModal } from "shared/components/AcademyModal";
+import { useAuth } from "shared/auth/useAuth";
 
 interface CategoryConfig {
   label: string;
@@ -84,6 +85,7 @@ export const StoryInitializer = ({
 }: StoryInitializerProps) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
 
   // Parse URL parameters
   const urlStep = parseInt(searchParams.get("step") || "1", 10);
@@ -167,7 +169,7 @@ export const StoryInitializer = ({
 
   // Debug mode for testing the animation (development only)
   const [debugShowProgress, setDebugShowProgress] = useState(false);
-  
+
   // Modal state for AI Draft warning
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [pendingSetupOptions, setPendingSetupOptions] = useState<{
@@ -626,14 +628,14 @@ export const StoryInitializer = ({
         pregenerateBeats: finalPregenerateBeats,
         difficultyLevel: selectedDifficultyLevel,
       };
-      
+
       // Check if template is not sparse and show warning
       if (!isSparse) {
         setPendingSetupOptions(setupOptions);
         setShowOverrideWarning(true);
         return;
       }
-      
+
       try {
         await onSetup(setupOptions);
       } catch (error) {
@@ -725,6 +727,23 @@ export const StoryInitializer = ({
 
     return (
       <div className="space-y-6">
+        {/* Show message for logged-in users about editing worlds */}
+        {user && !templateMode && (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-700">
+            <p>
+              This creates a new World and immediately starts a story in it. If
+              you want to edit and share your World, go to{" "}
+              <button
+                onClick={() => navigate("/users/my-worlds")}
+                className="text-link underline hover:no-underline"
+              >
+                My Worlds
+              </button>{" "}
+              and click on "+ New World".
+            </p>
+          </div>
+        )}
+
         <div className="text-center">
           <h2 className="text-xl md:text-2xl font-medium text-primary mb-4">
             {templateMode ? "I want players to ..." : "I want to ..."}
@@ -1288,7 +1307,7 @@ export const StoryInitializer = ({
           {currentStep === 3 && renderStep3()}
         </FormWrapper>
       </div>
-      
+
       {/* Override Warning Modal */}
       <AcademyModal
         isOpen={showOverrideWarning}
@@ -1299,10 +1318,12 @@ export const StoryInitializer = ({
         content={
           <div className="space-y-4">
             <p className="text-base">
-              <strong>Warning:</strong> Running AI Draft will completely replace your existing World content with new AI-generated content.
+              <strong>Warning:</strong> Running AI Draft will completely replace
+              your existing World content with new AI-generated content.
             </p>
             <p className="text-sm">
-              All your current story elements, characters, settings, and configurations will be overwritten. This action cannot be undone.
+              All your current story elements, characters, settings, and
+              configurations will be overwritten. This action cannot be undone.
             </p>
             <p className="text-sm font-semibold">
               Are you sure you want to continue?
