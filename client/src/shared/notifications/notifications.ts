@@ -37,13 +37,20 @@ export interface ModerationNotification extends ErrorNotification {
   reason: string;
 }
 
+export interface ImageGenerationErrorNotification extends ErrorNotification {
+  errorCode?: 'CONTENT_POLICY' | 'COPYRIGHT' | 'RATE_LIMIT' | 'TECHNICAL' | 'UNKNOWN';
+  guidance?: string;
+  retryable?: boolean;
+}
+
 export type Notification =
   | ErrorNotification
   | WarningNotification
   | InfoNotification
   | SuccessNotification
   | RateLimitNotification
-  | ModerationNotification;
+  | ModerationNotification
+  | ImageGenerationErrorNotification;
 
 export interface NotificationContextType {
   notifications: Notification[];

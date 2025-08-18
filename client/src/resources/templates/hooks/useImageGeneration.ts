@@ -11,9 +11,12 @@ import {
   GenerateCoverImageRequest,
   GeneratePlayerImageRequest,
   GenerateImageResponse,
+  ImageGenerationErrorResponse,
 } from "core/types/api";
 import { apiClient, LONG_OPERATION_TIMEOUT } from "shared/apiClient";
 import { invalidateTemplateImagesCache } from "./useTemplateImages";
+import { notificationService } from "shared/notifications/notificationService";
+import { ImageGenerationErrorNotification } from "shared/notifications/notifications";
 
 // Using longer timeout for image generation operations which can take significantly longer than normal API calls
 
@@ -28,7 +31,6 @@ interface UseImageGenerationResult {
     params: GeneratePlayerImageParams
   ) => Promise<GenerateImageResponse | null>;
   isGenerating: boolean;
-  error: string | null;
 }
 
 interface GenerateElementImageParams {
@@ -59,20 +61,52 @@ interface GeneratePlayerImageParams {
 
 export function useImageGeneration(): UseImageGenerationResult {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Helper function to parse API errors and show notifications
+  const handleApiError = (err: unknown): void => {
+    // Check if this is a structured image generation error response
+    if (typeof err === 'object' && err !== null && 'response' in err) {
+      const apiError = err as { response?: { data?: ImageGenerationErrorResponse } };
+      
+      if (apiError.response?.data?.imageGenerationError) {
+        const errorData = apiError.response.data;
+        const errorInfo = errorData.imageGenerationError;
+        
+        // Create an image generation error notification
+        const notification: Omit<ImageGenerationErrorNotification, "id"> = {
+          type: "error",
+          title: "Image Generation Failed",
+          message: errorData.errorMessage,
+          errorCode: errorInfo?.errorCode,
+          guidance: errorInfo?.guidance,
+          retryable: errorInfo?.retryable,
+          autoClose: false, // Make it sticky - user must manually dismiss
+        };
+        
+        notificationService.addNotification(notification);
+        return; // IMPORTANT: Return here to prevent fallback
+      }
+    }
+
+    // Fallback to generic error notification
+    const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+    const fallbackNotification = {
+      type: "error" as const,
+      title: "Image Generation Failed",
+      message: errorMessage,
+      autoClose: false, // Make it sticky - user must manually dismiss
+    };
+    
+    notificationService.addNotification(fallbackNotification);
+  };
 
   const generateImageForElement = async (
     params: GenerateElementImageParams
   ): Promise<GenerateImageResponse | null> => {
     const { templateId, element, imageInstructions, size, quality } = params;
 
-    console.log("useImageGeneration: Starting image generation process", {
-      elementId: element.id,
-      templateId,
-    });
 
     setIsGenerating(true);
-    setError(null);
 
     try {
       // Prepare the request payload
@@ -85,11 +119,8 @@ export function useImageGeneration(): UseImageGenerationResult {
         quality,
       };
 
-      console.log("Sending image generation request with payload:", payload);
-
       // Use the API endpoint
       const apiUrl = `/image-generation/template/element`;
-      console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
       const response = await apiClient.post<GenerateImageResponse>(
@@ -100,7 +131,6 @@ export function useImageGeneration(): UseImageGenerationResult {
         }
       );
 
-      console.log("Image generation response:", response);
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
@@ -108,13 +138,7 @@ export function useImageGeneration(): UseImageGenerationResult {
       // Handle successful response - apiClient already extracts the data property
       return response;
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-
-      setError(errorMessage);
-      console.error("Image generation failed:", errorMessage);
-      console.error("Error details:", err);
-
+      handleApiError(err);
       return null;
     } finally {
       setIsGenerating(false);
@@ -127,13 +151,8 @@ export function useImageGeneration(): UseImageGenerationResult {
     const { templateId, coverPrompt, imageInstructions, size, quality } =
       params;
 
-    console.log("useImageGeneration: Starting cover image generation", {
-      templateId,
-      coverPrompt,
-    });
 
     setIsGenerating(true);
-    setError(null);
 
     try {
       // Prepare the request payload
@@ -145,14 +164,8 @@ export function useImageGeneration(): UseImageGenerationResult {
         quality,
       };
 
-      console.log(
-        "Sending cover image generation request with payload:",
-        payload
-      );
-
       // Use the API endpoint
       const apiUrl = `/image-generation/template/cover`;
-      console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
       const response = await apiClient.post<GenerateImageResponse>(
@@ -163,7 +176,6 @@ export function useImageGeneration(): UseImageGenerationResult {
         }
       );
 
-      console.log("Cover image generation response:", response);
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
@@ -171,13 +183,7 @@ export function useImageGeneration(): UseImageGenerationResult {
       // Handle successful response - apiClient already extracts the data property
       return response;
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-
-      setError(errorMessage);
-      console.error("Cover image generation failed:", errorMessage);
-      console.error("Error details:", err);
-
+      handleApiError(err);
       return null;
     } finally {
       setIsGenerating(false);
@@ -197,15 +203,8 @@ export function useImageGeneration(): UseImageGenerationResult {
       quality,
     } = params;
 
-    console.log("useImageGeneration: Starting player image generation", {
-      templateId,
-      playerSlot,
-      identity,
-      identityIndex,
-    });
 
     setIsGenerating(true);
-    setError(null);
 
     try {
       // Prepare the request payload
@@ -226,14 +225,8 @@ export function useImageGeneration(): UseImageGenerationResult {
         quality,
       };
 
-      console.log(
-        "Sending player image generation request with payload:",
-        payload
-      );
-
       // Use the API endpoint
       const apiUrl = `/image-generation/template/player`;
-      console.log("Request URL:", apiUrl);
 
       // Make the API request using apiClient
       const response = await apiClient.post<GenerateImageResponse>(
@@ -244,7 +237,6 @@ export function useImageGeneration(): UseImageGenerationResult {
         }
       );
 
-      console.log("Player image generation response:", response);
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
@@ -252,13 +244,7 @@ export function useImageGeneration(): UseImageGenerationResult {
       // Handle successful response - apiClient already extracts the data property
       return response;
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-
-      setError(errorMessage);
-      console.error("Player image generation failed:", errorMessage);
-      console.error("Error details:", err);
-
+      handleApiError(err);
       return null;
     } finally {
       setIsGenerating(false);
@@ -270,6 +256,5 @@ export function useImageGeneration(): UseImageGenerationResult {
     generateCoverImage,
     generateImageForPlayer,
     isGenerating,
-    error,
   };
 }

@@ -80,6 +80,13 @@ export function NotificationDisplay() {
                 {Math.ceil(notification.timeRemaining / 60000)} minutes.
               </p>
             )}
+            {"guidance" in notification && notification.guidance && (
+              <div className="mt-2">
+                <p className="text-sm font-medium">
+                  Suggestion: {notification.guidance}
+                </p>
+              </div>
+            )}
           </div>
           <button
             onClick={() => removeNotification(notification.id)}

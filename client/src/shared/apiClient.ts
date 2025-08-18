@@ -238,6 +238,14 @@ axiosInstance.interceptors.response.use(
           case ResponseStatus.ERROR:
           case ResponseStatus.INVALID: {
             const errorResponse = apiResponse as ErrorResponse;
+            
+            // Skip creating generic notifications for image generation errors
+            // These are handled by the specific useImageGeneration hook
+            if ('imageGenerationError' in errorResponse) {
+              // Reject with the original error structure that the hook expects
+              return Promise.reject(error);
+            }
+            
             notificationService.addNotification({
               type: "error",
               title: errorResponse.operationType

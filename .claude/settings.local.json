@@ -23,7 +23,8 @@
       "Bash(git ls-tree:*)",
       "Bash(tsc:*)",
       "Bash(eslint:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:openai.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

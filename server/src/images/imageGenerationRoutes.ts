@@ -1,6 +1,6 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { aiImageGenerator } from "server/images/AIImageGenerator.js";
+import { aiImageGenerator, ImageGenerationError } from "server/images/AIImageGenerator.js";
 import { Logger } from "shared/logger.js";
 import {
   IMAGE_SIZES,
@@ -13,6 +13,7 @@ import {
   ImageSize,
   ImageQuality,
   ClientRequest,
+  ImageGenerationErrorResponse,
 } from "core/types/index.js";
 
 // Request interface for player image generation
@@ -40,6 +41,44 @@ import { verifyUser, checkPermissions } from "../users/authMiddleware.js";
 const router = express.Router();
 const IMAGE_GENERATION_ACTION_TYPE = "imageGeneration";
 const MAX_TEXT_LENGTH = 2000;
+
+// Helper function to send image generation errors with structured information
+const sendImageGenerationError = (
+  res: express.Response,
+  error: Error,
+  requestId?: string
+): void => {
+  if (error instanceof ImageGenerationError) {
+    // Determine appropriate HTTP status code based on error type
+    let statusCode = 400; // Default to Bad Request for business logic errors
+    
+    // Use 500 only for actual technical failures
+    if (error.imageGenerationError.errorCode === 'TECHNICAL') {
+      statusCode = 500;
+    } else if (error.imageGenerationError.errorCode === 'RATE_LIMIT') {
+      statusCode = 429; // Too Many Requests
+    }
+    
+    // Send structured error information for image generation errors
+    const response: ImageGenerationErrorResponse = {
+      status: statusCode === 400 ? ResponseStatus.INVALID : ResponseStatus.ERROR,
+      requestId: requestId || uuidv4(),
+      timestamp: Date.now(),
+      errorMessage: error.imageGenerationError.userFriendlyMessage,
+      operationType: res.req?.originalUrl?.split("?")[0],
+      imageGenerationError: error.imageGenerationError,
+    };
+    
+    Logger.Story.log(
+      `Image generation error [${response.requestId}] (${statusCode}) - ${error.imageGenerationError.errorCode}: ${error.imageGenerationError.technicalMessage}`
+    );
+    
+    res.status(statusCode).json(response);
+  } else {
+    // Fall back to regular error handling for non-image generation errors
+    sendError(res, error.message, 500, requestId, error);
+  }
+};
 
 // --- Validation Helper Functions ---
 const validateStringInput = (
@@ -176,12 +215,10 @@ router.post(
       });
     } catch (error) {
       Logger.Story.error("Error generating image for template element:", error);
-      sendError(
+      sendImageGenerationError(
         res,
-        "Failed to generate image",
-        500,
-        requestId,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : new Error(String(error)),
+        requestId
       );
     }
   }
@@ -276,12 +313,10 @@ router.post(
       });
     } catch (error) {
       Logger.Story.error("Error generating image for player identity:", error);
-      sendError(
+      sendImageGenerationError(
         res,
-        "Failed to generate player image",
-        500,
-        requestId,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : new Error(String(error)),
+        requestId
       );
     }
   }
@@ -352,12 +387,10 @@ router.post(
       });
     } catch (error) {
       Logger.Story.error("Error generating cover image for template:", error);
-      sendError(
+      sendImageGenerationError(
         res,
-        "Failed to generate cover image",
-        500,
-        requestId,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : new Error(String(error)),
+        requestId
       );
     }
   }

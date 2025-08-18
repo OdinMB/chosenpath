@@ -22,7 +22,7 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   readOnly = false,
   canGenerateImages = true,
 }) => {
-  const { generateCoverImage, isGenerating, error } = useImageGeneration();
+  const { generateCoverImage, isGenerating } = useImageGeneration();
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
 
   // Create cover image object for StoryImage
@@ -97,8 +97,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
               rows={5}
               disabled={readOnly || localIsGenerating}
             />
-
-            {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
 
             {/* Generate Button */}
             {canGenerateImages && (

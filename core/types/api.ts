@@ -60,6 +60,21 @@ export interface RateLimitedResponse extends BaseServerResponse {
   rateLimit: RateLimitInfo;
 }
 
+export interface ImageGenerationErrorInfo {
+  errorCode: 'CONTENT_POLICY' | 'COPYRIGHT' | 'RATE_LIMIT' | 'TECHNICAL' | 'UNKNOWN';
+  userFriendlyMessage: string;
+  technicalMessage: string;
+  guidance?: string;
+  retryable: boolean;
+}
+
+export interface ImageGenerationErrorResponse extends BaseServerResponse {
+  status: ResponseStatus.ERROR | ResponseStatus.INVALID;
+  errorMessage: string;
+  operationType?: string;
+  imageGenerationError?: ImageGenerationErrorInfo;
+}
+
 /**
  * Story generation
  */

@@ -11,6 +11,8 @@ export const notificationService = {
   addNotification: (notification: Omit<Notification, "id">) => {
     if (notificationCallback) {
       notificationCallback(notification);
+    } else {
+      console.error("No notification callback set! Notification will not be displayed.");
     }
   },
   addErrorNotification: (message?: string) => {

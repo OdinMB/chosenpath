@@ -8,8 +8,6 @@ Smaller commits!
 - 1: resolution animation: good outcomes on the right (as opposed to left)
 - 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 - 1: fix tooltip to not go beyond display borders
-- 1: on image generation error: give better notes (copyright etc.)
-- 1: content moderation: add copyright issues
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)

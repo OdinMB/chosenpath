@@ -135,7 +135,8 @@ export const MediaTab: React.FC<MediaTabProps> = ({
                   <span>a cover</span>
                 </li>
                 <li className="flex items-start">
-                  {templateImagesData.manifest.missingImages.playerIdentities.length === 0 ? (
+                  {templateImagesData.manifest.missingImages.playerIdentities
+                    .length === 0 ? (
                     <Icons.Success className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                   ) : (
                     <Icons.Error className="h-4 w-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
@@ -143,37 +144,51 @@ export const MediaTab: React.FC<MediaTabProps> = ({
                   <span>images for all player identities</span>
                 </li>
                 <li className="flex items-start">
-                  {templateImagesData.manifest.missingImages.storyElements.length === 0 ? (
+                  {templateImagesData.manifest.missingImages.storyElements
+                    .length === 0 ? (
                     <Icons.Success className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                   ) : (
                     <Icons.Error className="h-4 w-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                   )}
-                  <span>images for all story elements (that have a defined appearance)</span>
+                  <span>
+                    images for all story elements (that have a defined
+                    appearance)
+                  </span>
                 </li>
               </ul>
             ) : (
               <ul className="list-disc ml-6 mt-1 space-y-1">
                 <li>a cover</li>
                 <li>images for all player identities</li>
-                <li>images for all story elements (that have a defined appearance)</li>
+                <li>
+                  images for all story elements (that have a defined appearance)
+                </li>
               </ul>
             )}
             {/* Show summary if there are missing images */}
-            {containsImages && templateId && templateImagesData && (
-              templateImagesData.manifest.missingImages.cover ||
-              templateImagesData.manifest.missingImages.storyElements.length > 0 ||
-              templateImagesData.manifest.missingImages.playerIdentities.length > 0
-            ) && (
-              <div className="mt-2 text-sm text-gray-500">
-                {templateImagesData.manifest.totalImages} of {
-                  1 + // cover
-                  Object.keys(templateImagesData.manifest.storyElements).length +
-                  Object.values(templateImagesData.manifest.playerIdentities).reduce((sum: number, identities: Record<number, boolean>) => 
-                    sum + Object.keys(identities).length, 0
-                  )
-                } required images available
-              </div>
-            )}
+            {containsImages &&
+              templateId &&
+              templateImagesData &&
+              (templateImagesData.manifest.missingImages.cover ||
+                templateImagesData.manifest.missingImages.storyElements.length >
+                  0 ||
+                templateImagesData.manifest.missingImages.playerIdentities
+                  .length > 0) && (
+                <div className="mt-2 text-sm text-gray-500">
+                  {templateImagesData.manifest.totalImages} of{" "}
+                  {1 + // cover
+                    Object.keys(templateImagesData.manifest.storyElements)
+                      .length +
+                    Object.values(
+                      templateImagesData.manifest.playerIdentities
+                    ).reduce(
+                      (sum: number, identities: Record<number, boolean>) =>
+                        sum + Object.keys(identities).length,
+                      0
+                    )}{" "}
+                  required images available
+                </div>
+              )}
           </div>
           {!canGenerateImages && (
             <p className="text-sm text-amber-600 mt-2">
@@ -293,7 +308,6 @@ export const MediaTab: React.FC<MediaTabProps> = ({
 
       {/* Cover Image (boxed) */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="font-semibold mb-3">Cover image</h3>
         {coverPromptOnly ? (
           <TextArea
             value={imageInstructions.coverPrompt || ""}
