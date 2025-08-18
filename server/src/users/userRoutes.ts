@@ -343,6 +343,12 @@ router.post("/users/stories/link", verifyUser(), async (req, res) => {
     Logger.Route.error("Failed to link story code to user", error);
     const errorMessage =
       error instanceof Error ? error.message : "Failed to link story code";
+    
+    // Handle specific case where code is already linked to another account
+    if (errorMessage === "Story code is already linked to another account") {
+      return sendBadRequest(res, errorMessage, requestId);
+    }
+    
     return sendError(res, errorMessage, 500, requestId);
   }
 });

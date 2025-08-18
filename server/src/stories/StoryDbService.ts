@@ -369,10 +369,35 @@ class StoryDbService {
     userId: string
   ): Promise<void> {
     const db = getDb();
-    const query =
-      "UPDATE story_players SET user_id = $1 WHERE story_id = $2 AND player_slot = $3";
+    
+    // Check if this player slot is already assigned to a different user
+    const checkQuery = "SELECT user_id FROM story_players WHERE story_id = $1 AND player_slot = $2";
+    const updateQuery = "UPDATE story_players SET user_id = $1 WHERE story_id = $2 AND player_slot = $3";
+    
     try {
-      await db.query(query, [userId, storyId, playerSlot]);
+      const checkResult = await db.query(checkQuery, [storyId, playerSlot]);
+      
+      if (checkResult.rows.length === 0) {
+        throw new Error(`Player slot ${playerSlot} not found for story ${storyId}`);
+      }
+      
+      const currentUserId = checkResult.rows[0].user_id;
+      
+      // If already assigned to a different user, reject the operation
+      if (currentUserId && currentUserId !== userId) {
+        throw new Error(`Story code is already linked to another account`);
+      }
+      
+      // If already assigned to the same user, no need to update
+      if (currentUserId === userId) {
+        Logger.Transaction.log(
+          `User ${userId} is already assigned to player slot ${playerSlot} for story ${storyId}.`
+        );
+        return;
+      }
+      
+      // Assign the user to the player slot
+      await db.query(updateQuery, [userId, storyId, playerSlot]);
       Logger.Transaction.log(
         `Assigned user ${userId} to player slot ${playerSlot} for story ${storyId} in DB.`
       );
