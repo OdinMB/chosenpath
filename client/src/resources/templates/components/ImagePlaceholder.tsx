@@ -50,13 +50,13 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
 
   // Check if image URL can be constructed
   const canConstructUrl = image.source && image.sourceId && image.id;
-  
+
   // Check if the image actually exists on the server
   useEffect(() => {
     if (canConstructUrl && !isGenerating) {
       setCheckingImage(true);
       const imageUrl = constructImageUrl(image);
-      
+
       // Create a test image to check if it loads
       const img = new Image();
       img.onload = () => {
@@ -104,6 +104,7 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
           className={imageClassName}
           responsivePosition={false}
           objectPosition="center center"
+          mode="thumbnail"
         />
       </div>
     );
@@ -114,7 +115,7 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
     // User cannot generate images - show blocked icon with tooltip
     return (
       <div className={containerClass}>
-        <div 
+        <div
           className="w-full h-full flex items-center justify-center bg-gray-100 cursor-not-allowed group relative"
           title="You don't have permission to generate images"
         >
@@ -132,7 +133,7 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
     // No appearance description - show disabled generate icon
     return (
       <div className={containerClass}>
-        <div 
+        <div
           className="w-full h-full flex items-center justify-center bg-gray-100 cursor-not-allowed"
           title={missingContentMessage}
         >
@@ -151,7 +152,9 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
         title="Click to generate an image"
         type="button"
       >
-        <Icons.CreateImage className={`${iconClass} text-blue-500 group-hover:text-blue-700`} />
+        <Icons.CreateImage
+          className={`${iconClass} text-blue-500 group-hover:text-blue-700`}
+        />
       </button>
     </div>
   );

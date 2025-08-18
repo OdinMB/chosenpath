@@ -50,7 +50,7 @@ export class ImageGenerationError extends Error {
 
   constructor(message: string, errorInfo: ImageGenerationErrorInfo) {
     super(message);
-    this.name = 'ImageGenerationError';
+    this.name = "ImageGenerationError";
     this.imageGenerationError = errorInfo;
   }
 }
@@ -68,104 +68,129 @@ export class AIImageGenerator {
   /**
    * Analyzes OpenAI API errors and provides structured error information
    */
-  private analyzeImageGenerationError(error: unknown, prompt?: string): ImageGenerationErrorInfo {
+  private analyzeImageGenerationError(
+    error: unknown,
+    prompt?: string
+  ): ImageGenerationErrorInfo {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorCode = (error && typeof error === 'object' && 'code' in error) ? String((error as Record<string, unknown>).code) : '';
-    const errorStatus = (error && typeof error === 'object' && 'status' in error) ? Number((error as Record<string, unknown>).status) : undefined;
-    
+    const errorCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as Record<string, unknown>).code)
+        : "";
+    const errorStatus =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as Record<string, unknown>).status)
+        : undefined;
+
     // Check for copyright issues first (more specific than general content policy)
-    const promptText = prompt?.toLowerCase() || '';
-    const isCopyrightRelated = promptText.includes('disney') || 
-                              promptText.includes('elsa') || 
-                              promptText.includes('frozen') ||
-                              promptText.includes('marvel') ||
-                              promptText.includes('star wars') ||
-                              promptText.includes('pokemon') ||
-                              promptText.includes('nintendo') ||
-                              promptText.includes('mickey mouse') ||
-                              promptText.includes('superman') ||
-                              promptText.includes('batman') ||
-                              promptText.includes('spiderman') ||
-                              errorMessage.toLowerCase().includes('copyright') || 
-                              errorMessage.toLowerCase().includes('trademark') ||
-                              errorMessage.toLowerCase().includes('intellectual property');
+    const promptText = prompt?.toLowerCase() || "";
+    const isCopyrightRelated =
+      promptText.includes("disney") ||
+      promptText.includes("elsa") ||
+      promptText.includes("frozen") ||
+      promptText.includes("marvel") ||
+      promptText.includes("star wars") ||
+      promptText.includes("pokemon") ||
+      promptText.includes("nintendo") ||
+      promptText.includes("mickey mouse") ||
+      promptText.includes("superman") ||
+      promptText.includes("batman") ||
+      promptText.includes("spiderman") ||
+      errorMessage.toLowerCase().includes("copyright") ||
+      errorMessage.toLowerCase().includes("trademark") ||
+      errorMessage.toLowerCase().includes("intellectual property");
 
     // Content policy violations (including safety system and moderation blocks)
-    const isContentPolicyViolation = errorMessage.toLowerCase().includes('content policy') || 
-        errorMessage.toLowerCase().includes('content restrictions') ||
-        errorMessage.toLowerCase().includes('violates our content policies') ||
-        errorMessage.toLowerCase().includes('safety system') ||
-        errorMessage.toLowerCase().includes('moderation') ||
-        errorCode === 'content_policy_violation' ||
-        errorCode === 'moderation_blocked';
+    const isContentPolicyViolation =
+      errorMessage.toLowerCase().includes("content policy") ||
+      errorMessage.toLowerCase().includes("content restrictions") ||
+      errorMessage.toLowerCase().includes("violates our content policies") ||
+      errorMessage.toLowerCase().includes("safety system") ||
+      errorMessage.toLowerCase().includes("moderation") ||
+      errorCode === "content_policy_violation" ||
+      errorCode === "moderation_blocked";
 
     if (isContentPolicyViolation) {
       // If it's a content policy violation AND likely copyright-related, classify as COPYRIGHT
       if (isCopyrightRelated) {
         return {
-          errorCode: 'COPYRIGHT',
-          userFriendlyMessage: 'This request involves copyrighted content and was blocked',
+          errorCode: "COPYRIGHT",
+          userFriendlyMessage:
+            "This request involves copyrighted content and was blocked",
           technicalMessage: errorMessage,
-          guidance: 'Avoid specific brand names, celebrity names, or copyrighted characters. Use general descriptions instead.',
-          retryable: true
+          guidance:
+            "Avoid specific brand names, celebrity names, or copyrighted characters. Use general descriptions instead.",
+          retryable: true,
         };
       }
-      
+
       // Otherwise, it's a general content policy issue
       return {
-        errorCode: 'CONTENT_POLICY',
-        userFriendlyMessage: 'Your request was blocked by content safety policies',
+        errorCode: "CONTENT_POLICY",
+        userFriendlyMessage:
+          "Your request was blocked by content safety policies",
         technicalMessage: errorMessage,
-        guidance: 'Try making your description more general and avoid specific names, brands, copyrighted characters, or potentially sensitive content. Focus on general descriptions rather than specific people or entities.',
-        retryable: true
+        guidance:
+          "Try making your description more general and avoid specific names, brands, copyrighted characters, or potentially sensitive content. Focus on general descriptions rather than specific people or entities.",
+        retryable: true,
       };
     }
 
     // Explicit copyright/trademark issues (when not caught by content policy)
     if (isCopyrightRelated && !isContentPolicyViolation) {
       return {
-        errorCode: 'COPYRIGHT',
-        userFriendlyMessage: 'This request may involve copyrighted content',
+        errorCode: "COPYRIGHT",
+        userFriendlyMessage: "This request may involve copyrighted content",
         technicalMessage: errorMessage,
-        guidance: 'Avoid referencing specific brands, characters, celebrities, or copyrighted works. Instead, describe general visual styles or create original content inspired by but not copying existing works.',
-        retryable: true
+        guidance:
+          "Avoid referencing specific brands, characters, celebrities, or copyrighted works. Instead, describe general visual styles or create original content inspired by but not copying existing works.",
+        retryable: true,
       };
     }
 
     // Rate limiting
-    if (errorMessage.toLowerCase().includes('rate limit') || 
-        errorMessage.toLowerCase().includes('too many requests') ||
-        errorStatus === 429 ||
-        errorCode === 'rate_limit_exceeded') {
+    if (
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.toLowerCase().includes("too many requests") ||
+      errorStatus === 429 ||
+      errorCode === "rate_limit_exceeded"
+    ) {
       return {
-        errorCode: 'RATE_LIMIT',
-        userFriendlyMessage: 'Too many image generation requests',
+        errorCode: "RATE_LIMIT",
+        userFriendlyMessage: "Too many image generation requests",
         technicalMessage: errorMessage,
-        guidance: 'Please wait a moment before trying again. You\'ve reached the rate limit for image generation.',
-        retryable: true
+        guidance:
+          "Please wait a moment before trying again. You've reached the rate limit for image generation.",
+        retryable: true,
       };
     }
 
     // Technical/API errors
-    if ((errorStatus !== undefined && errorStatus >= 500) || 
-        errorMessage.toLowerCase().includes('internal server error') ||
-        errorMessage.toLowerCase().includes('service unavailable')) {
+    if (
+      (errorStatus !== undefined && errorStatus >= 500) ||
+      errorMessage.toLowerCase().includes("internal server error") ||
+      errorMessage.toLowerCase().includes("service unavailable")
+    ) {
       return {
-        errorCode: 'TECHNICAL',
-        userFriendlyMessage: 'A technical error occurred with the image generation service',
+        errorCode: "TECHNICAL",
+        userFriendlyMessage:
+          "A technical error occurred with the image generation service",
         technicalMessage: errorMessage,
-        guidance: 'This is a temporary issue. Please try again in a few moments.',
-        retryable: true
+        guidance:
+          "This is a temporary issue. Please try again in a few moments.",
+        retryable: true,
       };
     }
 
     // Unknown/generic errors
     return {
-      errorCode: 'UNKNOWN',
-      userFriendlyMessage: 'An unexpected error occurred during image generation',
+      errorCode: "UNKNOWN",
+      userFriendlyMessage:
+        "An unexpected error occurred during image generation",
       technicalMessage: errorMessage,
-      guidance: 'Please try simplifying your description or try again later. If the problem persists, contact support.',
-      retryable: true
+      guidance:
+        "Please try simplifying your description or try again later. If the problem persists, contact support.",
+      retryable: true,
     };
   }
 
@@ -234,6 +259,7 @@ export class AIImageGenerator {
     templateId: string,
     coverPrompt: string,
     imageInstructions?: ImageInstructions,
+    references?: ImageReference[],
     size?: ImageSize,
     quality?: ImageQuality
   ): Promise<string> {
@@ -251,7 +277,7 @@ export class AIImageGenerator {
     // Generate the image at original size
     const originalImageBuffer = await this.generateImage(
       prompt,
-      undefined, // No references
+      references && references.length > 0 ? references : undefined,
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
       quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
     );
@@ -377,13 +403,17 @@ export class AIImageGenerator {
           image: referenceImages,
         } as ImageEditParams;
         Logger.Story.log("Generating image with references");
-        imageResponse = await this.openai.images.edit(imageParams) as OpenAIImageResponse;
+        imageResponse = (await this.openai.images.edit(
+          imageParams
+        )) as OpenAIImageResponse;
       } else {
         const imageParams = {
           ...baseParams,
         } as ImageGenerateParams;
         Logger.Story.log("Generating image without references");
-        imageResponse = await this.openai.images.generate(imageParams) as OpenAIImageResponse;
+        imageResponse = (await this.openai.images.generate(
+          imageParams
+        )) as OpenAIImageResponse;
       }
 
       let imageBuffer: Buffer;
@@ -396,10 +426,10 @@ export class AIImageGenerator {
       return imageBuffer;
     } catch (error) {
       Logger.Story.error("Error generating image:", error);
-      
+
       // Analyze the error and provide structured information
       const errorInfo = this.analyzeImageGenerationError(error, prompt);
-      
+
       // Throw enhanced error with structured information
       throw new ImageGenerationError(errorInfo.userFriendlyMessage, errorInfo);
     }

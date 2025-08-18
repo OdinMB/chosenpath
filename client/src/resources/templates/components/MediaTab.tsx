@@ -1,16 +1,26 @@
 import React from "react";
-import { ImageInstructions, TemplateIterationSections } from "core/types";
+import {
+  ImageInstructions,
+  TemplateIterationSections,
+  StoryElement,
+} from "core/types";
 import { TextArea, Checkbox, Icons } from "components/ui";
 import { CoverImageEditor } from "./CoverImageEditor";
 import { AcademyContextCard } from "./AcademyContextCard";
 import { AiIterationCard } from "./AiIterationCard";
 import { AcademyContextButton } from "shared/components/AcademyContextButton";
 import { useTemplateImages } from "../hooks/useTemplateImages";
+// Reference image selection is handled inside CoverImageEditor when not using coverPromptOnly
 
 interface MediaTabProps {
   templateId?: string;
   imageInstructions: ImageInstructions;
   setImageInstructions: (instructions: ImageInstructions) => void;
+  // Pass all story elements for friendly labels in selectors
+  elements?: StoryElement[];
+  // Cover reference images (controlled from parent to persist in template state)
+  coverRefs?: string[];
+  onCoverRefsChange?: (ids: string[]) => void;
   containsImages: boolean;
   setContainsImages: (contains: boolean) => void;
   canGenerateImages?: boolean;
@@ -30,6 +40,10 @@ export const MediaTab: React.FC<MediaTabProps> = ({
   templateId,
   imageInstructions,
   setImageInstructions,
+  // elements passed through to CoverImageEditor when needed
+  elements,
+  coverRefs = [],
+  onCoverRefsChange,
   containsImages,
   setContainsImages,
   canGenerateImages = true,
@@ -46,6 +60,9 @@ export const MediaTab: React.FC<MediaTabProps> = ({
     templateId,
     Boolean(templateId && containsImages)
   );
+
+  // cover reference selection is handled in CoverImageEditor when applicable
+
   return (
     <div className="space-y-6">
       {/* Context cards */}
@@ -254,7 +271,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text sm font-medium text-gray-700 mb-2">
               Setting Details
             </label>
             <TextArea
@@ -319,6 +336,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             }
             placeholder="Describe your cover image..."
             autoHeight
+            minRows={5}
           />
         ) : (
           <CoverImageEditor
@@ -332,6 +350,9 @@ export const MediaTab: React.FC<MediaTabProps> = ({
               })
             }
             canGenerateImages={canGenerateImages}
+            coverRefs={coverRefs}
+            onCoverRefsChange={onCoverRefsChange}
+            allElements={elements}
           />
         )}
       </div>

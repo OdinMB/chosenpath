@@ -224,6 +224,8 @@ export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   showOnWelcomeScreen: boolean;
   order: number;
   containsImages: boolean;
+  // Optional app-level field to track reference images for the cover
+  coverImageReferenceIds?: string[];
 };
 
 /**

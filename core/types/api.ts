@@ -61,7 +61,12 @@ export interface RateLimitedResponse extends BaseServerResponse {
 }
 
 export interface ImageGenerationErrorInfo {
-  errorCode: 'CONTENT_POLICY' | 'COPYRIGHT' | 'RATE_LIMIT' | 'TECHNICAL' | 'UNKNOWN';
+  errorCode:
+    | "CONTENT_POLICY"
+    | "COPYRIGHT"
+    | "RATE_LIMIT"
+    | "TECHNICAL"
+    | "UNKNOWN";
   userFriendlyMessage: string;
   technicalMessage: string;
   guidance?: string;
@@ -162,6 +167,7 @@ export interface GenerateCoverImageRequest extends ClientRequest {
   templateId: string;
   coverPrompt: string;
   imageInstructions?: ImageInstructions;
+  referenceImageIds?: string[];
   size?: ImageSize;
   quality?: ImageQuality;
 }
@@ -183,6 +189,8 @@ export interface GenerateElementImageRequest extends ClientRequest {
   elementId: string;
   appearance: string;
   imageInstructions?: ImageInstructions;
+  // Optional list of up to 2 existing template image IDs to use as references
+  referenceImageIds?: string[];
   size?: ImageSize;
   quality?: ImageQuality;
 }
@@ -206,10 +214,11 @@ export interface TemplateImageManifest {
   };
 }
 
-export interface GetTemplateImagesResponse extends SuccessResponse<{
-  images: ImageStoryState[];
-  manifest: TemplateImageManifest;
-}> {}
+export interface GetTemplateImagesResponse
+  extends SuccessResponse<{
+    images: ImageStoryState[];
+    manifest: TemplateImageManifest;
+  }> {}
 
 /**
  * Basic story metadata

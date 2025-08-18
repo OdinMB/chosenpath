@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { TextArea, PrimaryButton } from "components/ui";
 import { Icons } from "components/ui/Icons";
-import { ImageInstructions, ImageUI } from "core/types";
+import { ImageInstructions, ImageUI, StoryElement } from "core/types";
 import { useImageGeneration } from "client/resources/templates/hooks/useImageGeneration";
 import { ImagePlaceholder } from "./ImagePlaceholder";
+import { ReferenceImageSelector } from "./ReferenceImageSelector";
 
 interface CoverImageEditorProps {
   templateId?: string;
@@ -12,6 +13,9 @@ interface CoverImageEditorProps {
   onCoverPromptChange: (value: string) => void;
   readOnly?: boolean;
   canGenerateImages?: boolean;
+  coverRefs?: string[];
+  onCoverRefsChange?: (ids: string[]) => void;
+  allElements?: StoryElement[];
 }
 
 export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
@@ -21,6 +25,9 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
   onCoverPromptChange,
   readOnly = false,
   canGenerateImages = true,
+  coverRefs = [],
+  onCoverRefsChange,
+  allElements,
 }) => {
   const { generateCoverImage, isGenerating } = useImageGeneration();
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
@@ -45,6 +52,7 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
         templateId,
         coverPrompt: imageInstructions.coverPrompt,
         imageInstructions,
+        referenceImageIds: coverRefs,
       });
 
       console.log("Cover image generated:", result);
@@ -78,58 +86,66 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
           </div>
         </div>
 
-        {/* Cover Prompt Input */}
+        {/* Cover Prompt stacked with Reference Selector */}
         <div className="w-full md:w-3/5 flex flex-col">
           <h3 className="text-lg font-medium mb-3">Cover Image Prompt</h3>
-          <div className="flex flex-col">
-            <div className="flex items-start gap-2 mb-2">
-              <span className="text-sm text-gray-600">
-                Describe what should appear on the cover image. Be specific.
-              </span>
+          <TextArea
+            id="cover-prompt"
+            name="cover-prompt"
+            value={coverPrompt}
+            onChange={(e) => onCoverPromptChange(e.target.value)}
+            placeholder="E.g., A mysterious forest at twilight with ancient ruins barely visible through the mist. A cloaked figure stands at a crossroads, their face hidden in shadow."
+            className="w-full"
+            autoHeight
+            minRows={5}
+            disabled={readOnly || localIsGenerating}
+          />
+
+          <div className="mt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm">Reference images</span>
+              {/* Help icon inline */}
             </div>
-            <TextArea
-              id="cover-prompt"
-              name="cover-prompt"
-              value={coverPrompt}
-              onChange={(e) => onCoverPromptChange(e.target.value)}
-              placeholder="E.g., A mysterious forest at twilight with ancient ruins barely visible through the mist. A cloaked figure stands at a crossroads, their face hidden in shadow."
-              className="w-full mb-4"
-              rows={5}
-              disabled={readOnly || localIsGenerating}
+            <ReferenceImageSelector
+              templateId={templateId || ""}
+              selectedIds={coverRefs}
+              onUpdate={(ids) => onCoverRefsChange && onCoverRefsChange(ids)}
+              readOnly={readOnly}
+              allElements={allElements}
             />
-
-            {/* Generate Button */}
-            {canGenerateImages && (
-              <div className="flex justify-center">
-                <PrimaryButton
-                  onClick={handleGenerateCoverImage}
-                  disabled={
-                    isGenerating ||
-                    localIsGenerating ||
-                    !imageInstructions?.coverPrompt ||
-                    readOnly ||
-                    !templateId
-                  }
-                  isLoading={localIsGenerating}
-                  leftIcon={<Icons.CreateImage className="h-5 w-5" />}
-                >
-                  Generate Cover Image
-                </PrimaryButton>
-              </div>
-            )}
-
-            {!canGenerateImages && (
-              <p className="text-sm text-amber-600 mt-2 text-center">
-                You do not have permission to generate images
-              </p>
-            )}
-
-            {canGenerateImages && !templateId && (
-              <p className="text-sm text-amber-600 mt-2 text-center">
-                Save the template first to generate a cover image
-              </p>
-            )}
           </div>
+
+          {/* Generate Button */}
+          {canGenerateImages && (
+            <div className="flex justify-center mt-4">
+              <PrimaryButton
+                onClick={handleGenerateCoverImage}
+                disabled={
+                  isGenerating ||
+                  localIsGenerating ||
+                  !imageInstructions?.coverPrompt ||
+                  readOnly ||
+                  !templateId
+                }
+                isLoading={localIsGenerating}
+                leftIcon={<Icons.CreateImage className="h-5 w-5" />}
+              >
+                Generate Cover Image
+              </PrimaryButton>
+            </div>
+          )}
+
+          {!canGenerateImages && (
+            <p className="text-sm text-amber-600 mt-2 text-center">
+              You do not have permission to generate images
+            </p>
+          )}
+
+          {canGenerateImages && !templateId && (
+            <p className="text-sm text-amber-600 mt-2 text-center">
+              Save the template first to generate a cover image
+            </p>
+          )}
         </div>
       </div>
     </div>

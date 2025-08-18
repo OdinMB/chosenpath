@@ -1,4 +1,8 @@
-import { StoryTemplate, ImageStoryState, PLAYER_SLOTS } from "core/types/index.js";
+import {
+  StoryTemplate,
+  ImageStoryState,
+  PLAYER_SLOTS,
+} from "core/types/index.js";
 
 // Define the types locally since they're in api.ts which might not be accessible from server
 interface TemplateImageManifest {
@@ -21,62 +25,75 @@ export function generateTemplateImageManifest(
   availableImages: ImageStoryState[]
 ): TemplateImageManifest {
   // Create a set of available image IDs for fast lookup
-  const availableImageIds = new Set(availableImages.map(img => img.id));
-  
+  const availableImageIds = new Set(availableImages.map((img) => img.id));
+
   // Debug logging
-  console.log(`DEBUG: Template ${template.id} - Available image IDs:`, Array.from(availableImageIds));
-  
+  console.log(
+    `DEBUG: Template ${template.id} - Available image IDs:`,
+    Array.from(availableImageIds)
+  );
+
   // Check cover image
   const hasCover = availableImageIds.has("cover");
-  
+
   // Check story elements with defined appearances
-  const storyElementsWithAppearance = (template.storyElements || [])
-    .filter(element => element.appearance && element.appearance.trim().length > 0);
-  
+  const storyElementsWithAppearance = (template.storyElements || []).filter(
+    (element) => element.appearance && element.appearance.trim().length > 0
+  );
+
   const storyElements: Record<string, boolean> = {};
   const missingStoryElements: string[] = [];
-  
-  storyElementsWithAppearance.forEach(element => {
+
+  storyElementsWithAppearance.forEach((element) => {
     const hasImage = availableImageIds.has(element.id);
     storyElements[element.id] = hasImage;
-    
-    // Debug logging
-    console.log(`DEBUG: Checking story element "${element.id}": found image: ${hasImage}`);
-    
+
     if (!hasImage) {
       missingStoryElements.push(element.id);
     }
   });
-  
+
   // Check player identities with defined appearances
   const playerIdentities: Record<string, Record<number, boolean>> = {};
-  const missingPlayerIdentities: Array<{ playerSlot: string; identityIndex: number }> = [];
-  
-  PLAYER_SLOTS.forEach(playerSlot => {
-    const playerData = template[playerSlot as keyof StoryTemplate] as {
-      possibleCharacterIdentities?: Array<{ appearance?: string }>;
-    } | undefined;
-    
+  const missingPlayerIdentities: Array<{
+    playerSlot: string;
+    identityIndex: number;
+  }> = [];
+
+  PLAYER_SLOTS.forEach((playerSlot) => {
+    const playerData = template[playerSlot as keyof StoryTemplate] as
+      | {
+          possibleCharacterIdentities?: Array<{ appearance?: string }>;
+        }
+      | undefined;
+
     if (playerData?.possibleCharacterIdentities) {
       playerIdentities[playerSlot] = {};
-      
-      playerData.possibleCharacterIdentities.forEach((identity, index: number) => {
-        if (identity.appearance && identity.appearance.trim().length > 0) {
-          const imageId = `${playerSlot}_${index}`;
-          const hasImage = availableImageIds.has(imageId);
-          playerIdentities[playerSlot][index] = hasImage;
-          
-          // Debug logging
-          console.log(`DEBUG: Checking ${playerSlot} identity ${index}: looking for "${imageId}", found: ${hasImage}`);
-          
-          if (!hasImage) {
-            missingPlayerIdentities.push({ playerSlot, identityIndex: index });
+
+      playerData.possibleCharacterIdentities.forEach(
+        (identity, index: number) => {
+          if (identity.appearance && identity.appearance.trim().length > 0) {
+            const imageId = `${playerSlot}_${index}`;
+            const hasImage = availableImageIds.has(imageId);
+            playerIdentities[playerSlot][index] = hasImage;
+
+            // Debug logging
+            console.log(
+              `DEBUG: Checking ${playerSlot} identity ${index}: looking for "${imageId}", found: ${hasImage}`
+            );
+
+            if (!hasImage) {
+              missingPlayerIdentities.push({
+                playerSlot,
+                identityIndex: index,
+              });
+            }
           }
         }
-      });
+      );
     }
   });
-  
+
   return {
     cover: hasCover,
     storyElements,
@@ -95,24 +112,30 @@ export function generateTemplateImageManifest(
  */
 export function getRequiredImageCount(template: StoryTemplate): number {
   let count = 1; // Cover image
-  
+
   // Count story elements with appearances
-  const elementsWithAppearance = (template.storyElements || [])
-    .filter(element => element.appearance && element.appearance.trim().length > 0);
+  const elementsWithAppearance = (template.storyElements || []).filter(
+    (element) => element.appearance && element.appearance.trim().length > 0
+  );
   count += elementsWithAppearance.length;
-  
+
   // Count player identities with appearances
-  PLAYER_SLOTS.forEach(playerSlot => {
-    const playerData = template[playerSlot as keyof StoryTemplate] as {
-      possibleCharacterIdentities?: Array<{ appearance?: string }>;
-    } | undefined;
-    
+  PLAYER_SLOTS.forEach((playerSlot) => {
+    const playerData = template[playerSlot as keyof StoryTemplate] as
+      | {
+          possibleCharacterIdentities?: Array<{ appearance?: string }>;
+        }
+      | undefined;
+
     if (playerData?.possibleCharacterIdentities) {
-      const identitiesWithAppearance = playerData.possibleCharacterIdentities
-        .filter((identity) => identity.appearance && identity.appearance.trim().length > 0);
+      const identitiesWithAppearance =
+        playerData.possibleCharacterIdentities.filter(
+          (identity) =>
+            identity.appearance && identity.appearance.trim().length > 0
+        );
       count += identitiesWithAppearance.length;
     }
   });
-  
+
   return count;
 }

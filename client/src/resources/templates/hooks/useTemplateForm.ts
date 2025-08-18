@@ -30,7 +30,10 @@ import {
   ValidationResult,
   ValidationIssue,
 } from "../utils/templateValidation";
-import { useTemplateImages, invalidateTemplateImagesCache } from "./useTemplateImages";
+import {
+  useTemplateImages,
+  invalidateTemplateImagesCache,
+} from "./useTemplateImages";
 
 // Define the TabType type
 export type TabType =
@@ -52,9 +55,26 @@ interface SaveHistoryEntry {
 interface UseTemplateFormProps {
   initialTemplate: StoryTemplate;
   onSave?: (template: StoryTemplate) => Promise<void>;
-  onGameModeChange?: (newGameMode: GameMode, oldGameMode: GameMode, isSparse: boolean) => void;
-  onPlayerCountChange?: (newMin: PlayerCount, newMax: PlayerCount, oldMin: PlayerCount, oldMax: PlayerCount, isMinChange: boolean, isSparse: boolean) => void;
-  onCompetitiveSingleCheck?: (gameMode: GameMode, newMin: PlayerCount, newMax: PlayerCount, isMinChange: boolean, isSparse: boolean) => void;
+  onGameModeChange?: (
+    newGameMode: GameMode,
+    oldGameMode: GameMode,
+    isSparse: boolean
+  ) => void;
+  onPlayerCountChange?: (
+    newMin: PlayerCount,
+    newMax: PlayerCount,
+    oldMin: PlayerCount,
+    oldMax: PlayerCount,
+    isMinChange: boolean,
+    isSparse: boolean
+  ) => void;
+  onCompetitiveSingleCheck?: (
+    gameMode: GameMode,
+    newMin: PlayerCount,
+    newMax: PlayerCount,
+    isMinChange: boolean,
+    isSparse: boolean
+  ) => void;
 }
 
 export function useTemplateForm({
@@ -70,15 +90,17 @@ export function useTemplateForm({
   const [isLoading, setIsLoading] = useState(false); // Manage isLoading internally
   const [validationResult, setValidationResult] =
     useState<ValidationResult | null>(null);
-    
+
   // Fetch template images for validation (when template is saved)
   // Note: We fetch even when containsImages is false to validate missing images
-  const { data: templateImagesData, refetch: refetchTemplateImages } = useTemplateImages(
-    formData.id,
-    Boolean(formData.id) // Fetch whenever we have a saved template ID
-  );
+  const { data: templateImagesData, refetch: refetchTemplateImages } =
+    useTemplateImages(
+      formData.id,
+      Boolean(formData.id) // Fetch whenever we have a saved template ID
+    );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [savedTemplate, setSavedTemplate] = useState<StoryTemplate>(initialTemplate);
+  const [savedTemplate, setSavedTemplate] =
+    useState<StoryTemplate>(initialTemplate);
   const [saveHistory, setSaveHistory] = useState<SaveHistoryEntry[]>([]);
   const navigate = useNavigate();
 
@@ -203,7 +225,7 @@ export function useTemplateForm({
   // Validate template integrity whenever formData or templateImagesData changes
   useEffect(() => {
     const validation = validateTemplateIntegrity(
-      formData, 
+      formData,
       templateImagesData?.manifest
     );
     setValidationResult(validation);
@@ -219,13 +241,14 @@ export function useTemplateForm({
   // Compare formData with savedTemplate to detect unsaved changes
   useEffect(() => {
     // Deep comparison of the two objects
-    const hasChanges = JSON.stringify(formData) !== JSON.stringify(savedTemplate);
+    const hasChanges =
+      JSON.stringify(formData) !== JSON.stringify(savedTemplate);
     setHasUnsavedChanges(hasChanges);
   }, [formData, savedTemplate]);
 
   // Helper function to update save history
   const addToSaveHistory = (template: StoryTemplate) => {
-    setSaveHistory(prev => {
+    setSaveHistory((prev) => {
       const newEntry: SaveHistoryEntry = {
         template: { ...template },
         timestamp: new Date(),
@@ -327,12 +350,14 @@ export function useTemplateForm({
   };
 
   // Encapsulated save function that handles server requests, error handling, and state updates
-  const saveTemplateToServer = async (templateToSave: StoryTemplate): Promise<StoryTemplate> => {
+  const saveTemplateToServer = async (
+    templateToSave: StoryTemplate
+  ): Promise<StoryTemplate> => {
     Logger.UI.log("Saving template to server", templateToSave.id);
-    
+
     try {
       let savedTemplate: StoryTemplate;
-      
+
       if (onSave) {
         // Use the provided onSave handler
         await onSave(templateToSave);
@@ -347,30 +372,37 @@ export function useTemplateForm({
         navigate(`/admin/templates/${savedTemplate.id}`); // Navigate to the new template's edit page
       } else {
         // Update existing template
-        Logger.Admin.log(`Updating template: ${templateToSave.id}`, templateToSave);
-        const response = await templateApi.updateTemplate(templateToSave.id, templateToSave);
+        Logger.Admin.log(
+          `Updating template: ${templateToSave.id}`,
+          templateToSave
+        );
+        const response = await templateApi.updateTemplate(
+          templateToSave.id,
+          templateToSave
+        );
         savedTemplate = response.template;
         Logger.Admin.log("Template updated successfully", savedTemplate);
       }
-      
+
       // Update local state with saved template
       addToSaveHistory(savedTemplate); // Add to save history
       setSavedTemplate(savedTemplate); // Update the saved template reference
       setHasUnsavedChanges(false); // Reset unsaved changes after successful save
-      
+
       // Refresh template images data for updated validation
       if (savedTemplate.id) {
         invalidateTemplateImagesCache(savedTemplate.id);
         // Trigger refetch to get updated validation data
-        refetchTemplateImages().catch(err => {
+        refetchTemplateImages().catch((err) => {
           Logger.UI.warn("Failed to refetch template images after save:", err);
         });
       }
-      
+
       return savedTemplate;
     } catch (err) {
       Logger.Admin.error("Error saving template:", err);
-      const message = err instanceof Error ? err.message : "Failed to save template";
+      const message =
+        err instanceof Error ? err.message : "Failed to save template";
       notificationService.addErrorNotification(message);
       throw err; // Re-throw to allow caller to handle it
     }
@@ -606,6 +638,14 @@ export function useTemplateForm({
     }));
   };
 
+  // Persist cover reference images in template state
+  const handleCoverReferenceImagesChange = (ids: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      coverImageReferenceIds: ids.slice(0, 2),
+    }));
+  };
+
   // Handle contains images
   const handleContainsImagesChange = (containsImages: boolean) => {
     setFormData((prev) => ({
@@ -674,7 +714,7 @@ export function useTemplateForm({
       if (onPlayerCountChange || onCompetitiveSingleCheck) {
         const oldMin = formData.playerCountMin;
         const oldMax = formData.playerCountMax;
-        
+
         // Check for player count change warning (single to multiplayer)
         if (onPlayerCountChange) {
           // Check if changing from single-player (min=1, max=1) to multiplayer (max>1)
@@ -683,7 +723,7 @@ export function useTemplateForm({
             return; // Don't apply change yet, let the callback handle it
           }
         }
-        
+
         // Check for competitive single player warning
         if (onCompetitiveSingleCheck) {
           const gameMode = formData.gameMode;
@@ -699,7 +739,7 @@ export function useTemplateForm({
       if (onPlayerCountChange || onCompetitiveSingleCheck) {
         const oldMin = formData.playerCountMin;
         const oldMax = formData.playerCountMax;
-        
+
         // Check for player count change warning (single to multiplayer)
         if (onPlayerCountChange) {
           // Check if changing from single-player (min=1, max=1) to multiplayer (max>1)
@@ -708,7 +748,7 @@ export function useTemplateForm({
             return; // Don't apply change yet, let the callback handle it
           }
         }
-        
+
         // Check for competitive single player warning
         if (onCompetitiveSingleCheck) {
           const gameMode = formData.gameMode;
@@ -739,7 +779,7 @@ export function useTemplateForm({
           default:
             newGameMode = GameModes.Cooperative;
         }
-        
+
         if (currentGameMode && currentGameMode !== newGameMode) {
           onGameModeChange(newGameMode, currentGameMode, isSparse);
           return; // Don't apply change yet, let the callback handle it
@@ -758,6 +798,7 @@ export function useTemplateForm({
     handlePublicationStatusChange,
     handleShowOnWelcomeScreenChange,
     handleImageInstructionsChange,
+    handleCoverReferenceImagesChange,
     handleDifficultyLevelsChange,
     // Helper functions
     getMinPlayerOptions,
@@ -785,10 +826,7 @@ export function useTemplateForm({
     },
     autoFixSingleIssue: (issue: ValidationIssue) => {
       if (validationResult) {
-        const fixedTemplate = autoFixTemplate(
-          formData,
-          [issue]
-        );
+        const fixedTemplate = autoFixTemplate(formData, [issue]);
         setFormData(fixedTemplate);
         console.log(`Auto-fixed issue: ${issue.message}`);
       }

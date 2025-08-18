@@ -97,6 +97,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handleGameModeChangeOriginal,
     handlePlayerCountMinChangeOriginal,
     handlePlayerCountMaxChangeOriginal,
+    // Cover refs persistence handler
+    handleCoverReferenceImagesChange,
   } = useTemplateForm({
     initialTemplate,
     onSave,
@@ -114,7 +116,13 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       isSparse
     ) => {
       if (!isSparse) {
-        warningHandlers.triggerPlayerCountWarning(newMin, newMax, oldMin, oldMax, isMinChange);
+        warningHandlers.triggerPlayerCountWarning(
+          newMin,
+          newMax,
+          oldMin,
+          oldMax,
+          isMinChange
+        );
       }
     },
     onCompetitiveSingleCheck: (
@@ -125,7 +133,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       isSparse
     ) => {
       if (!isSparse) {
-        warningHandlers.triggerCompetitiveSingleWarning(newMin, newMax, isMinChange);
+        warningHandlers.triggerCompetitiveSingleWarning(
+          newMin,
+          newMax,
+          isMinChange
+        );
       }
     },
   });
@@ -247,8 +259,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       }
     } else if (sectionKey === "media" && data.imageInstructions) {
       handleImageInstructionsChange(data.imageInstructions);
-    } else if (sectionKey === "difficultyLevels" && data.difficultyLevels) {
-      handleDifficultyLevelsChange(data.difficultyLevels);
     }
 
     // Delete the section from the iteration state and modal
@@ -449,7 +459,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             handleStoryElementsChange={handleStoryElementsChange}
             handleOutcomesChange={handleOutcomesChange}
             handlePlayerChange={handlePlayerChange}
-            handleCharacterSelectionIntroductionChange={handleCharacterSelectionIntroductionChange}
+            handleCharacterSelectionIntroductionChange={
+              handleCharacterSelectionIntroductionChange
+            }
             handleImageInstructionsChange={handleImageInstructionsChange}
             handleContainsImagesChange={handleContainsImagesChange}
             handleAiIterationSubmit={handleAiIterationSubmit}
@@ -464,8 +476,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             getMaxTurnsOptions={getMaxTurnsOptions}
             gameModeOptions={gameModeOptions}
             getGameModeValue={getGameModeValue}
-            getPlayerOptionsFromStoryTemplate={getPlayerOptionsFromStoryTemplate}
+            getPlayerOptionsFromStoryTemplate={
+              getPlayerOptionsFromStoryTemplate
+            }
             setActiveTab={setActiveTab}
+            handleCoverReferenceImagesChange={handleCoverReferenceImagesChange}
           />
         </div>
         {/* Mobile bottom Save button (hide on AI tabs) */}
@@ -508,15 +523,29 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
       <TemplateWarningModals
         showMultiplayerWarning={warningHandlers.showMultiplayerWarning}
         pendingGameModeChange={warningHandlers.pendingGameModeChange}
-        handleMultiplayerWarningCancel={warningHandlers.handleMultiplayerWarningCancel}
-        handleMultiplayerWarningProceed={warningHandlers.handleMultiplayerWarningProceed}
+        handleMultiplayerWarningCancel={
+          warningHandlers.handleMultiplayerWarningCancel
+        }
+        handleMultiplayerWarningProceed={
+          warningHandlers.handleMultiplayerWarningProceed
+        }
         showPlayerCountWarning={warningHandlers.showPlayerCountWarning}
         pendingPlayerCountChange={warningHandlers.pendingPlayerCountChange}
-        handlePlayerCountWarningCancel={warningHandlers.handlePlayerCountWarningCancel}
-        handlePlayerCountWarningProceed={warningHandlers.handlePlayerCountWarningProceed}
-        showCompetitiveSingleWarning={warningHandlers.showCompetitiveSingleWarning}
-        handleCompetitiveSingleWarningCancel={warningHandlers.handleCompetitiveSingleWarningCancel}
-        handleCompetitiveSingleWarningProceed={warningHandlers.handleCompetitiveSingleWarningProceed}
+        handlePlayerCountWarningCancel={
+          warningHandlers.handlePlayerCountWarningCancel
+        }
+        handlePlayerCountWarningProceed={
+          warningHandlers.handlePlayerCountWarningProceed
+        }
+        showCompetitiveSingleWarning={
+          warningHandlers.showCompetitiveSingleWarning
+        }
+        handleCompetitiveSingleWarningCancel={
+          warningHandlers.handleCompetitiveSingleWarningCancel
+        }
+        handleCompetitiveSingleWarningProceed={
+          warningHandlers.handleCompetitiveSingleWarningProceed
+        }
       />
     </>
   );

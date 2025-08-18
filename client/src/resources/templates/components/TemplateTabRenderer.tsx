@@ -32,13 +32,13 @@ interface TabRendererProps {
   isSparse: boolean;
   isAiIterating: boolean;
   tags: string[];
-  
+
   // Permissions
   canPublish: boolean;
   canSetWelcomeScreen: boolean;
   canManageTags: boolean;
   canGenerateImages: boolean;
-  
+
   // Basic info handlers
   handleTitleChange: (title: string) => void;
   handleTeaserChange: (teaser: string) => void;
@@ -50,8 +50,10 @@ interface TabRendererProps {
   handleTagsChange?: (tags: string[]) => void;
   handleShowOnWelcomeScreenChange?: (value: boolean) => void;
   handleDifficultyLevelsChange: (levels: DifficultyLevel[]) => void;
-  handlePublicationStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  
+  handlePublicationStatusChange: (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => void;
+
   // Guidelines handlers
   setWorld: (world: string) => void;
   setRules: (rules: string[]) => void;
@@ -60,7 +62,7 @@ interface TabRendererProps {
   setDecisions: (decisions: string[]) => void;
   setTypesOfThreads: (types: string[]) => void;
   setSwitchAndThreadInstructions: (instructions: string[]) => void;
-  
+
   // Other section handlers
   handleStatsChange: (updates: {
     statGroups?: string[];
@@ -71,13 +73,21 @@ interface TabRendererProps {
   handleStoryElementsChange: (elements: StoryElement[]) => void;
   handleOutcomesChange: (outcomes: Outcome[]) => void;
   handlePlayerChange: (update: Partial<StoryTemplate>) => void;
-  handleCharacterSelectionIntroductionChange: (intro: CharacterSelectionIntroduction) => void;
-  handleImageInstructionsChange: (instructions: Partial<ImageInstructions>) => void;
+  handleCharacterSelectionIntroductionChange: (
+    intro: CharacterSelectionIntroduction
+  ) => void;
+  handleImageInstructionsChange: (
+    instructions: Partial<ImageInstructions>
+  ) => void;
+  handleCoverReferenceImagesChange: (ids: string[]) => void;
   handleContainsImagesChange: (contains: boolean) => void;
-  
+
   // AI iteration handlers
-  handleAiIterationSubmit: (feedback: string, sections: Array<TemplateIterationSections>) => Promise<void>;
-  
+  handleAiIterationSubmit: (
+    feedback: string,
+    sections: Array<TemplateIterationSections>
+  ) => Promise<void>;
+
   // AI draft handlers
   handleAIDraftSetup: (options: {
     prompt: string;
@@ -91,7 +101,7 @@ interface TabRendererProps {
   aiDraftPlayerCount: PlayerCount | undefined;
   handleAiDraftPromptChange: (prompt: string) => void;
   handleAiDraftPlayerCountChange: (playerCount: PlayerCount) => void;
-  
+
   // Helper functions
   getMinPlayerOptions: () => number[];
   getMaxPlayerOptions: () => number[];
@@ -99,8 +109,10 @@ interface TabRendererProps {
   getMaxTurnsOptions: () => number[];
   gameModeOptions: Array<{ value: number; label: string }>;
   getGameModeValue: () => number;
-  getPlayerOptionsFromStoryTemplate: (template: Partial<StoryTemplate>) => Record<string, PlayerOptionsGeneration>;
-  
+  getPlayerOptionsFromStoryTemplate: (
+    template: Partial<StoryTemplate>
+  ) => Record<string, PlayerOptionsGeneration>;
+
   // Navigation
   setActiveTab: (tab: TabType) => void;
 }
@@ -142,6 +154,7 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
     handleCharacterSelectionIntroductionChange,
     handleImageInstructionsChange,
     handleContainsImagesChange,
+    handleCoverReferenceImagesChange,
     handleAiIterationSubmit,
     handleAIDraftSetup,
     aiDraftPrompt,
@@ -217,6 +230,7 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
       return (
         <MediaTab
           templateId={formData.id}
+          elements={formData.storyElements || []}
           imageInstructions={
             formData.imageInstructions || {
               visualStyle: "",
@@ -229,6 +243,9 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
             }
           }
           setImageInstructions={handleImageInstructionsChange}
+          coverRefs={formData.coverImageReferenceIds || []}
+          onCoverRefsChange={handleCoverReferenceImagesChange}
+          // wire cover reference images to template state via useTemplateForm
           containsImages={formData.containsImages || false}
           setContainsImages={handleContainsImagesChange}
           canGenerateImages={canGenerateImages}

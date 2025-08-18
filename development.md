@@ -8,13 +8,13 @@ Smaller commits!
 - 1: resolution animation: good outcomes on the right (as opposed to left)
 - 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 - 1: fix tooltip to not go beyond display borders
+- 1: when linking a locally stored story code to an account, check if that code already belongs to another account
+- 1: for logged-in users: when creating a new story via Page: do you want a one-off story or edit the World? (message and link is fine)
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
 - 2: meet future self should only have one possible identity
 
-- 1: when linking a locally stored story code to an account, check if that code already belongs to another account
-- 1: for logged-in users: when creating a new story via Page: do you want a one-off story or edit the World?
 - 2: review process for storytellers who want to publish on website
 - ?: Bild bei Draft mit hochladen (especially for kids stories)
 

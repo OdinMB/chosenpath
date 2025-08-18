@@ -15,6 +15,8 @@ interface StoryImageProps {
   caption?: string;
   withinText?: boolean;
   float?: "left" | "right";
+  // Display mode tweaks for thumbnails in tight containers
+  mode?: "default" | "thumbnail";
 }
 
 export const StoryImage: React.FC<StoryImageProps> = ({
@@ -29,6 +31,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   caption,
   withinText = false,
   float = "left",
+  mode = "default",
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -88,12 +91,28 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   };
 
   // Calculate the style for the image
+  const computeObjectFit = () => {
+    // In thumbnail mode, always show full image centered inside the square
+    if (mode === "thumbnail") return "contain" as const;
+    return "cover" as const;
+  };
+
+  // For thumbnails, adjust sizing to ensure portrait images are fully visible and centered;
+  // landscape images are vertically centered and cropped.
+  const isThumb = mode === "thumbnail";
   const imageStyle = {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover" as const,
+    width: "100%" as const,
+    height: "100%" as const,
+    maxWidth: "100%",
+    maxHeight: "100%",
+    objectFit: computeObjectFit(),
     transform: getTransformValue(),
-    objectPosition: responsivePosition ? "50% 0%" : objectPosition,
+    objectPosition: isThumb
+      ? ("center center" as const)
+      : responsivePosition
+      ? ("50% 0%" as const)
+      : (objectPosition as unknown as string),
+    display: isThumb ? ("block" as const) : undefined,
   };
 
   useEffect(() => {
@@ -173,9 +192,9 @@ export const StoryImage: React.FC<StoryImageProps> = ({
             <img
               src={src}
               alt={alt}
-              className={`w-full h-full object-cover ${
-                isLoading ? "opacity-0" : "opacity-100"
-              }`}
+              className={`w-full h-full ${
+                mode === "thumbnail" ? "object-contain" : "object-cover"
+              } ${isLoading ? "opacity-0" : "opacity-100"}`}
               style={imageStyle}
               onLoad={handleLoad}
               onError={handleError}

@@ -156,6 +156,8 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           templateId={templateId || ""}
           imageInstructions={imageInstructions}
           canGenerateImages={canGenerateImages}
+          // pass full element list for labeling reference images
+          allElements={elements}
         />
       ))}
     </div>

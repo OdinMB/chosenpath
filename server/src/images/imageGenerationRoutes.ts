@@ -1,6 +1,9 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { aiImageGenerator, ImageGenerationError } from "server/images/AIImageGenerator.js";
+import {
+  aiImageGenerator,
+  ImageGenerationError,
+} from "server/images/AIImageGenerator.js";
 import { Logger } from "shared/logger.js";
 import {
   IMAGE_SIZES,
@@ -51,28 +54,29 @@ const sendImageGenerationError = (
   if (error instanceof ImageGenerationError) {
     // Determine appropriate HTTP status code based on error type
     let statusCode = 400; // Default to Bad Request for business logic errors
-    
+
     // Use 500 only for actual technical failures
-    if (error.imageGenerationError.errorCode === 'TECHNICAL') {
+    if (error.imageGenerationError.errorCode === "TECHNICAL") {
       statusCode = 500;
-    } else if (error.imageGenerationError.errorCode === 'RATE_LIMIT') {
+    } else if (error.imageGenerationError.errorCode === "RATE_LIMIT") {
       statusCode = 429; // Too Many Requests
     }
-    
+
     // Send structured error information for image generation errors
     const response: ImageGenerationErrorResponse = {
-      status: statusCode === 400 ? ResponseStatus.INVALID : ResponseStatus.ERROR,
+      status:
+        statusCode === 400 ? ResponseStatus.INVALID : ResponseStatus.ERROR,
       requestId: requestId || uuidv4(),
       timestamp: Date.now(),
       errorMessage: error.imageGenerationError.userFriendlyMessage,
       operationType: res.req?.originalUrl?.split("?")[0],
       imageGenerationError: error.imageGenerationError,
     };
-    
+
     Logger.Story.log(
       `Image generation error [${response.requestId}] (${statusCode}) - ${error.imageGenerationError.errorCode}: ${error.imageGenerationError.technicalMessage}`
     );
-    
+
     res.status(statusCode).json(response);
   } else {
     // Fall back to regular error handling for non-image generation errors
@@ -130,7 +134,10 @@ const validateImageSize = (size?: string): string | null => {
 };
 
 const validateImageQuality = (quality?: string): string | null => {
-  if (quality && !Object.values(IMAGE_QUALITIES).includes(quality as ImageQuality)) {
+  if (
+    quality &&
+    !Object.values(IMAGE_QUALITIES).includes(quality as ImageQuality)
+  ) {
     return `Invalid image quality provided. Valid qualities are: ${Object.values(
       IMAGE_QUALITIES
     ).join(", ")}`;
@@ -138,6 +145,25 @@ const validateImageQuality = (quality?: string): string | null => {
   return null;
 };
 // --- End Validation Helper Functions ---
+
+// Helper to sanitize and map reference ids to template-scoped ImageReference objects
+const mapTemplateReferences = (
+  templateId: string,
+  referenceImageIds?: unknown
+) => {
+  const safeIds: string[] = Array.isArray(referenceImageIds)
+    ? referenceImageIds
+        .filter((v) => typeof v === "string" && v.trim().length > 0)
+        .slice(0, 2)
+    : [];
+  return safeIds.map((id) => ({
+    id,
+    source: "template" as const,
+    sourceId: templateId,
+    subDirectory: id.startsWith("player") ? "players" : undefined,
+    fileType: "jpeg" as const,
+  }));
+};
 
 /**
  * Generate an image for a story element in a template
@@ -149,7 +175,9 @@ router.post(
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
     Logger.Story.log(
-      `Image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+      `Image generation request from user: ${req.user?.username} (${
+        req.user?.id
+      }) with permissions: ${req.userPermissions?.join(", ")}`
     );
     try {
       const rateLimit = checkRateLimitForRequest(
@@ -165,6 +193,7 @@ router.post(
         elementId,
         appearance,
         imageInstructions,
+        referenceImageIds,
         size,
         quality,
       } = req.body as GenerateElementImageRequest;
@@ -193,6 +222,9 @@ router.post(
       if (validationError)
         return sendError(res, validationError, 400, requestId);
 
+      // Build references (optional, up to 2)
+      const references = mapTemplateReferences(templateId, referenceImageIds);
+
       const imageId = elementId; // elementId is validated as required
 
       const imagePath = await aiImageGenerator.generateImageForTemplate(
@@ -200,7 +232,7 @@ router.post(
         templateId,
         appearance,
         imageInstructions,
-        undefined,
+        references.length ? references : undefined,
         size,
         quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY
       );
@@ -234,7 +266,9 @@ router.post(
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
     Logger.Story.log(
-      `Player image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+      `Player image generation request from user: ${req.user?.username} (${
+        req.user?.id
+      }) with permissions: ${req.userPermissions?.join(", ")}`
     );
     try {
       const rateLimit = checkRateLimitForRequest(
@@ -332,7 +366,9 @@ router.post(
   async (req, res) => {
     const requestId = req.body.requestId || uuidv4();
     Logger.Story.log(
-      `Cover image generation request from user: ${req.user?.username} (${req.user?.id}) with permissions: ${req.userPermissions?.join(", ")}`
+      `Cover image generation request from user: ${req.user?.username} (${
+        req.user?.id
+      }) with permissions: ${req.userPermissions?.join(", ")}`
     );
     try {
       const rateLimit = checkRateLimitForRequest(
@@ -343,8 +379,14 @@ router.post(
         return sendRateLimited(res, rateLimit, requestId);
       }
 
-      const { templateId, coverPrompt, imageInstructions, size, quality } =
-        req.body as GenerateCoverImageRequest;
+      const {
+        templateId,
+        coverPrompt,
+        imageInstructions,
+        referenceImageIds,
+        size,
+        quality,
+      } = req.body as GenerateCoverImageRequest;
 
       // Input Validation
       let validationError = validateStringInput(templateId, "templateId", 255);
@@ -367,12 +409,16 @@ router.post(
       if (validationError)
         return sendError(res, validationError, 400, requestId);
 
+      // Build references (optional, up to 2)
+      const references = mapTemplateReferences(templateId, referenceImageIds);
+
       const imageId = "cover";
 
       const imagePath = await aiImageGenerator.generateCoverImageForTemplate(
         templateId,
         coverPrompt,
         imageInstructions,
+        references.length ? references : undefined,
         size || IMAGE_SIZES.PORTRAIT,
         quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
       );

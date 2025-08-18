@@ -35,4 +35,8 @@ export const StoryElementsSchema = z
     "List of important elements in the story, including NPCs, locations, and miscellaneous elements (like items, organizations, mysteries, conflicts, etc.). Add an initial set of facts for each element."
   );
 
-export type StoryElement = z.infer<typeof storyElementSchema>;
+// App-level type can include optional, non-LLM fields
+export type StoryElement = z.infer<typeof storyElementSchema> & {
+  // Optional list (persisted in template JSON) to guide image generation
+  sourceImageIds?: string[];
+};

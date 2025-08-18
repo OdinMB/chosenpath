@@ -37,6 +37,7 @@ interface GenerateElementImageParams {
   templateId: string;
   element: StoryElement;
   imageInstructions?: ImageInstructions;
+  referenceImageIds?: string[];
   size?: ImageSize;
   quality?: ImageQuality;
 }
@@ -45,6 +46,7 @@ interface GenerateCoverImageParams {
   templateId: string;
   coverPrompt: string;
   imageInstructions?: ImageInstructions;
+  referenceImageIds?: string[];
   size?: ImageSize;
   quality?: ImageQuality;
 }
@@ -65,13 +67,15 @@ export function useImageGeneration(): UseImageGenerationResult {
   // Helper function to parse API errors and show notifications
   const handleApiError = (err: unknown): void => {
     // Check if this is a structured image generation error response
-    if (typeof err === 'object' && err !== null && 'response' in err) {
-      const apiError = err as { response?: { data?: ImageGenerationErrorResponse } };
-      
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const apiError = err as {
+        response?: { data?: ImageGenerationErrorResponse };
+      };
+
       if (apiError.response?.data?.imageGenerationError) {
         const errorData = apiError.response.data;
         const errorInfo = errorData.imageGenerationError;
-        
+
         // Create an image generation error notification
         const notification: Omit<ImageGenerationErrorNotification, "id"> = {
           type: "error",
@@ -82,29 +86,36 @@ export function useImageGeneration(): UseImageGenerationResult {
           retryable: errorInfo?.retryable,
           autoClose: false, // Make it sticky - user must manually dismiss
         };
-        
+
         notificationService.addNotification(notification);
         return; // IMPORTANT: Return here to prevent fallback
       }
     }
 
     // Fallback to generic error notification
-    const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+    const errorMessage =
+      err instanceof Error ? err.message : "Unknown error occurred";
     const fallbackNotification = {
       type: "error" as const,
       title: "Image Generation Failed",
       message: errorMessage,
       autoClose: false, // Make it sticky - user must manually dismiss
     };
-    
+
     notificationService.addNotification(fallbackNotification);
   };
 
   const generateImageForElement = async (
     params: GenerateElementImageParams
   ): Promise<GenerateImageResponse | null> => {
-    const { templateId, element, imageInstructions, size, quality } = params;
-
+    const {
+      templateId,
+      element,
+      imageInstructions,
+      referenceImageIds,
+      size,
+      quality,
+    } = params;
 
     setIsGenerating(true);
 
@@ -115,6 +126,7 @@ export function useImageGeneration(): UseImageGenerationResult {
         elementId: element.id,
         appearance: element.name + "\n" + element.appearance,
         imageInstructions,
+        referenceImageIds: (referenceImageIds || []).slice(0, 2),
         size,
         quality,
       };
@@ -130,7 +142,6 @@ export function useImageGeneration(): UseImageGenerationResult {
           timeout: LONG_OPERATION_TIMEOUT,
         }
       );
-
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
@@ -148,9 +159,14 @@ export function useImageGeneration(): UseImageGenerationResult {
   const generateCoverImage = async (
     params: GenerateCoverImageParams
   ): Promise<GenerateImageResponse | null> => {
-    const { templateId, coverPrompt, imageInstructions, size, quality } =
-      params;
-
+    const {
+      templateId,
+      coverPrompt,
+      imageInstructions,
+      referenceImageIds,
+      size,
+      quality,
+    } = params;
 
     setIsGenerating(true);
 
@@ -160,6 +176,7 @@ export function useImageGeneration(): UseImageGenerationResult {
         templateId,
         coverPrompt,
         imageInstructions,
+        referenceImageIds: (referenceImageIds || []).slice(0, 2),
         size,
         quality,
       };
@@ -175,7 +192,6 @@ export function useImageGeneration(): UseImageGenerationResult {
           timeout: LONG_OPERATION_TIMEOUT,
         }
       );
-
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
@@ -202,7 +218,6 @@ export function useImageGeneration(): UseImageGenerationResult {
       size,
       quality,
     } = params;
-
 
     setIsGenerating(true);
 
@@ -236,7 +251,6 @@ export function useImageGeneration(): UseImageGenerationResult {
           timeout: LONG_OPERATION_TIMEOUT,
         }
       );
-
 
       // Invalidate template images cache so the UI updates
       invalidateTemplateImagesCache(templateId);
