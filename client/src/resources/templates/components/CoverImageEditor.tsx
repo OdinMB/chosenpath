@@ -80,7 +80,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
               onGenerateClick={handleGenerateCoverImage}
               size="large"
               className="!w-full !h-full !max-w-none"
-              imageClassName="w-full h-full object-cover"
               missingContentMessage="Add a cover image prompt to generate an image"
             />
           </div>
@@ -102,10 +101,6 @@ export const CoverImageEditor: React.FC<CoverImageEditorProps> = ({
           />
 
           <div className="mt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm">Reference images</span>
-              {/* Help icon inline */}
-            </div>
             <ReferenceImageSelector
               templateId={templateId || ""}
               selectedIds={coverRefs}

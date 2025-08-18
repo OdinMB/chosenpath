@@ -10,7 +10,6 @@ import { ArrayField, ExpandableItem } from "components";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { Icons } from "shared/components/ui/Icons";
 import { ImagePlaceholder } from "./ImagePlaceholder";
-import { AcademyContextButton } from "components";
 import { ReferenceImageSelector } from "./ReferenceImageSelector";
 
 interface StoryElementEditorProps {
@@ -205,60 +204,35 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
           <span className="font-semibold w-36 pt-2 self-start sm:self-auto">
             Appearance
           </span>
-          <TextArea
-            id={`element-appearance-${data.id}`}
-            name={`element-appearance-${data.id}`}
-            className="flex-1 w-full"
-            autoHeight
-            value={data.appearance}
-            onChange={(e) =>
-              onChange({
-                ...data,
-                appearance: e.target.value,
-              })
-            }
-            placeholder="Description of the element's visual appearance (for NPCs, locations, items)"
-            disabled={readOnly}
-          />
-        </div>
-
-        {/* Reference images selector */}
-        <div className="flex items-start gap-2 flex-col sm:flex-row">
-          <div className="flex items-center gap-2 sm:w-36 pt-2">
-            <span className="font-semibold">Reference images</span>
-            <AcademyContextButton
-              mode="icon"
-              content={
-                <div className="text-sm space-y-2">
-                  <div className="font-semibold">Using reference images</div>
-                  <p>
-                    You can guide image generation by selecting up to two
-                    existing images as references. This helps keep characters
-                    and visual motifs consistent across images.
-                  </p>
-                  <p>
-                    For best results, choose reference images that clearly show
-                    the subject, pose, and style you want to preserve.
-                  </p>
-                </div>
+          <div className="flex-1 w-full space-y-3">
+            <TextArea
+              id={`element-appearance-${data.id}`}
+              name={`element-appearance-${data.id}`}
+              className="w-full"
+              autoHeight
+              value={data.appearance}
+              onChange={(e) =>
+                onChange({
+                  ...data,
+                  appearance: e.target.value,
+                })
               }
+              placeholder="Description of the element's visual appearance (for NPCs, locations, items)"
+              disabled={readOnly}
             />
-          </div>
-          <div className="flex-1 space-y-2 w-full">
-            <div className="flex items-center gap-2 w-full">
-              <ReferenceImageSelector
-                templateId={templateId}
-                selectedIds={selectedSourceImageIds}
-                onUpdate={(next) => {
-                  setSelectedSourceImageIds(next);
-                  onChange({ ...data, sourceImageIds: next });
-                }}
-                readOnly={readOnly}
-                allElements={allElements}
-              />
-            </div>
-
-            {/* Selected thumbnails are rendered by ReferenceImageSelector */}
+            
+            {/* Reference image selector under appearance */}
+            <ReferenceImageSelector
+              templateId={templateId}
+              selectedIds={selectedSourceImageIds}
+              onUpdate={(next) => {
+                setSelectedSourceImageIds(next);
+                onChange({ ...data, sourceImageIds: next });
+              }}
+              readOnly={readOnly}
+              allElements={allElements}
+              className="mt-3"
+            />
           </div>
         </div>
 

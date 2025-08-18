@@ -2,7 +2,7 @@ import React from "react";
 import { Select } from "components/ui";
 import { ImageUI, StoryElement } from "core/types";
 import { ImagePlaceholder } from "./ImagePlaceholder";
-
+import { AcademyContextButton } from "components";
 import { useTemplateImages } from "../hooks/useTemplateImages";
 import { Icons } from "shared/components/ui/Icons";
 
@@ -106,6 +106,34 @@ export const ReferenceImageSelector: React.FC<ReferenceImageSelectorProps> = ({
 
   return (
     <div className={className}>
+      {/* Heading with help button */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-semibold text-sm">Reference images</span>
+        <AcademyContextButton
+          mode="icon"
+          content={
+            <div className="text-sm space-y-2">
+              <div className="font-semibold">Using reference images</div>
+              <p>
+                You can guide image generation by selecting existing images as
+                references. This helps keep characters and visual motifs
+                consistent across images.
+              </p>
+              <p>
+                For best results, choose reference images that clearly show the
+                characters, locations, items, or styles you want to preserve.
+              </p>
+              <p>
+                <em>
+                  Fahir (see reference image) is sitting in the Moonshine Bar
+                  (see reference image).
+                </em>
+              </p>
+            </div>
+          }
+        />
+      </div>
+
       <div className="flex items-center gap-2">
         {!hideDropdown && selectedIds.length < 2 && (
           <Select
