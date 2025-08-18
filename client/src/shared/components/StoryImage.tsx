@@ -97,8 +97,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     return "cover" as const;
   };
 
-  // For thumbnails, adjust sizing to ensure portrait images are fully visible and centered;
-  // landscape images are vertically centered and cropped.
+  // For thumbnails, ensure images are centered within their square containers
   const isThumb = mode === "thumbnail";
   const imageStyle = {
     width: "100%" as const,
@@ -108,10 +107,10 @@ export const StoryImage: React.FC<StoryImageProps> = ({
     objectFit: computeObjectFit(),
     transform: getTransformValue(),
     objectPosition: isThumb
-      ? ("center center" as const)
+      ? "center center"
       : responsivePosition
-      ? ("50% 0%" as const)
-      : (objectPosition as unknown as string),
+      ? "50% 0%"
+      : objectPosition,
     display: isThumb ? ("block" as const) : undefined,
   };
 
@@ -171,7 +170,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
   // Determine if we need to wrap the component for text flow
   const renderContent = () => {
     const imageContent = (
-      <div className={`relative ${className}`}>
+      <div className={`relative ${mode === "thumbnail" ? "" : ""} ${className}`}>
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
             <Icons.Spinner className="w-10 h-10 text-primary-500" />
@@ -183,7 +182,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
           </div>
         )}
         <div
-          className={`overflow-hidden rounded-lg ${
+          className={`${mode === "thumbnail" ? "w-full h-full" : ""} overflow-hidden rounded-lg ${
             !isMobile && image?.status === "ready" ? "cursor-pointer" : ""
           }`}
           onClick={handleImageClick}
@@ -192,9 +191,7 @@ export const StoryImage: React.FC<StoryImageProps> = ({
             <img
               src={src}
               alt={alt}
-              className={`w-full h-full ${
-                mode === "thumbnail" ? "object-contain" : "object-cover"
-              } ${isLoading ? "opacity-0" : "opacity-100"}`}
+              className={`${isLoading ? "opacity-0" : "opacity-100"}`}
               style={imageStyle}
               onLoad={handleLoad}
               onError={handleError}

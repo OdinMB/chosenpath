@@ -12,7 +12,6 @@ interface ImagePlaceholderProps {
   hasAppearance: boolean;
   onGenerateClick?: (e?: React.MouseEvent) => void;
   className?: string;
-  imageClassName?: string;
   size?: "small" | "medium" | "large";
   missingContentMessage?: string;
 }
@@ -25,7 +24,6 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
   hasAppearance,
   onGenerateClick,
   className = "",
-  imageClassName = "w-full h-full",
   size = "small",
   missingContentMessage = "Add an appearance description to generate an image",
 }) => {
@@ -45,7 +43,7 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
     large: "w-10 h-10",
   };
 
-  const containerClass = `${sizeClasses[size]} rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center ${className}`;
+  const containerClass = `${sizeClasses[size]} rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center bg-gray-50 ${className}`;
   const iconClass = iconSizes[size];
 
   // Check if image URL can be constructed
@@ -97,16 +95,14 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
   // If image exists, show the actual image
   if (imageExists) {
     return (
-      <div className={containerClass}>
-        <StoryImage
-          image={image}
-          alt={alt}
-          className={imageClassName}
-          responsivePosition={false}
-          objectPosition="center center"
-          mode="thumbnail"
-        />
-      </div>
+      <StoryImage
+        image={image}
+        alt={alt}
+        className={containerClass}
+        responsivePosition={false}
+        objectPosition="center center"
+        mode="thumbnail"
+      />
     );
   }
 

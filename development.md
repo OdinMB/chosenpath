@@ -38,7 +38,6 @@ Focus: Text/Images, English, Multiplayer
 
 - 5: Attach facts to players
 - 25: Multiplayer switch type with voting mechanism to decide which direction to take
-- 3: story setting: # paragraphs / beat (shorter for kids/roleplaying mode)
 - 20: Dynamically add new outcomes for longer stories
 - 30: Audio version
   https://elevenlabs.io/docs/cookbooks/text-to-speech/streaming
