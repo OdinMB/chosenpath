@@ -49,7 +49,8 @@ export const useMarkerAnimation = ({
 
         const elapsed = timestamp - animationStartTime.current;
         const progress = Math.min(elapsed / animationDuration, 1);
-        const targetRoll = resolutionDetails.roll;
+        // Invert the target roll for the reversed distribution bar
+        const targetRoll = 100 - resolutionDetails.roll;
 
         // Handle normal animation progress
         if (progress < 0.95) {
@@ -107,7 +108,8 @@ export const useMarkerAnimation = ({
     } else {
       setAnimatingMarker(false);
       if (resolutionDetails?.roll !== undefined) {
-        setCurrentMarkerPosition(resolutionDetails.roll);
+        // Invert the position for the reversed distribution bar
+        setCurrentMarkerPosition(100 - resolutionDetails.roll);
       }
     }
 

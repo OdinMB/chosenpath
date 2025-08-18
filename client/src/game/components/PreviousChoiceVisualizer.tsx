@@ -347,42 +347,42 @@ export const PreviousChoiceVisualizer: React.FC<
                 <div className="max-w-md mx-auto">
                   {/* Distribution bar - always visible */}
                   <div className="relative h-5 rounded-lg overflow-hidden shadow-inner flex z-0 w-full mb-2">
-                    {/* Favorable segment */}
-                    {currentDistribution.favorable > 0 && (
-                      <BarSegment
-                        width={currentDistribution.favorable}
-                        color={getColor("favorable")}
-                        isHighlighted={resolution === "favorable"}
-                        isLast={
-                          currentDistribution.mixed === 0 &&
-                          currentDistribution.unfavorable === 0
-                        }
-                        tooltipText={`${currentDistribution.favorable}%`}
-                        emojiIcon="😀"
-                      />
-                    )}
-
-                    {/* Mixed segment */}
-                    {currentDistribution.mixed > 0 && (
-                      <BarSegment
-                        width={currentDistribution.mixed}
-                        color={getColor("mixed")}
-                        isHighlighted={resolution === "mixed"}
-                        isLast={currentDistribution.unfavorable === 0}
-                        tooltipText={`${currentDistribution.mixed}%`}
-                        emojiIcon="😐"
-                      />
-                    )}
-
-                    {/* Unfavorable segment */}
+                    {/* Unfavorable segment (now on left) */}
                     {currentDistribution.unfavorable > 0 && (
                       <BarSegment
                         width={currentDistribution.unfavorable}
                         color={getColor("unfavorable")}
                         isHighlighted={resolution === "unfavorable"}
-                        isLast={true}
+                        isLast={
+                          currentDistribution.mixed === 0 &&
+                          currentDistribution.favorable === 0
+                        }
                         tooltipText={`${currentDistribution.unfavorable}%`}
                         emojiIcon="🙁"
+                      />
+                    )}
+
+                    {/* Mixed segment (stays in middle) */}
+                    {currentDistribution.mixed > 0 && (
+                      <BarSegment
+                        width={currentDistribution.mixed}
+                        color={getColor("mixed")}
+                        isHighlighted={resolution === "mixed"}
+                        isLast={currentDistribution.favorable === 0}
+                        tooltipText={`${currentDistribution.mixed}%`}
+                        emojiIcon="😐"
+                      />
+                    )}
+
+                    {/* Favorable segment (now on right) */}
+                    {currentDistribution.favorable > 0 && (
+                      <BarSegment
+                        width={currentDistribution.favorable}
+                        color={getColor("favorable")}
+                        isHighlighted={resolution === "favorable"}
+                        isLast={true}
+                        tooltipText={`${currentDistribution.favorable}%`}
+                        emojiIcon="😀"
                       />
                     )}
 
@@ -394,8 +394,8 @@ export const PreviousChoiceVisualizer: React.FC<
                           style={{
                             left: `${
                               isMarkerAnimating
-                                ? currentMarkerPosition
-                                : resolutionDetails.roll
+                                ? 100 - currentMarkerPosition
+                                : 100 - resolutionDetails.roll
                             }%`,
                             height: "calc(100% + 8px)",
                             top: "-4px", // Extend 4px above

@@ -5,7 +5,6 @@ Smaller commits!
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
 - 1: Teaser should be properly generated, not copy/pasted from user query
 
-- 1: resolution animation: good outcomes on the right (as opposed to left)
 - 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 - 1: fix tooltip to not go beyond display borders
 - 1: when linking a locally stored story code to an account, check if that code already belongs to another account

@@ -13,15 +13,15 @@ interface UseChoiceFormattingResult {
 }
 
 export const useChoiceFormatting = (): UseChoiceFormattingResult => {
-  // Format risk distribution for tooltip text
+  // Format risk distribution for tooltip text (reversed order: unfavorable-mixed-favorable)
   const formatRiskDistribution = useCallback((riskType?: string): string => {
     switch (riskType) {
       case "normal":
-        return `😀 ${DEFAULT_DISTRIBUTION.favorable}% | 😐 ${DEFAULT_DISTRIBUTION.mixed}% | 🙁 ${DEFAULT_DISTRIBUTION.unfavorable}%`;
+        return `🙁 ${DEFAULT_DISTRIBUTION.unfavorable}% | 😐 ${DEFAULT_DISTRIBUTION.mixed}% | 😀 ${DEFAULT_DISTRIBUTION.favorable}%`;
       case "safe":
-        return `😀 ${SAFE_DISTRIBUTION.favorable}% | 😐 ${SAFE_DISTRIBUTION.mixed}% | 🙁 ${SAFE_DISTRIBUTION.unfavorable}%`;
+        return `🙁 ${SAFE_DISTRIBUTION.unfavorable}% | 😐 ${SAFE_DISTRIBUTION.mixed}% | 😀 ${SAFE_DISTRIBUTION.favorable}%`;
       case "risky":
-        return `😀 ${RISKY_DISTRIBUTION.favorable}% | 😐 ${RISKY_DISTRIBUTION.mixed}% | 🙁 ${RISKY_DISTRIBUTION.unfavorable}%`;
+        return `🙁 ${RISKY_DISTRIBUTION.unfavorable}% | 😐 ${RISKY_DISTRIBUTION.mixed}% | 😀 ${RISKY_DISTRIBUTION.favorable}%`;
       default:
         return "Unknown risk type";
     }
