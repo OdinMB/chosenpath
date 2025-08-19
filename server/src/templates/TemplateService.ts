@@ -11,7 +11,6 @@ import {
   PublicationStatusType,
   Stat,
   TemplateIterationSections,
-  DifficultyLevel,
 } from "core/types/index.js";
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
@@ -26,8 +25,6 @@ import {
 import path from "path";
 import fsSync from "fs";
 import fs from "fs/promises";
-
-
 
 export class TemplateService {
   private storagePath: string;
@@ -75,7 +72,9 @@ export class TemplateService {
       teaser: baseTemplate.teaser || "",
       creatorId: baseTemplate.creatorId || undefined,
       creatorUsername: baseTemplate.creatorUsername || undefined,
-      containsImages: baseTemplate.containsImages ?? userPermissions.includes("templates_images"),
+      containsImages:
+        baseTemplate.containsImages ??
+        userPermissions.includes("templates_images"),
       imageInstructions: baseTemplate.imageInstructions || {
         visualStyle: "",
         atmosphere: "",
@@ -329,8 +328,10 @@ export class TemplateService {
         template.id = uuidv4();
       }
 
-      const fullTemplate: StoryTemplate =
-        this.createFullTemplateObject(template, userPermissions);
+      const fullTemplate: StoryTemplate = this.createFullTemplateObject(
+        template,
+        userPermissions
+      );
 
       // Set creator information on creation
       if (creatorId) {
@@ -340,7 +341,8 @@ export class TemplateService {
 
       // Set containsImages default based on user permissions
       if (fullTemplate.containsImages === undefined) {
-        fullTemplate.containsImages = userPermissions.includes("templates_images");
+        fullTemplate.containsImages =
+          userPermissions.includes("templates_images");
       }
 
       // Keep existing timestamps if provided
@@ -433,8 +435,10 @@ export class TemplateService {
         // Template doesn't exist, create it (inline to avoid circular dependency)
         this.logger.log(`Template ${template.id} doesn't exist, creating new`);
 
-        const fullTemplate: StoryTemplate =
-          this.createFullTemplateObject(template, userPermissions);
+        const fullTemplate: StoryTemplate = this.createFullTemplateObject(
+          template,
+          userPermissions
+        );
 
         // Set creator information on creation
         if (creatorId) {
@@ -444,7 +448,8 @@ export class TemplateService {
 
         // Set containsImages default based on user permissions
         if (fullTemplate.containsImages === undefined) {
-          fullTemplate.containsImages = userPermissions.includes("templates_images");
+          fullTemplate.containsImages =
+            userPermissions.includes("templates_images");
         }
 
         // Keep existing timestamps if provided
@@ -689,7 +694,6 @@ export class TemplateService {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel,
     creatorId?: string,
     creatorUsername?: string,
     userPermissions: string[] = []
@@ -700,43 +704,45 @@ export class TemplateService {
       // Create an ID for the new template
       const id = uuidv4();
 
-      // Generate the initial state which includes all necessary data
+      // Generate the template setup directly with teaser and difficulty levels
       const setupGenerator = this.aiStoryGenerator;
-      const initialState = await setupGenerator.createInitialState(
-        id,
+      const templateSetup = await setupGenerator.generateTemplateSetup(
         prompt,
-        generateImages,
         playerCount,
-        maxTurns,
         gameMode,
-        difficultyLevel
+        maxTurns
       );
 
-      // Convert story state to template
-
-      // Extract player options from the state
+      // Extract player options from the setup
       const playerOptions: Record<string, PlayerOptionsGeneration> = {};
-      Object.entries(initialState.characterSelectionOptions).forEach(
-        ([slot, options]) => {
-          playerOptions[slot] = options as PlayerOptionsGeneration;
-        }
+      const playerSlots = [`player1`, `player2`, `player3`].slice(
+        0,
+        playerCount
       );
+      playerSlots.forEach((slot) => {
+        const playerKey = slot as keyof typeof templateSetup;
+        if (templateSetup[playerKey]) {
+          playerOptions[slot] = templateSetup[
+            playerKey
+          ] as PlayerOptionsGeneration;
+        }
+      });
 
       // Use the common template creation function
       const templateData = {
-        title: initialState.title,
-        imageInstructions: initialState.imageInstructions,
-        teaser: `Generated from prompt: ${prompt}`,
-        guidelines: initialState.guidelines,
-        storyElements: initialState.storyElements,
-        sharedOutcomes: initialState.sharedOutcomes,
-        sharedStats: initialState.sharedStats,
-        playerStats: initialState.playerStats,
+        title: templateSetup.title,
+        imageInstructions: templateSetup.imageInstructions,
+        teaser: templateSetup.teaser, // Now comes from AI generation
+        guidelines: templateSetup.guidelines,
+        storyElements: templateSetup.storyElements,
+        sharedOutcomes: templateSetup.sharedOutcomes,
+        sharedStats: templateSetup.sharedStats,
+        playerStats: templateSetup.playerStats,
         characterSelectionIntroduction:
-          initialState.characterSelectionIntroduction,
+          templateSetup.characterSelectionIntroduction,
         statGroups: this.extractStatGroups(
-          initialState.sharedStats,
-          initialState.playerStats
+          templateSetup.sharedStats,
+          templateSetup.playerStats
         ),
         ...playerOptions,
       };
@@ -748,7 +754,7 @@ export class TemplateService {
         gameMode,
         maxTurnsMin: maxTurns,
         maxTurnsMax: maxTurns,
-        difficultyLevels: [difficultyLevel],
+        difficultyLevels: templateSetup.difficultyLevels, // Now comes from AI generation
         ...templateData,
         tags: [],
       };

@@ -40,7 +40,7 @@ const GENERATION_STEPS: GenerationStep[] = [
     description: "Creating conflicts, possible outcomes, and pacing...",
     imagePath: "/academy/switches-threads.jpeg",
     minDuration: 9000,
-    maxDuration: 11000,
+    maxDuration: 13000,
   },
   {
     id: "mechanics",
@@ -48,15 +48,15 @@ const GENERATION_STEPS: GenerationStep[] = [
     description: "Defining stats and player backgrounds...",
     imagePath: "/academy/stats.jpeg",
     minDuration: 7000,
-    maxDuration: 11000,
+    maxDuration: 13000,
   },
   {
     id: "elements",
     title: "Adding story elements",
     description: "Generating locations, factions, secrets, and more...",
     imagePath: "/academy/images.jpeg",
-    minDuration: 7000,
-    maxDuration: 11000,
+    minDuration: 9000,
+    maxDuration: 13000,
   },
   {
     id: "final-touches",
@@ -64,7 +64,7 @@ const GENERATION_STEPS: GenerationStep[] = [
     description: "Improving consistency and polish of your World...",
     imagePath: "/academy/story-engine.jpeg",
     minDuration: 8000,
-    maxDuration: 11000,
+    maxDuration: 13000,
   },
 ];
 

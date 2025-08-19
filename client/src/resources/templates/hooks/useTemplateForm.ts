@@ -13,7 +13,6 @@ import {
   Outcome,
   ImageInstructions,
   PlayerCount,
-  DifficultyLevel,
 } from "core/types";
 import { Logger } from "shared/logger";
 import { MAX_PLAYERS } from "core/config";
@@ -462,16 +461,9 @@ export function useTemplateForm({
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
-    difficultyLevel?: DifficultyLevel; // Made optional
   }) => {
     setIsLoading(true);
     Logger.UI.log("AI draft setup initiated with options:", options);
-
-    // If difficultyLevel is not provided by StoryInitializer (because it was commented out),
-    // we might need to ensure a default is used if the API expects one, or if our logic here needs it.
-    // For now, we'll assume the API or downstream logic can handle an undefined difficultyLevel
-    // or that the AI will choose one.
-    const difficultyToUse = options.difficultyLevel; // This will be undefined if not sent
 
     const requestData: GenerateTemplateRequest = {
       prompt: options.prompt,
@@ -479,7 +471,6 @@ export function useTemplateForm({
       maxTurns: options.maxTurns,
       gameMode: options.gameMode,
       generateImages: options.generateImages,
-      difficultyLevel: difficultyToUse, // Directly assign, it can be undefined
     };
 
     try {
@@ -529,9 +520,7 @@ export function useTemplateForm({
         playerCountMax: options.playerCount,
         maxTurnsMin: options.maxTurns,
         maxTurnsMax: options.maxTurns,
-        difficultyLevels: difficultyToUse
-          ? [difficultyToUse]
-          : formData.difficultyLevels,
+        difficultyLevels: generatedTemplateData.difficultyLevels || formData.difficultyLevels,
         updatedAt: new Date().toISOString(),
       };
 

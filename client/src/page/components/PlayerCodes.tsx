@@ -3,12 +3,14 @@ import { PlayerCode } from "shared/components";
 import { StoryTemplate } from "core/types";
 import { Icons } from "shared/components/ui/Icons";
 import { CoverCard } from "shared/components/CoverCard";
+import { GenerationProgress } from "./GenerationProgress";
 
 interface PlayerCodesProps {
   codes: Record<string, string>;
   onCodeSubmit: (code: string) => void;
   storyReady: boolean;
   template?: StoryTemplate;
+  showGenerationProgress?: boolean; // When true, show GenerationProgress instead of old loading spinner
 }
 
 export function PlayerCodes({
@@ -16,6 +18,7 @@ export function PlayerCodes({
   onCodeSubmit,
   storyReady,
   template,
+  showGenerationProgress = false,
 }: PlayerCodesProps) {
   // Story is ready to join only when the server confirms it
   const isReadyToJoin = storyReady;
@@ -81,14 +84,22 @@ export function PlayerCodes({
   };
 
 
-  // Loading spinner when story is not ready
-  const renderLoadingSpinner = () => {
+  // Loading display when story is not ready
+  const renderLoadingDisplay = () => {
     if (!isReadyToJoin) {
-      return (
-        <div className="mb-4 text-center">
-          <LoadingSpinner message="Creating your story. This may take a few minutes." />
-        </div>
-      );
+      if (showGenerationProgress) {
+        return (
+          <div className="mb-6">
+            <GenerationProgress isVisible={true} templateMode={false} />
+          </div>
+        );
+      } else {
+        return (
+          <div className="mb-4 text-center">
+            <LoadingSpinner message="Creating your story. This may take a few minutes." />
+          </div>
+        );
+      }
     }
     return null;
   };
@@ -123,7 +134,7 @@ export function PlayerCodes({
       )}
       {renderSaveCodesMessage()}
       {renderCodesList()}
-      {renderLoadingSpinner()}
+      {renderLoadingDisplay()}
       {renderBeginButton()}
     </>
   );

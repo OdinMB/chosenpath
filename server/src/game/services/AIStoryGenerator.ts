@@ -4,6 +4,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import type {
   StoryState,
   StorySetupGeneration,
+  TemplateSetupGeneration,
   PlayerOptionsGeneration,
   Change,
   Beat,
@@ -179,6 +180,41 @@ export class AIStoryGenerator {
         return [slot, createEmptyPlayerState(playerData.outcomes)];
       })
     );
+  }
+
+  async generateTemplateSetup(
+    prompt: string,
+    playerCount: PlayerCount,
+    gameMode: GameMode,
+    maxTurns: number
+  ): Promise<TemplateSetupGeneration<typeof playerCount>> {
+    const schema = createStorySetupSchema(playerCount, "template");
+    const structuredModel = this.generationModel.withStructuredOutput(schema);
+
+    try {
+      Logger.Story.log(
+        `Generating template setup with playerCount: ${playerCount}`
+      );
+
+      const setupPrompt = StorySetupPromptService.createSetupPrompt(
+        prompt,
+        playerCount,
+        gameMode,
+        maxTurns
+      );
+
+      const result = await structuredModel.invoke(setupPrompt);
+      Logger.Story.log("Template setup generated");
+
+      // Create a new object without the characterSelectionPlan property
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { characterSelectionPlan, ...templateSetupData } = result;
+
+      return templateSetupData as TemplateSetupGeneration<typeof playerCount>;
+    } catch (error) {
+      Logger.Story.error("Failed to initialize template:", error);
+      throw new Error("Failed to initialize template. Please try again.");
+    }
   }
 
   async generateStorySetup(

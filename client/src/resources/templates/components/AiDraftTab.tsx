@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StoryInitializer } from "page/components/StoryInitializer";
 import { ImageCard } from "shared/components/ImageCard";
 import { PrimaryButton, Icons } from "components/ui";
-import { GameModes, PlayerCount, DifficultyLevel } from "core/types";
+import { GameModes, PlayerCount } from "core/types";
 
 interface AiDraftTabProps {
   isSparse: boolean;
@@ -20,7 +20,6 @@ interface AiDraftTabProps {
     maxTurns: number;
     gameMode: GameModes;
     generateImages: boolean;
-    difficultyLevel?: DifficultyLevel;
   }) => Promise<void>;
   handleAiDraftPromptChange: (prompt: string) => void;
   handleAiDraftPlayerCountChange: (playerCount: PlayerCount) => void;

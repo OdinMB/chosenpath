@@ -632,7 +632,6 @@ router.post(
         maxTurns,
         gameMode,
         generateImages,
-        difficultyLevel,
       } = generateRequest;
 
       if (!prompt || !playerCount || !maxTurns || !gameMode) {
@@ -653,19 +652,12 @@ router.post(
       const creatorId = req.user?.id;
       const creatorUsername = req.user?.username;
 
-      // Provide a default difficulty level if none is specified
-      const finalDifficultyLevel = difficultyLevel || {
-        modifier: 0,
-        title: "Standard Experience",
-      };
-
       const generatedTemplate = await templateService.generateTemplate(
         prompt,
         generateImages || false,
         playerCount,
         maxTurns,
         gameMode,
-        finalDifficultyLevel,
         creatorId,
         creatorUsername,
         req.userPermissions || []

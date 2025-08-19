@@ -21,20 +21,25 @@ npm run dev
 
 ### Testing and Quality
 
-Run ALL checks with one command:
+**IMPORTANT: Always run the comprehensive check from the root directory:**
 
 ```bash
-cd client && npm run check:all
-cd server && npm run check:all
+npm run check:all
 ```
 
-Runs
+This single command from the root directory will:
+1. Build the core module
+2. Run ALL server checks (lint, tests, test linting)
+3. Run ALL client checks (lint, tests, test linting)
 
-1. ESLint on all source files
-2. TypeScript compilation check on all files
-3. Jest unit tests
-4. ESLint on test files
-5. TypeScript compilation check on test files
+Each check includes:
+- ESLint on all source files
+- TypeScript compilation check on all files
+- Jest unit tests
+- ESLint on test files
+- TypeScript compilation check on test files
+
+**Note:** Only use more specific commands when you need to check a very specific thing. In most cases, run the full suite with `npm run check:all` from the root.
 
 ### Installation
 
@@ -190,21 +195,26 @@ tests/
 
 ### Commands
 
-**Complete Quality Check:**
+**Complete Quality Check (from root directory):**
 
 ```bash
-cd client && npm run check:all
-cd server && npm run check:all
+npm run check:all   # Runs ALL checks for core, server, and client
 ```
 
-**Individual Commands (identical for both platforms):**
+**Individual Workspace Checks (only when needed for specific debugging):**
+
+```bash
+cd server && npm run check:all   # Server only
+cd client && npm run check:all   # Client only
+```
+
+**More Granular Commands (when debugging specific issues):**
 
 ```bash
 npm run lint        # ESLint + TypeScript on all source files
 npm test            # Run Jest tests
 npm run test:lint   # ESLint + TypeScript on test files
 npm run test:all    # Tests + test linting
-npm run check:all   # Everything above
 ```
 
 **Run Specific Tests:**
@@ -225,8 +235,8 @@ npm test -- --testPathPattern=fileName.test.ts
 
 1. All new functions, methods, classes, and services MUST have corresponding unit tests
 2. Integration tests should be added for complex workflows involving multiple components
-3. **For comprehensive validation**: Run `npm run check:all` (server and/or client directory). Do this for new features and anything beyond trivial changes.
-4. Even for small changes, run `npm run lint` to catch TypeScript and ESLint issues. **All lint warnings must be fixed**
+3. **For comprehensive validation**: Run `npm run check:all` from the root directory. This is the standard validation for all changes.
+4. **All lint warnings and errors must be fixed** - the check:all command will catch these
 
 ## Development Guidelines
 

@@ -22,7 +22,10 @@
     "install:all": "npm install && npm run install:core && npm run install:server && npm run install:client",
     "install:core": "cd core && npm install",
     "install:server": "cd server && npm install",
-    "install:client": "cd client && npm install"
+    "install:client": "cd client && npm install",
+    "check:all": "npm run build:core && npm run check:server && npm run check:client",
+    "check:server": "cd server && npm run check:all",
+    "check:client": "cd client && npm run check:all"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

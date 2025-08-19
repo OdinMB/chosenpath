@@ -95,7 +95,6 @@ interface TabRendererProps {
     maxTurns: number;
     gameMode: GameMode;
     generateImages: boolean;
-    difficultyLevel?: DifficultyLevel;
   }) => Promise<void>;
   aiDraftPrompt: string;
   aiDraftPlayerCount: PlayerCount | undefined;

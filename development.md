@@ -3,9 +3,6 @@ Smaller commits!
 # NEXT
 
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
-- 1: Teaser should be properly generated, not copy/pasted from user query
-
-- 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
@@ -13,6 +10,7 @@ Smaller commits!
 
 - 2: review process for storytellers who want to publish on website
 - ?: Bild bei Draft mit hochladen (especially for kids stories)
+- 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 
 Browser tests
 
@@ -49,7 +47,6 @@ Focus: Text/Images, English, Multiplayer
 - 1: Export stories
 - ?: Für Worldbuilders: Lizenz-Auswahl
 - 5: Barrierefreiheit (try eye-able.com)
-- 5: Admin: iterate on existing images by using them as reference images (new action icon)
 - 4: Images: thumbnail versions (especially for cover images); load full version in modals
 - 5: Credits system for generating stories
 - 15: Stripe / checkout.com integration

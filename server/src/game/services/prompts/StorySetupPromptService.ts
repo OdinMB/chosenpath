@@ -687,10 +687,20 @@ Outline generic archetypes that the backgrounds could implement and flesh out.
   ): string {
     if (sections.includes("difficultyLevels")) {
       return `Difficulty Levels
-- Define 3 difficulty levels appropriate for the story.
+- Define 3-5 difficulty levels appropriate for the story.
 - Each difficulty level must have a 'modifier' (number between +20 and -20, in steps of 10) and a 'title' (string).
 - The title should be a short, flavorful term that summarizes the difficulty level within the story's setting. Example: For a survival story, a modifier of -20 could be titled "Unforgiving". For a lighthearted adventure, +10 could be "Friendly Jaunt".
 - +10 means that things tend to go well for the player. 0 means that there are some ups and downs, but things will be OK in the end. -10 features frequent failures, and not all goals will be reached. -20 is playing against the odds, with players typically achieving only a few successes throughout the story.
+
+CRITICAL: Match difficulty range to story type:
+- KIDS STORIES / COZY / WHOLESOME / LIGHTHEARTED: Use range from +20 to 0 (easier difficulties)
+- BALANCED / ADVENTURE / MYSTERY: Use range from +10 to -10 (standard balanced range)
+- HORROR / GRIM / DARK / SURVIVAL: Use range from 0 to -20 (harder difficulties)
+
+Examples:
+- A bedtime story about friendly dragons: [+20 "Magical Dreams", +10 "Happy Adventure", 0 "Little Challenge"]
+- A detective mystery: [+10 "Amateur Sleuth", 0 "Professional Detective", -10 "Master Case"]
+- A horror survival game: [0 "Guardian Angel", -10 "Nightmare", -20 "Doom"]
 \n\n`;
     }
     return "";

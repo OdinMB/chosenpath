@@ -59,12 +59,12 @@ export const difficultyLevelSchema = z.object({
   modifier: z
     .number()
     .describe(
-      "Modifier that will be applied to all random number checks in the story. Use steps of 10. Default is 0."
+      "Modifier that will be applied to all random number checks in the story. Must be one of: -20, -10, 0, 10, 20. Use steps of 10. Default is 0."
     ),
   title: z
     .string()
     .describe(
-      "Short term to summarize the difficulty level in a way that works for the story's setting. Examples: 'Friendly' (for a kids story with +20 modifier), 'Unforgiving' (for a survival story with -20 modifier)"
+      "Short, flavorful title for the difficulty level appropriate to the story's setting."
     ),
 });
 export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
@@ -79,7 +79,7 @@ const storyDifficultyModifierSchema = z.union([
 ]);
 const storyDifficultyLevelSchema = z.object({
   modifier: storyDifficultyModifierSchema.describe(
-    "Modifier must be one of: -20, -10, 0, 10, 20. Keep most stories within -10 to +10."
+    "Modifier must be one of: -20, -10, 0, 10, 20. Keep most stories within -10 to +10. Kids stories and cozy slice-of-life stories should be easier (+10/+20). Gritty survival/grueling adventures should be harder (-10/-20)."
   ),
   title: z
     .string()
@@ -158,7 +158,12 @@ export const createStorySetupSchema = (
             difficultyLevels: z
               .array(difficultyLevelSchema)
               .describe(
-                "Array of 1-3 difficulty levels for the template that the player can choose from."
+                "Array of 1-5 difficulty levels for the template that the player can choose from. Each should have a unique title appropriate to this world's setting. Skew the difficulty levels to match the story's tone and setting: kids stories and cozy slice-of-life stories should be easier (+10/+20). Gritty survival/grueling adventures should be harder (-10/-20)."
+              ),
+            teaser: z
+              .string()
+              .describe(
+                "A compelling 1 sentence description that captures the essence and excitement of this world/template. Should intrigue players and make them want to play."
               ),
           }),
       storyElements: StoryElementsSchema,
@@ -205,6 +210,12 @@ export type StorySetupBase<N extends PlayerCount> = {
 export type StorySetupGeneration<N extends PlayerCount> = StorySetupBase<N> & {
   difficultyLevel: DifficultyLevel;
 };
+
+export type TemplateSetupGeneration<N extends PlayerCount> =
+  StorySetupBase<N> & {
+    teaser: string;
+    difficultyLevels: DifficultyLevel[];
+  };
 
 export type StoryTemplate = StorySetupBase<typeof MAX_PLAYERS> & {
   id: string;

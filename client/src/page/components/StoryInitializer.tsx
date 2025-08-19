@@ -6,6 +6,7 @@ import {
   ColoredBox,
   TextArea,
   InfoIcon,
+  LoadingSpinner,
 } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
@@ -329,6 +330,9 @@ export const StoryInitializer = ({
     handleCodeSubmit,
   } = useStoryCreation();
 
+  // Note: Navigation is handled by the "Begin" button in PlayerCodes component
+  // which calls handleCodeSubmit with the correct player code and navigates to /game/{code}
+
   const getPlaceholderText = useCallback(() => {
     if (playerCount === 1) {
       return defaultPlaceholders.singlePlayer;
@@ -626,7 +630,7 @@ export const StoryInitializer = ({
         gameMode,
         generateImages,
         pregenerateBeats: finalPregenerateBeats,
-        difficultyLevel: selectedDifficultyLevel,
+        ...(templateMode ? {} : { difficultyLevel: selectedDifficultyLevel }),
       };
 
       // Check if template is not sparse and show warning
@@ -655,10 +659,7 @@ export const StoryInitializer = ({
           gameMode,
           difficultyLevel: selectedDifficultyLevel,
         });
-
-        if (storyId) {
-          navigate(`/story/${storyId}`);
-        }
+        // Navigation now happens in useEffect when storyReady becomes true
       } catch (error) {
         console.error(error);
         notificationService.addErrorNotification();
@@ -694,7 +695,8 @@ export const StoryInitializer = ({
   };
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
-  const showGenerationProgress = currentIsLoading || debugShowProgress;
+  // Don't show GenerationProgress in renderStep3 if we already have codes (PlayerCodes will handle it)
+  const showGenerationProgress = (currentIsLoading || debugShowProgress) && !(storyId && playerCodes);
 
   if (storyId && playerCodes) {
     return (
@@ -702,6 +704,7 @@ export const StoryInitializer = ({
         codes={playerCodes}
         onCodeSubmit={handleCodeSubmit}
         storyReady={storyReady}
+        showGenerationProgress={!templateMode}
       />
     );
   }
@@ -998,7 +1001,23 @@ export const StoryInitializer = ({
   };
 
   const renderStep3 = () => {
-    // Show generation progress when loading or in debug mode
+    // For story creation mode, if we're loading but don't have codes yet, show minimal loading
+    if (!templateMode && currentIsLoading && !storyId) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center mb-6">
+            <h2 className="text-xl md:text-2xl font-medium text-primary mb-2">
+              Creating your Story...
+            </h2>
+          </div>
+          <div className="flex justify-center">
+            <LoadingSpinner message="Generating your story..." />
+          </div>
+        </div>
+      );
+    }
+
+    // Show generation progress when loading or in debug mode (template mode or debug)
     if (showGenerationProgress) {
       return (
         <div className="space-y-6">
