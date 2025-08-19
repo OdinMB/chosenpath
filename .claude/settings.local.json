@@ -24,7 +24,8 @@
       "Bash(tsc:*)",
       "Bash(eslint:*)",
       "Bash(node:*)",
-      "WebFetch(domain:openai.com)"
+      "WebFetch(domain:openai.com)",
+      "WebSearch"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

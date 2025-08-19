@@ -731,15 +731,15 @@ export const StoryInitializer = ({
         {user && !templateMode && (
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-700">
             <p>
-              This creates a new World and immediately starts a story in it. If
-              you want to edit and share your World, go to{" "}
+              This immediately starts a story in a new World. If you want to
+              edit and share your World, go to{" "}
               <button
                 onClick={() => navigate("/users/my-worlds")}
                 className="text-link underline hover:no-underline"
               >
                 My Worlds
               </button>{" "}
-              and click on "+ New World".
+              and click on "+ New".
             </p>
           </div>
         )}

@@ -143,4 +143,15 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Tooltip styles for colored variants */
+  .bg-accent svg {
+    fill: #01a29d !important;
+    stroke: #01a29d !important;
+  }
+
+  .bg-secondary svg {
+    fill: #000000 !important;
+    stroke: #000000 !important;
+  }
 }
