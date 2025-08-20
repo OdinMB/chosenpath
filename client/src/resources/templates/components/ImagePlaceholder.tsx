@@ -144,7 +144,7 @@ export const ImagePlaceholder: React.FC<ImagePlaceholderProps> = ({
     <div className={containerClass}>
       <button
         onClick={onGenerateClick}
-        className="w-full h-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors group"
+        className="w-full h-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:bg-gray-200 transition-all duration-200 group"
         title="Click to generate an image"
         type="button"
       >

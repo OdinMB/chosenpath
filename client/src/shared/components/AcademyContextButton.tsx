@@ -34,7 +34,7 @@ export const AcademyContextButton: React.FC<AcademyContextButtonProps> = ({
       <button
         type="button"
         onClick={handleOpen}
-        className={`text-blue-500 hover:text-blue-700 ${className}`}
+        className={`text-blue-500 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded p-1 transition-all duration-200 ${className}`}
         aria-label="Open Academy Context"
         title="Learn more"
       >

@@ -763,6 +763,13 @@ export const StoryInitializer = ({
               onClick={() => handleCategoryChange(key as PromptCategory)}
               className="p-0 overflow-hidden cursor-pointer flex flex-col h-full"
               disabled={currentIsLoading}
+              aria-pressed={selectedCategory === key}
+              aria-label={`${config.label} - ${key === "enjoy-fiction" ? "Immersive stories in fictional worlds" : 
+                           key === "vent-about-reality" ? "Satirical scenarios and simulations" :
+                           key === "pretend-to-be" ? "Slice of life stories to promote empathy" :
+                           key === "see-your-future-self" ? "Help for personal decision-making" :
+                           key === "read-with-kids" ? "Age-appropriate adventures" :
+                           key === "learn-something" ? "Educational storytelling" : config.label}`}
             >
               <div className="relative overflow-hidden h-16 sm:h-20">
                 <img

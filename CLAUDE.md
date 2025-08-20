@@ -7,16 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Build Commands
 
 ```bash
-# Build all workspaces from root
-npm run build
-# Development mode (builds core, then runs server + client)
-npm run dev
+npm run build   # Build all workspaces from root. Do NOT use this for lint/TS/test checks
+npm run dev     # Development mode (builds core, then runs server + client). Do NOT use this for checks.
 ```
 
 ### Testing and Quality
 
 ```bash
-npm run check:all   # Comprehensive check: build + lint + tests. Run in root for client+server checks, or in `client` or `server` directory
+npm run check:all   # Comprehensive check: build + lint + tests. Run in root (your default working directory) for client+server checks, or in `client` or `server` directory for more targeted checks.
 npm run lint        # ESLint + TypeScript on all source files
 npm run test:all    # Tests + test linting
 ```

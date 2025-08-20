@@ -85,7 +85,7 @@ export const Modal: React.FC<ModalProps> = ({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="absolute top-3 right-3 bg-white rounded-md shadow p-1 text-gray-700 hover:text-gray-900"
+                className="absolute top-3 right-3 bg-white rounded-md shadow p-1 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset transition-all duration-200"
                 aria-label="Close"
               >
                 <Icons.Close className="h-5 w-5" />
@@ -99,7 +99,7 @@ export const Modal: React.FC<ModalProps> = ({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="text-gray-500 hover:text-gray-700 ml-auto"
+                  className="text-gray-500 hover:text-gray-700 ml-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded p-1 transition-all duration-200"
                   aria-label="Close"
                 >
                   <Icons.Close className="h-5 w-5" />

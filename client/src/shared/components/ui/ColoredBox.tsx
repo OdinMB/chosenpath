@@ -31,7 +31,7 @@ export function ColoredBox<T extends ElementType = "div">({
   ...props
 }: ColoredBoxProps<T>) {
   const baseClasses =
-    "bg-white shadow-md rounded-lg transition-all duration-300";
+    "bg-white shadow-md rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 focus:z-10";
   const disabledClasses = disabled ? "cursor-not-allowed opacity-70" : "";
 
   const getBorderClasses = () => {
@@ -41,29 +41,29 @@ export function ColoredBox<T extends ElementType = "div">({
     // Static classes for color types instead of template literals
     if (isActive) {
       if (colorType === "primary") {
-        return `${borderClass} border-primary-800 hover:enabled:border-primary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+        return `${borderClass} border-primary-800 hover:enabled:border-primary hover:enabled:shadow-lg hover:enabled:translate-x-1 bg-primary-50`;
       } else if (colorType === "secondary") {
-        return `${borderClass} border-secondary-800 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+        return `${borderClass} border-secondary-800 hover:enabled:border-secondary hover:enabled:shadow-lg hover:enabled:translate-x-1 bg-secondary-50`;
       } else if (colorType === "tertiary") {
-        return `${borderClass} border-tertiary-800 hover:enabled:border-tertiary hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+        return `${borderClass} border-tertiary-800 hover:enabled:border-tertiary hover:enabled:shadow-lg hover:enabled:translate-x-1 bg-tertiary-50`;
       } else if (colorType === "accent") {
-        return `${borderClass} border-accent-800 hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+        return `${borderClass} border-accent-800 hover:enabled:border-accent hover:enabled:shadow-lg hover:enabled:translate-x-1 bg-accent-50`;
       } else if (colorType === "grey") {
-        return `${borderClass} border-primary-100 hover:enabled:border-primary-200 hover:enabled:shadow-lg hover:enabled:translate-x-1`;
+        return `${borderClass} border-primary-100 hover:enabled:border-primary-200 hover:enabled:shadow-lg hover:enabled:translate-x-1 bg-gray-50`;
       }
     }
 
     // Non-active state
     if (colorType === "primary") {
-      return `${borderClass} border-primary`;
+      return `${borderClass} border-primary hover:enabled:border-primary-600 hover:enabled:shadow-lg`;
     } else if (colorType === "secondary") {
-      return `${borderClass} border-secondary`;
+      return `${borderClass} border-secondary hover:enabled:border-secondary-600 hover:enabled:shadow-lg`;
     } else if (colorType === "tertiary") {
-      return `${borderClass} border-tertiary`;
+      return `${borderClass} border-tertiary hover:enabled:border-tertiary-600 hover:enabled:shadow-lg`;
     } else if (colorType === "accent") {
-      return `${borderClass} border-accent`;
+      return `${borderClass} border-accent hover:enabled:border-accent-600 hover:enabled:shadow-lg`;
     } else if (colorType === "grey") {
-      return `${borderClass} border-primary-100`;
+      return `${borderClass} border-primary-100 hover:enabled:border-primary-200 hover:enabled:shadow-lg`;
     }
 
     // Fallback to secondary

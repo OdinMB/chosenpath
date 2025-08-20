@@ -156,7 +156,7 @@ You utilize the available tools systematically:
 
 ```bash
 # Comprehensive check
-npm run check:all                    # All workspaces: build, lint, tests
+npm run check:all                    # All workspaces: build, lint, tests. Run in project's root directory (which is also your default working directory)
 
 # Individual workspace checks
 cd server && npm run check:all       # Server only

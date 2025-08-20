@@ -29,8 +29,9 @@ export const Select: React.FC<SelectProps> = ({
       "border-2 border-primary font-medium text-primary bg-white hover:bg-primary/5 shadow-sm",
   };
 
-  // Track the selected text value
+  // Track the selected text value and focus state
   const [selectedText, setSelectedText] = useState<string>(placeholder);
+  const [isFocused, setIsFocused] = useState<boolean>(false);
   const selectRef = useRef<HTMLSelectElement>(null);
 
   // Update the displayed text whenever the select value changes
@@ -47,7 +48,9 @@ export const Select: React.FC<SelectProps> = ({
       {/* The actual select element with native browser behavior */}
       <select
         ref={selectRef}
-        className={`w-full h-full absolute inset-0 opacity-0 cursor-pointer z-10`}
+        className={`w-full h-full absolute inset-0 opacity-0 cursor-pointer z-10 focus:outline-none`}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         onChange={(e) => {
           if (props.onChange) {
             props.onChange(e);
@@ -62,7 +65,9 @@ export const Select: React.FC<SelectProps> = ({
 
       {/* Custom styled display that looks like a select */}
       <div
-        className={`rounded transition-colors ${sizeClasses[size]} ${variantClasses[variant]} ${className} relative`}
+        className={`rounded transition-colors ${sizeClasses[size]} ${variantClasses[variant]} ${className} relative ${
+          isFocused ? 'ring-2 ring-secondary-500 ring-offset-2' : ''
+        }`}
       >
         {/* Text display */}
         <span className="block truncate pr-8">{selectedText}</span>

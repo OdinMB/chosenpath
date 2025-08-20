@@ -46,8 +46,8 @@ export const Tabs = <T extends string>({
                 <button
                   key={tab.id}
                   type="button"
-                  className={`text-slate-700 hover:text-primary-600 py-1 ${
-                    activeTab === tab.id ? "font-semibold text-primary-700" : ""
+                  className={`text-slate-700 hover:text-primary-600 py-1 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset rounded transition-all duration-200 ${
+                    activeTab === tab.id ? "font-semibold text-primary-700 bg-primary-50" : ""
                   }`}
                   onClick={() => onTabChange(tab.id)}
                 >
@@ -142,8 +142,8 @@ export const Tabs = <T extends string>({
           } ${collapsedSelectSpacingClass}`}
         >
           <select
-            aria-label="Tab selector"
-            className="block w-full rounded-md border-2 border-secondary-300 bg-white py-2.5 px-3 text-sm font-semibold text-secondary-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-300 cursor-pointer"
+            aria-label="Select tab to navigate"
+            className="block w-full rounded-md border-2 border-secondary-300 bg-white py-2.5 px-3 text-sm font-semibold text-secondary-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-inset cursor-pointer transition-all duration-200"
             value={activeTab as string}
             onChange={(e) => onTabChange(e.target.value as T)}
           >
@@ -174,13 +174,17 @@ export const Tabs = <T extends string>({
             <div key={tab.id} className="relative">
               <button
                 type="button"
-                className={`$${tab.category ? "" : ""} ${
+                className={`${tab.category ? "" : ""} ${
                   tab.category
                     ? getTabStyles(tab.category)
                     : getLegacyTabStyles(activeTab === tab.id)
-                } flex-shrink-0`}
+                } flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-inset focus:z-10 transition-all duration-200 relative ${
+                  activeTab === tab.id ? 'z-10' : 'z-0'
+                }`}
                 onMouseEnter={() => setHoveredTab(tab.id)}
                 onMouseLeave={() => setHoveredTab(null)}
+                onFocus={() => setHoveredTab(tab.id)}
+                onBlur={() => setHoveredTab(null)}
                 onClick={() => onTabChange(tab.id)}
               >
                 {tab.label}
