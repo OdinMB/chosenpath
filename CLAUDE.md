@@ -16,11 +16,13 @@ See `/.cursor/rules/testing.mdc` for detailed testing commands and patterns.
 
 ### Quick Code Review
 
-AFTER making code changes, run a quick validation:
+After making code changes, always run a quick validation:
 
 1. **Run checks** - Check for ESLint / TS / test issues. When in doubt, use check:all in the `client` or `server` directory, or in root to check both.
 2. **Verify functionality** - Test the specific feature/fix you implemented
 3. **Check for obvious issues** - Review your changes for common problems
+
+Having to remind you about lint issues is one of the most common interruptions in our workflow. Always identify and fix lint issues yourself before you treat a task as completed.
 
 ### Comprehensive Code Review
 
@@ -34,7 +36,7 @@ Take project-specific requirements into account: `.cursor/rules/testing.mdc`.
 
 ### Quick Visual Check
 
-IMMEDIATELY after implementing any front-end change:
+After implementing any front-end change and in addition to the code checks, also perform a visual check:
 
 1. **Identify what changed** - Review the modified components/pages
 2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view

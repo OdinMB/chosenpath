@@ -2,7 +2,7 @@ import { LoaderFunctionArgs } from "react-router-dom";
 import { Logger } from "../../shared/logger";
 import { TemplateMetadata } from "core/types";
 import { groupTagsByCategories } from "../../resources/templates/tagCategories";
-import { templateApi } from "../../resources/templates/templateApi.js";
+import { templateCache } from "../../resources/templates/templateCache";
 
 interface LibraryLoaderData {
   templates: TemplateMetadata[];
@@ -32,8 +32,8 @@ export async function libraryLoader({
   // );
 
   try {
-    // Fetch template metadata based on context
-    const templates = await templateApi.getPublishedTemplateMetadata(
+    // Fetch template metadata using cache
+    const templates = await templateCache.getPublishedTemplates(
       isWelcomeScreen
     );
 

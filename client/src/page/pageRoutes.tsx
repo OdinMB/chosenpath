@@ -1,6 +1,5 @@
 import { RouteObject } from "react-router-dom";
 import { Page } from "./Page";
-import { templatesLoader } from "../resources/templates/loaders/templatesLoader";
 import { configurableTemplateLoader } from "../resources/templates/loaders/templateLoader";
 import { TemplateErrorBoundary } from "./TemplateErrorBoundary";
 import { LibraryBrowser } from "./components/LibraryBrowser";
@@ -29,11 +28,6 @@ export const pageRoutes: RouteObject[] = [
     children: [
       {
         path: "/",
-        loader: async () =>
-          templatesLoader({
-            context: "published",
-            forWelcomeScreen: true,
-          }),
         element: <Page />,
         id: "welcome",
       },

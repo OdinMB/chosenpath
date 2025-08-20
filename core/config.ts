@@ -95,6 +95,9 @@ export const RATE_LIMITS: Record<
   },
 };
 
+// Template caching configuration
+export const TEMPLATE_CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
 // WebSocket keep-alive configuration
 export const SOCKET_CONFIG = {
   // Client-side configuration
