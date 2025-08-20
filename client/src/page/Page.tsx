@@ -13,6 +13,8 @@ export function Page() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [showResumableSection, setShowResumableSection] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { user } = useAuth();
   const previousUserIdRef = useRef<string | undefined | null>(user?.id);
 
@@ -24,14 +26,53 @@ export function Page() {
     previousUserIdRef.current = currentUserId;
   }, [user?.id]);
 
-  const handleJoinGame = (e: React.FormEvent) => {
+  const validateCodeFormat = (inputCode: string): boolean => {
+    const trimmedCode = inputCode.trim();
+    // Story codes are exactly 6 alphanumeric characters (0-9, A-Z)
+    // NOTE: This validation must match code generation in server/src/stories/StoryCreationService.ts (generatePlayerCodes method)
+    return trimmedCode.length === 6 && /^[A-Z0-9]+$/.test(trimmedCode);
+  };
+
+  const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) return;
-    navigate(`/game/${code}`);
+    const trimmedCode = code.trim();
+    
+    if (!trimmedCode) return;
+    
+    if (!validateCodeFormat(trimmedCode)) {
+      setValidationError("Code must be exactly 6 characters and contain only letters and numbers");
+      return;
+    }
+
+    setIsValidating(true);
+    setValidationError(null);
+
+    try {
+      const response = await fetch(`/api/stories/${trimmedCode}/exists`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setValidationError("Story code not found. Please check the code and try again.");
+          return;
+        }
+        throw new Error("Failed to validate story code");
+      }
+
+      navigate(`/game/${trimmedCode}`);
+    } catch {
+      setValidationError("Unable to validate code. Please try again.");
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCode(e.target.value.toUpperCase());
+    const newValue = e.target.value.toUpperCase();
+    setCode(newValue);
+    
+    if (validationError) {
+      setValidationError(null);
+    }
   };
 
   // Navigate to setup page for new story
@@ -211,22 +252,52 @@ export function Page() {
 
           {/* Join game */}
           <form onSubmit={handleJoinGame} className="space-y-4">
-            <div className="flex flex-row gap-3 w-full">
-              <input
-                id="code"
-                type="text"
-                value={code}
-                onChange={handleInputChange}
-                className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm placeholder-primary-400"
-                placeholder="Story code"
-              />
-              <PrimaryButton
-                type="submit"
-                disabled={!code.trim()}
-                className="whitespace-nowrap min-w-[90px]"
-              >
-                Join Game
-              </PrimaryButton>
+            <div className="space-y-2">
+              <div className="flex flex-row gap-3 w-full">
+                <div className="flex-grow min-w-0 relative">
+                  <input
+                    id="code"
+                    type="text"
+                    value={code}
+                    onChange={handleInputChange}
+                    className={`w-full h-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white text-primary shadow-sm placeholder-primary-400 ${
+                      validationError 
+                        ? "border-red-300" 
+                        : code.trim() && validateCodeFormat(code.trim())
+                        ? "border-green-300"
+                        : "border-primary-100"
+                    }`}
+                    placeholder="Story code"
+                    disabled={isValidating}
+                  />
+                  {code.trim() && validateCodeFormat(code.trim()) && !validationError && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <PrimaryButton
+                  type="submit"
+                  disabled={!code.trim() || !validateCodeFormat(code.trim()) || isValidating}
+                  className="whitespace-nowrap min-w-[90px] relative"
+                >
+                  {isValidating ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Joining...</span>
+                    </div>
+                  ) : (
+                    "Join Game"
+                  )}
+                </PrimaryButton>
+              </div>
+              {validationError && (
+                <p className="text-red-600 text-sm px-1">
+                  {validationError}
+                </p>
+              )}
             </div>
           </form>
         </div>

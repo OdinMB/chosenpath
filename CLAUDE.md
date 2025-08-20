@@ -4,13 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Build Commands
-
-```bash
-npm run build   # Build all workspaces from root. Do NOT use this for lint/TS/test checks
-npm run dev     # Development mode (builds core, then runs server + client). Do NOT use this for checks.
-```
-
 ### Testing and Quality
 
 ```bash

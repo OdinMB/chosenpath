@@ -16,7 +16,6 @@ A multiplayer interactive fiction game powered by AI that generates unique story
 
 ```bash
 git clone <repository-url>
-cd ai-story-game
 npm run install:all
 ```
 

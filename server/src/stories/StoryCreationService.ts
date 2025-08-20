@@ -46,7 +46,8 @@ export class StoryCreationService {
     );
 
     playerSlots.forEach((slot) => {
-      // Generate a random 6-character code
+      // Generate a random 6-character alphanumeric code (0-9, A-Z)
+      // NOTE: If you change this format, also update validation in client/src/page/Page.tsx (validateCodeFormat function)
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       codes[slot] = code;
     });
