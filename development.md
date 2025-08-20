@@ -14,7 +14,7 @@ Smaller commits!
 
 Browser tests
 
-- 1: why does Safari not show images in template editor?
+- check if solved: Safari doesn't show category images
 - 1: why does Brave browser not respect background color?
 - 1: Brave doesn't break up paragraphs in frontend fix logic
 

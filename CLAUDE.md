@@ -14,6 +14,8 @@ npm run test:all    # Tests + test linting
 
 See `/.cursor/rules/testing.mdc` for detailed testing commands and patterns.
 
+Don't use `npm run dev`. The site is already available on localhost:5173, and the server is already running on :3000.
+
 ### Quick Code Review
 
 After making code changes, always run a quick validation:

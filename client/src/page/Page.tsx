@@ -184,7 +184,7 @@ export function Page() {
             <strong>Everything is free during the beta phase.</strong>
           </p>
           <p>
-            Share your feedback, and say hello on{" "}
+            Jump in, share your feedback, and say hello on{" "}
             <a
               href={config.discordUrl}
               target="_blank"

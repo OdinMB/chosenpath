@@ -174,9 +174,10 @@ export const StoryCard = ({
           {story.title}
         </h3>
 
-        <div className="flex flex-col gap-1 text-primary-500 mb-3">
-          <div className="flex items-center flex-wrap justify-between">
-            <div className="flex items-center flex-wrap">
+        <div className="flex flex-col gap-2 text-primary-500 mb-3">
+          {/* Mobile layout - separate rows */}
+          <div className="flex items-center justify-between sm:hidden">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`${sizeClasses.info} font-semibold`}>
                 {typeof story.currentBeat === "number"
                   ? `${story.currentBeat} / `
@@ -184,7 +185,88 @@ export const StoryCard = ({
                 {story.maxTurns} turns
               </span>
               {story.difficultyLevel && (
-                <span className="flex items-center ml-3">
+                <span className="flex items-center">
+                  <span className={`${sizeClasses.info} font-semibold mr-1`}>
+                    {story.difficultyLevel.title}
+                  </span>
+                  <InfoIcon
+                    tooltipText={getDifficultyDescription(
+                      story.difficultyLevel.modifier
+                    )}
+                    position="top"
+                    className="mb-1"
+                  />
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Mobile: Show last played as text and actions */}
+          <div className="flex items-center justify-between sm:hidden">
+            <span className={`${sizeClasses.info} text-primary-400`}>
+              {lastPlayedTime === "Never played" ? "Never played" : `Played ${lastPlayedTime}`}
+            </span>
+            {(onDelete ||
+              (onArchive && user && !showArchivedContent) ||
+              (onResume && showArchivedContent)) &&
+              (story.creatorId === user?.id ||
+                (user &&
+                  story.players.some(
+                    (p) =>
+                      p.userId === user.id &&
+                      (showArchivedContent
+                        ? p.status === "archived"
+                        : p.status === "active")
+                  ))) && (
+                <div className="flex gap-2">
+                  {showArchivedContent && onResume && user && (
+                    <Tooltip content="Resume story" position="top">
+                      <button
+                        onClick={handleResume}
+                        className="text-green-600 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded p-1 flex items-center"
+                        aria-label="Resume story"
+                      >
+                        <Icons.Refresh className="h-5 w-5" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {!showArchivedContent && onArchive && user && (
+                    <Tooltip content="Archive story" position="top">
+                      <button
+                        onClick={handleArchive}
+                        className="text-orange-600 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 rounded p-1 flex items-center"
+                        aria-label="Archive story"
+                      >
+                        <Icons.Download className="h-5 w-5" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {onDelete && (
+                    <Tooltip content="Delete story" position="top">
+                      <button
+                        onClick={handleDelete}
+                        className="text-red-600 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded p-1 flex items-center"
+                        aria-label="Delete story"
+                      >
+                        <Icons.Trash className="h-5 w-5" />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
+          </div>
+
+          {/* Desktop/tablet layout - single row */}
+          <div className="hidden sm:flex sm:items-center sm:justify-between">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+              <span className={`${sizeClasses.info} font-semibold`}>
+                {typeof story.currentBeat === "number"
+                  ? `${story.currentBeat} / `
+                  : ""}
+                {story.maxTurns} turns
+              </span>
+              {story.difficultyLevel && (
+                <span className="flex items-center">
                   <span className={`${sizeClasses.info} font-semibold mr-2`}>
                     {story.difficultyLevel.title}
                   </span>
@@ -200,7 +282,7 @@ export const StoryCard = ({
               <InfoIcon
                 tooltipText={infoTooltip}
                 position="top"
-                className="ml-4 mb-1"
+                className="mb-1"
                 icon={Icons.Clock}
               />
             </div>
@@ -217,12 +299,12 @@ export const StoryCard = ({
                         ? p.status === "archived"
                         : p.status === "active")
                   ))) && (
-                <div className="flex gap-2 ml-2">
+                <div className="flex gap-2">
                   {showArchivedContent && onResume && user && (
                     <Tooltip content="Resume story" position="top">
                       <button
                         onClick={handleResume}
-                        className="text-green-600 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded flex items-center"
+                        className="text-green-600 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded p-1 flex items-center"
                         aria-label="Resume story"
                       >
                         <Icons.Refresh className="h-4 w-4" />
@@ -233,7 +315,7 @@ export const StoryCard = ({
                     <Tooltip content="Archive story" position="top">
                       <button
                         onClick={handleArchive}
-                        className="text-orange-600 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 rounded flex items-center"
+                        className="text-orange-600 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 rounded p-1 flex items-center"
                         aria-label="Archive story"
                       >
                         <Icons.Download className="h-4 w-4" />
@@ -244,7 +326,7 @@ export const StoryCard = ({
                     <Tooltip content="Delete story" position="top">
                       <button
                         onClick={handleDelete}
-                        className="text-red-600 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded flex items-center"
+                        className="text-red-600 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded p-1 flex items-center"
                         aria-label="Delete story"
                       >
                         <Icons.Trash className="h-4 w-4" />
@@ -284,7 +366,7 @@ export const StoryCard = ({
               return (
                 <div
                   key={player.playerSlot}
-                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 items-center"
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 sm:gap-x-3 items-center"
                 >
                   <span
                     className={`font-medium text-primary-600 ${nameFontSizeClass} truncate`}
@@ -299,7 +381,7 @@ export const StoryCard = ({
                       <span className="text-red-600 text-xs ml-1">(left)</span>
                     )}
                   </span>
-                  <div className="text-xs text-left w-[70px]">
+                  <div className="text-xs text-left w-[65px] sm:w-[70px]">
                     {isMultiplayerStory &&
                       player.isPending &&
                       player.status === "active" && (
@@ -313,7 +395,7 @@ export const StoryCard = ({
                       </span>
                     )}
                   </div>
-                  <div className="md:pl-2">
+                  <div className="sm:pl-1 md:pl-2">
                     <PlayerCode
                       code={player.code}
                       size="sm"
