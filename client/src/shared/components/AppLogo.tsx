@@ -18,8 +18,18 @@ export function AppLogo({
 
   return (
     <div
-      className={`text-center ${className} ${onClick ? "cursor-pointer" : ""}`}
+      className={`text-center ${className} ${onClick ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded" : ""}`}
       onClick={onClick}
+      {...(onClick && {
+        tabIndex: 0,
+        role: "button",
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }
+      })}
     >
       <div className="inline-block">
         <img

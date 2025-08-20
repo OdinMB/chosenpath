@@ -210,7 +210,7 @@ export function FeedbackModal({
             {mode === "story-beat" ? "Comments (optional)" : "Your feedback"}
           </label>
           <textarea
-            className="w-full border rounded-lg p-2 h-24 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
+            className="w-full border rounded-lg p-2 h-24 border-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="The good, the bad, ..."
@@ -225,7 +225,7 @@ export function FeedbackModal({
             </label>
             <input
               type="text"
-              className="w-full border rounded-lg p-2 border-primary-100 focus:ring-2 focus:ring-accent focus:border-accent"
+              className="w-full border rounded-lg p-2 border-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent"
               value={contactInfo}
               onChange={(e) => setContactInfo(e.target.value)}
             />

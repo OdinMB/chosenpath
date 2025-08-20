@@ -12,7 +12,15 @@ export function CategoryTile({ image, title, mobileTitle, onClick }: CategoryTil
   return (
     <div
       onClick={onClick}
-      className="cursor-pointer overflow-hidden bg-white flex flex-col h-full"
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="cursor-pointer overflow-hidden bg-white flex flex-col h-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
     >
       <div className="relative overflow-hidden h-20">
         <img

@@ -70,7 +70,7 @@ export function LoginForm({
           <input
             id="email"
             type="email"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your email"
@@ -89,7 +89,7 @@ export function LoginForm({
           <input
             id="password"
             type="password"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Your password"
@@ -102,7 +102,7 @@ export function LoginForm({
           <input
             id="rememberMe"
             type="checkbox"
-            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+            className="h-4 w-4 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent border-gray-300 rounded"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={isLoading}

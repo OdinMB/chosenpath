@@ -243,8 +243,8 @@ export function RegisterForm({
 
   const getInputBorderClass = (fieldName: string) => {
     return fieldError === fieldName
-      ? "border-red-500 ring-red-500"
-      : "border-gray-300 focus:ring-primary";
+      ? "border-red-500 focus:ring-offset-2 focus:ring-red-500"
+      : "border-gray-300 focus:ring-offset-2 focus:ring-accent focus:border-accent";
   };
 
   const renderPasswordCriteria = () => (

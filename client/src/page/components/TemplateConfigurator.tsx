@@ -287,7 +287,7 @@ export function TemplateConfigurator() {
                   type="checkbox"
                   checked={generateImages}
                   onChange={(e) => setGenerateImages(e.target.checked)}
-                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
                   disabled={isLoading}
                 />
                 <label
@@ -310,7 +310,7 @@ export function TemplateConfigurator() {
                   type="checkbox"
                   checked={pregenerateBeats}
                   onChange={(e) => setPregenerateBeats(e.target.checked)}
-                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                  className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
                   disabled={
                     isLoading ||
                     (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)

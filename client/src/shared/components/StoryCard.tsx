@@ -222,7 +222,7 @@ export const StoryCard = ({
                     <Tooltip content="Resume story" position="top">
                       <button
                         onClick={handleResume}
-                        className="text-green-600 hover:text-green-700 focus:outline-none flex items-center"
+                        className="text-green-600 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 rounded flex items-center"
                         aria-label="Resume story"
                       >
                         <Icons.Refresh className="h-4 w-4" />
@@ -233,7 +233,7 @@ export const StoryCard = ({
                     <Tooltip content="Archive story" position="top">
                       <button
                         onClick={handleArchive}
-                        className="text-orange-600 hover:text-orange-700 focus:outline-none flex items-center"
+                        className="text-orange-600 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 rounded flex items-center"
                         aria-label="Archive story"
                       >
                         <Icons.Download className="h-4 w-4" />
@@ -244,7 +244,7 @@ export const StoryCard = ({
                     <Tooltip content="Delete story" position="top">
                       <button
                         onClick={handleDelete}
-                        className="text-red-600 hover:text-red-700 focus:outline-none flex items-center"
+                        className="text-red-600 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded flex items-center"
                         aria-label="Delete story"
                       >
                         <Icons.Trash className="h-4 w-4" />

@@ -16,7 +16,7 @@ npm run dev
 ### Testing and Quality
 
 ```bash
-npm run check:all   # Comprehensive check: build + lint + tests (all workspaces)
+npm run check:all   # Comprehensive check: build + lint + tests. Run in root for client+server checks, or in `client` or `server` directory
 npm run lint        # ESLint + TypeScript on all source files
 npm run test:all    # Tests + test linting
 ```
@@ -27,7 +27,7 @@ See `/.cursor/rules/testing.mdc` for detailed testing commands and patterns.
 
 AFTER making code changes, run a quick validation:
 
-1. **Run checks** - Check for ESLint / TS / test issues. When in doubt, use check:all.
+1. **Run checks** - Check for ESLint / TS / test issues. When in doubt, use check:all in the `client` or `server` directory, or in root to check both.
 2. **Verify functionality** - Test the specific feature/fix you implemented
 3. **Check for obvious issues** - Review your changes for common problems
 

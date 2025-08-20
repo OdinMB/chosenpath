@@ -923,7 +923,7 @@ export const StoryInitializer = ({
                   setGenerateImages(e.target.checked);
                   updateURLParams({ images: e.target.checked });
                 }}
-                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
                 disabled={currentIsLoading}
               />
               <label
@@ -943,7 +943,7 @@ export const StoryInitializer = ({
                   setPregenerateBeats(e.target.checked);
                   updateURLParams({ pregenerate: e.target.checked });
                 }}
-                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:ring-accent"
+                className="h-5 w-5 md:h-6 md:w-6 rounded border-primary-100 text-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
                 disabled={
                   currentIsLoading ||
                   (DISABLE_PREGENERATION_FOR_MULTIPLAYER && playerCount >= 2)
@@ -1122,7 +1122,7 @@ export const StoryInitializer = ({
                                 e.target.value
                               )
                             }
-                            className="flex-1 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            className="flex-1 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white"
                             placeholder={field.placeholder}
                             disabled={currentIsLoading}
                           />
@@ -1145,7 +1145,7 @@ export const StoryInitializer = ({
                                 e.target.value
                               )
                             }
-                            className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            className="w-full sm:w-32 rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white"
                             placeholder={field.placeholder}
                             disabled={currentIsLoading}
                           />
@@ -1167,7 +1167,7 @@ export const StoryInitializer = ({
                                 e.target.value
                               )
                             }
-                            className="min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                            className="min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white"
                             placeholder={field.placeholder}
                             disabled={currentIsLoading}
                             autoHeight
@@ -1207,7 +1207,7 @@ export const StoryInitializer = ({
                 id="prompt"
                 value={prompt}
                 onChange={handlePromptChange}
-                className={`min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent bg-white`}
+                className={`min-h-[60px] sm:min-h-[48px] rounded-lg border border-primary-100 shadow-sm px-3 md:px-4 py-2 md:py-3 text-base md:text-lg text-primary placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent bg-white`}
                 placeholder={(() => {
                   if (
                     selectedCategory === "enjoy-fiction" ||

@@ -70,7 +70,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
       colorType={variant === "outline" ? "primary" : "secondary"}
       disabled={disabled || isLoading}
       className={`
-        font-medium focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50
+        font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent
         ${getSizeClasses()}
         ${getVariantClasses()}
         ${getTextAlignClasses()}

@@ -105,7 +105,7 @@ export function Page() {
                 e.preventDefault();
                 navigate("/academy/story-engine-not-writing-tool");
               }}
-              className="text-link"
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
               Story Engine
             </a>
@@ -118,7 +118,7 @@ export function Page() {
                 e.preventDefault();
                 navigate("/users/signin");
               }}
-              className="text-link"
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
               Sign in
             </a>{" "} */}{" "}
@@ -129,7 +129,7 @@ export function Page() {
                 e.preventDefault();
                 navigate("/academy");
               }}
-              className="text-link"
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
               Worldbuilding Academy
             </a>{" "}
@@ -142,7 +142,7 @@ export function Page() {
               href={config.discordUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-link"
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
               Discord
             </a>
@@ -217,7 +217,7 @@ export function Page() {
                 type="text"
                 value={code}
                 onChange={handleInputChange}
-                className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm placeholder-primary-400"
+                className="flex-grow min-w-0 h-10 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent border-primary-100 bg-white text-primary shadow-sm placeholder-primary-400"
                 placeholder="Story code"
               />
               <PrimaryButton

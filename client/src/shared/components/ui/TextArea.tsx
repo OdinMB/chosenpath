@@ -136,7 +136,7 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
           id={inputId}
           name={name || inputId}
           rows={autoHeight ? 1 : rows}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary ${
+          className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:border-accent ${
             autoHeight ? "resize-none overflow-hidden" : ""
           } ${className}`}
           onInput={handleInput}

@@ -60,7 +60,7 @@ export const DifficultySlider: React.FC<DifficultySliderProps> = ({
         step={1}
         value={currentSliderValue}
         onChange={handleSliderChange}
-        className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary"
+        className="w-full h-2 bg-secondary-100 rounded-lg appearance-none cursor-pointer touch-pan-x accent-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
         disabled={disabled}
       />
       <div className="flex justify-between text-xs md:text-sm text-primary-600 mt-2">
