@@ -6,9 +6,6 @@ interface CategoryTileProps {
 }
 
 export function CategoryTile({ image, title, mobileTitle, onClick }: CategoryTileProps) {
-  // The percentage to offset from the top
-  const topOffset = "15%";
-
   return (
     <div
       onClick={onClick}
@@ -26,12 +23,7 @@ export function CategoryTile({ image, title, mobileTitle, onClick }: CategoryTil
         <img
           src={image}
           alt={title}
-          className="absolute w-full h-auto min-h-full transition-transform duration-500 hover:scale-110"
-          style={{
-            objectFit: "cover",
-            top: `-${topOffset}`,
-            left: 0,
-          }}
+          className="category-tile-image"
         />
       </div>
       <div className="p-1.5 text-center font-medium text-primary-700">

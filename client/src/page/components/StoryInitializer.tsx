@@ -696,7 +696,8 @@ export const StoryInitializer = ({
 
   const currentIsLoading = templateMode ? externalIsLoading : internalIsLoading;
   // Don't show GenerationProgress in renderStep3 if we already have codes (PlayerCodes will handle it)
-  const showGenerationProgress = (currentIsLoading || debugShowProgress) && !(storyId && playerCodes);
+  const showGenerationProgress =
+    (currentIsLoading || debugShowProgress) && !(storyId && playerCodes);
 
   if (storyId && playerCodes) {
     return (
@@ -764,23 +765,27 @@ export const StoryInitializer = ({
               className="p-0 overflow-hidden cursor-pointer flex flex-col h-full"
               disabled={currentIsLoading}
               aria-pressed={selectedCategory === key}
-              aria-label={`${config.label} - ${key === "enjoy-fiction" ? "Immersive stories in fictional worlds" : 
-                           key === "vent-about-reality" ? "Satirical scenarios and simulations" :
-                           key === "pretend-to-be" ? "Slice of life stories to promote empathy" :
-                           key === "see-your-future-self" ? "Help for personal decision-making" :
-                           key === "read-with-kids" ? "Age-appropriate adventures" :
-                           key === "learn-something" ? "Educational storytelling" : config.label}`}
+              aria-label={`${config.label} - ${
+                key === "enjoy-fiction"
+                  ? "Unique fictional worlds"
+                  : key === "vent-about-reality"
+                  ? "Satirical scenarios and simulations"
+                  : key === "pretend-to-be"
+                  ? "Realistic slice of life stories"
+                  : key === "see-your-future-self"
+                  ? "Help for personal decision-making"
+                  : key === "read-with-kids"
+                  ? "Age-appropriate adventures"
+                  : key === "learn-something"
+                  ? "Educational storytelling"
+                  : config.label
+              }`}
             >
               <div className="relative overflow-hidden h-16 sm:h-20">
                 <img
                   src={categoryImages[key as PromptCategory]}
                   alt={config.label}
-                  className="absolute w-full h-auto min-h-full transition-transform duration-300 hover:scale-110"
-                  style={{
-                    objectFit: "cover",
-                    top: "-15%",
-                    left: 0,
-                  }}
+                  className="category-tile-image"
                 />
               </div>
               <div className="p-1.5 sm:p-2 text-center">
@@ -794,12 +799,10 @@ export const StoryInitializer = ({
                 </span>
                 {/* Short description for each tile */}
                 <p className="text-xs text-primary-600 mt-1 px-1 block">
-                  {key === "enjoy-fiction" &&
-                    "Immersive stories in fictional worlds"}
+                  {key === "enjoy-fiction" && "Unique fictional worlds"}
                   {key === "vent-about-reality" &&
                     "Satirical scenarios and simulations"}
-                  {key === "pretend-to-be" &&
-                    "Slice of life stories to promote empathy"}
+                  {key === "pretend-to-be" && "Realistic slice of life stories"}
                   {key === "see-your-future-self" &&
                     "Help for personal decision-making"}
                   {key === "read-with-kids" && "Age-appropriate adventures"}

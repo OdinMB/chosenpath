@@ -144,6 +144,52 @@
     scrollbar-width: none;
   }
 
+  /* Safari-compatible category image positioning */
+  .category-tile-image {
+    position: absolute;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    object-fit: cover;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.3s ease;
+  }
+
+  /* Mobile screens (default) - centered */
+  @media (max-width: 639px) {
+    .category-tile-image {
+      transform: translateY(-50%);
+    }
+    
+    .category-tile-image:hover {
+      transform: translateY(-50%) scale(1.1);
+    }
+  }
+
+  /* Medium screens (sm breakpoint) - show more of the top */
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .category-tile-image {
+      transform: translateY(-40%);
+    }
+    
+    .category-tile-image:hover {
+      transform: translateY(-40%) scale(1.1);
+    }
+  }
+
+  /* Large screens (lg breakpoint and up) - show even more of the top */
+  @media (min-width: 1024px) {
+    .category-tile-image {
+      transform: translateY(-35%);
+    }
+    
+    .category-tile-image:hover {
+      transform: translateY(-35%) scale(1.1);
+    }
+  }
+
   /* Tooltip styles for colored variants */
   .bg-accent svg {
     fill: #01a29d !important;
