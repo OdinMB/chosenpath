@@ -1,0 +1,69 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+### Testing Commands
+
+**Comprehensive check from the root directory:**
+
+```bash
+npm run check:all
+```
+
+This single command from the root directory will:
+
+1. Build the core module
+2. Run ALL server checks (lint, tests, test linting)
+3. Run ALL client checks (lint, tests, test linting)
+
+Each check includes:
+
+- ESLint on all source and test files
+- TypeScript compilation check on all source and test files
+- Jest unit tests
+
+**Note:** Only use more specific commands when you need to check a very specific thing. In most cases, run the full suite with `npm run check:all` from the root.
+
+**Individual Workspace Checks (only when needed for specific debugging):**
+
+```bash
+cd server && npm run check:all   # Server only
+cd client && npm run check:all   # Client only
+```
+
+**More Granular Commands (when debugging specific issues):**
+
+```bash
+npm run lint        # ESLint + TypeScript on all source files
+npm test            # Run Jest tests
+npm run test:lint   # ESLint + TypeScript on test files
+npm run test:all    # Tests + test linting
+```
+
+**Run Specific Tests:**
+
+```bash
+npm test -- --testPathPattern=fileName.test.ts
+```
+
+**All lint warnings and errors must be fixed.** Run `npm run check:all` after making changes to catch issues early.
+
+### Directory Structure
+
+```
+tests/
+├── unit/           # Unit tests for individual components
+├── integration/    # Integration tests for multiple components
+├── __mocks__/      # Mock implementations
+└── helpers/        # Test utilities and helpers
+```
+
+### Test File Conventions
+
+- **Naming**: Use `.test.ts` suffix for all test files
+- **Location**: Both server and client use unit/integration subdirectories
+- **Imports**: Use relative paths in test files (e.g., `'../../../../src/module'`)
+- **Path Aliases**: Source files can use path aliases - Jest resolves them automatically
+- **Mock Data**: Use existing mock story state from `/server/tests/__mocks__/game/services/AIStoryGenerator.ts` - contains `createMockStoryState()` function for consistent test data

@@ -1,11 +1,222 @@
 ---
-description: 
-globs: 
+description: UI Component Style Guide and Usage Patterns
+globs:
 alwaysApply: false
 ---
-# UI
 
-- UI elements ([index.ts](mdc:client/src/shared/components/ui/index.ts)) are in the client/shared/components/ui directory. Import from 'components/ui' (using directory aliases)
-- Particularly relevant: PrimaryButton for buttons and [Modal.tsx](mdc:client/src/shared/components/ui/Modal.tsx) for modals.
-- Design conventions are in [tailwind.config.js](mdc:client/tailwind.config.js)
-- All icons must be stored in and consumed via components/ui/Icons.tsx
+# UI Style Guide
+
+## Component Library Location
+
+All UI components are in `/client/src/shared/components/ui/`
+Import using: `import { ComponentName } from 'components/ui'`
+
+## Core Design System
+
+### Color Palette
+
+```typescript
+// Primary Colors (defined in tailwind.config.js)
+primary: '#000000'      // Black - text
+secondary: '#1E4999'    // Dark blue - main brand; links, interactive
+tertiary: '#FF6B6B'     // Red - errors, warnings
+accent: '#01A29D'       // Green - success, CTAs
+
+// Usage in Tailwind
+text-primary, bg-secondary, border-accent, etc.
+// With opacity: text-primary-500, bg-secondary-200
+```
+
+### Typography
+
+```typescript
+// Font Families
+font-lora          // Serif - story content, narrative text
+font-montserrat    // Sans-serif - UI elements, controls
+
+// Font Sizes (Tailwind defaults)
+text-xs, text-sm, text-base, text-lg, text-xl, text-2xl
+
+// Font Weights
+font-normal (400), font-medium (500), font-semibold (600), font-bold (700)
+```
+
+### Spacing Scale
+
+```typescript
+// Based on 4px unit (Tailwind default)
+p-1 (4px), p-2 (8px), p-3 (12px), p-4 (16px), p-6 (24px), p-8 (32px)
+// Same for margins: m-1, m-2, etc.
+```
+
+## Component Patterns
+
+### ColoredBox (Base Component)
+
+```typescript
+// Foundation for cards and buttons
+<ColoredBox
+  as="div" // or "button"
+  isActive={true} // Hover effects enabled
+  leftBorder={true} // Show accent border
+  colorType="secondary" // primary|secondary|tertiary|accent|grey
+  className="" // Additional styles
+>
+  Content
+</ColoredBox>
+```
+
+### PrimaryButton
+
+```typescript
+// Main action button
+<PrimaryButton
+  variant="primary" // primary|secondary|outline
+  size="md" // sm|md|lg
+  isLoading={false}
+  fullWidth={false}
+  leftIcon={<Icon />}
+  rightIcon={<Icon />}
+  textAlign="center" // left|center|right
+>
+  Button Text
+</PrimaryButton>
+```
+
+### Modal
+
+```typescript
+// Overlay dialogs
+<Modal
+  isOpen={isOpen}
+  onClose={handleClose}
+  title="Modal Title"
+  width="md" // sm|md|lg|xl|2xl|5xl|full
+  showCloseButton={true}
+  closeOnBackdropClick={true}
+  headerImageSrc="/path/to/image" // Optional
+>
+  Modal content
+</Modal>
+```
+
+### Form Controls
+
+```typescript
+// Input fields
+<Input
+  label="Field Label"
+  value={value}
+  onChange={onChange}
+  error="Error message"
+  placeholder="Enter text..."
+/>
+
+// Text areas
+<TextArea
+  label="Description"
+  value={value}
+  onChange={onChange}
+  rows={4}
+/>
+
+// Dropdowns
+<Select
+  label="Choose Option"
+  value={value}
+  onChange={onChange}
+  options={[
+    { value: '1', label: 'Option 1' },
+    { value: '2', label: 'Option 2' }
+  ]}
+/>
+```
+
+### Icons
+
+```typescript
+// All icons centralized in Icons.tsx
+import { Icons } from 'components/ui'
+
+<Icons.Close className="w-6 h-6" />
+<Icons.ArrowLeft className="w-5 h-5" />
+<Icons.ChevronRight className="w-4 h-4" />
+
+// Adding new icons:
+// 1. Add to /client/src/shared/components/ui/Icons.tsx
+// 2. Export from Icons object
+// 3. Use consistent naming: PascalCase
+```
+
+### Loading States
+
+```typescript
+<LoadingSpinner
+  size="small" // small|medium|large
+  message="Loading..." // Optional message
+  messageSize="small" // small|medium|large
+/>
+```
+
+### Tooltips
+
+```typescript
+<Tooltip
+  content="Helpful information"
+  position="top" // top|bottom|left|right
+>
+  <button>Hover me</button>
+</Tooltip>
+```
+
+## Responsive Design
+
+### Breakpoints
+
+```css
+/* Mobile First Approach */
+default    /* < 640px */
+sm:        /* >= 640px */
+md:        /* >= 768px */
+lg:        /* >= 1024px */
+xl:        /* >= 1280px */
+2xl:       /* >= 1536px */
+```
+
+## Animation Classes
+
+### Built-in Animations
+
+```css
+animate-fadeIn       /* 0.3s fade in */
+animate-pulse        /* 2s pulsing */
+animate-pulse-slow   /* 4s slow pulse */
+animate-sparkle      /* 4s sparkle effect */
+animate-spin         /* Continuous rotation */
+```
+
+### Transitions
+
+```typescript
+// Standard transition
+className = "transition-all duration-300";
+
+// Hover transforms
+className = "hover:translate-x-1 hover:shadow-lg";
+
+// Color transitions
+className = "transition-colors duration-200";
+```
+
+## Best Practices
+
+1. **Always use ColoredBox or ImageCard for card-like components** - Maintains consistency
+2. **Use PrimaryButton for all buttons** - Don't create custom button components
+3. **Store all icons in Icons.tsx** - Centralized icon management
+4. **Use semantic color names** - primary, secondary, accent, not hardcoded colors
+5. **Mobile-first responsive design** - Start with mobile, add breakpoints for larger screens
+6. **Consistent spacing** - Use Tailwind spacing scale (p-2, m-4, etc.)
+7. **Loading states** - Always show LoadingSpinner for async operations
+8. **Accessibility** - Include focus states, ARIA labels, keyboard navigation
+9. **Typography hierarchy** - Use font-lora for story text, font-montserrat for UI
+10. **Component composition** - Build complex components from simple primitives
