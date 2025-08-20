@@ -48,7 +48,27 @@ npm run test:all    # Tests + test linting
 npm test -- --testPathPattern=fileName.test.ts
 ```
 
+### Project-Specific Lint/TypeScript Rules
+
 **All lint warnings and errors must be fixed.** Run `npm run check:all` after making changes to catch issues early.
+
+Run `npm run check:all` from root to verify all checks pass, or one of the more granular commands listed below (if that's save enough). Common issues to catch:
+
+- `@typescript-eslint/no-unused-vars` - Remove unused variables, imports, and function parameters
+- **Unused imports** - Remove unused React imports (use `import { useState } from "react"` instead of `import React, { useState } from "react"` when React itself isn't used)
+- `@typescript-eslint/no-explicit-any` - Avoid `any` types, use specific types instead
+- `@typescript-eslint/no-unsafe-*` - Avoid unsafe operations on `any` types
+- Property access errors - Use optional chaining (`?.`) or proper type guards
+- Array/object method errors - Ensure arrays/objects exist before calling `.length`, `.map()`, etc.
+- Missing return types on functions - Add explicit return types for exported functions
+- Only use @ts-ignore and @ts-expect-error after explicit user consent
+
+**Type Safety Patterns:**
+
+- Use proper TypeScript types instead of `any`
+- Add type guards when accessing potentially undefined properties
+- Define proper interfaces for complex objects
+- No "as unknown as" trickery without explicit user consent
 
 ### Directory Structure
 

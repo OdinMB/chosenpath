@@ -37,6 +37,8 @@ Invoke the `code-reviewer` subagent for thorough code validation when:
 - Before finalizing PRs/tasks with substantial code changes
 - Needing systematic review of architecture, security, and maintainability
 
+Take project-specific requirements into account: `.cursor/rules/testing.mdc`.
+
 ### Quick Visual Check
 
 IMMEDIATELY after implementing any front-end change:
