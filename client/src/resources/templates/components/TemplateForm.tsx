@@ -99,6 +99,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
     handlePlayerCountMaxChangeOriginal,
     // Cover refs persistence handler
     handleCoverReferenceImagesChange,
+    // Image handling utilities
+    getEffectiveImageId,
+    pendingImageOperations,
   } = useTemplateForm({
     initialTemplate,
     onSave,
@@ -481,6 +484,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({
             }
             setActiveTab={setActiveTab}
             handleCoverReferenceImagesChange={handleCoverReferenceImagesChange}
+            getEffectiveImageId={getEffectiveImageId}
+            pendingImageOperations={pendingImageOperations}
           />
         </div>
         {/* Mobile bottom Save button (hide on AI tabs) */}

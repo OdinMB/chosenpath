@@ -221,6 +221,25 @@ export interface GetTemplateImagesResponse
   }> {}
 
 /**
+ * Template image management
+ */
+export interface RenameTemplateImageRequest extends ClientRequest {
+  templateId: string;
+  oldElementId: string;
+  newElementId: string;
+}
+
+export interface DeleteTemplateImageRequest extends ClientRequest {
+  templateId: string;
+  elementId: string;
+}
+
+export interface ImageOperationResponse extends SuccessResponse<{
+  success: boolean;
+  message?: string;
+}> {}
+
+/**
  * Basic story metadata
  */
 export interface StoryMetadata {

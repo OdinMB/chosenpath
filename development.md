@@ -2,7 +2,9 @@ Smaller commits!
 
 # NEXT
 
+- 1: reverting to an old save: add pending image operations / submit immediately.
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
+- 1: mid-sized devices: academy/iteration cards should be next to each other
 
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
@@ -10,7 +12,6 @@ Smaller commits!
 
 - 2: review process for storytellers who want to publish on website
 - ?: Bild bei Draft mit hochladen (especially for kids stories)
-- 1: resolution animation: sometimes, stat ids are shown, as opposed to stat names
 
 Browser tests
 

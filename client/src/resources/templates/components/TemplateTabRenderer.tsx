@@ -39,6 +39,10 @@ interface TabRendererProps {
   canManageTags: boolean;
   canGenerateImages: boolean;
 
+  // Image handling utilities
+  getEffectiveImageId?: (currentId: string) => string;
+  pendingImageOperations?: Array<{ type: string; oldId: string; newId: string }>;
+
   // Basic info handlers
   handleTitleChange: (title: string) => void;
   handleTeaserChange: (teaser: string) => void;
@@ -315,6 +319,8 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
           isAiIterating={isAiIterating}
           isSparse={isSparse}
           onRequestElementsIteration={handleElementsIterationRequest}
+          getEffectiveImageId={props.getEffectiveImageId}
+          pendingImageOperations={props.pendingImageOperations}
         />
       );
 

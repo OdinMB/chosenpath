@@ -301,4 +301,33 @@ export const templateApi = {
       throw error;
     }
   },
+
+  /**
+   * Rename a template image when element ID changes
+   */
+  renameTemplateImage: async (
+    templateId: string,
+    oldElementId: string,
+    newElementId: string
+  ): Promise<{ success: boolean; message: string }> => {
+    Logger.API.log(`Renaming template image: ${oldElementId} -> ${newElementId} for template ${templateId}`);
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>(
+        `/images/templates/${templateId}/rename`,
+        {
+          oldElementId,
+          newElementId,
+          requestId: `rename-${Date.now()}`
+        }
+      );
+      Logger.API.log(`Successfully renamed template image: ${oldElementId} -> ${newElementId}`);
+      return response;
+    } catch (error) {
+      Logger.API.error(
+        `Failed to rename template image: ${oldElementId} -> ${newElementId}`,
+        error
+      );
+      throw error;
+    }
+  },
 };

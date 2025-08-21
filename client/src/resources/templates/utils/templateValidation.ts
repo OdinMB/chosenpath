@@ -1,5 +1,6 @@
 import { StoryTemplate, CharacterBackground } from "core/types";
 import { TemplateImageManifest } from "core/types/api";
+import { checkPlayerBackgroundConsistency } from "../hooks/useTemplateWarnings";
 
 export interface ValidationIssue {
   type: "error" | "warning" | "info";
@@ -41,10 +42,14 @@ export const validateTemplateIntegrity = (
   // Validate stat references
   issues.push(...validateStatReferences(template));
 
+  // Validate player background consistency
+  issues.push(...validatePlayerBackgroundConsistency(template));
+
   // Validate image requirements if manifest is provided
   // Check images regardless of containsImages flag to catch missing required images
   if (imageManifest) {
     issues.push(...validateImageRequirements(template, imageManifest));
+    issues.push(...validateImageReferences(template, imageManifest));
   }
 
   // Calculate statistics
@@ -128,7 +133,7 @@ const validateStatDefinitions = (
   const allStats = [...template.playerStats, ...template.sharedStats];
 
   // Check for duplicate stat IDs
-  const statIds = allStats.map((stat) => stat.id);
+  const statIds = allStats.map((stat) => stat.id).filter((id): id is string => !!id);
   const duplicateIds = statIds.filter(
     (id, index) => statIds.indexOf(id) !== index
   );
@@ -136,7 +141,7 @@ const validateStatDefinitions = (
     issues.push({
       type: "error",
       category: "stats",
-      message: `Duplicate stat IDs found: ${[...new Set(duplicateIds)].join(
+      message: `Duplicate stat IDs found: ${Array.from(new Set(duplicateIds)).join(
         ", "
       )}`,
       affectedItems: duplicateIds,
@@ -154,7 +159,7 @@ const validateStatDefinitions = (
         type: "error",
         category: "stats",
         message: `Player stat "${stat.name}" has partOfPlayerBackgrounds=false but no initialValue`,
-        affectedItems: [stat.id],
+        affectedItems: [stat.id!],
         autoFixable: true,
       });
     }
@@ -174,7 +179,7 @@ const validateStatDefinitions = (
         type: "error",
         category: "stats",
         message: `Stat "${stat.name}" has invalid type: ${stat.type}`,
-        affectedItems: [stat.id],
+        affectedItems: [stat.id!],
         autoFixable: false,
       });
     }
@@ -210,7 +215,8 @@ const validateBackgroundCompleteness = (
   // Get stats that should be in backgrounds
   const backgroundStatIds = template.playerStats
     .filter((stat) => stat.partOfPlayerBackgrounds !== false)
-    .map((stat) => stat.id);
+    .map((stat) => stat.id)
+    .filter((id): id is string => !!id);
 
   if (backgroundStatIds.length === 0) {
     return issues; // No background stats to validate
@@ -348,7 +354,7 @@ export const autoFixTemplate = (
     ) {
       fixedTemplate.playerStats = fixedTemplate.playerStats.map((stat) => {
         if (
-          issue.affectedItems?.includes(stat.id) &&
+          stat.id && issue.affectedItems?.includes(stat.id) &&
           stat.partOfPlayerBackgrounds === false &&
           (stat.initialValue === undefined || stat.initialValue === null)
         ) {
@@ -392,7 +398,8 @@ export const autoFixTemplate = (
     ) {
       const backgroundStatIds = fixedTemplate.playerStats
         .filter((stat) => stat.partOfPlayerBackgrounds !== false)
-        .map((stat) => stat.id);
+        .map((stat) => stat.id)
+        .filter((id): id is string => !!id);
 
       Object.entries(fixedTemplate).forEach(([key, playerOptions]) => {
         if (
@@ -433,7 +440,7 @@ export const autoFixTemplate = (
                           defaultValue = 50;
                         }
                         newStatValues.push({
-                          statId,
+                          statId: statId!,
                           value: defaultValue,
                         });
                       }
@@ -460,7 +467,8 @@ export const autoFixTemplate = (
     ) {
       const backgroundStatIds = fixedTemplate.playerStats
         .filter((stat) => stat.partOfPlayerBackgrounds !== false)
-        .map((stat) => stat.id);
+        .map((stat) => stat.id)
+        .filter((id): id is string => !!id);
 
       Object.entries(fixedTemplate).forEach(([key, playerOptions]) => {
         if (
@@ -493,6 +501,56 @@ export const autoFixTemplate = (
           Object.assign(fixedTemplate, { [key]: updatedPlayerOptions });
         }
       });
+    }
+
+    // Fix broken image references
+    if (
+      issue.category === "images" &&
+      issue.message.includes("references missing images:")
+    ) {
+      // Fix cover image references
+      if (issue.message.includes("Cover references missing images:")) {
+        if (fixedTemplate.coverImageReferenceIds) {
+          const filteredRefs = fixedTemplate.coverImageReferenceIds.filter(
+            refId => !issue.affectedItems?.includes(refId)
+          );
+          if (filteredRefs.length > 0) {
+            fixedTemplate.coverImageReferenceIds = filteredRefs;
+          } else {
+            delete fixedTemplate.coverImageReferenceIds;
+          }
+        }
+        console.log(`Removed broken cover image references: ${issue.affectedItems?.join(", ")}`);
+      }
+      
+      // Fix story element source image references
+      else if (issue.message.includes("Element") && issue.affectedItems && issue.affectedItems.length > 0) {
+        const elementIdentifier = issue.affectedItems[0]; // First item is the element ID/name
+        const brokenRefIds = issue.affectedItems.slice(1); // Rest are broken reference IDs
+        
+        fixedTemplate.storyElements = fixedTemplate.storyElements?.map(element => {
+          // Find the element by ID or name
+          if (element.id === elementIdentifier || element.name === elementIdentifier) {
+            if (element.sourceImageIds) {
+              const filteredSourceIds = element.sourceImageIds.filter(
+                refId => !brokenRefIds.includes(refId)
+              );
+              console.log(`Removed broken image references from element "${element.name}": ${brokenRefIds.join(", ")}`);
+              if (filteredSourceIds.length > 0) {
+                return {
+                  ...element,
+                  sourceImageIds: filteredSourceIds
+                };
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { sourceImageIds: _, ...elementWithoutSourceIds } = element;
+                return elementWithoutSourceIds;
+              }
+            }
+          }
+          return element;
+        });
+      }
     }
   });
 
@@ -561,5 +619,103 @@ const validateImageRequirements = (
     });
   }
 
+  return issues;
+};
+
+/**
+ * Validates player background consistency (checks for orphaned stat references)
+ */
+const validatePlayerBackgroundConsistency = (
+  template: StoryTemplate
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  
+  // Use the consistency check function from useTemplateWarnings
+  const consistencyIssues = checkPlayerBackgroundConsistency(template);
+  
+  // Convert consistency issues to validation issues
+  consistencyIssues.forEach(issueMessage => {
+    issues.push({
+      type: "error",
+      category: "backgrounds",
+      message: issueMessage,
+      autoFixable: true, // The existing updatePlayerBackgroundStats can fix these
+    });
+  });
+  
+  return issues;
+};
+
+/**
+ * Validates that image references correspond to available images
+ */
+const validateImageReferences = (
+  template: StoryTemplate,
+  manifest: TemplateImageManifest
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  
+  // Get all available image IDs from the manifest
+  const availableImageIds = new Set<string>();
+  
+  // Add cover image if available
+  if (manifest.cover) {
+    availableImageIds.add("cover");
+  }
+  
+  // Add story element image IDs
+  Object.keys(manifest.storyElements).forEach(elementId => {
+    if (manifest.storyElements[elementId]) {
+      availableImageIds.add(elementId);
+    }
+  });
+  
+  // Add player identity image IDs
+  Object.entries(manifest.playerIdentities).forEach(([playerSlot, identities]) => {
+    Object.entries(identities).forEach(([index, hasImage]) => {
+      if (hasImage) {
+        availableImageIds.add(`${playerSlot}_${index}`);
+      }
+    });
+  });
+  
+  // Check cover image references
+  if (template.coverImageReferenceIds && template.coverImageReferenceIds.length > 0) {
+    const brokenCoverRefs = template.coverImageReferenceIds.filter(refId => 
+      !availableImageIds.has(refId)
+    );
+    
+    if (brokenCoverRefs.length > 0) {
+      issues.push({
+        type: "warning",
+        category: "images",
+        message: `Cover references missing images: ${brokenCoverRefs.join(", ")}`,
+        affectedItems: brokenCoverRefs,
+        autoFixable: true, // Can be auto-fixed by removing broken references
+      });
+    }
+  }
+  
+  // Check story element source image references
+  if (template.storyElements) {
+    template.storyElements.forEach(element => {
+      if (element.sourceImageIds && element.sourceImageIds.length > 0) {
+        const brokenSourceRefs = element.sourceImageIds.filter(refId => 
+          !availableImageIds.has(refId)
+        );
+        
+        if (brokenSourceRefs.length > 0) {
+          issues.push({
+            type: "warning",
+            category: "images",
+            message: `Element "${element.name}" references missing images: ${brokenSourceRefs.join(", ")}`,
+            affectedItems: [element.id || element.name || "unnamed", ...brokenSourceRefs],
+            autoFixable: true, // Can be auto-fixed by removing broken references
+          });
+        }
+      }
+    });
+  }
+  
   return issues;
 };

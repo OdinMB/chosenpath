@@ -98,27 +98,31 @@ export const StatEditor: React.FC<StatEditorProps> = ({
               disabled={readOnly}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold w-24">ID</span>
-            <div className="flex flex-1">
-              <span className="inline-flex items-center px-3 rounded-l border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                {type === "shared" ? "shared_" : "player_"}
-              </span>
-              <input
-                id={`stat-id-${stat.id}`}
-                name={`stat-id-${stat.id}`}
-                className="flex-1 p-2 border rounded-r"
-                value={localStat.id.replace(/^(shared_|player_)/, "")}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const prefix = type === "shared" ? "shared_" : "player_";
-                  const newId = prefix + e.target.value;
-                  updateStatField("id", newId);
-                }}
-                placeholder="Enter stat ID"
-                disabled={readOnly}
-              />
+{/* ID field - hidden in production, disabled in development */}
+          {import.meta.env.DEV && (
+            <div className="flex items-center gap-2">
+              <span className="font-semibold w-24">ID</span>
+              <div className="flex flex-1">
+                <span className="inline-flex items-center px-3 rounded-l border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                  {type === "shared" ? "shared_" : "player_"}
+                </span>
+                <input
+                  id={`stat-id-${stat.id}`}
+                  name={`stat-id-${stat.id}`}
+                  className="flex-1 p-2 border rounded-r bg-gray-100"
+                  value={localStat.id?.replace(/^(shared_|player_)/, "") || ""}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const prefix = type === "shared" ? "shared_" : "player_";
+                    const newId = prefix + e.target.value;
+                    updateStatField("id", newId);
+                  }}
+                  placeholder="Auto-generated from name"
+                  disabled={true}
+                  title="ID is automatically generated from the stat name"
+                />
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="font-semibold w-24">Description</span>
             <Input

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GameModes, PlayerCount } from "core/types";
+import { GameModes, PlayerCount, StoryTemplate, PLAYER_SLOTS, PlayerOptionsGeneration } from "core/types";
 
 interface PendingGameModeChange {
   newMode: GameModes;
@@ -146,4 +146,77 @@ export function useTemplateWarnings({
     triggerPlayerCountWarning,
     triggerCompetitiveSingleWarning,
   };
+}
+
+/**
+ * Check for orphaned stat references in player backgrounds
+ * @param template The template to validate
+ * @returns Array of consistency issue descriptions
+ */
+export function checkPlayerBackgroundConsistency(template: StoryTemplate): string[] {
+  const issues: string[] = [];
+  const playerStatIds = template.playerStats?.map(stat => stat.id).filter(Boolean) || [];
+  const sharedStatIds = template.sharedStats?.map(stat => stat.id).filter(Boolean) || [];
+  const allStatIds = [...playerStatIds, ...sharedStatIds];
+  
+  PLAYER_SLOTS.forEach(slot => {
+    const playerOptions = template[slot as keyof StoryTemplate] as PlayerOptionsGeneration;
+    
+    if (playerOptions?.possibleCharacterBackgrounds) {
+      playerOptions.possibleCharacterBackgrounds.forEach((background) => {
+        background.initialPlayerStatValues?.forEach((statValue) => {
+          if (!allStatIds.includes(statValue.statId)) {
+            issues.push(
+              `${slot} background "${background.title}" references undefined stat "${statValue.statId}"`
+            );
+          }
+        });
+      });
+    }
+  });
+  
+  return issues;
+}
+
+/**
+ * Check for broken image references in template
+ * @param template The template to validate
+ * @param availableImageIds Set of available image IDs
+ * @returns Array of broken image reference issues
+ */
+export function checkImageReferenceConsistency(
+  template: StoryTemplate, 
+  availableImageIds: Set<string>
+): string[] {
+  const issues: string[] = [];
+  
+  // Check cover image references
+  if (template.coverImageReferenceIds && template.coverImageReferenceIds.length > 0) {
+    const brokenCoverRefs = template.coverImageReferenceIds.filter(refId => 
+      !availableImageIds.has(refId)
+    );
+    
+    if (brokenCoverRefs.length > 0) {
+      issues.push(`Cover references missing images: ${brokenCoverRefs.join(", ")}`);
+    }
+  }
+  
+  // Check story element source image references
+  if (template.storyElements) {
+    template.storyElements.forEach(element => {
+      if (element.sourceImageIds && element.sourceImageIds.length > 0) {
+        const brokenSourceRefs = element.sourceImageIds.filter(refId => 
+          !availableImageIds.has(refId)
+        );
+        
+        if (brokenSourceRefs.length > 0) {
+          issues.push(
+            `Element "${element.name || 'unnamed'}" references missing images: ${brokenSourceRefs.join(", ")}`
+          );
+        }
+      }
+    });
+  }
+  
+  return issues;
 }

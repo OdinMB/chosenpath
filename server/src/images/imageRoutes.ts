@@ -6,8 +6,23 @@ import {
   storageFileExists,
   getStoryImagesDirectoryPath,
 } from "shared/storageUtils.js";
-import { sendError, sendNotFound } from "shared/responseUtils.js";
+import { sendError, sendNotFound, sendSuccess } from "shared/responseUtils.js";
 import fsSync from "fs";
+import type { RenameTemplateImageRequest } from "core/types/api.js";
+
+/**
+ * Validates that path parameters don't contain directory traversal sequences
+ * @param paths Array of path strings to validate
+ * @returns true if all paths are safe, false otherwise
+ */
+function validateSafePaths(...paths: string[]): boolean {
+  const unsafeCharacters = ["..", "/", "\\"];
+  return paths.every(pathParam => 
+    pathParam && 
+    typeof pathParam === 'string' &&
+    !unsafeCharacters.some(unsafeChar => pathParam.includes(unsafeChar))
+  );
+}
 
 const imageRouter = express.Router();
 
@@ -79,7 +94,7 @@ imageRouter.get("/templates/:templateId/:path(*)", async (req, res) => {
 
   try {
     // Validate input to prevent directory traversal attacks
-    if (templateId.includes("..") || filePath.includes("..")) {
+    if (!validateSafePaths(templateId, filePath)) {
       Logger.Route.error(
         `Invalid path parameters detected: ${templateId}/${filePath}`
       );
@@ -120,7 +135,7 @@ imageRouter.get("/stories/:storyId/:path(*)", async (req, res) => {
 
   try {
     // Validate input to prevent directory traversal attacks
-    if (storyId.includes("..") || filePath.includes("..")) {
+    if (!validateSafePaths(storyId, filePath)) {
       Logger.Route.error(
         `Invalid path parameters detected: ${storyId}/${filePath}`
       );
@@ -152,7 +167,126 @@ imageRouter.get("/stories/:storyId/:path(*)", async (req, res) => {
   }
 });
 
-// Catch-all for invalid image routes
+// Template image management endpoints
+
+/**
+ * Rename template images when story element IDs change
+ * POST /api/images/templates/:templateId/rename
+ */
+imageRouter.post("/templates/:templateId/rename", async (req, res) => {
+  const { templateId } = req.params;
+  const { oldElementId, newElementId } = req.body as RenameTemplateImageRequest;
+  const requestId = req.body.requestId || "unknown";
+
+  try {
+    // Validate input and prevent path traversal
+    if (
+      !oldElementId ||
+      !newElementId ||
+      !validateSafePaths(templateId, oldElementId, newElementId)
+    ) {
+      return sendError(res, "Invalid parameters", 400, requestId);
+    }
+
+    // Get image file paths
+    const oldImagePath = getStorageFilePath(
+      "templates",
+      path.join(templateId, "images", `${oldElementId}.jpeg`)
+    );
+    const newImagePath = getStorageFilePath(
+      "templates",
+      path.join(templateId, "images", `${newElementId}.jpeg`)
+    );
+
+    // Check if old image exists
+    if (!fsSync.existsSync(oldImagePath)) {
+      // No image to rename, this is fine
+      return sendSuccess(
+        res,
+        { success: true, message: "No image found to rename" },
+        requestId
+      );
+    }
+
+    // Rename the image file
+    fsSync.renameSync(oldImagePath, newImagePath);
+
+    Logger.Route.log(
+      `Renamed template image: ${oldElementId} -> ${newElementId} for template ${templateId}`
+    );
+
+    return sendSuccess(
+      res,
+      { success: true, message: "Image renamed successfully" },
+      requestId
+    );
+  } catch (error) {
+    Logger.Route.error(
+      `Error renaming template image: ${templateId}/${oldElementId} -> ${newElementId}`,
+      error
+    );
+    return sendError(res, "Failed to rename image", 500, requestId, error);
+  }
+});
+
+/**
+ * Delete template images when story elements are deleted
+ * DELETE /api/images/templates/:templateId/element/:elementId
+ */
+imageRouter.delete(
+  "/templates/:templateId/element/:elementId",
+  async (req, res) => {
+    const { templateId, elementId } = req.params;
+    const requestId = (req.query.requestId as string) || "unknown";
+
+    try {
+      // Validate input and prevent path traversal
+      if (!elementId || !validateSafePaths(templateId, elementId)) {
+        return sendError(res, "Invalid parameters", 400, requestId);
+      }
+
+      // Get image file path
+      const imagePath = getStorageFilePath(
+        "templates",
+        path.join(templateId, "images", `${elementId}.jpg`)
+      );
+
+      // Check if image exists and delete it
+      if (fsSync.existsSync(imagePath)) {
+        fsSync.unlinkSync(imagePath);
+        Logger.Route.log(
+          `Deleted template image: ${elementId} for template ${templateId}`
+        );
+        return sendSuccess(
+          res,
+          { success: true, message: "Image deleted successfully" },
+          requestId
+        );
+      } else {
+        // No image to delete, this is fine
+        return sendSuccess(
+          res,
+          { success: true, message: "No image found to delete" },
+          requestId
+        );
+      }
+    } catch (error) {
+      Logger.Route.error(
+        `Error deleting template image: ${templateId}/${elementId}`,
+        error
+      );
+      return sendError(res, "Failed to delete image", 500, requestId, error);
+    }
+  }
+);
+
+// Add a test route to verify proxy
+imageRouter.get("/test", (req, res) => {
+  Logger.Route.log("[IMAGE-DEBUG] Test route accessed");
+  res.send("Image server is working correctly!");
+});
+
+// Catch-all for invalid image routes (must be last!)
 imageRouter.use((req, res) => {
   const requestId = (req.query.requestId as string) || "unknown";
   Logger.Route.error(`Invalid image request: ${req.method} ${req.originalUrl}`);
@@ -165,12 +299,6 @@ imageRouter.use((req, res) => {
     // For non-image requests, return a JSON error
     sendNotFound(res, "Image not found", requestId);
   }
-});
-
-// Add a test route to verify proxy
-imageRouter.get("/test", (req, res) => {
-  Logger.Route.log("[IMAGE-DEBUG] Test route accessed");
-  res.send("Image server is working correctly!");
 });
 
 export { imageRouter };

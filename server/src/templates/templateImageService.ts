@@ -38,18 +38,18 @@ export function generateTemplateImageManifest(
 
   // Check story elements with defined appearances
   const storyElementsWithAppearance = (template.storyElements || []).filter(
-    (element) => element.appearance && element.appearance.trim().length > 0
+    (element) => element.id && element.appearance && element.appearance.trim().length > 0
   );
 
   const storyElements: Record<string, boolean> = {};
   const missingStoryElements: string[] = [];
 
   storyElementsWithAppearance.forEach((element) => {
-    const hasImage = availableImageIds.has(element.id);
-    storyElements[element.id] = hasImage;
+    const hasImage = availableImageIds.has(element.id!);
+    storyElements[element.id!] = hasImage;
 
     if (!hasImage) {
-      missingStoryElements.push(element.id);
+      missingStoryElements.push(element.id!);
     }
   });
 

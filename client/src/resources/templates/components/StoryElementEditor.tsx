@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StoryElement,
   ImageInstructions,
@@ -24,6 +24,8 @@ interface StoryElementEditorProps {
   imageInstructions?: ImageInstructions;
   canGenerateImages?: boolean;
   allElements?: StoryElement[];
+  getEffectiveImageId?: (currentId: string) => string;
+  pendingImageOperations?: Array<{ type: string; oldId: string; newId: string }>;
 }
 
 export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
@@ -38,6 +40,8 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   imageInstructions,
   canGenerateImages = true,
   allElements,
+  getEffectiveImageId,
+  pendingImageOperations,
 }) => {
   const { generateImageForElement } = useImageGeneration();
   const [imageStatus, setImageStatus] = useState<ImageStatus>("ready");
@@ -45,6 +49,12 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   const [selectedSourceImageIds, setSelectedSourceImageIds] = useState<
     string[]
   >((element as unknown as { sourceImageIds?: string[] }).sourceImageIds || []);
+
+  // Sync selectedSourceImageIds with element prop when it changes
+  useEffect(() => {
+    const elementSourceIds = (element as unknown as { sourceImageIds?: string[] }).sourceImageIds || [];
+    setSelectedSourceImageIds(elementSourceIds);
+  }, [element.id, element]); // Update when element ID or element changes
 
   // Build friendly labels from current element (best-effort). For full mapping, pass all elements to selector.
 
@@ -98,8 +108,10 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
   };
 
   // Create element image object for StoryImage
+  // Use effective image ID to handle pending renames
+  const effectiveImageId = getEffectiveImageId ? getEffectiveImageId(element.id) : element.id;
   const elementImage: ImageUI = {
-    id: element.id,
+    id: effectiveImageId,
     fileType: "jpeg",
     source: "template",
     sourceId: templateId,
@@ -150,18 +162,22 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-col sm:flex-row">
-          <span className="font-semibold w-24 self-start sm:self-auto">ID</span>
-          <Input
-            id={`element-id-${data.id}`}
-            name={`element-id-${data.id}`}
-            className="flex-1 w-full"
-            value={data.id}
-            onChange={(e) => onChange({ ...data, id: e.target.value })}
-            placeholder="Enter element ID (use underscores, e.g., mr_x)"
-            disabled={readOnly}
-          />
-        </div>
+{/* ID field - hidden in production, disabled in development */}
+        {import.meta.env.DEV && (
+          <div className="flex items-center gap-2 flex-col sm:flex-row">
+            <span className="font-semibold w-24 self-start sm:self-auto">ID</span>
+            <Input
+              id={`element-id-${data.id}`}
+              name={`element-id-${data.id}`}
+              className="flex-1 w-full bg-gray-100"
+              value={data.id}
+              onChange={(e) => onChange({ ...data, id: e.target.value })}
+              placeholder="Auto-generated from name"
+              disabled={true}
+              title="ID is automatically generated from the element name"
+            />
+          </div>
+        )}
 
         <div className="flex items-start gap-2 flex-col sm:flex-row">
           <span className="font-semibold w-24 pt-2 self-start sm:self-auto">
@@ -232,6 +248,8 @@ export const StoryElementEditor: React.FC<StoryElementEditorProps> = ({
               readOnly={readOnly}
               allElements={allElements}
               className="mt-3"
+              getEffectiveImageId={getEffectiveImageId}
+              pendingImageOperations={pendingImageOperations}
             />
           </div>
         </div>

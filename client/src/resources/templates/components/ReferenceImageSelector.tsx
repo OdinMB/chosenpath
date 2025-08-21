@@ -14,6 +14,8 @@ interface ReferenceImageSelectorProps {
   allElements?: StoryElement[];
   className?: string;
   hideDropdown?: boolean;
+  getEffectiveImageId?: (currentId: string) => string;
+  pendingImageOperations?: Array<{ type: string; oldId: string; newId: string }>;
 }
 
 export const ReferenceImageSelector: React.FC<ReferenceImageSelectorProps> = ({
@@ -24,12 +26,24 @@ export const ReferenceImageSelector: React.FC<ReferenceImageSelectorProps> = ({
   allElements,
   className = "",
   hideDropdown = false,
+  getEffectiveImageId,
+  pendingImageOperations,
 }) => {
-  const { data: templateImagesData } = useTemplateImages(
+  const { data: templateImagesData, refetch: refetchImages } = useTemplateImages(
     templateId,
     !!templateId
   );
-  const availableImageIds = (templateImagesData?.images || []).map(
+  
+  // Manually refetch when pending operations change (especially when cleared after save)
+  const pendingOpsLength = pendingImageOperations?.length || 0;
+  React.useEffect(() => {
+    if (templateId && pendingOpsLength === 0 && refetchImages) {
+      // When pending operations are cleared (after save), refetch images
+      refetchImages();
+    }
+  }, [pendingOpsLength, templateId, refetchImages]);
+  
+  const imagesOnDisk = (templateImagesData?.images || []).map(
     (img) => img.id
   );
 
@@ -41,6 +55,43 @@ export const ReferenceImageSelector: React.FC<ReferenceImageSelectorProps> = ({
     });
     return map;
   }, [allElements]);
+
+  // Build list of available image IDs
+  // This should include current element IDs (which might be new) if they have corresponding images on disk
+  const availableImageIds = React.useMemo(() => {
+    const availableIds: string[] = [];
+    
+    // Add element IDs that have images (check using getEffectiveImageId)
+    (allElements || []).forEach((el) => {
+      if (el.id && el.appearance) {
+        // Check if this element has an image by checking if its effective ID exists on disk
+        const effectiveId = getEffectiveImageId ? getEffectiveImageId(el.id) : el.id;
+        if (imagesOnDisk.includes(effectiveId)) {
+          availableIds.push(el.id); // Use the current ID, not the effective one
+        }
+      }
+    });
+    
+    // Also add any orphaned images (images on disk without corresponding elements)
+    const elementIds = (allElements || []).map(el => el.id).filter(Boolean);
+    imagesOnDisk.forEach(diskId => {
+      // Check if this disk image corresponds to any element
+      let hasElement = false;
+      elementIds.forEach(elId => {
+        const effectiveId = getEffectiveImageId ? getEffectiveImageId(elId!) : elId;
+        if (effectiveId === diskId) {
+          hasElement = true;
+        }
+      });
+      
+      // If no element corresponds to this image, add it as an orphaned image
+      if (!hasElement && !availableIds.includes(diskId)) {
+        availableIds.push(diskId);
+      }
+    });
+    
+    return availableIds;
+  }, [allElements, imagesOnDisk, getEffectiveImageId]);
 
   const addId = (id: string) => {
     if (!id) return;
@@ -58,14 +109,16 @@ export const ReferenceImageSelector: React.FC<ReferenceImageSelectorProps> = ({
     return (
       <div className="flex flex-wrap gap-3 mt-2">
         {selectedIds.map((id) => {
+          // Use effective image ID to handle pending renames
+          const effectiveId = getEffectiveImageId ? getEffectiveImageId(id) : id;
           const refImage: ImageUI = {
-            id,
+            id: effectiveId,
             source: "template",
             sourceId: templateId,
             fileType: "jpeg",
             status: "ready",
           };
-          // Friendly label
+          // Friendly label - use the current ID (not effective) for label lookup
           let label = id;
           const friendly = elementIdToName.get(id);
           if (friendly) label = friendly;

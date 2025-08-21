@@ -16,9 +16,32 @@ See `/.cursor/rules/testing.mdc` for detailed testing commands and patterns.
 
 Don't use `npm run dev`. The site is already available on localhost:5173, and the server is already running on :3000.
 
+### Quick Visual Check
+
+After implementing any front-end change, perform visual checks until the task is achieved:
+
+1. **Identify what changed** - Review the modified components/pages
+2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view
+3. **Verify design compliance** - Compare against `/.cursor/rules/design-principles.md` and `/.cursor/rules/style-guide.md`
+4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
+5. **Check acceptance criteria** - Review any provided context files or requirements
+6. **Capture evidence** - Take full page screenshot at desktop and mobile viewports of each changed view
+7. **Check for errors** - Run `mcp__playwright__browser_console_messages`
+
+The site is available at http://localhost:5173/.
+To login, use username 'claude@localdevelopment.com' and password 'asdF!234'.
+
+### Comprehensive Design Review
+
+Invoke the `design-reviewer` subagent for thorough design validation when:
+
+- Completing significant UI/UX features
+- Before finalizing PRs/tasks with visual changes
+- Needing comprehensive accessibility and responsiveness testing
+
 ### Quick Code Review
 
-After making code changes, always run a quick validation:
+After making code changes (and only when the visual checks are done), run a quick validation:
 
 1. **Run checks** - Check for ESLint / TS / test issues. When in doubt, use check:all in the `client` or `server` directory, or in root to check both.
 2. **Verify functionality** - Test the specific feature/fix you implemented
@@ -35,29 +58,6 @@ Invoke the `code-reviewer` subagent for thorough code validation when:
 - Needing systematic review of architecture, security, and maintainability
 
 Take project-specific requirements into account: `.cursor/rules/testing.mdc`.
-
-### Quick Visual Check
-
-After implementing any front-end change and in addition to the code checks, also perform a visual check:
-
-1. **Identify what changed** - Review the modified components/pages
-2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view
-3. **Verify design compliance** - Compare against `/.cursor/rules/design-principles.md` and `/.cursor/rules/style-guide.md`
-4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
-5. **Check acceptance criteria** - Review any provided context files or requirements
-6. **Capture evidence** - Take full page screenshot at desktop viewport (1440px) of each changed view
-7. **Check for errors** - Run `mcp__playwright__browser_console_messages`
-
-The site is available at http://localhost:5173/.
-To login, use username 'claude@localdevelopment.com' and password 'asdF!234'.
-
-### Comprehensive Design Review
-
-Invoke the `design-reviewer` subagent for thorough design validation when:
-
-- Completing significant UI/UX features
-- Before finalizing PRs/tasks with visual changes
-- Needing comprehensive accessibility and responsiveness testing
 
 ### Content Management
 

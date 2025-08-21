@@ -33,6 +33,14 @@ import {
   useTemplateImages,
   invalidateTemplateImagesCache,
 } from "./useTemplateImages";
+import { generateIdFromName } from "shared/utils/idGeneration";
+
+// Types for deferred image operations
+interface PendingImageOperation {
+  type: 'rename';
+  oldId: string;
+  newId: string;
+}
 
 // Define the TabType type
 export type TabType =
@@ -101,7 +109,22 @@ export function useTemplateForm({
   const [savedTemplate, setSavedTemplate] =
     useState<StoryTemplate>(initialTemplate);
   const [saveHistory, setSaveHistory] = useState<SaveHistoryEntry[]>([]);
+  const [pendingImageOperations, setPendingImageOperations] = useState<PendingImageOperation[]>([]);
   const navigate = useNavigate();
+
+  // Helper function to get the effective image ID considering pending operations
+  // This ensures images display correctly even when there are pending renames
+  const getEffectiveImageId = (currentId: string): string => {
+    // Walk backwards through pending operations to find the original ID
+    let effectiveId = currentId;
+    for (let i = pendingImageOperations.length - 1; i >= 0; i--) {
+      const op = pendingImageOperations[i];
+      if (op.type === 'rename' && op.newId === effectiveId) {
+        effectiveId = op.oldId;
+      }
+    }
+    return effectiveId;
+  };
 
   // Use specialized hooks
   const {
@@ -283,7 +306,7 @@ export function useTemplateForm({
 
             // Check for missing stats
             const missingStats = backgroundStatIds.filter(
-              (id) => !existingStatIds.includes(id)
+              (id) => id && !existingStatIds.includes(id)
             );
 
             // Check for orphaned stats (stats that shouldn't be in backgrounds)
@@ -309,7 +332,7 @@ export function useTemplateForm({
                   }
 
                   newStatValues.push({
-                    statId,
+                    statId: statId!,
                     value: defaultValue,
                   });
                 }
@@ -383,13 +406,64 @@ export function useTemplateForm({
         Logger.Admin.log("Template updated successfully", savedTemplate);
       }
 
+      // Execute pending image operations after template is saved
+      if (savedTemplate.id && pendingImageOperations.length > 0) {
+        Logger.UI.log(`Executing ${pendingImageOperations.length} pending image operations`);
+        
+        const imageOperationResults = await Promise.allSettled(
+          pendingImageOperations.map(async (op) => {
+            try {
+              if (op.type === 'rename') {
+                await templateApi.renameTemplateImage(savedTemplate.id!, op.oldId, op.newId);
+                Logger.UI.log(`Successfully renamed image: ${op.oldId} -> ${op.newId}`);
+                return { success: true, operation: op };
+              }
+            } catch (error) {
+              Logger.UI.warn(`Failed to execute image operation: ${op.oldId} -> ${op.newId}`, error);
+              // Show toast notification for failed operations
+              notificationService.addNotification({
+                type: "warning",
+                title: "Image Rename Failed",
+                message: `Failed to rename image "${op.oldId}" to "${op.newId}". The image will remain in the template library.`,
+                duration: 5000,
+              });
+              return { success: false, operation: op, error };
+            }
+          })
+        );
+
+        // Clear pending operations after attempting to execute them
+        setPendingImageOperations([]);
+
+        // Log results
+        const successful = imageOperationResults.filter(result => 
+          result.status === 'fulfilled' && result.value && result.value.success
+        ).length;
+        const failed = imageOperationResults.length - successful;
+        
+        if (failed > 0) {
+          Logger.UI.warn(`${successful} image operations succeeded, ${failed} failed`);
+        } else {
+          Logger.UI.log(`All ${successful} image operations completed successfully`);
+        }
+        
+        // Invalidate cache after image operations complete
+        if (savedTemplate.id) {
+          invalidateTemplateImagesCache(savedTemplate.id);
+          // Trigger refetch to get updated validation data
+          refetchTemplateImages().catch((err) => {
+            Logger.UI.warn("Failed to refetch template images after image operations:", err);
+          });
+        }
+      }
+
       // Update local state with saved template
       addToSaveHistory(savedTemplate); // Add to save history
       setSavedTemplate(savedTemplate); // Update the saved template reference
       setHasUnsavedChanges(false); // Reset unsaved changes after successful save
 
-      // Refresh template images data for updated validation
-      if (savedTemplate.id) {
+      // Also refresh template images if no pending operations (for non-rename saves)
+      if (savedTemplate.id && pendingImageOperations.length === 0) {
         invalidateTemplateImagesCache(savedTemplate.id);
         // Trigger refetch to get updated validation data
         refetchTemplateImages().catch((err) => {
@@ -569,17 +643,153 @@ export function useTemplateForm({
     playerStats?: Stat[];
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => {
+    // Auto-generate IDs for stats that have names but no IDs, and update IDs when names change
+    const processStats = (stats: Stat[] | undefined, existingIds: string[]): Stat[] | undefined => {
+      if (!stats) return stats;
+      
+      return stats.map(stat => {
+        // Skip if no name
+        if (!stat.name?.trim()) {
+          return stat;
+        }
+        
+        // Generate or update ID from name
+        const otherIds = existingIds.filter(id => id !== stat.id);
+        const newId = generateIdFromName(stat.name, otherIds);
+        
+        // Update existing IDs list to maintain uniqueness
+        const existingIndex = existingIds.indexOf(stat.id!);
+        if (existingIndex !== -1) {
+          existingIds[existingIndex] = newId;
+        } else {
+          existingIds.push(newId);
+        }
+        
+        return {
+          ...stat,
+          id: newId
+        };
+      });
+    };
+
+    // Collect existing IDs from all stats (including previous form data)
+    const existingIds: string[] = [];
+    
+    // Include existing IDs from current form state
+    if (formData.sharedStats) {
+      existingIds.push(...formData.sharedStats.filter(s => s.id).map(s => s.id!));
+    }
+    if (formData.playerStats) {
+      existingIds.push(...formData.playerStats.filter(s => s.id).map(s => s.id!));
+    }
+    
+    // Include IDs from the updates being processed
+    if (updates.sharedStats) {
+      existingIds.push(...updates.sharedStats.filter(s => s.id).map(s => s.id!));
+    }
+    if (updates.playerStats) {
+      existingIds.push(...updates.playerStats.filter(s => s.id).map(s => s.id!));
+    }
+
+    // Process shared stats first, then player stats with updated existing IDs
+    const processedSharedStats = processStats(updates.sharedStats, [...existingIds]);
+    
+    // Update existing IDs with any newly generated shared stat IDs
+    const newSharedIds = processedSharedStats?.filter(s => s.id && !existingIds.includes(s.id)).map(s => s.id!) || [];
+    const updatedExistingIds = [...existingIds, ...newSharedIds];
+    
+    const processedPlayerStats = processStats(updates.playerStats, updatedExistingIds);
+
     setFormData((prev: StoryTemplate) => ({
       ...prev,
       statGroups: updates.statGroups || prev.statGroups,
-      sharedStats: updates.sharedStats || prev.sharedStats,
-      playerStats: updates.playerStats || prev.playerStats,
+      sharedStats: processedSharedStats || prev.sharedStats,
+      playerStats: processedPlayerStats || prev.playerStats,
       ...(updates.playerOptions || {}),
     }));
   };
 
-  const handleStoryElementsChange = (elements: StoryElement[]) =>
-    setFormData((prev) => ({ ...prev, storyElements: elements }));
+  const handleStoryElementsChange = (elements: StoryElement[]) => {
+    // Auto-generate IDs for elements that have names but no IDs, and update IDs when names change
+    const existingIds = elements.filter(e => e.id).map(e => e.id!);
+    const idChanges: Array<{ oldId: string; newId: string }> = [];
+    
+    // First pass: collect all ID changes
+    const elementsWithNewIds = elements.map((element) => {
+      // Skip if no name
+      if (!element.name?.trim()) {
+        return element;
+      }
+      
+      // Generate or update ID from name
+      const otherIds = existingIds.filter(id => id !== element.id);
+      const newId = generateIdFromName(element.name, otherIds);
+      
+      // Track ID changes for deferred image renaming
+      if (element.id && element.id !== newId) {
+        idChanges.push({ oldId: element.id, newId });
+      }
+      
+      // Track the new ID for uniqueness in subsequent elements
+      const existingIndex = existingIds.indexOf(element.id!);
+      if (existingIndex !== -1) {
+        existingIds[existingIndex] = newId;
+      } else {
+        existingIds.push(newId);
+      }
+      
+      return {
+        ...element,
+        id: newId
+      };
+    });
+    
+    // Second pass: update sourceImageIds with all collected ID changes
+    const updatedElements = elementsWithNewIds.map((element) => {
+      if (element.sourceImageIds && element.sourceImageIds.length > 0) {
+        const updatedSourceImageIds = element.sourceImageIds.map(sourceId => {
+          // Check if any of the ID changes affect this source ID
+          const change = idChanges.find(c => c.oldId === sourceId);
+          return change ? change.newId : sourceId;
+        });
+        return { ...element, sourceImageIds: updatedSourceImageIds };
+      }
+      return element;
+    });
+    
+    // Update template state and queue pending image operations
+    if (idChanges.length > 0) {
+      // Add new pending operations for ID changes
+      setPendingImageOperations(prevOps => [
+        ...prevOps,
+        ...idChanges.map(change => ({
+          type: 'rename' as const,
+          oldId: change.oldId,
+          newId: change.newId
+        }))
+      ]);
+
+      // Update image references in the template (using new IDs)
+      setFormData((prev) => {
+        // Update cover image references
+        const updatedCoverRefs = prev.coverImageReferenceIds?.map(refId => {
+          const change = idChanges.find(c => c.oldId === refId);
+          return change ? change.newId : refId;
+        });
+        
+        // Story element source image references are already updated in updatedElements
+        
+        return {
+          ...prev,
+          storyElements: updatedElements,
+          coverImageReferenceIds: updatedCoverRefs
+        };
+      });
+    } else {
+      // No ID changes, just update story elements
+      setFormData((prev) => ({ ...prev, storyElements: updatedElements }));
+    }
+  };
 
   const handleOutcomesChange = (outcomes: Outcome[]) =>
     setFormData((prev) => ({ ...prev, sharedOutcomes: outcomes }));
@@ -657,6 +867,10 @@ export function useTemplateForm({
     setFormData(historyEntry.template);
     setSavedTemplate(historyEntry.template);
     setHasUnsavedChanges(false);
+    
+    // Clear any pending image operations since we're reverting to a previous state
+    setPendingImageOperations([]);
+    Logger.UI.log("Cleared pending image operations due to template revert");
   };
 
   // Return all the handlers and state needed by the UI component
@@ -820,5 +1034,8 @@ export function useTemplateForm({
         console.log(`Auto-fixed issue: ${issue.message}`);
       }
     },
+    // Image handling utilities
+    getEffectiveImageId,
+    pendingImageOperations,
   };
 }

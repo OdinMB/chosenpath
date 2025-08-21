@@ -22,6 +22,8 @@ interface StoryElementsTabProps {
   ) => Promise<void> | void;
   isAiIterating?: boolean;
   isSparse?: boolean;
+  getEffectiveImageId?: (currentId: string) => string;
+  pendingImageOperations?: Array<{ type: string; oldId: string; newId: string }>;
 }
 
 export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
@@ -35,6 +37,8 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
   onRequestElementsIteration,
   isAiIterating,
   isSparse = false,
+  getEffectiveImageId,
+  pendingImageOperations,
 }) => {
   // Get templateId from URL if not provided as prop
   const { templateId: urlTemplateId } = useParams<{ templateId: string }>();
@@ -158,6 +162,8 @@ export const StoryElementsTab: React.FC<StoryElementsTabProps> = ({
           canGenerateImages={canGenerateImages}
           // pass full element list for labeling reference images
           allElements={elements}
+          getEffectiveImageId={getEffectiveImageId}
+          pendingImageOperations={pendingImageOperations}
         />
       ))}
     </div>
