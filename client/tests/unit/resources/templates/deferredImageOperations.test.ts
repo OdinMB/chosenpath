@@ -12,7 +12,7 @@ describe('Deferred Image Operations Logic', () => {
     let effectiveId = currentId;
     for (let i = pendingOps.length - 1; i >= 0; i--) {
       const op = pendingOps[i];
-      if (op && op.type === 'rename' && op.newId === effectiveId) {
+      if (op?.type === 'rename' && op.newId === effectiveId) {
         effectiveId = op.oldId;
       }
     }
@@ -102,8 +102,8 @@ describe('Deferred Image Operations Logic', () => {
       { oldId: 'professor_azura', newId: 'professor_azuraa' }
     ];
 
-    const updatedCoverRefs = coverImageRefs.map(refId => {
-      const change = idChanges.find(c => c.oldId === refId);
+    const updatedCoverRefs = coverImageRefs.map((refId) => {
+      const change = idChanges.find((c) => c.oldId === refId);
       return change ? change.newId : refId;
     });
 

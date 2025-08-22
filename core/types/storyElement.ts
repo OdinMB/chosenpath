@@ -37,6 +37,8 @@ export const StoryElementsSchema = z
 
 // App-level type can include optional, non-LLM fields
 export type StoryElement = z.infer<typeof storyElementSchema> & {
+  // Fixed UUID for tracking element identity across saves/reverts (never changes)
+  uuid?: string;
   // Optional list (persisted in template JSON) to guide image generation
   sourceImageIds?: string[];
 };

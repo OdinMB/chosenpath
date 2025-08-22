@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { StoryElement } from "core/types/index.js";
 import { MAX_PLAYERS } from "core/config.js";
 import {
   GameMode,
@@ -30,6 +31,41 @@ export class TemplateService {
   private storagePath: string;
   private logger = Logger.forService("LibraryService");
   private aiStoryGenerator: AIStoryGenerator;
+
+  /**
+   * Ensure all story elements have UUIDs (for AI-generated or migrated elements)
+   */
+  private ensureElementUuids(elements: StoryElement[]): StoryElement[] {
+    return elements.map(element => ({
+      ...element,
+      uuid: element.uuid || uuidv4()
+    }));
+  }
+
+  /**
+   * Merge AI-generated story elements with existing ones, preserving UUIDs where possible
+   */
+  private mergeStoryElementsPreservingUuids(
+    existingElements: StoryElement[],
+    aiGeneratedElements: StoryElement[]
+  ): StoryElement[] {
+    // Create a map of existing elements by name for UUID lookup
+    const existingByName = new Map<string, StoryElement>();
+    existingElements.forEach(el => {
+      if (el.name) {
+        existingByName.set(el.name, el);
+      }
+    });
+
+    // Process AI-generated elements, preserving UUIDs where possible
+    return aiGeneratedElements.map(aiElement => {
+      const existing = existingByName.get(aiElement.name);
+      return {
+        ...aiElement,
+        uuid: existing?.uuid || uuidv4() // Preserve existing UUID or generate new one
+      };
+    });
+  }
 
   constructor() {
     // Get the appropriate storage path using the utility function
@@ -734,7 +770,7 @@ export class TemplateService {
         imageInstructions: templateSetup.imageInstructions,
         teaser: templateSetup.teaser, // Now comes from AI generation
         guidelines: templateSetup.guidelines,
-        storyElements: templateSetup.storyElements,
+        storyElements: this.ensureElementUuids(templateSetup.storyElements || []),
         sharedOutcomes: templateSetup.sharedOutcomes,
         sharedStats: templateSetup.sharedStats,
         playerStats: templateSetup.playerStats,
@@ -817,6 +853,17 @@ export class TemplateService {
         sections as TemplateIterationSections[],
         playerCount
       );
+
+      // If story elements were updated, preserve UUIDs from existing elements
+      if (updatedSections.storyElements && template.storyElements) {
+        updatedSections.storyElements = this.mergeStoryElementsPreservingUuids(
+          template.storyElements,
+          updatedSections.storyElements
+        );
+      } else if (updatedSections.storyElements) {
+        // No existing elements, just ensure new ones have UUIDs
+        updatedSections.storyElements = this.ensureElementUuids(updatedSections.storyElements);
+      }
 
       this.logger.log(`Generated iteration for template ${id}`);
       return updatedSections as Partial<StoryTemplate>;

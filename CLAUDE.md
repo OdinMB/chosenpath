@@ -157,3 +157,4 @@ React SPA with:
 - `/.cursor/rules/image-generation.mdc` - Image generation flows
 - `/.cursor/rules/pregenerations.mdc` - Flows for pregenerating possible future story states (to reduce wait times for users)
 - `/.cursor/rules/security.mdc` - Security layers and components
+- `/.cursor/rules/template-hiding-ids.mdc` - Automated story element ID generation and deferred image file operations

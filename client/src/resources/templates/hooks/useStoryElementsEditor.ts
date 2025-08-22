@@ -21,6 +21,7 @@ type SingleElementResult = Pick<
 // Helper function to create an empty story element
 function createEmptyStoryElement(): StoryElement {
   return {
+    uuid: crypto.randomUUID(),
     id: `element_${Date.now()}`,
     name: "",
     role: "",

@@ -2,6 +2,7 @@ Smaller commits!
 
 # NEXT
 
+- 1.  One additional thing: when we open the template and no save slot is used yet, let's use the first slot for the current state. Let's only display the revert button if 2 or more slots are filled.
 - 1: reverting to an old save: add pending image operations / submit immediately.
 - 2: users should not have to worry about IDs (elements, stats). Do what we do for Outcomes (whatever that is)?
 - 1: mid-sized devices: academy/iteration cards should be next to each other

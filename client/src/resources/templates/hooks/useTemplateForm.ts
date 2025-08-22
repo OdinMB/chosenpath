@@ -182,18 +182,36 @@ export function useTemplateForm({
     },
   });
 
+  // Helper function to ensure all story elements have UUIDs (backward compatibility)
+  const ensureElementUuids = (template: StoryTemplate): StoryTemplate => {
+    if (!template.storyElements) return template;
+    
+    const updatedElements = template.storyElements.map(element => {
+      if (!element.uuid) {
+        return { ...element, uuid: crypto.randomUUID() };
+      }
+      return element;
+    });
+    
+    return { ...template, storyElements: updatedElements };
+  };
+
   // Update form data when initialTemplate prop changes
   useEffect(() => {
     Logger.UI.log(
       "Template form received updated template data:",
       initialTemplate.id
     );
-    setFormData(initialTemplate);
-    setSavedTemplate(initialTemplate);
+    
+    // Ensure all elements have UUIDs for backward compatibility
+    const migratedTemplate = ensureElementUuids(initialTemplate);
+    
+    setFormData(migratedTemplate);
+    setSavedTemplate(migratedTemplate);
     setHasUnsavedChanges(false); // Reset unsaved changes when template is loaded
 
     // Ensure player stats have assigned initial values
-    updatePlayerBackgroundStats(initialTemplate);
+    updatePlayerBackgroundStats(migratedTemplate);
   }, [initialTemplate]);
   // Determine if the template is sparse
   const isSparse = (() => {
@@ -863,14 +881,65 @@ export function useTemplateForm({
   const revertToSave = (historyEntry: SaveHistoryEntry) => {
     // Add current saved state to history before reverting
     addToSaveHistory(savedTemplate);
+    
+    // Detect story element ID changes that require image operations
+    // Use savedTemplate (actual saved state) instead of formData (which may have unsaved changes)
+    const currentElements = savedTemplate.storyElements || [];
+    const revertedElements = historyEntry.template.storyElements || [];
+    const imageOperationsForRevert: PendingImageOperation[] = [];
+    
+    Logger.UI.log('Revert comparison:', { 
+      currentCount: currentElements.length, 
+      revertedCount: revertedElements.length,
+      currentWithUuid: currentElements.filter(el => el.uuid).length,
+      revertedWithUuid: revertedElements.filter(el => el.uuid).length
+    });
+    
+    // Match elements by UUID only - templates without UUIDs get them assigned on load
+    const currentElementsByUuid = new Map<string, StoryElement>();
+    const revertedElementsByUuid = new Map<string, StoryElement>();
+    
+    // Build UUID maps for elements that have UUIDs
+    currentElements.forEach(el => {
+      if (el.uuid) {
+        currentElementsByUuid.set(el.uuid, el);
+      }
+    });
+    
+    revertedElements.forEach(el => {
+      if (el.uuid) {
+        revertedElementsByUuid.set(el.uuid, el);
+      }
+    });
+    
+    // Find elements by UUID that need image operations
+    currentElementsByUuid.forEach((currentElement, uuid) => {
+      const revertedElement = revertedElementsByUuid.get(uuid);
+      if (revertedElement && currentElement.id !== revertedElement.id) {
+        // Same element (by UUID) but different IDs - need to rename image file
+        imageOperationsForRevert.push({
+          type: 'rename',
+          oldId: currentElement.id,
+          newId: revertedElement.id
+        });
+        Logger.UI.log(`UUID-based revert operation: ${currentElement.id} -> ${revertedElement.id} (UUID: ${uuid})`);
+      }
+    });
+    
     // Set the selected history entry as the current state
     setFormData(historyEntry.template);
     setSavedTemplate(historyEntry.template);
     setHasUnsavedChanges(false);
     
-    // Clear any pending image operations since we're reverting to a previous state
-    setPendingImageOperations([]);
-    Logger.UI.log("Cleared pending image operations due to template revert");
+    // Set pending image operations for any ID changes detected during revert
+    if (imageOperationsForRevert.length > 0) {
+      setPendingImageOperations(imageOperationsForRevert);
+      Logger.UI.log(`Queued ${imageOperationsForRevert.length} image operations for revert:`, imageOperationsForRevert);
+    } else {
+      // Clear any existing pending operations if no new ones are needed
+      setPendingImageOperations([]);
+      Logger.UI.log("Cleared pending image operations due to template revert (no ID changes detected)");
+    }
   };
 
   // Return all the handlers and state needed by the UI component
