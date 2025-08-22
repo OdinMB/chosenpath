@@ -2,8 +2,6 @@ Smaller commits!
 
 # NEXT
 
-- 1.  One additional thing: when we open the template and no save slot is used yet, let's use the first slot for the current state. Let's only display the revert button if 2 or more slots are filled.
-
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
 - 2: meet future self should only have one possible identity

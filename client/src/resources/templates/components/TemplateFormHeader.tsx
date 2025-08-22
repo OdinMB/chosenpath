@@ -36,7 +36,7 @@ export const TemplateFormHeader: React.FC<TemplateFormHeaderProps> = ({
             leftIcon={<Icons.Close className="h-4 w-4" />}
           />
         )}
-        {saveHistoryLength > 0 && (
+        {saveHistoryLength > 1 && (
           <PrimaryButton
             type="button"
             variant="outline"

@@ -210,6 +210,12 @@ export function useTemplateForm({
     setSavedTemplate(migratedTemplate);
     setHasUnsavedChanges(false); // Reset unsaved changes when template is loaded
 
+    // Add the initial template state to the first save slot
+    setSaveHistory([{
+      template: { ...migratedTemplate },
+      timestamp: new Date(),
+    }]);
+
     // Ensure player stats have assigned initial values
     updatePlayerBackgroundStats(migratedTemplate);
   }, [initialTemplate]);
