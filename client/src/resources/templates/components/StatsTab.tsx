@@ -90,7 +90,7 @@ export const StatsTab = ({
   return (
     <div className="space-y-8">
       {showContextCards && !readOnly && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AcademyContextCard
             lectureHref="/academy/stats"
             blurb="Stats model what matters in your World: conditions, resources, abilities, relationships, ..."

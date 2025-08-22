@@ -47,7 +47,7 @@ export const Tabs = <T extends string>({
                   key={tab.id}
                   type="button"
                   className={`text-slate-700 hover:text-primary-600 py-1 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset rounded transition-all duration-200 ${
-                    activeTab === tab.id ? "font-semibold text-primary-700 bg-primary-50" : ""
+                    activeTab === tab.id ? "font-semibold text-primary-700" : ""
                   }`}
                   onClick={() => onTabChange(tab.id)}
                 >

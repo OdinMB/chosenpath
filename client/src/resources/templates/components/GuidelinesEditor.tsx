@@ -55,7 +55,7 @@ export const GuidelinesEditor: React.FC<GuidelinesEditorProps> = ({
     <div className="space-y-6">
       {/* Context cards */}
       {showContextCards && !readOnly && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AcademyContextCard
             lectureHref="/academy/setting"
             blurb="Focus on your World's premise and vision. Keep specifics for other sections."
