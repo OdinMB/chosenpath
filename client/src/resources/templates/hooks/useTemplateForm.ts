@@ -665,7 +665,7 @@ export function useTemplateForm({
     const statIdChanges: Array<{ oldId: string; newId: string }> = [];
     
     // Auto-generate IDs for stats that have names but no IDs, and update IDs when names change
-    const processStats = (stats: Stat[] | undefined, existingIds: string[]): Stat[] | undefined => {
+    const processStats = (stats: Stat[] | undefined, existingIds: string[], statType: 'shared' | 'player'): Stat[] | undefined => {
       if (!stats) return stats;
       
       return stats.map(stat => {
@@ -675,8 +675,15 @@ export function useTemplateForm({
         }
         
         // Generate or update ID from name
-        const otherIds = existingIds.filter(id => id !== stat.id);
-        const newId = generateIdFromName(stat.name, otherIds);
+        // Extract base IDs (without prefixes) for uniqueness checking
+        const otherBaseIds = existingIds
+          .filter(id => id !== stat.id)
+          .map(id => id.replace(/^(shared_|player_)/, ''));
+        const baseId = generateIdFromName(stat.name, otherBaseIds);
+        
+        // Add appropriate prefix for the stat type
+        const prefix = statType === 'shared' ? 'shared_' : 'player_';
+        const newId = prefix + baseId;
         
         // Track ID changes for updating player background references
         if (stat.id && stat.id !== newId) {
@@ -718,13 +725,13 @@ export function useTemplateForm({
     }
 
     // Process shared stats first, then player stats with updated existing IDs
-    const processedSharedStats = processStats(updates.sharedStats, [...existingIds]);
+    const processedSharedStats = processStats(updates.sharedStats, [...existingIds], 'shared');
     
     // Update existing IDs with any newly generated shared stat IDs
     const newSharedIds = processedSharedStats?.filter(s => s.id && !existingIds.includes(s.id)).map(s => s.id!) || [];
     const updatedExistingIds = [...existingIds, ...newSharedIds];
     
-    const processedPlayerStats = processStats(updates.playerStats, updatedExistingIds);
+    const processedPlayerStats = processStats(updates.playerStats, updatedExistingIds, 'player');
 
     // Update player background stat references if there are stat ID changes
     const updatedPlayerOptions: Record<string, PlayerOptionsGeneration> = {};
