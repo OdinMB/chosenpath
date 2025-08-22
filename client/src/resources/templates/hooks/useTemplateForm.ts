@@ -661,6 +661,9 @@ export function useTemplateForm({
     playerStats?: Stat[];
     playerOptions?: Record<PlayerSlot, PlayerOptionsGeneration>;
   }) => {
+    // Track ID changes for updating player background references
+    const statIdChanges: Array<{ oldId: string; newId: string }> = [];
+    
     // Auto-generate IDs for stats that have names but no IDs, and update IDs when names change
     const processStats = (stats: Stat[] | undefined, existingIds: string[]): Stat[] | undefined => {
       if (!stats) return stats;
@@ -674,6 +677,11 @@ export function useTemplateForm({
         // Generate or update ID from name
         const otherIds = existingIds.filter(id => id !== stat.id);
         const newId = generateIdFromName(stat.name, otherIds);
+        
+        // Track ID changes for updating player background references
+        if (stat.id && stat.id !== newId) {
+          statIdChanges.push({ oldId: stat.id, newId });
+        }
         
         // Update existing IDs list to maintain uniqueness
         const existingIndex = existingIds.indexOf(stat.id!);
@@ -718,12 +726,42 @@ export function useTemplateForm({
     
     const processedPlayerStats = processStats(updates.playerStats, updatedExistingIds);
 
+    // Update player background stat references if there are stat ID changes
+    const updatedPlayerOptions: Record<string, PlayerOptionsGeneration> = {};
+    if (statIdChanges.length > 0) {
+      // Get current player options and update stat references
+      const playerSlots = PLAYER_SLOTS.slice(0, MAX_PLAYERS);
+      playerSlots.forEach((slot) => {
+        const currentPlayerOption = formData[slot as keyof StoryTemplate] as PlayerOptionsGeneration;
+        if (currentPlayerOption?.possibleCharacterBackgrounds) {
+          const updatedBackgrounds = currentPlayerOption.possibleCharacterBackgrounds.map((background) => {
+            const updatedStatValues = background.initialPlayerStatValues.map((statValue) => {
+              // Check if this stat ID needs to be updated
+              const change = statIdChanges.find(c => c.oldId === statValue.statId);
+              return change ? { ...statValue, statId: change.newId } : statValue;
+            });
+            
+            return {
+              ...background,
+              initialPlayerStatValues: updatedStatValues
+            };
+          });
+          
+          updatedPlayerOptions[slot] = {
+            ...currentPlayerOption,
+            possibleCharacterBackgrounds: updatedBackgrounds
+          };
+        }
+      });
+    }
+
     setFormData((prev: StoryTemplate) => ({
       ...prev,
       statGroups: updates.statGroups || prev.statGroups,
       sharedStats: processedSharedStats || prev.sharedStats,
       playerStats: processedPlayerStats || prev.playerStats,
       ...(updates.playerOptions || {}),
+      ...updatedPlayerOptions, // Apply updated player background stat references
     }));
   };
 
