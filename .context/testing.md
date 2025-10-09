@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 ### Testing Commands
 
 **Comprehensive check from the root directory:**

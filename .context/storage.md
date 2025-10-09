@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 ### PostgreSQL Tables
 
 - **users**: Authentication, roles, preferences

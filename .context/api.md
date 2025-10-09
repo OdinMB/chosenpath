@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 # Adding a new API interaction (except game interactions, which use websocket flows)
 
 - Add types for request and response in [api.ts](mdc:core/types/api.ts)

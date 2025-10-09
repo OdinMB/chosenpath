@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 ## Deployment & Workspace Dependencies
 
 This monorepo deploys successfully to platforms like Render using workspace isolation:

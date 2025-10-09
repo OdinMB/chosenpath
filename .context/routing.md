@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 # Client routing
 
 - **URL Structure**: Feature/role-based first (`/admin/templates`, `/page/templates/:id`)

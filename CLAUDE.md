@@ -12,7 +12,7 @@ npm run lint        # ESLint + TypeScript on all source files
 npm run test:all    # Tests + test linting
 ```
 
-See `/.cursor/rules/testing.mdc` for detailed testing commands and patterns.
+See `/.context/testing.md` for detailed testing commands and patterns.
 
 Don't use `npm run dev`. The site is already available on localhost:5173, and the server is already running on :3000.
 
@@ -22,7 +22,7 @@ After implementing any front-end change, perform visual checks until the task is
 
 1. **Identify what changed** - Review the modified components/pages
 2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view
-3. **Verify design compliance** - Compare against `/.cursor/rules/design-principles.md` and `/.cursor/rules/style-guide.md`
+3. **Verify design compliance** - Compare against `/.context/design-principles.md` and `/.context/style-guide.md`
 4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
 5. **Check acceptance criteria** - Review any provided context files or requirements
 6. **Capture evidence** - Take full page screenshot at desktop and mobile viewports of each changed view
@@ -57,7 +57,7 @@ Invoke the `code-reviewer` subagent for thorough code validation when:
 - Before finalizing PRs/tasks with substantial code changes
 - Needing systematic review of architecture, security, and maintainability
 
-Take project-specific requirements into account: `.cursor/rules/testing.mdc`.
+Take project-specific requirements into account: `.context/testing.md`.
 
 ### Content Management
 
@@ -146,15 +146,15 @@ React SPA with:
 
 ## Additional context information
 
-- `/.cursor/rules/folder-structure.mdc` - More details about the folder structure of the repo
-- `/.cursor/rules/deployment.mdc` - Deployment, Workspace Dependencies, Install commands
-- `/.cursor/rules/api.mdc` - API flows between client and server (with end-to-end instructions)
-- `/.cursor/rules/storage.mdc` - Database schemas and file storage system
-- `/.cursor/rules/testing.mdc` - Unit and integration tests, commands for checking for ESLint and TypeScript issues
-- `/.cursor/rules/design-principles.mdc` - Design principles for frontend
-- `/.cursor/rules/ui.mdc` - Style guide
-- `/.cursor/rules/story.mdc` - Story state and Story model classes
-- `/.cursor/rules/image-generation.mdc` - Image generation flows
-- `/.cursor/rules/pregenerations.mdc` - Flows for pregenerating possible future story states (to reduce wait times for users)
-- `/.cursor/rules/security.mdc` - Security layers and components
-- `/.cursor/rules/template-hiding-ids.mdc` - Automated story element ID generation and deferred image file operations
+- `/.context/folder-structure.md` - More details about the folder structure of the repo
+- `/.context/deployment.md` - Deployment, Workspace Dependencies, Install commands
+- `/.context/api.md` - API flows between client and server (with end-to-end instructions)
+- `/.context/storage.md` - Database schemas and file storage system
+- `/.context/testing.md` - Unit and integration tests, commands for checking for ESLint and TypeScript issues
+- `/.context/design-principles.md` - Design principles for frontend
+- `/.context/ui.md` - Style guide
+- `/.context/story.md` - Story state and Story model classes
+- `/.context/image-generation.md` - Image generation flows
+- `/.context/pregenerations.md` - Flows for pregenerating possible future story states (to reduce wait times for users)
+- `/.context/security.md` - Security layers and components
+- `/.context/template-hiding-ids.md` - Automated story element ID generation and deferred image file operations

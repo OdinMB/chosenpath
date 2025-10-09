@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 - **Authentication**: JWT tokens with secure cookie handling
 - **CSRF protection**: Token-based CSRF prevention
 - **Rate limiting**: API endpoints protected against abuse

@@ -12,7 +12,8 @@
   "files.exclude": {
     "**/__pycache__": true,
     "**/node_modules": true,
-    "**/dist": true
+    "**/dist": true,
+    "**/.playwright-mcp": true
   },
   "workbench.tree.renderIndentGuides": "always",
   "explorer.decorations.badges": true,

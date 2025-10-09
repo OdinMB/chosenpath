@@ -1,9 +1,3 @@
----
-description: When the StoryState must be manipulated
-globs: server/src/services/Story.ts, shared/types/story.ts
-alwaysApply: false
----
-
 ### To manipulate and get information from the StoryState, use model classes
 
 - Relevant model classes include Story.ts and ClientStateManager.ts, PlayerManager.ts, and ThreadManager.ts (all in shared/models directory).

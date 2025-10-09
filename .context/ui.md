@@ -1,9 +1,3 @@
----
-description: UI Component Style Guide and Usage Patterns
-globs:
-alwaysApply: false
----
-
 # UI Style Guide
 
 ## Component Library Location

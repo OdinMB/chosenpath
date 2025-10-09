@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 # Design Principles for Interactive Fiction Game
 
 ## I. Core Design Philosophy

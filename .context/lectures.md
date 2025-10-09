@@ -1,0 +1,1 @@
+Make sure that lecture pages are in sync with [sitemap.xml](mdc:client/public/sitemap.xml).

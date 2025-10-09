@@ -36,7 +36,8 @@
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_navigate_back",
       "mcp__playwright__browser_wait_for",
-      "mcp__playwright__browser_evaluate"
+      "mcp__playwright__browser_evaluate",
+      "WebFetch(domain:platform.openai.com)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
