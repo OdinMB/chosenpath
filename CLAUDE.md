@@ -148,7 +148,8 @@ React SPA with:
 
 - `/.context/folder-structure.md` - More details about the folder structure of the repo
 - `/.context/deployment.md` - Deployment, Workspace Dependencies, Install commands
-- `/.context/api.md` - API flows between client and server (with end-to-end instructions)
+- `/.context/api.md` - Current endpoints
+- `/.context/api-dev.md` - How to create new API flows between client and server
 - `/.context/storage.md` - Database schemas and file storage system
 - `/.context/testing.md` - Unit and integration tests, commands for checking for ESLint and TypeScript issues
 - `/.context/design-principles.md` - Design principles for frontend
