@@ -21,7 +21,7 @@
     "@dnd-kit/sortable": "^7.0.2",
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/react": "^0.27.15",
-    "@langchain/core": "^0.3.39",
+    "@langchain/core": "^0.3.80",
     "@langchain/openai": "^0.4.3",
     "@tippyjs/react": "^4.2.6",
     "axios": "^1.8.4",

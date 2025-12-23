@@ -27,7 +27,7 @@
   "license": "",
   "dependencies": {
     "@langchain/anthropic": "^0.3.21",
-    "@langchain/core": "^0.3.68",
+    "@langchain/core": "^0.3.80",
     "@langchain/google-genai": "^0.2.9",
     "@langchain/openai": "^0.6.7",
     "@types/cookie-parser": "^1.4.8",
