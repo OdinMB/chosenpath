@@ -46,7 +46,7 @@
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.1",
     "langchain": "^0.3.30",
-    "multer": "^2.0.1",
+    "multer": "^2.1.0",
     "openai": "^5.12.2",
     "pg": "^8.16.0",
     "sharp": "^0.34.2",
