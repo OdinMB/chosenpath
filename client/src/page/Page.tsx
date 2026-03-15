@@ -139,46 +139,55 @@ export function Page() {
         <div className="mb-8 text-primary-800">
           <p className="mb-2">
             Dive into interactive stories. Play alone or invite friends to shape
-            a story with multiple characters — whether you're exploring distant
-            galaxies or serving croissants in a Parisian café.
+            a story with multiple characters. Create any world you want, with
+            full control for{" "}
+            <a
+              href="/for-storytellers"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/for-storytellers");
+              }}
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
+            >
+              ambitious storytellers
+            </a>
+            .
           </p>
           <p className="mb-2">
-            For creators, Chosen Path is a{" "}
+            Reach out if you want to use interactive stories{" "}
             <a
-              href="/academy"
+              href="/for-educators"
               onClick={(e) => {
                 e.preventDefault();
-                navigate("/academy/story-engine-not-writing-tool");
+                navigate("/for-educators");
               }}
               className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
-              Story Engine
+              in the classroom
             </a>
-            . Define characters, conflicts, mechanics, possible endings, and
-            much more. Chosen Path generates prose and images, applies
-            mechanics, and coordinates multiplayer.
-            {/* <a
-              href="/users/signin"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate("/users/signin");
-              }}
-              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
-            >
-              Sign in
-            </a>{" "} */}{" "}
-            Visit{" "}
+            ,{" "}
             <a
-              href="/academy"
+              href="/for-coaches"
               onClick={(e) => {
                 e.preventDefault();
-                navigate("/academy");
+                navigate("/for-coaches");
               }}
               className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
             >
-              Worldbuilding Academy
-            </a>{" "}
-            to learn more.
+              in your coaching practice
+            </a>
+            , or{" "}
+            <a
+              href="/for-therapists"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("/for-therapists");
+              }}
+              className="text-link focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent rounded"
+            >
+              for narrative therapy
+            </a>
+            .
           </p>
           <p className="mb-2">
             <strong>Everything is free during the beta phase.</strong>

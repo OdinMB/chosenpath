@@ -257,8 +257,33 @@ export function Credits() {
             </div>
           </div>
         </section>
+
+        <section>
+          <h2 className="text-lg font-montserrat font-semibold mb-3 text-primary-700">
+            Chosen Path
+          </h2>
+          <p className="text-sm text-primary-600">
+            Chosen Path itself is open-source under{" "}
+            <a
+              href="https://github.com/OdinMB/chosenpath"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-600 hover:text-primary-800 underline"
+            >
+              AGPL-3.0
+            </a>
+            . See the{" "}
+            <a
+              href="/stewardship"
+              className="text-primary-600 hover:text-primary-800 underline"
+            >
+              Stewardship
+            </a>{" "}
+            page for details on contributing, licensing, and adoption.
+          </p>
+        </section>
       </div>
-      
+
       <Footer />
     </div>
   );
