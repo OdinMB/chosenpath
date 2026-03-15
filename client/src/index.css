@@ -130,7 +130,7 @@
   }
 
   .footer-link {
-    @apply text-primary-400 hover:text-primary-600;
+    @apply text-primary-500 hover:text-primary-700;
   }
 }
 
