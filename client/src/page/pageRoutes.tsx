@@ -11,6 +11,8 @@ import { Privacy } from "./static/Privacy";
 import { ForStorytellers } from "./static/ForStorytellers";
 import { ForCoaches } from "./static/ForCoaches";
 import { ForEducators } from "./static/ForEducators";
+import { ForTherapists } from "./static/ForTherapists";
+import { Stewardship } from "./static/Stewardship";
 import { Academy } from "./components/Academy";
 import { LecturePage } from "./components/LecturePage";
 import { ScrollRestoration } from "react-router-dom";
@@ -65,6 +67,16 @@ export const pageRoutes: RouteObject[] = [
         path: "/for-educators",
         element: <ForEducators />,
         id: "for-educators",
+      },
+      {
+        path: "/for-therapists",
+        element: <ForTherapists />,
+        id: "for-therapists",
+      },
+      {
+        path: "/stewardship",
+        element: <Stewardship />,
+        id: "stewardship",
       },
       {
         path: "/academy",
