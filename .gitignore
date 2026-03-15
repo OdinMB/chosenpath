@@ -16,7 +16,7 @@ dist-ssr
 tsconfig.tsbuildinfo
 
 # Editor directories and files
-!.vscode/extensions.json
+.vscode/
 .idea
 .DS_Store
 *.suo
@@ -33,6 +33,7 @@ tsconfig.tsbuildinfo
 .vite/**
 
 # AI coding tools
+.claude/settings.local.json
 .playwright-mcp/
 dev-screenshot.png
 
