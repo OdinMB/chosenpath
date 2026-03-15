@@ -4,7 +4,7 @@
   "private": true,
   "keywords": [],
   "author": "Odin Mühlenbein",
-  "license": "",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "workspaces": [
     "client",
