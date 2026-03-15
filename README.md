@@ -10,7 +10,7 @@ An AI-powered multiplayer interactive fiction platform. Create any world you wan
 
 <p align="center">
   <img src="client/public/category-fiction.jpeg" alt="Interactive fiction" width="32%">
-  <img src="client/public/landing/multiplayer3.jpeg" alt="Multiplayer storytelling" width="32%">
+  <img src="client/public/landing/multiplayer2.jpeg" alt="Multiplayer storytelling" width="32%">
   <img src="client/public/category-futureself.jpeg" alt="Future-self exploration" width="32%">
 </p>
 
