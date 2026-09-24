@@ -73,14 +73,24 @@ export function supportsExtendedQualities(model: string): boolean {
   return model.startsWith("gpt-image-2.5");
 }
 
+/** The quality that will actually be sent: xhigh/max become high on older models. */
+export function effectiveImageQuality(
+  model: string,
+  quality: ImageQuality
+): ImageQuality {
+  return EXTENDED_QUALITIES.has(quality) && !supportsExtendedQualities(model)
+    ? IMAGE_QUALITIES.HIGH
+    : quality;
+}
+
 function resolveQuality(model: string, quality: ImageQuality): ImageQuality {
-  if (EXTENDED_QUALITIES.has(quality) && !supportsExtendedQualities(model)) {
+  const effective = effectiveImageQuality(model, quality);
+  if (effective !== quality) {
     Logger.Story.warn(
-      `Image quality '${quality}' only exists on gpt-image-2.5 models; sending 'high' to ${model}`
+      `Image quality '${quality}' only exists on gpt-image-2.5 models; sending '${effective}' to ${model}`
     );
-    return IMAGE_QUALITIES.HIGH;
   }
-  return quality;
+  return effective;
 }
 
 function capReferenceImages(images: Uploadable[]): Uploadable[] {
@@ -105,7 +115,7 @@ function readCachedTokens(details: unknown): number | undefined {
   return undefined;
 }
 
-function mapUsage(
+export function mapImageUsage(
   usage: ImagesResponse["usage"]
 ): ImageApiUsage | undefined {
   if (!usage) {
@@ -164,7 +174,7 @@ export async function requestImage(
 
   return {
     buffer: Buffer.from(b64, "base64"),
-    usage: mapUsage(response.usage),
+    usage: mapImageUsage(response.usage),
     model: req.model,
     quality,
     size: req.size,

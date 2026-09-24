@@ -53,3 +53,15 @@ Models and settings
 - Errors: `error.type === "image_generation_user_error"` (GPT Image 2.5) is classified CONTENT_POLICY or COPYRIGHT with `retryable: false`, because the unchanged request fails again. The app itself never retries; the OpenAI SDK retries only 408/409/429/5xx.
 - Prompt wording lives in `server/src/images/imagePrompts.ts`. The eval builds its prompts with the same functions, so a wording change also changes what the eval measures.
 - Template covers are generated at 1024x1536 and shrunk to 512x768 (`templateCover.ts`).
+
+Evaluating image models
+
+- Harness: `server/src/evals/imageModelEval/`, run from `server/` (it finds `data/` and `server/.env` relative to the working directory):
+  - `npm run eval:images` (dry run, the default): case list, arms per item, call count, estimated spend and duration. No API calls.
+  - `npm run eval:images -- --probe --max-spend 0.5`: which request parameters GPT Image 2.5 accepts (size `auto` on generate and edit, jpeg with compression, png fallback, xhigh on 1.5). Raw SDK calls; checks that would pass the cap are skipped.
+  - `npm run eval:images -- --run --max-spend 8`: the replay. Refuses to start if the estimate exceeds the cap, stops scheduling when the next call would, and resumes from `calls.jsonl` without repeating finished calls.
+- What it replays: stored beat `imageRequest`s from `data/stories/*/story.json` and `pregeneration_*.json` (12 items plus 3 reserves, round-robin across templates, near-duplicate reference sets deferred), plus 2 custom-story covers, 1 custom-story portrait, 1 template cover and 1 template portrait. Prompts come from `imagePrompts.ts` and requests from `requestImage`, exactly as in production. It reads files only; no database, queue or route module is imported.
+- Arms: `gpt-image-1.5` baseline at today's quality against Flare/Sunburst at medium/high (xhigh for the template cover), plus a 1536x1024 Flare arm for beats. Each item has 2 to 4 options.
+- Output (gitignored, never committed): `DOCS/2026-09-24_gpt6-eval/` with `rating-sets.json` (the owner's blind rating file), `rating-key.json` (which label is which arm), `results.md` (per-arm failures, latency, tokens, $ per image and per story, automated gates), `calls.jsonl`, `probe.json` and `images/`.
+- Blindness: any rater-visible text matching `LEAK_PATTERN` (`blinding.ts`: model names, "flare", "sora") drops the case at selection, and the rating file is only written if nothing in it matches.
+- Pacing and cost: at most 5 request starts per rolling minute (Tier 1) and 3 in flight; only rate limits and transient failures are retried (twice, 30 s then 60 s). Cost comes from reported usage; estimates assume 1,500 input tokens per reference image.
