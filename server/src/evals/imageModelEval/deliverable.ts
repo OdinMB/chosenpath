@@ -35,10 +35,16 @@ function copyReferences(outDir: string, plans: RatingSetPlan[], ratingSets: Rati
   }
 }
 
-/** Images stored before storeOutput stripped content credentials are cleaned here. */
-function stripRatedImages(outDir: string, ratingSets: RatingSets) {
+/**
+ * Images stored before storeOutput stripped content credentials are cleaned here.
+ * Every rated image also gets the same modification time: baselines are generated
+ * first, so sorting a folder by date would otherwise point at today's setting.
+ */
+function stripRatedImages(outDir: string, ratingSets: RatingSets, stampedAt: Date) {
   for (const option of ratingSets.sets.flatMap((s) => s.items.flatMap((i) => i.options))) {
-    stripContentCredentialsInFile(path.join(outDir, option.src));
+    const file = path.join(outDir, option.src);
+    stripContentCredentialsInFile(file);
+    fs.utimesSync(file, stampedAt, stampedAt);
   }
 }
 
@@ -60,7 +66,7 @@ export function writeDeliverable(input: {
   const { ratingSets, ratingKey } = buildRatingFiles(plans, records, outputExists);
 
   copyReferences(outDir, plans, ratingSets);
-  stripRatedImages(outDir, ratingSets);
+  stripRatedImages(outDir, ratingSets, input.now);
 
   const itemCount = (setId: string) =>
     ratingSets.sets.find((s) => s.id === setId)?.items.length ?? 0;
