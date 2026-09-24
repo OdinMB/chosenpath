@@ -33,7 +33,7 @@ import {
   IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
   IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
   IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
-} from "config.js";
+} from "server/config.js";
 import {
   checkRateLimitForRequest,
   incrementRateLimitForRequest,

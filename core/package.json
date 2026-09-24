@@ -12,7 +12,7 @@
     "./types/*": "./dist/types/*"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../node_modules/typescript/bin/tsc",
     "watch": "tsc -w"
   },
   "devDependencies": {

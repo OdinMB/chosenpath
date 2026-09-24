@@ -57,11 +57,10 @@ moduleNameMapper: {
 ```json
 {
   "compilerOptions": {
-    "baseUrl": "..",
     "paths": {
-      "client/*": ["src/*"],
-      "core/*": ["../core/*"],
-      "shared/*": ["src/shared/*"],
+      "client/*": ["../src/*"],
+      "core/*": ["../../core/*"],
+      "shared/*": ["../src/shared/*"],
       // ... other aliases matching Vite config
     }
   }

@@ -23,18 +23,17 @@
     "noUncheckedSideEffectImports": true,
 
     /* Path aliases */
-    "baseUrl": ".",
     "paths": {
-      "client/*": ["src/*"],
+      "client/*": ["./src/*"],
       "core/*": ["../core/*"],
-      "shared/*": ["src/shared/*"],
-      "components": ["src/shared/components"],
-      "components/*": ["src/shared/components/*"],
-      "admin/*": ["src/admin/*"],
-      "game/*": ["src/game/*"],
-      "page/*": ["src/page/*"],
-      "users/*": ["src/users/*"],
-      "resources/*": ["src/resources/*"]
+      "shared/*": ["./src/shared/*"],
+      "components": ["./src/shared/components"],
+      "components/*": ["./src/shared/components/*"],
+      "admin/*": ["./src/admin/*"],
+      "game/*": ["./src/game/*"],
+      "page/*": ["./src/page/*"],
+      "users/*": ["./src/users/*"],
+      "resources/*": ["./src/resources/*"]
     }
   },
   "include": ["src/**/*"]

@@ -3,13 +3,12 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "src",
-    "baseUrl": "src",
     "paths": {
-      "core/*": ["../../core/*"],
-      "server/*": ["./*"],
-      "shared/*": ["./shared/*"],
-      "game/*": ["./game/*"],
-      "users/*": ["./users/*"]
+      "core/*": ["../core/*"],
+      "server/*": ["./src/*"],
+      "shared/*": ["./src/shared/*"],
+      "game/*": ["./src/game/*"],
+      "users/*": ["./src/users/*"]
     },
     "strict": true,
     "strictNullChecks": true,
@@ -18,11 +17,13 @@
     "strictFunctionTypes": true,
     "noImplicitAny": false,
     "noImplicitThis": false,
-    "alwaysStrict": false,
     "types": ["node"],
     "typeRoots": ["../node_modules/@types", "./node_modules/@types"],
     "moduleResolution": "NodeNext",
     "module": "NodeNext"
+  },
+  "tsc-alias": {
+    "replacers": { "base-url": { "enabled": true } }
   },
   "references": [{ "path": "../core" }],
   "include": ["src/**/*"],

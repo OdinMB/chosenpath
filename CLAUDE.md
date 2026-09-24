@@ -147,7 +147,7 @@ React SPA with:
 ## Additional context information
 
 - `/.context/folder-structure.md` - More details about the folder structure of the repo
-- `/.context/deployment.md` - Deployment, Workspace Dependencies, Install commands
+- `/.context/deployment.md` - Deployment, Workspace Dependencies, Install commands, why the server build pins its TypeScript compiler (read before touching build scripts or tsconfig `paths`)
 - `/.context/api.md` - Current endpoints
 - `/.context/api-dev.md` - How to create new API flows between client and server
 - `/.context/storage.md` - Database schemas and file storage system

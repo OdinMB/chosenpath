@@ -8,7 +8,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "build": "cd ../core && npm install && npm run build && cd ../server && npm install && rm -rf dist && tsc --project tsconfig.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
+    "build": "cd ../core && npm install --include=dev && node ../node_modules/typescript/bin/tsc --version && npm run build && cd ../server && npm install --include=dev && rm -rf dist && node ../node_modules/typescript/bin/tsc --project tsconfig.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
     "dev": "tsx watch src/index.ts",
     "eval:images": "tsx src/evals/imageModelEval/run.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js",

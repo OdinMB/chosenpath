@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -13,19 +13,18 @@
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
-    "baseUrl": "..",
     "jsx": "react-jsx",
     "paths": {
-      "client/*": ["src/*"],
-      "core/*": ["../core/*"],
-      "shared/*": ["src/shared/*"],
-      "components": ["src/shared/components"],
-      "components/*": ["src/shared/components/*"],
-      "admin/*": ["src/admin/*"],
-      "game/*": ["src/game/*"],
-      "page/*": ["src/page/*"],
-      "users/*": ["src/users/*"],
-      "resources/*": ["src/resources/*"]
+      "client/*": ["../src/*"],
+      "core/*": ["../../core/*"],
+      "shared/*": ["../src/shared/*"],
+      "components": ["../src/shared/components"],
+      "components/*": ["../src/shared/components/*"],
+      "admin/*": ["../src/admin/*"],
+      "game/*": ["../src/game/*"],
+      "page/*": ["../src/page/*"],
+      "users/*": ["../src/users/*"],
+      "resources/*": ["../src/resources/*"]
     }
   },
   "include": [
