@@ -1,6 +1,6 @@
 import express from "express";
-import multer from "multer";
 import type { Request } from "express";
+import { templateUpload } from "./templateUpload.js";
 
 // Extended request interface for multer file uploads
 interface RequestWithFile extends Request {
@@ -52,10 +52,6 @@ import {
   checkRateLimitForRequest,
   incrementRateLimitForRequest,
 } from "shared/rateLimiter.js";
-
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
 
 const router = express.Router();
 const templateService = new TemplateService();
@@ -767,7 +763,7 @@ router.post(
   "/templates/:id/files",
   verifyUser(),
   verifyTemplateEditAccess(),
-  upload.single("file"),
+  templateUpload.single("file"),
   async (req, res) => {
     const { id } = req.params;
     const requestId = req.query.requestId as string;
@@ -847,7 +843,7 @@ router.post(
   "/templates/import",
   verifyUser(),
   (req, res, next) => verifyTemplateCreatePermission(req, res, next),
-  upload.single("zip"),
+  templateUpload.single("zip"),
   async (req, res) => {
     const requestId = (req.query.requestId as string) || "unknown";
 
