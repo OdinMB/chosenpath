@@ -139,6 +139,48 @@ export function gateFailures(arm: ArmMetrics, baseline: ArmMetrics): string[] {
   return reasons;
 }
 
+function sortedSiteMetrics(site: CallSite, metrics: ArmMetrics[]): ArmMetrics[] {
+  return metrics
+    .filter((m) => m.callSite === site)
+    .sort((a, b) => Number(b.baseline) - Number(a.baseline) || a.armKey.localeCompare(b.armKey));
+}
+
+export type SiteSummary = {
+  /** Baseline first, then the candidates alphabetically */
+  armsTested: string[];
+  ruledOut: { armKey: string; reasons: string[] }[];
+  baselineUsdPerImage?: number;
+  /** The cheapest non-baseline arm that passes every gate */
+  cheapestPassing?: { armKey: string; usdPerImage: number };
+};
+
+/** What the automated gates leave standing on one call site; undefined without a baseline. */
+export function summarizeSite(site: CallSite, metrics: ArmMetrics[]): SiteSummary | undefined {
+  const siteMetrics = sortedSiteMetrics(site, metrics);
+  const baseline = siteMetrics.find((m) => m.baseline);
+  if (!baseline) {
+    return undefined;
+  }
+  const candidates = siteMetrics
+    .filter((m) => !m.baseline)
+    .map((m) => ({ metrics: m, reasons: gateFailures(m, baseline) }));
+  const passing = candidates
+    .filter((c) => c.reasons.length === 0 && c.metrics.usdPerImage !== undefined)
+    .sort((a, b) => (a.metrics.usdPerImage ?? 0) - (b.metrics.usdPerImage ?? 0));
+  const cheapest = passing[0]?.metrics;
+  return {
+    armsTested: siteMetrics.map((m) => m.armKey),
+    ruledOut: candidates
+      .filter((c) => c.reasons.length > 0)
+      .map((c) => ({ armKey: c.metrics.armKey, reasons: c.reasons })),
+    baselineUsdPerImage: baseline.usdPerImage,
+    cheapestPassing:
+      cheapest?.usdPerImage === undefined
+        ? undefined
+        : { armKey: cheapest.armKey, usdPerImage: cheapest.usdPerImage },
+  };
+}
+
 function usd(value: number | undefined, digits = 4): string {
   return value === undefined ? "n/a" : `$${value.toFixed(digits)}`;
 }
@@ -164,10 +206,62 @@ function modelQuality(armKey: string): string {
   return armKey.replace(/-\d+x\d+$/, "");
 }
 
+function compatibilityLine(probe: ProbeReport | undefined): string {
+  if (!probe) {
+    return "- Request compatibility: not checked, the probe has not run.";
+  }
+  const rejected = probe.results.filter(
+    (r) => r.model.startsWith("gpt-image-2.5") && r.outcome === "rejected"
+  );
+  return rejected.length === 0
+    ? "- Request compatibility: GPT Image 2.5 accepted every parameter the app sends (jpeg with output_compression, moderation low, size auto on generate and on edit with references; see the probe results), so no size or format fallback is needed."
+    : `- Request compatibility: GPT Image 2.5 rejected ${rejected.map((r) => r.id).join(", ")}; see the probe results.`;
+}
+
+function renderSummary(metrics: ArmMetrics[], probe: ProbeReport | undefined): string {
+  const rows = CALL_SITES.map(({ site, title }) => {
+    const summary = summarizeSite(site, metrics);
+    if (!summary) {
+      return `| ${title} | not run | | | |`;
+    }
+    const ruledOut =
+      summary.ruledOut.length === 0
+        ? "none"
+        : summary.ruledOut.map((r) => `${r.armKey} (${r.reasons.join("; ")})`).join("<br>");
+    const cheapest = summary.cheapestPassing
+      ? `${summary.cheapestPassing.armKey}, ${usd(summary.cheapestPassing.usdPerImage)} per image (${versus(summary.cheapestPassing.usdPerImage, summary.baselineUsdPerImage)} vs baseline)`
+      : "none";
+    return `| ${title} | ${summary.armsTested.join("<br>")} | ${ruledOut} | ${cheapest} | Awaits the owner's blind rating |`;
+  });
+  return [
+    "## Summary",
+    "",
+    "Every call site in this project is an image call site, and which image is better is a matter of taste, so no call site is decided by the automated checks alone. The checks below only rule arms out; the owner's blind rating (rating-sets.json) picks among the rest. The first arm listed is today's production setting (the baseline).",
+    "",
+    "| Call site | Arms tested | Ruled out by the automated gates | Cheapest arm still in the running | Decision |",
+    "|---|---|---|---|---|",
+    ...rows,
+    "",
+    "Decided by automated checks (not a matter of taste):",
+    "",
+    compatibilityLine(probe),
+    "- Template element images follow the template-editor model; they were covered by the probe, not replayed.",
+    "- Text call sites (gpt-4.1, gpt-4.1-mini) and the content filter were out of scope and are unchanged.",
+  ].join("\n");
+}
+
+function latencyNote(siteMetrics: ArmMetrics[]): string {
+  const counts = siteMetrics.map((m) => m.successes);
+  const min = Math.min(...counts);
+  const max = Math.max(...counts);
+  const range = min === max ? `${min}` : `${min} to ${max}`;
+  return max <= 1
+    ? "One call per arm: p50 and p95 are that call's latency, and the figures are single samples."
+    : `With ${range} successful calls per arm, p95 is effectively the slowest call.`;
+}
+
 function renderSite(site: CallSite, title: string, metrics: ArmMetrics[]): string {
-  const siteMetrics = metrics
-    .filter((m) => m.callSite === site)
-    .sort((a, b) => Number(b.baseline) - Number(a.baseline) || a.armKey.localeCompare(b.armKey));
+  const siteMetrics = sortedSiteMetrics(site, metrics);
   const baseline = siteMetrics.find((m) => m.baseline);
   if (siteMetrics.length === 0 || !baseline) {
     return `## ${title}\n\nNo results (not run yet, or the baseline has no calls).`;
@@ -184,7 +278,7 @@ function renderSite(site: CallSite, title: string, metrics: ArmMetrics[]): strin
     "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...rows,
     "",
-    "With 9 to 12 calls per arm, p95 is effectively the slowest call.",
+    latencyNote(siteMetrics),
   ].join("\n");
 }
 
@@ -269,6 +363,8 @@ export function renderResults(input: ResultsInput): string {
     "",
     `Rating items produced: ${input.ratedItems.beats} beat illustrations and ${input.ratedItems.coversPortraits} covers/portraits (rating-sets.json).`,
     "",
+    renderSummary(input.metrics, input.probe),
+    "",
     "## How to read this",
     "",
     "- No machine metric measures agreement with the baseline for images. The owner's blind rating is that measure.",
@@ -297,7 +393,7 @@ export function renderResults(input: ResultsInput): string {
     "",
     "- Local data has no custom-story beats and no multiplayer stories, so beat items come from two pre-made worlds only.",
     "- The gpt-image-2 fallback was not tested.",
-    "- Before this run, reference-image input was measured only on gpt-image-2.5 (1,536 tokens per reference in the probe); the call estimates assumed 1,600 per reference for every model.",
+    "- The pre-run cost estimates assumed 1,600 input tokens per reference image for every model; the measured figures are in the 'Avg image in' columns.",
     "",
     "## Spend",
     "",

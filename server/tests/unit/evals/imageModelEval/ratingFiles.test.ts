@@ -77,6 +77,21 @@ describe("buildRatingFiles", () => {
     expect(new Set(baselineLabels).size).toBeGreaterThan(1);
   });
 
+  it("spreads the baseline evenly over the labels within a set", () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `case-${i}`);
+    const plans = plansFor(ids);
+    const { ratingKey } = buildRatingFiles(plans, successRecords(plans), exists);
+
+    const counts: Record<string, number> = {};
+    for (const [itemId, labels] of Object.entries(ratingKey)) {
+      if (!itemId.startsWith(BEAT_SET_ID)) continue;
+      const label = Object.entries(labels).find(([, arm]) => arm === "gpt-image-1.5@medium")?.[0];
+      counts[label ?? "none"] = (counts[label ?? "none"] ?? 0) + 1;
+    }
+
+    expect(counts).toEqual({ A: 3, B: 3, C: 3, D: 3 });
+  });
+
   it("maps every option label to exactly one arm in the key", () => {
     const plans = plansFor(["a", "b"]);
     const { ratingSets, ratingKey } = buildRatingFiles(plans, successRecords(plans), exists);

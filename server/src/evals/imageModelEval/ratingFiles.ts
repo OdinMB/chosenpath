@@ -127,14 +127,48 @@ function contextFor(evalCase: EvalCase): string {
   );
 }
 
-function optionOrder(id: string, armKey: string): string {
-  return createHash("sha256").update(`${id}|${armKey}`).digest("hex");
+function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/**
+ * The label position of the baseline in each item: items are ranked by
+ * sha256(itemId), and rank r puts the baseline at position r mod the item's
+ * option count, so within a set every label holds the baseline about equally
+ * often and no pattern follows the item order.
+ */
+function baselinePositions(items: { itemId: string; optionCount: number }[]): number[] {
+  const positions = new Array<number>(items.length).fill(0);
+  items
+    .map((item, index) => ({ index, hash: sha256(item.itemId) }))
+    .sort((a, b) => a.hash.localeCompare(b.hash))
+    .forEach(({ index }, rank) => {
+      positions[index] = rank % items[index].optionCount;
+    });
+  return positions;
+}
+
+/** Candidates in sha256(itemId|armKey) order, with the baseline inserted at its position. */
+function orderOptions<T extends { arm: { key: string; baseline: boolean } }>(
+  itemId: string,
+  generated: T[],
+  baselinePosition: number
+): T[] {
+  const baseline = generated.filter((g) => g.arm.baseline);
+  const candidates = generated
+    .filter((g) => !g.arm.baseline)
+    .sort((a, b) =>
+      sha256(`${itemId}|${a.arm.key}`).localeCompare(sha256(`${itemId}|${b.arm.key}`))
+    );
+  candidates.splice(baselinePosition, 0, ...baseline);
+  return candidates;
 }
 
 /**
  * Builds rating-sets.json and rating-key.json from the final plan. Failed or
  * junk arms are dropped; an item needs its baseline plus at least one other
- * option. Options are ordered by sha256(itemId|armKey) and labelled A-D.
+ * option. Options are labelled A-D: the baseline's label is balanced across
+ * the set (baselinePositions), the candidates are ordered by hash.
  */
 export function buildRatingFiles(
   plans: RatingSetPlan[],
@@ -143,28 +177,35 @@ export function buildRatingFiles(
 ): { ratingSets: RatingSets; ratingKey: RatingKey } {
   const ratingKey: RatingKey = {};
   const sets = plans.map((plan): RatingSet => {
-    const items: RatingItem[] = [];
-    for (const item of plan.items) {
-      const generated = item.arms
-        .map((arm) => ({
-          arm,
-          record: latestFinalRecord(records, item.evalCase.id, arm.key),
-        }))
-        .filter(
-          ({ record }) =>
-            record?.status === "success" &&
-            record.outputFile !== undefined &&
-            outputExists(record.outputFile)
-        );
-      const hasBaseline = generated.some(({ arm }) => arm.baseline);
-      if (!hasBaseline || generated.length < MIN_OPTIONS) {
-        continue;
-      }
-      const ordered = [...generated].sort((a, b) =>
-        optionOrder(item.itemId, a.arm.key).localeCompare(
-          optionOrder(item.itemId, b.arm.key)
-        )
+    const rated = plan.items
+      .map((item) => ({
+        item,
+        generated: item.arms
+          .map((arm) => ({
+            arm,
+            record: latestFinalRecord(records, item.evalCase.id, arm.key),
+          }))
+          .filter(
+            ({ record }) =>
+              record?.status === "success" &&
+              record.outputFile !== undefined &&
+              outputExists(record.outputFile)
+          ),
+      }))
+      .filter(
+        ({ generated }) =>
+          generated.some(({ arm }) => arm.baseline) && generated.length >= MIN_OPTIONS
       );
+    const positions = baselinePositions(
+      rated.map(({ item, generated }) => ({
+        itemId: item.itemId,
+        optionCount: generated.length,
+      }))
+    );
+
+    const items: RatingItem[] = [];
+    for (const [index, { item, generated }] of rated.entries()) {
+      const ordered = orderOptions(item.itemId, generated, positions[index]);
       ratingKey[item.itemId] = Object.fromEntries(
         ordered.map(({ arm }, i) => [LABELS[i], arm.key])
       );

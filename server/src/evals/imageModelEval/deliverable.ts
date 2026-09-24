@@ -10,6 +10,7 @@ import {
   COVER_SET_ID,
   type RatingSets,
 } from "./ratingFiles.js";
+import { stripContentCredentialsInFile } from "./outputs.js";
 import { computeArmMetrics, renderResults } from "./resultsReport.js";
 import type { CallRecord } from "./runner.js";
 
@@ -29,7 +30,15 @@ function copyReferences(outDir: string, plans: RatingSetPlan[], ratingSets: Rati
       const target = path.join(outDir, referenceFileFor(ref));
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.copyFileSync(ref.path, target);
+      stripContentCredentialsInFile(target);
     }
+  }
+}
+
+/** Images stored before storeOutput stripped content credentials are cleaned here. */
+function stripRatedImages(outDir: string, ratingSets: RatingSets) {
+  for (const option of ratingSets.sets.flatMap((s) => s.items.flatMap((i) => i.options))) {
+    stripContentCredentialsInFile(path.join(outDir, option.src));
   }
 }
 
@@ -51,6 +60,7 @@ export function writeDeliverable(input: {
   const { ratingSets, ratingKey } = buildRatingFiles(plans, records, outputExists);
 
   copyReferences(outDir, plans, ratingSets);
+  stripRatedImages(outDir, ratingSets);
 
   const itemCount = (setId: string) =>
     ratingSets.sets.find((s) => s.id === setId)?.items.length ?? 0;

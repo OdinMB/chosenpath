@@ -2,6 +2,7 @@ import {
   computeArmMetrics,
   gateFailures,
   percentile,
+  summarizeSite,
 } from "../../../../src/evals/imageModelEval/resultsReport.js";
 import type { ArmMetrics } from "../../../../src/evals/imageModelEval/resultsReport.js";
 import type { CallRecord } from "../../../../src/evals/imageModelEval/runner.js";
@@ -57,6 +58,28 @@ describe("gateFailures", () => {
   it("allows beat latency up to a slower baseline's p95", () => {
     const slowBaseline = { ...baseline, p95LatencyMs: 45_000 };
     expect(gateFailures(metrics({ p95LatencyMs: 40_000 }), slowBaseline)).toEqual([]);
+  });
+});
+
+describe("summarizeSite", () => {
+  it("lists ruled-out arms and the cheapest arm that passes the gates", () => {
+    const all = [
+      metrics({ armKey: "gpt-image-1.5@medium", baseline: true, usdPerImage: 0.05 }),
+      metrics({ armKey: "slow-cheap", p95LatencyMs: 45_000, usdPerImage: 0.01 }),
+      metrics({ armKey: "fast-mid", usdPerImage: 0.04 }),
+      metrics({ armKey: "fast-dear", usdPerImage: 0.09 }),
+      metrics({ callSite: "story-cover", armKey: "other-site", usdPerImage: 0.001 }),
+    ];
+
+    const summary = summarizeSite("beat", all);
+
+    expect(summary?.armsTested).toEqual(["gpt-image-1.5@medium", "fast-dear", "fast-mid", "slow-cheap"]);
+    expect(summary?.ruledOut.map((r) => r.armKey)).toEqual(["slow-cheap"]);
+    expect(summary?.cheapestPassing?.armKey).toBe("fast-mid");
+  });
+
+  it("is undefined when the site has no baseline results", () => {
+    expect(summarizeSite("template-cover", [metrics({})])).toBeUndefined();
   });
 });
 
