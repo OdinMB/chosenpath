@@ -83,7 +83,7 @@ export async function initializeDatabase() {
     await pool.query(
       `
       INSERT INTO role_permissions (role_id, permission, created_at)
-      VALUES 
+      VALUES
         ('role_user', 'templates_create', $1),
         ('role_admin', 'templates_see_all', $1),
         ('role_admin', 'templates_edit_all', $1),
@@ -91,10 +91,12 @@ export async function initializeDatabase() {
         ('role_admin', 'templates_carousel', $1),
         ('role_admin', 'templates_create', $1),
         ('role_admin', 'templates_images', $1),
+        ('role_admin', 'templates_videos', $1),
         ('role_admin', 'feedback_view', $1),
         ('role_admin', 'feedback_delete', $1),
         ('role_worldbuilder', 'templates_create', $1),
-        ('role_worldbuilder', 'templates_images', $1)
+        ('role_worldbuilder', 'templates_images', $1),
+        ('role_worldbuilder', 'templates_videos', $1)
       ON CONFLICT (role_id, permission) DO NOTHING
     `,
       [nowEpochMs]

@@ -226,6 +226,8 @@ export const canCreateTemplates = () => checkPermissions(["templates_create"]);
 
 export const canGenerateImages = () => checkPermissions(["templates_images"]);
 
+export const canGenerateVideos = () => checkPermissions(["templates_videos"]);
+
 export const canViewFeedback = () => checkPermissions(["feedback_view"]);
 
 export const canDeleteFeedback = () => checkPermissions(["feedback_delete"]);

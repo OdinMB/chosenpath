@@ -1,6 +1,7 @@
 export * from "./beat.js";
 export * from "./change.js";
 export * from "./image.js";
+export * from "./video.js";
 export * from "./outcome.js";
 export * from "./player.js";
 export * from "./stat.js";

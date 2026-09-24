@@ -1250,13 +1250,15 @@ Test endpoint to verify image server is working.
 
 ---
 
-## Video Endpoints (in development)
+## Video Endpoints (no generator)
+
+Sora was retired on 2026-09-24 and no video generator is implemented. The serving routes, storage helpers, types (`core/types/video.ts`) and the `templates_videos` permission are provider-neutral; a new generator belongs in `server/src/videos/AIVideoGenerator.ts`.
 
 ### Get Template Video
 
 **GET** `/videos/templates/:templateId/:path(*)`
 
-Serve template videos. Similar structure to image endpoints.
+Serve template videos (`.mp4`, `.webm`, `.mov`) from `templates/:templateId/videos/`. Similar structure to image endpoints.
 
 **Path Params:**
 
@@ -1270,6 +1272,29 @@ Serve template videos. Similar structure to image endpoints.
 
 **Response:**
 Binary video file with appropriate headers.
+
+**Error Cases:**
+
+- `400`: Invalid path parameters or file type
+- `404`: Video not found
+
+---
+
+### Get Story Video
+
+**GET** `/videos/stories/:storyId/:path(*)`
+
+Serve story videos from `stories/:storyId/videos/`. Same params, response and error cases as the template route.
+
+---
+
+### Generate Video
+
+**POST** `/videos/generate`
+
+**Auth Required**: Yes, plus the `templates_videos` permission
+
+Always responds `501` with `errorMessage` "Video generation is not available: no video generator is currently implemented." The handler reads nothing from the body except `requestId`.
 
 ---
 

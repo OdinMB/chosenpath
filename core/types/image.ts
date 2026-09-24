@@ -61,7 +61,7 @@ export const imageInstructionsSchema = z
     visualStyle: z
       .string()
       .describe(
-        "The primary artistic style for images in this visual novel. Depending on the story, safe options could be anime, semi-realistic, digital illustration, fantasy illustration, graphic novel, Pixar, etc. Can also be experimental if it fits the story, lik watercolor or pixel art."
+        "The primary artistic style for images in this interactive story. Depending on the story, safe options could be anime, semi-realistic, digital illustration, fantasy illustration, graphic novel, Pixar, etc. Can also be experimental if it fits the story, lik watercolor or pixel art."
       ),
     atmosphere: z
       .string()

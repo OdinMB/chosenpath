@@ -2,6 +2,7 @@ Smaller commits!
 
 # NEXT
 
+- 4: in pre-defined worlds, stories can have their first beat for each identity/background combination pre-defined, such that there are never any waiting times for the player.
 - 4: custom rules for templates/stories (rename setting rules) for things like "all options must always be git commands", "no challenge threads ever", etc.
 - 3: setting options: how much text per beat (paragraphs, level of detail per paragraph?)
 - 2: meet future self should only have one possible identity

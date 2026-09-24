@@ -13,6 +13,7 @@ import adminFeedbackRoutes from "./feedback/adminFeedbackRoutes.js";
 
 import { imageRouter } from "./images/imageRoutes.js";
 import imageGenerationRoutes from "./images/imageGenerationRoutes.js";
+import { videoRouter } from "./videos/videoRoutes.js";
 import feedbackRoutes from "./feedback/feedbackRoutes.js";
 
 const router = express.Router();
@@ -22,6 +23,10 @@ const router = express.Router();
 // Mount the image routes first to ensure they handle image requests before templateRoutes
 // The full path for accessing images will be /images/templates/:templateId/:path(*)
 router.use("/images", imageRouter);
+
+// Mount the video routes
+// The full path for accessing videos will be /videos/templates/:templateId/:path(*)
+router.use("/videos", videoRouter);
 
 // Use image generation routes
 router.use(imageGenerationRoutes);

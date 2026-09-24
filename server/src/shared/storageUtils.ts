@@ -86,6 +86,15 @@ export function getStoryImagesDirectoryPath(storyId: string): string {
 }
 
 /**
+ * Gets the videos directory path for a specific story
+ * @param storyId - The story ID
+ * @returns The full path to the story's videos directory
+ */
+export function getStoryVideosDirectoryPath(storyId: string): string {
+  return path.join(getStoryDirectoryPath(storyId), "videos");
+}
+
+/**
  * Ensures a story directory structure exists, creating directories if needed
  * @param storyId - The story ID
  * @returns The full path to the created story directory
