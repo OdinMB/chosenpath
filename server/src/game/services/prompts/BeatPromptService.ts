@@ -5,6 +5,14 @@ import {
 } from "./StoryStatePromptService.js";
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
 
+/**
+ * Part of the image-request instructions for every image-generating story,
+ * template-based or custom alike. Custom stories start with an empty image
+ * library, so they need it most; template stories get it too.
+ */
+export const GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION =
+  "If a generic image for a story element is not yet available, start by requesting such a generic image for the story element first (like NPCs, locations, items, etc.). Once such a generic image is available, you can request images that feature these story elements in more complex arrangements in later beats.";
+
 export class BeatPromptService {
   private static readonly SECTIONS_GAME_STATE: SectionConfig = {
     gameMode: true,
@@ -283,9 +291,7 @@ ${
       "Image ids must not start with 'player', 'player1_' etc. This prefix is reserved for player images, which are handled differently. Use the name of the player character instead.\n" +
       "Skip this step if a fitting image is already available in the image library. If a character is analyzing magic glyphs, request a new image and don't just show the generic character image. If we already have an image of a flock of birds, don't generate a new one just because the weather has changed.\n" +
       "If you generate an image for a beat, you MUST include the image in the beat text with the '[image]' tag. Use the new image relatively late in the beat text. (That way, we buy some time for the image generation to finish.)\n" +
-      (!story.isBasedOnTemplate
-        ? ""
-        : "If a generic image for a story element is not yet available, start by requesting such a generic image for the story element first (like NPCs, locations, items, etc.). Once such a generic image is available, you can request images that feature these story elements in more complex arrangements in later beats.") +
+      GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION +
       "\n"
     : ""
 }Text
