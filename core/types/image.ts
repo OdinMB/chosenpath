@@ -9,10 +9,14 @@ export const IMAGE_SIZES = {
   PORTRAIT: "1024x1536",
 } as const;
 
+// XHIGH and MAX exist only on GPT Image 2.5 (gpt-image-2.5-*); the server's
+// Images API client downgrades them to HIGH on other models.
 export const IMAGE_QUALITIES = {
   LOW: "low",
   MEDIUM: "medium",
   HIGH: "high",
+  XHIGH: "xhigh",
+  MAX: "max",
 } as const;
 
 export type ImageSize = (typeof IMAGE_SIZES)[keyof typeof IMAGE_SIZES];
@@ -124,4 +128,5 @@ export const imageRequestSchema = z.object({
 export type ImageRequest = z.infer<typeof imageRequestSchema> & {
   subDir?: string;
   imageSize?: ImageSize;
+  imageQuality?: ImageQuality;
 };

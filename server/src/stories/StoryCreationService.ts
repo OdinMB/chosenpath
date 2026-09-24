@@ -24,6 +24,7 @@ import {
 import { Response } from "express";
 import { storyDbService } from "./StoryDbService.js";
 import { getDb } from "shared/db.js";
+import { IMAGE_GENERATION_STORY_COVER_QUALITY } from "server/config.js";
 
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
@@ -261,6 +262,7 @@ export class StoryCreationService {
             id: "cover",
             prompt: coverPrompt,
             imageSize: IMAGE_SIZES.PORTRAIT,
+            imageQuality: IMAGE_GENERATION_STORY_COVER_QUALITY,
             referenceImageIds: [],
           };
 

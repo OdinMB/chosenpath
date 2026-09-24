@@ -5,6 +5,8 @@ import type {
 } from "game/queue.js";
 import type { PlayerSlot } from "core/types/index.js";
 import { AIImageGenerator } from "../../images/AIImageGenerator.js";
+import { getStoryPlayerPortraitDescription } from "../../images/imagePrompts.js";
+import { IMAGE_GENERATION_STORY_PLAYER_QUALITY } from "server/config.js";
 import { BaseQueueProcessor } from "./QueueProcessor.js";
 import { Story } from "core/models/Story.js";
 import { ImageRequest, IMAGE_SIZES } from "core/types/index.js";
@@ -306,15 +308,10 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
       const imageRequest: ImageRequest = {
         caption: selectedIdentity.name,
         id: playerSlot + "_" + identityIndex,
-        prompt:
-          "Pronouns: " +
-          selectedIdentity.pronouns.personal +
-          "/" +
-          selectedIdentity.pronouns.possessive +
-          "\n" +
-          selectedIdentity.appearance,
+        prompt: getStoryPlayerPortraitDescription(selectedIdentity),
         subDir: "players",
         imageSize: IMAGE_SIZES.PORTRAIT,
+        imageQuality: IMAGE_GENERATION_STORY_PLAYER_QUALITY,
         referenceImageIds: [],
       };
 

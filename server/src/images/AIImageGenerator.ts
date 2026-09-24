@@ -1,9 +1,5 @@
 import dotenv from "dotenv";
-import OpenAI, { toFile } from "openai";
-import type {
-  ImageEditParams,
-  ImageGenerateParams,
-} from "openai/resources/images";
+import OpenAI from "openai";
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
   ImageStoryState,
@@ -18,7 +14,7 @@ import type {
 import { Story } from "core/models/Story.js";
 import {
   IMAGE_GENERATION_MODEL,
-  IMAGE_GENERATION_OUTPUT_COMPRESSION,
+  IMAGE_GENERATION_TEMPLATE_MODEL,
   IMAGE_GENERATION_BEAT_QUALITY,
   IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
   IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
@@ -28,19 +24,18 @@ import fs from "fs";
 import path from "path";
 import { getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
-import sharp from "sharp";
+import {
+  analyzeImageGenerationError,
+  loadReferenceImages,
+  requestImage,
+} from "./openaiImageClient.js";
+import {
+  getImagePrompt,
+  getTemplateCoverPrompt,
+  getTemplatePlayerPortraitPrompt,
+} from "./imagePrompts.js";
+import { resizeTemplateCover } from "./templateCover.js";
 dotenv.config();
-
-// OpenAI API response interfaces
-interface OpenAIImageResponse {
-  data: Array<{
-    b64_json?: string;
-    url?: string;
-  }>;
-}
-
-// Import the proper Uploadable type from OpenAI
-import type { Uploadable } from "openai/uploads";
 
 /**
  * Enhanced error class for image generation that includes structured error information
@@ -65,135 +60,6 @@ export class AIImageGenerator {
     this.openai = new OpenAI();
   }
 
-  /**
-   * Analyzes OpenAI API errors and provides structured error information
-   */
-  private analyzeImageGenerationError(
-    error: unknown,
-    prompt?: string
-  ): ImageGenerationErrorInfo {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorCode =
-      error && typeof error === "object" && "code" in error
-        ? String((error as Record<string, unknown>).code)
-        : "";
-    const errorStatus =
-      error && typeof error === "object" && "status" in error
-        ? Number((error as Record<string, unknown>).status)
-        : undefined;
-
-    // Check for copyright issues first (more specific than general content policy)
-    const promptText = prompt?.toLowerCase() || "";
-    const isCopyrightRelated =
-      promptText.includes("disney") ||
-      promptText.includes("elsa") ||
-      promptText.includes("frozen") ||
-      promptText.includes("marvel") ||
-      promptText.includes("star wars") ||
-      promptText.includes("pokemon") ||
-      promptText.includes("nintendo") ||
-      promptText.includes("mickey mouse") ||
-      promptText.includes("superman") ||
-      promptText.includes("batman") ||
-      promptText.includes("spiderman") ||
-      errorMessage.toLowerCase().includes("copyright") ||
-      errorMessage.toLowerCase().includes("trademark") ||
-      errorMessage.toLowerCase().includes("intellectual property");
-
-    // Content policy violations (including safety system and moderation blocks)
-    const isContentPolicyViolation =
-      errorMessage.toLowerCase().includes("content policy") ||
-      errorMessage.toLowerCase().includes("content restrictions") ||
-      errorMessage.toLowerCase().includes("violates our content policies") ||
-      errorMessage.toLowerCase().includes("safety system") ||
-      errorMessage.toLowerCase().includes("moderation") ||
-      errorCode === "content_policy_violation" ||
-      errorCode === "moderation_blocked";
-
-    if (isContentPolicyViolation) {
-      // If it's a content policy violation AND likely copyright-related, classify as COPYRIGHT
-      if (isCopyrightRelated) {
-        return {
-          errorCode: "COPYRIGHT",
-          userFriendlyMessage:
-            "This request involves copyrighted content and was blocked",
-          technicalMessage: errorMessage,
-          guidance:
-            "Avoid specific brand names, celebrity names, or copyrighted characters. Use general descriptions instead.",
-          retryable: true,
-        };
-      }
-
-      // Otherwise, it's a general content policy issue
-      return {
-        errorCode: "CONTENT_POLICY",
-        userFriendlyMessage:
-          "Your request was blocked by content safety policies",
-        technicalMessage: errorMessage,
-        guidance:
-          "Try making your description more general and avoid specific names, brands, copyrighted characters, or potentially sensitive content. Focus on general descriptions rather than specific people or entities.",
-        retryable: true,
-      };
-    }
-
-    // Explicit copyright/trademark issues (when not caught by content policy)
-    if (isCopyrightRelated && !isContentPolicyViolation) {
-      return {
-        errorCode: "COPYRIGHT",
-        userFriendlyMessage: "This request may involve copyrighted content",
-        technicalMessage: errorMessage,
-        guidance:
-          "Avoid referencing specific brands, characters, celebrities, or copyrighted works. Instead, describe general visual styles or create original content inspired by but not copying existing works.",
-        retryable: true,
-      };
-    }
-
-    // Rate limiting
-    if (
-      errorMessage.toLowerCase().includes("rate limit") ||
-      errorMessage.toLowerCase().includes("too many requests") ||
-      errorStatus === 429 ||
-      errorCode === "rate_limit_exceeded"
-    ) {
-      return {
-        errorCode: "RATE_LIMIT",
-        userFriendlyMessage: "Too many image generation requests",
-        technicalMessage: errorMessage,
-        guidance:
-          "Please wait a moment before trying again. You've reached the rate limit for image generation.",
-        retryable: true,
-      };
-    }
-
-    // Technical/API errors
-    if (
-      (errorStatus !== undefined && errorStatus >= 500) ||
-      errorMessage.toLowerCase().includes("internal server error") ||
-      errorMessage.toLowerCase().includes("service unavailable")
-    ) {
-      return {
-        errorCode: "TECHNICAL",
-        userFriendlyMessage:
-          "A technical error occurred with the image generation service",
-        technicalMessage: errorMessage,
-        guidance:
-          "This is a temporary issue. Please try again in a few moments.",
-        retryable: true,
-      };
-    }
-
-    // Unknown/generic errors
-    return {
-      errorCode: "UNKNOWN",
-      userFriendlyMessage:
-        "An unexpected error occurred during image generation",
-      technicalMessage: errorMessage,
-      guidance:
-        "Please try simplifying your description or try again later. If the problem persists, contact support.",
-      retryable: true,
-    };
-  }
-
   public async generateImageForTemplate(
     imageId: string,
     templateId: string,
@@ -203,12 +69,13 @@ export class AIImageGenerator {
     size?: ImageSize,
     quality?: ImageQuality
   ): Promise<string> {
-    const prompt = this.getImagePrompt(elementAppearance, imageInstructions);
+    const prompt = getImagePrompt(elementAppearance, imageInstructions);
     const imageBuffer = await this.generateImage(
       prompt,
       references,
       size,
-      quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY
+      quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
+      IMAGE_GENERATION_TEMPLATE_MODEL
     );
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
@@ -226,13 +93,10 @@ export class AIImageGenerator {
     const imageId = `${playerSlot}_${identityIndex}`;
 
     // Create the full prompt for the player character
-    let prompt = `Generate a portrait image of a character with the following appearance:\n\n${appearance}`;
-
-    if (imageInstructions) {
-      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
-        imageInstructions
-      )}`;
-    }
+    const prompt = getTemplatePlayerPortraitPrompt(
+      appearance,
+      imageInstructions
+    );
 
     Logger.Story.log(
       `Generating player image for ${playerSlot} identity ${identityIndex}`
@@ -243,7 +107,8 @@ export class AIImageGenerator {
       prompt,
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
-      quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY
+      quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
+      IMAGE_GENERATION_TEMPLATE_MODEL
     );
 
     // Save the image in template/images/players directory
@@ -264,13 +129,7 @@ export class AIImageGenerator {
     quality?: ImageQuality
   ): Promise<string> {
     // Create the full prompt combining cover prompt with image instructions
-    let prompt = `Generate a cover image for a story with the following description:\n\n${coverPrompt}`;
-
-    if (imageInstructions) {
-      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
-        imageInstructions
-      )}`;
-    }
+    const prompt = getTemplateCoverPrompt(coverPrompt, imageInstructions);
 
     Logger.Story.log("Generating cover image");
 
@@ -279,204 +138,57 @@ export class AIImageGenerator {
       prompt,
       references && references.length > 0 ? references : undefined,
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
-      quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
+      quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
+      IMAGE_GENERATION_TEMPLATE_MODEL
     );
 
-    // Resize cover images to square format for better main page display
-    const resizedImageBuffer = await this.resizeCoverImage(originalImageBuffer);
+    // Shrink cover images for the library, where multiple covers are shown
+    const resizedImageBuffer = await resizeTemplateCover(originalImageBuffer);
 
     // Save the resized image with 'cover' as the ID
     return this.saveImageToTemplate("cover", templateId, resizedImageBuffer);
   }
 
-  public getImagePrompt(
-    description: string,
-    imageInstructions?: ImageInstructions
-  ) {
-    let prompt: string = "";
-    prompt += `Generate an image that can accompany the following scene or story element\n\n`;
-    prompt += `==========\n${description}\n==========`;
-    if (imageInstructions) {
-      prompt += `\n\n${this.getPromptSectionFromImageInstructions(
-        imageInstructions
-      )}`;
-    }
-    return prompt;
-  }
-
-  private getPromptSectionFromImageInstructions(
-    imageInstructions: ImageInstructions
-  ): string {
-    let prompt = "=======\n\n";
-
-    // Format each instruction with its key
-    const instructionMap: Record<string, string> = {
-      visualStyle: "Visual Style",
-      atmosphere: "Atmosphere",
-      colorPalette: "Color Palette",
-      settingDetails: "Setting Details",
-      characterStyle: "Character Style",
-      artInfluences: "Art Influences",
-    };
-
-    // Add each non-empty instruction to the formatted string
-    Object.entries(imageInstructions).forEach(([key, value]) => {
-      // Skip the coverPrompt itself since we're already using it
-      if (key !== "coverPrompt" && value) {
-        const label = instructionMap[key] || key;
-        prompt += `${label}: ${value}\n`;
-      }
-    });
-    prompt += `Text: Don't include any title or caption texts in the image.`;
-
-    return prompt;
-  }
-
-  /**
-   * Resize cover images from portrait (1024x1536) to smaller portrait (683x1024) format
-   * for better display on the main page where multiple covers are shown
-   */
-  private async resizeCoverImage(imageBuffer: Buffer): Promise<Buffer> {
-    try {
-      Logger.Story.log("Resizing cover image to smaller portrait format");
-
-      // Calculate target dimensions maintaining aspect ratio
-      // Original: 1024x1536, Target height: 768px
-      // Target width: 768 * (1024/1536) = 683px (rounded)
-      const targetWidth = Math.round(768 * (1024 / 1536));
-      const targetHeight = 768;
-
-      const resizedBuffer = await sharp(imageBuffer)
-        .resize(targetWidth, targetHeight, {
-          fit: "inside", // Resize to fit within dimensions, maintaining aspect ratio
-          withoutEnlargement: true,
-        })
-        .jpeg({
-          quality: IMAGE_GENERATION_OUTPUT_COMPRESSION,
-          progressive: true,
-        })
-        .toBuffer();
-
-      Logger.Story.log(
-        `Cover image resized successfully to ${targetWidth}x${targetHeight}`
-      );
-      return resizedBuffer;
-    } catch (error) {
-      Logger.Story.error("Error resizing cover image:", error);
-      // Return original buffer if resizing fails
-      return imageBuffer;
-    }
-  }
-
   private async generateImage(
     prompt: string,
-    references?: ImageReference[],
-    size?: ImageSize,
-    quality?: ImageQuality
+    references: ImageReference[] | undefined,
+    size: ImageSize | undefined,
+    quality: ImageQuality | undefined,
+    model: string
   ): Promise<Buffer> {
     try {
       Logger.Story.log("Generating image for prompt:", prompt);
 
-      const baseParams = {
-        model: IMAGE_GENERATION_MODEL,
+      const referenceImages =
+        references && references.length > 0
+          ? await loadReferenceImages(references)
+          : [];
+
+      const result = await requestImage(this.openai, {
         prompt,
-        moderation: "low",
-        n: 1,
+        model,
         quality: quality || IMAGE_QUALITIES.LOW, // low for security
-        output_format: "jpeg",
-        output_compression: IMAGE_GENERATION_OUTPUT_COMPRESSION,
         size: size || IMAGE_SIZES.AUTO,
-      };
+        images: referenceImages,
+      });
 
-      // Generate the image using either generate or edit API endpoint
-      let referenceImages: Uploadable[] = [];
-      let withReferences: boolean = false;
-      if (references && references.length > 0) {
-        referenceImages = await this.loadReferenceImages(references);
-        withReferences = true;
-      }
+      const usage = result.usage
+        ? `input text ${result.usage.inputTextTokens}, input image ${result.usage.inputImageTokens}, output ${result.usage.outputTokens}`
+        : "not reported";
+      Logger.Story.log(
+        `Image generated: model ${result.model}, quality ${result.quality}, size ${result.size}, ${result.imagesSent} reference image(s), usage ${usage}`
+      );
 
-      let imageResponse: OpenAIImageResponse;
-      if (withReferences) {
-        const imageParams = {
-          ...baseParams,
-          image: referenceImages,
-        } as ImageEditParams;
-        Logger.Story.log("Generating image with references");
-        imageResponse = (await this.openai.images.edit(
-          imageParams
-        )) as OpenAIImageResponse;
-      } else {
-        const imageParams = {
-          ...baseParams,
-        } as ImageGenerateParams;
-        Logger.Story.log("Generating image without references");
-        imageResponse = (await this.openai.images.generate(
-          imageParams
-        )) as OpenAIImageResponse;
-      }
-
-      let imageBuffer: Buffer;
-      if (imageResponse.data?.[0]?.b64_json) {
-        imageBuffer = Buffer.from(imageResponse.data[0].b64_json, "base64");
-      } else {
-        throw new Error("No image data in response from images.edit");
-      }
-
-      return imageBuffer;
+      return result.buffer;
     } catch (error) {
       Logger.Story.error("Error generating image:", error);
 
       // Analyze the error and provide structured information
-      const errorInfo = this.analyzeImageGenerationError(error, prompt);
+      const errorInfo = analyzeImageGenerationError(error, prompt);
 
       // Throw enhanced error with structured information
       throw new ImageGenerationError(errorInfo.userFriendlyMessage, errorInfo);
     }
-  }
-
-  /**
-   * Loads reference images for image generation
-   * @param references: Array of ImageReference objects
-   * @returns Array of OpenAI-compatible File objects
-   */
-  private async loadReferenceImages(
-    references: ImageReference[]
-  ): Promise<Uploadable[]> {
-    const templatesBasePath = getStoragePath("templates");
-    const storiesBasePath = getStoragePath("stories");
-
-    const referenceImages: Uploadable[] = [];
-    for (const reference of references) {
-      const imageBaseDir =
-        reference.source === "template" ? templatesBasePath : storiesBasePath;
-      const imageDir = path.join(
-        imageBaseDir,
-        reference.sourceId,
-        "images",
-        reference.subDirectory || ""
-      );
-      const imagePath = path.join(imageDir, `${reference.id}.jpeg`);
-
-      // Check if the file exists
-      if (fs.existsSync(imagePath)) {
-        try {
-          const stream = fs.createReadStream(imagePath);
-          const file = await toFile(stream, null, { type: "image/jpeg" });
-          referenceImages.push(file);
-          Logger.Story.log(`Loaded reference image: ${imagePath}`);
-        } catch (error) {
-          Logger.Story.error(
-            `Reference image found but failed to load: ${imagePath}`,
-            error
-          );
-        }
-      } else {
-        Logger.Story.warn(`Reference image not found: ${imagePath}`);
-      }
-    }
-
-    return referenceImages;
   }
 
   private async saveImageToFile(
@@ -585,15 +297,18 @@ export class AIImageGenerator {
           }
         }
 
-        const prompt = this.getImagePrompt(
+        const prompt = getImagePrompt(
           imageRequest.prompt,
           story.getImageInstructions()
         );
         const imageBuffer = await this.generateImage(
           prompt,
           imageReferences.length > 0 ? imageReferences : undefined,
-          imageRequest.imageSize || IMAGE_SIZES.SQUARE, // faster/cheaper than other sizes. Allows using medium quality instead of low
-          IMAGE_GENERATION_BEAT_QUALITY
+          // Square is faster/cheaper than other sizes on gpt-image-1.x (allows medium
+          // instead of low quality). On gpt-image-2.5, landscape/portrait use fewer tokens.
+          imageRequest.imageSize || IMAGE_SIZES.SQUARE,
+          imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
+          IMAGE_GENERATION_MODEL
         );
 
         await this.saveImageToStory(
