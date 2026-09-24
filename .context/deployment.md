@@ -22,6 +22,10 @@ Keep TypeScript upgrades deliberate: bump it in the lockfile and check the build
 
 The tsconfigs carry no `baseUrl`, and `paths` are relative to each tsconfig file. tsc-alias only enables its `base-url` replacer when `baseUrl` is set, and that replacer is what rewrites `core/*` imports to the copied `dist/core/`. `server/tsconfig.json` turns it on explicitly (`"tsc-alias": { "replacers": { "base-url": { "enabled": true } } }`). If you remove that, the server's `core/*` imports stay bare in `dist` and the server fails at startup.
 
+### Dependency overrides
+
+The root `package.json` overrides `langsmith` to `^0.6.0`. LangChain 0.3 (`langchain`, `@langchain/core`) still asks for langsmith `^0.3`, and langsmith below 0.6.0 has a high-severity advisory. The server's `ChatOpenAI` + `withStructuredOutput` calls were checked against 0.6.3, with tracing on and off. Drop the override when LangChain moves to 1.x, which accepts langsmith 0.5 and later on its own. The client declares `uuid` itself: it used to get the package and its types from langsmith 0.3 by hoisting.
+
 ### Installation
 
 ```bash
