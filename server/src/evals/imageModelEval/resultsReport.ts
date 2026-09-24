@@ -297,7 +297,7 @@ export function renderResults(input: ResultsInput): string {
     "",
     "- Local data has no custom-story beats and no multiplayer stories, so beat items come from two pre-made worlds only.",
     "- The gpt-image-2 fallback was not tested.",
-    "- Reference-image input tokens were unmeasured before this run; the estimate assumed 1,500 per reference.",
+    "- Before this run, reference-image input was measured only on gpt-image-2.5 (1,536 tokens per reference in the probe); the call estimates assumed 1,600 per reference for every model.",
     "",
     "## Spend",
     "",

@@ -53,6 +53,7 @@ Models and settings
 - Errors: `error.type === "image_generation_user_error"` (GPT Image 2.5) is classified CONTENT_POLICY or COPYRIGHT with `retryable: false`, because the unchanged request fails again. The app itself never retries; the OpenAI SDK retries only 408/409/429/5xx.
 - Prompt wording lives in `server/src/images/imagePrompts.ts`. The eval builds its prompts with the same functions, so a wording change also changes what the eval measures.
 - Template covers are generated at 1024x1536 and shrunk to 512x768 (`templateCover.ts`).
+- Probe of 2026-09-24 (low quality, Flare and Sunburst): size `auto` is accepted on generate and on edit with references, and jpeg with `output_compression` is accepted, so no size or format fallback exists in `requestImage`. `auto` on 2.5 picks non-standard sizes (1254x1254 and 1312x1199 on generate, 1536x1024 on edit), unlike 1.5's three fixed sizes; template element images, which send `auto`, will come back in such sizes after a switch. Two reference images cost 3,072 input image tokens on 2.5. The usage object reports no cached input tokens. Latency was 10 to 16 s at low quality.
 
 Evaluating image models
 
@@ -64,4 +65,4 @@ Evaluating image models
 - Arms: `gpt-image-1.5` baseline at today's quality against Flare/Sunburst at medium/high (xhigh for the template cover), plus a 1536x1024 Flare arm for beats. Each item has 2 to 4 options.
 - Output (gitignored, never committed): `DOCS/2026-09-24_gpt6-eval/` with `rating-sets.json` (the owner's blind rating file), `rating-key.json` (which label is which arm), `results.md` (per-arm failures, latency, tokens, $ per image and per story, automated gates), `calls.jsonl`, `probe.json` and `images/`.
 - Blindness: any rater-visible text matching `LEAK_PATTERN` (`blinding.ts`: model names, "flare", "sora") drops the case at selection, and the rating file is only written if nothing in it matches.
-- Pacing and cost: at most 5 request starts per rolling minute (Tier 1) and 3 in flight; only rate limits and transient failures are retried (twice, 30 s then 60 s). Cost comes from reported usage; estimates assume 1,500 input tokens per reference image.
+- Pacing and cost: at most 5 request starts per rolling minute (Tier 1) and 3 in flight; only rate limits and transient failures are retried (twice, 30 s then 60 s). Cost comes from reported usage; estimates assume 1,600 input tokens per reference image (the probe measured 1,536 on 2.5).

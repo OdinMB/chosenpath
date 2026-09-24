@@ -142,8 +142,12 @@ const OUTPUT_TOKENS: Record<"1.5" | "2.5", { square: TokenTable; nonSquare: Toke
   },
 };
 
-/** Conservative input-token estimate for one stored reference image. */
-export const ESTIMATED_TOKENS_PER_REFERENCE = 1500;
+/**
+ * Input-token estimate for one stored reference image. The 2026-09-24 probe
+ * measured 1,536 per reference on gpt-image-2.5 (two references = 3,072 image
+ * tokens); rounded up because gpt-image-1.5 was not measured.
+ */
+export const ESTIMATED_TOKENS_PER_REFERENCE = 1600;
 
 function estimateOutputTokens(model: string, quality: ImageQuality, size: ImageSize): number {
   const family = model.startsWith("gpt-image-2.5")
@@ -169,9 +173,9 @@ function estimateOutputTokens(model: string, quality: ImageQuality, size: ImageS
 }
 
 /**
- * Estimated cost of one call: prompt text at ~4 characters per token, a
- * conservative 1,500 tokens per reference image, and the output tokens for
- * the model, quality and size.
+ * Estimated cost of one call: prompt text at ~4 characters per token,
+ * ESTIMATED_TOKENS_PER_REFERENCE per reference image, and the output tokens
+ * for the model, quality and size.
  */
 export function estimateCallCost(
   arm: Pick<Arm, "model" | "quality" | "size">,
