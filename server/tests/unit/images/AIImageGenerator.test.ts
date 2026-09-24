@@ -7,8 +7,17 @@ import type {
   ImageEditParamsNonStreaming,
   ImagesResponse,
 } from "openai/resources/images";
+import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type { ImageRequest } from "core/types/index.js";
 import type { ImageApiClient } from "../../../src/images/openaiImageClient.js";
+import {
+  IMAGE_GENERATION_MODEL,
+  IMAGE_GENERATION_TEMPLATE_MODEL,
+  IMAGE_GENERATION_BEAT_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
+  IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
+} from "../../../src/config.js";
 import { createMockStory } from "../../helpers/testHelpers.js";
 
 // Generated files land in a throwaway directory, never in data/stories
@@ -20,6 +29,9 @@ jest.unstable_mockModule("../../../src/shared/storageUtils.js", () => ({
 
 const { AIImageGenerator, ImageGenerationError } = await import(
   "../../../src/images/AIImageGenerator.js"
+);
+const { effectiveImageQuality } = await import(
+  "../../../src/images/openaiImageClient.js"
 );
 
 const STORY_ID = "story-under-test";
@@ -43,6 +55,22 @@ function makeClient(): ImageApiClient {
       edit: (body: ImageEditParamsNonStreaming) => answer(body),
     },
   };
+}
+
+/** An image API that succeeds and records the parameters of every request. */
+function makeRecordingClient() {
+  const response: ImagesResponse = {
+    created: 0,
+    data: [{ b64_json: IMAGE_BYTES.toString("base64") }],
+  };
+  const generate =
+    jest.fn<(body: ImageGenerateParamsNonStreaming) => Promise<ImagesResponse>>();
+  const edit =
+    jest.fn<(body: ImageEditParamsNonStreaming) => Promise<ImagesResponse>>();
+  generate.mockResolvedValue(response);
+  edit.mockResolvedValue(response);
+  const client: ImageApiClient = { images: { generate, edit } };
+  return { client, generate };
 }
 
 function storedImagePath(imageId: string): string {
@@ -90,6 +118,109 @@ describe("AIImageGenerator.generateBeatImage", () => {
     expect(fs.readFileSync(storedImagePath("generated_beat_image"))).toEqual(
       IMAGE_BYTES
     );
+  });
+});
+
+// Expected qualities go through effectiveImageQuality so that a local model
+// override (server/.env) cannot fail these tests; that the default models take
+// the default qualities as is, is pinned in imageGenerationDefaults.test.ts.
+describe("AIImageGenerator per-flow defaults", () => {
+  it("sends a beat request without size or quality as a square image on the in-game model", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+    const story = createMockStory({ id: STORY_ID, generateImages: true });
+
+    await generator.generateBeatImage(
+      story,
+      makeRequest("default_beat_image", "a harbour at dawn")
+    );
+
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      model: IMAGE_GENERATION_MODEL,
+      quality: effectiveImageQuality(
+        IMAGE_GENERATION_MODEL,
+        IMAGE_GENERATION_BEAT_QUALITY
+      ),
+      size: IMAGE_SIZES.SQUARE,
+    });
+  });
+
+  it("keeps the size and quality an in-game request carries", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+    const story = createMockStory({ id: STORY_ID, generateImages: true });
+
+    await generator.generateBeatImage(story, {
+      ...makeRequest("cover", "a harbour town"),
+      imageSize: IMAGE_SIZES.PORTRAIT,
+      imageQuality: IMAGE_QUALITIES.LOW,
+    });
+
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      model: IMAGE_GENERATION_MODEL,
+      quality: IMAGE_QUALITIES.LOW,
+      size: IMAGE_SIZES.PORTRAIT,
+    });
+  });
+
+  it("sends the template cover on the template model at the template cover quality", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+
+    await generator.generateCoverImageForTemplate(
+      "template-under-test",
+      "a harbour town at dusk"
+    );
+
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      model: IMAGE_GENERATION_TEMPLATE_MODEL,
+      quality: effectiveImageQuality(
+        IMAGE_GENERATION_TEMPLATE_MODEL,
+        IMAGE_GENERATION_TEMPLATE_COVER_QUALITY
+      ),
+      size: IMAGE_SIZES.PORTRAIT,
+    });
+  });
+
+  it("sends a template player portrait on the template model at the template player quality", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+
+    await generator.generatePlayerImageForTemplate(
+      "player1",
+      0,
+      "template-under-test",
+      "a lighthouse keeper with a grey beard"
+    );
+
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      model: IMAGE_GENERATION_TEMPLATE_MODEL,
+      quality: effectiveImageQuality(
+        IMAGE_GENERATION_TEMPLATE_MODEL,
+        IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY
+      ),
+      size: IMAGE_SIZES.PORTRAIT,
+    });
+  });
+
+  it("sends a template element image on the template model at the element quality and size auto", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+
+    await generator.generateImageForTemplate(
+      "lighthouse",
+      "template-under-test",
+      "a white lighthouse on a rock"
+    );
+
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      model: IMAGE_GENERATION_TEMPLATE_MODEL,
+      quality: effectiveImageQuality(
+        IMAGE_GENERATION_TEMPLATE_MODEL,
+        IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY
+      ),
+      size: IMAGE_SIZES.AUTO,
+    });
   });
 });
 

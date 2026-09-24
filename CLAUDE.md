@@ -155,7 +155,7 @@ React SPA with:
 - `/.context/design-principles.md` - Design principles for frontend
 - `/.context/ui.md` - Style guide
 - `/.context/story.md` - Story state and Story model classes
-- `/.context/image-generation.md` - Image generation flows, models/settings (which env var drives which flow; image model defaults change only after the owner's blind rating), and the image-model eval harness
+- `/.context/image-generation.md` - Image generation flows, models/settings (which env var drives which flow; the image model and quality defaults come from the owner's blind rating of 2026-09-24, so change them only on a new rating), and the image-model eval harness
 - `/.context/pregenerations.md` - Flows for pregenerating possible future story states (to reduce wait times for users)
 - `/.context/security.md` - Security layers and components
 - `/.context/template-hiding-ids.md` - Automated story element ID generation and deferred image file operations

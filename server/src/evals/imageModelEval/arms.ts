@@ -58,7 +58,7 @@ export function beatArmsForItem(index: number): Arm[] {
 }
 
 const COVER_PORTRAIT_ARMS: Record<Exclude<CallSite, "beat">, Arm[]> = {
-  // Same arms as today's in-game flow
+  // Baselines are the production settings before the 2026-09-24 switch
   "story-cover": [
     makeArm(BASELINE_MODEL, MEDIUM, PORTRAIT, PORTRAIT, true),
     makeArm(FLARE, MEDIUM, PORTRAIT, PORTRAIT),
@@ -71,7 +71,7 @@ const COVER_PORTRAIT_ARMS: Record<Exclude<CallSite, "beat">, Arm[]> = {
     makeArm(FLARE, HIGH, PORTRAIT, PORTRAIT),
     makeArm(SUNBURST, HIGH, PORTRAIT, PORTRAIT),
   ],
-  // Template editor: quality-first, today's cover quality is high
+  // Template editor: quality-first; the cover baseline was high
   "template-cover": [
     makeArm(BASELINE_MODEL, HIGH, PORTRAIT, PORTRAIT, true),
     makeArm(SUNBURST, HIGH, PORTRAIT, PORTRAIT),

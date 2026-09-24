@@ -307,8 +307,9 @@ export class AIImageGenerator {
     const imageBuffer = await this.generateImage(
       prompt,
       imageReferences.length > 0 ? imageReferences : undefined,
-      // Square is faster/cheaper than other sizes on gpt-image-1.x (allows medium
-      // instead of low quality). On gpt-image-2.5, landscape/portrait use fewer tokens.
+      // Square because the owner chose it in the blind rating of 2026-09-24
+      // (Flare medium square over Flare high landscape), not for cost: on
+      // gpt-image-2.5, landscape and portrait use fewer output tokens.
       imageRequest.imageSize || IMAGE_SIZES.SQUARE,
       imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
       IMAGE_GENERATION_MODEL

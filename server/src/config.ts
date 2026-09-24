@@ -65,17 +65,23 @@ export const CONTENT_FILTER_MODEL_NAME =
 export const CONTENT_FILTER_MODEL_TEMPERATURE =
   process.env.CONTENT_FILTER_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
 
-// Image generation settings (see .context/image-generation.md, "Models and settings")
+// Image generation settings (see .context/image-generation.md, "Models and settings").
+// Models and qualities follow the owner's blind rating of 2026-09-24.
+export const DEFAULT_IMAGE_GENERATION_MODEL = "gpt-image-2.5-flare";
+export const DEFAULT_IMAGE_GENERATION_TEMPLATE_MODEL = "gpt-image-2.5-sunburst";
 // In-game flows: beat illustrations, custom-story cover, custom-story player portraits.
 export const IMAGE_GENERATION_MODEL =
-  process.env.IMAGE_GENERATION_MODEL || "gpt-image-1.5";
+  process.env.IMAGE_GENERATION_MODEL || DEFAULT_IMAGE_GENERATION_MODEL;
 // Template editor flows: element images, player identity portraits, template cover.
+// Does not follow IMAGE_GENERATION_MODEL: overriding one leaves the other on its default.
 export const IMAGE_GENERATION_TEMPLATE_MODEL =
-  process.env.IMAGE_GENERATION_TEMPLATE_MODEL || IMAGE_GENERATION_MODEL;
+  process.env.IMAGE_GENERATION_TEMPLATE_MODEL ||
+  DEFAULT_IMAGE_GENERATION_TEMPLATE_MODEL;
 export const IMAGE_GENERATION_OUTPUT_COMPRESSION = 75;
-export const IMAGE_GENERATION_TEMPLATE_COVER_QUALITY = IMAGE_QUALITIES.HIGH;
-export const IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY = IMAGE_QUALITIES.MEDIUM;
+// xhigh exists only on gpt-image-2.5; other models get high (openaiImageClient.ts).
+export const IMAGE_GENERATION_TEMPLATE_COVER_QUALITY = IMAGE_QUALITIES.XHIGH;
+export const IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY = IMAGE_QUALITIES.HIGH;
 export const IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY = IMAGE_QUALITIES.MEDIUM;
-export const IMAGE_GENERATION_STORY_COVER_QUALITY = IMAGE_QUALITIES.MEDIUM;
-export const IMAGE_GENERATION_STORY_PLAYER_QUALITY = IMAGE_QUALITIES.MEDIUM;
+export const IMAGE_GENERATION_STORY_COVER_QUALITY = IMAGE_QUALITIES.HIGH;
+export const IMAGE_GENERATION_STORY_PLAYER_QUALITY = IMAGE_QUALITIES.HIGH;
 export const IMAGE_GENERATION_BEAT_QUALITY = IMAGE_QUALITIES.MEDIUM;
