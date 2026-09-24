@@ -203,6 +203,26 @@ describe("runCalls", () => {
     }
     expect(startTimes).toHaveLength(11);
   });
+
+  it("keeps the per-minute limit across runs that share a start log", async () => {
+    const { deps } = setup(success);
+    const startTimes: number[] = [];
+    const execute = deps.execute;
+    deps.execute = async (c) => {
+      startTimes.push(deps.now());
+      return execute(c);
+    };
+    const startLog: number[] = [];
+
+    await runCalls([call("a1"), call("a2"), call("a3")], deps, { ...baseOptions, startLog });
+    await runCalls([call("b1"), call("b2"), call("b3")], deps, { ...baseOptions, startLog });
+
+    for (const start of startTimes) {
+      const inWindow = startTimes.filter((t) => t >= start && t < start + 60_000);
+      expect(inWindow.length).toBeLessThanOrEqual(5);
+    }
+    expect(startTimes).toHaveLength(6);
+  });
 });
 
 describe("shouldRetry", () => {

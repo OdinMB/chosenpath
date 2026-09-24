@@ -260,6 +260,9 @@ async function run(args: Args, storiesDir: string, templatesDir: string) {
   }
 
   const client = createClient();
+  // One start log for every phase, so the baseline and candidate phases
+  // together stay within the per-minute image limit
+  const startLog: number[] = [];
   const runPhase: PhaseRunner = async (calls) => {
     const result = await runCalls(
       calls,
@@ -287,7 +290,7 @@ async function run(args: Args, storiesDir: string, templatesDir: string) {
         now: Date.now,
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       },
-      { maxSpendUsd, spentUsd: spent, previous: records, outputExists }
+      { maxSpendUsd, spentUsd: spent, previous: records, outputExists, startLog }
     );
     spent = result.spentUsd;
     records.push(...result.records);

@@ -70,6 +70,11 @@ export type RunnerOptions = {
   outputExists: (outputFile: string) => boolean;
   maxStartsPerWindow?: number;
   windowMs?: number;
+  /**
+   * Start times shared across runCalls invocations, so back-to-back phases
+   * stay within the per-minute limit together. Mutated in place.
+   */
+  startLog?: number[];
   maxInFlight?: number;
   retryBackoffsMs?: number[];
 };
@@ -194,7 +199,7 @@ export async function runCalls(
     (c) => !finished.has(callKey(c.evalCase.id, c.arm.key))
   );
   const records: CallRecord[] = [];
-  const starts: number[] = [];
+  const starts = options.startLog ?? [];
   let spent = options.spentUsd;
   let reserved = 0;
   let stopped = false;
