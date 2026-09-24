@@ -235,8 +235,10 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     const imageRequests = this.collectLatestBeatImageRequests(story);
     if (imageRequests.length === 0) return;
     for (const req of imageRequests) {
+      // Attach only images that were written: a library entry without a file
+      // shows as an endless spinner and invites later beats to reuse it.
       void this.aiImageGenerator
-        .generateImagesForBeats(story, [req], false)
+        .generateBeatImage(story, req)
         .then(async () => {
           await this.addOperation({
             type: "attachImageToStory",

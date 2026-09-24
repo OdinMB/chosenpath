@@ -28,6 +28,7 @@ import {
   analyzeImageGenerationError,
   loadReferenceImages,
   requestImage,
+  type ImageApiClient,
 } from "./openaiImageClient.js";
 import {
   getImagePrompt,
@@ -51,9 +52,14 @@ export class ImageGenerationError extends Error {
 }
 
 export class AIImageGenerator {
-  private openai: OpenAI;
+  private openai: ImageApiClient;
 
-  constructor() {
+  /** Uses the OpenAI client unless an image client is passed in (tests). */
+  constructor(imageClient?: ImageApiClient) {
+    if (imageClient) {
+      this.openai = imageClient;
+      return;
+    }
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
@@ -271,6 +277,56 @@ export class AIImageGenerator {
     return this.saveImageToFile(imageId, "story", storyId, imageBuffer, subDir);
   }
 
+  /**
+   * Generates one in-game image and writes it to the story's image folder.
+   * Rejects when generation or saving fails, so callers can tell a written
+   * image from a failed one.
+   */
+  async generateBeatImage(
+    story: Story,
+    imageRequest: ImageRequest
+  ): Promise<void> {
+    // Collect available reference images, log warnings for any missing ones
+    const imageReferences: ImageReference[] = [];
+
+    for (const id of imageRequest.referenceImageIds) {
+      const ref = story.getImageReferenceFromImageId(id);
+      if (ref) {
+        imageReferences.push(ref);
+      } else {
+        Logger.Story.warn(
+          `Reference image with ID '${id}' not found, continuing without it`
+        );
+      }
+    }
+
+    const prompt = getImagePrompt(
+      imageRequest.prompt,
+      story.getImageInstructions()
+    );
+    const imageBuffer = await this.generateImage(
+      prompt,
+      imageReferences.length > 0 ? imageReferences : undefined,
+      // Square is faster/cheaper than other sizes on gpt-image-1.x (allows medium
+      // instead of low quality). On gpt-image-2.5, landscape/portrait use fewer tokens.
+      imageRequest.imageSize || IMAGE_SIZES.SQUARE,
+      imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
+      IMAGE_GENERATION_MODEL
+    );
+
+    await this.saveImageToStory(
+      imageRequest.id,
+      story.getId(),
+      imageBuffer,
+      imageRequest.subDir
+    );
+  }
+
+  /**
+   * Generates several in-game images in parallel. Failures are logged, not
+   * thrown; with `saveToStoryState`, only the images that were written are
+   * added to the returned story's image library.
+   */
   async generateImagesForBeats(
     story: Story,
     imageRequests: ImageRequest[],
@@ -281,42 +337,7 @@ export class AIImageGenerator {
     // Generate images in parallel
     const imagePromises = imageRequests.map(async (imageRequest) => {
       try {
-        // Collect available reference images, log warnings for any missing ones
-        const imageReferences: ImageReference[] = [];
-
-        if (imageRequest.referenceImageIds.length > 0) {
-          for (const id of imageRequest.referenceImageIds) {
-            const ref = story.getImageReferenceFromImageId(id);
-            if (ref) {
-              imageReferences.push(ref);
-            } else {
-              Logger.Story.warn(
-                `Reference image with ID '${id}' not found, continuing without it`
-              );
-            }
-          }
-        }
-
-        const prompt = getImagePrompt(
-          imageRequest.prompt,
-          story.getImageInstructions()
-        );
-        const imageBuffer = await this.generateImage(
-          prompt,
-          imageReferences.length > 0 ? imageReferences : undefined,
-          // Square is faster/cheaper than other sizes on gpt-image-1.x (allows medium
-          // instead of low quality). On gpt-image-2.5, landscape/portrait use fewer tokens.
-          imageRequest.imageSize || IMAGE_SIZES.SQUARE,
-          imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
-          IMAGE_GENERATION_MODEL
-        );
-
-        await this.saveImageToStory(
-          imageRequest.id,
-          story.getId(),
-          imageBuffer,
-          imageRequest.subDir
-        );
+        await this.generateBeatImage(story, imageRequest);
 
         // Player images for example are not added to the story state
         // They are just assumed to be available

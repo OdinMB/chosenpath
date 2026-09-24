@@ -8,7 +8,7 @@ Context
 Current server implementation
 
 - Latest-beat requests only: After any progression (generated or pregen-adopted), the server collects image requests from the latest beat for each player and filters out requests whose `id` already exists in the story image library.
-- Parallel generation: For each collected request, the server generates the image in the background (no story mutation), then enqueues `attachImageToStory { imageId, caption }` on completion to safely update the story via the per-story queue.
+- Parallel generation: For each collected request, the server generates the image in the background (`AIImageGenerator.generateBeatImage`, no story mutation), then enqueues `attachImageToStory { imageId, caption }` only if the file was written. A failed generation is logged and attaches nothing: a library entry without a file would invite later beats to reuse the id. (`generateImagesForBeats` swallows per-image errors, so it cannot tell the caller what failed.)
 - Idempotent attach: If an image with the same id already exists, attach is effectively a no-op at the story state level (client may still fetch by URL).
 
 Server flows that trigger image generation
@@ -19,7 +19,7 @@ Server flows that trigger image generation
 - Run the unified image flow:
   - Collect latest-beat image requests for each player.
   - Filter out requests whose `id` already exists in `story.images`.
-  - For each remaining request, generate the image and enqueue `attachImageToStory { imageId, caption }` on completion.
+  - For each remaining request, generate the image and enqueue `attachImageToStory { imageId, caption }` once it is written.
 
 2. recordChoice with complete pregen (no moveStoryForward queued)
 
@@ -34,7 +34,7 @@ Attach image operation
 Storage and URLs
 
 - Images are written to: `/images/stories/:storyId/(subDir/)?imageId.jpeg`.
-- Clients render placeholders until the image is available at its deterministic URL.
+- Clients render placeholders until the image is available at its deterministic URL. The reader (`StoryImage`) shows a spinner for any URL that fails to load and cannot tell "not written yet" from "failed", so an image whose generation failed still spins in the beat that requested it.
 
 Notes
 
