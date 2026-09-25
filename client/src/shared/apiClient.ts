@@ -25,6 +25,7 @@ import {
   RateLimitNotification,
 } from "./notifications/notifications";
 import { notificationService } from "./notifications/notificationService";
+import { MODERATION_MESSAGE } from "./notifications/moderationMessage";
 
 // Extend axios request config to include adminAuth property
 export interface AdminRequestConfig extends AxiosRequestConfig {
@@ -212,11 +213,11 @@ axiosInstance.interceptors.response.use(
         switch (apiResponse.status) {
           case ResponseStatus.MODERATION_BLOCKED: {
             const moderationError = apiResponse as ModerationBlockedResponse;
-            const detailedMessage = `Story creation blocked. Reason: ${moderationError.moderation.reason}`;
             notificationService.addNotification({
               type: "error",
               title: "Content Moderation",
-              message: detailedMessage,
+              // NotificationDisplay shows the reason on its own line below
+              message: MODERATION_MESSAGE,
               reason: moderationError.moderation.reason, // Keep for potential richer display
               // moderationInfo: moderationError.moderation, // To use ContentModerationNotification.tsx directly
               autoClose: false,

@@ -1,10 +1,7 @@
 import { memo } from "react";
 import { ContentModerationInfo } from "core/types";
 import { Notification } from "../components/ui";
-
-// Owner's approved copy of 2026-09-25 (CP-9): says the check is automated and uses AI
-const MODERATION_MESSAGE =
-  "Our automated moderation, which uses AI, flagged your content, so we couldn't process it.";
+import { MODERATION_MESSAGE } from "./moderationMessage";
 
 interface ContentModerationNotificationProps {
   contentModeration: ContentModerationInfo;
