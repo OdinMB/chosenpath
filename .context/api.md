@@ -416,6 +416,7 @@ Create a new story from a prompt.
     title: string,
     modifier: number  // If equals DEFAULT_SELECTED_DIFFICULTY_MODIFIER, AI chooses
   },
+  category?: StoryCategory,  // setup category (core STORY_CATEGORIES); unknown values are dropped. "read-with-kids" gets stricter image moderation
   requestId?: string
 }
 ```
@@ -438,8 +439,9 @@ Story is generated asynchronously. Client should poll `/stories/:id/status` to c
 
 **Error Cases:**
 
+- `400`: The premise was blocked by content moderation
 - `429`: Rate limit exceeded
-- `500`: Story creation failed
+- `500`: Story creation failed, including when the content filter was unavailable (it fails closed)
 
 ---
 
@@ -962,7 +964,8 @@ Generate a new template using AI.
 {
   success: true,
   data: {
-    template: Template
+    template: Template,
+    provenance: AiContentProvenance  // machine-readable "AI-generated" marker (core/types/provenance.ts)
   },
   requestId: string
 }
@@ -974,6 +977,7 @@ Generate a new template using AI.
 
 - `400`: Missing required fields or moderation blocked
 - `429`: Rate limit exceeded
+- `500`: Generation failed, or the content filter was unavailable (it fails closed)
 
 ---
 
@@ -1014,7 +1018,8 @@ Use AI to iterate on specific sections of a template.
 {
   success: true,
   data: {
-    templateUpdate: Partial<Template>  // Updated sections
+    templateUpdate: Partial<Template>,  // Updated sections
+    provenance: AiContentProvenance  // machine-readable "AI-generated" marker
   },
   requestId: string
 }
@@ -1025,6 +1030,7 @@ Use AI to iterate on specific sections of a template.
 - `400`: Missing required fields or moderation blocked
 - `404`: Template not found
 - `429`: Rate limit exceeded
+- `500`: Generation failed, or the content filter was unavailable (it fails closed)
 
 ---
 
@@ -1575,11 +1581,13 @@ All file serving endpoints (`/images`, `/videos`) validate path parameters to pr
 
 ### Content Moderation
 
-AI generation endpoints (`/templates/generate`, `/templates/iterate`) apply content filtering to detect:
+These endpoints screen user-written text before generation:
 
-- Inappropriate content
-- Copyright infringement
-- Other policy violations
+- `POST /stories`: the premise.
+- `/templates/generate` and `/templates/:id/iterate`: the prompt or feedback. The filter looks for the prohibited-content rules, inappropriate content, copyright infringement and other policy violations.
+- `/image-generation/template/*`: the description and image instructions. The filter checks the prohibited-content rules only.
+
+The filter fails closed. If it cannot answer, the request is refused: a `500` with the route's generic failure message, or the `TECHNICAL` image error. Details are in `.context/content-safety.md`.
 
 ### Rate Limiting
 

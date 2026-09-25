@@ -87,7 +87,7 @@ Express.js backend with:
 
 - **WebSocket**: Real-time game orchestration via Socket.IO
 - **HTTP API**: REST endpoints for CRUD operations
-- **AI Integration**: LangChain with OpenAI/Anthropic/Google providers
+- **AI Integration**: OpenAI only: text through LangChain `ChatOpenAI`, images through the OpenAI Images API (`@langchain/anthropic` and `@langchain/google-genai` are installed but unused)
 - **Storage**: PostgreSQL for users/metadata, JSON files for stories/templates
 - **Authentication**: JWT with role-based access (user/admin)
 
@@ -104,7 +104,7 @@ React SPA with:
 
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, React Router
 - **Backend**: Express.js, Socket.IO, PostgreSQL, JWT authentication
-- **AI**: LangChain, OpenAI API, image generation via AI providers
+- **AI**: LangChain, OpenAI API, image generation via the OpenAI Images API
 - **Validation**: Zod schemas shared between client/server
 - **Build**: Workspace-based monorepo with TypeScript compilation
 
@@ -159,3 +159,5 @@ React SPA with:
 - `/.context/pregenerations.md` - Flows for pregenerating possible future story states (to reduce wait times for users)
 - `/.context/security.md` - Security layers and components
 - `/.context/template-hiding-ids.md` - Automated story element ID generation and deferred image file operations
+- `/.context/ai-transparency.md` - EU AI Act transparency record. Changing an AI feature, model, label or image pipeline? Update it in the same change. It holds roles, AI features with model ids, marking and label measures, the owner's decisions, and the open items.
+- `/.context/content-safety.md` - What every story and template refuses (Art. 5 safeguards). Read it before touching the content filter, image prompts or image moderation. It covers the rule list, the fail-closed filter, the kids moderation, how failed images are hidden, and the known limits.

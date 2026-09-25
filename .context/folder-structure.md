@@ -60,7 +60,8 @@ server/src/
 │ ├── responseUtils.ts
 │ ├── storageUtils.ts
 │ └── ...
-├── evals/ # Offline eval CLIs (npm run eval:*): type-checked and linted with the server, never imported by the app
+├── evals/ # Offline eval CLIs (npm run eval:*): type-checked and linted with the server, never imported by the app (ESLint rejects such imports)
+├── scripts/ # One-off maintenance CLIs the owner runs by hand (npm run backfill:*), never started by the app
 ├── config.ts
 ├── routes.ts
 
