@@ -26,7 +26,7 @@ import { MAX_PLAYERS } from "../config.js";
 
 /**
  * The setup categories a custom story can be created from. Template stories
- * tagged "Kids" count as read-with-kids.
+ * tagged "Kids" count as read-with-kids (categoryFromTemplateTags).
  */
 export const STORY_CATEGORIES = [
   "flexible",
@@ -44,6 +44,18 @@ export function isStoryCategory(value: unknown): value is StoryCategory {
     typeof value === "string" &&
     (STORY_CATEGORIES as readonly string[]).includes(value)
   );
+}
+
+/**
+ * The category a template story counts as. Only "Kids" maps to one: the
+ * library's "Read with Kids" shelf lists the templates with that tag.
+ */
+export function categoryFromTemplateTags(
+  tags: string[] | undefined
+): StoryCategory | undefined {
+  return tags?.some((tag) => tag.trim().toLowerCase() === "kids")
+    ? "read-with-kids"
+    : undefined;
 }
 
 // GENERATION WITH LLM

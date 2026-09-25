@@ -2,6 +2,7 @@ import { ClientStoryState, ImageUI } from "core/types";
 import { createPlayerIdentityImage } from "shared/utils/imageUtils";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { ImageCard } from "shared/components/ImageCard";
+import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
 
 interface PlayerInterludeProps {
   storyState: ClientStoryState;
@@ -37,6 +38,7 @@ export function PlayerInterlude({
           <ImageCard
             imageRef={playerIdentityImage}
             title={player.name}
+            alt={aiGeneratedImageAlt(player.name)}
             size="large"
             className="mb-4"
           >

@@ -2,6 +2,7 @@ import {
   DEFAULT_IMAGE_MODERATION,
   KIDS_IMAGE_MODERATION,
   imageModerationFor,
+  imageModerationForTemplate,
   withImageSafetyConstraints,
 } from "../../../src/images/imageSafety.js";
 import { PROHIBITED_CONTENT_RULES } from "../../../src/shared/contentSafetyRules.js";
@@ -46,5 +47,23 @@ describe("imageModerationFor", () => {
     expect(imageModerationFor(createMockStory())).toBe(
       DEFAULT_IMAGE_MODERATION
     );
+  });
+});
+
+describe("imageModerationForTemplate", () => {
+  it("uses the stricter moderation for templates tagged Kids, however the tag is written", () => {
+    for (const tags of [["Kids"], ["Fantasy", "kids"], [" KIDS "]]) {
+      expect(imageModerationForTemplate({ tags })).toBe(KIDS_IMAGE_MODERATION);
+    }
+  });
+
+  it("keeps the default moderation for other templates and for templates not saved yet", () => {
+    expect(imageModerationForTemplate({ tags: ["Fantasy", "Satire"] })).toBe(
+      DEFAULT_IMAGE_MODERATION
+    );
+    expect(imageModerationForTemplate({ tags: [] })).toBe(
+      DEFAULT_IMAGE_MODERATION
+    );
+    expect(imageModerationForTemplate(null)).toBe(DEFAULT_IMAGE_MODERATION);
   });
 });

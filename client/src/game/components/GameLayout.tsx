@@ -13,6 +13,7 @@ import {
   createPlayerIdentityImage,
   isFailedStoryImage,
 } from "shared/utils/imageUtils";
+import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
@@ -279,7 +280,7 @@ export function GameLayout({
               <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 mr-3">
                 <StoryImage
                   image={playerIdentityImage}
-                  alt={`${player.name}`}
+                  alt={aiGeneratedImageAlt(player.name)}
                   className="w-full h-full"
                   responsivePosition={true}
                   desktopOffset="4%"

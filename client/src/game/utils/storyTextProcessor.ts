@@ -6,6 +6,7 @@ import {
   createImageFromPlaceholder,
 } from "shared/utils/imageUtils";
 import { StoryImage } from "shared/components/StoryImage";
+import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { optimizeImagePositions } from "./imageRepositioning";
 
@@ -459,7 +460,7 @@ export function insertImages(
         const component = React.createElement(StoryImage, {
           key: `img-${imageEl.position}`,
           image: imageEl.image!,
-          alt: imageEl.image?.description || "",
+          alt: aiGeneratedImageAlt(imageEl.image?.description),
           caption: imageEl.image?.description || "",
           withinText: true,
           float: imageEl.float || "left",
@@ -484,7 +485,7 @@ export function insertImages(
       const component = React.createElement(StoryImage, {
         key: `img-${imageEl.position}`,
         image: imageEl.image!,
-        alt: imageEl.image?.description || "",
+        alt: aiGeneratedImageAlt(imageEl.image?.description),
         caption: imageEl.image?.description || "",
         withinText: true,
         float: imageEl.float || "left",

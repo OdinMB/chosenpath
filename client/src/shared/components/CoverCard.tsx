@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { ImageCard } from "./ImageCard";
 import { ImageReference } from "core/types/image";
+import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
 
 interface CoverCardProps {
   sourceId?: string; // Template or Story ID (optional)
@@ -41,6 +42,7 @@ export const CoverCard: React.FC<CoverCardProps> = ({
     <ImageCard
       imageRef={coverImageRef}
       title={title}
+      alt={aiGeneratedImageAlt(title)}
       size={size}
       onClick={onClick}
       className={className}

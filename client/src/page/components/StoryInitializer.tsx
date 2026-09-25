@@ -32,6 +32,7 @@ import {
 import { ConfigSummary } from "./ConfigSummary";
 import { GenerationProgress } from "./GenerationProgress";
 import { AcademyModal } from "shared/components/AcademyModal";
+import { AiNotice } from "shared/components/AiNotice";
 import { useAuth } from "shared/auth/useAuth";
 
 interface CategoryConfig {
@@ -1279,6 +1280,9 @@ export const StoryInitializer = ({
             </PrimaryButton>
           </div>
         )}
+
+        {/* Template mode drafts a world in the labelled AI Worldbuilding Assistant */}
+        {!templateMode && <AiNotice variant="setup" className="sm:justify-end" />}
 
         <div className="flex flex-row gap-3 sm:gap-4 sm:justify-between pt-1 sm:pt-2">
           <PrimaryButton

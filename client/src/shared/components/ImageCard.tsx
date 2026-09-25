@@ -7,6 +7,8 @@ interface ImageCardProps {
   imageRef?: ImageReference;
   publicImagePath?: string; // For public directory images
   title: string;
+  /** Defaults to the title. */
+  alt?: string;
   size?: "default" | "large";
   onClick?: () => void;
   children: React.ReactNode;
@@ -17,6 +19,7 @@ export const ImageCard = ({
   imageRef,
   publicImagePath,
   title,
+  alt = title,
   size = "default",
   onClick,
   children,
@@ -69,7 +72,7 @@ export const ImageCard = ({
             >
               <img
                 src={imageSrc}
-                alt={`${title}`}
+                alt={alt}
                 className={`absolute h-full ${imageContainerClass} object-cover object-center transition-all duration-500 hover:scale-110
                 } ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                 onLoad={handleImageLoad}

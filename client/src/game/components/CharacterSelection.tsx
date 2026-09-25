@@ -13,6 +13,8 @@ import { PrimaryButton } from "components/ui";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { StoryImage } from "shared/components/StoryImage";
 import { createPlayerIdentityImage } from "shared/utils/imageUtils";
+import { aiGeneratedImageAlt } from "shared/utils/aiImageAlt";
+import { AiNotice } from "shared/components/AiNotice";
 
 interface CharacterSelectionProps {
   onCharacterSelected: (identityIndex: number, backgroundIndex: number) => void;
@@ -105,7 +107,7 @@ export function CharacterSelection({
             >
               <StoryImage
                 image={characterImage}
-                alt={`${identity.name}`}
+                alt={aiGeneratedImageAlt(identity.name)}
                 className="w-full h-full max-w-[350px]"
                 responsivePosition={true}
                 desktopOffset="4%"
@@ -191,6 +193,8 @@ export function CharacterSelection({
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-primary">
         {storyState.characterSelectionIntroduction?.title || "Who are you?"}
       </h1>
+
+      <AiNotice variant="join" className="justify-center text-center mb-6" />
 
       {storyState.characterSelectionIntroduction?.text ? (
         <p className="mb-10 text-lg text-primary-700">

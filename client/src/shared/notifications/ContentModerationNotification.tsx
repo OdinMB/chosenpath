@@ -2,6 +2,10 @@ import { memo } from "react";
 import { ContentModerationInfo } from "core/types";
 import { Notification } from "../components/ui";
 
+// Owner's approved copy of 2026-09-25 (CP-9): says the check is automated and uses AI
+const MODERATION_MESSAGE =
+  "Our automated moderation, which uses AI, flagged your content, so we couldn't process it.";
+
 interface ContentModerationNotificationProps {
   contentModeration: ContentModerationInfo;
   onClose?: () => void;
@@ -16,17 +20,14 @@ export const ContentModerationNotification = memo(
   }: ContentModerationNotificationProps) {
     const getMessage = () => {
       if (!contentModeration) {
-        return <p>Your content was flagged by our moderation system.</p>;
+        return <p>{MODERATION_MESSAGE}</p>;
       }
 
       const { reason } = contentModeration;
 
       return (
         <>
-          <p>
-            Your content was flagged by our moderation system and could not be
-            processed.
-          </p>
+          <p>{MODERATION_MESSAGE}</p>
           <p className="mt-3 font-semibold">Reason:</p>
           <p className="mt-1 italic">{reason}</p>
         </>

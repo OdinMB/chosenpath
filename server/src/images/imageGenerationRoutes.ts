@@ -41,10 +41,13 @@ import {
 import { sendRateLimited, sendError } from "../shared/responseUtils.js";
 import { verifyUser, checkPermissions } from "../users/authMiddleware.js";
 import { ContentFilterService } from "../game/services/ContentFilterService.js";
+import { TemplateService } from "../templates/TemplateService.js";
 import { screenImageRequest } from "./imageRequestScreening.js";
+import { imageModerationForTemplate } from "./imageSafety.js";
 
 const router = express.Router();
 const contentFilter = new ContentFilterService();
+const templateService = new TemplateService();
 const IMAGE_GENERATION_ACTION_TYPE = "imageGeneration";
 const MAX_TEXT_LENGTH = 2000;
 
@@ -149,6 +152,10 @@ const validateImageQuality = (quality?: string): string | null => {
 };
 // --- End Validation Helper Functions ---
 
+// Stricter moderation when the stored template is tagged "Kids"
+const moderationForTemplate = async (templateId: string) =>
+  imageModerationForTemplate(await templateService.getTemplateById(templateId));
+
 // Helper to sanitize and map reference ids to template-scoped ImageReference objects
 const mapTemplateReferences = (
   templateId: string,
@@ -241,6 +248,7 @@ router.post(
         imageId,
         templateId,
         appearance,
+        await moderationForTemplate(templateId),
         imageInstructions,
         references.length ? references : undefined,
         size,
@@ -341,6 +349,7 @@ router.post(
         identityIndex,
         templateId,
         appearance,
+        await moderationForTemplate(templateId),
         imageInstructions,
         size || IMAGE_SIZES.PORTRAIT,
         quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY
@@ -436,6 +445,7 @@ router.post(
       const imagePath = await aiImageGenerator.generateCoverImageForTemplate(
         templateId,
         coverPrompt,
+        await moderationForTemplate(templateId),
         imageInstructions,
         references.length ? references : undefined,
         size || IMAGE_SIZES.PORTRAIT,

@@ -36,6 +36,13 @@ export function Privacy() {
             </p>
           </div>
 
+          <p className="mb-4">
+            To write story text and create images, we send your story premise,
+            your choices, and anything you write about yourself to{" "}
+            <b>OpenAI</b> (USA). OpenAI processes this data on our behalf under
+            a data processing agreement and doesn't use it for training.
+          </p>
+
           <div className="my-6">
             <img
               src="/no-cookies_medium.jpeg"

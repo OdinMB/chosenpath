@@ -1,4 +1,4 @@
-import { categoryFromTemplateTags } from "../../../../src/game/services/StoryStateFactory.js";
+import { categoryFromTemplateTags } from "core/types/index.js";
 
 describe("categoryFromTemplateTags", () => {
   it("treats a template tagged Kids as a read-with-kids story, whatever the case", () => {

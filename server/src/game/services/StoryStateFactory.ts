@@ -5,21 +5,9 @@ import {
   DifficultyLevel,
   PlayerCount,
   Outcome,
-  StoryCategory,
+  categoryFromTemplateTags,
 } from "core/types/index.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
-
-/**
- * The category a template story counts as. Only "Kids" maps to one: the
- * library's "Read with Kids" shelf lists the templates with that tag.
- */
-export function categoryFromTemplateTags(
-  tags: string[] | undefined
-): StoryCategory | undefined {
-  return tags?.some((tag) => tag.trim().toLowerCase() === "kids")
-    ? "read-with-kids"
-    : undefined;
-}
 
 /**
  * Creates a story state from a template with the given parameters

@@ -81,3 +81,12 @@ tests/
 - **Imports**: Use relative paths in test files (e.g., `'../../../../src/module'`)
 - **Path Aliases**: Source files can use path aliases - Jest resolves them automatically
 - **Mock Data**: Use existing mock story state from `/server/tests/__mocks__/game/services/AIStoryGenerator.ts` - contains `createMockStoryState()` function for consistent test data
+
+### Client rendering tests
+
+The client has no DOM in Jest (`testEnvironment: node`, no Testing Library). Components are rendered with `renderMarkup` from `client/tests/helpers/staticMarkup.ts` (`react-dom/server`), which runs no effects: the markup is the first paint, before any interaction. That is what the AI-label tests assert (`notesIn` reads each `role="note"` with its accessible name, `lang` and text). Story and session fixtures are in `client/tests/helpers/storyFixtures.ts`; wrap game components in `GameSessionContext.Provider` with `gameSession(state)`.
+
+- State that an effect sets (beat navigation, image sources in `StoryImage` and `ImageCard`) never appears in a static render: mock the hook or the image component with a marker that shows the props you assert on.
+- Components that reach `src/config.ts` need `jest.mock("<relative>/src/config", () => jest.requireActual("<relative>/tests/__mocks__/client/config"))`, because Jest cannot parse `import.meta.env`. An import of `core/utils/*.js` resolves to core's ESM build; mock it with `jest.requireActual` on the core source.
+- Mock `react-router-dom` hooks (`useNavigate`, `useSearchParams`) instead of rendering `MemoryRouter`: react-router's types come from the root `@types/react` 19 and the client's from 18, so `<MemoryRouter>` fails the test type check.
+- `client/tests/tsconfig.json` uses the app's strictness (no `exactOptionalPropertyTypes` or `noUncheckedIndexedAccess`), because a rendering test type-checks every source file it imports.

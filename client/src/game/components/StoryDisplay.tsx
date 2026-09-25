@@ -6,6 +6,8 @@ import { NextBeatPlaceholder } from "./NextBeatPlaceholder";
 import { useStoryBeatState } from "../hooks/useStoryBeatState";
 import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
+import { AiNotice } from "shared/components/AiNotice";
+import { useBeatAiNotice } from "../hooks/useBeatAiNotice";
 
 interface StoryDisplayProps {
   onChoiceSelected: (index: number) => void;
@@ -28,6 +30,13 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     storyState,
     isRequestPending,
   });
+
+  // The AI notice above the beat on screen: once per session, and at new Threads
+  const aiNotice = useBeatAiNotice(
+    storyState?.category,
+    beatHistory,
+    displayedBeatIndex
+  );
 
   // Forward choice selections to the parent component
   const handleChoiceClick = (index: number) => {
@@ -92,6 +101,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
     }
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[70vh]">
+        {aiNotice && (
+          <AiNotice variant={aiNotice} className="max-w-2xl mt-8 px-4" />
+        )}
         <PlayerInterlude
           storyState={storyState}
           className="mt-8 mb-4 sm:mb-8"
@@ -122,6 +134,9 @@ export function StoryDisplay({ onChoiceSelected }: StoryDisplayProps) {
 
       <div ref={contentRef} className="flex-1 p-4 md:p-6 overflow-y-auto">
         <div className="space-y-4 md:space-y-6">
+          {aiNotice && (
+            <AiNotice variant={aiNotice} className="max-w-2xl mx-auto" />
+          )}
           {isShowingPlaceholder ? (
             <NextBeatPlaceholder
               storyState={storyState}

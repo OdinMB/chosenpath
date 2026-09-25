@@ -69,10 +69,13 @@ export class AIImageGenerator {
     this.openai = new OpenAI();
   }
 
+  // The template-editor methods take the moderation explicitly, so no route can
+  // make a template image without deciding it (imageModerationForTemplate).
   public async generateImageForTemplate(
     imageId: string,
     templateId: string,
     elementAppearance: string,
+    moderation: ImageModeration,
     imageInstructions?: ImageInstructions,
     references?: ImageReference[],
     size?: ImageSize,
@@ -84,7 +87,8 @@ export class AIImageGenerator {
       references,
       size,
       quality || IMAGE_GENERATION_TEMPLATE_ELEMENT_QUALITY,
-      IMAGE_GENERATION_TEMPLATE_MODEL
+      IMAGE_GENERATION_TEMPLATE_MODEL,
+      moderation
     );
     return this.saveImageToTemplate(imageId, templateId, imageBuffer);
   }
@@ -94,6 +98,7 @@ export class AIImageGenerator {
     identityIndex: number,
     templateId: string,
     appearance: string,
+    moderation: ImageModeration,
     imageInstructions?: ImageInstructions,
     size?: ImageSize,
     quality?: ImageQuality
@@ -117,7 +122,8 @@ export class AIImageGenerator {
       undefined, // No references
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for player images
       quality || IMAGE_GENERATION_TEMPLATE_PLAYER_QUALITY,
-      IMAGE_GENERATION_TEMPLATE_MODEL
+      IMAGE_GENERATION_TEMPLATE_MODEL,
+      moderation
     );
 
     // Save the image in template/images/players directory
@@ -132,6 +138,7 @@ export class AIImageGenerator {
   public async generateCoverImageForTemplate(
     templateId: string,
     coverPrompt: string,
+    moderation: ImageModeration,
     imageInstructions?: ImageInstructions,
     references?: ImageReference[],
     size?: ImageSize,
@@ -147,7 +154,8 @@ export class AIImageGenerator {
       references && references.length > 0 ? references : undefined,
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
       quality || IMAGE_GENERATION_TEMPLATE_COVER_QUALITY,
-      IMAGE_GENERATION_TEMPLATE_MODEL
+      IMAGE_GENERATION_TEMPLATE_MODEL,
+      moderation
     );
 
     // Stored as returned, never resized: any re-encode would invalidate the

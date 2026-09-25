@@ -38,6 +38,7 @@ const { effectiveImageQuality } = await import(
 const {
   DEFAULT_IMAGE_MODERATION,
   KIDS_IMAGE_MODERATION,
+  imageModerationForTemplate,
 } = await import("../../../src/images/imageSafety.js");
 
 const STORY_ID = "story-under-test";
@@ -176,7 +177,8 @@ describe("AIImageGenerator per-flow defaults", () => {
 
     await generator.generateCoverImageForTemplate(
       "template-under-test",
-      "a harbour town at dusk"
+      "a harbour town at dusk",
+      DEFAULT_IMAGE_MODERATION
     );
 
     expect(generate.mock.calls[0][0]).toMatchObject({
@@ -197,7 +199,8 @@ describe("AIImageGenerator per-flow defaults", () => {
       "player1",
       0,
       "template-under-test",
-      "a lighthouse keeper with a grey beard"
+      "a lighthouse keeper with a grey beard",
+      DEFAULT_IMAGE_MODERATION
     );
 
     expect(generate.mock.calls[0][0]).toMatchObject({
@@ -217,7 +220,8 @@ describe("AIImageGenerator per-flow defaults", () => {
     await generator.generateImageForTemplate(
       "lighthouse",
       "template-under-test",
-      "a white lighthouse on a rock"
+      "a white lighthouse on a rock",
+      DEFAULT_IMAGE_MODERATION
     );
 
     expect(generate.mock.calls[0][0]).toMatchObject({
@@ -265,6 +269,58 @@ describe("AIImageGenerator image moderation", () => {
 
     expect(generate.mock.calls[0][0].moderation).toBe(DEFAULT_IMAGE_MODERATION);
   });
+
+  // A "Kids" template's editor images end up in read-with-kids stories
+  const kidsTemplate = imageModerationForTemplate({
+    tags: ["Fantasy", "Kids"],
+  });
+  const templateFlows: Array<
+    [string, (generator: InstanceType<typeof AIImageGenerator>) => Promise<string>]
+  > = [
+    [
+      "element image",
+      (generator) =>
+        generator.generateImageForTemplate(
+          "dragon",
+          TEMPLATE_ID,
+          "a friendly dragon",
+          kidsTemplate
+        ),
+    ],
+    [
+      "identity portrait",
+      (generator) =>
+        generator.generatePlayerImageForTemplate(
+          "player1",
+          0,
+          TEMPLATE_ID,
+          "a girl with a red scarf",
+          kidsTemplate
+        ),
+    ],
+    [
+      "cover",
+      (generator) =>
+        generator.generateCoverImageForTemplate(
+          TEMPLATE_ID,
+          "a castle made of cake",
+          kidsTemplate
+        ),
+    ],
+  ];
+
+  it.each(templateFlows)(
+    "sends the template %s of a Kids-tagged template with the stricter moderation",
+    async (_flow, generate) => {
+      const recording = makeRecordingClient();
+
+      await generate(new AIImageGenerator(recording.client));
+
+      expect(recording.generate.mock.calls[0][0].moderation).toBe(
+        KIDS_IMAGE_MODERATION
+      );
+    }
+  );
 });
 
 describe("AIImageGenerator.generateCoverImageForTemplate", () => {
@@ -292,7 +348,8 @@ describe("AIImageGenerator.generateCoverImageForTemplate", () => {
 
     const imagePath = await generator.generateCoverImageForTemplate(
       TEMPLATE_ID,
-      "a harbour town at dusk"
+      "a harbour town at dusk",
+      DEFAULT_IMAGE_MODERATION
     );
 
     expect(imagePath).toBe(`/images/templates/${TEMPLATE_ID}/cover.jpeg`);

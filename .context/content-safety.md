@@ -39,14 +39,14 @@ Two things are not screened by this filter:
 - Every Images API request, in production and in the eval, gets the rules appended.
 - An edit with reference images also treats every person in the input images as a real, identifiable person.
 
-**3. OpenAI image moderation.** Moderation is `low` everywhere, which is the owner's choice. The one exception is in-game images of read-with-kids stories, which use `auto` (`imageModerationFor`).
+**3. OpenAI image moderation.** Moderation is `low` everywhere, which is the owner's choice. Two exceptions use `auto`: in-game images of read-with-kids stories (`imageModerationFor`), and template-editor images (element images, identity portraits, covers) of templates tagged "Kids", whose images end up in read-with-kids stories (`imageModerationForTemplate`; owner decision of 2026-09-25).
 
 A story is read-with-kids when `StoryState.category === "read-with-kids"`:
 
 - **Custom stories:** the category comes from the setup flow. The client sends `category` on `POST /stories`, and unknown values are dropped.
-- **Template stories:** the category is set when the template's tags include "Kids" (`categoryFromTemplateTags`).
+- **Template stories:** the category is set when the template's tags include "Kids" (`categoryFromTemplateTags` in `core/types/story.ts`, the one source for that rule).
 
-Stories created before 2026-09-25 have no category, so they stay on `low`. The template editor also stays on `low`.
+Stories created before 2026-09-25 have no category, so they stay on `low`. The template-editor methods of `AIImageGenerator` take the moderation as a required argument, so a new template-image route has to decide it; the routes read the tags of the stored template.
 
 **4. Failures never stop a story.** A refused or failed image never blocks the text:
 
@@ -62,7 +62,8 @@ This covers beat images, the custom-story cover and custom-story portraits. The 
 - Reference images are not inspected. Only the request text is judged, and no vision moderation runs.
 - Images that people upload (template zip import, file upload) are not screened.
 - The category comes from the client. A client that omits it gets the default moderation, which is the owner's baseline.
-- There is no coaching category, so coaching stories cannot be told apart from others.
+- The editor's moderation follows the saved tags. Images generated before a "Kids" tag is saved, or before the template is saved at all, use `low`, and a later tag does not regenerate them.
+- There is no coaching category. The coach and therapist pages link to future-self stories, so coaching gets the future-self treatment (the Thread reminder); a coaching story set up another way cannot be told apart.
 
 ## When changing this
 
