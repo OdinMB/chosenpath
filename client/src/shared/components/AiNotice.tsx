@@ -1,13 +1,23 @@
 /*
  * The notices that tell people an AI system writes their story (AI Act
  * Art. 50(1)). The wording is the owner's approved copy of 2026-09-25
- * (DOCS/2026-09-25_ai-label-copy-review.md, CP-1 to CP-5): change it only
- * with the owner. Each notice is real text with a visible "AI" badge, and
- * none can be dismissed: the conservative reading asks for a notice in every
- * session. Where each one is mounted: .context/ai-transparency.md §7.
+ * (DOCS/2026-09-25_ai-label-copy-review.md, CP-1 to CP-5); the setup line's
+ * template and no-images variants are the owner's of 2026-09-26 (CP-3).
+ * Change a word only with the owner. Each notice is real text with a visible
+ * "AI" badge, and none can be dismissed: the conservative reading asks for a
+ * notice in every session. Where each one is mounted:
+ * .context/ai-transparency.md §7.
  */
 
-export type AiNoticeVariant = "session" | "kids" | "reminder" | "join" | "setup";
+export type AiNoticeVariant =
+  | "session"
+  | "kids"
+  | "reminder"
+  | "join"
+  | "setup"
+  | "setupNoImages"
+  | "templateSetup"
+  | "templateSetupNoImages";
 
 const NOTICE_TEXT: Record<AiNoticeVariant, string> = {
   session:
@@ -18,6 +28,10 @@ const NOTICE_TEXT: Record<AiNoticeVariant, string> = {
   join: "This story is written by an AI system, not a person. Your choices steer what it writes next.",
   setup:
     "An AI system will write your story and create its images from your premise.",
+  setupNoImages: "An AI system will write your story from your premise.",
+  templateSetup:
+    "An AI system will write your story and create its images from this template.",
+  templateSetupNoImages: "An AI system will write your story from this template.",
 };
 
 /** The badge is decorative for screen readers; the note's name carries it. */
@@ -44,5 +58,38 @@ export function AiNotice({ variant, className = "" }: AiNoticeProps) {
       </span>
       <span>{NOTICE_TEXT[variant]}</span>
     </p>
+  );
+}
+
+/** What a new story is built from: the player's own premise, or a template. */
+export type SetupSource = "premise" | "template";
+
+const SETUP_VARIANTS: Record<
+  SetupSource,
+  { images: AiNoticeVariant; noImages: AiNoticeVariant }
+> = {
+  premise: { images: "setup", noImages: "setupNoImages" },
+  template: { images: "templateSetup", noImages: "templateSetupNoImages" },
+};
+
+type SetupAiNoticeProps = {
+  source: SetupSource;
+  /** Whether the story will generate images; without them the line drops its images clause. */
+  images: boolean;
+  className?: string;
+};
+
+/** CP-3, next to the button that starts a story, before the first AI generation. */
+export function SetupAiNotice({
+  source,
+  images,
+  className = "",
+}: SetupAiNoticeProps) {
+  const variants = SETUP_VARIANTS[source];
+  return (
+    <AiNotice
+      variant={images ? variants.images : variants.noImages}
+      className={className}
+    />
   );
 }

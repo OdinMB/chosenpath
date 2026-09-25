@@ -5,6 +5,7 @@ import { PrimaryButton, Icons, InfoIcon } from "components/ui";
 import { DISABLE_PREGENERATION_FOR_MULTIPLAYER } from "core/config";
 import { TemplateCard } from "./TemplateCard";
 import { ShareLink } from "shared/components/ShareLink";
+import { SetupAiNotice } from "shared/components/AiNotice";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
@@ -338,6 +339,12 @@ export function TemplateConfigurator() {
               </div>
             </div>
           )}
+
+          <SetupAiNotice
+            source="template"
+            images={generateImages}
+            className="sm:justify-end"
+          />
 
           <div className="flex flex-row gap-3 sm:gap-4 pt-2">
             <PrimaryButton
