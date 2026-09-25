@@ -19,6 +19,7 @@ import {
   PublicationStatus,
   TemplateMetadata,
   PlayerCount,
+  AI_TEXT_PROVENANCE,
 } from "core/types/index.js";
 import {
   sendSuccess,
@@ -634,7 +635,8 @@ router.post(
         return sendBadRequest(res, "Missing required fields", requestId);
       }
 
-      // Check if the prompt contains inappropriate content or copyright infringement
+      // Check if the prompt contains inappropriate content or copyright infringement.
+      // Fails closed: an unavailable filter throws, and the catch below refuses.
       const contentCheck = await contentFilter.isAppropriatePrompt(prompt);
       if (!contentCheck.isAppropriate) {
         const moderationInfo = {
@@ -667,7 +669,12 @@ router.post(
       Logger.Route.log(
         `Generated template: ${generatedTemplate.title} for user ${creatorId}`
       );
-      sendSuccess(res, { template: generatedTemplate }, requestId, 201);
+      sendSuccess(
+        res,
+        { template: generatedTemplate, provenance: AI_TEXT_PROVENANCE },
+        requestId,
+        201
+      );
     } catch (error) {
       Logger.Route.error("Error generating template", error);
       sendError(res, "Failed to generate template", 500, requestId, error);
@@ -714,7 +721,8 @@ router.post(
         );
       }
 
-      // Check if the feedback contains inappropriate content or copyright infringement
+      // Check if the feedback contains inappropriate content or copyright infringement.
+      // Fails closed: an unavailable filter throws, and the catch below refuses.
       const contentCheck = await contentFilter.isAppropriatePrompt(feedback);
       if (!contentCheck.isAppropriate) {
         const moderationInfo = {
@@ -746,7 +754,11 @@ router.post(
       }
 
       Logger.Route.log(`Generated iteration for template ${id}`);
-      sendSuccess(res, { templateUpdate }, requestId);
+      sendSuccess(
+        res,
+        { templateUpdate, provenance: AI_TEXT_PROVENANCE },
+        requestId
+      );
     } catch (error) {
       Logger.Route.error(`Error iterating template ${id}`, error);
       sendError(res, `Failed to iterate template ${id}`, 500, requestId, error);

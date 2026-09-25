@@ -5,8 +5,21 @@ import {
   DifficultyLevel,
   PlayerCount,
   Outcome,
+  StoryCategory,
 } from "core/types/index.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
+
+/**
+ * The category a template story counts as. Only "Kids" maps to one: the
+ * library's "Read with Kids" shelf lists the templates with that tag.
+ */
+export function categoryFromTemplateTags(
+  tags: string[] | undefined
+): StoryCategory | undefined {
+  return tags?.some((tag) => tag.trim().toLowerCase() === "kids")
+    ? "read-with-kids"
+    : undefined;
+}
 
 /**
  * Creates a story state from a template with the given parameters
@@ -61,6 +74,10 @@ export function createStoryStateFromTemplate(
     images: loadTemplateImages(template.id),
     playerCodes,
   };
+  const category = categoryFromTemplateTags(template.tags);
+  if (category) {
+    storyState.category = category;
+  }
 
   // Set up character selection options for the requested player count
   // Only include active players based on the requested player count

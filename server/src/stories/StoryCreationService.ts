@@ -5,6 +5,7 @@ import {
   DifficultyLevel,
   ImageRequest,
   IMAGE_SIZES,
+  StoryCategory,
 } from "core/types/index.js";
 import { connectionManager } from "server/game/ConnectionManager.js";
 import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
@@ -25,6 +26,8 @@ import { Response } from "express";
 import { storyDbService } from "./StoryDbService.js";
 import { getDb } from "shared/db.js";
 import { IMAGE_GENERATION_STORY_COVER_QUALITY } from "server/config.js";
+import { gameQueueProcessor } from "../game/services/GameQueueProcessor.js";
+import { startBackgroundImageGeneration } from "../game/services/StoryImageJobs.js";
 
 export class StoryCreationService {
   private contentFilter: ContentFilterService;
@@ -111,13 +114,15 @@ export class StoryCreationService {
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel | undefined,
     res: Response,
-    creatorId?: string
+    creatorId?: string,
+    category?: StoryCategory
   ): Promise<void> {
     Logger.Route.log(
       `Creating new story with prompt: "${prompt.substring(0, 50)}..."`
     );
 
-    // Check if the prompt contains inappropriate content
+    // Check if the prompt contains inappropriate content. The filter fails
+    // closed: when it cannot answer it throws, and the route refuses the story.
     const contentCheck = await this.contentFilter.isAppropriatePrompt(prompt);
     if (!contentCheck.isAppropriate) {
       const moderationInfo = {
@@ -171,7 +176,8 @@ export class StoryCreationService {
       maxTurns,
       gameMode,
       difficultyLevel, // Pass original difficultyLevel (could be undefined)
-      playerCodes
+      playerCodes,
+      category
       // creatorId - currently unused
     ).catch((error) => {
       Logger.Route.error(
@@ -197,7 +203,8 @@ export class StoryCreationService {
     maxTurns: number,
     gameMode: GameMode,
     difficultyLevel: DifficultyLevel | undefined,
-    playerCodes: Record<string, string>
+    playerCodes: Record<string, string>,
+    category: StoryCategory | undefined
     // creatorId is currently unused but may be needed for future features like story ownership tracking
     // creatorId?: string
   ): Promise<void> {
@@ -233,10 +240,11 @@ export class StoryCreationService {
 
       const story = Story.create(storyState);
 
-      // Add player codes and pregeneration setting to state
+      // Add player codes, pregeneration setting and category to state
       const storyWithCodes = story.clone({
         playerCodes,
         pregenerateBeats,
+        ...(category ? { category } : {}),
       });
 
       console.log(
@@ -256,7 +264,6 @@ export class StoryCreationService {
         const coverPrompt = storyWithCodes.getImageInstructions()?.coverPrompt;
 
         if (coverPrompt) {
-          // Fire and forget - no await
           const imageRequest: ImageRequest = {
             caption: "Story Cover",
             id: "cover",
@@ -266,18 +273,19 @@ export class StoryCreationService {
             referenceImageIds: [],
           };
 
-          this.aiImageGenerator
-            .generateImagesForBeats(
-              storyWithCodes,
-              [imageRequest],
-              false // don't add to story state image library
-            )
-            .catch((err) => {
-              Logger.Route.error(
-                `Failed to generate cover image for story ${storyId}:`,
-                err
-              );
-            });
+          // Fire and forget. The cover stays out of the story's image library;
+          // a failed cover is recorded so the reader hides it.
+          void startBackgroundImageGeneration(
+            {
+              generate: (story, request) =>
+                this.aiImageGenerator.generateBeatImage(story, request),
+              enqueue: (operation) => gameQueueProcessor.addOperation(operation),
+            },
+            storyId,
+            storyWithCodes,
+            [imageRequest],
+            { attachToLibrary: false }
+          );
         } else {
           Logger.Route.warn(
             `No cover prompt found for story ${storyId}, skipping cover image generation`

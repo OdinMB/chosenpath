@@ -72,6 +72,12 @@ export interface GameOperations {
     };
     story: Story;
   };
+  recordImageFailure: {
+    input: {
+      imageId: string;
+    };
+    story: Story;
+  };
   pregenerateStoryState: {
     input: {
       story: Story;

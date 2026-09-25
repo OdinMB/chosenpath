@@ -21,7 +21,30 @@ import {
 import { StoryElementsSchema, StoryElement } from "./storyElement.js";
 import { SwitchAnalysis } from "./switch.js";
 import { ThreadAnalysis } from "./thread.js";
+import { AiContentProvenance } from "./provenance.js";
 import { MAX_PLAYERS } from "../config.js";
+
+/**
+ * The setup categories a custom story can be created from. Template stories
+ * tagged "Kids" count as read-with-kids.
+ */
+export const STORY_CATEGORIES = [
+  "flexible",
+  "enjoy-fiction",
+  "vent-about-reality",
+  "pretend-to-be",
+  "see-your-future-self",
+  "read-with-kids",
+  "learn-something",
+] as const;
+export type StoryCategory = (typeof STORY_CATEGORIES)[number];
+
+export function isStoryCategory(value: unknown): value is StoryCategory {
+  return (
+    typeof value === "string" &&
+    (STORY_CATEGORIES as readonly string[]).includes(value)
+  );
+}
 
 // GENERATION WITH LLM
 
@@ -306,6 +329,10 @@ export type StoryState = {
   generateImages: boolean;
   pregenerateBeats: boolean;
   images: ImageLibrary;
+  /** Story images whose generation failed; the reader hides their slots. */
+  failedImageIds?: string[];
+  /** Absent on stories created before categories were recorded. */
+  category?: StoryCategory;
   playerCodes: Record<(typeof PLAYER_SLOTS)[number], string>;
 };
 
@@ -329,8 +356,12 @@ export type ClientStoryState = {
   characterSelectionIntroduction: CharacterSelectionIntroduction;
   generateImages: boolean;
   images: ImageLibrary;
+  failedImageIds?: string[];
+  category?: StoryCategory;
   pendingPlayers: PlayerSlot[];
   gameOver: boolean;
+  /** Marks the story text in this state as AI-generated, for machines. */
+  provenance?: AiContentProvenance;
 };
 
 // Type for items in the admin stories list

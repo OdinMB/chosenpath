@@ -25,13 +25,39 @@ export class ImageManager {
   }
 
   /**
-   * Add a new image to the story
+   * Add a new image to the story. A written image outranks an earlier
+   * failure with the same id (two generations of one request can race).
    */
   addImage(state: StoryState, image: ImageStoryState): StoryState {
-    return {
+    const updated: StoryState = {
       ...state,
       images: [...state.images, image],
     };
+    if (state.failedImageIds?.includes(image.id)) {
+      updated.failedImageIds = state.failedImageIds.filter(
+        (id) => id !== image.id
+      );
+    }
+    return updated;
+  }
+
+  /**
+   * Record an image whose generation failed. A no-op when the id is already
+   * recorded, or when an image with that id made it into the library.
+   */
+  markImageFailed(state: StoryState, imageId: string): StoryState {
+    const failed = state.failedImageIds ?? [];
+    if (
+      failed.includes(imageId) ||
+      state.images.some((image) => image.id === imageId)
+    ) {
+      return state;
+    }
+    return { ...state, failedImageIds: [...failed, imageId] };
+  }
+
+  getFailedImageIds(state: StoryState): string[] {
+    return state.failedImageIds ?? [];
   }
 
   /**

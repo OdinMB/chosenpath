@@ -12,6 +12,11 @@ import {
   MAX_REFERENCE_IMAGES,
 } from "../../../src/images/openaiImageClient.js";
 import type { ImageApiClient } from "../../../src/images/openaiImageClient.js";
+import {
+  DEFAULT_IMAGE_MODERATION,
+  withImageSafetyConstraints,
+} from "../../../src/images/imageSafety.js";
+import { PROHIBITED_CONTENT_RULES } from "../../../src/shared/contentSafetyRules.js";
 
 const IMAGE_BYTES = Buffer.from("fake-jpeg-bytes");
 
@@ -128,6 +133,34 @@ describe("requestImage", () => {
     );
     expect(generate.mock.calls[0][0].model).toBe("gpt-image-2.5-flare");
     expect(edit.mock.calls[0][0]).not.toHaveProperty("input_fidelity");
+  });
+
+  it("appends the safety rules to every prompt, with the input-image rules on edits", async () => {
+    const { client, generate, edit } = makeClient();
+
+    await requestImage(client, baseRequest);
+    await requestImage(client, { ...baseRequest, images: await makeImages(1) });
+
+    expect(generate.mock.calls[0][0].prompt).toBe(
+      withImageSafetyConstraints(baseRequest.prompt, false)
+    );
+    expect(edit.mock.calls[0][0].prompt).toBe(
+      withImageSafetyConstraints(baseRequest.prompt, true)
+    );
+    for (const rule of PROHIBITED_CONTENT_RULES) {
+      expect(generate.mock.calls[0][0].prompt).toContain(rule);
+      expect(edit.mock.calls[0][0].prompt).toContain(rule);
+    }
+  });
+
+  it("sends the default moderation unless the request asks for another", async () => {
+    const { client, generate } = makeClient();
+
+    await requestImage(client, baseRequest);
+    await requestImage(client, { ...baseRequest, moderation: "auto" });
+
+    expect(generate.mock.calls[0][0].moderation).toBe(DEFAULT_IMAGE_MODERATION);
+    expect(generate.mock.calls[1][0].moderation).toBe("auto");
   });
 
   it.each(["xhigh", "max"] as const)(

@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import sharp from "sharp";
 import type {
   ImageGenerateParamsNonStreaming,
   ImageEditParamsNonStreaming,
@@ -34,7 +35,13 @@ const { effectiveImageQuality } = await import(
   "../../../src/images/openaiImageClient.js"
 );
 
+const {
+  DEFAULT_IMAGE_MODERATION,
+  KIDS_IMAGE_MODERATION,
+} = await import("../../../src/images/imageSafety.js");
+
 const STORY_ID = "story-under-test";
+const TEMPLATE_ID = "template-under-test";
 const IMAGE_BYTES = Buffer.from("fake-jpeg-bytes");
 
 function makeRequest(id: string, prompt: string): ImageRequest {
@@ -224,18 +231,74 @@ describe("AIImageGenerator per-flow defaults", () => {
   });
 });
 
-describe("AIImageGenerator.generateImagesForBeats", () => {
-  it("adds only the images that were generated to the image library", async () => {
-    const generator = new AIImageGenerator(makeClient());
-    const story = createMockStory({ id: STORY_ID, generateImages: true });
+describe("AIImageGenerator image moderation", () => {
+  it("sends in-game images of read-with-kids stories with the stricter moderation", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+    const story = createMockStory({
+      id: STORY_ID,
+      generateImages: true,
+      category: "read-with-kids",
+    });
 
-    const updated = await generator.generateImagesForBeats(story, [
-      makeRequest("library_ok", "a lighthouse"),
-      makeRequest("library_failed", "an unlucky lighthouse"),
-    ]);
+    await generator.generateBeatImage(
+      story,
+      makeRequest("kids_beat_image", "a friendly dragon")
+    );
 
-    expect(updated.getState().images.map((image) => image.id)).toEqual([
-      "library_ok",
-    ]);
+    expect(generate.mock.calls[0][0].moderation).toBe(KIDS_IMAGE_MODERATION);
+  });
+
+  it("sends in-game images of other stories with the default moderation", async () => {
+    const { client, generate } = makeRecordingClient();
+    const generator = new AIImageGenerator(client);
+    const story = createMockStory({
+      id: STORY_ID,
+      generateImages: true,
+      category: "enjoy-fiction",
+    });
+
+    await generator.generateBeatImage(
+      story,
+      makeRequest("fiction_beat_image", "a friendly dragon")
+    );
+
+    expect(generate.mock.calls[0][0].moderation).toBe(DEFAULT_IMAGE_MODERATION);
+  });
+});
+
+describe("AIImageGenerator.generateCoverImageForTemplate", () => {
+  it("stores the cover byte for byte as the image API returned it, so its content credentials survive", async () => {
+    // A real full-size cover: a resize or re-encode would change these bytes
+    const cover = await sharp({
+      create: {
+        width: 1024,
+        height: 1536,
+        channels: 3,
+        background: { r: 40, g: 90, b: 160 },
+      },
+    })
+      .jpeg()
+      .toBuffer();
+    const generate =
+      jest.fn<(body: ImageGenerateParamsNonStreaming) => Promise<ImagesResponse>>();
+    generate.mockResolvedValue({
+      created: 0,
+      data: [{ b64_json: cover.toString("base64") }],
+    });
+    const edit =
+      jest.fn<(body: ImageEditParamsNonStreaming) => Promise<ImagesResponse>>();
+    const generator = new AIImageGenerator({ images: { generate, edit } });
+
+    const imagePath = await generator.generateCoverImageForTemplate(
+      TEMPLATE_ID,
+      "a harbour town at dusk"
+    );
+
+    expect(imagePath).toBe(`/images/templates/${TEMPLATE_ID}/cover.jpeg`);
+    const stored = fs.readFileSync(
+      path.join(storageRoot, TEMPLATE_ID, "images", "cover.jpeg")
+    );
+    expect(stored.equals(cover)).toBe(true);
   });
 });

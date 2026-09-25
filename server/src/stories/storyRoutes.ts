@@ -16,7 +16,7 @@ import {
   CreateStoryFromTemplateRequest,
   UpdateStoryStatusRequest,
 } from "core/types/api.js";
-import { PlayerCount } from "core/types/index.js";
+import { PlayerCount, isStoryCategory } from "core/types/index.js";
 import { DEFAULT_SELECTED_DIFFICULTY_MODIFIER } from "core/config.js";
 import { verifyUser } from "../users/authMiddleware.js";
 import { v4 as uuidv4 } from "uuid";
@@ -49,6 +49,7 @@ router.post(
         pregenerateBeats = false, // Default to false for now
         gameMode,
         difficultyLevel: requestedDifficultyLevel,
+        category,
       } = req.body as CreateStoryRequest;
 
       const creatorId = (req as Express.Request & { user?: { id: string } })
@@ -71,9 +72,11 @@ router.post(
         gameMode,
         difficultyToPass,
         res,
-        creatorId
+        creatorId,
+        isStoryCategory(category) ? category : undefined
       );
     } catch (error) {
+      // Also reached when the content filter is unavailable (it fails closed)
       Logger.Route.error("Failed to create story:", error);
       // Get requestId from the body if available, or generate a new one if critical for sendError
       const requestId = (req.body as CreateStoryRequest)?.requestId || uuidv4();

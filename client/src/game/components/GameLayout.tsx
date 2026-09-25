@@ -9,7 +9,10 @@ import { useState } from "react";
 import { PendingPlayers } from "./PendingPlayers.js";
 import { PrimaryButton, Icons } from "components/ui";
 import { StoryImage } from "shared/components/StoryImage";
-import { createPlayerIdentityImage } from "shared/utils/imageUtils";
+import {
+  createPlayerIdentityImage,
+  isFailedStoryImage,
+} from "shared/utils/imageUtils";
 import { ClientStateManager } from "core/models/ClientStateManager";
 import { PlayerInterlude } from "./PlayerInterlude";
 import { LoadingSpinner } from "components/ui";
@@ -254,15 +257,18 @@ export function GameLayout({
       return "";
     };
 
-    // Create player identity image if needed
+    // Create player identity image if needed; a failed portrait is hidden
     let playerIdentityImage = undefined;
     if (storyIncludesImages && player.identityChoice >= 0) {
-      playerIdentityImage = createPlayerIdentityImage(
+      const portrait = createPlayerIdentityImage(
         playerSlot,
         player.identityChoice,
         storyState.templateId ? "template" : "story",
         storyState.templateId ? storyState.templateId : storyState.id
       );
+      const failed =
+        !storyState.templateId && isFailedStoryImage(storyState, portrait.id);
+      playerIdentityImage = failed ? undefined : portrait;
     }
 
     return (

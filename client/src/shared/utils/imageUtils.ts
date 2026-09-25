@@ -230,9 +230,21 @@ export function parseImagePlaceholder(
 }
 
 /**
+ * Whether the server recorded this story image's generation as failed. The
+ * reader hides such images instead of showing a spinner that never resolves.
+ */
+export function isFailedStoryImage(
+  storyState: Pick<ClientStoryState, "failedImageIds">,
+  imageId: string
+): boolean {
+  return storyState.failedImageIds?.includes(imageId) ?? false;
+}
+
+/**
  * Creates an Image object from parsed placeholder attributes
  * @param attributes The parsed attributes from an image placeholder
- * @returns An Image object for use with StoryImage component
+ * @returns An Image object for use with StoryImage component, or null when
+ * there is nothing to show (invalid placeholder, or a story image that failed)
  */
 export function createImageFromPlaceholder(
   placeholder: ImagePlaceholder,
@@ -270,13 +282,24 @@ export function createImageFromPlaceholder(
 
     const player = storyState.players[placeholder.id as PlayerSlot];
     const playerIdentity = player?.identityChoice ?? 0;
-    return createPlayerIdentityImage(
+    const portrait = createPlayerIdentityImage(
       placeholder.id as PlayerSlot,
       playerIdentity,
       placeholder.source as ImageSource,
       sourceId,
       placeholder.desc
     );
+    return placeholder.source === "story" &&
+      isFailedStoryImage(storyState, portrait.id)
+      ? null
+      : portrait;
+  }
+
+  if (
+    placeholder.source === "story" &&
+    isFailedStoryImage(storyState, placeholder.id)
+  ) {
+    return null;
   }
 
   // Create the image object

@@ -107,10 +107,8 @@ export class GameHandler {
       case "moveStoryForward":
         userFriendlyMessage = "Unable to continue the story. Please try again.";
         break;
-      case "attachImageToStory":
-        userFriendlyMessage =
-          "Unable to attach the generated image. The story will continue without it.";
-        break;
+      // Image outcomes (attachImageToStory, recordImageFailure) never fail
+      // the queue: their handler logs errors instead of rethrowing them.
       default:
         userFriendlyMessage = `Something went wrong with operation ${event.operationType}. Please try again.`;
     }

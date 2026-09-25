@@ -19,6 +19,13 @@ import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
 import { CharacterIdentity } from "core/types/index.js";
+import {
+  applyImageOutcome,
+  collectLatestBeatImageRequests,
+  mergeImageRecords,
+  startBackgroundImageGeneration,
+  type StoryImageJobDeps,
+} from "./StoryImageJobs.js";
 
 export interface QueueEvents {
   storyUpdated: (event: StoryUpdateEvent) => void;
@@ -32,7 +39,8 @@ export type GameOperationType =
   | "recordCharacterSelection"
   | "pregenerateStoryState"
   | "bulkPregenerateStoryStates"
-  | "attachImageToStory";
+  | "attachImageToStory"
+  | "recordImageFailure";
 
 export interface GameOperationExtended {
   gameId: string;
@@ -41,28 +49,16 @@ export interface GameOperationExtended {
 }
 
 export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
-  private aiImageGenerator: AIImageGenerator;
+  private imageJobDeps: StoryImageJobDeps;
 
   constructor() {
     super();
-    this.aiImageGenerator = new AIImageGenerator();
-  }
-
-  /**
-   * Merge image library from base story into target story without duplicates
-   */
-  private mergeImageLibrary(base: Story, target: Story): Story {
-    const baseImages = base.getState().images || [];
-    const targetImages = new Set(
-      (target.getState().images || []).map((img) => img.id)
-    );
-    let merged = target;
-    for (const img of baseImages) {
-      if (!targetImages.has(img.id)) {
-        merged = merged.addImage(img);
-      }
-    }
-    return merged;
+    const aiImageGenerator = new AIImageGenerator();
+    this.imageJobDeps = {
+      generate: (story, request) =>
+        aiImageGenerator.generateBeatImage(story, request),
+      enqueue: (operation) => this.addOperation(operation),
+    };
   }
 
   protected getQueueId(operation: GameOperation): string {
@@ -75,9 +71,9 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         await this.handleMoveStoryForward(operation);
         break;
       case "attachImageToStory":
-        await this.handleAttachImageToStory(operation);
+      case "recordImageFailure":
+        await this.handleImageOutcome(operation);
         break;
-      // no-op placeholder for potential image generation operations
       case "recordChoice":
         await this.handleRecordChoice(operation);
         break;
@@ -106,11 +102,17 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     // Ensure the story directory structure exists
     await ensureStoryDirectoryStructure(gameId);
 
+    // Keep image outcomes that landed after `story` was read (an operation
+    // working from an older copy, or an adopted pregeneration, must not drop
+    // an attached or failed image, or the reader would wait for it forever)
+    const latest = await storyRepository.getStory(gameId);
+    const toStore = latest ? mergeImageRecords(latest, story) : story;
+
     // Store the updated story in the repository (this also updates stories.current_turn and stories.updatedAt)
-    await storyRepository.storeStory(gameId, story);
+    await storyRepository.storeStory(gameId, toStore);
 
     // Then broadcast the update to all connected clients
-    connectionManager.broadcastStoryUpdate(gameId, story);
+    connectionManager.broadcastStoryUpdate(gameId, toStore);
   }
 
   private async handleMoveStoryForward(
@@ -206,53 +208,20 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
   }
 
   /**
-   * Unified image generation flow
+   * Unified image generation flow: generates the latest beats' images in the
+   * background (StoryImageJobs), then attaches or records each outcome.
    */
-  private collectLatestBeatImageRequests(story: Story): ImageRequest[] {
-    const requests: ImageRequest[] = [];
-    const existing = new Set(
-      (story.getState().images || []).map((img) => img.id)
-    );
-    for (const slot of story.getPlayerSlots()) {
-      const player = story.getPlayer(slot);
-      const lastBeat = player?.beatHistory[player.beatHistory.length - 1];
-      const req = lastBeat?.imageRequest;
-      if (
-        req &&
-        typeof req === "object" &&
-        !existing.has((req as ImageRequest).id)
-      ) {
-        requests.push(req as ImageRequest);
-      }
-    }
-    return requests;
-  }
-
   private async triggerImageGenerationFlow(
     gameId: string,
     story: Story
   ): Promise<void> {
-    const imageRequests = this.collectLatestBeatImageRequests(story);
-    if (imageRequests.length === 0) return;
-    for (const req of imageRequests) {
-      // Attach only images that were written: a library entry without a file
-      // shows as an endless spinner and invites later beats to reuse it.
-      void this.aiImageGenerator
-        .generateBeatImage(story, req)
-        .then(async () => {
-          await this.addOperation({
-            type: "attachImageToStory",
-            gameId,
-            input: { imageId: req.id, caption: req.caption },
-          });
-        })
-        .catch((err) => {
-          Logger.Queue.error(
-            `[GameQueueProcessor] Background image generation failed for ${gameId} (${req.id}):`,
-            err
-          );
-        });
-    }
+    void startBackgroundImageGeneration(
+      this.imageJobDeps,
+      gameId,
+      story,
+      collectLatestBeatImageRequests(story),
+      { attachToLibrary: true }
+    );
   }
 
   private async handleRecordCharacterSelection(
@@ -317,16 +286,15 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         referenceImageIds: [],
       };
 
-      // Fire and forget - no await; we intentionally do not add player images to story state library
-      void this.aiImageGenerator
-        .generateImagesForBeats(
-          updatedStory,
-          [imageRequest],
-          false // don't add image to story state image library
-        )
-        .catch((err) => {
-          Logger.Queue.error(`Failed to generate player image: ${err}`);
-        });
+      // Fire and forget. Player images stay out of the story's image library;
+      // a failed portrait is recorded so the reader hides it.
+      void startBackgroundImageGeneration(
+        this.imageJobDeps,
+        gameId,
+        updatedStory,
+        [imageRequest],
+        { attachToLibrary: false }
+      );
     }
 
     // Check if all players have completed character selection
@@ -350,42 +318,46 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     }
   }
 
-  private async handleAttachImageToStory(
-    operation: GameOperation
-  ): Promise<void> {
-    if (operation.type !== "attachImageToStory") return;
-    const { gameId, input } = operation;
-    const { imageId, caption } = input as { imageId: string; caption?: string };
+  /**
+   * Applies an image outcome (attached or failed) to the latest stored story
+   * and broadcasts it. Never rethrows: image bookkeeping must not surface as
+   * an error message in the reader, whose text does not depend on it.
+   */
+  private async handleImageOutcome(operation: GameOperation): Promise<void> {
+    if (
+      operation.type !== "attachImageToStory" &&
+      operation.type !== "recordImageFailure"
+    ) {
+      return;
+    }
+    const { gameId } = operation;
+    const { imageId } = operation.input;
 
     try {
       console.log(
-        `[GameQueueProcessor] Attaching image to story state for game: ${gameId}, imageId: ${imageId}`
+        `[GameQueueProcessor] ${operation.type} for game: ${gameId}, imageId: ${imageId}`
       );
 
       const currentStory = await storyRepository.getStory(gameId);
       if (!currentStory) {
         Logger.Queue.error(
-          `[GameQueueProcessor] Story not found when attaching image: ${gameId}`
+          `[GameQueueProcessor] Story not found for ${operation.type}: ${gameId}`
         );
         return;
       }
 
-      const updated = currentStory.addImage({
-        id: imageId,
-        source: "story",
-        description: caption || "",
-      });
-
-      await this.updateAndBroadcastStory(gameId, updated);
+      await this.updateAndBroadcastStory(
+        gameId,
+        applyImageOutcome(currentStory, operation)
+      );
 
       // No need to mirror into pregenerated files. We merge live image library into pregenerated
-      // states when storing/using them (see mergeImageLibrary calls elsewhere).
+      // states when storing/using them (see mergeImageRecords calls elsewhere).
     } catch (error) {
       Logger.Queue.error(
-        `[GameQueueProcessor] Failed to attach image to story for game: ${gameId}, imageId: ${imageId}:`,
+        `[GameQueueProcessor] ${operation.type} failed for game: ${gameId}, imageId: ${imageId}:`,
         error
       );
-      throw error;
     }
   }
 
@@ -567,7 +539,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
       // Merge current actual story images into pregenerated state to avoid losing refs
       const latestActual = await storyRepository.getStory(gameId);
       const storyToStore = latestActual
-        ? this.mergeImageLibrary(latestActual, storyWithBeatResolution)
+        ? mergeImageRecords(latestActual, storyWithBeatResolution)
         : storyWithBeatResolution;
 
       // Store the partial pregeneration state (has beat resolution for interludes)
@@ -738,7 +710,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         // Merge images from latest actual story before storing complete pregenerated state
         const latestActual = await storyRepository.getStory(gameId);
         const finalToStore = latestActual
-          ? this.mergeImageLibrary(latestActual, progressionResult.finalStory)
+          ? mergeImageRecords(latestActual, progressionResult.finalStory)
           : progressionResult.finalStory;
 
         // Store the complete pregenerated story state
@@ -757,7 +729,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         // Just store the state with the choice applied but not yet progressed
         const latestActualMid = await storyRepository.getStory(gameId);
         const midToStore = latestActualMid
-          ? this.mergeImageLibrary(latestActualMid, storyWithBeatResolution)
+          ? mergeImageRecords(latestActualMid, storyWithBeatResolution)
           : storyWithBeatResolution;
         await storyRepository.storePregeneratedStory(
           gameId,

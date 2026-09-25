@@ -11,6 +11,7 @@
     "build": "cd ../core && npm install --include=dev && node ../node_modules/typescript/bin/tsc --version && npm run build && cd ../server && npm install --include=dev && rm -rf dist && node ../node_modules/typescript/bin/tsc --project tsconfig.json && mkdir -p dist/core && cp -r ../core/dist/* dist/core/ && npx tsc-alias && npm run debug-build",
     "dev": "tsx watch src/index.ts",
     "eval:images": "tsx src/evals/imageModelEval/run.ts",
+    "backfill:cover-dst": "tsx src/scripts/backfillCoverDigitalSourceType.ts",
     "start": "node --es-module-specifier-resolution=node dist/index.js",
     "debug-build": "echo '\\n===== DEBUG: Server dist directory structure =====\\n' && ls -la dist && echo '\\n===== DEBUG: Core dist directory structure =====\\n' && ls -la ../core/dist && echo '\\n===== DEBUG: Server dist/core directory structure =====\\n' && ls -la dist/core && echo '\\n===== DEBUG: Sample config.js in server dist/core =====\\n' && head -20 dist/core/config.js && echo '\\n===== DEBUG: First few lines of dist/config.js =====\\n' && head -20 dist/config.js && echo '\\n===== DEBUG: Done debugging ====='",
     "lint": "eslint . && tsc --noEmit",

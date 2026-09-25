@@ -18,6 +18,7 @@ import {
   ThreadAnalysis,
   Thread,
   Resolution,
+  StoryCategory,
 } from "../types/index.js";
 import { PlayerManager } from "./PlayerManager.js";
 import { ThreadManager } from "./ThreadManager.js";
@@ -69,6 +70,14 @@ export class Story {
 
   isBasedOnTemplate(): boolean {
     return this.state.templateId !== undefined;
+  }
+
+  getCategory(): StoryCategory | undefined {
+    return this.state.category;
+  }
+
+  isReadWithKids(): boolean {
+    return this.state.category === "read-with-kids";
   }
 
   getTitle(): string {
@@ -484,6 +493,15 @@ export class Story {
   addImage(image: ImageStoryState) {
     const updatedState = this.imageManager.addImage(this.state, image);
     return new Story(updatedState);
+  }
+
+  /** Records a story image whose generation failed, so the reader hides it. */
+  markImageFailed(imageId: string): Story {
+    return new Story(this.imageManager.markImageFailed(this.state, imageId));
+  }
+
+  getFailedImageIds(): string[] {
+    return this.imageManager.getFailedImageIds(this.state);
   }
 
   updateImage(imageId: string, updates: Partial<ImageStoryState>) {

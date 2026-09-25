@@ -40,8 +40,11 @@ import {
 } from "../shared/rateLimiter.js";
 import { sendRateLimited, sendError } from "../shared/responseUtils.js";
 import { verifyUser, checkPermissions } from "../users/authMiddleware.js";
+import { ContentFilterService } from "../game/services/ContentFilterService.js";
+import { screenImageRequest } from "./imageRequestScreening.js";
 
 const router = express.Router();
+const contentFilter = new ContentFilterService();
 const IMAGE_GENERATION_ACTION_TYPE = "imageGeneration";
 const MAX_TEXT_LENGTH = 2000;
 
@@ -225,6 +228,13 @@ router.post(
       // Build references (optional, up to 2)
       const references = mapTemplateReferences(templateId, referenceImageIds);
 
+      await screenImageRequest(
+        contentFilter,
+        appearance,
+        imageInstructions,
+        references.length
+      );
+
       const imageId = elementId; // elementId is validated as required
 
       const imagePath = await aiImageGenerator.generateImageForTemplate(
@@ -324,6 +334,8 @@ router.post(
       if (validationError)
         return sendError(res, validationError, 400, requestId);
 
+      await screenImageRequest(contentFilter, appearance, imageInstructions, 0);
+
       const imagePath = await aiImageGenerator.generatePlayerImageForTemplate(
         playerSlot,
         identityIndex,
@@ -411,6 +423,13 @@ router.post(
 
       // Build references (optional, up to 2)
       const references = mapTemplateReferences(templateId, referenceImageIds);
+
+      await screenImageRequest(
+        contentFilter,
+        coverPrompt,
+        imageInstructions,
+        references.length
+      );
 
       const imageId = "cover";
 

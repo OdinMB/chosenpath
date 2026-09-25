@@ -17,6 +17,11 @@ import type {
 import { IMAGE_GENERATION_OUTPUT_COMPRESSION } from "server/config.js";
 import { getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
+import {
+  DEFAULT_IMAGE_MODERATION,
+  withImageSafetyConstraints,
+  type ImageModeration,
+} from "./imageSafety.js";
 
 /*
  * Sends one OpenAI Images API request under per-model rules and returns the
@@ -42,6 +47,8 @@ export type ImageApiRequest = {
   size: ImageSize;
   /** Loaded reference images. None (or an empty array) means plain generation. */
   images?: Uploadable[];
+  /** OpenAI moderation level; DEFAULT_IMAGE_MODERATION when absent. */
+  moderation?: ImageModeration;
 };
 
 export type ImageApiUsage = {
@@ -137,6 +144,7 @@ export function mapImageUsage(
 /**
  * Sends one Images API request. Uses images.edit when at least one reference
  * image is supplied, images.generate otherwise. Never sends input_fidelity.
+ * Every prompt goes out with the safety rules appended (imageSafety.ts).
  * Raw SDK errors propagate unchanged (status, code and type stay readable).
  */
 export async function requestImage(
@@ -148,8 +156,8 @@ export async function requestImage(
 
   const baseParams = {
     model: req.model,
-    prompt: req.prompt,
-    moderation: "low" as const,
+    prompt: withImageSafetyConstraints(req.prompt, images.length > 0),
+    moderation: req.moderation ?? DEFAULT_IMAGE_MODERATION,
     n: 1,
     quality,
     output_format: "jpeg" as const,

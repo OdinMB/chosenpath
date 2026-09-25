@@ -23,4 +23,25 @@ export default tseslint.config(
       'prefer-const': 'error',
     },
   },
+  {
+    // The eval harness strips the AI marks (C2PA) from its images to keep
+    // ratings blind. Removing them from images people see would break the
+    // AI Act's marking duty, so nothing outside src/evals/ may import it.
+    files: ['src/**/*.ts'],
+    ignores: ['src/evals/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)evals(/|$)',
+              message:
+                'src/evals/ is eval-only: it strips AI content credentials (AI Act Art. 50(2)). Do not use it in the app.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 )

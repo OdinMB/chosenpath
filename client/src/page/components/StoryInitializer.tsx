@@ -658,6 +658,8 @@ export const StoryInitializer = ({
           pregenerateBeats: finalPregenerateBeats,
           gameMode,
           difficultyLevel: selectedDifficultyLevel,
+          // Read-with-kids stories get stricter image moderation on the server
+          category: selectedCategory,
         });
         // Navigation now happens in useEffect when storyReady becomes true
       } catch (error) {

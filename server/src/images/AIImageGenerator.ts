@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import { IMAGE_QUALITIES, IMAGE_SIZES } from "core/types/index.js";
 import type {
-  ImageStoryState,
   ImageReference,
   ImageRequest,
   ImageSize,
@@ -35,7 +34,11 @@ import {
   getTemplateCoverPrompt,
   getTemplatePlayerPortraitPrompt,
 } from "./imagePrompts.js";
-import { resizeTemplateCover } from "./templateCover.js";
+import {
+  DEFAULT_IMAGE_MODERATION,
+  imageModerationFor,
+  type ImageModeration,
+} from "./imageSafety.js";
 dotenv.config();
 
 /**
@@ -139,8 +142,7 @@ export class AIImageGenerator {
 
     Logger.Story.log("Generating cover image");
 
-    // Generate the image at original size
-    const originalImageBuffer = await this.generateImage(
+    const imageBuffer = await this.generateImage(
       prompt,
       references && references.length > 0 ? references : undefined,
       size || IMAGE_SIZES.PORTRAIT, // Default to portrait for covers (1024x1536)
@@ -148,11 +150,9 @@ export class AIImageGenerator {
       IMAGE_GENERATION_TEMPLATE_MODEL
     );
 
-    // Shrink cover images for the library, where multiple covers are shown
-    const resizedImageBuffer = await resizeTemplateCover(originalImageBuffer);
-
-    // Save the resized image with 'cover' as the ID
-    return this.saveImageToTemplate("cover", templateId, resizedImageBuffer);
+    // Stored as returned, never resized: any re-encode would invalidate the
+    // vendor's C2PA content credentials in the published cover (AI Act Art. 50(2)).
+    return this.saveImageToTemplate("cover", templateId, imageBuffer);
   }
 
   private async generateImage(
@@ -160,7 +160,8 @@ export class AIImageGenerator {
     references: ImageReference[] | undefined,
     size: ImageSize | undefined,
     quality: ImageQuality | undefined,
-    model: string
+    model: string,
+    moderation: ImageModeration = DEFAULT_IMAGE_MODERATION
   ): Promise<Buffer> {
     try {
       Logger.Story.log("Generating image for prompt:", prompt);
@@ -176,6 +177,7 @@ export class AIImageGenerator {
         quality: quality || IMAGE_QUALITIES.LOW, // low for security
         size: size || IMAGE_SIZES.AUTO,
         images: referenceImages,
+        moderation,
       });
 
       const usage = result.usage
@@ -312,7 +314,8 @@ export class AIImageGenerator {
       // gpt-image-2.5, landscape and portrait use fewer output tokens.
       imageRequest.imageSize || IMAGE_SIZES.SQUARE,
       imageRequest.imageQuality || IMAGE_GENERATION_BEAT_QUALITY,
-      IMAGE_GENERATION_MODEL
+      IMAGE_GENERATION_MODEL,
+      imageModerationFor(story)
     );
 
     await this.saveImageToStory(
@@ -321,44 +324,6 @@ export class AIImageGenerator {
       imageBuffer,
       imageRequest.subDir
     );
-  }
-
-  /**
-   * Generates several in-game images in parallel. Failures are logged, not
-   * thrown; with `saveToStoryState`, only the images that were written are
-   * added to the returned story's image library.
-   */
-  async generateImagesForBeats(
-    story: Story,
-    imageRequests: ImageRequest[],
-    saveToStoryState: boolean = true
-  ): Promise<Story> {
-    let updatedStory = story;
-
-    // Generate images in parallel
-    const imagePromises = imageRequests.map(async (imageRequest) => {
-      try {
-        await this.generateBeatImage(story, imageRequest);
-
-        // Player images for example are not added to the story state
-        // They are just assumed to be available
-        if (saveToStoryState) {
-          const imageStoryState: ImageStoryState = {
-            id: imageRequest.id,
-            source: "story",
-            description: imageRequest.caption,
-          };
-
-          updatedStory = updatedStory.addImage(imageStoryState);
-        }
-      } catch (error) {
-        Logger.Story.error("Failed to generate image for beat:", error);
-      }
-    });
-
-    await Promise.all(imagePromises);
-
-    return updatedStory;
   }
 }
 

@@ -1,11 +1,7 @@
-export type PromptCategory =
-  | "flexible"
-  | "enjoy-fiction"
-  | "vent-about-reality"
-  | "pretend-to-be"
-  | "see-your-future-self"
-  | "read-with-kids"
-  | "learn-something";
+import type { StoryCategory } from "core/types";
+
+/** The setup categories; the server records them on the story (core STORY_CATEGORIES). */
+export type PromptCategory = StoryCategory;
 
 export interface CategorySuggestion {
   [fieldKey: string]: string;

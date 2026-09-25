@@ -4,12 +4,16 @@ import path from "path";
 import sharp from "sharp";
 import { IMAGE_SIZES } from "core/types/index.js";
 import type { ImageSize } from "core/types/index.js";
-import { resizeTemplateCover } from "../../images/templateCover.js";
+import {
+  JPEG_APP11,
+  readJpegHeaderSegments,
+} from "../../images/jpegSegments.js";
 import type { PlannedCall } from "./runner.js";
 
 /*
  * Vets and stores the images the eval generates: a junk check on the raw API
- * bytes, the same cover resize users see, and a file name that hides the arm.
+ * bytes, and a file name that hides the arm. Every flow, the template cover
+ * included, stores the image as the API returned it, which is what users see.
  */
 
 /** Below this maximum channel standard deviation an image is blank or near-uniform. */
@@ -39,41 +43,29 @@ export async function findJunkReason(
   return undefined;
 }
 
-const JPEG_SOI = 0xd8;
-const JPEG_SOS = 0xda;
-const JPEG_APP11 = 0xeb;
-
 /**
  * Removes the JPEG's APP11 segments, where the API embeds C2PA content
  * credentials that name the generating model (e.g. "gpt-image-1.5"), so an
  * image viewer's metadata panel cannot unblind the rating. Lossless: the
  * image data is not re-encoded. Anything that is not a JPEG is returned as is.
+ *
+ * EVAL ONLY. Removing the machine-readable AI marks from images people see
+ * breaks the AI Act's marking duty (Art. 50(2)) and the Code of Practice's
+ * non-removal measure. Never call this outside src/evals/: the server's ESLint
+ * config rejects any import of src/evals/ from other source files.
  */
 export function stripContentCredentials(image: Buffer): Buffer {
-  if (image.length < 4 || image[0] !== 0xff || image[1] !== JPEG_SOI) {
+  const segments = readJpegHeaderSegments(image);
+  if (!segments?.some((segment) => segment.marker === JPEG_APP11)) {
     return image;
   }
   const kept: Buffer[] = [image.subarray(0, 2)];
-  let offset = 2;
-  let removed = false;
-  // Header segments run until the start of scan; each is FF <marker> <2-byte length>
-  while (offset + 4 <= image.length && image[offset] === 0xff) {
-    const marker = image[offset + 1];
-    if (marker === JPEG_SOS) {
-      break;
+  for (const segment of segments) {
+    if (segment.marker !== JPEG_APP11) {
+      kept.push(image.subarray(segment.start, segment.end));
     }
-    const end = offset + 2 + image.readUInt16BE(offset + 2);
-    if (marker === JPEG_APP11) {
-      removed = true;
-    } else {
-      kept.push(image.subarray(offset, end));
-    }
-    offset = end;
   }
-  if (!removed) {
-    return image;
-  }
-  kept.push(image.subarray(offset));
+  kept.push(image.subarray(segments[segments.length - 1].end));
   return Buffer.concat(kept);
 }
 
@@ -101,14 +93,9 @@ export async function storeOutput(
   if (junkReason) {
     return { junkReason };
   }
-  // The template cover is shown at library size, as users see it
-  const shown =
-    call.evalCase.callSite === "template-cover"
-      ? await resizeTemplateCover(buffer)
-      : buffer;
   const outputFile = outputFileFor(call);
   const target = path.join(outDir, outputFile);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, stripContentCredentials(shown));
+  fs.writeFileSync(target, stripContentCredentials(buffer));
   return { outputFile };
 }

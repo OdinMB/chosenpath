@@ -6,6 +6,7 @@ import { LoadingSpinner, PrimaryButton, ColoredBox } from "components/ui";
 import { ClientStoryState, Beat, BeatOption } from "core/types";
 import { processStoryText } from "client/game/utils/storyTextProcessor";
 import { enhanceResolutionDetails } from "../utils/resolutionUtils";
+import { AI_GENERATED_TEXT_ATTRIBUTES } from "../utils/aiContentMarkers";
 
 interface BeatContentProps {
   storyState: ClientStoryState;
@@ -240,8 +241,11 @@ export const BeatContent: React.FC<BeatContentProps> = ({
         {currentBeat.title}
       </h2>
 
-      {/* Main narrative content */}
-      <div className="narrative-container relative">
+      {/* Main narrative content, marked as AI-generated for machines */}
+      <div
+        className="narrative-container relative"
+        {...AI_GENERATED_TEXT_ATTRIBUTES}
+      >
         <div className="narrative-text text-base md:text-lg [&>p]:mb-4 text-primary">
           {renderBeatTextWithImages(currentBeat.text, storyState)}
         </div>

@@ -6,6 +6,7 @@ import {
   ClientStat,
   Beat,
   BeatType,
+  AI_TEXT_PROVENANCE,
 } from "../types/index.js";
 
 /**
@@ -125,10 +126,13 @@ export class ClientStateManager {
         filteredState.characterSelectionIntroduction,
       generateImages: filteredState.generateImages,
       images: filteredState.images,
+      failedImageIds: filteredState.failedImageIds ?? [],
+      category: filteredState.category,
       pendingPlayers: filteredState.characterSelectionCompleted
         ? pendingPlayers
         : pendingCharacterSelections,
       gameOver: currentBeatType === "ending",
+      provenance: AI_TEXT_PROVENANCE,
     } as ClientStoryState;
   }
 
