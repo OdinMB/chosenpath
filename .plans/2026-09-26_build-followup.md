@@ -654,7 +654,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - Tokens: visible 1,600 → 1,416 (1,327); reasoning 1,535 → 2,046 (1,884).
     - Waits: p50 26.6 → 32.0 s (26.4); p95 35.1 → 54.2 s (40.9).
     - Prose and facts: words 334 → 267 (259); facts 3.20 → 3.58 (3.47).
-    - Cost per turn, replies only: $0.00264 ($0.00225), or $0.00229 without the 4 padded replies. With hangs at their estimate: $0.0028 ($0.0034).
+    - Cost per turn, replies only: $0.00264 ($0.00225), or $0.00226 without the 4 padded replies (corrected from $0.00229 in the owner report step: $0.18997 over the 84 unpadded replies). With hangs at their estimate: $0.0028 ($0.0034).
     - Cache read share: 47.6% (46.8%).
     - Checks lower than slim beyond noise: sentences 86.4% (81.8%), paragraphs 89.8% (88.6%), no meta words 87.5% (88.6%), no whitespace padding 95.5% (98.9%), second person 96.6% (100%), requested image used 97.7%, no image in the last paragraph 98.9% (94.3%), and `threeInterludes` 80.7% (by design).
     - Part of the slower waits is server speed (DERIVED): on its unpadded replies, v2 wrote 110 tokens a second, against 121 on v1 and 117 on slim. It also writes about 7% more output (median 3,451 against 3,215 tokens).
@@ -689,6 +689,12 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - export: the page's own export code built `ratings-text-turn-c4867b2d79.json` with that rating. It was captured from the page rather than downloaded (Skipped Items). A reload restored the last-export time;
     - console: only the test server's favicon 404. The only requests were for the page itself, plus the check's own read of the export blob.
   - `--score` on the captured export found `keys/round3-turns-c4867b2d79.json`. Then I deleted the test scores and the export, and removed the test rating from the browser's storage. I checked the origin's storage was empty from a same-origin 404 page, because the rating page writes its state again whenever it loads. Then I closed the browser, stopped the server and deleted this run's `.playwright-mcp/` files. The three files from 2026-03-15 are untouched.
+- Milestone 3 (count fix): **Stage 4b owner report: `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage4-fix-report.md`.** Figures the earlier entries don't have (DERIVED from `calls.jsonl` and `results.md`, which was current at 17:33 UTC and not rewritten):
+  - **Story 8988006e turn 4 is where v2's trouble sits.** On that turn, 6 of v2's 17 attempts (14 jobs) hung or padded, against 0 of slim's 14 and 5 of Round 1's 95 GPT-6 beat attempts (2 hangs, 3 padded). Elsewhere v2 had no hang and one padded reply (`first-tpl-e401abf2-p1`, which hung once in Round 1 on Luna none prod).
+  - **The lead on v2** (Luna medium v2 turns, Luna low minimal planning, Sol low v2 setup with examples, 1 player): $0.328 billed and $0.379 caching off, replies only; $0.339 and $0.390 with hung and failed calls at their estimate; $0.295 and $0.346 without the 4 padded replies. Caching off per turn is $0.00302, 10% above slim's $0.00274.
+  - **60 s reading:** thread planning p95 7.6 s + v2 turn p95 54.2 s = 61.8 s, over by 1.8 s; 56.1 s on the 84 unpadded replies (turn p95 48.5 s, nearest rank as `percentile` computes it).
+  - **Sol v2 single-player slowest:** 82.1 s with examples, 71.1 s without, both over the 68.3 s p95 cap (v1 without examples read 67.0 s, within). At Round 1's 93 tokens a second the medians would be about 61 s and 60 s, still over 57.6 s.
+  - **Billing if hangs are billed:** v2's hang rate would add about $0.03–0.05 per story (v1: $0.36–0.61); Stage 4b's 3 hangs at most about $0.05 in total.
 
 ## Suggested Follow-Up Work
 
@@ -728,8 +734,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (planner): On adoption: move the message shaping to `shared/llm/` beside the factory, and decide an explicit cache TTL there (a production request-shape change, the owner's call).
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
-- Milestone 3 (count fix): **Report and docs for Stage 4b.** The runs and the Round 3 rebuild are done (Borderline Insights, "Stage 4b paid runs" and "Round 3 rebuilt"). What's left:
-  - The owner report. Read `noBlankItems` beside the list-count checks and `noWhitespacePadding`, because a clean `noBlankItems` alone does not show the fix worked. The padding that is left (4 of 88 turns, after the beat closes) doesn't show on a rating page, because the page renders the parsed reply.
+- Milestone 3 (count fix): **Docs for Stage 4b.** The runs, the Round 3 rebuild and the owner report (`DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage4-fix-report.md`) are done. What's left:
   - The Stage 4 report's section 9 (and its blind-rating note at the top) still describes the v1 page: its export name `ratings-text-turn-291fb89390.json` and the blank-interlude caveat. The new page's export is `ratings-text-turn-c4867b2d79.json`, and its remaining tells are the interlude count and the length (User Input Needed).
   - `.context/text-model-eval.md` Known limits still names `keys/round3-turns-291fb89390.json` (now in `keys/superseded/`), calls the worded counts "the fix under test", and doesn't record Stage 4b's spend.
 - Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.
