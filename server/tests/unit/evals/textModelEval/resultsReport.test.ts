@@ -1,13 +1,11 @@
 import {
   computeArmStats,
-  gates,
-  renderResults,
-  storyCost,
   weightedQuantile,
   type ArmStats,
   type CostReading,
-  type GameplayConfig,
-} from "../../../../src/evals/textModelEval/resultsReport.js";
+} from "../../../../src/evals/textModelEval/armStats.js";
+import { gates, storyCost, type GameplayConfig } from "../../../../src/evals/textModelEval/gateReadings.js";
+import { renderResults } from "../../../../src/evals/textModelEval/resultsReport.js";
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import type { CheckResult } from "../../../../src/evals/textModelEval/textChecks.js";
 import type { CaseTags } from "../../../../src/evals/textModelEval/cases.js";
