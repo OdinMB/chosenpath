@@ -49,10 +49,11 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 
 - *(no flags)*: the dry run. It prints the cases, the jobs, and the estimated $ and minutes per stage against the caps. No API calls.
 - `--probe [--max-spend 1]`: what Sol and Luna accept.
-  - Raw SDK checks: temperature with effort, `minimal`, verbosity, explicit and implicit caching, and a cache breakpoint.
-  - Every production schema at low and medium, capped at 64 output tokens.
-  - One full medium completion per model through the production path.
+  - Raw SDK checks: a small strict schema at none, low, medium and high; temperature with effort, `minimal`, verbosity, explicit and implicit caching, and a cache breakpoint. Each cache check has its own prefix, so one check's cache write cannot show up as another's read.
+  - Every production schema, capped at 64 output tokens: at all four efforts on Luna, at low on Sol (schema validation does not depend on effort).
+  - Full completions through the production path: Sol medium, Luna medium and Luna high.
   - Checks run cheapest first. The tail is skipped at the cap.
+  - Findings of 2026-09-26 (about $0.47): every schema accepted on both models; temperature 0.2 accepted at none and rejected above it; `minimal` rejected (the API lists none, low, medium, high and xhigh); explicit caching writes nothing, the implicit default writes the whole prompt; a breakpoint is read back on the repeat; cached, cache-write and reasoning tokens are all reported.
 - `--build-cases [--rebuild-cases] [--max-spend 0.75]`: plays templates forward with the baseline and freezes every case. It refuses to overwrite frozen cases without `--rebuild-cases`, because rebuilding changes the inputs.
 - `--run --stage 0|1-2|3|4 --prompt-state <tag>`: the replay. It refuses to start when the estimate exceeds a cap, stops scheduling when the next call would, and resumes from `calls.jsonl`. It rewrites `results.md` at the end.
   - Filters: `--role setup,beat,switch,thread,iteration` (`analysis` means switch plus thread), `--mode isolated|pipeline`, `--arms`, `--cases`, `--samples N` and `--subset15`.
@@ -79,6 +80,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
   - Rare-failure batch: 50 extra single-sample Luna beat calls per effort.
 - Stages 3 and 4 have no arms until their variants exist (`variants.ts`; only `prod` so far).
 - Prices per 1M tokens are in `arms.ts`. Cost = (I − C − W)·in + C·cached + W·write + O·out, where O already includes reasoning.
+- Estimates count the JSON schema as input (`requestChars` in `jobPlan.ts`), because OpenAI bills it: the production schemas alone are 4K to 16.5K tokens (setup about 14K, a 1-player beat about 4.5K, a 3-player beat about 15K).
 
 **Isolated versus pipeline.**
 - Isolated: every beat arm gets the same fixed analysis (the stored one, or the baseline's for built cases).
@@ -106,7 +108,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 
 **Gates in `results.md`.** The report never picks a winner.
 - **60 s:** p95 at most 60 s, separately for beat-only turns and for analysis turns.
-- **Cost:** the per-story cost is at most the baseline's. With pregeneration that is 85 beats, 19 switch calls, 21 thread calls and 1 setup; without it, 29/7/7.
+- **Cost:** the per-story cost is at most the baseline's. With pregeneration that is 85 beats, 19 switch calls, 21 thread calls and 1 setup; without it, 29/7/7. A story is priced from single-player calls only, and the summed analysis-turn wait from single-player waits, since multiplayer calls carry more output.
 - **Setup:** the median wait is at most 1.5 × the baseline median; p95 is shown alongside.
 - **Multiplayer:** above the baseline p95 + 5 s, the arm is marked "needs multiplayer pregeneration"; above 60 s it fails.
 - **The owner's exception:** flagged when the no-pregeneration full-turn median is at most 5 s and its p95 at most 8 s. The full turn mixes beat-only and analysis turns at 15/29 and 14/29.
@@ -114,4 +116,5 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 **Known limits.**
 - The built multiplayer and ending cases come from the baseline or from synthetic settings, not from real play.
 - There are no dated GPT-6 snapshots, so a later rerun may meet a changed model.
-- The Stage 0 pre-fix baseline has not run yet. The dry run of 2026-09-26 estimated about $1.65 before built cases, against a pre-fix share of about $1.60.
+- Run A (2026-09-26) did the probe, the case build and the pre-fix baseline for $2.39 of Stage 0. Its measured sizes, waits and per-story cost are in `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_run-A-report.md`.
+- The baseline's billed cost includes gpt-4.1's implicit cache hits, which depend on how close together the eval sends its calls. `results.md` shows the uncached figure beside it.
