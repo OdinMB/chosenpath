@@ -9,6 +9,7 @@ import type {
 import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { playerParagraphs } from "./playerText.js";
+import { longestWhitespaceRun } from "./responseCheck.js";
 import type { SetupInput } from "./variants.js";
 
 /*
@@ -163,7 +164,9 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
     imageTagsWellFormed: tags.every((t) => t.id !== undefined && t.source !== undefined && t.desc !== undefined),
     noImageInLastParagraph: tags.every((t) => t.paragraph < paragraphs.length - 1),
     requestedImageUsed: !requested || tags.some((t) => t.id === requested),
+    // Production's contract says 3; rule B32's own breakdown (and the worded rewrite) allows 2 to 4
     threeInterludes: beat.interludes.length === 3,
+    interludesTwoToFour: beat.interludes.length >= 2 && beat.interludes.length <= 4,
     basePoints: beat.options.every(basePointsInRange),
     modifierRange: beat.options.every(
       (o) => o.optionType !== "challenge" || o.modifiersToSuccessRate.every((m) => m.effect >= -15 && m.effect <= 15)
@@ -178,6 +181,7 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
     facts: beat.plan.establishedFacts.length,
     newElements: beat.plan.newGameElements.length,
     introductions: beat.plan.newIntroductionsOfStoryElements.length,
+    interludes: beat.interludes.length,
     paragraphs: paragraphs.length,
     // Prose and planning lengths apart: whether verbosity reaches strings inside the JSON is undocumented
     words: prose.split(/\s+/).filter(Boolean).length,
@@ -219,6 +223,24 @@ export function blankItems(value: unknown): number {
   return Object.values(value).reduce((sum: number, inner) => sum + blankItems(inner), 0);
 }
 
+/**
+ * The longest whitespace run between a reply's JSON tokens that still reads
+ * as layout. Over the recorded outputs to Stage 4, layout runs reach 29
+ * characters, and the padded replies run from 30,601 to 160,622.
+ */
+export const PADDING_RUN_CHARS = 64;
+
+/**
+ * A reply's check result with its whitespace padding added: the longest run
+ * between JSON tokens, read from the reply text (the parsed output has lost
+ * it). A model that pads and then recovers gives a valid, blank-free reply
+ * that only this reading shows.
+ */
+export function withPadding(result: CheckResult, content: string): CheckResult {
+  const run = longestWhitespaceRun(content);
+  return merge([result, { checks: { noWhitespacePadding: run <= PADDING_RUN_CHARS }, counts: { longestWhitespaceRun: run }, unknownIds: [] }]);
+}
+
 function merge(results: CheckResult[]): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
@@ -256,12 +278,15 @@ export function checkBeatSet(output: SetOfBeatGenerationSchema, story: Story): C
 
 export const ALLOWED_DIFFICULTY_MODIFIERS = [-20, -10, 0, 10, 20];
 
+type SetupStat = { isVisible?: boolean; effectOnPoints?: unknown[] };
+
 /** The setup fields the checks read (StorySetupGeneration has them all). */
 export type SetupShape = {
   difficultyLevel?: { modifier: number };
-  sharedStats: { isVisible?: boolean }[];
-  playerStats: { isVisible?: boolean }[];
-  storyElements: unknown[];
+  sharedStats: SetupStat[];
+  playerStats: SetupStat[];
+  storyElements: { facts?: unknown[] }[];
+  sharedOutcomes?: unknown[];
   guidelines: { typesOfThreads: unknown[] };
   [slot: `player${number}`]: unknown;
 };
@@ -271,10 +296,33 @@ function visibleCount(stats: { isVisible?: boolean }[]): number {
   return stats.filter((stat) => stat.isVisible !== false).length;
 }
 
+/** A list field's length; a missing list counts as empty. */
+function lengthOf(value: unknown, key: string): number {
+  const list = value !== null && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
+  return Array.isArray(list) ? list.length : 0;
+}
+
+const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+
+/**
+ * The rule checks, plus every list whose count the prompt states (production
+ * and the rewrite alike): 6-8 story elements with three facts each, at least 3
+ * effects per stat, and per player 3 identities, 3 backgrounds and 3 outcomes
+ * counting the shared ones. The worded rewrite enforces none of these as a
+ * minimum, so a model can leave a list short instead of padding it with a
+ * blank item, and noBlankItems cannot see a missing one.
+ */
 export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
   const slots = Object.keys(output).filter((key) => /^player\d+$/.test(key));
   const expected = Array.from({ length: input.playerCount }, (_, i) => `player${i + 1}`);
   const between = (n: number, min: number, max: number) => n >= min && n <= max;
+  const players = slots.map((slot) => output[slot as `player${number}`]);
+  const perPlayer = (key: string) => players.map((player) => lengthOf(player, key));
+  const identities = perPlayer("possibleCharacterIdentities");
+  const backgrounds = perPlayer("possibleCharacterBackgrounds");
+  const shared = output.sharedOutcomes?.length ?? 0;
+  const facts = output.storyElements.map((element) => lengthOf(element, "facts"));
+  const stats = [...output.sharedStats, ...output.playerStats];
   return {
     checks: {
       difficultyModifier:
@@ -284,12 +332,21 @@ export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
       sharedStats: between(visibleCount(output.sharedStats), 3, 4),
       playerStats: between(visibleCount(output.playerStats), 3, 4),
       threadTypes: between(output.guidelines.typesOfThreads.length, 6, 8),
+      storyElements: between(output.storyElements.length, 6, 8),
+      threeFactsPerElement: facts.every((n) => n === 3),
+      effectsPerStat: stats.every((stat) => lengthOf(stat, "effectOnPoints") >= 3),
+      threeIdentities: identities.every((n) => n === 3),
+      threeBackgrounds: backgrounds.every((n) => n === 3),
+      threeOutcomes: perPlayer("outcomes").every((n) => n + shared === 3),
       noBlankItems: blankItems(output) === 0,
     },
     counts: {
       sharedStats: output.sharedStats.length,
       playerStats: output.playerStats.length,
       storyElements: output.storyElements.length,
+      factsPerElement: mean(facts),
+      identitiesPerPlayer: mean(identities),
+      backgroundsPerPlayer: mean(backgrounds),
     },
     unknownIds: [],
   };

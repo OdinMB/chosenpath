@@ -28,6 +28,8 @@ export type BudgetOverride = {
   stageCap?: number;
   globalCap?: number;
   reason: string;
+  /** A paid run's --arms: the arms the raise pays for */
+  arms?: string[];
 };
 
 export type CapArgs = {
@@ -36,9 +38,20 @@ export type CapArgs = {
   globalCap?: number;
   maxSpend?: number;
   overTargetReason?: string;
+  /** A paid run (--run), whose raised stage cap pays only for the arms it names */
+  forRun?: boolean;
+  /** The run's --arms */
+  armKeys?: string[];
 };
 
-/** Throws on a stage cap above its default without a reason, or a global cap above the hard ceiling. */
+/**
+ * Throws on a stage cap above its default without a reason, or a global cap
+ * above the hard ceiling. A paid run that raises a stage cap must name its
+ * arms (--arms), and the recorded override lists them: the raise is approved
+ * for arms, and plan order cannot hold it to them (the runner goes setup
+ * before beat, and warm-first can start a later arm early), so a run filtered
+ * by role alone would spend it on whatever else the stage plans.
+ */
 export function resolveCaps(
   args: CapArgs,
   now: () => Date = () => new Date()
@@ -63,6 +76,10 @@ export function resolveCaps(
       'A cap above the owner\'s target needs --over-target-reason "<why this spend is obviously useful>".'
     );
   }
+  const arms = args.armKeys?.length ? args.armKeys : undefined;
+  if (raisesStage && args.forRun && !arms) {
+    throw new Error("A raised stage cap pays only for the arms it was approved for: name them with --arms.");
+  }
   const caps: Caps = { stageCaps, globalCap, maxSpend: args.maxSpend };
   if (!reason || !(raisesStage || raisesGlobal)) {
     return { caps };
@@ -75,6 +92,7 @@ export function resolveCaps(
       stageCap: raisesStage && args.stage ? stageCaps[args.stage] : undefined,
       globalCap: raisesGlobal ? globalCap : undefined,
       reason,
+      ...(args.forRun && arms ? { arms } : {}),
     },
   };
 }

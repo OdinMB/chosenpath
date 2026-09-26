@@ -6,7 +6,9 @@ import {
   checkBeatSet,
   checkSetup,
   checkThread,
+  PADDING_RUN_CHARS,
   paragraphsOf,
+  withPadding,
   type SetupShape,
 } from "../../../../src/evals/textModelEval/textChecks.js";
 import { createMockStory } from "../../../helpers/testHelpers.js";
@@ -106,6 +108,22 @@ describe("checkBeatSet", () => {
     expect(result.checks.threeInterludes).toBe(false);
   });
 
+  it("reads interludes against rule B32's two to four as well as production's three, and counts them", () => {
+    const withInterludes = (n: number) => {
+      const beat = beatGeneration();
+      const interludes = Array.from({ length: n }, (_, i) => ({ ...beat.interludes[0], text: `Interlude ${i + 1}.` }));
+      return checkBeatSet(beatSet(1, { player1: { ...beat, interludes } }), story);
+    };
+    // A dropped interlude is not a blank one, so noBlankItems passes and only the count sees it
+    expect(withInterludes(1).checks).toMatchObject({ interludesTwoToFour: false, threeInterludes: false, noBlankItems: true });
+    expect(withInterludes(0).checks.interludesTwoToFour).toBe(false);
+    expect(withInterludes(2).checks).toMatchObject({ interludesTwoToFour: true, threeInterludes: false });
+    expect(withInterludes(3).checks).toMatchObject({ interludesTwoToFour: true, threeInterludes: true });
+    expect(withInterludes(4).checks.interludesTwoToFour).toBe(true);
+    expect(withInterludes(5).checks.interludesTwoToFour).toBe(false);
+    expect(withInterludes(2).counts.interludes).toBe(2);
+  });
+
   it("reports ids that do not exist", () => {
     const beat = beatGeneration();
     beat.plan.establishedFacts = [{ type: "newFact", storyElementId: "ghost_ship", fact: "It sails at night." }];
@@ -190,6 +208,86 @@ describe("checkSetup", () => {
     expect(checkSetup({ ...clean, sharedStats: [stat(["+10 in fights", " "]), ...clean.sharedStats.slice(1)] }, input).checks.noBlankItems).toBe(false);
     const blankIdentity = { possibleCharacterIdentities: [identity("Ada"), identity("Bo"), identity("")] };
     expect(checkSetup({ ...clean, player1: blankIdentity }, input).checks.noBlankItems).toBe(false);
+  });
+
+  describe("list counts: a list left one item short passes noBlankItems, so the counts must see it", () => {
+    const twoPlayers = { ...input, playerCount: 2 as const, gameMode: GameModes.Cooperative };
+    const COUNT_CHECKS = ["storyElements", "threeFactsPerElement", "effectsPerStat", "threeIdentities", "threeBackgrounds", "threeOutcomes"];
+    const list = <T>(n: number, make: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => make(i));
+    const element = (facts = 3) => ({ id: "inn", name: "The Inn", facts: list(facts, (i) => `Fact ${i + 1}.`) });
+    const stat = (effects = 3) => ({ name: "Courage", effectOnPoints: list(effects, (i) => `Effect ${i + 1}.`) });
+    const outcome = (i: number) => ({ id: `o${i}`, question: `Question ${i + 1}?` });
+    const player = ({ identities = 3, backgrounds = 3, outcomes = 2 } = {}) => ({
+      possibleCharacterIdentities: list(identities, (i) => ({ name: `Name ${i + 1}` })),
+      possibleCharacterBackgrounds: list(backgrounds, (i) => ({ title: `Background ${i + 1}` })),
+      outcomes: list(outcomes, outcome),
+    });
+    const complete = (overrides: Partial<SetupShape> = {}) =>
+      setup({
+        storyElements: list(6, () => element()),
+        sharedStats: list(3, () => stat()),
+        playerStats: list(3, () => stat()),
+        sharedOutcomes: [outcome(9)],
+        player1: player(),
+        player2: player(),
+        ...overrides,
+      });
+    const failing = (overrides: Partial<SetupShape>) =>
+      Object.entries(checkSetup(complete(overrides), twoPlayers).checks)
+        .filter(([name, ok]) => COUNT_CHECKS.includes(name) && !ok)
+        .map(([name]) => name);
+
+    it("passes a setup with every list at the count the prompt asks for", () => {
+      expect(failing({})).toEqual([]);
+      expect(checkSetup(complete({ storyElements: list(8, () => element()) }), twoPlayers).checks.storyElements).toBe(true);
+      expect(checkSetup(complete({ sharedStats: [stat(5), stat(), stat()] }), twoPlayers).checks.effectsPerStat).toBe(true);
+    });
+
+    it("fails a list one item short, or one over, on one player, element or stat", () => {
+      expect(failing({ player2: player({ identities: 2 }) })).toEqual(["threeIdentities"]);
+      expect(failing({ player1: player({ backgrounds: 2 }) })).toEqual(["threeBackgrounds"]);
+      expect(failing({ player1: player({ identities: 4 }) })).toEqual(["threeIdentities"]);
+      expect(failing({ storyElements: [...list(5, () => element()), element(2)] })).toEqual(["threeFactsPerElement"]);
+      expect(failing({ storyElements: list(5, () => element()) })).toEqual(["storyElements"]);
+      expect(failing({ storyElements: list(9, () => element()) })).toEqual(["storyElements"]);
+      expect(failing({ playerStats: [stat(), stat(2), stat()] })).toEqual(["effectsPerStat"]);
+      // Three outcomes per player, counting the shared ones
+      expect(failing({ player1: player({ outcomes: 1 }) })).toEqual(["threeOutcomes"]);
+      expect(failing({ sharedOutcomes: [], player1: player({ outcomes: 3 }), player2: player({ outcomes: 3 }) })).toEqual([]);
+    });
+
+    it("fails a list that is missing altogether", () => {
+      expect(failing({ player1: {} })).toEqual(["threeIdentities", "threeBackgrounds", "threeOutcomes"]);
+      expect(failing({ storyElements: list(6, () => ({ id: "inn", facts: undefined })) })).toEqual(["threeFactsPerElement"]);
+    });
+
+    it("counts identities and backgrounds per player and facts per element, as means", () => {
+      const { counts } = checkSetup(
+        complete({ player2: player({ identities: 2, backgrounds: 2 }), storyElements: [...list(5, () => element()), element(0)] }),
+        twoPlayers
+      );
+      expect(counts).toMatchObject({ identitiesPerPlayer: 2.5, backgroundsPerPlayer: 2.5, storyElements: 6 });
+      expect(counts.factsPerElement).toBeCloseTo(15 / 6);
+    });
+  });
+});
+
+describe("withPadding", () => {
+  const result = { checks: { duration: true }, counts: { threads: 2 }, unknownIds: [] };
+
+  it("adds the reply's longest whitespace run between JSON tokens as a check and a count", () => {
+    const run = (n: number) => `{"a":[1,${" ".repeat(n)}2]}`;
+    expect(withPadding(result, run(PADDING_RUN_CHARS))).toEqual({
+      checks: { duration: true, noWhitespacePadding: true },
+      counts: { threads: 2, longestWhitespaceRun: PADDING_RUN_CHARS },
+      unknownIds: [],
+    });
+    expect(withPadding(result, run(PADDING_RUN_CHARS + 1)).checks.noWhitespacePadding).toBe(false);
+  });
+
+  it("passes a pretty-printed reply: indentation is not padding", () => {
+    const pretty = JSON.stringify({ a: { b: { c: { d: { e: { f: ["x"] } } } } } }, null, 4);
+    expect(withPadding(result, pretty).checks.noWhitespacePadding).toBe(true);
   });
 });
 

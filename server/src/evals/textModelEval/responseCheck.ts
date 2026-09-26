@@ -4,7 +4,9 @@ import type { z } from "zod";
  * What happened to one eval call, read from the raw HTTP response the
  * executor captured (so a reply LangChain failed to parse is still visible):
  * rejected, timed out, refused, cut off, valid, repairable (text after the
- * JSON), or broken. Also flags junk characters inside the output's strings.
+ * JSON), or broken. Also flags junk characters inside the output's strings,
+ * and measures whitespace padding between its tokens (from the reply text,
+ * since parsing drops it).
  */
 
 export type Outcome =
@@ -93,6 +95,35 @@ export function firstJsonObject(text: string): { json: string; rest: string } | 
   return undefined;
 }
 
+const JSON_WHITESPACE = new Set([" ", "\n", "\r", "\t"]);
+
+/**
+ * The longest run of whitespace outside JSON strings. A model that cannot
+ * close a list pads between tokens; the parsed value drops that padding, so
+ * only the reply text shows it. Indentation makes short runs.
+ */
+export function longestWhitespaceRun(text: string): number {
+  let longest = 0;
+  let run = 0;
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (JSON_WHITESPACE.has(ch)) {
+      longest = Math.max(longest, ++run);
+      continue;
+    }
+    run = 0;
+    if (ch === '"') inString = true;
+  }
+  return longest;
+}
+
 const ALLOWED_CONTROL = new Set(["\n", "\r", "\t"]);
 const ALLOWED_SCRIPT = /\p{Script=Latin}|\p{Script=Greek}|\p{Script=Cyrillic}/u;
 
@@ -123,6 +154,16 @@ export function junkIn(value: unknown): { count: number; sample?: string } {
     }
   }
   return { count, sample };
+}
+
+function messageOf(body: unknown): unknown {
+  return field((field(body, "choices") as unknown[] | undefined)?.[0], "message");
+}
+
+/** The reply text in a stored raw body (outputs/<callId>.json's rawBody), whitespace kept. */
+export function replyContent(rawBody: string | undefined): string | undefined {
+  const body = parseJson(rawBody);
+  return body.ok ? asString(field(messageOf(body.value), "content")) : undefined;
 }
 
 function isTimeout(error: unknown): boolean {
@@ -158,7 +199,7 @@ export function classifyCall(
   }
 
   const choice = (field(bodyValue, "choices") as unknown[] | undefined)?.[0];
-  const message = field(choice, "message");
+  const message = messageOf(bodyValue);
   const finishReason = asString(field(choice, "finish_reason"));
   const content = asString(field(message, "content"));
   const refusal = asString(field(message, "refusal"));

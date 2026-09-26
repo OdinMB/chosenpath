@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { classifyCall, firstJsonObject, junkIn } from "../../../../src/evals/textModelEval/responseCheck.js";
+import {
+  classifyCall,
+  firstJsonObject,
+  junkIn,
+  longestWhitespaceRun,
+  replyContent,
+} from "../../../../src/evals/textModelEval/responseCheck.js";
 
 const schema = z.object({ answer: z.string() });
 
@@ -68,5 +74,30 @@ describe("classifyCall", () => {
 describe("firstJsonObject", () => {
   it("returns undefined when no object closes", () => {
     expect(firstJsonObject('{"a": "b"')).toBeUndefined();
+  });
+});
+
+describe("longestWhitespaceRun", () => {
+  it("measures the longest whitespace run between JSON tokens, which no parsed value shows", () => {
+    expect(longestWhitespaceRun('{"a":["x","y"]}')).toBe(0);
+    expect(longestWhitespaceRun('{\n  "a": [\n    "x"\n  ]\n}')).toBe(5);
+    const padded = `{"interludes":[{"text":"One."},${" \n".repeat(400)}{"text":"Two."}]}`;
+    expect(longestWhitespaceRun(padded)).toBe(800);
+    // Whitespace after the JSON (text after it) counts too: it is still outside any string
+    expect(longestWhitespaceRun(`{"a":1}${"\t".repeat(7)}`)).toBe(7);
+  });
+
+  it("ignores whitespace inside strings, escaped quotes included", () => {
+    expect(longestWhitespaceRun(JSON.stringify({ a: `say \\"hi\\"${" ".repeat(50)}"`, b: " ".repeat(90) }))).toBe(0);
+  });
+});
+
+describe("replyContent", () => {
+  it("reads the reply text out of a stored raw body, whitespace kept", () => {
+    const content = '{"answer":   \n\n   "yes"}';
+    expect(replyContent(reply(content).body)).toBe(content);
+    expect(replyContent(reply(null, { refusal: "No." }).body)).toBeUndefined();
+    expect(replyContent(undefined)).toBeUndefined();
+    expect(replyContent("not json")).toBeUndefined();
   });
 });

@@ -287,9 +287,11 @@ function stage4Arms(role: EvalRole): ArmPlan[] {
  * Stage 4b, the count fix (owner, 2026-09-26): the lead's turns and Sol low
  * setup, with and without the examples, re-run on the rewrite with its list
  * counts in words and caps only (rewrite2*), each read against the same base
- * as its Stage 4 form. Planned before Stage 4's arms, so a cap stop cuts
- * Stage 4's leftovers (the verbosity arm, the hedge, gpt-4.1's open setups)
- * first.
+ * as its Stage 4 form. Planned before Stage 4's arms, but that order holds
+ * only loosely within one role: the runner runs every setup job before any
+ * beat job, and warm-first can start a leftover while a Stage 4b cache line
+ * warms. What holds the $6 raise to these arms is --arms, which a run that
+ * raises a stage cap must pass (resolveCaps).
  */
 function stage4bArms(role: EvalRole): ArmPlan[] {
   switch (role) {

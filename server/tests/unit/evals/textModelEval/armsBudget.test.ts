@@ -137,6 +137,24 @@ describe("budget caps", () => {
     expect(resolveCaps({ globalCap: 20 }).caps.globalCap).toBe(20);
   });
 
+  it("lets a paid run raise a stage cap only for the arms it names, and records them", () => {
+    const reason = "Owner approved: re-run Luna medium turns";
+    // Plan order protects approved arms only within a role, so a role-only run would spend the raise on leftovers
+    expect(() => resolveCaps({ stage: "4", stageCap: 6, overTargetReason: reason, forRun: true })).toThrow(/--arms/);
+    expect(() => resolveCaps({ stage: "4", stageCap: 6, overTargetReason: reason, forRun: true, armKeys: [] })).toThrow(/--arms/);
+    const arms = ["gpt-6-luna@medium/rewrite2Slim"];
+    const { caps, override } = resolveCaps(
+      { stage: "4", stageCap: 6, overTargetReason: reason, forRun: true, armKeys: arms },
+      () => new Date("2026-09-27T00:00:00Z")
+    );
+    expect(caps.stageCaps["4"]).toBe(6);
+    expect(override).toMatchObject({ stage: "4", stageCap: 6, reason, arms });
+    // A run within the default cap names no arms; so does a raise outside --run (probe, case building)
+    expect(resolveCaps({ stage: "4", forRun: true }).caps.stageCaps["4"]).toBe(4);
+    expect(resolveCaps({ stage: "4", stageCap: 3, forRun: true }).caps.stageCaps["4"]).toBe(3);
+    expect(resolveCaps({ stage: "0", stageCap: 9, overTargetReason: reason }).override).not.toHaveProperty("arms");
+  });
+
   it("never lets the global cap pass $30, whatever the reason", () => {
     expect(() => resolveCaps({ globalCap: 30.01, overTargetReason: "anything" })).toThrow(/\$30/);
     expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$30/);

@@ -41,7 +41,8 @@ import { PRE_FIX_PROMPT_STATE } from "./variants.js";
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
  *   --rare-failure skip|only (leaves out, or plans only, the rare-failure batch)
  * Budget: --max-spend <usd> (this invocation), --global-cap, --stage-cap,
- *   --over-target-reason "<text>"; --tpm <tokens/min per model>; --out <dir>
+ *   --over-target-reason "<text>" (a --run that raises --stage-cap also needs --arms);
+ *   --tpm <tokens/min per model>; --out <dir>
  * Reads only local files under data/ and the frozen cases; never touches a database.
  */
 
@@ -267,6 +268,8 @@ function capsFor(args: Args, files: EvalFiles, stage: Stage, defaultMaxSpend?: n
     globalCap: args.globalCap,
     maxSpend: args.maxSpend ?? defaultMaxSpend,
     overTargetReason: args.overTargetReason,
+    forRun: args.mode === "run",
+    armKeys: args.armKeys,
   });
   if (override) {
     files.appendOverride(override);
@@ -420,7 +423,7 @@ async function run(args: Args, files: EvalFiles) {
 
 function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
   const records = files.readRecords();
-  const { checks, prose } = checksForRecords(records, cases, files.loadOutput);
+  const { checks, prose } = checksForRecords(records, cases, files.loadOutput, files.loadReplyContent);
   files.writeResults(
     renderResults({
       records,

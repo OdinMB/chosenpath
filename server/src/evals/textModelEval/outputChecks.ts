@@ -8,6 +8,7 @@ import {
   checkSetup,
   checkSwitch,
   checkThread,
+  withPadding,
   type CheckResult,
   type SetupShape,
 } from "./textChecks.js";
@@ -15,7 +16,8 @@ import {
 /*
  * Applies the automatic checks to stored outputs: each usable call's parsed
  * output against the input it was written for (for a pipeline beat, the case
- * with that chain's own analysis applied). Also collects beat prose per arm.
+ * with that chain's own analysis applied), plus the whitespace padding in its
+ * reply text. Also collects beat prose per arm.
  */
 
 function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[], load: (r: CallRecord) => unknown) {
@@ -29,10 +31,12 @@ function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[]
     : switchStep.apply(base, parsed as SwitchAnalysis);
 }
 
+/** `loadContent` gives a call's reply text, for the whitespace padding reading (withPadding) on every role. */
 export function checksForRecords(
   records: CallRecord[],
   cases: EvalCase[],
-  load: (record: CallRecord) => unknown
+  load: (record: CallRecord) => unknown,
+  loadContent: (record: CallRecord) => string | undefined
 ): { checks: Map<string, CheckResult>; prose: Record<string, ReturnType<typeof aggregateProse>> } {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const checks = new Map<string, CheckResult>();
@@ -58,7 +62,8 @@ export function checksForRecords(
     } else if (record.role === "thread") {
       result = checkThread(output as ThreadAnalysis);
     }
-    if (result) checks.set(record.outputFile, result);
+    const content = result ? loadContent(record) : undefined;
+    if (result) checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
   }
   const prose = Object.fromEntries([...texts.entries()].map(([arm, list]) => [arm, aggregateProse(list)]));
   return { checks, prose };

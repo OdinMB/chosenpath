@@ -5,6 +5,7 @@ import type { BuildReport } from "./caseBuilder.js";
 import type { EvalCase } from "./cases.js";
 import type { ProbeReport } from "./probe.js";
 import type { RatingKey } from "./ratingSets.js";
+import { replyContent } from "./responseCheck.js";
 import type { CallRecord } from "./runner.js";
 
 /*
@@ -68,6 +69,11 @@ export function evalFiles(outDir: string) {
     /** The parsed output of a usable call */
     loadOutput: (record: CallRecord): unknown =>
       record.outputFile ? (JSON.parse(fs.readFileSync(at(record.outputFile), "utf-8")) as { parsed?: unknown }).parsed : undefined,
+    /** The call's reply text as the API sent it, whitespace between tokens included */
+    loadReplyContent: (record: CallRecord): string | undefined =>
+      record.outputFile
+        ? replyContent((JSON.parse(fs.readFileSync(at(record.outputFile), "utf-8")) as { rawBody?: string }).rawBody)
+        : undefined,
     writeRatingPage: (fileName: string, html: string, preview: boolean) => {
       const dir = preview ? at("rating", "preview") : at("rating");
       fs.mkdirSync(dir, { recursive: true });

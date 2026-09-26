@@ -2,9 +2,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { z } from "zod";
+import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { executeCall, type FetchFn } from "../../../../src/evals/textModelEval/executor.js";
 import { MESSAGE_SEPARATOR } from "../../../../src/evals/textModelEval/variants.js";
-import { BASELINE, LUNA } from "./fixtures.js";
+import { BASELINE, LUNA, record } from "./fixtures.js";
 
 function replyWith(content: string): FetchFn {
   return async () =>
@@ -38,6 +39,19 @@ describe("executeCall", () => {
     const stored = JSON.parse(fs.readFileSync(path.join(outDir, result.outputFile), "utf-8"));
     expect(stored.rawBody).toContain("and some extra words");
     expect(fs.readFileSync(path.join(outDir, "prompts", `${result.promptHash}.txt`), "utf-8")).toBe("write");
+  });
+
+  it("stores the reply text so it reads back whitespace and all, beside the parsed output", async () => {
+    const content = '{"answer":\n\n        "yes"}';
+    const result = await executeCall(
+      { callId: "call-padded", role: "beat", arm: LUNA, request: { prompt: "write", schema: z.object({ answer: z.string() }) } },
+      { outDir, now: () => 0, fetch: replyWith(content) }
+    );
+    const files = evalFiles(outDir);
+    const stored = record({ outputFile: result.outputFile });
+    expect(files.loadOutput(stored)).toEqual({ answer: "yes" });
+    expect(files.loadReplyContent(stored)).toBe(content);
+    expect(files.loadReplyContent(record({ outputFile: undefined }))).toBeUndefined();
   });
 
   describe("the request body, by request shape and model family", () => {
