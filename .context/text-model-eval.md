@@ -28,9 +28,9 @@
   - AI Iteration (`TemplateService.iterateTemplate`) and the eval build their prompt with `StorySetupPromptService.createIterationPrompt`. It drops the template's `creatorId` and `creatorUsername` before the template is sent to OpenAI.
   - `storyTextTrims.ts` (eval only) derives the Stage 3 variants from these requests. Each is production's request minus the planning fields nothing reads after generation, and minus the prompt lines asking for them. Kept schema fields stay production's zod instances, shared across player slots where production shares them. Prompt edits are anchored on production's wording and apply only before the story state or premise. Each must match exactly once, so a production prompt edit near an anchor fails `storyTextTrims.test.ts` instead of silently undoing a trim: fix the anchor, not the prompt. Only `variants.ts` calls it. Delete it once Stage 3 is decided and Stage 4's rewrite supersedes it.
   - `storyTextRewrite/` (eval only) builds the Stage 4 split requests, for single-player beats (`beat.ts`; a multiplayer story throws) and custom-story setup (`setup.ts`).
-    - `fixed`: the rules, each stated once. It is byte-identical for every beat call, and for setup within the single-player class and within the multiplayer class, so it caches.
+    - `fixed`: the rules, each stated once across the whole request. It is byte-identical for every beat call, and for setup within the single-player class and within the multiplayer class, so it caches.
     - `perCall`: this call's branch instructions, then production's story state or configuration block (with the premise), verbatim.
-    - `schema`: production's fields, types, key order and shared instances, with the named descriptions rewritten and the array counts enforced (`minItems`/`maxItems`).
+    - `schema`: production's fields, types, key order and shared instances, with the named descriptions rewritten and the array counts enforced (`minItems`/`maxItems`). Production clauses that restate a rule the prompt carries are cut from the other descriptions (title, stat changes, milestones, new elements, facts and world building for beats; the stat lists, the stat's type, name, visibility, backgrounds flag and outcome-tracking clause, the background's multiplayer clause and the conversion rates' balance clause for setup). The tests pin each cut clause by name, since the exact-sentence check cannot see a paraphrase.
     - The with-examples setup carries production's example stat setups verbatim.
     - It reads production's prompt at four first-occurrence anchors: the state marker, `Number of players:`, `EXAMPLE STAT SETUPS` and `Character Selection Instructions`. A production edit there fails its tests: fix the anchor, not the prompt.
     - It does not import `storyTextTrims.ts`, so the trims stay deletable. Only `variants.ts` calls it.
@@ -104,7 +104,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - Stage caps: Stage 0 (probe, case building, both baselines) $8, Stages 1–2 $13, Stage 3 $3, Stage 4 $4.
 - A stage cap above its default (`--stage-cap`) needs `--over-target-reason "<why>"`, which is appended to `budget-overrides.jsonl`. `--global-cap` can only lower the $30; no flag or reason raises it.
 - `--max-spend` caps one invocation.
-- The runner reserves each call's estimate, re-sends included, before it starts, so parallel calls cannot overshoot.
+- The runner reserves each call's estimate, re-sends included, before it starts, so parallel calls overshoot a cap only by the estimates' error. Setup estimates read low (see Estimates), so with 6 calls in flight a setup invocation can pass a cap by up to about $0.1.
 - Groups run setup first and pipeline chains last. A cap stop cuts from the end of that order, so the chains go first and Sol setup is reached last.
 - The owner's shrink order when a dry run predicts an overrun:
   1. `--no-mp-continuations`;
@@ -115,8 +115,8 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 **Runner.**
 - Transport failures (429, 5xx, timeouts, dropped connections) retry after a backoff, on their own budget of 3.
 - A reply production's LangChain parse rejects is re-sent at once, at most `PRODUCTION_MAX_RETRIES` (2) times, as production does. That covers `repaired` (text after the JSON), `invalid-json`, `schema-mismatch`, `length` and `refusal`.
-- A 400 is never retried. One naming a parameter (`rejectedParam`) leaves its job open: the next invocation plans it again. Validity and the call count leave such attempts out, like transport failures, and the rejected-parameter rate still reads over all records. So a request-shape bug found by a smoke run leaves no dead job.
-- Every attempt is a record in `calls.jsonl`.
+- A 400 is never retried. One naming a parameter (`rejectedParam`) leaves its job open: the next invocation plans it again. `finishesJob` in `runner.ts` is the one definition of finished, used for resuming, for case building (`finishingRecord`) and for the variant section's pairs. Validity, the call count, the cost and input-cost means and the cache readings leave such attempts out, like transport failures, and the rejected-parameter rate still reads over all records. So a request-shape bug found by a smoke run leaves no dead job, and a job still waiting for its re-run is neither a matched pair nor a $0 call.
+- Every attempt is a record in `calls.jsonl`. Attempts are numbered after those already recorded for the job and step, so a re-run (a re-planned rejected request, or a job resumed part-way) gets new callIds and never overwrites an earlier attempt's `outputs/<callId>.json`. A job without records starts at attempt 1.
 - **Split requests** (Stage 4) go out per model family (`chatInput` in `executor.ts`):
   - gpt-6: a `developer` message whose text part carries `prompt_cache_breakpoint: { mode: "explicit" }` (the factory already sends explicit cache mode), then the user message;
   - gpt-4.x: a plain `system` message, then the user message. Its implicit prefix cache needs no breakpoint, and the field is gpt-5.6+ only.
@@ -147,11 +147,12 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - Stage 4 (Milestone 3, the coordinator's carry-forward): the GPT-6-style rewrite. No analysis arms and no chains. Run it with `--prompt-state postfix`.
   - Setup on the 9 `STAGE3_SETUP_PREMISES` ×1: Sol low and gpt-4.1 (production's default settings), each `rewrite` and `rewriteZeroShot`.
   - Beats on single-player cases, in this order: Luna medium `rewriteSlim` ×2 (the lead), gpt-4.1-mini `rewrite` ×1 (does the cleanup help today's model?), Luna medium verbosity low `rewriteSlim` ×1, and Luna medium `rewrite` ×1 (the full-scaffold hedge).
-  - Dry run of 2026-09-26: 256 jobs (setup 36, beat 220), $3.66 uncached against the $4 cap.
+  - Dry run of 2026-09-26: 256 jobs (setup 36, beat 220), $3.62 uncached against the $4 cap. Setup estimates read low (see Estimates), so about $4.1 uncached is the realistic figure, over the cap as the plan expected.
 - Prices per 1M tokens are in `pricing.ts`, with the cost and estimate functions. Cost = (I − C − W)·in + C·cached + W·write + O·out, where O already includes reasoning.
 - Estimates count the JSON schema as input (`requestChars` in `jobPlan.ts`), because OpenAI bills it: the production schemas alone are 4K to 16.5K tokens (setup about 14K, a 1-player beat about 4.5K, a 3-player beat about 15K).
 - Until a new variant has `MIN_MEASURED_RECORDS` measured outputs, it borrows them from its reference chain: `referenceKey` is walked until a key has enough (the verbosity arm → `rewriteSlim` → slim → prod). A trim writes less than its full form, so its estimate errs high. Without the borrowing, Luna medium would be priced at the §2.2 guess of 6,200 reasoning tokens (measured: about 1,600), and the cap would refuse a run that fits.
-- Estimates ignore caching: every input token is priced uncached. So the reservations stay safe if caching fails, and a Stage 4 estimate reads high when it works.
+- Estimates ignore caching: every input token is priced uncached, so a Stage 4 estimate reads high when caching works.
+- Input is estimated at 4 characters per token, which undercounts the JSON schema: it bills at about 1.8 characters per token. Setup input therefore reads about 6–7K tokens (28–32%) low per call (Stage 3 Sol minimal: 14.6–15.2K estimated, 20.4–22.3K measured), while beats are about right. A setup estimate is not conservative: check a setup invocation against measured per-call costs (a Sol or gpt-4.1 rewrite setup is about $0.09 uncached), not against the pre-run refusal alone.
 
 **Isolated versus pipeline.**
 - Isolated: every beat arm gets the same fixed analysis (the stored one, or the baseline's for built cases).
@@ -212,6 +213,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - Stage 3's full forms are Round 1's records, so the trimmed waits carry server drift; tokens and cost do not. Multiplayer trims are unit-tested but not measured, because Stage 3 turns run single-player only.
 - GPT-6's cache is measured at its default TTL: the eval sets no `ttl`.
 - Multiplayer beats are not rewritten: the Stage 4 builder throws on them, and Stage 4 turns run single-player only. A multiplayer rewrite needs its own measurement before any multiplayer adoption.
+- The rewrite keeps a few production descriptions that touch a prompt rule on purpose: the planning fields that ask the model to apply one (beat `optionConsiderations` and `newIntroductionsOfStoryElements`; setup `characterSelectionPlan.multiplayerCoordination`), the fields' own definitions (a story element's `instructions`, a fact's `storyElementId` allowing `world`, a character name unique across players), and production-internal repeats inside the schema (the stat's ±10/±20 effect sizes). They define or plan a field rather than restate the rule. Everything else a prompt rule restated is cut and pinned in the tests.
 - The generic views pair a variant beat arm with the analysis arm of the same key (`configsFor`), else with the baseline's analysis, which is what every Stage 4 beat arm gets there. Read the variants from their own section.
 - Round 1 (2026-09-26) ran the post-fix baseline ($4.03) and Stages 1–2 ($12.09), $18.51 in total. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_round1-report.md`. The rating pages are `rating/round1-setup.html` and `rating/round1-turns.html`; their keys are `keys/round1-*.json`.
 - Until the Stage 3 run, the checks and pages split paragraphs on blank lines only. gpt-4.1-mini sometimes separates paragraphs with single newlines, so its post-fix paragraph and image-placement rates read low: 92.9% and 90.2%, now 100% and 96.4%. GPT-6 figures did not change. `round1-turns.html` was re-rendered with `--rerender-page`, and one option changed.

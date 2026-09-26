@@ -418,6 +418,7 @@ The per-field stat definitions stay only in `statSchema`'s descriptions and leav
    - If invocation 4 is refused, add `--cases` with 6 premises: `setup-pretend-er-doctor,setup-learn-lemonade,setup-fiction-bounty-hunters,setup-kids-animal-rescue,setup-vent-berlin-flat,setup-pretend-cofounders`. If it is still refused, use 3: `setup-learn-lemonade,setup-kids-animal-rescue,setup-pretend-cofounders`.
    - Invocations 5 and 6 run only while they fit. A cap stop part-way is fine.
    - Never fewer than 9 Sol premises.
+   - Review note (2026-09-26): the setup estimates are not conservative. Input is estimated at 4 characters per token, and the setup schema bills at about 1.8, so each setup call reads about 6–7K input tokens low. Realistic uncached costs are about $1.7 for Sol setup and about $1.6 for gpt-4.1 setup, not the dry run's $1.44 and $1.36 (DERIVED: about $0.0135 more per call × 18). Don't rely on the pre-run refusal for invocation 4: check the Stage 4 spend so far plus 18 × about $0.09 against $4 by hand. If that doesn't fit (Stage 4 spend above about $2.35), apply the 6-premise shrink. Use measured per-call costs for invocations 5 and 6 as well.
    
    After invocation 1, check the first line's second and third calls for `cachedTokens` > 0. If they show none, caching reads are failing: continue (the cost still fits), and record it. Record hangs (`outcome` `timeout`) separately, as Round 1 did.
 4. **Read the variant section of `results.md`.** It gives, per Stage 4 arm against its reference, on matched (case, sample) pairs:
