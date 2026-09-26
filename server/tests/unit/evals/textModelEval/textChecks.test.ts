@@ -79,17 +79,32 @@ describe("checkBeatSet", () => {
 });
 
 describe("checkSetup", () => {
+  const input = { premise: "p", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 };
+  const setup = (overrides: Partial<SetupShape> = {}): SetupShape => ({
+    difficultyLevel: { modifier: 0 },
+    sharedStats: [{}, {}, {}],
+    playerStats: [{}, {}, {}],
+    storyElements: [],
+    guidelines: { typesOfThreads: [1, 2, 3, 4, 5, 6] },
+    player1: {},
+    ...overrides,
+  });
+
   it("rejects a difficulty modifier outside the allowed set", () => {
-    const output: SetupShape = {
-      difficultyLevel: { modifier: 15 },
-      sharedStats: [1, 2, 3],
-      playerStats: [1, 2, 3],
-      storyElements: [],
-      guidelines: { typesOfThreads: [1, 2, 3, 4, 5, 6] },
-      player1: {},
-    };
-    const result = checkSetup(output, { premise: "p", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 });
+    const result = checkSetup(setup({ difficultyLevel: { modifier: 15 } }), input);
     expect(result.checks).toMatchObject({ difficultyModifier: false, playerSlots: true, sharedStats: true, threadTypes: true });
+  });
+
+  it("counts only visible stats against the 3-4 rule", () => {
+    const hidden = { isVisible: false };
+    const withInvisibleExtra = setup({
+      sharedStats: [{}, {}, { isVisible: true }, {}, hidden],
+      playerStats: [{}, {}, {}, {}, hidden],
+    });
+    expect(checkSetup(withInvisibleExtra, input).checks).toMatchObject({ sharedStats: true, playerStats: true });
+    expect(checkSetup(withInvisibleExtra, input).counts).toMatchObject({ sharedStats: 5, playerStats: 5 });
+    const tooFewVisible = setup({ playerStats: [{}, {}, hidden, hidden] });
+    expect(checkSetup(tooFewVisible, input).checks.playerStats).toBe(false);
   });
 });
 

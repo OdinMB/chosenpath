@@ -209,12 +209,17 @@ export const ALLOWED_DIFFICULTY_MODIFIERS = [-20, -10, 0, 10, 20];
 /** The setup fields the checks read (StorySetupGeneration has them all). */
 export type SetupShape = {
   difficultyLevel?: { modifier: number };
-  sharedStats: unknown[];
-  playerStats: unknown[];
+  sharedStats: { isVisible?: boolean }[];
+  playerStats: { isVisible?: boolean }[];
   storyElements: unknown[];
   guidelines: { typesOfThreads: unknown[] };
   [slot: `player${number}`]: unknown;
 };
+
+/** The prompt asks for 3-4 visible stats per list, plus any invisible ones. */
+function visibleCount(stats: { isVisible?: boolean }[]): number {
+  return stats.filter((stat) => stat.isVisible !== false).length;
+}
 
 export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
   const slots = Object.keys(output).filter((key) => /^player\d+$/.test(key));
@@ -226,8 +231,8 @@ export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
         output.difficultyLevel !== undefined &&
         ALLOWED_DIFFICULTY_MODIFIERS.includes(output.difficultyLevel.modifier),
       playerSlots: slots.length === expected.length && expected.every((s) => slots.includes(s)),
-      sharedStats: between(output.sharedStats.length, 3, 4),
-      playerStats: between(output.playerStats.length, 3, 4),
+      sharedStats: between(visibleCount(output.sharedStats), 3, 4),
+      playerStats: between(visibleCount(output.playerStats), 3, 4),
       threadTypes: between(output.guidelines.typesOfThreads.length, 6, 8),
     },
     counts: {

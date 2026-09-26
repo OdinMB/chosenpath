@@ -203,7 +203,8 @@ export const setupStep = {
         premise,
         playerCount,
         gameMode,
-        maxTurns
+        maxTurns,
+        kind
       ),
       schema: createStorySetupSchema(playerCount, kind),
     };

@@ -45,14 +45,13 @@ export type RequestInput =
 /** Template iteration exactly as TemplateService.iterateTemplate builds it. */
 function iterationRequest(input: IterationInput): TextRequest {
   return {
-    prompt: StorySetupPromptService.createSetupPrompt(
+    prompt: StorySetupPromptService.createIterationPrompt(
       input.feedback,
       input.playerCount,
       input.gameMode,
       input.maxTurns,
-      true,
       input.sections,
-      JSON.stringify(input.template)
+      input.template
     ),
     schema: partialTemplateSchema(input.sections, input.playerCount),
   };

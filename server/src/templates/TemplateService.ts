@@ -836,15 +836,14 @@ export class TemplateService {
       const generator = this.aiStoryGenerator;
 
       // Generate the partial template update based on user-selected sections
-      const templateJson = JSON.stringify(template);
-      const aiPrompt = StorySetupPromptService.createSetupPrompt(
+      // (the prompt leaves out the creator's id and username)
+      const aiPrompt = StorySetupPromptService.createIterationPrompt(
         feedback,
         playerCount,
         gameMode,
         maxTurns,
-        true, // iteration mode
         sections,
-        templateJson
+        template
       );
 
       // Create a partial schema for just the requested sections

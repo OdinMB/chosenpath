@@ -22,20 +22,62 @@ const GAME_MODE_DESCRIPTIONS: Record<
     "Players should need to carefully balance helping others versus pursuing their own interests.",
 };
 
+/** A new custom story or template from a premise, or an iteration on an existing template. */
+type SetupMode = "story" | "template" | "iteration";
+
+/** Template fields that identify its creator; they never go to the model. */
+const CREATOR_FIELDS = new Set(["creatorId", "creatorUsername"]);
+
+const ALL_SECTIONS = Object.keys(
+  templateIterationSections
+) as TemplateIterationSections[];
+
 export class StorySetupPromptService {
+  /** A new setup from a premise: a custom story (one difficulty level) or a template (3-5). */
   public static createSetupPrompt(
-    prompt: string,
+    premise: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
     maxTurns: number,
-    iterationMode: boolean = false,
-    // default: all sections
-    sections: TemplateIterationSections[] = Object.keys(
-      templateIterationSections
-    ) as TemplateIterationSections[],
-    templateJson: string = ""
+    kind: "story" | "template"
   ): string {
-    const setupPrompt =
+    return this.buildPrompt(premise, playerCount, gameMode, kind, ALL_SECTIONS, "");
+  }
+
+  /** Regenerates the given sections of an existing template from user feedback. */
+  public static createIterationPrompt(
+    feedback: string,
+    playerCount: PlayerCount,
+    gameMode: GameMode,
+    maxTurns: number,
+    sections: TemplateIterationSections[],
+    template: object
+  ): string {
+    const templateJson = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(template).filter(([key]) => !CREATOR_FIELDS.has(key))
+      )
+    );
+    return this.buildPrompt(
+      feedback,
+      playerCount,
+      gameMode,
+      "iteration",
+      sections,
+      templateJson
+    );
+  }
+
+  private static buildPrompt(
+    prompt: string,
+    playerCount: PlayerCount,
+    gameMode: GameMode,
+    mode: SetupMode,
+    sections: TemplateIterationSections[],
+    templateJson: string
+  ): string {
+    const iterationMode = mode === "iteration";
+    return (
       this.getCreationModeInstructions(iterationMode) +
       "Guidelines for story setups:\n\n" +
       this.getGuidelinesInstructions(sections) +
@@ -45,7 +87,7 @@ export class StorySetupPromptService {
       this.getStatInstructions(sections, playerCount > 1) +
       this.getExampleStatSetups(iterationMode) +
       this.getCharacterSelectionInstructions(sections, playerCount > 1) +
-      this.getDifficultyLevelsInstructions(sections) +
+      this.getDifficultyLevelsInstructions(sections, mode) +
       "#".repeat(50) +
       "\n\n" +
       this.getConfigurationInstructions(
@@ -55,10 +97,8 @@ export class StorySetupPromptService {
         iterationMode,
         sections,
         templateJson
-      );
-
-    // console.log("\x1b[36m%s\x1b[0m", setupPrompt);
-    return setupPrompt;
+      )
+    );
   }
 
   private static getCreationModeInstructions(iterativeMode: boolean): string {
@@ -293,7 +333,7 @@ Context for additional stat parameters
 - Threads are resolved as favorable/mixed/unfavorable.
 - At the end of a thread and depending on the resolution, a milestone is added to the story state. This is what drives the story to its overall resolution.
 - Each thread consists of 2-4 beats.
-- Each beat is 5-6 paragraphs of text (4-5 sentences each) followed by a player decision.
+- Each beat is 5-6 paragraphs of text (3-5 sentences each) followed by a player decision.
 - Beats have a probability distribution for favorable/mixed/unfavorable resolutions.
 - This distribution can be influenced by stats.
 - It can be shifted in the player's favor by sacrificing something, or in the player's disadvantage by choosing a reward that is going to help the player in other ways later on.
@@ -303,9 +343,9 @@ Context for additional stat parameters
 For each stat, you must define:
 
 Effects on Beat Resolution
-Define bonuses and maluses that the stat applies to the chance of success in certain challenges (+/-10 for minor effects, +/-30 for major effects). Be creative. Options include:
+Define bonuses and maluses that the stat applies to the chance of success in certain challenges (+/-10 for minor effects, +/-20 for major effects). Be creative. Options include:
 - Define conditional bonuses based on context (e.g., "+20 points in forest-based challenges when Forest Health is above 70%")
-- Define resource spending mechanics (e.g., "-10/-30 points when the spaceship is Worn/Damaged and required to perform a risky maneuver")
+- Define resource spending mechanics (e.g., "-10/-20 points when the spaceship is Worn/Damaged and required to perform a risky maneuver")
 
 Options (if any) for sacrificing the stat for a higher chance of success in certain beats (expressed in points)
 Options (if any) for gaining the stat as a reward for choosing a lower chance of success in certain beats
@@ -670,7 +710,7 @@ playerStatConversionRates:
 - Example: '20% Stage Presence equals one level of Instrument Mastery'
 - Example: '50 Followers equals one Special Follower'
 
-playerBackgroundVariety:
+backgroundArchetypes:
 Outline generic archetypes that the backgrounds could implement and flesh out.
 - Consider the player stat conversion rates.
 - Each archetype should represent a particular tradeoff between player stats.
@@ -683,12 +723,19 @@ Outline generic archetypes that the backgrounds could implement and flesh out.
   }
 
   private static getDifficultyLevelsInstructions(
-    sections: TemplateIterationSections[]
+    sections: TemplateIterationSections[],
+    mode: SetupMode
   ): string {
     if (sections.includes("difficultyLevels")) {
+      const isStory = mode === "story";
       return `Difficulty Levels
-- Define 3-5 difficulty levels appropriate for the story.
-- Each difficulty level must have a 'modifier' (number between +20 and -20, in steps of 10) and a 'title' (string).
+${
+  isStory
+    ? `- Define exactly one difficulty level appropriate for the story.
+- The difficulty level must have a 'modifier' (number between +20 and -20, in steps of 10) and a 'title' (string).`
+    : `- Define 3-5 difficulty levels appropriate for the story.
+- Each difficulty level must have a 'modifier' (number between +20 and -20, in steps of 10) and a 'title' (string).`
+}
 - The title should be a short, flavorful term that summarizes the difficulty level within the story's setting. Example: For a survival story, a modifier of -20 could be titled "Unforgiving". For a lighthearted adventure, +10 could be "Friendly Jaunt".
 - +10 means that things tend to go well for the player. 0 means that there are some ups and downs, but things will be OK in the end. -10 features frequent failures, and not all goals will be reached. -20 is playing against the odds, with players typically achieving only a few successes throughout the story.
 
@@ -697,7 +744,11 @@ CRITICAL: Match difficulty range to story type:
 - BALANCED / ADVENTURE / MYSTERY: Use range from +10 to -10 (standard balanced range)
 - HORROR / GRIM / DARK / SURVIVAL: Use range from 0 to -20 (harder difficulties)
 
-Examples:
+${
+  isStory
+    ? "Examples of the levels in each range (pick the one level that fits this story from the matching range):"
+    : "Examples:"
+}
 - A bedtime story about friendly dragons: [+20 "Magical Dreams", +10 "Happy Adventure", 0 "Little Challenge"]
 - A detective mystery: [+10 "Amateur Sleuth", 0 "Professional Detective", -10 "Master Case"]
 - A horror survival game: [0 "Guardian Angel", -10 "Nightmare", -20 "Doom"]
@@ -729,7 +780,9 @@ ${templateJson}
 
 Here is the feedback from the user on the existing story template:
 
-${prompt.toUpperCase()}
+<feedback>
+${prompt}
+</feedback>
 
 You must ONLY regenerate the following sections:
 ${sections.join(", ")}
@@ -743,7 +796,9 @@ Note that the user can only accept entire sections. If you make changes to the g
 Number of players: ${playerCount}
 Game mode: ${this.getGameModeInstructions(gameMode, playerCount > 1)}
 
-${prompt.toUpperCase()}`;
+<premise>
+${prompt}
+</premise>`;
     }
   }
 
