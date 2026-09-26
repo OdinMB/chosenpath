@@ -78,7 +78,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
     - ±20 for a major stat effect;
     - 3–5 sentences per paragraph;
     - 3–4 *visible* shared and player stats plus any invisible ones.
-  - The checkers follow the corrected rules: visible stat counts, and sacrifice and reward at exactly ±30.
+  - The checkers follow the corrected rules: visible stat counts, and sacrifice and reward at exactly ±30. Endings are not held to three options, because the ending prompt asks for none.
 - `--rating-page setup|turn --arms <baseline,cand1,…> [--items N] [--per-item K]`: a blind rating page.
   - An arm is `armKey` or `promptState:armKey`; the first arm is the baseline.
   - `--per-item K` shows the baseline plus K candidates per item. Every K-subset appears once per cycle, the least-shown first, so with 3 candidates, K = 2 and 9 items each candidate is on 6 items. The baseline's label also shifts once per cycle, so each pair meets it at every label. Subsets are handed out in stratum order (setup: player count first), so each candidate is spread over the strata; the page still shows the items in salted order. The repeated item keeps the arms of the item it repeats. Every arm still needs a usable sample 1 on a case for that case to qualify.
@@ -168,3 +168,5 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - Run A (2026-09-26) did the probe, the case build and the pre-fix baseline for $2.39 of Stage 0. Its measured sizes, waits and per-story cost are in `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_run-A-report.md`.
 - The baseline's billed cost includes gpt-4.1's implicit cache hits, which depend on how close together the eval sends its calls. `results.md` shows the uncached figure beside it.
 - Waits count each attempt alone, not the re-sends in front of it. If re-sends pass about 1%, the 60 s gate should read the summed wait per call.
+- A call that hangs until the 300 s timeout is a transport failure. It is retried, left out of validity, and absent from every wait percentile. Round 1 had 4 such hangs in 714 Luna turn calls, so count them separately (`outcome` `timeout` in `calls.jsonl`).
+- Round 1 (2026-09-26) ran the post-fix baseline ($4.03) and Stages 1–2 ($12.09). Total spend is $18.51. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_round1-report.md`. The rating pages are `rating/round1-setup.html` and `rating/round1-turns.html`; their keys are `keys/round1-*.json`.
