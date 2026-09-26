@@ -24,6 +24,7 @@ import { planRatingSet, type ArmRef, type RatingKind } from "./ratingSets.js";
 import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, keyOf, runJobs, usable } from "./runner.js";
+import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
@@ -71,8 +72,6 @@ type Args = {
 
 class UsageError extends Error {}
 
-/** Run A's prompt state, recorded before Milestone 2 fixed the prompts */
-const PRE_FIX_PROMPT_STATE = "prefix";
 const DEFAULT_PROBE_MAX_SPEND = 1;
 const DEFAULT_BUILD_MAX_SPEND = 0.75;
 const DEFAULT_ITEMS: Record<RatingKind, number> = { setup: 6, turn: 15 };

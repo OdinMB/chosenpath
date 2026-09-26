@@ -20,6 +20,13 @@ import {
 export type VariantId = "prod";
 export const VARIANTS: VariantId[] = ["prod"];
 
+/**
+ * Prompt states tag which version of the production prompt code a run
+ * measured. "prefix" is Run A's, before Milestone 2 fixed the prompts; that
+ * code no longer exists, so only its records do.
+ */
+export const PRE_FIX_PROMPT_STATE = "prefix";
+
 export type SetupInput = {
   premise: string;
   playerCount: PlayerCount;

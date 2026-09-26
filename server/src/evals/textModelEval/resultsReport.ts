@@ -13,12 +13,15 @@ import {
   type ValidityReading,
 } from "./validityGate.js";
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
+import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 
 /*
  * results.md from the call records and the automatic checks: validity,
  * rule rates against the baseline and its noise floor, latency, tokens and
- * cost, and the owner's three views (single-player with and without
- * pregeneration, multiplayer). The report never picks a winner.
+ * cost, and the owner's gate readings as views (single-player with and
+ * without pregeneration, multiplayer, setup). Cost is read on the billed
+ * and the uncached basis, the setup cap on the median and the p95. The
+ * report marks each reading within or over and never picks a winner.
  */
 
 export const PER_STORY_WITH_PREGEN = { beat: 85, switch: 19, thread: 21 };
@@ -32,6 +35,17 @@ export const MULTIPLAYER_SLACK_S = 5;
 export const SETUP_WAIT_FACTOR = 1.5;
 
 type Quantiles = { n: number; p50?: number; p95?: number };
+
+/** Billed: as charged. Uncached: priced as if nothing came from cache (gpt-4.1 caches implicitly). */
+export type CostBasis = "billed" | "uncached";
+export const COST_BASES: CostBasis[] = ["billed", "uncached"];
+
+export type CostReading = {
+  /** Mean cost of a call, every attempt summed (production pays for re-sends too) */
+  perCall: number;
+  /** The same over calls with this many players */
+  byPlayers: Record<number, number>;
+};
 
 export type ArmStats = {
   promptState: string;
@@ -62,10 +76,7 @@ export type ArmStats = {
   turnLatencies: number[];
   latencyByPlayers: Record<number, number[]>;
   medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number };
-  costPerCall: number;
-  /** Over single-player calls only, which is what a single-player story pays; undefined without any */
-  singlePlayerCostPerCall?: number;
-  uncachedCostPerCall: number;
+  cost: Record<CostBasis, CostReading>;
 };
 
 export function percentile(values: number[], p: number): number | undefined {
@@ -111,6 +122,41 @@ function ruleRatesOf(records: CallRecord[], checks: Map<string, CheckResult>): R
   return Object.fromEntries(Object.entries(passes).map(([name, p]) => [name, rate(p.ok, p.n)]));
 }
 
+function uncachedCost(r: CallRecord): number {
+  return r.costSource === "usage"
+    ? costFromUsage(r.model, {
+        inputTokens: r.inputTokens,
+        cachedTokens: 0,
+        cacheWriteTokens: r.cacheWriteTokens,
+        outputTokens: r.outputTokens,
+      })
+    : r.costUsd;
+}
+
+const PRICE: Record<CostBasis, (r: CallRecord) => number> = {
+  billed: (r) => r.costUsd,
+  uncached: uncachedCost,
+};
+
+const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+
+/** Every attempt of a call (job and step) summed, then averaged over calls, overall and by player count. */
+function costReading(records: CallRecord[], price: (r: CallRecord) => number): CostReading {
+  const calls = new Map<string, { players: number; usd: number }>();
+  for (const r of records) {
+    const key = `${r.jobKey}|${r.step}`;
+    const call = calls.get(key) ?? { players: r.players, usd: 0 };
+    call.usd += price(r);
+    calls.set(key, call);
+  }
+  const all = [...calls.values()];
+  const byPlayers: Record<number, number> = {};
+  for (const players of new Set(all.map((c) => c.players))) {
+    byPlayers[players] = mean(all.filter((c) => c.players === players).map((c) => c.usd));
+  }
+  return { perCall: mean(all.map((c) => c.usd)), byPlayers };
+}
+
 function statsFor(
   records: CallRecord[],
   checks: Map<string, CheckResult>,
@@ -127,19 +173,6 @@ function statsFor(
   const s2 = bySample(2);
   const latencyByPlayers: Record<number, number[]> = {};
   for (const r of good) (latencyByPlayers[r.players] ??= []).push(seconds(r));
-  const costs = finals.map((r) => r.costUsd);
-  const singlePlayerCosts = finals.filter((r) => r.players === 1).map((r) => r.costUsd);
-  // As if no input had been served from cache (gpt-4.1 caches implicitly)
-  const uncached = finals.map((r) =>
-    r.costSource === "usage"
-      ? costFromUsage(r.model, {
-          inputTokens: r.inputTokens,
-          cachedTokens: 0,
-          cacheWriteTokens: r.cacheWriteTokens,
-          outputTokens: r.outputTokens,
-        })
-      : r.costUsd
-  );
   return {
     promptState: first.promptState,
     group: first.group,
@@ -175,11 +208,7 @@ function statsFor(
       output: median(good.map((r) => r.outputTokens)),
       reasoning: median(good.map((r) => r.reasoningTokens)),
     },
-    costPerCall: costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0,
-    singlePlayerCostPerCall: singlePlayerCosts.length
-      ? singlePlayerCosts.reduce((a, b) => a + b, 0) / singlePlayerCosts.length
-      : undefined,
-    uncachedCostPerCall: uncached.length ? uncached.reduce((a, b) => a + b, 0) / uncached.length : 0,
+    cost: { billed: costReading(records, PRICE.billed), uncached: costReading(records, PRICE.uncached) },
   };
 }
 
@@ -202,20 +231,35 @@ export function computeArmStats(
 
 export type GameplayConfig = { beat: ArmStats; switch?: ArmStats; thread?: ArmStats; setup?: ArmStats };
 
-/** A single-player story pays single-player calls: multiplayer beats carry about 3x the output. */
-function storyCallCost(stats: ArmStats | undefined): number {
-  return stats ? (stats.singlePlayerCostPerCall ?? stats.costPerCall) : 0;
+/**
+ * A role's cost per call at a player count: its calls with that many players
+ * when there are any (multiplayer beats carry about 3x the output), else all calls.
+ */
+function callCost(stats: ArmStats | undefined, basis: CostBasis, players: number): number {
+  if (!stats) return 0;
+  const reading = stats.cost[basis];
+  return reading.byPlayers[players] ?? reading.perCall;
 }
 
-/** Text cost per 25-turn single-player story, with and without pregeneration. */
-export function storyCost(config: GameplayConfig): { withPregen: number; withoutPregen: number } {
+/**
+ * Text cost per 25-turn story at a player count, with pregeneration
+ * (85/19/21 calls) and without (29/7/7), plus its setup.
+ */
+export function storyCost(
+  config: GameplayConfig,
+  basis: CostBasis,
+  players = 1
+): { withPregen: number; withoutPregen: number } {
   const per = (counts: typeof PER_STORY_WITH_PREGEN) =>
-    counts.beat * storyCallCost(config.beat) +
-    counts.switch * storyCallCost(config.switch) +
-    counts.thread * storyCallCost(config.thread) +
-    storyCallCost(config.setup);
+    counts.beat * callCost(config.beat, basis, players) +
+    counts.switch * callCost(config.switch, basis, players) +
+    counts.thread * callCost(config.thread, basis, players) +
+    callCost(config.setup, basis, players);
   return { withPregen: per(PER_STORY_WITH_PREGEN), withoutPregen: per(PER_STORY_WITHOUT_PREGEN) };
 }
+
+const byBasis = <T>(read: (basis: CostBasis) => T): Record<CostBasis, T> =>
+  ({ billed: read("billed"), uncached: read("uncached") });
 
 /** A single-player wait quantile: multiplayer calls carry more output and would inflate it. */
 function onePlayerLatency(stats: ArmStats | undefined, p: number): number | undefined {
@@ -233,26 +277,43 @@ function analysisTurnP95(config: GameplayConfig): { p95?: number; source: "pipel
   return { p95: beat === undefined ? undefined : beat + analysis, source: "summed" };
 }
 
-export type Gates = {
-  pregenTurn: { beatOnlyP95?: number; analysisTurnP95?: number; source: string; pass: boolean };
-  costCap: { perStory: number; baselinePerStory: number; pass: boolean };
-  noPregen: { perStory: number; median?: number; p95?: number; exception: boolean };
-  multiplayer: { byPlayers: Record<number, { p95?: number; baselineP95?: number }>; verdict: "ok" | "needs multiplayer pregeneration" | "fail" };
-  setup?: { median?: number; p95?: number; baselineMedian?: number; pass: boolean };
+type CostCheck = { perStory: number; baselinePerStory: number; withinCap: boolean };
+
+export type SetupReading = {
+  median?: number;
+  p95?: number;
+  baselineMedian?: number;
+  baselineP95?: number;
+  medianWithinCap: boolean;
+  p95WithinCap: boolean;
 };
 
-export function gates(config: GameplayConfig, baseline: GameplayConfig): Gates {
+export type Gates = {
+  pregenTurn: { beatOnlyP95?: number; analysisTurnP95?: number; source: string; pass: boolean };
+  /** Single-player, pregeneration on: billed against billed, uncached against uncached */
+  cost: Record<CostBasis, CostCheck>;
+  noPregen: { perStory: Record<CostBasis, number>; median?: number; p95?: number; exception: boolean };
+  multiplayer: {
+    byPlayers: Record<number, { p95?: number; baselineP95?: number }>;
+    verdict: "ok" | "needs multiplayer pregeneration" | "fail";
+    /** Per custom story at this player count: today's 29/7/7 calls, or 85/19/21 with multiplayer pregeneration */
+    costByPlayers: Record<number, Record<CostBasis, { withoutMpPregen: number; withMpPregen: number }>>;
+  };
+  setup?: SetupReading;
+};
+
+function pregenTurnReading(config: GameplayConfig): Gates["pregenTurn"] {
   const beatOnlyP95 = percentile(config.beat.beatOnlyLatencies, 95);
   const analysis = analysisTurnP95(config);
-  const pregenPass =
+  const pass =
     beatOnlyP95 !== undefined &&
     analysis.p95 !== undefined &&
     beatOnlyP95 <= PREGEN_TURN_CAP_S &&
     analysis.p95 <= PREGEN_TURN_CAP_S;
+  return { beatOnlyP95, analysisTurnP95: analysis.p95, source: analysis.source, pass };
+}
 
-  const cost = storyCost(config);
-  const baselineCost = storyCost(baseline);
-
+function noPregenReading(config: GameplayConfig): Gates["noPregen"] {
   const analysisLatencies = config.beat.turnLatencies.length
     ? config.beat.turnLatencies
     : config.beat.beatOnlyLatencies.map((s) => s + (onePlayerLatency(config.thread, 50) ?? onePlayerLatency(config.switch, 50) ?? 0));
@@ -260,48 +321,68 @@ export function gates(config: GameplayConfig, baseline: GameplayConfig): Gates {
     ...config.beat.beatOnlyLatencies.map((value) => ({ value, weight: TURN_MIX.beatOnly / config.beat.beatOnlyLatencies.length })),
     ...analysisLatencies.map((value) => ({ value, weight: TURN_MIX.analysis / analysisLatencies.length })),
   ];
-  const noPregenMedian = weightedQuantile(mixed, 0.5);
-  const noPregenP95 = weightedQuantile(mixed, 0.95);
+  const median = weightedQuantile(mixed, 0.5);
+  const p95 = weightedQuantile(mixed, 0.95);
+  return {
+    perStory: byBasis((basis) => storyCost(config, basis).withoutPregen),
+    median,
+    p95,
+    exception: median !== undefined && p95 !== undefined && median <= NO_PREGEN_BAR.medianS && p95 <= NO_PREGEN_BAR.p95S,
+  };
+}
 
+function multiplayerReading(config: GameplayConfig, baseline: GameplayConfig): Gates["multiplayer"] {
   const byPlayers: Gates["multiplayer"]["byPlayers"] = {};
+  const costByPlayers: Gates["multiplayer"]["costByPlayers"] = {};
   let verdict: Gates["multiplayer"]["verdict"] = "ok";
   for (const [players, values] of Object.entries(config.beat.latencyByPlayers)) {
-    if (Number(players) < 2) continue;
+    const n = Number(players);
+    if (n < 2) continue;
     const p95 = percentile(values, 95);
-    const baselineP95 = percentile(baseline.beat.latencyByPlayers[Number(players)] ?? [], 95);
-    byPlayers[Number(players)] = { p95, baselineP95 };
+    const baselineP95 = percentile(baseline.beat.latencyByPlayers[n] ?? [], 95);
+    byPlayers[n] = { p95, baselineP95 };
     if (p95 === undefined || baselineP95 === undefined) continue;
     if (p95 > PREGEN_TURN_CAP_S) verdict = "fail";
     else if (p95 > baselineP95 + MULTIPLAYER_SLACK_S && verdict === "ok") verdict = "needs multiplayer pregeneration";
   }
+  for (const players of Object.keys(config.beat.cost.billed.byPlayers).map(Number).filter((n) => n >= 2)) {
+    costByPlayers[players] = byBasis((basis) => {
+      const cost = storyCost(config, basis, players);
+      return { withoutMpPregen: cost.withoutPregen, withMpPregen: cost.withPregen };
+    });
+  }
+  return { byPlayers, verdict, costByPlayers };
+}
 
-  const setup = config.setup
-    ? {
-        median: config.setup.latency.p50,
-        p95: config.setup.latency.p95,
-        baselineMedian: baseline.setup?.latency.p50,
-        pass:
-          config.setup.latency.p50 !== undefined &&
-          baseline.setup?.latency.p50 !== undefined &&
-          config.setup.latency.p50 <= SETUP_WAIT_FACTOR * baseline.setup.latency.p50,
-      }
-    : undefined;
-
+/** The owner's setup cap (1.5x today's wait), read on the median and on the p95. */
+export function setupReading(setup: ArmStats, baselineSetup?: ArmStats): SetupReading {
+  const { p50: median, p95 } = setup.latency;
+  const baselineMedian = baselineSetup?.latency.p50;
+  const baselineP95 = baselineSetup?.latency.p95;
+  const within = (value?: number, base?: number) =>
+    value !== undefined && base !== undefined && value <= SETUP_WAIT_FACTOR * base;
   return {
-    pregenTurn: { beatOnlyP95, analysisTurnP95: analysis.p95, source: analysis.source, pass: pregenPass },
-    costCap: { perStory: cost.withPregen, baselinePerStory: baselineCost.withPregen, pass: cost.withPregen <= baselineCost.withPregen },
-    noPregen: {
-      perStory: cost.withoutPregen,
-      median: noPregenMedian,
-      p95: noPregenP95,
-      exception:
-        noPregenMedian !== undefined &&
-        noPregenP95 !== undefined &&
-        noPregenMedian <= NO_PREGEN_BAR.medianS &&
-        noPregenP95 <= NO_PREGEN_BAR.p95S,
-    },
-    multiplayer: { byPlayers, verdict },
-    setup,
+    median,
+    p95,
+    baselineMedian,
+    baselineP95,
+    medianWithinCap: within(median, baselineMedian),
+    p95WithinCap: within(p95, baselineP95),
+  };
+}
+
+export function gates(config: GameplayConfig, baseline: GameplayConfig): Gates {
+  const cost = byBasis((basis): CostCheck => {
+    const perStory = storyCost(config, basis).withPregen;
+    const baselinePerStory = storyCost(baseline, basis).withPregen;
+    return { perStory, baselinePerStory, withinCap: perStory <= baselinePerStory };
+  });
+  return {
+    pregenTurn: pregenTurnReading(config),
+    cost,
+    noPregen: noPregenReading(config),
+    multiplayer: multiplayerReading(config, baseline),
+    setup: config.setup ? setupReading(config.setup, baseline.setup) : undefined,
   };
 }
 
@@ -340,37 +421,134 @@ function configsFor(stats: ArmStats[], promptState: string) {
   return { baseline, candidates, setupArms: inState.filter((s) => s.group === "setup") };
 }
 
+const within = (ok: boolean) => (ok ? "within" : "over");
+const bothBases = (read: (basis: CostBasis) => number) => `${usd(read("billed"))} / ${usd(read("uncached"))}`;
+
+type Named = [string, GameplayConfig];
+
+function renderPregenView(all: Named[], baseline: GameplayConfig): string[] {
+  const lines = [
+    "",
+    "**Single-player, pregeneration on.** Cost against the baseline's per-story cost on each basis; waits against the 60 s cap.",
+    "",
+    "| Gameplay arm | $/story billed | Billed cap | $/story uncached | Uncached cap | Beat-only p95 | Analysis-turn p95 | 60 s cap |",
+    "|---|---|---|---|---|---|---|---|",
+  ];
+  for (const [name, config] of all) {
+    const { cost, pregenTurn } = gates(config, baseline);
+    const cap = (basis: CostBasis) => `${within(cost[basis].withinCap)} (${usd(cost[basis].baselinePerStory)})`;
+    lines.push(
+      `| ${name} | ${usd(cost.billed.perStory)} | ${cap("billed")} | ${usd(cost.uncached.perStory)} | ${cap("uncached")} | ${secs(pregenTurn.beatOnlyP95)} | ${secs(pregenTurn.analysisTurnP95)} (${pregenTurn.source}) | ${within(pregenTurn.pass)} |`
+    );
+  }
+  return lines;
+}
+
+function renderNoPregenView(all: Named[], baseline: GameplayConfig): string[] {
+  const lines = [
+    "",
+    `**Single-player, no pregeneration** (reported, not gated; flag at a full-turn median of at most ${NO_PREGEN_BAR.medianS} s and a p95 of at most ${NO_PREGEN_BAR.p95S} s).`,
+    "",
+    "| Gameplay arm | $/story billed / uncached | Full-turn median | Full-turn p95 | Flag |",
+    "|---|---|---|---|---|",
+  ];
+  for (const [name, config] of all) {
+    const { noPregen } = gates(config, baseline);
+    lines.push(
+      `| ${name} | ${bothBases((basis) => noPregen.perStory[basis])} | ${secs(noPregen.median)} | ${secs(noPregen.p95)} | ${noPregen.exception ? "yes" : "no"} |`
+    );
+  }
+  return lines;
+}
+
+function renderMultiplayerView(all: Named[], baseline: GameplayConfig): string[] {
+  const lines = [
+    "",
+    `**Multiplayer.** Beat p95 against the baseline's (+${MULTIPLAYER_SLACK_S} s is "ok"; above that but within ${PREGEN_TURN_CAP_S} s "needs multiplayer pregeneration"); $ per custom story billed / uncached.`,
+    "",
+    "| Gameplay arm | Beat p95 by players | Verdict | $/story without multiplayer pregeneration | $/story with multiplayer pregeneration |",
+    "|---|---|---|---|---|",
+  ];
+  for (const [name, config] of all) {
+    const { multiplayer } = gates(config, baseline);
+    const waits = Object.entries(multiplayer.byPlayers)
+      .map(([players, v]) => `${players}p ${secs(v.p95)} (base ${secs(v.baselineP95)})`)
+      .join("; ");
+    const costs = (pick: "withoutMpPregen" | "withMpPregen") =>
+      Object.entries(multiplayer.costByPlayers)
+        .map(([players, cost]) => `${players}p ${bothBases((basis) => cost[basis][pick])}`)
+        .join("; ");
+    lines.push(`| ${name} | ${waits || "–"} | ${multiplayer.verdict} | ${costs("withoutMpPregen") || "–"} | ${costs("withMpPregen") || "–"} |`);
+  }
+  return lines;
+}
+
+function renderSetupView(setupArms: ArmStats[], baseline: GameplayConfig): string[] {
+  const base = baseline.setup;
+  const cap = (value?: number) => (value === undefined ? "–" : secs(SETUP_WAIT_FACTOR * value));
+  const lines = [
+    "",
+    `**Setup.** The cap is ${SETUP_WAIT_FACTOR} × today's wait, read on the median and on the p95.`,
+    "",
+    `| Setup arm | Median | Median cap (${cap(base?.latency.p50)}) | p95 | p95 cap (${cap(base?.latency.p95)}) | $/setup billed / uncached |`,
+    "|---|---|---|---|---|---|",
+  ];
+  for (const arm of setupArms) {
+    const reading = setupReading(arm, base);
+    const verdict = (ok: boolean) => (arm.baseline ? "baseline" : within(ok));
+    lines.push(
+      `| ${arm.armKey} | ${secs(reading.median)} | ${verdict(reading.medianWithinCap)} | ${secs(reading.p95)} | ${verdict(reading.p95WithinCap)} | ${bothBases((basis) => arm.cost[basis].perCall)} |`
+    );
+  }
+  return lines;
+}
+
+function renderSetupMatrix(setupArms: ArmStats[], all: Named[], baseline: GameplayConfig): string[] {
+  const cap = byBasis((basis) => storyCost(baseline, basis).withPregen);
+  const lines = [
+    "",
+    `**Per-story cost, setup arm × gameplay arm** (single-player, pregeneration on; billed / uncached; caps ${usd(cap.billed)} / ${usd(cap.uncached)}):`,
+    "",
+    `| Setup \\ Gameplay | ${all.map(([name]) => name).join(" | ")} |`,
+    `|---|${all.map(() => "---").join("|")}|`,
+  ];
+  for (const setup of setupArms) {
+    const cells = all.map(([, config]) => {
+      const cost = byBasis((basis) => storyCost({ ...config, setup }, basis).withPregen);
+      const over = COST_BASES.filter((basis) => cost[basis] > cap[basis]);
+      return `${bothBases((basis) => cost[basis])}${over.length ? ` (over: ${over.join(", ")})` : ""}`;
+    });
+    lines.push(`| ${setup.armKey} | ${cells.join(" | ")} |`);
+  }
+  return lines;
+}
+
+/** The pre-fix baseline (Run A): what production pays and waits today. */
+function todaysProduction(stats: ArmStats[], promptState: string): string[] {
+  const prefix = configsFor(stats, PRE_FIX_PROMPT_STATE);
+  if (promptState === PRE_FIX_PROMPT_STATE || !prefix) return [];
+  const cost = byBasis((basis) => storyCost(prefix.baseline, basis).withPregen);
+  const setup = prefix.baseline.setup?.latency;
+  return [
+    "",
+    `Today's production (the pre-fix baseline): ${usd(cost.billed)} billed / ${usd(cost.uncached)} uncached per custom story with pregeneration; setup median ${secs(setup?.p50)}, p95 ${secs(setup?.p95)}.`,
+  ];
+}
+
 function renderViews(stats: ArmStats[], promptState: string): string[] {
   const configs = configsFor(stats, promptState);
   if (!configs) return [`No baseline beat results for prompt state ${promptState} yet.`];
-  const lines: string[] = [];
-  const all: [string, GameplayConfig][] = [["baseline " + configs.baseline.beat.armKey, configs.baseline], ...configs.candidates];
-  lines.push(
+  const all: Named[] = [["baseline " + configs.baseline.beat.armKey, configs.baseline], ...configs.candidates];
+  const lines = [
     "",
-    "| Gameplay arm | $/story (pregen) | Cost cap | Beat-only p95 | Analysis-turn p95 | 60 s cap | $/story (no pregen) | Full-turn median / p95 (no pregen) | Exception | Multiplayer p95 by players | Multiplayer |",
-    "|---|---|---|---|---|---|---|---|---|---|---|"
-  );
-  for (const [name, config] of all) {
-    const g = gates(config, configs.baseline);
-    const mp = Object.entries(g.multiplayer.byPlayers)
-      .map(([players, v]) => `${players}p ${secs(v.p95)} (base ${secs(v.baselineP95)})`)
-      .join("; ") || "–";
-    lines.push(
-      `| ${name} | ${usd(g.costCap.perStory)} | ${g.costCap.pass ? "pass" : "FAIL"} | ${secs(g.pregenTurn.beatOnlyP95)} | ${secs(g.pregenTurn.analysisTurnP95)} (${g.pregenTurn.source}) | ${g.pregenTurn.pass ? "pass" : "FAIL"} | ${usd(g.noPregen.perStory)} | ${secs(g.noPregen.median)} / ${secs(g.noPregen.p95)} | ${g.noPregen.exception ? "yes" : "no"} | ${mp} | ${g.multiplayer.verdict} |`
-    );
-  }
+    "These are readings, not verdicts: each is marked within or over, no arm is dropped, and the owner decides which reading applies.",
+    ...todaysProduction(stats, promptState),
+    ...renderPregenView(all, configs.baseline),
+    ...renderNoPregenView(all, configs.baseline),
+    ...renderMultiplayerView(all, configs.baseline),
+  ];
   if (configs.setupArms.length > 0) {
-    lines.push("", "**Setup gate** (median wait at most 1.5 × the baseline median; p95 alongside):", "", "| Setup arm | Median | p95 | Gate |", "|---|---|---|---|");
-    const baseMedian = configs.baseline.setup?.latency.p50;
-    for (const arm of configs.setupArms) {
-      const pass = arm.latency.p50 !== undefined && baseMedian !== undefined && arm.latency.p50 <= SETUP_WAIT_FACTOR * baseMedian;
-      lines.push(`| ${arm.armKey} | ${secs(arm.latency.p50)} | ${secs(arm.latency.p95)} | ${arm.baseline ? "baseline" : pass ? "pass" : "FAIL"} |`);
-    }
-    lines.push("", "**Per-story cost, setup arm × gameplay arm** (pregeneration on):", "");
-    lines.push(`| Setup \\ Gameplay | ${all.map(([name]) => name).join(" | ")} |`, `|---|${all.map(() => "---").join("|")}|`);
-    for (const setup of configs.setupArms) {
-      lines.push(`| ${setup.armKey} | ${all.map(([, config]) => usd(storyCost({ ...config, setup }).withPregen)).join(" | ")} |`);
-    }
+    lines.push(...renderSetupView(configs.setupArms, configs.baseline), ...renderSetupMatrix(configs.setupArms, all, configs.baseline));
   }
   return lines;
 }
@@ -437,7 +615,7 @@ export function renderResults(input: ResultsInput): string {
     for (const s of stats.filter((x) => x.promptState === promptState)) {
       const t = s.medianTokens;
       lines.push(
-        `| ${s.group} | ${s.armKey}${s.baseline ? " (baseline)" : ""} | ${s.calls} | ${pct(s.rates.repaired)} | ${pct(s.rates.refusal)} | ${pct(s.rates.length)} | ${pct(s.rates.rejectedParam)} | ${pct(s.rates.textAfterJson)} | ${pct(s.rates.junk)} | ${secs(s.latency.p50)} | ${secs(s.latency.p95)} | ${t.input} / ${t.cached} / ${t.cacheWrite} / ${t.output} / ${t.reasoning} | ${usd(s.costPerCall)} (${usd(s.uncachedCostPerCall)}) |`
+        `| ${s.group} | ${s.armKey}${s.baseline ? " (baseline)" : ""} | ${s.calls} | ${pct(s.rates.repaired)} | ${pct(s.rates.refusal)} | ${pct(s.rates.length)} | ${pct(s.rates.rejectedParam)} | ${pct(s.rates.textAfterJson)} | ${pct(s.rates.junk)} | ${secs(s.latency.p50)} | ${secs(s.latency.p95)} | ${t.input} / ${t.cached} / ${t.cacheWrite} / ${t.output} / ${t.reasoning} | ${usd(s.cost.billed.perCall)} (${usd(s.cost.uncached.perCall)}) |`
       );
     }
     lines.push(...renderValidityGate(stats, promptState));
@@ -456,7 +634,7 @@ export function renderResults(input: ResultsInput): string {
       }
       lines.push("");
     }
-    lines.push("### Views: single-player with pregeneration, without, and multiplayer", ...renderViews(stats, promptState));
+    lines.push("### Views: single-player with and without pregeneration, multiplayer, setup", ...renderViews(stats, promptState));
   }
   if (input.prose) {
     lines.push("", "## Prose aggregates (beats)", "", "| Arm | Beats | Distinct openings | Opens with \"You\" | Stock phrases / 1000 words |", "|---|---|---|---|---|");

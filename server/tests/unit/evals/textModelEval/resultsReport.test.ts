@@ -5,12 +5,20 @@ import {
   storyCost,
   weightedQuantile,
   type ArmStats,
+  type CostReading,
   type GameplayConfig,
 } from "../../../../src/evals/textModelEval/resultsReport.js";
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import type { CheckResult } from "../../../../src/evals/textModelEval/textChecks.js";
 import type { CaseTags } from "../../../../src/evals/textModelEval/cases.js";
 import { record, tags } from "./fixtures.js";
+
+const flat = (perCall: number, byPlayers: Record<number, number> = {}): CostReading => ({ perCall, byPlayers });
+
+/** The same per-call cost on both bases */
+function priced(perCall: number, byPlayers: Record<number, number> = {}): Pick<ArmStats, "cost"> {
+  return { cost: { billed: flat(perCall, byPlayers), uncached: flat(perCall, byPlayers) } };
+}
 
 function arm(overrides: Partial<ArmStats> = {}): ArmStats {
   return {
@@ -29,8 +37,7 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
     turnLatencies: [],
     latencyByPlayers: {},
     medianTokens: { input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0 },
-    costPerCall: 0.01,
-    uncachedCostPerCall: 0.01,
+    ...priced(0.01),
     ...overrides,
   };
 }
@@ -38,19 +45,24 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
 describe("storyCost", () => {
   it("counts 85/19/21 calls with pregeneration and 29/7/7 without, plus one setup", () => {
     const config: GameplayConfig = {
-      beat: arm({ costPerCall: 0.01 }),
-      switch: arm({ costPerCall: 0.002 }),
-      thread: arm({ costPerCall: 0.004 }),
-      setup: arm({ costPerCall: 0.1 }),
+      beat: arm(priced(0.01)),
+      switch: arm(priced(0.002)),
+      thread: arm(priced(0.004)),
+      setup: arm(priced(0.1)),
     };
-    const cost = storyCost(config);
+    const cost = storyCost(config, "billed");
     expect(cost.withPregen).toBeCloseTo(0.85 + 0.038 + 0.084 + 0.1);
     expect(cost.withoutPregen).toBeCloseTo(0.29 + 0.014 + 0.028 + 0.1);
   });
 
-  it("prices a single-player story from single-player calls when there are any", () => {
-    const config: GameplayConfig = { beat: arm({ costPerCall: 0.02, singlePlayerCostPerCall: 0.01 }) };
-    expect(storyCost(config).withPregen).toBeCloseTo(0.85);
+  it("prices by basis and by player count, falling back to the mean over all calls", () => {
+    const beat = arm({ cost: { billed: flat(0.02, { 1: 0.01, 3: 0.03 }), uncached: flat(0.04, { 1: 0.02 }) } });
+    const config: GameplayConfig = { beat, setup: arm(priced(0.1, { 3: 0.2 })) };
+    expect(storyCost(config, "billed").withPregen).toBeCloseTo(0.85 + 0.1);
+    expect(storyCost(config, "uncached").withPregen).toBeCloseTo(1.7 + 0.1);
+    expect(storyCost(config, "billed", 3).withoutPregen).toBeCloseTo(29 * 0.03 + 0.2);
+    // No 3-player uncached beat calls: the mean over all calls stands in
+    expect(storyCost(config, "uncached", 3).withoutPregen).toBeCloseTo(29 * 0.04 + 0.2);
   });
 });
 
@@ -83,7 +95,7 @@ describe("weightedQuantile", () => {
 
 describe("gates", () => {
   const baseline: GameplayConfig = {
-    beat: arm({ baseline: true, costPerCall: 0.01, latencyByPlayers: { 2: [30, 40], 3: [40, 50] } }),
+    beat: arm({ baseline: true, latencyByPlayers: { 2: [30, 40], 3: [40, 50] } }),
     switch: arm({ latency: { n: 2, p50: 4, p95: 5 } }),
     thread: arm({ latency: { n: 2, p50: 6, p95: 8 } }),
     setup: arm({ group: "setup", latency: { n: 2, p50: 40, p95: 50 } }),
@@ -102,15 +114,29 @@ describe("gates", () => {
     expect(gates({ ...baseline, beat, thread }, baseline).pregenTurn.analysisTurnP95).toBe(31);
   });
 
-  it("caps cost at the baseline's per-story cost", () => {
-    expect(gates({ ...baseline, beat: arm({ costPerCall: 0.009 }) }, baseline).costCap.pass).toBe(true);
-    expect(gates({ ...baseline, beat: arm({ costPerCall: 0.011 }) }, baseline).costCap.pass).toBe(false);
+  it("reads the cost cap on each basis against the baseline's figure on the same basis", () => {
+    // The baseline got cache hits: billed $0.006 per beat, $0.01 uncached
+    const cachedBaseline: GameplayConfig = { ...baseline, beat: arm({ ...baseline.beat, cost: { billed: flat(0.006), uncached: flat(0.01) } }) };
+    const { cost } = gates({ ...baseline, beat: arm(priced(0.008)) }, cachedBaseline);
+    expect(cost.billed).toMatchObject({ withinCap: false });
+    expect(cost.uncached).toMatchObject({ withinCap: true });
+    expect(cost.uncached.baselinePerStory).toBeGreaterThan(cost.billed.baselinePerStory);
   });
 
-  it("allows a setup up to 1.5 times the baseline median", () => {
-    const setup = (p50: number) => gates({ ...baseline, setup: arm({ group: "setup", latency: { n: 1, p50, p95: p50 } }) }, baseline).setup?.pass;
-    expect(setup(60)).toBe(true);
-    expect(setup(61)).toBe(false);
+  it("reads the setup cap (1.5x today's wait) on the median and on the p95", () => {
+    const setup = (p50: number, p95: number) => gates({ ...baseline, setup: arm({ group: "setup", latency: { n: 2, p50, p95 } }) }, baseline).setup;
+    expect(setup(60, 75)).toMatchObject({ medianWithinCap: true, p95WithinCap: true, baselineP95: 50 });
+    expect(setup(55, 80)).toMatchObject({ medianWithinCap: true, p95WithinCap: false });
+    expect(setup(61, 70)).toMatchObject({ medianWithinCap: false, p95WithinCap: true });
+  });
+
+  it("prices a multiplayer story at its player count, with and without multiplayer pregeneration", () => {
+    const beat = arm({ ...priced(0.01, { 1: 0.01, 2: 0.03 }), latencyByPlayers: { 1: [10], 2: [30] } });
+    const setup = arm({ group: "setup", ...priced(0.1, { 2: 0.12 }) });
+    const { multiplayer } = gates({ beat, setup }, baseline);
+    expect(Object.keys(multiplayer.costByPlayers)).toEqual(["2"]);
+    expect(multiplayer.costByPlayers[2].billed.withoutMpPregen).toBeCloseTo(29 * 0.03 + 0.12);
+    expect(multiplayer.costByPlayers[2].billed.withMpPregen).toBeCloseTo(85 * 0.03 + 0.12);
   });
 
   it("marks multiplayer pregeneration above +5 s and fails above 60 s", () => {
@@ -129,6 +155,18 @@ describe("gates", () => {
 });
 
 describe("computeArmStats", () => {
+  it("sums a call's attempts, so a re-send costs what production pays", () => {
+    const attempts = [
+      record({ jobKey: "a|arm|postfix|s1", caseId: "a", attempt: 1, final: false, jobFinal: false, outcome: "invalid-json", costUsd: 0.01 }),
+      record({ jobKey: "a|arm|postfix|s1", caseId: "a", attempt: 2, costUsd: 0.01 }),
+      record({ jobKey: "b|arm|postfix|s1", caseId: "b", costUsd: 0.01, players: 2 }),
+    ];
+    const [stats] = computeArmStats(attempts, new Map(), new Map([["a", tags()], ["b", tags()]]));
+    expect(stats.cost.billed.perCall).toBeCloseTo(0.015);
+    expect(stats.cost.billed.byPlayers).toEqual({ 1: 0.02, 2: 0.01 });
+    expect(stats.validity).toMatchObject({ calls: 2, firstAttemptValid: 1, validWithinRetries: 2 });
+  });
+
   it("takes the noise floor from the gap between baseline samples 1 and 2", () => {
     const checks = new Map<string, CheckResult>([
       ["o1", { checks: { paragraphs: true }, counts: {}, unknownIds: [] }],
