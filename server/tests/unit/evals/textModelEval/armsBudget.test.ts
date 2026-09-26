@@ -1,11 +1,9 @@
+import { armKey, makeArm, prodSiblingKey } from "../../../../src/evals/textModelEval/arms.js";
 import {
-  armKey,
   costFromUsage,
   estimateCall,
-  makeArm,
   MIN_MEASURED_RECORDS,
-  prodSiblingKey,
-} from "../../../../src/evals/textModelEval/arms.js";
+} from "../../../../src/evals/textModelEval/pricing.js";
 import {
   budgetCheck,
   resolveCaps,

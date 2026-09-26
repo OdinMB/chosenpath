@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { GameModes } from "core/types/index.js";
-import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/arms.js";
+import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import { requestFor } from "../../../../src/evals/textModelEval/variants.js";

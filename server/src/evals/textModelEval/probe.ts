@@ -8,8 +8,9 @@ import type { ReasoningEffort } from "shared/llm/textModelSettings.js";
 import { callMetricsFromCompletion, type CallMetrics } from "shared/llm/usageRecorder.js";
 import { contentFilterSchema } from "../../game/services/ContentFilterService.js";
 import { partialTemplateSchema } from "../../game/services/storyTextSteps.js";
-import { costFromUsage, makeArm } from "./arms.js";
+import { makeArm } from "./arms.js";
 import type { CallSpec, ExecutedCall } from "./executor.js";
+import { costFromUsage } from "./pricing.js";
 
 /*
  * Which request parameters and schemas the API accepts for Sol and Luna

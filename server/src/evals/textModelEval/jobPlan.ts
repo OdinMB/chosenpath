@@ -6,8 +6,6 @@ import {
   armsFor,
   baselineArm,
   chainKey,
-  estimateCall,
-  MIN_MEASURED_RECORDS,
   pipelinePlan,
   prodSiblingKey,
   type Arm,
@@ -16,6 +14,7 @@ import {
   type Stage,
 } from "./arms.js";
 import { caseStory, hashOrder, type EvalCase } from "./cases.js";
+import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
 import { usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
 import { requestFor, type RequestInput } from "./variants.js";
 
