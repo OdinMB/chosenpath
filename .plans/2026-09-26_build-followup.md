@@ -416,6 +416,26 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - The gap is mostly setup, and, as the Milestone 3 review corrects, mostly the estimator rather than the shorter rewrite. Estimates count prompt plus schema at 4 characters per token, and the setup schema bills at about 1.8, so each setup call reads about 6–7K input tokens low. Realistic uncached figures are about $1.7 (Sol) and $1.6 (gpt-4.1), and about $4.1 for Stage 4, over the cap as the plan expected (see Controversial Decisions). The zero-shot arm also drops the examples.
   - So the dry run fits the $4 cap in one invocation, although the real cost would not. The Runbook's six separate invocations are still the right order: one invocation would run both gpt-4.1 setup arms (priority 4) before the Luna turns (priority 2), because the runner runs setup before beats.
 - Milestone 3 (implementer): **Privacy page and AI transparency record: checked, no change.** No production model, feature, prompt, schema, default or data flow changed. The rewrite, the message shaping and the warm-first runner live in the eval harness. `storyTextRewrite/` sits beside the production services but has no production caller.
+- Milestone 3 (eval run): **Stage 4 smoke (Runbook step 2): all four calls valid, both GPT-6 calls wrote the cache, and the write covers the schema plus the fixed text.**
+  - **Before the smoke:** rule B12 now names the label the story state renders ("Can be adjusted anytime") instead of "changeable in beat resolutions" (3ef52b9). The free dry run still builds the Stage 4 row: 256 jobs, est $3.62.
+  - **The beat case:** `cont-6edd813c-t2-o0`: 1 player, game mode single-player, images on (template portraits), step 2 of 3 of a challenge thread.
+  - **The records** (first attempt each; no 400, no timeout, no retry):
+
+    | Arm | Case | Outcome | Input | Cached | Cache write | Reasoning | Output | Wait | Cost |
+    |---|---|---|---|---|---|---|---|---|---|
+    | `gpt-6-luna@medium/rewriteSlim` | `cont-6edd813c-t2-o0` | valid | 8,247 | 0 | 4,409 | 1,536 | 2,743 | 25.4 s | $0.0023 |
+    | `gpt-4.1-mini@t0.2/rewrite` | `cont-6edd813c-t2-o0` | valid | 8,938 | 0 | 0 | 0 | 1,586 | 11.6 s | $0.0061 |
+    | `gpt-6-sol@low/rewrite` | `setup-learn-lemonade` | valid | 18,192 | 0 | 18,094 | 54 | 5,263 | 65.6 s | $0.0981 |
+    | `gpt-4.1@t0.2/rewrite` | `setup-learn-lemonade` | valid | 18,193 | 0 | 0 | 0 | 3,338 | 26.1 s | $0.0631 |
+
+  - **The schema is in the cacheable prefix** (Run A's open question). The explicit breakpoint caches everything before the user message: the JSON schema and the fixed rules.
+    - Setup: input minus write is 98 tokens, which is the per-call message alone (483 bytes: the player count, the game mode and the premise). The fixed text is 25,834 bytes, about 5–6K tokens, so about 12K of the 18,094 written tokens is the schema. The probe measured production's 1-player setup schema at 13.6K; the rewrite's descriptions are shorter.
+    - Beat: input minus write is 3,838 tokens, which is the per-call message (18,603 bytes, 17,592 of them production's state) at 4.8 bytes per token. Production's prompt on the same case bills at the same rate: 37,581 bytes, about 7,840 tokens once the schema is taken out. So the 4,409 written tokens are the fixed text (5,006 bytes, about 1,040 tokens) plus the slim schema (about 3,330 tokens).
+  - **What that means for cost (DERIVED from the price table):** a warm Sol setup call reads about 18.1K tokens at $0.20/M instead of $2.00/M, so its input drops from about $0.036 to about $0.004 per call. The first call of a line pays a $0.009 write premium. Output then dominates, at about $0.05 per call. A warm Luna turn reads 53% of its input from the cache.
+  - **The rewrite is shorter on input:** Luna rewriteSlim 8,247 tokens against slim's 11,508 on the same case, and gpt-4.1-mini 8,938 against prod's 12,383 (both −28%). Setup is 18,192 against prod's 21,265 (−14%).
+  - **The estimator undercounts Sol setup,** as the review note said: $0.098 measured against $0.084 estimated. gpt-4.1 came in under its estimate ($0.063 against $0.079), because its output was shorter than the borrowed figure.
+  - **The smoke records are kept.** The four jobs count as finished, so invocation 1 plans 17 Sol calls and invocation 2 plans 87 Luna calls. If the default TTL expires before invocation 1, Sol's lemonade line writes a second time. The report's "writes per line" can then show 2 on that line, and the cause is the gap between runs, not a failed read.
+  - **Spend after the smoke:** Stage 4 $0.17 of $4, total $20.94 of $30. Dry run now: 252 jobs, est $3.45.
 
 ## Suggested Follow-Up Work
 
