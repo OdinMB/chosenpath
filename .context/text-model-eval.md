@@ -80,12 +80,14 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
     - 3–5 sentences per paragraph;
     - 3–4 *visible* shared and player stats plus any invisible ones.
   - The checkers follow the corrected rules: visible stat counts, and sacrifice and reward at exactly ±30. Endings are not held to three options, because the ending prompt asks for none.
+  - Paragraphs are split as the game shows them. `playerText.ts` copies the client's `normalizeStoryText` (`client/src/game/utils/storyTextProcessor.ts`), so a single newline starts a paragraph and an image line joins the paragraph after it. The paragraph, sentence and image-placement checks and the rating pages all use it. Keep it in step with the client function.
 - `--rating-page setup|turn --arms <baseline,cand1,…> [--items N] [--per-item K]`: a blind rating page.
   - An arm is `armKey` or `promptState:armKey`; the first arm is the baseline.
   - `--per-item K` shows the baseline plus K candidates per item. Every K-subset appears once per cycle, the least-shown first, so with 3 candidates, K = 2 and 9 items each candidate is on 6 items. The baseline's label also shifts once per cycle, so each pair meets it at every label. Subsets are handed out in stratum order (setup: player count first), so each candidate is spread over the strata; the page still shows the items in salted order. The repeated item keeps the arms of the item it repeats. Every arm still needs a usable sample 1 on a case for that case to qualify.
   - `--cases a,b,…` limits the regular items to those cases; the baseline-against-baseline control still comes from the other cases.
   - Post-fix pages need `--prompt-state postfix` (or `postfix:<armKey>` refs), because a bare arm key defaults to `prefix`.
   - `--preview` allows a single arm and shows a banner. `--preview --stored` builds a layout-only page from stored beats and custom-story setups, with no eval output needed.
+- `--rerender-page <pageId>`: renders the page of an existing key afresh from the stored outputs, after a rendering fix. The page id, items and labels stay the same, so ratings a browser has already saved still apply, and the key is not rewritten. It writes `rating/text-<kind>-<pageId>.html`, so rename it over the handed-out file.
 - `--score <ratings-export.json>`: scores an export against its answer key.
 
 **Budget** (owner, 2026-09-26).
@@ -186,4 +188,6 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - Waits count each attempt alone, not the re-sends in front of it. If re-sends pass about 1%, the 60 s gate should read the summed wait per call.
 - A call that hangs until the 300 s timeout is a transport failure. It is retried, left out of validity, and absent from every wait percentile. Round 1 had 4 such hangs in 714 Luna turn calls, so count them separately (`outcome` `timeout` in `calls.jsonl`).
 - Stage 3's full forms are Round 1's records, so the trimmed waits carry server drift; tokens and cost do not. Multiplayer trims are unit-tested but not measured, because Stage 3 turns run single-player only.
-- Round 1 (2026-09-26) ran the post-fix baseline ($4.03) and Stages 1–2 ($12.09). Total spend is $18.51. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_round1-report.md`. The rating pages are `rating/round1-setup.html` and `rating/round1-turns.html`; their keys are `keys/round1-*.json`.
+- Round 1 (2026-09-26) ran the post-fix baseline ($4.03) and Stages 1–2 ($12.09), $18.51 in total. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_round1-report.md`. The rating pages are `rating/round1-setup.html` and `rating/round1-turns.html`; their keys are `keys/round1-*.json`.
+- Until the Stage 3 run, the checks and pages split paragraphs on blank lines only. gpt-4.1-mini sometimes separates paragraphs with single newlines, so its post-fix paragraph and image-placement rates read low: 92.9% and 90.2%, now 100% and 96.4%. GPT-6 figures did not change. `round1-turns.html` was re-rendered with `--rerender-page`, and one option changed.
+- Stage 3 (2026-09-26) cost $2.26, which brings the total to $20.77. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage3-report.md`. The Round 2 turn page is `rating/round2-turns.html`, and its key is `keys/round2-turns-891345004e.json`. No Round 2 setup page was built.
