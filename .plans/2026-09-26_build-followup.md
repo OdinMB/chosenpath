@@ -269,7 +269,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Run A: **The 29–58 s gaps between local pregeneration files** (test plan §2.6) were not investigated. Today's text calls take about 10–17 s per turn, and pregeneration runs its options in parallel. Production `[TurnTiming]` lines will show the real pregeneration time.
 - Milestone 3 (implementer): **Two jobPlan test cases moved from commit 4 to commit 5.** Both are cache-line cases on split requests: one line for two cases with the same schema and fixed text, and separate lines for an image-on case and an ending. `planJobs` can plan a split request only from the Stage 4 matrix, which arrives in commit 5. Commit 4 carries the other half, "a production request has no cache line". The commit 5 case was proven able to fail by disabling the cache-line assignment.
 - Milestone 3 (implementer): **No visual check.** Nothing in this change touches the client or a rating page.
-- Milestone 3 (count fix): **No paid calls, and no Round 3 rebuild.** Both belong to the run that follows, as the task scoped it. There was no visual check either: nothing touches the client or a rating page.
+- Milestone 3 (count fix): **The build made no paid calls and didn't rebuild Round 3.** The task scoped both to the run that follows, which has started with the smoke (Borderline Insights). There was no visual check either: nothing touches the client or a rating page.
 
 ## User Input Needed
 
@@ -583,17 +583,35 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - Invocation 1, `--role beat --arms gpt-6-luna@medium/rewrite2Slim`: 88 jobs, est $0.24, at least 7 min.
   - Invocation 2, `--role setup --arms gpt-6-sol@low/rewrite2,gpt-6-sol@low/rewrite2ZeroShot`: 18 jobs, est $1.52 (with examples 9 for $0.82, without 9 for $0.70), at least 4 min.
   - Spend: $24.76 of $30, Stage 4 $3.99 of $4 (the dry run shows the default cap; the flag raises it to $6 for one `--run`).
-- Milestone 3 (count fix): **Budget arithmetic for the run (DERIVED).** $2.01 is left under the $6 cap.
-  - Luna turns: about $0.20, at Stage 4's measured $0.00225 per turn on replies only. The $0.24 estimate ignores caching.
-  - Sol setups: at the hand rate of $0.10 per reply, 18 cost $1.80. With Luna's estimate that is $2.04, $0.03 over. At Stage 4's measured replies-only costs with caching ($0.082 with examples, $0.075 without), they cost about $1.41, so about $1.6 in total.
-  - Hung calls are booked at their estimate: about $0.09 per Sol setup and $0.003 per Luna turn.
-  - Suggested order: Luna first, then check the Stage 4 spend plus 18 × $0.10 against $6 before the Sol invocation. A cap stop in it lands on the last setups without examples (3-player premises), since jobs run in plan order.
+- Milestone 3 (count fix): **Budget arithmetic for the run, after the smoke (DERIVED).** Stage 4 is at $4.10 by the ledger, so $1.90 is left under the $6 cap. The open work is 87 Luna turns and 17 Sol setups.
+  - Luna turns: about $0.20, at Stage 4's measured $0.00225 per turn on replies only. The dry run's estimate ignores caching.
+  - Sol setups: at the hand rate of $0.10 per reply, the 17 cost $1.70. With the Luna turns that makes $1.90, exactly what is left, with nothing for hangs. At Stage 4's measured replies-only costs with caching ($0.082 with examples, $0.075 without), they cost about $1.33, about $1.53 in total.
+  - Hung calls are booked at their estimate: about $0.09 per Sol setup and $0.003 per Luna turn. So every Sol hang takes about one setup's worth out of the room left.
+  - Suggested order: Luna first, then check the Stage 4 spend plus 17 × $0.10 against $6 before the Sol invocation. A cap stop in it lands on the last setups without examples (3-player premises), since jobs run in plan order. The raise stops at $6, so a stop there is final unless you approve more.
 - Milestone 3 (count fix): **The blank-item check over the existing records reproduces the Stage 4 report's hand count exactly.**
   - Luna medium rewriteSlim: 14 of 88 (13 blank interludes and 1 blank option).
   - Sol low rewrite: 2 of 9 (co-founders, animal rescue). Without examples: 1 of 9 (bounty hunters).
   - 0 on every other arm, Stages 0–3 included: slim 0 of 88, Sol prod 0 of 36, Sol minimal 0 of 9, gpt-4.1 prod 0 of 36, gpt-4.1 rewrite 0 of 11, gpt-4.1-mini rewrite 0 of 44.
   - In a re-render of `results.md` (scratchpad only; the one in `DOCS/` is untouched, and the next `--run` rewrites it with the check), the variant section flags Luna rewriteSlim 100% → 84.1% and Sol rewrite 100% → 77.8% lower. It shows rewriteZeroShot at 77.8% → 88.9% raw, since its reference has one sample.
 - Milestone 3 (count fix): **Privacy page and AI transparency record: checked, no change.** The count fix, the new variants and the blank check live only in the eval harness. No production prompt, schema, model or default changed.
+- Milestone 3 (count fix): **Stage 4b smoke (real calls): both replies valid and clean. The request shape works and the cache writes. The turn hung once before it answered.**
+  - **How it ran.** Two invocations from `server/`, each with `--stage 4 --prompt-state postfix --samples 1 --stage-cap 6 --over-target-reason "Owner approved 2026-09-26: fix the rewrite's forced counts, re-run Luna medium turns and Sol low setup"` and its own `--arms`. `budget-overrides.jsonl` has one entry per invocation, with its arms. The turn smoke (16:48 UTC) was already in the ledger when this session started. It came from an earlier attempt at this step that ended before it recorded anything. The job had finished, so I kept it and didn't run it again.
+  - **The turn case:** `cont-8988006e-t4-o1`. Story 8988006e turn 4 hung on 8 of its first 10 Stage 4 attempts. This case and `cont-8988006e-t4-o0` each hung 3 times on one sample and answered only on a 4th attempt.
+  - **The records:**
+
+    | Arm | Case | Attempt | Outcome | Input | Cached | Cache write | Reasoning | Output | Wait | Cost |
+    |---|---|---|---|---|---|---|---|---|---|---|
+    | `gpt-6-luna@medium/rewrite2Slim` | `cont-8988006e-t4-o1` | 1 | timeout | – | – | – | – | – | 300 s | $0.0029 (estimate) |
+    | `gpt-6-luna@medium/rewrite2Slim` | `cont-8988006e-t4-o1` | 2 | valid, `stop` | 10,297 | 4,660 | 0 | 1,812 | 3,353 | 31.8 s | $0.0023 |
+    | `gpt-6-sol@low/rewrite2` | `setup-kids-animal-rescue` (2 players) | 1 | valid, `stop` | 19,939 | 0 | 19,815 | 41 | 5,558 | 74.2 s | $0.1054 |
+
+  - **Caching.** The setup's first call wrote 19,815 of its 19,939 tokens: everything except the 124-token per-call message. The turn's first call hung, so it has no usage record. But its retry read 4,660 cached tokens. That is the whole v2 prefix: it is larger than any v1 line's write (3,748 to 4,628), and no other call is on its cache line (`f767cc22dfe5`). So the hung call wrote it, as Stage 4's ending line showed (DERIVED).
+  - **The replies (read from `outputs/`).**
+    - The turn has 3 options, 3 interludes, 2 show-don't-tell points and 4 facts. Nothing in it is blank. Its longest whitespace run is 11 characters. In the stored text, the model's indentation drifts after `plan`, but the JSON is well formed and parses as it should.
+    - The setup has 7 story elements with 3 facts each, 3 shared and 3 player stats with 3 effects each, and 7 thread types. Each player has 3 identities, 3 backgrounds and 3 outcomes (1 own plus 2 shared). Nothing in it is blank, and its longest whitespace run is 11.
+    - In `results.md`, both pass `noBlankItems`, `noWhitespacePadding` and every list-count check. The one miss is `noMetaWords` on the turn: its prose says "The milestone is concrete". That is one reply. v1 read 88.6% on that check and slim 90.9%.
+  - **The hang, which one call can't settle.** v2's first attempt on this case hung for 300 s, just as v1's first three did, and its second answered in 31.8 s. The full run (87 turns) is where the hang rate gets read.
+  - **Cost.** The smoke cost $0.11: $0.0052 for the turn, the hung call included at its estimate, and $0.1054 for the setup. $0.10 per setup holds as the rate to budget by hand. A line's first call pays the write premium: $0.0955 caching off, against a $0.091 estimate. Stage 4 is at $4.10 of the $6 raise, and the ledger total is $24.87 of $30. The dry run shows 104 Stage 4b jobs open (87 turns and 17 setups).
 
 ## Suggested Follow-Up Work
 
@@ -633,5 +651,5 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (planner): On adoption: move the message shaping to `shared/llm/` beside the factory, and decide an explicit cache TTL there (a production request-shape change, the owner's call).
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
-- Milestone 3 (count fix): **Run Stage 4b and rebuild Round 3 from it.** The worded counts, the arms, the blank check, the list-count checks and the padding reading are in the code. Run Luna medium `rewrite2Slim` (`--role beat --arms gpt-6-luna@medium/rewrite2Slim`), then Sol low (`--role setup --arms gpt-6-sol@low/rewrite2,gpt-6-sol@low/rewrite2ZeroShot`), each with `--stage 4 --stage-cap 6 --over-target-reason "…"` (Controversial Decisions). Then build the Round 3 page from `rewrite2Slim` against slim. In the report, read `noBlankItems` beside the list-count checks and `noWhitespacePadding`: a clean `noBlankItems` alone does not show the fix worked.
+- Milestone 3 (count fix): **Run Stage 4b and rebuild Round 3 from it.** The worded counts, the arms, the blank check, the list-count checks and the padding reading are in the code. Run Luna medium `rewrite2Slim` (`--role beat --arms gpt-6-luna@medium/rewrite2Slim`), then Sol low (`--role setup --arms gpt-6-sol@low/rewrite2,gpt-6-sol@low/rewrite2ZeroShot`), each with `--stage 4 --stage-cap 6 --over-target-reason "…"` (Controversial Decisions). Then build the Round 3 page from `rewrite2Slim` against slim. In the report, read `noBlankItems` beside the list-count checks and `noWhitespacePadding`: a clean `noBlankItems` alone does not show the fix worked. The smoke is done (Borderline Insights), and its two jobs count as finished, so the runs plan 87 turns and 17 setups. That leaves no room for hangs under the $6 raise at the hand rate ("Budget arithmetic for the run, after the smoke").
 - Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.
