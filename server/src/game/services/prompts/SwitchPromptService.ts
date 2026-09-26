@@ -5,6 +5,15 @@ import {
 } from "./StoryStatePromptService.js";
 import { GameModes } from "core/types/story.js";
 
+/** Closes the example output of every switch analysis after the opening multiplayer one. */
+const SWITCH_EXERCISE_REMINDER = `IMPORTANT:
+This whole exercise is ONLY about designing a sensible narrative structure. The output is NOT about what the player should do.
+The relevant questions are:
+- Given what has happened so far and the questions that the story wants to answer (for its ending), what could be the next thread (or set of threads)?
+- How much agency can we give the player over which outcome/question will be explored next?
+Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
+`;
+
 export class SwitchPromptService {
   private static readonly SECTIONS_GAME_STATE: SectionConfig = {
     gameMode: true,
@@ -51,7 +60,7 @@ export class SwitchPromptService {
     return `CONTEXT
 
 Beats
-are a narrative structure of 5-6 paragraphs of text (4-5 sentences each) followed by a decision that the player must make.
+are a narrative structure of 5-6 paragraphs of text (3-5 sentences each) followed by a decision that the player must make.
 Beats are the smallest narrative unit that in the game.
 
 Threads
@@ -149,7 +158,7 @@ Switch 1:
 
 If the game mode is cooperative or cooperative-competitive, the first thread should be about a cooperative shared outcome. If the game mode is competitive, the first thread must be about a contested shared outcome.
 `;
-    } else {
+    } else if (story.isMultiplayer()) {
       instructions += `Coordination pattern: player1 and player2 will be in a grouped thread (and get a flavor switch). player3 will get a topic switch to decide if they want to join player1 and player2's thread or play a separate thread.
 
 Switch 1:
@@ -164,13 +173,16 @@ Switch 2:
 - Topic choices: 3 directions, including an option to join the grouped thread with player1 and player2
 - Players: player3
 
-IMPORTANT:
-This whole exercise is ONLY about designing a sensible narrative structure. The output is NOT about what the player should do.
-The relevant questions are:
-- Given what has happened so far and the questions that the story wants to answer (for its ending), what could be the next thread (or set of threads)?
-- How much agency can we give the player over which outcome/question will be explored next?
-Don't make ANY assessment as to what the player should do to achieve their goals. It doesn't matter what would be sensible or rational for the player to do. That's for the player to decide.
-`;
+${SWITCH_EXERCISE_REMINDER}`;
+    } else {
+      instructions += `Coordination pattern: Single-player story: player1 gets one switch.
+
+Switch 1:
+- Type: Topic switch (Justification: Nothing forces the focus of the next thread, so the player chooses it)
+- Topic choices: 3 directions, each pushing a different outcome/question
+- Players: player1
+
+${SWITCH_EXERCISE_REMINDER}`;
     }
     instructions +=
       "\nAlso consider the SWITCH/THREAD INSTRUCTIONS that are specific to this story.\n";

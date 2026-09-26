@@ -46,14 +46,25 @@ describe("checkBeatSet", () => {
   it("flags option count, a second sacrifice, and the wrong option type for a challenge thread", () => {
     const inThread = Story.create({ ...story.getState(), storyPhases: [threadAnalysis("challenge", 2, 0)] });
     const options = challengeOptions();
-    options[0] = { ...options[0], resourceType: "sacrifice", basePoints: 25 };
-    options[1] = { ...options[1], resourceType: "reward", basePoints: -25 };
+    options[0] = { ...options[0], resourceType: "sacrifice", basePoints: 30 };
+    options[1] = { ...options[1], resourceType: "reward", basePoints: -30 };
     const twoTradeOffs = checkBeatSet(beatSet(1, { player1: beatGeneration({ options }) }), inThread);
     expect(twoTradeOffs.checks).toMatchObject({ atMostOneSacrificeOrReward: false, optionType: true, basePoints: true });
     const exploration = checkBeatSet(beatSet(1), inThread);
     expect(exploration.checks.optionType).toBe(false);
     const two = checkBeatSet(beatSet(1, { player1: beatGeneration({ options: challengeOptions().slice(0, 2) }) }), inThread);
     expect(two.checks.threeOptions).toBe(false);
+  });
+
+  it("wants a sacrifice option at exactly the fixed sacrifice bonus", () => {
+    const inThread = Story.create({ ...story.getState(), storyPhases: [threadAnalysis("challenge", 2, 0)] });
+    const withSacrifice = (basePoints: number) => {
+      const options = challengeOptions();
+      options[0] = { ...options[0], resourceType: "sacrifice", basePoints };
+      return checkBeatSet(beatSet(1, { player1: beatGeneration({ options }) }), inThread).checks.basePoints;
+    };
+    expect(withSacrifice(25)).toBe(false);
+    expect(withSacrifice(30)).toBe(true);
   });
 
   it("counts interludes", () => {

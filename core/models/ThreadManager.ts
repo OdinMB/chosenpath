@@ -359,10 +359,11 @@ export class ThreadManager {
       // Get the beat history for this player
       const beatHistory = playerState.beatHistory || [];
 
-      // Find the beats that belong to this thread
-      // This is a simplification - in a real implementation, you would need to
-      // match beats to thread steps more precisely
-      result[playerSlot] = beatHistory.slice(-thread.duration);
+      // The thread's beats, counted from its first beat (index i is step i)
+      result[playerSlot] = beatHistory.slice(
+        thread.firstBeatIndex,
+        thread.firstBeatIndex + thread.duration
+      );
     });
 
     return result;

@@ -10,6 +10,7 @@ import {
 } from "./change.js";
 import { imageRequestSchema } from "./image.js";
 import { Resolution } from "./thread.js";
+import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "../config.js";
 
 export const OPTION_RISK_TYPES = ["normal", "safe", "risky"] as const;
 export type OptionRiskType = (typeof OPTION_RISK_TYPES)[number];
@@ -52,9 +53,9 @@ const optionChallengeSchema = z
     basePoints: z
       .number()
       .describe(
-        "For normal resource types: +5 to -10 depending on how much sense this option makes for achieving a favorable result / winning the contest. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15.\n" +
-          "For sacrifice resource types: +20 to +30 depending on how much is sacrificed and how much sense this option makes for achieving a favorable result / winning the contest.\n" +
-          "For reward resource types: -20 to -30 depending on how much is gained and how much sense this option makes for achieving a favorable result / winning the contest."
+        "For normal resource types: +5 to -15 depending on how much sense this option makes for achieving a favorable result / winning the contest. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15.\n" +
+          `For sacrifice resource types: always +${POINTS_FOR_SACRIFICE}.\n` +
+          `For reward resource types: always ${POINTS_FOR_REWARD}.`
       ),
     modifiersToSuccessRate: z
       .array(
@@ -220,7 +221,7 @@ export const createBeatGenerationSchema = (
         ". No other images exist.\n" +
         "--- Add the tags at the beginning of the paragraph that you want to show the image in.\n" +
         "--- A good distribution is to have one image tag right before the first paragraph and one on the third or fourth paragraph. Avoid using image tags in or right in front of the last paragraph.\n" +
-        "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written. Feel free to use images of other players who are part of this beat.\n" +
+        "--- For player characters, use ids player1, player2, etc. Don't use images of the player for whom this beat is written, except in the first beat of the story. Feel free to use images of other players who are part of this beat.\n" +
         (generateImages
           ? "--- If you requested an image to be generated for this beat, you must use it in this beat. (For the image tag: the source of requested images is 'story'.) Use it relatively late in the beat text (third or fourth paragraph). That way, we buy some time for the image generation to finish.\n"
           : "")
@@ -268,7 +269,7 @@ export const createBeatGenerationSchema = (
     interludes: z
       .array(interludeSchema)
       .describe(
-        'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Hint at interesting details without spelling them out. Make the player wonder what else is going on in the world. (Example: "The Guild Hall is across the dry canal" makes the player wonder: Why is the canal dry?)\n- If images are disabled for this story, only create the first interlude.'
+        'A total of exactly 3 snippets that will be shown to the player while the new beat is being generated.\n- 1 thought that goes through the mind of the character for whom this beat is written using first-person stream of throught (imageId = player slot)\n- 1-2 facts about story elements that are relevant in the beat (imageId = story element id)\n- 0-1 a general detail about the world (imageId = "cover"). Hint at interesting details without spelling them out. Make the player wonder what else is going on in the world. (Example: "The Guild Hall is across the dry canal" makes the player wonder: Why is the canal dry?)\n- Create all 3 even if images are disabled for this story (leave imageId empty and set imageSource to \'none\').'
       ),
   });
 };

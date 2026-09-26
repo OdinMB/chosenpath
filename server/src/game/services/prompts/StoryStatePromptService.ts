@@ -201,7 +201,7 @@ ${modeDescriptions[story.getGameMode()]}
     if (!story.isFirstBeat()) {
       text +=
         " Don't use a player's own image in beats for that player (except for interludes).";
-      if (!story.isMultiplayer()) {
+      if (story.isMultiplayer()) {
         text +=
           " Do show other players' images in beats with other players, though.";
       }
@@ -545,7 +545,7 @@ ${modeDescriptions[story.getGameMode()]}
     if (type === "current") {
       threadAnalysis = story.getCurrentThreadAnalysis();
     } else {
-      threadAnalysis = story.getPreviousThreadAnalysis();
+      threadAnalysis = story.getResolvedThreadAnalysis();
     }
 
     if (!threadAnalysis) {
@@ -911,7 +911,10 @@ ${modeDescriptions[story.getGameMode()]}
     const sharedStatValues = state.sharedStatValues;
     const playerStats = state.playerStats;
 
-    const showAdjustmentsAfterThreads = story.getCurrentBeatType() === "switch";
+    // Switches and the ending narrate a resolved thread
+    const showAdjustmentsAfterThreads =
+      story.getCurrentBeatType() === "switch" ||
+      story.getCurrentBeatType() === "ending";
     const sections: string[] = [];
 
     // Shared stats with values

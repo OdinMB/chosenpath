@@ -7,6 +7,7 @@ import type {
   ThreadAnalysis,
 } from "core/types/index.js";
 import { getThreadType } from "core/types/thread.js";
+import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import type { SetupInput } from "./variants.js";
 
 /*
@@ -64,11 +65,12 @@ const META_WORDS =
 const PAST_MARKERS = /\b(was|were|had|did)\b/gi;
 const PRESENT_MARKERS = /\b(is|are|has|does)\b/gi;
 
+/** The prompt's rule: normal +5 to -15; sacrifice and reward exactly the game's fixed bonus and malus. */
 function basePointsInRange(option: BeatOption): boolean {
   if (option.optionType !== "challenge") return true;
   const { basePoints, resourceType } = option;
-  if (resourceType === "sacrifice") return basePoints >= 20 && basePoints <= 30;
-  if (resourceType === "reward") return basePoints >= -30 && basePoints <= -20;
+  if (resourceType === "sacrifice") return basePoints === POINTS_FOR_SACRIFICE;
+  if (resourceType === "reward") return basePoints === POINTS_FOR_REWARD;
   return basePoints >= -15 && basePoints <= 5;
 }
 

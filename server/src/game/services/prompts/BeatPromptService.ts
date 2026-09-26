@@ -34,11 +34,11 @@ export class BeatPromptService {
       // thread configuration for thread beats
       threadConfigurationForThreadBeats:
         story.getCurrentBeatType() === "thread",
-      // previous thread to continue from
+      // the resolved thread that this beat narrates
       threadConfigurationForSwitchBeats:
         (story.getCurrentBeatType() === "switch" ||
           story.getCurrentBeatType() === "ending") &&
-        story.getPreviousThreadAnalysis() !== null,
+        story.getResolvedThreadAnalysis() !== null,
     } as const;
   }
 
@@ -46,7 +46,9 @@ export class BeatPromptService {
     // Create a copy of SECTIONS_GAME_STATE and set outcomes based on beat type
     const sections = {
       ...this.SECTIONS_GAME_STATE,
-      outcomes: story.getCurrentBeatType() === "switch",
+      outcomes:
+        story.getCurrentBeatType() === "switch" ||
+        story.getCurrentBeatType() === "ending",
     };
 
     const prompt =
@@ -86,7 +88,7 @@ ${
   story.getCurrentBeatType() !== "ending"
     ? "\nSwitches\nare a narrative structure of exactly 1 beat. Their main purpose is to give the player agency over the direction of the story." +
       (story.getCurrentBeatType() === "switch"
-        ? "There are two types of switches: topic switches and flavor switches.\n" +
+        ? "\nThere are two types of switches: topic switches and flavor switches.\n" +
           "Topic switches: The player can choose which question is going to be addressed in the next thread.\n" +
           "- Example: A player might choose between exploring the wastelands (pushing the outcome 'Does [insert player name] unravel [mystery]?') and attending a meeting of the resistance (pushing the outcome 'Will the resistance be able to take over [city]?').\n" +
           "Flavor switches: When the focused outcome for the next thread is already defined, the player can still choose the style of the thread.\n" +
@@ -94,7 +96,9 @@ ${
         : "") +
       "\n\nStory structure\n" +
       "A story follows the following structure: Switch, Thread, Switch, Thread, ..., Ending.\n" +
-      "It is time to create the next switch to this sequence.\n"
+      (story.getCurrentBeatType() === "thread"
+        ? "It is time to create the next beat of the current thread.\n"
+        : "It is time to create the next switch to this sequence.\n")
     : ""
 }
 How beats work mechanically:
@@ -176,9 +180,7 @@ ${
       "- There should always be clear narrative feedback for players' decisions." +
       (story.getCurrentBeatType() == "switch"
         ? "\n- Since a thread was just resolved, describe the resolution of the thread in detail. Focus on the milestones that were added to outcomes and how that affects the player" +
-          story.isMultiplayer()
-          ? " (and other players)."
-          : "."
+          (story.isMultiplayer() ? " (and other players)." : ".")
         : "")
 }
 
@@ -248,7 +250,6 @@ ${
       (story.getCurrentBeatType() === "thread"
         ? ", especially the plan for the thread's progression?"
         : "?") +
-      "?" +
       (story.getCurrentBeatType() === "thread"
         ? "\n- The options must answer the question posed in the step in the beat progression that must be implemented with this beat." +
           "\n- Choose the right option type: Exploration threads require Exploration options, Challenge threads require Challenge options, and Contest threads also require Challenge options." +
@@ -431,16 +432,16 @@ Options
 - Offer exactly 3 options.
 - Make sure that the beat implements the current ${story.getCurrentBeatType()} configuration.${
       story.getCurrentBeatType() === "thread"
-        ? "--- Only offer options that answer the question that is posed in this step of the thread progression.\n" +
-          "--- Avoid offering options that are similar to options that were already offered to the player during this thread.\n"
+        ? "\n--- Only offer options that answer the question that is posed in this step of the thread progression.\n" +
+          "--- Avoid offering options that are similar to options that were already offered to the player during this thread."
         : story.getCurrentBeatType() === "switch"
-        ? "--- Don't offer options for the upcoming thread that are similar to the previous threads."
+        ? "\n--- Don't offer options for the upcoming thread that are similar to the previous threads."
         : ""
     }
 --- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${story.getCurrentBeatType()} in any other way.${
       story.isMultiplayer()
-        ? "- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
-          "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this.\n"
+        ? "\n- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
+          "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this."
         : ""
     }
 - Be specific.

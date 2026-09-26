@@ -1,7 +1,18 @@
 import { jest } from "@jest/globals";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes, createStorySetupSchema } from "core/types/index.js";
+import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import { StorySetupPromptService } from "../../../../../src/game/services/prompts/StorySetupPromptService.js";
+import { BeatPromptService } from "../../../../../src/game/services/prompts/BeatPromptService.js";
+import { SwitchPromptService } from "../../../../../src/game/services/prompts/SwitchPromptService.js";
+import { ThreadPromptService } from "../../../../../src/game/services/prompts/ThreadPromptService.js";
+import {
+  firstSwitchBeat,
+  laterSwitchBeat,
+  switchAnalysisAfterThread,
+  threadAnalysisAfterSwitch,
+  threadBeat,
+} from "../../../../helpers/promptStories.js";
 
 /*
  * Guards the resolved prompt contradictions (Milestone 2, test plan A7):
@@ -37,6 +48,16 @@ const TEXTS: [string, () => string][] = [
   ],
   ["story setup schema", () => schemaText(createStorySetupSchema(1, "story"))],
   ["template setup schema", () => schemaText(createStorySetupSchema(2, "template"))],
+  ["beat prompt, first beat", () => BeatPromptService.createBeatPrompt(firstSwitchBeat(1, { generateImages: true }))],
+  ["beat prompt, single-player thread beat", () => BeatPromptService.createBeatPrompt(threadBeat(1))],
+  ["beat prompt, multiplayer thread beat", () => BeatPromptService.createBeatPrompt(threadBeat(2))],
+  ["beat prompt, multiplayer switch beat", () => BeatPromptService.createBeatPrompt(laterSwitchBeat(2))],
+  ["switch analysis, single-player", () => SwitchPromptService.createSwitchAnalysisPrompt(switchAnalysisAfterThread(1))],
+  ["switch analysis, multiplayer", () => SwitchPromptService.createSwitchAnalysisPrompt(switchAnalysisAfterThread(3))],
+  ["thread analysis, single-player", () => ThreadPromptService.createThreadPrompt(threadAnalysisAfterSwitch(1))],
+  ["thread analysis, multiplayer", () => ThreadPromptService.createThreadPrompt(threadAnalysisAfterSwitch(2))],
+  ["beat schema, images on", () => schemaText(createSetOfBeatGenerationSchema(2, true, true, true, true))],
+  ["beat schema, images off", () => schemaText(createSetOfBeatGenerationSchema(1, false, false, false, false))],
 ];
 
 beforeEach(() => {

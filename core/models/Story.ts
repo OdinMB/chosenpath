@@ -239,6 +239,17 @@ export class Story {
     return null;
   }
 
+  /**
+   * The thread analysis whose resolution the current beat narrates: at the
+   * ending the current one (just resolved), otherwise the previous one.
+   */
+  getResolvedThreadAnalysis(): ThreadAnalysis | null {
+    if (this.getCurrentBeatType() === "ending") {
+      return this.getCurrentThreadAnalysis();
+    }
+    return this.getPreviousThreadAnalysis();
+  }
+
   // Beat types and turn management
   getCurrentBeatType(): BeatType {
     return this.threadManager.getCurrentBeatType(this.state);
