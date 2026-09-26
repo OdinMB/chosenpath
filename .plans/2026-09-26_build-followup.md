@@ -206,6 +206,10 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - The judgement call: no code change. Commit 1 moved `estimateCall` verbatim, and a schema-density fix would change every earlier stage's estimates and reservations. I added a Runbook note in step 3 of the Stage 4 plan instead: before invocation 4, check the Stage 4 spend plus 18 × about $0.09 against $4 by hand, shrink to 6 premises if Stage 4 spend is above about $2.35, and use measured costs for invocations 5 and 6.
   - With 6 calls in flight, a setup invocation can pass a cap by up to about $0.1. `.context/text-model-eval.md` now says so, instead of "parallel calls cannot overshoot" and "reservations stay safe".
   - Two corrections to earlier entries: the Stage 4 dry-run gap (Borderline Insights) is mostly this undercount, not the shorter rewrite; and Stage 3's 13% setup overrun (Implementation Issues, "Estimates") came from it too, not from the output borrowing. The estimator fix is under Suggested Follow-Up Work.
+- Milestone 3 (eval run): **Round 3 items avoid every case on the Round 1 and Round 2 turn pages, so the page holds only plain mid-thread turns.** `--cases` was limited to the 18 single-player turn cases that neither earlier key names. All 44 single-player cases have a usable sample 1 on both `gpt-6-luna@medium/slim` and `gpt-6-luna@medium/rewriteSlim`, and 26 of them were on an earlier page.
+  - The price: every single-player first beat (3), ending (3) and analysis turn (11) was already on Round 1 or Round 2, so none is on Round 3. The rewrite's first-beat, later-switch and ending instructions (table B rows B13 and B23–B25) get no rating. The automatic checks are their only reading.
+  - The 8 items: 4 from story 8988006e, 2 from 6edd813c, 1 from 2ee343b6 and 1 image-off synthetic turn from 7492b211. 6 show images and 2 don't. The control (slim against slim, samples 1 and 2) is on `cont-8988006e-t2-o0`, which was on neither earlier page either.
+  - The fallback (re-admit Round 1 cases if fewer than 9 qualified) was not needed, so I did not use it. Re-admitting Round 1's first beats and endings would have covered those branches, at the price of showing the owner cases a second time.
 
 ## Skipped Items
 
@@ -288,6 +292,9 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - gpt-4.1 setup on the other 3 premises plus the open job without examples (about $0.45).
     
     Raising the Stage 4 cap takes `--over-target-reason`, and that is your call. Fixing the enforced-count loop first would make those runs cheaper and their reading cleaner.
+- Milestone 3 (eval run): **Rate Round 3 after Rounds 1 and 2:** `DOCS/2026-09-26_gpt6-text-eval/rating/round3-turns.html`. It has 10 items (8 regular, a repeat and a control), 2 options each, about 20 minutes.
+  - The export downloads as `ratings-text-turn-291fb89390.json`. Hand it to the next session for `--score`. It finds the renamed key `keys/round3-turns-291fb89390.json` by its page id (checked with a test export).
+  - One of the two versions sometimes leaves an interlude empty. The page shows it as a blank bullet, as the game would show a blank interlude slide. The Borderline Insights entry "empty interludes" names the arm, so read it after rating if you want Round 3 blind.
 
 ## Implementation Issues
 
@@ -483,6 +490,23 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - With no `maxTokens`, GPT-6's output limit lets a loop outlast the 300 s timeout.
     - A replay of a few hung cases with `max_completion_tokens` set would show where the loop starts. If this reading holds, the count enforcement, or the counts' removal from the descriptions, needs revisiting before any adoption.
   - No 400s, and no invalid replies other than the 3 runaways.
+- Milestone 3 (eval run): **Round 3 page (Runbook step 5): built, and checked in the browser.**
+  - From `server/`: `npm run eval:text -- --rating-page turn --prompt-state postfix --arms gpt-6-luna@medium/slim,gpt-6-luna@medium/rewriteSlim --items 8 --cases <the 18 cases>` (Controversial Decisions has the selection). Free: it reads stored outputs only.
+  - Page id `291fb89390`. The page is renamed to `rating/round3-turns.html`, and the key to `keys/round3-turns-291fb89390.json`. All 8 items qualified and the planner wrote no notes. The baseline (slim) sits at A on 4 items and at B on 4.
+  - The Playwright check served `rating/` only (not `keys/`) on 127.0.0.1:
+    - desktop (1440) and mobile (390) widths, with no horizontal scroll;
+    - `n` and `p`, and typing n and p into a note does not navigate;
+    - one item rated with a note, then exported: the download was `ratings-text-turn-291fb89390.json` and held that rating;
+    - a reload restored the ratings, the note, the current item and the last-export time;
+    - console: only the test server's favicon 404. The page made one request, itself.
+  - `--score` on that export found the renamed key. Then I removed the test rating from the browser's storage, deleted the test scores and the export, stopped the server, closed the browser, and deleted this run's `.playwright-mcp/` files. The Jump-to menu was not exercised.
+- Milestone 3 (eval run): **Empty interludes: the enforced interlude count shows in the rewrite's output (read this after rating Round 3 if you want it blind).**
+  - 12 of 88 `gpt-6-luna@medium/rewriteSlim` outputs have an interlude with empty text (13 interludes in all), most with an empty `imageId` and source `none`. Slim has none in 88.
+  - Table BS enforces exactly 3 interludes, while rule B32 asks for 1 player interlude, 1–2 about elements and 0–1 world detail, which allows 2. When the model wants 2, it pads a blank third one.
+  - This is the same mechanism as gpt-4.1's facts runaways: Luna escapes with an empty string instead of whitespace. It supports the reading that the enforced counts need revisiting.
+  - No automatic check flags an empty interlude, so validity and the checks read 100% on it. The game would show a blank interlude slide (`Interlude.tsx` renders `text || ""`).
+  - On the Round 3 page, the rewrite's option carries it on 3 of the 8 regular items and on the repeat, so a rater can learn to spot the rewrite.
+  - The page also shows one rewrite option as a single four-sentence paragraph (536 characters). That fits the variant section: rewriteSlim's paragraph check falls from 97.7% to 88.6%, and its prose from 334 to 259 words.
 
 ## Suggested Follow-Up Work
 
