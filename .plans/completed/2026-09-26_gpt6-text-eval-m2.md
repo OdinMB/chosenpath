@@ -1,7 +1,7 @@
 # GPT-6 text eval, Milestone 2: prompt-bug fixes on today's models, the new budget, and every gate reading in the report
 
 - **Date**: 2026-09-26
-- **Status**: draft
+- **Status**: implemented
 - **Type**: bugfix (dominant: the production prompt fixes; the harness items are small features, planned with a balanced lean)
 - **Complexity**: complex
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
