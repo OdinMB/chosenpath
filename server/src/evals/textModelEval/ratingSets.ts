@@ -33,6 +33,8 @@ export type RatingSpec = {
    * candidate appears about equally often; every candidate when unset.
    */
   perItem?: number;
+  /** Regular items come only from these cases (the control item may use any other) */
+  caseIds?: string[];
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -140,6 +142,7 @@ function qualifying(spec: RatingSpec, records: CallRecord[], cases: EvalCase[]):
   return cases.filter(
     (c) =>
       c.role === groupOf(spec.kind) &&
+      (!spec.caseIds || spec.caseIds.includes(c.id)) &&
       spec.arms.every((arm) => findOutput(records, spec.kind, { ...arm, sample: 1, caseId: c.id }))
   );
 }

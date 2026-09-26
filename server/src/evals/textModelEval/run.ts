@@ -33,7 +33,7 @@ import { PRE_FIX_PROMPT_STATE } from "./variants.js";
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
  *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses "prefix": Run A recorded it)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--preview [--stored]]
- *     (--per-item K: the baseline plus K rotating candidates per item)
+ *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items)
  *   --score <export.json>
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
@@ -452,7 +452,7 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
   if (arms.length === 0) throw new UsageError("--rating-page needs --arms <baseline,candidate,…>.");
   if (arms.length === 1 && !args.preview) throw new UsageError("A real rating page needs at least two arms (or --preview).");
   const { set, key } = planRatingSet(
-    { kind, arms, items: args.items ?? DEFAULT_ITEMS[kind], preview: args.preview, perItem: args.perItem },
+    { kind, arms, items: args.items ?? DEFAULT_ITEMS[kind], preview: args.preview, perItem: args.perItem, caseIds: args.caseIds },
     records,
     cases,
     { loadOutput, salt: crypto.randomBytes(16).toString("hex"), now: new Date() }

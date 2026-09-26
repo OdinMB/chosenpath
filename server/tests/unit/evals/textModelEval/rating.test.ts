@@ -133,6 +133,21 @@ describe("planRatingSet: rotating candidates (perItem)", () => {
     expect(Object.keys(repeat?.labels ?? {})).toHaveLength(3);
   });
 
+  it("picks regular items only from caseIds, and the control from the other cases", () => {
+    const { cases, records, load } = fixture([BASELINE, LUNA, SOL], 10);
+    const chosen = ["setup-case-1", "setup-case-4", "setup-case-7"];
+    const { key } = planRatingSet(
+      { kind: "setup", arms: ARMS, items: 9, preview: false, caseIds: chosen },
+      records,
+      cases,
+      { loadOutput: load, salt: "chosen", now: new Date(0) }
+    );
+    const items = Object.values(key.items);
+    expect(items.filter((i) => !i.control).every((i) => chosen.includes(i.caseId))).toBe(true);
+    expect(items.filter((i) => !i.control && !i.repeatOf)).toHaveLength(3);
+    expect(chosen).not.toContain(items.find((i) => i.control)?.caseId);
+  });
+
   it("shows every arm on every item when perItem is unset or covers all candidates", () => {
     const { set } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 6, 3);
     expect(set.items.filter((i) => i.options.length === 4)).toHaveLength(set.items.length - 1);
