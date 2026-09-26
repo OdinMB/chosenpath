@@ -16,6 +16,9 @@ import {
   trimmedSwitchRequest,
   trimmedThreadRequest,
 } from "../../game/services/storyTextTrims.js";
+import { rewriteBeatRequest, type RewriteScaffold } from "../../game/services/storyTextRewrite/beat.js";
+import type { SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
+import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -29,11 +32,30 @@ import {
  *   Stage 3 drop: also showDontTell and the options check in beats, the
  *   per-player analysis and restated lists in the switch, the restated lists
  *   in the thread, and the character-selection plan in setup.
- * Stage 4's rewrite comes next; the request type will then widen to messages.
+ * The Stage 4 rewrite (storyTextRewrite/) sends split requests: fixed rules
+ * as a first, cacheable message, then the per-call part:
+ * - "rewrite": single-player beats on production's full planning fields, and
+ *   custom-story setup with production's example stat setups;
+ * - "rewriteSlim": single-player beats on Stage 3's slim planning fields;
+ * - "rewriteZeroShot": custom-story setup without the examples.
  */
 
-export type VariantId = "prod" | "slim" | "minimal";
-export const VARIANTS: VariantId[] = ["prod", "slim", "minimal"];
+export type VariantId = "prod" | "slim" | "minimal" | "rewrite" | "rewriteSlim" | "rewriteZeroShot";
+export const VARIANTS: VariantId[] = ["prod", "slim", "minimal", "rewrite", "rewriteSlim", "rewriteZeroShot"];
+
+/** What a variant sends: one user message (production's shape), or fixed rules then a per-call message. */
+export type EvalRequest = TextRequest | SplitTextRequest;
+
+export function isSplitRequest(request: EvalRequest): request is SplitTextRequest {
+  return "fixed" in request;
+}
+
+export const MESSAGE_SEPARATOR = "\n\n----- per-call message -----\n\n";
+
+/** The request's text as one string: for prompt storage, hashing and size estimates. */
+export function requestText(request: EvalRequest): string {
+  return isSplitRequest(request) ? `${request.fixed}${MESSAGE_SEPARATOR}${request.perCall}` : request.prompt;
+}
 
 /**
  * Prompt states tag which version of the production prompt code a run
@@ -118,12 +140,27 @@ function minimalRequest(input: RequestInput): TextRequest {
   }
 }
 
-const BUILDERS: Record<VariantId, (input: RequestInput) => TextRequest> = {
+/** A Stage 4 variant: its setup builder (with or without examples) and its beat scaffold, where it covers them. */
+function rewriteVariant(variant: VariantId, covers: { setupWithExamples?: boolean; beat?: RewriteScaffold }) {
+  return (input: RequestInput): SplitTextRequest => {
+    if (input.role === "setup" && covers.setupWithExamples !== undefined) {
+      const { premise, playerCount, gameMode, maxTurns } = input.setup;
+      return rewriteSetupRequest(premise, playerCount, gameMode, maxTurns, covers.setupWithExamples);
+    }
+    if (input.role === "beat" && covers.beat) return rewriteBeatRequest(input.story, covers.beat);
+    throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  };
+}
+
+const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
   minimal: minimalRequest,
+  rewrite: rewriteVariant("rewrite", { setupWithExamples: true, beat: "full" }),
+  rewriteSlim: rewriteVariant("rewriteSlim", { beat: "slim" }),
+  rewriteZeroShot: rewriteVariant("rewriteZeroShot", { setupWithExamples: false }),
 };
 
-export function requestFor(variant: VariantId, input: RequestInput): TextRequest {
+export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {
   return BUILDERS[variant](input);
 }

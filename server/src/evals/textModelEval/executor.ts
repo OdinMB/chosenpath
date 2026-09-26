@@ -1,17 +1,22 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { createChatModel } from "shared/llm/chatModel.js";
+import { ChatMessage, HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { createChatModel, modelFamily } from "shared/llm/chatModel.js";
 import { callMetricsFromCompletion, type CallMetrics } from "shared/llm/usageRecorder.js";
-import type { TextRequest } from "../../game/services/storyTextSteps.js";
 import { armSettings, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { classifyCall, type Capture, type CallCheck } from "./responseCheck.js";
+import { isSplitRequest, requestText, type EvalRequest } from "./variants.js";
 
 /*
  * One eval call through the production path: the production factory and
  * LangChain's structured output, with retries off (the runner counts every
  * attempt). A wrapped fetch records the raw HTTP response before LangChain
  * parses it, so a reply that fails to parse is still visible.
+ *
+ * A split request (Stage 4) goes out as two messages, shaped per model
+ * family by chatInput; production's factory is unchanged. On adoption this
+ * shaping belongs beside the factory in shared/llm/.
  *
  * Never calls AIStoryGenerator (it wraps every error into a generic message)
  * and never imports StoryProgressionService (it pulls in the database).
@@ -25,8 +30,26 @@ export type CallSpec = {
   callId: string;
   role: EvalRole;
   arm: Arm;
-  request: TextRequest;
+  request: EvalRequest;
 };
+
+/**
+ * What the model is invoked with. A plain request is one user message, as
+ * production sends it. A split request on gpt-6 is a developer message whose
+ * text part carries an explicit cache breakpoint (the factory already sends
+ * explicit cache mode), then the user message; on gpt-4.x a system message
+ * without a breakpoint (its implicit prefix cache needs none, and the field
+ * is gpt-5.6+ only), then the user message.
+ */
+export function chatInput(request: EvalRequest, model: string): string | BaseMessage[] {
+  if (!isSplitRequest(request)) return request.prompt;
+  const perCall = new HumanMessage(request.perCall);
+  if (modelFamily(model) === "gpt-6") {
+    const fixed = { type: "text", text: request.fixed, prompt_cache_breakpoint: { mode: "explicit" } };
+    return [new ChatMessage({ role: "developer", content: [fixed] }), perCall];
+  }
+  return [new SystemMessage(request.fixed), perCall];
+}
 
 export type ExecutedCall = {
   capture: Capture & { retryAfterMs?: number };
@@ -102,12 +125,12 @@ export async function executeCall(spec: CallSpec, deps: ExecutorDeps): Promise<E
     timeoutMs: EVAL_TIMEOUT_MS,
     configuration: { fetch: capturingFetch(inner, capture) },
   });
-  const promptHash = storePrompt(deps.outDir, spec.request.prompt);
+  const promptHash = storePrompt(deps.outDir, requestText(spec.request));
 
   const startedAt = deps.now();
   let error: unknown;
   try {
-    await model.withStructuredOutput(spec.request.schema).invoke(spec.request.prompt);
+    await model.withStructuredOutput(spec.request.schema).invoke(chatInput(spec.request, spec.arm.model));
   } catch (caught) {
     error = caught;
   }

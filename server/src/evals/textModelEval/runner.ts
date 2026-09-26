@@ -1,19 +1,26 @@
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
-import type { TextRequest } from "../../game/services/storyTextSteps.js";
 import type { Arm, EvalRole, Stage } from "./arms.js";
 import { budgetCheck, spentByStage, type Caps, type SpendRecord } from "./budget.js";
 import { sha256, type CallSpec, type ExecutedCall } from "./executor.js";
 import { costFromUsage, type Estimate } from "./pricing.js";
 import { USABLE_OUTCOMES, type CallCheck, type Outcome } from "./responseCheck.js";
+import type { EvalRequest } from "./variants.js";
 
 /*
  * Schedules planned eval jobs and records every attempt: setup first, then
  * beats, analysis and pipeline chains, then iteration; within a role every
  * case's baseline first, candidates only where the baseline worked. Paced by
  * a rolling per-model token window, stopped by the spend caps, and
- * resumable from earlier records. Transport failures retry after a backoff;
- * a reply production could not parse is re-sent at once, up to
- * production's retries, as LangChain does in production.
+ * resumable from earlier records; a job whose final record is a request the
+ * API rejected (a 400 naming a parameter) counts as not finished, so the next
+ * invocation plans it again. Transport failures retry after a backoff; a
+ * reply production could not parse is re-sent at once, up to production's
+ * retries, as LangChain does in production.
+ *
+ * Warm-first: the first call of each cache line (a split request's arm,
+ * schema and fixed rules) runs alone, and the rest of that line waits until
+ * it has finished, so they read a warm cache. Other lines and jobs without a
+ * line are never held.
  */
 
 export type PlannedCall = {
@@ -22,7 +29,7 @@ export type PlannedCall = {
   players: number;
   estimate: Estimate;
   /** Built lazily, so a resumed job never builds its prompt */
-  request: () => TextRequest;
+  request: () => EvalRequest;
 };
 
 export type Job = {
@@ -38,6 +45,8 @@ export type Job = {
   first: PlannedCall;
   /** Pipeline chains: the beat call, built from the analysis output */
   then?: { estimate: Estimate; arm: Arm; players: number; build: (analysis: unknown) => PlannedCall };
+  /** Split requests: the cached prefix this call shares with others (arm, schema and fixed rules) */
+  cacheLine?: string;
 };
 
 export type CallRecord = {
@@ -87,6 +96,8 @@ export type CallRecord = {
   promptHash?: string;
   promptHashDrift?: boolean;
   errorMessage?: string;
+  /** The job's cache line, on every record of the job */
+  cacheLine?: string;
 };
 
 export type RunnerDeps = {
@@ -122,8 +133,9 @@ export function keyOf(job: Job): string {
   return jobKey(job.caseId, job.armKey, job.promptState, job.sample);
 }
 
+/** Jobs with a final record; a request the API rejected says nothing about the model, so it is planned again. */
 export function finishedJobKeys(records: CallRecord[]): Set<string> {
-  return new Set(records.filter((r) => r.jobFinal).map((r) => r.jobKey));
+  return new Set(records.filter((r) => r.jobFinal && !r.rejectedParam).map((r) => r.jobKey));
 }
 
 /** Whether a record's output can be used (valid or repaired) */
@@ -221,6 +233,7 @@ function attemptRecord(input: {
     promptHash: executed.promptHash,
     promptHashDrift: input.drift || undefined,
     errorMessage: check.errorMessage,
+    cacheLine: job.cacheLine,
   };
 }
 
