@@ -145,7 +145,8 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
   const checks: Record<string, boolean> = {
     paragraphs: paragraphs.length >= 5 && paragraphs.length <= 6,
     sentences: paragraphs.every((p) => sentenceCount(p) >= 3 && sentenceCount(p) <= 5),
-    threeOptions: beat.options.length === 3,
+    // The ending prompt carries no option instructions (its title is "The End"), so any count passes there
+    threeOptions: story.getCurrentBeatType() === "ending" || beat.options.length === 3,
     atMostOneSacrificeOrReward: beat.options.filter((o) => o.resourceType !== "normal").length <= 1,
     optionType: expected === undefined || beat.options.every((o) => o.optionType === expected),
     imageTagsWellFormed: tags.every((t) => t.id !== undefined && t.source !== undefined && t.desc !== undefined),

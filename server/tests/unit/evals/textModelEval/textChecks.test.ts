@@ -56,6 +56,14 @@ describe("checkBeatSet", () => {
     expect(two.checks.threeOptions).toBe(false);
   });
 
+  it("does not hold an ending to three options (the ending prompt asks for none)", () => {
+    const ending = Story.create(story.getState());
+    jest.spyOn(ending, "getCurrentBeatType").mockReturnValue("ending");
+    const none = checkBeatSet(beatSet(1, { player1: beatGeneration({ options: [] }) }), ending);
+    expect(none.checks.threeOptions).toBe(true);
+    expect(checkBeatSet(beatSet(1), ending).checks.threeOptions).toBe(true);
+  });
+
   it("wants a sacrifice option at exactly the fixed sacrifice bonus", () => {
     const inThread = Story.create({ ...story.getState(), storyPhases: [threadAnalysis("challenge", 2, 0)] });
     const withSacrifice = (basePoints: number) => {
