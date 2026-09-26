@@ -1,10 +1,12 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { Logger } from "shared/logger.js";
+import { TEXT_MODEL_CONFIG } from "server/config.js";
 import {
-  CONTENT_FILTER_MODEL_NAME,
-  CONTENT_FILTER_MODEL_TEMPERATURE,
-} from "server/config.js";
+  createChatModel,
+  PRODUCTION_MAX_RETRIES,
+  PRODUCTION_TIMEOUT_MS,
+} from "shared/llm/chatModel.js";
+import { settingsFor } from "shared/llm/textModelSettings.js";
 import { PROHIBITED_CONTENT_RULES } from "shared/contentSafetyRules.js";
 import dotenv from "dotenv";
 
@@ -113,9 +115,11 @@ export class ContentFilterService {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
-    const structuredModel = new ChatOpenAI({
-      modelName: CONTENT_FILTER_MODEL_NAME,
-      temperature: Number(CONTENT_FILTER_MODEL_TEMPERATURE),
+    const structuredModel = createChatModel({
+      role: "contentFilter",
+      settings: settingsFor(TEXT_MODEL_CONFIG, "contentFilter"),
+      maxRetries: PRODUCTION_MAX_RETRIES,
+      timeoutMs: PRODUCTION_TIMEOUT_MS.contentFilter,
     }).withStructuredOutput(contentFilterSchema);
     this.classify = (filterPrompt) => structuredModel.invoke(filterPrompt);
   }

@@ -37,18 +37,13 @@ import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
 } from "core/config.js";
+import { TEXT_MODEL_CONFIG } from "server/config.js";
 import {
-  MODEL_BASE_REASONING,
-  GENERATION_MODEL_NAME,
-  GENERATION_MODEL_TEMPERATURE,
-  GENERATION_MODEL_REASONING_EFFORT,
-  TEXT_MODEL_NAME,
-  TEXT_MODEL_TEMPERATURE,
-  TEXT_MODEL_REASONING_EFFORT,
-  SWITCH_THREAD_MODEL_NAME,
-  SWITCH_THREAD_MODEL_TEMPERATURE,
-  SWITCH_THREAD_MODEL_REASONING_EFFORT,
-} from "server/config.js";
+  createChatModel,
+  PRODUCTION_MAX_RETRIES,
+  PRODUCTION_TIMEOUT_MS,
+} from "shared/llm/chatModel.js";
+import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { z } from "zod";
@@ -57,36 +52,29 @@ import { templateIterationSections } from "core/utils/templateIterationSections.
 dotenv.config();
 
 export class AIStoryGenerator {
-  private textModel: ChatOpenAI;
-  private switchThreadModel: ChatOpenAI;
-  private generationModel: ChatOpenAI;
+  /** One model per role and resolved settings, created on first use */
+  private models = new Map<string, ChatOpenAI>();
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
+  }
 
-    this.textModel = new ChatOpenAI({
-      model: TEXT_MODEL_NAME as string,
-      temperature: TEXT_MODEL_TEMPERATURE as number,
-      modelKwargs: MODEL_BASE_REASONING
-        ? { reasoning_effort: TEXT_MODEL_REASONING_EFFORT }
-        : {},
-    });
-    this.switchThreadModel = new ChatOpenAI({
-      model: SWITCH_THREAD_MODEL_NAME as string,
-      temperature: SWITCH_THREAD_MODEL_TEMPERATURE as number,
-      modelKwargs: MODEL_BASE_REASONING
-        ? { reasoning_effort: SWITCH_THREAD_MODEL_REASONING_EFFORT }
-        : {},
-    });
-    this.generationModel = new ChatOpenAI({
-      model: GENERATION_MODEL_NAME as string,
-      temperature: GENERATION_MODEL_TEMPERATURE as number,
-      modelKwargs: MODEL_BASE_REASONING
-        ? { reasoning_effort: GENERATION_MODEL_REASONING_EFFORT }
-        : {},
-    });
+  private modelFor(role: TextRole, multiplayer: boolean = false): ChatOpenAI {
+    const settings = settingsFor(TEXT_MODEL_CONFIG, role, { multiplayer });
+    const key = `${role}|${JSON.stringify(settings)}`;
+    let model = this.models.get(key);
+    if (!model) {
+      model = createChatModel({
+        role,
+        settings,
+        maxRetries: PRODUCTION_MAX_RETRIES,
+        timeoutMs: PRODUCTION_TIMEOUT_MS[role],
+      });
+      this.models.set(key, model);
+    }
+    return model;
   }
 
   public async createInitialState(
@@ -189,7 +177,8 @@ export class AIStoryGenerator {
     maxTurns: number
   ): Promise<TemplateSetupGeneration<typeof playerCount>> {
     const schema = createStorySetupSchema(playerCount, "template");
-    const structuredModel = this.generationModel.withStructuredOutput(schema);
+    const structuredModel =
+      this.modelFor("templateGeneration").withStructuredOutput(schema);
 
     try {
       Logger.Story.log(
@@ -257,7 +246,7 @@ export class AIStoryGenerator {
 
     // Generate a new story setup using the LLM
     const schema = createStorySetupSchema(playerCount);
-    const structuredModel = this.generationModel.withStructuredOutput(schema);
+    const structuredModel = this.modelFor("setup").withStructuredOutput(schema);
 
     try {
       Logger.Story.log(
@@ -304,7 +293,10 @@ export class AIStoryGenerator {
     const schema = createSwitchAnalysisSchema(
       Object.keys(story.getPlayers()).length as PlayerCount
     );
-    const structuredModel = this.switchThreadModel.withStructuredOutput(schema);
+    const structuredModel = this.modelFor(
+      "switchAnalysis",
+      story.isMultiplayer()
+    ).withStructuredOutput(schema);
     const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
@@ -326,7 +318,10 @@ export class AIStoryGenerator {
 
   async generateThreads(story: Story): Promise<Story> {
     const schema = threadAnalysisSchema;
-    const structuredModel = this.switchThreadModel.withStructuredOutput(schema);
+    const structuredModel = this.modelFor(
+      "threadAnalysis",
+      story.isMultiplayer()
+    ).withStructuredOutput(schema);
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
     const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
@@ -405,7 +400,10 @@ export class AIStoryGenerator {
       // Pass the hasImages flag from the story
       story.hasImages()
     );
-    const structuredModel = this.textModel.withStructuredOutput(schema);
+    const structuredModel = this.modelFor(
+      "beat",
+      story.isMultiplayer()
+    ).withStructuredOutput(schema);
 
     Logger.Story.log(
       `Generating beats for turn: ${story.getCurrentTurn() + 1}`
@@ -549,7 +547,7 @@ export class AIStoryGenerator {
 
       // Create a structured model with the partial schema
       const structuredModel =
-        this.generationModel.withStructuredOutput(partialSchema);
+        this.modelFor("templateIteration").withStructuredOutput(partialSchema);
       const result = await structuredModel.invoke(prompt);
 
       // Logger.Story.log("Result:", JSON.stringify(result, null, 2));

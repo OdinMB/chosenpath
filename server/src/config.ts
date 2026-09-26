@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { getApiConfig } from "core/config.js";
 import { IMAGE_QUALITIES } from "core/types/image.js";
+import { resolveTextModelConfig } from "shared/llm/textModelSettings.js";
 
 // Load environment variables
 dotenv.config();
@@ -31,39 +32,9 @@ export const STORAGE_PATHS = {
   },
 };
 
-export const MODEL_BASE_REASONING = false;
-const OPENAI_MODEL_BASE = "gpt-4.1";
-const OPENAI_MODEL_BASE_TEMPERATURE = 0.2;
-const OPENAI_MODEL_BASE_REASONING_EFFORT = "minimal";
-
-// Model settings
-export const GENERATION_MODEL_NAME =
-  process.env.GENERATION_MODEL_NAME || `${OPENAI_MODEL_BASE}`;
-export const GENERATION_MODEL_TEMPERATURE =
-  process.env.GENERATION_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
-export const GENERATION_MODEL_REASONING_EFFORT =
-  process.env.GENERATION_MODEL_REASONING_EFFORT ||
-  OPENAI_MODEL_BASE_REASONING_EFFORT;
-
-export const SWITCH_THREAD_MODEL_NAME =
-  process.env.SWITCH_THREAD_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
-export const SWITCH_THREAD_MODEL_TEMPERATURE =
-  process.env.SWITCH_THREAD_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
-export const SWITCH_THREAD_MODEL_REASONING_EFFORT =
-  process.env.SWITCH_THREAD_MODEL_REASONING_EFFORT ||
-  OPENAI_MODEL_BASE_REASONING_EFFORT;
-
-export const TEXT_MODEL_NAME =
-  process.env.TEXT_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
-export const TEXT_MODEL_TEMPERATURE =
-  process.env.TEXT_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
-export const TEXT_MODEL_REASONING_EFFORT =
-  process.env.TEXT_MODEL_REASONING_EFFORT || OPENAI_MODEL_BASE_REASONING_EFFORT;
-
-export const CONTENT_FILTER_MODEL_NAME =
-  process.env.CONTENT_FILTER_MODEL_NAME || `${OPENAI_MODEL_BASE}-mini`;
-export const CONTENT_FILTER_MODEL_TEMPERATURE =
-  process.env.CONTENT_FILTER_MODEL_TEMPERATURE || OPENAI_MODEL_BASE_TEMPERATURE;
+// Text model settings per role (defaults and env names: shared/llm/textModelSettings.ts).
+// Throws at startup on an unsupported model or a gpt-6 model without an effort.
+export const TEXT_MODEL_CONFIG = resolveTextModelConfig(process.env);
 
 // Image generation settings (see .context/image-generation.md, "Models and settings").
 // Models and qualities follow the owner's blind rating of 2026-09-24.
