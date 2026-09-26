@@ -1,6 +1,7 @@
 import { htmlLeaks, metadataLeaks } from "../../../../src/evals/textModelEval/blinding.js";
+import { withPictureNotes } from "../../../../src/evals/textModelEval/ratingContent.js";
 import { renderRatingPage } from "../../../../src/evals/textModelEval/ratingPage.js";
-import { planRatingSet, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
+import { planRatingSet, ratingSetFromKey, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
 import { scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
@@ -75,6 +76,34 @@ describe("planRatingSet", () => {
       [BASELINE.key, 2],
     ]);
     expect(set.items.every((i) => /^setup-\d{2}$/.test(i.id))).toBe(true);
+  });
+});
+
+describe("ratingSetFromKey", () => {
+  it("rebuilds the planned page from its key: same page id, items, labels and content", () => {
+    const { cases, records, load } = fixture();
+    const { set, key } = planRatingSet({ kind: "setup", arms: ARMS, items: 6, preview: false }, records, cases, { loadOutput: load, salt: "again", now: new Date(0) });
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+  });
+
+  it("re-reads each keyed output, so a rendering fix reaches a page already handed out", () => {
+    const { cases, records, load } = fixture();
+    const { set, key } = planRatingSet({ kind: "setup", arms: ARMS, items: 6, preview: false }, records, cases, { loadOutput: load, salt: "again", now: new Date(0) });
+    const renamed = (r: CallRecord) => ({ ...(load(r) as object), title: `New ${r.outputFile}` });
+    const rebuilt = ratingSetFromKey(key, records, cases, renamed);
+    expect(rebuilt.pageId).toBe(set.pageId);
+    expect(rebuilt.items.map((i) => [i.id, i.options.map((o) => o.label)])).toEqual(set.items.map((i) => [i.id, i.options.map((o) => o.label)]));
+    const first = key.items[rebuilt.items[0].id].labels.A;
+    const firstTitle = rebuilt.items[0].options[0].content.kind === "setup" ? rebuilt.items[0].options[0].content.title : "";
+    expect(firstTitle).toBe(`New ${first.caseId}-${first.armKey}-${first.sample}`);
+  });
+
+  it("refuses a key whose output is gone", () => {
+    const { cases, records, load } = fixture();
+    const { key } = planRatingSet({ kind: "setup", arms: ARMS, items: 6, preview: false }, records, cases, { loadOutput: load, salt: "again", now: new Date(0) });
+    const first = Object.values(key.items)[0].labels.A;
+    const without = records.filter((r) => !(r.caseId === first.caseId && r.armKey === first.armKey && r.sample === first.sample));
+    expect(() => ratingSetFromKey(key, without, cases, load)).toThrow(/No usable output/);
   });
 });
 
@@ -208,6 +237,23 @@ describe("renderRatingPage", () => {
     }
     expect(html).not.toContain(key.keyFile);
     expect(html).not.toContain(key.salt);
+  });
+});
+
+describe("withPictureNotes", () => {
+  it("breaks paragraphs where the game does: at single newlines too", () => {
+    expect(withPictureNotes("First paragraph.\nSecond paragraph.\n\nThird paragraph.")).toEqual([
+      "First paragraph.",
+      "Second paragraph.",
+      "Third paragraph.",
+    ]);
+  });
+
+  it("keeps an image line with the paragraph after it", () => {
+    expect(withPictureNotes('Before.\n[image id=inn source=story desc="The inn"]\nAfter.')).toEqual([
+      "Before.",
+      "[picture: The inn] After.",
+    ]);
   });
 });
 

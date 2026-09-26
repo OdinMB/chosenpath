@@ -33,6 +33,31 @@ describe("paragraphsOf", () => {
     const text = `[image id=inn source=story desc="The inn"]\n\n${paragraphs(5, '[image id=inn source=story desc="The inn"] ')}`;
     expect(paragraphsOf(text)).toHaveLength(5);
   });
+
+  it("counts paragraphs as the game shows them: a single newline starts a paragraph", () => {
+    expect(paragraphsOf(Array.from({ length: 5 }, () => PARAGRAPH).join("\n"))).toHaveLength(5);
+  });
+
+  it("joins an image line to the paragraph after it, and a line starting with a comma to the one before", () => {
+    const text = `[image id=inn source=story desc="The inn"]\n${PARAGRAPH}\n, and then some.\n${PARAGRAPH}`;
+    expect(paragraphsOf(text)).toEqual([`${PARAGRAPH} , and then some.`, PARAGRAPH]);
+  });
+});
+
+describe("checkBeatSet: image placement on single-newline paragraphs", () => {
+  const story = createMockStory({ images: [{ id: "inn", source: "story", description: "The inn" }] });
+  const tag = '[image id=inn source=story desc="The inn"]';
+  const lines = (n: number) => Array.from({ length: n }, () => PARAGRAPH);
+  const check = (text: string) => checkBeatSet(beatSet(1, { player1: beatGeneration({ text }) }), story).checks;
+
+  it("places an image line before the first paragraph in the first paragraph", () => {
+    expect(check([tag, ...lines(5)].join("\n"))).toMatchObject({ noImageInLastParagraph: true, paragraphs: true });
+  });
+
+  it("places an image line before the last paragraph, or trailing after it, in the last paragraph", () => {
+    expect(check([...lines(4), tag, PARAGRAPH].join("\n"))).toMatchObject({ noImageInLastParagraph: false, paragraphs: true });
+    expect(check([...lines(5), tag].join("\n"))).toMatchObject({ noImageInLastParagraph: false, paragraphs: true });
+  });
 });
 
 describe("checkBeatSet", () => {

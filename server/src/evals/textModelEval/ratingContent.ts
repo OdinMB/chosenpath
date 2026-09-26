@@ -1,4 +1,5 @@
 import type { StoryState } from "core/types/index.js";
+import { playerParagraphs } from "./playerText.js";
 
 /*
  * What a rater sees of one output: a setup as a one-page story card, a turn
@@ -53,14 +54,11 @@ function strings(value: unknown): string[] {
   return list(value).map(text).filter((s) => s.length > 0);
 }
 
-/** Image tags become a muted "[picture: desc]"; the paragraph stays. */
+/** The paragraphs a player sees; image tags become a muted "[picture: desc]". */
 export function withPictureNotes(beatText: string): string[] {
-  return beatText
-    .replace(/\[image\s+[^\]]*?desc="([^"]*)"[^\]]*\]/g, "[picture: $1]")
-    .replace(/\[image\s+[^\]]*\]/g, "[picture]")
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
+  return playerParagraphs(beatText).map((p) =>
+    p.replace(/\[image\s+[^\]]*?desc="([^"]*)"[^\]]*\]/g, "[picture: $1]").replace(/\[image\s+[^\]]*\]/g, "[picture]")
+  );
 }
 
 export function setupCard(output: unknown): SetupCard {

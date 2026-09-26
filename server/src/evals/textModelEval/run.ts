@@ -20,7 +20,7 @@ import { checksForRecords } from "./outputChecks.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
 import { runProbe } from "./probe.js";
 import { renderRatingPage } from "./ratingPage.js";
-import { planRatingSet, type ArmRef, type RatingKind } from "./ratingSets.js";
+import { planRatingSet, ratingSetFromKey, type ArmRef, type RatingKind } from "./ratingSets.js";
 import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, keyOf, runJobs, usable } from "./runner.js";
@@ -34,6 +34,7 @@ import { PRE_FIX_PROMPT_STATE } from "./variants.js";
  *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses "prefix": Run A recorded it)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items)
+ *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
@@ -44,7 +45,7 @@ import { PRE_FIX_PROMPT_STATE } from "./variants.js";
  * Reads only local files under data/ and the frozen cases; never touches a database.
  */
 
-type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "score";
+type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score";
 
 type Args = {
   mode: Mode;
@@ -73,6 +74,8 @@ type Args = {
   /** Preview pages from stored beats and setups (no eval output needed) */
   stored: boolean;
   scoreFile?: string;
+  /** --rerender-page: the page whose key to render afresh */
+  pageId?: string;
 };
 
 class UsageError extends Error {}
@@ -126,6 +129,11 @@ function parseArgs(argv: string[]): Args {
         args.ratingKind = kind;
         break;
       }
+      case "--rerender-page":
+        args.mode = "rerender-page";
+        args.pageId = next();
+        if (!args.pageId) throw new UsageError("--rerender-page needs a page id (the key's -<pageId>.json suffix)");
+        break;
       case "--score":
         args.mode = "score";
         args.scoreFile = path.resolve(next() ?? "");
@@ -469,6 +477,20 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
   for (const note of key.notes) console.log(`  note: ${note}`);
 }
 
+/** An existing page rendered afresh from its key, e.g. after a rendering fix; ratings in progress still apply. */
+function rerenderPage(args: Args, files: EvalFiles) {
+  const key = files.readKey(args.pageId as string);
+  if (!key) throw new UsageError(`No answer key for page ${args.pageId} in ${files.at("keys")}.`);
+  const set = ratingSetFromKey(key, files.readRecords(), files.readCases(), files.loadOutput);
+  const html = renderRatingPage(set);
+  const leaks = [...metadataLeaks(set), ...htmlLeaks(html, key)];
+  if (leaks.length > 0) {
+    throw new UsageError(`The page would reveal an arm; nothing written:\n  ${leaks.join("\n  ")}`);
+  }
+  const page = files.writeRatingPage(`${set.setId}-${set.pageId}.html`, html, false);
+  console.log(`Re-rendered ${set.items.length} items to ${page} (key unchanged)`);
+}
+
 function score(args: Args, files: EvalFiles) {
   const exported = JSON.parse(fs.readFileSync(args.scoreFile as string, "utf-8")) as ExportedRatings;
   const key = files.readKey(exported.pageId);
@@ -491,6 +513,8 @@ async function main() {
       return run(args, files);
     case "rating-page":
       return ratingPage(args, files, dirs);
+    case "rerender-page":
+      return rerenderPage(args, files);
     case "score":
       return score(args, files);
     default:

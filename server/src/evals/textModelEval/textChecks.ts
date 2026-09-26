@@ -8,12 +8,14 @@ import type {
 } from "core/types/index.js";
 import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
+import { playerParagraphs } from "./playerText.js";
 import type { SetupInput } from "./variants.js";
 
 /*
  * The rule and state checks of test plan §4.4 on parsed outputs. Each check
  * is a named pass/fail; the report compares rates against the baseline's.
- * These only rule arms out, they never pick a winner.
+ * These only rule arms out, they never pick a winner. Paragraphs are split
+ * as the game shows them (playerText.ts).
  */
 
 export type CheckResult = {
@@ -30,10 +32,10 @@ export function stripImageTags(text: string): string {
   return text.replace(IMAGE_TAG, "").replace(/[ \t]+/g, " ");
 }
 
+/** The text paragraphs a player sees (split as the game splits them), without image tags. */
 export function paragraphsOf(text: string): string[] {
-  return stripImageTags(text)
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
+  return playerParagraphs(text)
+    .map((p) => stripImageTags(p).trim())
     .filter((p) => p.length > 0);
 }
 
@@ -43,10 +45,19 @@ export function sentenceCount(paragraph: string): number {
 
 type ImageTag = { raw: string; id?: string; source?: string; desc?: string; paragraph: number };
 
+/**
+ * Image tags with the index of the text paragraph (as in paragraphsOf) they
+ * sit in. A tag on its own paragraph counts towards the next text paragraph,
+ * or the last one when none follows.
+ */
 function imageTags(text: string): ImageTag[] {
-  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
-  return paragraphs.flatMap((paragraph, index) =>
-    [...paragraph.matchAll(IMAGE_TAG)].map((match) => {
+  const paragraphs = playerParagraphs(text);
+  const textCount = paragraphs.filter((p) => stripImageTags(p).trim().length > 0).length;
+  let textBefore = 0;
+  return paragraphs.flatMap((paragraph) => {
+    const index = Math.min(textBefore, Math.max(textCount - 1, 0));
+    if (stripImageTags(paragraph).trim().length > 0) textBefore++;
+    return [...paragraph.matchAll(IMAGE_TAG)].map((match) => {
       const attrs = match[1];
       return {
         raw: match[0],
@@ -55,8 +66,8 @@ function imageTags(text: string): ImageTag[] {
         desc: /\bdesc="([^"]*)"/.exec(attrs)?.[1],
         paragraph: index,
       };
-    })
-  );
+    });
+  });
 }
 
 const META_WORDS =

@@ -307,8 +307,6 @@ export function planRatingSet(
   const keyItems: Record<string, KeyItem> = {};
 
   const items = drafts.map((draft, index): RatingItem => {
-    const evalCase = caseById.get(draft.caseId);
-    if (!evalCase) throw new Error(`Unknown case ${draft.caseId}`);
     const id = itemId(index);
     keyItems[id] = {
       caseId: draft.caseId,
@@ -320,21 +318,13 @@ export function planRatingSet(
     if (!draft.control && !draft.repeat && baselineAt >= 0) {
       labelDistribution[LABELS[baselineAt]] = (labelDistribution[LABELS[baselineAt]] ?? 0) + 1;
     }
-    return {
-      id,
-      premise: evalCase.setup?.premise,
-      context: spec.kind === "turn" && evalCase.state ? turnContext(evalCase.state) : [],
-      options: draft.refs.map((ref, position) => ({
-        label: LABELS[position],
-        content: optionContent(spec.kind, deps.loadOutput(findOutput(records, spec.kind, ref) as CallRecord), evalCase.state),
-      })),
-    };
+    return buildItem(spec.kind, id, keyItems[id], caseById, records, deps.loadOutput);
   });
 
   const setId = `text-${spec.kind}`;
   const pageId = sha256(`${deps.salt}|page`).slice(0, 10);
   return {
-    set: { setId, pageId, kind: spec.kind, title: TITLES[spec.kind], instructions: INSTRUCTIONS[spec.kind], fieldLabels: FIELD_LABELS, items, preview: spec.preview },
+    set: pageSet(spec.kind, setId, pageId, items, spec.preview),
     key: {
       setId,
       pageId,
@@ -347,6 +337,50 @@ export function planRatingSet(
       notes,
     },
   };
+}
+
+function pageSet(kind: RatingKind, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
+  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels: FIELD_LABELS, items, preview };
+}
+
+/** One item as the rater sees it: the case's context and each keyed output. */
+function buildItem(
+  kind: RatingKind,
+  id: string,
+  keyItem: KeyItem,
+  caseById: Map<string, EvalCase>,
+  records: CallRecord[],
+  loadOutput: PlanDeps["loadOutput"]
+): RatingItem {
+  const evalCase = caseById.get(keyItem.caseId);
+  if (!evalCase) throw new Error(`Unknown case ${keyItem.caseId}`);
+  return {
+    id,
+    premise: evalCase.setup?.premise,
+    context: kind === "turn" && evalCase.state ? turnContext(evalCase.state) : [],
+    options: Object.entries(keyItem.labels).map(([label, ref]) => {
+      const record = findOutput(records, kind, ref);
+      if (!record) throw new Error(`No usable output for ${id} option ${label}`);
+      return { label, content: optionContent(kind, loadOutput(record), evalCase.state) };
+    }),
+  };
+}
+
+/**
+ * The page an existing key describes, rendered afresh from its outputs:
+ * the same page id, items and labels, so ratings already saved in a browser
+ * still apply. For re-rendering a page after a rendering fix.
+ */
+export function ratingSetFromKey(
+  key: RatingKey,
+  records: CallRecord[],
+  cases: EvalCase[],
+  loadOutput: PlanDeps["loadOutput"]
+): RatingSet {
+  const kind: RatingKind = key.setId === "text-setup" ? "setup" : "turn";
+  const caseById = new Map(cases.map((c) => [c.id, c]));
+  const items = Object.entries(key.items).map(([id, keyItem]) => buildItem(kind, id, keyItem, caseById, records, loadOutput));
+  return pageSet(kind, key.setId, key.pageId, items, false);
 }
 
 function optionContent(kind: RatingKind, output: unknown, state: StoryState | undefined): OptionContent {
