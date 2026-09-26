@@ -63,7 +63,7 @@ describe("renderResults", () => {
       probe: { generatedAt: "", results: [], totalCostUsd: 0.5, priorSpendUsd: 0.25 },
       generatedAt: new Date(0),
     });
-    expect(text).toContain("| 0 | $1.00 | $6.00 |");
+    expect(text).toContain("| 0 | $1.00 | $8.00 |");
   });
 });
 

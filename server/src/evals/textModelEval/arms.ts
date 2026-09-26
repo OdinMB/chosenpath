@@ -104,7 +104,7 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
     case "setup":
       return [
         { arm: sol("low"), samples: 2, scope: "all" },
-        { arm: sol("medium"), samples: 2, scope: "all" },
+        { arm: sol("medium"), samples: 1, scope: "all" },
         { arm: sol("none"), samples: 1, scope: "all" },
         { arm: luna("none"), samples: 2, scope: "all" },
         { arm: luna("low"), samples: 2, scope: "all" },

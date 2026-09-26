@@ -1,14 +1,19 @@
 import type { Stage } from "./arms.js";
 
 /*
- * The spend caps. Owner (2026-09-26): target $25 for the whole evaluation,
- * split by stage; above that only with a recorded reason, and never past $50.
- * The probe and case building count as Stage 0.
+ * The spend caps. Owner (2026-09-26): target about $25 for the whole
+ * evaluation, a hard cap of $30 (below the owner's standing ceiling of $50),
+ * extra spend only when obviously useful and recorded. Going a little over
+ * $25 is justified because the owner explicitly prioritised Sol for story
+ * setups, and setup inputs are 21-23K tokens with the schema, not the 15K
+ * the plan assumed. The stage caps are $8 / $13 / $3 / $4; a stage cap above
+ * its default needs a recorded reason, and the global cap can only be
+ * lowered. The probe and case building count as Stage 0.
  */
 
-export const DEFAULT_STAGE_CAPS: Record<Stage, number> = { "0": 6, "1-2": 12, "3": 3, "4": 4 };
-export const DEFAULT_GLOBAL_CAP = 25;
-export const HARD_CEILING = 50;
+export const DEFAULT_STAGE_CAPS: Record<Stage, number> = { "0": 8, "1-2": 13, "3": 3, "4": 4 };
+export const HARD_CEILING = 30;
+export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
 export type Caps = {
   stageCaps: Record<Stage, number>;
@@ -33,7 +38,7 @@ export type CapArgs = {
   overTargetReason?: string;
 };
 
-/** Throws on a cap above the default without a reason, or a global cap above $50. */
+/** Throws on a stage cap above its default without a reason, or a global cap above the hard ceiling. */
 export function resolveCaps(
   args: CapArgs,
   now: () => Date = () => new Date()

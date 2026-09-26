@@ -8,7 +8,7 @@ import {
   type EvalRole,
   type Stage,
 } from "./arms.js";
-import { resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
+import { HARD_CEILING, resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type Snapshot } from "./cases.js";
 import { jobEstimateUsd, planJobs, requestChars, type PlanOptions } from "./jobPlan.js";
@@ -114,8 +114,8 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   const plan = (stage: Stage, promptState: string, extra: Partial<PlanOptions>) =>
     planJobs(cases ?? [], input.options(stage, promptState, extra));
   const analysis: Partial<PlanOptions> = { mode: "pipeline", roles: ["switch", "thread"] };
+  // The pre-fix baseline finished in Run A, and --run now refuses "prefix"
   const rows: [string, Stage, Job[]][] = [
-    ["Stage 0 pre-fix baseline (1 sample, isolated)", "0", plan("0", "prefix", { samples: input.samples ?? 1, mode: "isolated" })],
     ["Stage 0 post-fix baseline (2 samples, isolated)", "0", plan("0", "postfix", { samples: input.samples ?? 2, mode: "isolated" })],
     ["Stage 0 post-fix baseline pipeline chains", "0", plan("0", "postfix", analysis).filter((j) => j.group === "pipeline")],
     ["Stages 1-2 candidates (isolated)", "1-2", plan("1-2", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
@@ -138,7 +138,7 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   for (const stage of STAGES) {
     log(`  Stage ${stage}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
   }
-  log(`  Total: $${spend.total.toFixed(2)} of $${caps.globalCap} (never above $50)`);
+  log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap; the owner's target is about $25)`);
   log(
     `Baseline arms from production config: setup ${baselineArm("setup", false).key}, beat ${baselineArm("beat", false).key}, analysis ${baselineArm("switch", false).key}`
   );

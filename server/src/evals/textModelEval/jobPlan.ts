@@ -35,6 +35,8 @@ export type PlanOptions = {
   /** Overrides every arm's sample count */
   samples?: number;
   subset15: boolean;
+  /** --no-mp-continuations: leave out multiplayer beats that are neither a first beat nor an ending */
+  skipMultiplayerContinuations?: boolean;
   /** Earlier records, for measured output sizes */
   records: CallRecord[];
   env?: Env;
@@ -169,6 +171,11 @@ function chainJob(
   };
 }
 
+/** The owner's first shrink lever: multiplayer beats in the middle of a story. */
+function isMultiplayerContinuation(c: EvalCase): boolean {
+  return c.role === "beat" && c.tags.multiplayer && !c.tags.firstBeat && !c.tags.ending;
+}
+
 /** The role's cases after the filters; the 15-case subset narrows beats only. */
 function casesFor(cases: EvalCase[], role: EvalRole, options: PlanOptions, scope: ArmPlan["scope"] = "all"): EvalCase[] {
   const subsetOnly = role === "beat" && (options.subset15 || scope === "subset15");
@@ -176,7 +183,8 @@ function casesFor(cases: EvalCase[], role: EvalRole, options: PlanOptions, scope
     (c) =>
       c.role === role &&
       (!options.caseIds || options.caseIds.includes(c.id)) &&
-      (!subsetOnly || c.tags.subset15)
+      (!subsetOnly || c.tags.subset15) &&
+      !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
   );
 }
 

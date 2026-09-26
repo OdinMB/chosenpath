@@ -30,11 +30,12 @@ import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, keyOf, runJobs, usable } fr
  *   --dry-run (default)           cases, calls, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses "prefix": Run A recorded it)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--preview [--stored]]
  *   --score <export.json>
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
- *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15
+ *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
+ *   --no-mp-continuations (drops multiplayer beats other than first beats and endings)
  * Budget: --max-spend <usd> (this invocation), --global-cap, --stage-cap,
  *   --over-target-reason "<text>"; --tpm <tokens/min per model>; --out <dir>
  * Reads only local files under data/ and the frozen cases; never touches a database.
@@ -52,6 +53,7 @@ type Args = {
   caseIds?: string[];
   samples?: number;
   subset15: boolean;
+  skipMultiplayerContinuations: boolean;
   maxSpend?: number;
   globalCap?: number;
   stageCap?: number;
@@ -69,6 +71,8 @@ type Args = {
 
 class UsageError extends Error {}
 
+/** Run A's prompt state, recorded before Milestone 2 fixed the prompts */
+const PRE_FIX_PROMPT_STATE = "prefix";
 const DEFAULT_PROBE_MAX_SPEND = 1;
 const DEFAULT_BUILD_MAX_SPEND = 0.75;
 const DEFAULT_ITEMS: Record<RatingKind, number> = { setup: 6, turn: 15 };
@@ -94,6 +98,7 @@ function parseArgs(argv: string[]): Args {
     roles: ["setup", "beat", "switch", "thread"],
     mode2: "isolated",
     subset15: false,
+    skipMultiplayerContinuations: false,
     tpm: DEFAULT_TOKENS_PER_MINUTE,
     outDir: path.resolve(process.cwd(), "..", "DOCS", "2026-09-26_gpt6-text-eval"),
     rebuildCases: false,
@@ -150,6 +155,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--subset15":
         args.subset15 = true;
+        break;
+      case "--no-mp-continuations":
+        args.skipMultiplayerContinuations = true;
         break;
       case "--max-spend":
         args.maxSpend = numberArg(arg, next());
@@ -256,6 +264,7 @@ function planOptions(args: Args, stage: Stage, promptState: string, records: Pla
     caseIds: args.caseIds,
     samples: args.samples,
     subset15: args.subset15,
+    skipMultiplayerContinuations: args.skipMultiplayerContinuations,
     records,
     ...extra,
   };
@@ -342,7 +351,7 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
   const { cases, report } = await buildCases({
     ...localSources(dirs),
     callBaseline: async (role, caseId, request, players) => {
-      const job = requestJob({ stage: "0", promptState: "prefix", caseId, role, arm: baselineArm(role, players > 1), players, request, records });
+      const job = requestJob({ stage: "0", promptState: PRE_FIX_PROMPT_STATE, caseId, role, arm: baselineArm(role, players > 1), players, request, records });
       const remaining: Caps = { ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - buildSpent };
       const result = await runJobs([job], deps, { caps: remaining, previous: records, extraSpend: extraSpend(files), tokensPerMinute: args.tpm });
       buildSpent += result.records.reduce((sum, r) => sum + r.costUsd, 0);
@@ -359,8 +368,13 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
 }
 
 async function run(args: Args, files: EvalFiles) {
-  requireApiKey();
   if (!args.stage || !args.promptState) throw new UsageError("--run needs --stage and --prompt-state.");
+  if (args.promptState === PRE_FIX_PROMPT_STATE) {
+    throw new UsageError(
+      'The pre-fix prompts no longer exist in the code (Run A recorded them), so --prompt-state prefix would mix post-fix prompts into pre-fix results. Use "postfix".'
+    );
+  }
+  requireApiKey();
   if (!files.casesExist()) throw new UsageError("No frozen cases. Run --build-cases first.");
   const caps = capsFor(args, files, args.stage);
   const records = files.readRecords();
