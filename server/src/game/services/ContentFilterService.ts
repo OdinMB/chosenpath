@@ -7,6 +7,7 @@ import {
   PRODUCTION_TIMEOUT_MS,
 } from "shared/llm/chatModel.js";
 import { settingsFor } from "shared/llm/textModelSettings.js";
+import { llmCallLogger } from "shared/llm/usageRecorder.js";
 import { PROHIBITED_CONTENT_RULES } from "shared/contentSafetyRules.js";
 import dotenv from "dotenv";
 
@@ -120,6 +121,7 @@ export class ContentFilterService {
       settings: settingsFor(TEXT_MODEL_CONFIG, "contentFilter"),
       maxRetries: PRODUCTION_MAX_RETRIES,
       timeoutMs: PRODUCTION_TIMEOUT_MS.contentFilter,
+      callbacks: [llmCallLogger],
     }).withStructuredOutput(contentFilterSchema);
     this.classify = (filterPrompt) => structuredModel.invoke(filterPrompt);
   }

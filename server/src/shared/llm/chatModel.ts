@@ -158,6 +158,8 @@ export function chatModelFields(options: ChatModelOptions): ChatOpenAIFields {
     useResponsesApi: false,
     __includeRawResponse: true,
     callbacks: options.callbacks,
+    // Reaches every callback's metadata, so call logs carry the role
+    metadata: { role: options.role },
     onFailedAttempt: retryHandler(options.role),
     configuration: options.configuration,
   };

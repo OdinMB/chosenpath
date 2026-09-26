@@ -1,6 +1,9 @@
 import type { BeatType, ImageRequest, PlayerSlot } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
-import { AIStoryGenerator } from "./AIStoryGenerator.js";
+import {
+  AIStoryGenerator,
+  type GenerationContext,
+} from "./AIStoryGenerator.js";
 import { AIImageGenerator } from "../../images/AIImageGenerator.js";
 import { ChangeService } from "./ChangeService.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
@@ -71,9 +74,11 @@ export class StoryProgressionService {
     // console.log(
     //   `[StoryProgressionService] Next beat type to create: ${nextBeatType}`
     // );
+    const context = { pregeneration: skipDatabaseUpdate };
     currentStory = await this.processPreparatorySteps(
       currentStory,
-      nextBeatType
+      nextBeatType,
+      context
     );
 
     // Try to find a complete pregenerated state first (only in real progression)
@@ -101,7 +106,7 @@ export class StoryProgressionService {
       console.log(
         "[StoryProgressionService] No complete pregenerated state found, generating beats"
       );
-      const result = await this.processBeatGeneration(currentStory);
+      const result = await this.processBeatGeneration(currentStory, context);
       finalStory = result.story;
       imageRequests = result.imageRequests;
     }
@@ -228,19 +233,26 @@ export class StoryProgressionService {
    */
   private async processPreparatorySteps(
     story: Story,
-    nextBeatType: BeatType
+    nextBeatType: BeatType,
+    context: GenerationContext
   ): Promise<Story> {
     let updatedStory = story.clone();
 
     if (nextBeatType === "switch") {
       console.log("[StoryProgressionService] Generating switches");
-      updatedStory = await this.aiStoryGenerator.generateSwitches(updatedStory);
+      updatedStory = await this.aiStoryGenerator.generateSwitches(
+        updatedStory,
+        context
+      );
     } else if (
       nextBeatType === "thread" &&
       updatedStory.getCurrentThreadBeatsCompleted() === 0
     ) {
       console.log("[StoryProgressionService] Generating threads");
-      updatedStory = await this.aiStoryGenerator.generateThreads(updatedStory);
+      updatedStory = await this.aiStoryGenerator.generateThreads(
+        updatedStory,
+        context
+      );
     }
 
     return updatedStory;
@@ -312,11 +324,12 @@ export class StoryProgressionService {
    * Generate new beats for the story
    */
   private async processBeatGeneration(
-    story: Story
+    story: Story,
+    context: GenerationContext
   ): Promise<{ story: Story; imageRequests: ImageRequest[] }> {
     console.log("[StoryProgressionService] Generating beats");
     const [nextStory, changes, requests] =
-      await this.aiStoryGenerator.generateBeats(story);
+      await this.aiStoryGenerator.generateBeats(story, false, context);
     const finalStory = this.changeService.applyChanges(nextStory, changes);
     return { story: finalStory, imageRequests: requests };
   }

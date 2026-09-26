@@ -19,6 +19,7 @@ import { ensureStoryDirectoryStructure } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
 import { CharacterIdentity } from "core/types/index.js";
+import { noteBroadcast, notePregenerationFinished } from "./turnTimings.js";
 import {
   applyImageOutcome,
   collectLatestBeatImageRequests,
@@ -113,6 +114,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
 
     // Then broadcast the update to all connected clients
     connectionManager.broadcastStoryUpdate(gameId, toStore);
+    noteBroadcast(gameId, toStore.getCurrentTurn(), toStore.getNumberOfPlayers());
   }
 
   private async handleMoveStoryForward(
@@ -573,6 +575,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     playerSlot: PlayerSlot,
     optionIndex: number
   ): Promise<void> {
+    let startedAt: number | undefined;
     try {
       const pregenerationKey = `${turn}_${playerSlot}_${optionIndex}`;
 
@@ -656,6 +659,7 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         playerSlot,
         optionIndex
       );
+      startedAt = Date.now();
 
       console.log(
         `[GameQueueProcessor] Starting full pregeneration for game: ${gameId}, turn: ${turn}, player: ${playerSlot}, option: ${optionIndex}`
@@ -751,6 +755,14 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         playerSlot,
         optionIndex
       );
+      notePregenerationFinished(
+        gameId,
+        turn,
+        playerSlot,
+        optionIndex,
+        Date.now() - startedAt,
+        true
+      );
     } catch (error) {
       console.error(
         `[GameQueueProcessor] Failed to pregenerate story state for game: ${gameId}, turn: ${turn}, player: ${playerSlot}, option: ${optionIndex}:`,
@@ -764,6 +776,16 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
         playerSlot,
         optionIndex
       );
+      if (startedAt !== undefined) {
+        notePregenerationFinished(
+          gameId,
+          turn,
+          playerSlot,
+          optionIndex,
+          Date.now() - startedAt,
+          false
+        );
+      }
       throw error;
     }
   }

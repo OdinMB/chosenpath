@@ -4,6 +4,7 @@ import { BeatResolutionService } from "./BeatResolutionService.js";
 import { pregenerationService } from "./PregenerationService.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
 import { Logger } from "shared/logger.js";
+import { noteChoice } from "./turnTimings.js";
 
 export interface ChoiceProcessingResult {
   processedStory: Story;
@@ -41,6 +42,13 @@ export class ChoiceProcessingService {
     const pregeneratedState = await this.checkPregeneratedState(gameId, currentTurn, playerSlot, optionIndex, story);
 
     console.log(`[ChoiceProcessingService] Pregeneration check result: ${pregeneratedState.type} for ${gameId}: turn ${currentTurn}, ${playerSlot}, option ${optionIndex}`);
+    noteChoice(
+      gameId,
+      currentTurn,
+      playerSlot,
+      pregeneratedState.type,
+      pregenerationService.isPregenerationInProgress(gameId, currentTurn, playerSlot, optionIndex)
+    );
 
     switch (pregeneratedState.type) {
       case 'complete':

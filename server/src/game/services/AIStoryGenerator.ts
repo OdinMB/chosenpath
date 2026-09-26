@@ -44,12 +44,32 @@ import {
   PRODUCTION_TIMEOUT_MS,
 } from "shared/llm/chatModel.js";
 import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
+import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { z } from "zod";
 import { templateIterationSections } from "core/utils/templateIterationSections.js";
 
 dotenv.config();
+
+/** Whether a call belongs to a background pregeneration (reaches the call logs only). */
+export type GenerationContext = { pregeneration: boolean };
+
+/** Story tags for the per-call log: ids and numbers, never text. */
+function storyTags(
+  story: Story,
+  context: GenerationContext | undefined,
+  beatType?: string
+): CallTags {
+  return {
+    storyId: story.getId(),
+    turn: story.getCurrentTurn() + 1,
+    players: story.getNumberOfPlayers(),
+    beatType,
+    images: story.generatesImages(),
+    pregeneration: context?.pregeneration ?? false,
+  };
+}
 
 export class AIStoryGenerator {
   /** One model per role and resolved settings, created on first use */
@@ -71,6 +91,7 @@ export class AIStoryGenerator {
         settings,
         maxRetries: PRODUCTION_MAX_RETRIES,
         timeoutMs: PRODUCTION_TIMEOUT_MS[role],
+        callbacks: [llmCallLogger],
       });
       this.models.set(key, model);
     }
@@ -192,7 +213,9 @@ export class AIStoryGenerator {
         maxTurns
       );
 
-      const result = await structuredModel.invoke(setupPrompt);
+      const result = await structuredModel.invoke(setupPrompt, {
+        metadata: { players: playerCount },
+      });
       Logger.Story.log("Template setup generated");
 
       // Create a new object without the characterSelectionPlan property
@@ -260,7 +283,9 @@ export class AIStoryGenerator {
         maxTurns
       );
 
-      const result = await structuredModel.invoke(setupPrompt);
+      const result = await structuredModel.invoke(setupPrompt, {
+        metadata: { players: playerCount },
+      });
       // Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
       Logger.Story.log("Story setup generated");
 
@@ -289,7 +314,10 @@ export class AIStoryGenerator {
     }
   }
 
-  async generateSwitches(story: Story): Promise<Story> {
+  async generateSwitches(
+    story: Story,
+    context?: GenerationContext
+  ): Promise<Story> {
     const schema = createSwitchAnalysisSchema(
       Object.keys(story.getPlayers()).length as PlayerCount
     );
@@ -299,7 +327,9 @@ export class AIStoryGenerator {
     ).withStructuredOutput(schema);
     const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
 
-    const response = (await structuredModel.invoke(prompt)) as SwitchAnalysis;
+    const response = (await structuredModel.invoke(prompt, {
+      metadata: storyTags(story, context),
+    })) as SwitchAnalysis;
     // Logger.Story.log(JSON.stringify(response, null, 2));
     Logger.Story.log("Switches generated");
 
@@ -316,7 +346,10 @@ export class AIStoryGenerator {
     return story.addPhase(transformedResponse);
   }
 
-  async generateThreads(story: Story): Promise<Story> {
+  async generateThreads(
+    story: Story,
+    context?: GenerationContext
+  ): Promise<Story> {
     const schema = threadAnalysisSchema;
     const structuredModel = this.modelFor(
       "threadAnalysis",
@@ -324,7 +357,9 @@ export class AIStoryGenerator {
     ).withStructuredOutput(schema);
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
-    const response = (await structuredModel.invoke(prompt)) as ThreadAnalysis;
+    const response = (await structuredModel.invoke(prompt, {
+      metadata: storyTags(story, context),
+    })) as ThreadAnalysis;
     // Logger.Story.log(JSON.stringify(response, null, 2));
     Logger.Story.log("Threads generated");
 
@@ -367,10 +402,11 @@ export class AIStoryGenerator {
 
   async generateBeats(
     story: Story,
-    skipImageRequests: boolean = false
+    skipImageRequests: boolean = false,
+    context?: GenerationContext
   ): Promise<[Story, Change[], ImageRequest[]]> {
     try {
-      const response = await this.generateBeatsResponse(story);
+      const response = await this.generateBeatsResponse(story, context);
       const [updatedStory, imageRequests] = this.processBeatsResponse(
         story,
         response,
@@ -386,7 +422,8 @@ export class AIStoryGenerator {
   }
 
   private async generateBeatsResponse(
-    story: Story
+    story: Story,
+    context?: GenerationContext
   ): Promise<SetOfBeatGenerationSchema> {
     const schema = createSetOfBeatGenerationSchema(
       story.getNumberOfPlayers(),
@@ -410,7 +447,8 @@ export class AIStoryGenerator {
     );
 
     const response = (await structuredModel.invoke(
-      BeatPromptService.createBeatPrompt(story)
+      BeatPromptService.createBeatPrompt(story),
+      { metadata: storyTags(story, context, story.getCurrentBeatType()) }
     )) as SetOfBeatGenerationSchema;
 
     // Logger.Story.log(JSON.stringify(response, null, 2));
@@ -548,7 +586,9 @@ export class AIStoryGenerator {
       // Create a structured model with the partial schema
       const structuredModel =
         this.modelFor("templateIteration").withStructuredOutput(partialSchema);
-      const result = await structuredModel.invoke(prompt);
+      const result = await structuredModel.invoke(prompt, {
+        metadata: { players: playerCount },
+      });
 
       // Logger.Story.log("Result:", JSON.stringify(result, null, 2));
       Logger.Story.log("Partial template update generated");
