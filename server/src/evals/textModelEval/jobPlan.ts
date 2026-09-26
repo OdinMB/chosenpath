@@ -1,3 +1,4 @@
+import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Env } from "shared/llm/textModelSettings.js";
 import { switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
@@ -57,6 +58,15 @@ function inputFor(evalCase: EvalCase): RequestInput {
   }
 }
 
+/**
+ * Characters a request puts in front of the model: the prompt plus its JSON
+ * schema, which OpenAI bills as input. The probe of 2026-09-26 measured 4K to
+ * 16.5K input tokens for the production schemas alone (setup about 14K).
+ */
+export function requestChars(request: TextRequest): number {
+  return request.prompt.length + JSON.stringify(toJsonSchema(request.schema)).length;
+}
+
 /** role|armKey -> output tokens of usable final calls */
 export function measuredOutputs(records: CallRecord[]): Map<string, number[]> {
   const measured = new Map<string, number[]>();
@@ -87,7 +97,7 @@ function planned(
       role,
       arm,
       players,
-      promptChars: promptChars ?? request().prompt.length,
+      promptChars: promptChars ?? requestChars(request()),
       measuredOutputTokens: measured.get(`${role}|${arm.key}`),
     }),
   };
@@ -202,8 +212,8 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
 function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: PlanOptions, measured: Map<string, number[]>): Job[] {
   const beatCases = cases.filter((c) => c.role === "beat");
   const beatChars = beatCases.length
-    ? [...beatCases.map((c) => requestFor("prod", inputFor(c)).prompt.length)].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
-    : 60_000;
+    ? [...beatCases.map((c) => requestChars(requestFor("prod", inputFor(c))))].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
+    : 80_000;
   const jobs: Job[] = [];
   const samples = options.samples ?? DEFAULT_BASELINE_SAMPLES;
   for (const evalCase of casesFor(cases, role, options)) {

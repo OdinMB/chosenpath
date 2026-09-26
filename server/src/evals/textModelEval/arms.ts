@@ -208,7 +208,8 @@ function median(values: number[]): number {
 }
 
 /**
- * Input from the prompt length (4 characters per token). Output and reasoning
+ * Input from the prompt and schema length (4 characters per token;
+ * `promptChars` must include the schema, see `requestChars`). Output and reasoning
  * from the §2.2 table until MIN_MEASURED_RECORDS measured outputs exist for
  * this role, model and effort; from then on, their median.
  */

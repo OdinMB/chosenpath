@@ -22,7 +22,23 @@ import type { CallSpec, ExecutedCall } from "./executor.js";
  */
 
 export const PROBE_MODELS = ["gpt-6-sol", "gpt-6-luna"] as const;
-const SCHEMA_EFFORTS: ReasoningEffort[] = ["low", "medium"];
+type ProbeModel = (typeof PROBE_MODELS)[number];
+const ALL_EFFORTS: ReasoningEffort[] = ["none", "low", "medium", "high"];
+/**
+ * Every production schema at these efforts. Schema validation happens before
+ * generation and does not depend on effort, so the dearer Sol checks every
+ * variant once; each effort is covered for both models by the small strict check.
+ */
+const SCHEMA_EFFORTS: Record<ProbeModel, ReasoningEffort[]> = {
+  "gpt-6-luna": ALL_EFFORTS,
+  "gpt-6-sol": ["low"],
+};
+/** Full completions through the production path: does a strict reply parse at this effort? */
+const FULL_COMPLETIONS: { model: ProbeModel; effort: ReasoningEffort }[] = [
+  { model: "gpt-6-sol", effort: "medium" },
+  { model: "gpt-6-luna", effort: "medium" },
+  { model: "gpt-6-luna", effort: "high" },
+];
 const CAPPED_OUTPUT_TOKENS = 64;
 
 export type ProbeCheck = {
@@ -77,19 +93,36 @@ const SMALL_SCHEMA = {
 
 const SHORT_MESSAGES = [{ role: "user", content: "Reply with a JSON object whose answer is the word yes." }];
 
-/** About 1,300 tokens of fixed text: above GPT-6's 1,024-token cache minimum. */
-const LONG_TEXT = Array.from(
-  { length: 60 },
-  (_, i) => `Rule ${i + 1}: keep every story consistent with the facts already established, and write in the second person.`
-).join("\n");
+/**
+ * About 1,300 tokens of fixed text: above GPT-6's 1,024-token cache minimum.
+ * The first line makes each check's prefix unique, so one check's cache write
+ * (or an earlier probe run's, within the cache lifetime) cannot show up as
+ * another check's cache read.
+ */
+export function longText(prefix: string): string {
+  const rules = Array.from(
+    { length: 60 },
+    (_, i) => `Rule ${i + 1}: keep every story consistent with the facts already established, and write in the second person.`
+  );
+  return [`Probe ${prefix}.`, ...rules].join("\n");
+}
 
-function rawChecks(model: string): ProbeCheck[] {
+function rawChecks(model: string, nonce: string): ProbeCheck[] {
   const base = { model, response_format: SMALL_SCHEMA, messages: SHORT_MESSAGES, max_completion_tokens: CAPPED_OUTPUT_TOKENS };
-  const longMessages = [
-    { role: "developer", content: LONG_TEXT },
+  const longMessages = (id: string) => [
+    { role: "developer", content: longText(`${nonce} ${model} ${id}`) },
     { role: "user", content: "Reply with a JSON object whose answer is the word yes." },
   ];
   return [
+    ...ALL_EFFORTS.map(
+      (effort): ProbeCheck => ({
+        id: `strict-small-${effort}`,
+        model,
+        description: `small strict json_schema at effort ${effort}`,
+        expect: "accepted",
+        body: { ...base, reasoning_effort: effort },
+      })
+    ),
     { id: "none-with-temperature", model, description: "effort none with temperature 0.2", expect: "accepted", body: { ...base, reasoning_effort: "none", temperature: 0.2 } },
     { id: "low-with-temperature", model, description: "effort low with temperature 0.2", expect: "rejected", body: { ...base, reasoning_effort: "low", temperature: 0.2 } },
     { id: "minimal", model, description: 'effort "minimal"', expect: "rejected", body: { ...base, reasoning_effort: "minimal" } },
@@ -99,14 +132,14 @@ function rawChecks(model: string): ProbeCheck[] {
       model,
       description: "prompt_cache_options explicit (expect no cache write)",
       expect: "observe",
-      body: { ...base, messages: longMessages, reasoning_effort: "none", prompt_cache_options: { mode: "explicit" } },
+      body: { ...base, messages: longMessages("cache-explicit"), reasoning_effort: "none", prompt_cache_options: { mode: "explicit" } },
     },
     {
       id: "cache-implicit",
       model,
       description: "implicit caching default (expect a cache write of about the prompt)",
       expect: "observe",
-      body: { ...base, messages: longMessages, reasoning_effort: "none" },
+      body: { ...base, messages: longMessages("cache-implicit"), reasoning_effort: "none" },
     },
     {
       id: "cache-breakpoint",
@@ -119,7 +152,10 @@ function rawChecks(model: string): ProbeCheck[] {
         reasoning_effort: "none",
         prompt_cache_options: { mode: "explicit" },
         messages: [
-          { role: "developer", content: [{ type: "text", text: LONG_TEXT, prompt_cache_breakpoint: { mode: "explicit" } }] },
+          {
+            role: "developer",
+            content: [{ type: "text", text: longText(`${nonce} ${model} cache-breakpoint`), prompt_cache_breakpoint: { mode: "explicit" } }],
+          },
           { role: "user", content: "Reply with a JSON object whose answer is the word yes." },
         ],
       },
@@ -163,11 +199,14 @@ export function factoryBody(model: string, effort: ReasoningEffort, named: Named
   return { ...params, messages: SHORT_MESSAGES, max_completion_tokens: CAPPED_OUTPUT_TOKENS };
 }
 
-/** Raw checks first, then schemas from cheapest to dearest (Luna, then Sol), so a cap skips the tail. */
-export function probeChecks(): ProbeCheck[] {
-  const checks = PROBE_MODELS.flatMap(rawChecks);
+/**
+ * Raw checks first, then schemas from cheapest to dearest (Luna, then Sol), so a cap skips the tail.
+ * `nonce` keeps the cache checks' prefixes unique per run.
+ */
+export function probeChecks(nonce = ""): ProbeCheck[] {
+  const checks = PROBE_MODELS.flatMap((model) => rawChecks(model, nonce));
   for (const model of [...PROBE_MODELS].reverse()) {
-    for (const effort of SCHEMA_EFFORTS) {
+    for (const effort of SCHEMA_EFFORTS[model]) {
       for (const named of schemaVariants()) {
         checks.push({
           id: `schema-${named.name}-${effort}`,
@@ -198,6 +237,8 @@ export type ProbeDeps = {
   log: (line: string) => void;
   /** One full completion through the production path */
   executeCall: (spec: CallSpec) => Promise<ExecutedCall>;
+  /** Makes the cache checks' prefixes unique per run (default: the start time) */
+  nonce?: string;
 };
 
 function field(value: unknown, key: string): unknown {
@@ -238,17 +279,18 @@ async function send(client: OpenAI, check: ProbeCheck): Promise<Omit<ProbeResult
   }
 }
 
-/** A full medium-effort filter completion: short prompt, reasoning plus a small reply. */
-function fullCompletionEstimate(model: string): number {
-  return costFromUsage(model, { inputTokens: 400, cachedTokens: 0, cacheWriteTokens: 0, outputTokens: 7_000 });
+/** A full filter completion: short prompt, reasoning plus a small reply (high assumes 12K reasoning). */
+function fullCompletionEstimate(model: string, effort: ReasoningEffort): number {
+  const outputTokens = effort === "high" ? 13_000 : 7_000;
+  return costFromUsage(model, { inputTokens: 400, cachedTokens: 0, cacheWriteTokens: 0, outputTokens });
 }
 
 export async function runProbe(client: OpenAI, deps: ProbeDeps): Promise<ProbeReport> {
   const results: ProbeResult[] = [];
   let spent = 0;
   // The full completions run last but are reserved first: they answer questions the checks cannot
-  const reserved = PROBE_MODELS.reduce((sum, model) => sum + fullCompletionEstimate(model), 0);
-  for (const check of probeChecks()) {
+  const reserved = FULL_COMPLETIONS.reduce((sum, full) => sum + fullCompletionEstimate(full.model, full.effort), 0);
+  for (const check of probeChecks(deps.nonce ?? new Date().toISOString())) {
     const meta = { id: check.id, model: check.model, description: check.description, expect: check.expect };
     const estimate = estimateCheckCost(check);
     if (spent + estimate + reserved > deps.maxSpendUsd) {
@@ -261,17 +303,22 @@ export async function runProbe(client: OpenAI, deps: ProbeDeps): Promise<ProbeRe
     deps.log(`${check.model} ${check.id}: ${result.outcome}${result.status ? ` ${result.status}` : ""}${result.param ? ` param=${result.param}` : ""}`);
   }
 
-  // One full completion per model at medium, through the production path
-  for (const model of PROBE_MODELS) {
-    const arm = makeArm({ model, reasoningEffort: "medium" });
-    const estimate = fullCompletionEstimate(model);
-    const meta = { id: "full-medium-filter", model, description: "full filter-schema completion at medium via LangChain", expect: "accepted" as const };
+  // Full completions through the production path
+  for (const { model, effort } of FULL_COMPLETIONS) {
+    const arm = makeArm({ model, reasoningEffort: effort });
+    const estimate = fullCompletionEstimate(model, effort);
+    const meta = {
+      id: `full-${effort}-filter`,
+      model,
+      description: `full filter-schema completion at ${effort} via LangChain`,
+      expect: "accepted" as const,
+    };
     if (spent + estimate > deps.maxSpendUsd) {
       results.push({ ...meta, outcome: "skipped", costUsd: 0, note: `would pass the $${deps.maxSpendUsd} cap` });
       continue;
     }
     const executed = await deps.executeCall({
-      callId: `probe-full-${model}`,
+      callId: `probe-full-${model}-${effort}`,
       role: "setup",
       arm,
       request: {

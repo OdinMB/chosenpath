@@ -11,7 +11,7 @@ import {
 import { resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type Snapshot } from "./cases.js";
-import { jobEstimateUsd, planJobs, type PlanOptions } from "./jobPlan.js";
+import { jobEstimateUsd, planJobs, requestChars, type PlanOptions } from "./jobPlan.js";
 import { estimateCheckCost, probeChecks } from "./probe.js";
 import { finishedJobKeys, keyOf, type CallRecord, type Job } from "./runner.js";
 
@@ -51,16 +51,17 @@ export async function localCases(sources: LocalCaseSources) {
 export function buildEstimate(local: LocalCases): number {
   const beatChars = local.cases
     .filter((c) => c.role === "beat")
-    .map((c) => beatStep.request(caseStory(c)).prompt.length)
+    .map((c) => requestChars(beatStep.request(caseStory(c))))
     .sort((a, b) => a - b);
-  const medianBeatChars = beatChars[Math.floor(beatChars.length / 2)] ?? 60_000;
+  const medianBeatChars = beatChars[Math.floor(beatChars.length / 2)] ?? 80_000;
   return local.requests.reduce((sum, r) => {
     const est = (role: EvalRole, promptChars: number) =>
       estimateCall({ role, arm: baselineArm(role, r.players > 1), players: r.players, promptChars }).costUsd;
-    const known = est(r.role, r.request.prompt.length);
+    const known = est(r.role, requestChars(r.request));
     if (!r.caseId.startsWith("switch-tpl-")) return sum + known;
-    const beat = est("beat", medianBeatChars + 4_000 * (r.players - 1));
-    const thread = r.players > 1 ? est("thread", r.request.prompt.length) : 0;
+    // Each extra player adds prompt and schema (probe: the beat schema is about 4.5K tokens at 1p, 15K at 3p)
+    const beat = est("beat", medianBeatChars + 30_000 * (r.players - 1));
+    const thread = r.players > 1 ? est("thread", requestChars(r.request)) : 0;
     return sum + known + beat + thread;
   }, 0);
 }
@@ -122,7 +123,7 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   ];
   const caps = resolveCaps({}).caps;
   const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0);
-  log(`\nProbe: about $${probeEstimate.toFixed(2)} before the two full completions (checks over the cap are skipped)`);
+  log(`\nProbe: about $${probeEstimate.toFixed(2)} before the three full completions, about $0.08 (checks over the cap are skipped)`);
   for (const [label, stage, jobs] of rows) {
     const open = jobs.filter((j) => !finished.has(keyOf(j)));
     const cost = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);

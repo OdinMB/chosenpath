@@ -10,6 +10,8 @@ import {
   resolveCaps,
   spentByStage,
 } from "../../../../src/evals/textModelEval/budget.js";
+import { z } from "zod";
+import { requestChars } from "../../../../src/evals/textModelEval/jobPlan.js";
 
 describe("costFromUsage", () => {
   it("bills uncached, cached, cache-write and output tokens separately", () => {
@@ -43,6 +45,13 @@ describe("arm keys and estimates", () => {
     const enough = estimateCall({ ...base, measuredOutputTokens: [900, 1_000, 5_000] });
     expect(enough.outputTokens).toBe(1_000);
     expect(enough.inputTokens).toBe(1_000);
+  });
+
+  it("counts the schema as input, since OpenAI bills it", () => {
+    const schema = z.object({ answer: z.string().describe("x".repeat(2_000)) });
+    const chars = requestChars({ prompt: "p".repeat(1_000), schema });
+    expect(chars).toBeGreaterThan(3_000);
+    expect(chars).toBeLessThan(3_500);
   });
 });
 
