@@ -15,6 +15,31 @@ export type SplitTextRequest = {
   schema: z.ZodTypeAny;
 };
 
+/**
+ * How the schema carries its list counts.
+ * - "exact": Stage 4 as it ran, kept so its records stay reproducible. Counts
+ *   are enforced (minItems/maxItems, several with minItems equal to maxItems),
+ *   and several descriptions leave the count out. Under strict structured
+ *   output a model that wants fewer items cannot close the list, so it pads
+ *   whitespace or writes blank items.
+ * - "worded": the count fix. No minItems anywhere; maxItems only where a cap
+ *   helps (it only lets the model close early); every count in words in its
+ *   field's description, as production words it; and one fixed rule that no
+ *   list item is empty.
+ */
+export type RewriteCounts = "exact" | "worded";
+
+/** The worded form's one rule about list items (fixed text, so it caches). */
+export const NO_EMPTY_ITEMS = "Every item in a list carries real content; a list never holds an empty or blank item.";
+
+/** The closing lines of the fixed rules: the reply format's own rules. */
+export function replyFormatLines(counts: RewriteCounts): string[] {
+  return [
+    ...(counts === "worded" ? [NO_EMPTY_ITEMS] : []),
+    "The field descriptions in the reply format are part of these instructions.",
+  ];
+}
+
 function required(text: string, anchor: string, name: string): number {
   const at = text.indexOf(anchor);
   if (at < 0) throw new Error(`Stage 4 rewrite: ${name} anchor "${anchor}" not found`);

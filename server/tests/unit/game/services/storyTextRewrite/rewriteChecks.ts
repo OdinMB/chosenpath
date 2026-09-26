@@ -33,6 +33,15 @@ export function find(value: Json, path: string[]): Json {
   }, value);
 }
 
+/** Every minItems and maxItems in the JSON schema, as "<keyword> at <path>", in document order. */
+export function countKeywords(value: Json, path = ""): string[] {
+  if (Array.isArray(value)) return value.flatMap((inner, i) => countKeywords(inner, `${path}.${i}`));
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, inner]) =>
+    key === "minItems" || key === "maxItems" ? [`${key} at ${path || "."}`] : countKeywords(inner, `${path}.${key}`)
+  );
+}
+
 /** An array schema's minItems and maxItems, where set. */
 export function countOf(value: Json): { minItems?: number; maxItems?: number } {
   if (!isRecord(value)) throw new Error("not a schema object");

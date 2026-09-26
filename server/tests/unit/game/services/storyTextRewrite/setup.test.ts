@@ -6,8 +6,9 @@ import {
   productionExamples,
   rewriteSetupRequest,
 } from "../../../../../src/game/services/storyTextRewrite/setup.js";
+import { NO_EMPTY_ITEMS, type RewriteCounts } from "../../../../../src/game/services/storyTextRewrite/common.js";
 import { slotsOf } from "../../../../helpers/promptStories.js";
-import { allCapsWords, countOf, descriptionsOf, find, repeatedSentences, withoutCounts } from "./rewriteChecks.js";
+import { allCapsWords, countKeywords, countOf, descriptionsOf, find, repeatedSentences, withoutCounts } from "./rewriteChecks.js";
 
 const PREMISES = ["A lighthouse keeper's last winter", "Two rival bakers share one oven in a floating market"];
 const MULTIPLAYER_MODES: GameMode[] = [GameModes.Cooperative, GameModes.Competitive, GameModes.CooperativeCompetitive];
@@ -16,21 +17,27 @@ const INPUTS: [PlayerCount, GameMode][] = [
   ...([2, 3] as PlayerCount[]).flatMap((players) => MULTIPLAYER_MODES.map((mode): [PlayerCount, GameMode] => [players, mode])),
 ];
 const CASES = [true, false].flatMap((withExamples) => INPUTS.map(([players, mode]) => [withExamples, players, mode] as const));
+/** exact: the Stage 4 form as it ran (its records stay reproducible); worded: the count fix. */
+const FORMS: RewriteCounts[] = ["exact", "worded"];
+const FORM_INPUTS = FORMS.flatMap((counts) => INPUTS.map(([players, mode]) => [counts, players, mode] as const));
+const FORM_CASES = FORMS.flatMap((counts) => CASES.map(([withExamples, players, mode]) => [counts, withExamples, players, mode] as const));
 
-const rewrite = (players: PlayerCount, mode: GameMode, withExamples: boolean, premise = PREMISES[0]) =>
-  rewriteSetupRequest(premise, players, mode, 25, withExamples);
+const rewrite = (players: PlayerCount, mode: GameMode, withExamples: boolean, premise = PREMISES[0], counts: RewriteCounts = "exact") =>
+  rewriteSetupRequest(premise, players, mode, 25, withExamples, counts);
 const production = (players: PlayerCount, mode: GameMode, premise = PREMISES[0]) => setupStep.request(premise, players, mode, 25, "story");
 
 const examplesSectionOf = (players: PlayerCount, mode: GameMode) => `\n\n${EXAMPLES_HEADING}\n\n${productionExamples(production(players, mode).prompt)}`;
 
 describe("rewriteSetupRequest", () => {
-  it.each([true, false])("with examples %s: fixed is identical across premises and game modes within each player-count class", (withExamples) => {
+  const FORM_EXAMPLES = FORMS.flatMap((counts) => [true, false].map((withExamples) => [counts, withExamples] as const));
+
+  it.each(FORM_EXAMPLES)("%s counts, with examples %s: fixed is identical across premises and game modes within each player-count class", (counts, withExamples) => {
     const classOf = (players: PlayerCount) => (players > 1 ? "multiplayer" : "single-player");
     const byClass = new Map<string, Set<string>>();
     for (const [players, mode] of INPUTS) {
       for (const premise of PREMISES) {
         const set = byClass.get(classOf(players)) ?? new Set<string>();
-        set.add(rewrite(players, mode, withExamples, premise).fixed);
+        set.add(rewrite(players, mode, withExamples, premise, counts).fixed);
         byClass.set(classOf(players), set);
       }
     }
@@ -38,11 +45,24 @@ describe("rewriteSetupRequest", () => {
     expect(byClass.get("single-player")).not.toEqual(byClass.get("multiplayer"));
   });
 
-  it.each(INPUTS)("%i players, %s: without examples, fixed is the with-examples text minus its examples section", (players, mode) => {
+  it.each(FORM_INPUTS)("%s counts, %i players, %s: without examples, fixed is the with-examples text minus its examples section", (counts, players, mode) => {
     const section = examplesSectionOf(players, mode);
-    const withExamples = rewrite(players, mode, true).fixed;
+    const withExamples = rewrite(players, mode, true, PREMISES[0], counts).fixed;
     expect(withExamples.split(section)).toHaveLength(2);
-    expect(withExamples.replace(section, "")).toBe(rewrite(players, mode, false).fixed);
+    expect(withExamples.replace(section, "")).toBe(rewrite(players, mode, false, PREMISES[0], counts).fixed);
+  });
+
+  it("builds the Stage 4 form by default", () => {
+    const sent = (request: ReturnType<typeof rewriteSetupRequest>) => ({ ...request, schema: JSON.stringify(toJsonSchema(request.schema)) });
+    expect(sent(rewriteSetupRequest(PREMISES[0], 2, GameModes.Cooperative, 25, true))).toEqual(sent(rewrite(2, GameModes.Cooperative, true, PREMISES[0], "exact")));
+  });
+
+  it.each(CASES)("with examples %s, %i players, %s: the count fix's fixed text is the Stage 4 form's plus the line that no list item is empty", (withExamples, players, mode) => {
+    const exact = rewrite(players, mode, withExamples).fixed;
+    const worded = rewrite(players, mode, withExamples, PREMISES[0], "worded").fixed;
+    expect(exact).not.toContain(NO_EMPTY_ITEMS);
+    expect(worded.split(NO_EMPTY_ITEMS)).toHaveLength(2);
+    expect(worded.replace(`${NO_EMPTY_ITEMS}\n`, "")).toBe(exact);
   });
 
   it.each([[1, GameModes.SinglePlayer], [3, GameModes.Cooperative]] as [PlayerCount, GameMode][])(
@@ -65,21 +85,62 @@ describe("rewriteSetupRequest", () => {
     expect(() => productionExamples(prompt)).toThrow('"EXAMPLE STAT SETUPS" found 2 times before the configuration');
   });
 
-  it.each(CASES)("with examples %s, %i players, %s: the per-call message is production's configuration block, premise included", (withExamples, players, mode) => {
+  it.each(FORM_CASES)("%s counts, with examples %s, %i players, %s: the per-call message is production's configuration block, premise included", (counts, withExamples, players, mode) => {
     const prompt = production(players, mode, PREMISES[1]).prompt;
-    const { perCall } = rewrite(players, mode, withExamples, PREMISES[1]);
+    const { perCall } = rewrite(players, mode, withExamples, PREMISES[1], counts);
     expect(perCall).toBe(prompt.slice(prompt.indexOf("Number of players:")));
     expect(perCall).toContain(`<premise>\n${PREMISES[1]}\n</premise>`);
   });
 });
 
 describe("the rewrite's schema", () => {
-  it.each(INPUTS)("%i players, %s: production's field set, types, key order and shared references", (players, mode) => {
+  it.each(FORM_INPUTS)("%s counts, %i players, %s: production's field set, types, key order and shared references", (counts, players, mode) => {
     const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(withoutCounts(toJsonSchema(schema)));
-    expect(json(rewrite(players, mode, true).schema)).toBe(json(production(players, mode).schema));
+    expect(json(rewrite(players, mode, true, PREMISES[0], counts).schema)).toBe(json(production(players, mode).schema));
   });
 
-  it.each(INPUTS)("%i players, %s: counts at every path of table SS", (players, mode) => {
+  it.each(INPUTS)("worded counts, %i players, %s: caps only, no minItems anywhere, and one stat and one player instance still shared", (players, mode) => {
+    const json = toJsonSchema(rewrite(players, mode, true, PREMISES[0], "worded").schema);
+    expect(countKeywords(json).filter((keyword) => keyword.startsWith("minItems"))).toEqual([]);
+    const at = (...path: string[]) => countOf(find(json, ["properties", ...path]));
+    const upToThree = { maxItems: 3 };
+    expect(at("storyElements")).toEqual({ maxItems: 8 });
+    expect(at("storyElements", "items", "properties", "facts")).toEqual(upToThree);
+    expect(at("guidelines", "properties", "typesOfThreads")).toEqual({ maxItems: 8 });
+    expect(at("guidelines", "properties", "switchAndThreadInstructions")).toEqual(upToThree);
+    expect(at("statGroups")).toEqual(upToThree);
+    expect(at("sharedStats", "items", "properties", "effectOnPoints")).toEqual({});
+    expect(find(json, ["properties", "playerStats", "items"])).toEqual({ $ref: "#/properties/sharedStats/items" });
+    expect(at("characterSelectionPlan", "properties", "playerStatConversionRates")).toEqual(upToThree);
+    expect(at("characterSelectionPlan", "properties", "backgroundArchetypes")).toEqual(upToThree);
+    expect(at("characterSelectionPlan", "properties", "multiplayerCoordination")).toEqual(players > 1 ? upToThree : {});
+    expect(at("player1", "properties", "outcomes")).toEqual(upToThree);
+    expect(at("player1", "properties", "possibleCharacterIdentities")).toEqual(upToThree);
+    expect(at("player1", "properties", "possibleCharacterBackgrounds")).toEqual(upToThree);
+    for (const slot of slotsOf(players).slice(1)) {
+      expect(find(json, ["properties", slot])).toEqual({ $ref: "#/properties/player1" });
+    }
+  });
+
+  it.each(INPUTS)("worded counts, %i players, %s: every count in words in its field's description (the outcomes' in the fixed rules)", (players, mode) => {
+    const request = rewrite(players, mode, true, PREMISES[0], "worded");
+    const json = toJsonSchema(request.schema);
+    const description = (...path: string[]) => String(find(json, ["properties", ...path, "description"]));
+    expect(description("storyElements")).toContain("List of 6-8 important elements in the story");
+    expect(description("storyElements", "items", "properties", "facts")).toMatch(/^Three additional facts/);
+    expect(description("guidelines", "properties", "typesOfThreads")).toMatch(/^6-8 types of threads/);
+    expect(description("guidelines", "properties", "switchAndThreadInstructions")).toContain("Generate 0-3 instructions.");
+    expect(description("statGroups")).toContain("Maximum of 3 groups.");
+    expect(description("sharedStats", "items", "properties", "effectOnPoints")).toContain("List at least 3 ways in which this stat can be relevant");
+    expect(description("characterSelectionPlan", "properties", "playerStatConversionRates")).toMatch(/^List three rough conversion rates/);
+    expect(description("characterSelectionPlan", "properties", "backgroundArchetypes")).toMatch(/^Outline exactly 3 generic archetypes/);
+    if (players > 1) expect(description("characterSelectionPlan", "properties", "multiplayerCoordination")).toContain("List three mechanisms");
+    expect(description("player1", "properties", "possibleCharacterIdentities")).toMatch(/^Generate exactly 3 possible identities/);
+    expect(description("player1", "properties", "possibleCharacterBackgrounds")).toMatch(/^Generate exactly 3 possible backgrounds/);
+    expect(request.fixed).toContain("Every player has 3 outcomes, counting shared ones");
+  });
+
+  it.each(INPUTS)("exact counts, %i players, %s: counts at every path of table SS", (players, mode) => {
     const json = toJsonSchema(rewrite(players, mode, true).schema);
     const at = (...path: string[]) => countOf(find(json, ["properties", ...path]));
     const exactlyThree = { minItems: 3, maxItems: 3 };
@@ -102,8 +163,8 @@ describe("the rewrite's schema", () => {
     }
   });
 
-  it.each(INPUTS)("%i players, %s: keeps every field that story creation reads", (players, mode) => {
-    const schema = rewrite(players, mode, false).schema;
+  it.each(FORM_INPUTS)("%s counts, %i players, %s: keeps every field that story creation reads", (counts, players, mode) => {
+    const schema = rewrite(players, mode, false, PREMISES[0], counts).schema;
     const shape = "shape" in schema && typeof schema.shape === "object" && schema.shape !== null ? schema.shape : {};
     const read = [
       "title", "imageInstructions", "guidelines", "storyElements", "sharedOutcomes", "sharedStats", "playerStats",
@@ -148,18 +209,26 @@ const SETUP_RULES: Rule[] = [
   { id: "S18 configuration", part: "perCall", applies: always, pattern: "Number of players:" },
 ];
 
+/** The count fix's rule: in the fixed text of the worded form only. */
+const noEmptyItems = (counts: RewriteCounts): Rule => ({
+  id: "no empty list items",
+  part: "fixed",
+  applies: () => counts === "worded",
+  pattern: "a list never holds an empty or blank item",
+});
+
 const occurrences = (text: string, pattern: string) => text.split(pattern).length - 1;
 
 describe("every rule of table S, once, where the table puts it", () => {
-  it.each(CASES)("with examples %s, %i players, %s", (withExamples, players, mode) => {
-    const request = rewrite(players, mode, withExamples);
+  it.each(FORM_CASES)("%s counts, with examples %s, %i players, %s", (counts, withExamples, players, mode) => {
+    const request = rewrite(players, mode, withExamples, PREMISES[0], counts);
     const parts: Record<Part, string> = {
       fixed: request.fixed,
       perCall: request.perCall,
       schema: descriptionsOf(toJsonSchema(request.schema)).join("\n"),
     };
     const on = { multiplayer: players > 1, withExamples };
-    for (const rule of SETUP_RULES) {
+    for (const rule of [...SETUP_RULES, noEmptyItems(counts)]) {
       const found = Object.fromEntries((Object.keys(parts) as Part[]).map((part) => [part, occurrences(parts[part], rule.pattern)]));
       const expected = { fixed: 0, perCall: 0, schema: 0, ...(rule.applies(on) ? { [rule.part]: 1 } : {}) };
       expect({ rule: rule.id, found }).toEqual({ rule: rule.id, found: expected });
@@ -168,8 +237,8 @@ describe("every rule of table S, once, where the table puts it", () => {
 });
 
 describe("stated once, without shouting (the examples and the configuration block are production's, and exempt)", () => {
-  it.each(INPUTS)("%i players, %s", (players, mode) => {
-    const request = rewrite(players, mode, true);
+  it.each(FORM_INPUTS)("%s counts, %i players, %s", (counts, players, mode) => {
+    const request = rewrite(players, mode, true, PREMISES[0], counts);
     const fixed = request.fixed.replace(examplesSectionOf(players, mode), "");
     const texts = [fixed, ...descriptionsOf(toJsonSchema(request.schema))];
     expect(repeatedSentences(texts)).toEqual([]);
@@ -197,9 +266,9 @@ const RESTATED_BY_PRODUCTION_DESCRIPTIONS = [
 ];
 
 describe("no rule in the fixed text is restated in a field description", () => {
-  it.each(INPUTS)("%i players, %s", (players, mode) => {
+  it.each(FORM_INPUTS)("%s counts, %i players, %s", (counts, players, mode) => {
     const inProduction = descriptionsOf(toJsonSchema(production(players, mode).schema)).join("\n");
-    const inRewrite = descriptionsOf(toJsonSchema(rewrite(players, mode, true).schema)).join("\n");
+    const inRewrite = descriptionsOf(toJsonSchema(rewrite(players, mode, true, PREMISES[0], counts).schema)).join("\n");
     for (const clause of RESTATED_BY_PRODUCTION_DESCRIPTIONS) {
       expect({ clause, inProduction: inProduction.includes(clause), inRewrite: inRewrite.includes(clause) }).toEqual({
         clause,

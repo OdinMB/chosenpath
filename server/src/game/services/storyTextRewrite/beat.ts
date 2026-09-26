@@ -2,16 +2,27 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION } from "../prompts/BeatPromptService.js";
 import { beatStep } from "../storyTextSteps.js";
-import { asArray, asDiscriminatedUnion, asObject, asUnion, reworded, textFrom, type SplitTextRequest } from "./common.js";
+import {
+  asArray,
+  asDiscriminatedUnion,
+  asObject,
+  asUnion,
+  replyFormatLines,
+  reworded,
+  textFrom,
+  type RewriteCounts,
+  type SplitTextRequest,
+} from "./common.js";
 
 /*
  * Stage 4 of the text-model eval: the single-player beat request rewritten
- * in GPT-6 style. The fixed rules (identical for every beat call, so they
- * cache) state each rule once; the per-call message holds this beat's
- * branch instructions, then production's story state verbatim; the schema
- * is production's field set and key order with the named descriptions
- * rewritten, the rules the prompt states cut from the others, and the array
- * counts enforced. Eval only: the harness's
+ * in GPT-6 style. The fixed rules (identical for every beat call of a counts
+ * form, so they cache) state each rule once; the per-call message holds this
+ * beat's branch instructions, then production's story state verbatim; the
+ * schema is production's field set and key order with the named descriptions
+ * rewritten, the rules the prompt states cut from the others, and the list
+ * counts in one of two forms (RewriteCounts: Stage 4's enforced counts, or
+ * the count fix's worded counts and caps). Eval only: the harness's
  * variants.ts is the one caller, and production keeps storyTextSteps.ts.
  */
 
@@ -40,7 +51,7 @@ const PHRASES_TO_AVOID = [
   "genuinely",
 ];
 
-const BEAT_FIXED = [
+const BEAT_RULES = [
   "You are the narrator of an interactive story game. You write the next beat of the story for one player, in the tone that the story's guidelines set.",
   "",
   "Prose style",
@@ -76,8 +87,9 @@ const BEAT_FIXED = [
   "- When a beat has options, the stats shape which options exist, through the story rather than the points: when a force|agility stat leans towards force, the options are forceful rather than sneaky.",
   "- Offer sacrifice and reward options only for stats whose definitions allow them.",
   "",
-  "The field descriptions in the reply format are part of these instructions.",
-].join("\n");
+];
+
+const beatFixed = (counts: RewriteCounts) => [...BEAT_RULES, ...replyFormatLines(counts)].join("\n");
 
 // ---------------------------------------------------------------- per call
 
@@ -204,8 +216,11 @@ const IMAGE_REQUEST_ADDITION =
   "A character analysing magic glyphs calls for a new image rather than their generic one; an existing picture of a flock of birds needs no new one just because the weather changed. " +
   GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION;
 
-const OPTIONS_DESCRIPTION = [
-  "The player's choices at the end of this beat, as a set:",
+/**
+ * The options as a set, after the count line. The game needs exactly three:
+ * an exploration thread's step maps options to its three resolutions by index.
+ */
+const OPTION_RULES = [
   '- Be specific. Bad: "Propose a compromise". Good: say what the compromise is. Bad: "Create a diversion". Good: "Divert the guards by throwing some gold coins around."',
   "- Name only the action or decision, never its actual or likely consequences. A sacrifice or reward option names the stat it trades, so the player knows the trade-off, and leaves the words sacrifice and reward out.",
   "- Stay in the scene: no option leaves it, suddenly does something else, or derails the core theme of the switch or thread.",
@@ -213,18 +228,33 @@ const OPTIONS_DESCRIPTION = [
   "- At most one option in the set is a sacrifice or reward option, and the others are normal. A sacrifice is always lost and a reward always gained, whatever the result.",
   '- Word sacrifice and reward options with flavour. Bad: "Sacrifice 10% emotional stability for a higher chance of catching his attention." Good: "Bite your lips (-10% stability) and intercept Adrian directly."',
   "- Offer nothing similar to the options this player already had in this thread.",
-].join("\n");
+];
 
-const INTERLUDES_DESCRIPTION = [
-  "Snippets the player sees while the next beat is being written:",
+const optionsDescription = (counts: RewriteCounts) =>
+  [
+    counts === "worded" ? "Exactly three choices for the player at the end of this beat, as a set:" : "The player's choices at the end of this beat, as a set:",
+    ...OPTION_RULES,
+  ].join("\n");
+
+/** Rule B32 allows two to four: one inner thought, one or two about elements, at most one about the world. */
+const INTERLUDE_RULES = [
   "- one stream of consciousness of the player character this beat is for, in the first person, with specific associations, emotions and unfinished thoughts rather than a polished monologue (imageId = the player's slot). Only this character's thoughts, since the player cannot know anyone else's;",
   "- one or two about story elements that matter in this beat (imageId = the element's id);",
   "- at most one about the world in general (any available imageId, or cover for the story's cover image).",
   'Imply interesting details instead of spelling them out: "The Guild Hall is right behind the dry canal." (Why is the canal dry?) "The dream distillery is surrounded by scaffolding." (What is a dream distillery?) When the story has no images, the interludes keep their text and use imageSource none.',
-].join("\n");
+];
+
+const interludesDescription = (counts: RewriteCounts) =>
+  [
+    counts === "worded" ? "Two to four snippets the player sees while the next beat is being written:" : "Snippets the player sees while the next beat is being written:",
+    ...INTERLUDE_RULES,
+  ].join("\n");
+
+const MODIFIERS_DESCRIPTION =
+  "most relevant stats (individual or shared) whose current values raise or lower this option's chance of success. Leave out the bonus or malus of a sacrifice or reward, which the game adds on its own. Count negative effects as well as positive ones, and use only stats that exist in the story state.";
 
 /** Production's two option kinds with the rewritten resource, text and modifier descriptions. */
-function rewrittenOptionKinds(options: z.ZodArray<z.ZodTypeAny>) {
+function rewrittenOptionKinds(options: z.ZodArray<z.ZodTypeAny>, counts: RewriteCounts) {
   const union = asDiscriminatedUnion(options.element, "option");
   const [exploration, challenge] = union.options.map((option, i) => asObject(option, `option kind ${i + 1}`));
   const modifiers = asArray(challenge.shape.modifiersToSuccessRate, "modifiersToSuccessRate");
@@ -252,19 +282,21 @@ function rewrittenOptionKinds(options: z.ZodArray<z.ZodTypeAny>) {
           })
         )
         .max(2)
-        .describe(
-          "The most relevant stats (individual or shared) whose current values raise or lower this option's chance of success. Leave out the bonus or malus of a sacrifice or reward, which the game adds on its own. Count negative effects as well as positive ones, and use only stats that exist in the story state."
-        ),
+        .describe(counts === "worded" ? `Up to two of the ${MODIFIERS_DESCRIPTION}` : `The ${MODIFIERS_DESCRIPTION}`),
     }),
   ]);
 }
 
-function rewrittenPlan(plan: z.AnyZodObject, scaffold: RewriteScaffold): z.AnyZodObject {
-  const showDontTell = asArray(plan.shape.showDontTell, "showDontTell")
-    .length(3)
-    .describe(
-      "The most important actions and developments this beat covers, each with a short pointer on how to show it rather than tell it (concrete actions, direct speech). From the second beat on, the first is the player carrying out the action they chose, and how it plays out."
-    );
+const SHOW_DONT_TELL_DESCRIPTION =
+  "most important actions and developments this beat covers, each with a short pointer on how to show it rather than tell it (concrete actions, direct speech). From the second beat on, the first is the player carrying out the action they chose, and how it plays out.";
+
+function rewrittenPlan(plan: z.AnyZodObject, scaffold: RewriteScaffold, counts: RewriteCounts): z.AnyZodObject {
+  const points = asArray(plan.shape.showDontTell, "showDontTell");
+  // Production asks for no count; the plan is private, so a cap only keeps it short
+  const showDontTell =
+    counts === "worded"
+      ? points.max(3).describe(`One to three of the ${SHOW_DONT_TELL_DESCRIPTION}`)
+      : points.length(3).describe(`The ${SHOW_DONT_TELL_DESCRIPTION}`);
   // The fixed rules state when to add an element and how to link a fact; these descriptions keep what the field holds
   const kept = {
     showDontTell,
@@ -296,25 +328,26 @@ function rewrittenPlan(plan: z.AnyZodObject, scaffold: RewriteScaffold): z.AnyZo
   });
 }
 
-function rewrittenPlayer(player: z.AnyZodObject, story: Story, scaffold: RewriteScaffold): z.AnyZodObject {
+function rewrittenPlayer(player: z.AnyZodObject, story: Story, scaffold: RewriteScaffold, counts: RewriteCounts): z.AnyZodObject {
   const options = asArray(player.shape.options, "options");
-  const optionList = z.array(rewrittenOptionKinds(options));
+  const optionList = z.array(rewrittenOptionKinds(options, counts));
   const ending = story.getCurrentBeatType() === "ending";
   const imageRequest: z.ZodTypeAny | undefined = player.shape.imageRequest;
+  const interludes = asArray(player.shape.interludes, "interludes");
   return player.extend({
-    plan: rewrittenPlan(asObject(player.shape.plan, "plan"), scaffold),
+    plan: rewrittenPlan(asObject(player.shape.plan, "plan"), scaffold, counts),
     // The per-call instructions name this beat's title
     title: player.shape.title.describe("The beat's title, as this beat's instructions give it."),
     ...(imageRequest ? { imageRequest: imageRequest.describe(`${imageRequest.description ?? ""} ${IMAGE_REQUEST_ADDITION}`) } : {}),
     text: player.shape.text.describe(textDescription(story)),
     options: ending
       ? optionList.describe("The story ends with this beat, so this list stays empty.")
-      : optionList.length(3).describe(OPTIONS_DESCRIPTION),
-    interludes: asArray(player.shape.interludes, "interludes").length(3).describe(INTERLUDES_DESCRIPTION),
+      : (counts === "worded" ? optionList.max(3) : optionList.length(3)).describe(optionsDescription(counts)),
+    interludes: (counts === "worded" ? interludes.max(4) : interludes.length(3)).describe(interludesDescription(counts)),
   });
 }
 
-function rewrittenSchema(production: z.AnyZodObject, story: Story, scaffold: RewriteScaffold): z.AnyZodObject {
+function rewrittenSchema(production: z.AnyZodObject, story: Story, scaffold: RewriteScaffold, counts: RewriteCounts): z.AnyZodObject {
   const root =
     scaffold === "slim" ? production.omit(omitting(["statsAffectingDecisionConsequences", "multiplayerCoordination"])) : production;
   // The fixed rules and the thread-resolved instruction carry the sacrifice, reward, adjustment and milestone rules
@@ -329,17 +362,20 @@ function rewrittenSchema(production: z.AnyZodObject, story: Story, scaffold: Rew
     ...(milestones instanceof z.ZodArray
       ? { newMilestones: reworded(milestones, " Create one item for each outcome of each thread that has been concluded.", "") }
       : {}),
-    player1: rewrittenPlayer(asObject(production.shape.player1, "player1"), story, scaffold),
+    player1: rewrittenPlayer(asObject(production.shape.player1, "player1"), story, scaffold, counts),
   });
 }
 
-/** The Stage 4 request for a single-player beat; a multiplayer story throws. */
-export function rewriteBeatRequest(story: Story, scaffold: RewriteScaffold): SplitTextRequest {
+/**
+ * The Stage 4 request for a single-player beat; a multiplayer story throws.
+ * counts: "exact" is Stage 4 as it ran, "worded" the count fix.
+ */
+export function rewriteBeatRequest(story: Story, scaffold: RewriteScaffold, counts: RewriteCounts = "exact"): SplitTextRequest {
   if (story.isMultiplayer()) throw new Error("Stage 4 rewrite covers single-player beats");
   const production = beatStep.request(story);
   return {
-    fixed: BEAT_FIXED,
+    fixed: beatFixed(counts),
     perCall: `${perCallInstructions(story)}\n\n${textFrom(production.prompt, STATE_MARKER, "story state")}`,
-    schema: rewrittenSchema(asObject(production.schema, "beat set"), story, scaffold),
+    schema: rewrittenSchema(asObject(production.schema, "beat set"), story, scaffold, counts),
   };
 }

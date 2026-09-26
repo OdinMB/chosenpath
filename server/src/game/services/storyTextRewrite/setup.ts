@@ -1,17 +1,28 @@
 import { z } from "zod";
 import { PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
 import { setupStep } from "../storyTextSteps.js";
-import { asArray, asObject, reworded, textBetween, textFrom, type SplitTextRequest } from "./common.js";
+import {
+  asArray,
+  asObject,
+  replyFormatLines,
+  reworded,
+  textBetween,
+  textFrom,
+  type RewriteCounts,
+  type SplitTextRequest,
+} from "./common.js";
 
 /*
  * Stage 4 of the text-model eval: the custom-story setup request rewritten
  * in GPT-6 style. The fixed rules state each rule once and are identical
- * within the single-player class and within the multiplayer class (so they
- * cache); the with-examples arm adds production's example stat setups
- * verbatim. The per-call message is production's configuration block with
- * the premise, verbatim. The schema is production's story-kind setup schema
- * with array counts enforced, and with the counts and the rules the fixed
- * text states dropped from the descriptions.
+ * within the single-player class and within the multiplayer class of a
+ * counts form (so they cache); the with-examples arm adds production's
+ * example stat setups verbatim. The per-call message is production's
+ * configuration block with the premise, verbatim. The schema is production's
+ * story-kind setup schema without the rules the fixed text states, and with
+ * the list counts in one of two forms (RewriteCounts): Stage 4's enforced
+ * counts, with the counts dropped from the descriptions, or the count fix's
+ * caps, with production's counts in words.
  * Eval only: the harness's variants.ts is the one caller.
  */
 
@@ -98,7 +109,6 @@ const DIFFICULTY_AND_PREMISE = [
   "",
   "If the premise is thin, odd or contradictory, use its most plausible reading and build a complete setup without commenting on the premise.",
   "",
-  "The field descriptions in the reply format are part of these instructions.",
 ];
 
 export const EXAMPLES_HEADING = "Example stat setups (for depth and shape; your setup fits its own premise):";
@@ -119,7 +129,7 @@ function examplesSection(productionPrompt: string): string[] {
   return ["", EXAMPLES_HEADING, "", productionExamples(productionPrompt)];
 }
 
-function setupFixed(multiplayer: boolean, examples: string[]): string {
+function setupFixed(multiplayer: boolean, examples: string[], counts: RewriteCounts): string {
   return [
     ...INTRODUCTION,
     "",
@@ -131,6 +141,7 @@ function setupFixed(multiplayer: boolean, examples: string[]): string {
     ...examples,
     ...characterLines(multiplayer),
     ...DIFFICULTY_AND_PREMISE,
+    ...replyFormatLines(counts),
   ].join("\n");
 }
 
@@ -153,17 +164,18 @@ function once<T extends z.ZodTypeAny>(rewrite: (production: z.ZodTypeAny) => T):
 const without = <T extends z.ZodTypeAny>(schema: T, ...passages: string[]): T =>
   passages.reduce((result, passage) => reworded(result, passage, ""), schema);
 
-function rewrittenStat(stat: z.ZodTypeAny): z.AnyZodObject {
+function rewrittenStat(stat: z.ZodTypeAny, counts: RewriteCounts): z.AnyZodObject {
   const object = asObject(stat, "stat");
-  const effects = reworded(
-    reworded(
-      asArray(object.shape.effectOnPoints, "effectOnPoints"),
-      "List 3 ways in which this stat can be relevant for the player's chance of success.",
-      "Each item is one way in which this stat can be relevant for the player's chance of success."
-    ),
-    "\nRemember: at least 3 items in this list!",
-    ""
-  );
+  // Production states "at least 3" twice; each form states it once (exact: enforces it and says what an item is)
+  const effects = without(asArray(object.shape.effectOnPoints, "effectOnPoints"), "\nRemember: at least 3 items in this list!");
+  const effectOnPoints =
+    counts === "worded"
+      ? reworded(effects, "List 3 ways in which", "List at least 3 ways in which")
+      : reworded(
+          effects,
+          "List 3 ways in which this stat can be relevant for the player's chance of success.",
+          "Each item is one way in which this stat can be relevant for the player's chance of success."
+        ).min(3);
   // The fixed rules (section 4) carry the type preference, naming, visibility, backgrounds and outcome-tracking rules
   return without(
     object.extend({
@@ -172,7 +184,7 @@ function rewrittenStat(stat: z.ZodTypeAny): z.AnyZodObject {
         "\nAs a general tendency, favor string and string[] over percentage/opposites/number unless for countable things whose management is central to the story (number), and percentages/opposites for aspects that must be managed by the player often and granularly."
       ),
       name: without(object.shape.name, "\n- Must be specific and immediately convey the stat's meaning and function."),
-      effectOnPoints: effects.min(3),
+      effectOnPoints,
       isVisible: object.shape.isVisible.describe("Whether this stat is visible to the player."),
       partOfPlayerBackgrounds: without(
         object.shape.partOfPlayerBackgrounds,
@@ -191,83 +203,99 @@ function rewrittenBackground(background: z.ZodTypeAny): z.AnyZodObject {
   );
 }
 
-function rewrittenPlayer(player: z.ZodTypeAny): z.AnyZodObject {
+function rewrittenPlayer(player: z.ZodTypeAny, counts: RewriteCounts): z.AnyZodObject {
   const object = asObject(player, "player");
+  const identities = asArray(object.shape.possibleCharacterIdentities, "possibleCharacterIdentities");
   const backgrounds = asArray(object.shape.possibleCharacterBackgrounds, "possibleCharacterBackgrounds");
+  const backgroundList = z.array(rewrittenBackground(backgrounds.element));
   return object.extend({
-    // sharedOutcomes carries the same sentence; the player's copy says it without repeating it
+    // sharedOutcomes carries the same sentence; the player's copy says it without repeating it. Section 3 of the fixed rules gives the count.
     outcomes: reworded(
       asArray(object.shape.outcomes, "outcomes"),
       " No intermediate outcomes, only elements of the ending.",
       " Like the shared outcomes, they are elements of the ending only."
     ).max(3),
-    possibleCharacterIdentities: asArray(object.shape.possibleCharacterIdentities, "possibleCharacterIdentities")
-      .length(3)
-      .describe("Identities the player can choose from."),
-    possibleCharacterBackgrounds: described(
-      z.array(rewrittenBackground(backgrounds.element)).length(3),
-      reworded(backgrounds, "Generate exactly 3 possible backgrounds", "Possible backgrounds")
-    ),
+    // The game shows as many as there are; production asks for exactly 3 in words, and so does the worded form
+    possibleCharacterIdentities:
+      counts === "worded" ? identities.max(3) : identities.length(3).describe("Identities the player can choose from."),
+    possibleCharacterBackgrounds:
+      counts === "worded"
+        ? described(backgroundList.max(3), backgrounds)
+        : described(backgroundList.length(3), reworded(backgrounds, "Generate exactly 3 possible backgrounds", "Possible backgrounds")),
   });
 }
 
-function rewrittenCharacterPlan(plan: z.AnyZodObject, multiplayer: boolean): z.AnyZodObject {
+function rewrittenCharacterPlan(plan: z.AnyZodObject, multiplayer: boolean, counts: RewriteCounts): z.AnyZodObject {
   const coordination = asArray(plan.shape.multiplayerCoordination, "multiplayerCoordination");
+  // Section 7 of the fixed rules says the backgrounds balance
+  const rates = without(
+    asArray(plan.shape.playerStatConversionRates, "playerStatConversionRates"),
+    " This will help ensure that the background options for each player are balanced, with no option being clearly better than another."
+  );
+  const archetypes = asArray(plan.shape.backgroundArchetypes, "backgroundArchetypes");
+  // Planning fields: nothing reads them after generation, so the worded form keeps production's "three" as a cap
+  if (counts === "worded") {
+    return plan.extend({
+      ...(multiplayer ? { multiplayerCoordination: coordination.max(3) } : {}),
+      playerStatConversionRates: rates.max(3),
+      backgroundArchetypes: archetypes.max(3),
+    });
+  }
   return plan.extend({
     ...(multiplayer
       ? { multiplayerCoordination: reworded(coordination, " List three mechanisms", " Mechanisms").length(3) }
       : {}),
-    // Section 7 of the fixed rules says the backgrounds balance
-    playerStatConversionRates: without(
-      reworded(asArray(plan.shape.playerStatConversionRates, "playerStatConversionRates"), "List three rough conversion rates", "Rough conversion rates"),
-      " This will help ensure that the background options for each player are balanced, with no option being clearly better than another."
-    ).length(3),
-    backgroundArchetypes: reworded(asArray(plan.shape.backgroundArchetypes, "backgroundArchetypes"), "Outline exactly 3 generic", "Outline generic").length(3),
+    playerStatConversionRates: reworded(rates, "List three rough conversion rates", "Rough conversion rates").length(3),
+    backgroundArchetypes: reworded(archetypes, "Outline exactly 3 generic", "Outline generic").length(3),
   });
 }
 
-function rewrittenSchema(production: z.AnyZodObject, playerCount: PlayerCount): z.AnyZodObject {
+/** Story elements with their facts: 6-8 elements of three facts each, in production's words. */
+function rewrittenElements(elements: z.ZodArray<z.ZodTypeAny>, counts: RewriteCounts): z.ZodArray<z.AnyZodObject> {
+  const element = asObject(elements.element, "story element");
+  const facts = asArray(element.shape.facts, "facts");
+  if (counts === "worded") {
+    // Production's prompt asks for 6-8; the rewrite's fixed rules give only the mix, so the total goes here
+    return described(
+      z.array(element.extend({ facts: facts.max(3) })).max(8),
+      reworded(elements, "List of important elements", "List of 6-8 important elements")
+    );
+  }
+  return described(
+    z.array(element.extend({ facts: reworded(facts, "Three additional facts", "Additional facts").length(3) })).min(6).max(8),
+    elements
+  );
+}
+
+function rewrittenSchema(production: z.AnyZodObject, playerCount: PlayerCount, counts: RewriteCounts): z.AnyZodObject {
   const shape = production.shape;
   const guidelines = asObject(shape.guidelines, "guidelines");
-  const elements = asArray(shape.storyElements, "storyElements");
-  const element = asObject(elements.element, "story element");
   const difficulty = asObject(shape.difficultyLevel, "difficultyLevel");
-  const stat = once(rewrittenStat);
-  const player = once(rewrittenPlayer);
+  const stat = once((instance) => rewrittenStat(instance, counts));
+  const player = once((instance) => rewrittenPlayer(instance, counts));
   // Section 4 of the fixed rules gives the counts and what goes in each list; the descriptions keep what the field is
   const statList = (key: string, description: string) => z.array(stat(asArray(shape[key], key).element)).describe(description);
   const slots = Object.keys(shape).filter((key) => PLAYER_SLOTS.includes(key));
+  const threadTypes = asArray(guidelines.shape.typesOfThreads, "typesOfThreads");
+  const instructions = asArray(guidelines.shape.switchAndThreadInstructions, "switchAndThreadInstructions");
+  const groups = asArray(shape.statGroups, "statGroups");
   return production.extend({
     guidelines: guidelines.extend({
-      typesOfThreads: reworded(asArray(guidelines.shape.typesOfThreads, "typesOfThreads"), "6-8 types of threads", "Types of threads")
-        .min(6)
-        .max(8),
-      switchAndThreadInstructions: reworded(
-        asArray(guidelines.shape.switchAndThreadInstructions, "switchAndThreadInstructions"),
-        " Generate 0-3 instructions.",
-        ""
-      ).max(3),
+      typesOfThreads:
+        counts === "worded" ? threadTypes.max(8) : reworded(threadTypes, "6-8 types of threads", "Types of threads").min(6).max(8),
+      switchAndThreadInstructions:
+        counts === "worded" ? instructions.max(3) : reworded(instructions, " Generate 0-3 instructions.", "").max(3),
     }),
     difficultyLevel: difficulty
       .extend({
         modifier: difficulty.shape.modifier.describe("The modifier applied to every chance of success in the story, in steps of 10."),
       })
       .describe("The story's one difficulty level."),
-    storyElements: described(
-      z
-        .array(
-          element.extend({
-            facts: reworded(asArray(element.shape.facts, "facts"), "Three additional facts", "Additional facts").length(3),
-          })
-        )
-        .min(6)
-        .max(8),
-      elements
-    ),
-    statGroups: reworded(asArray(shape.statGroups, "statGroups"), " Maximum of 3 groups.", "").max(3),
+    storyElements: rewrittenElements(asArray(shape.storyElements, "storyElements"), counts),
+    statGroups: counts === "worded" ? groups.max(3) : reworded(groups, " Maximum of 3 groups.", "").max(3),
     sharedStats: statList("sharedStats", "Stats that are not tied to one player."),
     playerStats: statList("playerStats", "Stats tied to one player. In multiplayer games, each player has their own values for them."),
-    characterSelectionPlan: rewrittenCharacterPlan(asObject(shape.characterSelectionPlan, "characterSelectionPlan"), playerCount > 1),
+    characterSelectionPlan: rewrittenCharacterPlan(asObject(shape.characterSelectionPlan, "characterSelectionPlan"), playerCount > 1, counts),
     ...Object.fromEntries(slots.map((slot) => [slot, player(shape[slot])])),
   });
 }
@@ -275,18 +303,20 @@ function rewrittenSchema(production: z.AnyZodObject, playerCount: PlayerCount): 
 /**
  * The Stage 4 request for a custom story's setup (production's "story"
  * kind), with or without production's example stat setups.
+ * counts: "exact" is Stage 4 as it ran, "worded" the count fix.
  */
 export function rewriteSetupRequest(
   premise: string,
   playerCount: PlayerCount,
   gameMode: GameMode,
   maxTurns: number,
-  withExamples: boolean
+  withExamples: boolean,
+  counts: RewriteCounts = "exact"
 ): SplitTextRequest {
   const production = setupStep.request(premise, playerCount, gameMode, maxTurns, "story");
   return {
-    fixed: setupFixed(playerCount > 1, withExamples ? examplesSection(production.prompt) : []),
+    fixed: setupFixed(playerCount > 1, withExamples ? examplesSection(production.prompt) : [], counts),
     perCall: textFrom(production.prompt, CONFIGURATION_ANCHOR, "configuration"),
-    schema: rewrittenSchema(asObject(production.schema, "setup"), playerCount),
+    schema: rewrittenSchema(asObject(production.schema, "setup"), playerCount, counts),
   };
 }

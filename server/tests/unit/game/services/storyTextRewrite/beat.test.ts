@@ -6,10 +6,11 @@ import type { Change, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { trimmedBeatRequest } from "../../../../../src/game/services/storyTextTrims.js";
 import { rewriteBeatRequest, type RewriteScaffold } from "../../../../../src/game/services/storyTextRewrite/beat.js";
+import { NO_EMPTY_ITEMS, type RewriteCounts } from "../../../../../src/game/services/storyTextRewrite/common.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../../helpers/promptStories.js";
 import { beatGeneration, beatSet, switchAnalysis, threadAnalysis } from "../../../../helpers/textFixtures.js";
 import { createMockMultiplayerStory } from "../../../../helpers/testHelpers.js";
-import { allCapsWords, countOf, descriptionsOf, find, repeatedSentences, withoutCounts } from "./rewriteChecks.js";
+import { allCapsWords, countKeywords, countOf, descriptionsOf, find, repeatedSentences, withoutCounts } from "./rewriteChecks.js";
 
 beforeEach(() => {
   jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -46,6 +47,10 @@ const BRANCHES: Branch[] = [
 
 const CASES = SCAFFOLDS.flatMap((scaffold) => BRANCHES.map(([name, build, marker]) => [scaffold, name, build, marker] as const));
 
+/** exact: the Stage 4 form as it ran (its records stay reproducible); worded: the count fix. */
+const FORMS: RewriteCounts[] = ["exact", "worded"];
+const FORM_CASES = FORMS.flatMap((counts) => CASES.map(([scaffold, name, build]) => [counts, scaffold, name, build] as const));
+
 /** The per-call instructions: the per-call message before production's story state. */
 const instructionsOf = (perCall: string) => perCall.slice(0, perCall.indexOf(STATE_MARKER));
 
@@ -54,36 +59,52 @@ describe("rewriteBeatRequest", () => {
     const story = build();
     expect(beatStep.request(story).prompt).toContain(marker);
     expect(() => rewriteBeatRequest(story, scaffold)).not.toThrow();
+    expect(() => rewriteBeatRequest(story, scaffold, "worded")).not.toThrow();
   });
 
   it("throws on a multiplayer story", () => {
     expect(() => rewriteBeatRequest(createMockMultiplayerStory(2), "slim")).toThrow("Stage 4 rewrite covers single-player beats");
   });
 
-  it("keeps the fixed rules byte-identical across every branch and both scaffolds, so they cache", () => {
-    const fixed = new Set(CASES.map(([scaffold, , build]) => rewriteBeatRequest(build(), scaffold).fixed));
+  it.each(FORMS)("%s counts: keeps the fixed rules byte-identical across every branch and both scaffolds, so they cache", (counts) => {
+    const fixed = new Set(CASES.map(([scaffold, , build]) => rewriteBeatRequest(build(), scaffold, counts).fixed));
     expect(fixed.size).toBe(1);
   });
 
-  it.each(CASES)("%s, %s: the per-call message ends with production's story state, byte for byte", (scaffold, _, build) => {
+  it("builds the Stage 4 form by default", () => {
+    const story = threadStepStory("challenge", 3, 1);
+    const sent = (request: ReturnType<typeof rewriteBeatRequest>) => ({ ...request, schema: JSON.stringify(toJsonSchema(request.schema)) });
+    expect(sent(rewriteBeatRequest(story, "slim"))).toEqual(sent(rewriteBeatRequest(story, "slim", "exact")));
+  });
+
+  it("words the count fix's fixed rules as the Stage 4 form's plus the line that no list item is empty", () => {
+    const story = threadStepStory("challenge", 3, 1);
+    const exact = rewriteBeatRequest(story, "slim", "exact").fixed;
+    const worded = rewriteBeatRequest(story, "slim", "worded").fixed;
+    expect(exact).not.toContain(NO_EMPTY_ITEMS);
+    expect(worded.split(NO_EMPTY_ITEMS)).toHaveLength(2);
+    expect(worded.replace(`${NO_EMPTY_ITEMS}\n`, "")).toBe(exact);
+  });
+
+  it.each(FORM_CASES)("%s counts, %s, %s: the per-call message ends with production's story state, byte for byte", (counts, scaffold, _, build) => {
     const story = build();
     const production = beatStep.request(story).prompt;
     const state = production.slice(production.indexOf(STATE_MARKER));
-    const { perCall } = rewriteBeatRequest(story, scaffold);
+    const { perCall } = rewriteBeatRequest(story, scaffold, counts);
     expect(perCall.endsWith(state)).toBe(true);
     expect(perCall.indexOf(STATE_MARKER)).toBe(perCall.length - state.length);
   });
 });
 
 describe("the rewrite's schema", () => {
-  it.each(CASES)("%s, %s: the field set, types, key order and shared references of its base", (scaffold, _, build) => {
+  it.each(FORM_CASES)("%s counts, %s, %s: the field set, types, key order and shared references of its base", (counts, scaffold, _, build) => {
     const story = build();
     const base = scaffold === "full" ? beatStep.request(story).schema : trimmedBeatRequest(story, "slim").schema;
-    const rewrite = rewriteBeatRequest(story, scaffold).schema;
+    const rewrite = rewriteBeatRequest(story, scaffold, counts).schema;
     expect(JSON.stringify(withoutCounts(toJsonSchema(rewrite)))).toBe(JSON.stringify(withoutCounts(toJsonSchema(base))));
   });
 
-  it.each(CASES)("%s, %s: counts", (scaffold, _, build) => {
+  it.each(CASES)("exact counts, %s, %s: counts", (scaffold, _, build) => {
     const story = build();
     const json = toJsonSchema(rewriteBeatRequest(story, scaffold).schema);
     const player = find(json, ["properties", "player1"]);
@@ -97,12 +118,40 @@ describe("the rewrite's schema", () => {
     expect(countOf(find(player, ["properties", "plan", "properties", "showDontTell"]))).toEqual({ minItems: 3, maxItems: 3 });
     expect(countOf(find(options, ["items", "anyOf", "1", "properties", "modifiersToSuccessRate"]))).toEqual({ maxItems: 2 });
   });
+
+  it.each(CASES)("worded counts, %s, %s: caps only, no minItems anywhere", (scaffold, _, build) => {
+    const story = build();
+    const json = toJsonSchema(rewriteBeatRequest(story, scaffold, "worded").schema);
+    expect(countKeywords(json).filter((keyword) => keyword.startsWith("minItems"))).toEqual([]);
+    const player = find(json, ["properties", "player1"]);
+    const options = find(player, ["properties", "options"]);
+    expect(countOf(options)).toEqual(story.getCurrentBeatType() === "ending" ? {} : { maxItems: 3 });
+    expect(countOf(find(player, ["properties", "interludes"]))).toEqual({ maxItems: 4 });
+    expect(countOf(find(player, ["properties", "plan", "properties", "showDontTell"]))).toEqual({ maxItems: 3 });
+    expect(countOf(find(options, ["items", "anyOf", "1", "properties", "modifiersToSuccessRate"]))).toEqual({ maxItems: 2 });
+  });
+
+  it.each(CASES)("worded counts, %s, %s: every count in words in its field's description", (scaffold, _, build) => {
+    const story = build();
+    const json = toJsonSchema(rewriteBeatRequest(story, scaffold, "worded").schema);
+    const player = find(json, ["properties", "player1"]);
+    const description = (...path: string[]) => String(find(player, [...path, "description"]));
+    if (story.getCurrentBeatType() === "ending") {
+      expect(description("properties", "options")).toMatch(/^The story ends with this beat, so this list stays empty\./);
+    } else {
+      expect(description("properties", "options")).toMatch(/^Exactly three choices for the player/);
+    }
+    expect(description("properties", "interludes")).toMatch(/^Two to four snippets/);
+    expect(description("properties", "plan", "properties", "showDontTell")).toMatch(/^One to three of the most important/);
+    expect(description("properties", "options", "items", "anyOf", "1", "properties", "modifiersToSuccessRate")).toMatch(/^Up to two of the most relevant stats/);
+  });
 });
 
 describe("a rewrite reply works in production code", () => {
   const SLIM_DROPS = ["forPlayer", "developmentsToNarrate", "beatTypeConsiderations", "otherBeats", "worldBuilding", "showDontTellPreviousDecision"];
+  const FORM_SCAFFOLDS = FORMS.flatMap((counts) => SCAFFOLDS.map((scaffold) => [counts, scaffold] as const));
 
-  it.each(SCAFFOLDS)("%s: the same changes and stored beat as production's parse (slim drops only its fields)", (scaffold) => {
+  it.each(FORM_SCAFFOLDS)("%s counts, %s: the same changes and stored beat as production's parse (slim drops only its fields)", (counts, scaffold) => {
     const story = laterSwitchBeat(1);
     const statChange: Change = { type: "statChange", group: "shared", stat: "gold", change: "addNumber", value: 5 };
     const milestone: Change = { type: "newMilestone", outcomeGroup: "player1", outcome: "o1", newMilestone: "m" };
@@ -113,7 +162,7 @@ describe("a rewrite reply works in production code", () => {
     const reply = { ...beatSet(1, { statChanges: [statChange], newMilestones: [milestone], player1: beat }), multiplayerCoordination: "" };
 
     const fromProduction: SetOfBeatGenerationSchema = beatStep.request(story).schema.parse(reply);
-    const fromRewrite: SetOfBeatGenerationSchema = rewriteBeatRequest(story, scaffold).schema.parse(reply);
+    const fromRewrite: SetOfBeatGenerationSchema = rewriteBeatRequest(story, scaffold, counts).schema.parse(reply);
     const [productionStory, productionChanges] = beatStep.apply(story, fromProduction);
     const [rewriteStory, rewriteChanges] = beatStep.apply(story, fromRewrite);
     expect(rewriteChanges).toEqual(productionChanges);
@@ -181,18 +230,26 @@ const BEAT_RULES: Rule[] = [
   { id: "B37 descriptions are instructions", part: "fixed", applies: always, pattern: "The field descriptions in the reply format are part of these instructions." },
 ];
 
-function partsOf(story: Story, scaffold: RewriteScaffold): Record<Part, string> {
-  const request = rewriteBeatRequest(story, scaffold);
+/** The count fix's rule: in the fixed text of the worded form only. */
+const noEmptyItems = (counts: RewriteCounts): Rule => ({
+  id: "no empty list items",
+  part: "fixed",
+  applies: () => counts === "worded",
+  pattern: "a list never holds an empty or blank item",
+});
+
+function partsOf(story: Story, scaffold: RewriteScaffold, counts: RewriteCounts = "exact"): Record<Part, string> {
+  const request = rewriteBeatRequest(story, scaffold, counts);
   return { fixed: request.fixed, perCall: request.perCall, schema: descriptionsOf(toJsonSchema(request.schema)).join("\n") };
 }
 
 const occurrences = (text: string, pattern: string) => text.split(pattern).length - 1;
 
 describe("every rule of table B, once, where the table puts it", () => {
-  it.each(CASES)("%s, %s", (scaffold, _, build) => {
+  it.each(FORM_CASES)("%s counts, %s, %s", (counts, scaffold, _, build) => {
     const story = build();
-    const parts = partsOf(story, scaffold);
-    for (const rule of BEAT_RULES) {
+    const parts = partsOf(story, scaffold, counts);
+    for (const rule of [...BEAT_RULES, noEmptyItems(counts)]) {
       const found = Object.fromEntries((Object.keys(parts) as Part[]).map((part) => [part, occurrences(parts[part], rule.pattern)]));
       const expected = { fixed: 0, perCall: 0, schema: 0, ...(rule.applies(story) ? { [rule.part]: 1 } : {}) };
       expect({ rule: rule.id, found }).toEqual({ rule: rule.id, found: expected });
@@ -208,8 +265,8 @@ describe("every rule of table B, once, where the table puts it", () => {
 });
 
 describe("stated once, without shouting", () => {
-  it.each(CASES)("%s, %s", (scaffold, _, build) => {
-    const parts = partsOf(build(), scaffold);
+  it.each(FORM_CASES)("%s counts, %s, %s", (counts, scaffold, _, build) => {
+    const parts = partsOf(build(), scaffold, counts);
     const texts = [parts.fixed, instructionsOf(parts.perCall), parts.schema];
     expect(repeatedSentences(texts)).toEqual([]);
     expect(texts.flatMap(allCapsWords)).toEqual([]);
@@ -249,8 +306,8 @@ describe("no rule in the prompt is restated in a field description", () => {
     }
   });
 
-  it.each(CASES)("%s, %s", (scaffold, _, build) => {
-    const schema = partsOf(build(), scaffold).schema;
+  it.each(FORM_CASES)("%s counts, %s, %s", (counts, scaffold, _, build) => {
+    const schema = partsOf(build(), scaffold, counts).schema;
     for (const clause of RESTATED_BY_PRODUCTION_DESCRIPTIONS) {
       expect({ clause, inRewrite: schema.includes(clause) }).toEqual({ clause, inRewrite: false });
     }
