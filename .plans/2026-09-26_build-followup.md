@@ -277,6 +277,17 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (eval run): **Do about 9% fewer established facts per turn matter?** Both turn trims record fewer facts on Luna medium (3.51 → 3.2) and Luna low (3.60 → 3.3–3.4), and more introductions and stat changes instead. Luna none does not. Later beats read the facts, so the Round 2 rating is the check.
 - Milestone 3 (eval run): **The setup trim, my reading: don't adopt it on its own.** It saves under half a cent per story and no measurable wait. On Luna low it pushed 2 of 36 setups to 5 visible player stats (full: 0 of 36). Stage 4's rewrite covers the setup prompt anyway.
 - Milestone 3 (planner): **Round 3 (8 items, about 20 minutes) comes after Rounds 1 and 2.** If Round 2 rates slim below full, read the Luna medium rewrite on the full scaffold instead; a second sample costs about $0.1.
+- Milestone 3 (eval run): **Stage 4 stopped at its cap, and the ledger probably understates what OpenAI billed.** Borderline Insights has the figures. Two things need you:
+  - **Check the OpenAI usage page** for gpt-6-sol and gpt-6-luna on 2026-09-26, 13:26–14:30 UTC.
+    - The harness books a hung call at its estimate: $0.41 for the 5 Sol hangs and $0.10 for the 38 Luna hangs.
+    - If those calls kept generating for the full 300 s, at the smoke's measured speeds (Sol about 80, Luna about 110 tokens per second), the bill is about $1.4 higher (DERIVED from the price table). That makes about $26.1 in total, not $24.76.
+    - It is more if OpenAI kept generating after the client disconnected.
+  - **Decide whether the rest is worth funding.** Not run:
+    - the verbosity arm (est $0.12);
+    - the full-scaffold hedge ($0.14);
+    - gpt-4.1 setup on the other 3 premises plus the open job without examples (about $0.45).
+    
+    Raising the Stage 4 cap takes `--over-target-reason`, and that is your call. Fixing the enforced-count loop first would make those runs cheaper and their reading cleaner.
 
 ## Implementation Issues
 
@@ -436,6 +447,42 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - **The estimator undercounts Sol setup,** as the review note said: $0.098 measured against $0.084 estimated. gpt-4.1 came in under its estimate ($0.063 against $0.079), because its output was shorter than the borrowed figure.
   - **The smoke records are kept.** The four jobs count as finished, so invocation 1 plans 17 Sol calls and invocation 2 plans 87 Luna calls. If the default TTL expires before invocation 1, Sol's lemonade line writes a second time. The report's "writes per line" can then show 2 on that line, and the cause is the gap between runs, not a failed read.
   - **Spend after the smoke:** Stage 4 $0.17 of $4, total $20.94 of $30. Dry run now: 252 jobs, est $3.45.
+- Milestone 3 (eval run): **Stage 4 paid invocations (Runbook step 3): four ran, the cap stopped the fourth at $3.99, and invocations 5 and 6 did not fit.** The records are in `DOCS/2026-09-26_gpt6-text-eval/calls.jsonl`, and each run rewrote `results.md`. The invocations ran one at a time, in the plan's order, and no cap was raised.
+  - **Per invocation.** Spend is the ledger's, and the ledger books a hung call at its estimate.
+
+    | # | Arms | Jobs | Estimate | Spent | Outcome |
+    |---|---|---|---|---|---|
+    | 1 | Sol low setup, with and without examples, 9 premises | 17 open (+1 smoke) | $1.36 | $1.73 ($1.32 replies, $0.41 for 5 hangs) | all 18 valid |
+    | 2 | Luna medium rewriteSlim ×2 | 87 open (+1 smoke) | $0.23 | $0.30 ($0.20 replies, $0.10 for 38 hangs) | all 88 valid; 4 jobs on their fourth and last attempt |
+    | 3 | gpt-4.1-mini rewrite ×1 | 43 open (+1 smoke) | $0.32 | $0.20 | all valid on the first attempt |
+    | 4 | gpt-4.1 setup, shrunk to 6 premises | 11 open (+1 smoke) | $0.83 | $1.59 ($0.73 for 10 replies, $0.86 for 3 runaways) | cap stop: 11 valid, 1 job open |
+    | 5 | Luna medium verbosity low ×1 | 44 | $0.12 | – | not run: $0.01 left |
+    | 6 | Luna medium rewrite, full scaffold ×1 | 44 | $0.14 | – | not run |
+
+  - **Stage 4: $3.99 of $4** (the smoke's $0.17 included). The ledger total is $24.76 of $30; User Input Needed has the likely real figure.
+  - **The shrink.** Before invocation 4, $2.39 + 18 × $0.09 = $4.01: over the cap, and past the plan's $2.35 threshold. So it ran on the plan's 6 premises (12 jobs, the smoke's lemonade job already done).
+    - The open job is `setup-pretend-er-doctor` without examples: its one attempt ran away, and its retry did not fit.
+    - So gpt-4.1 has 6 premises with examples and 5 without.
+  - **Caching reads work.** The first line (Sol rewrite, 1 player) read 18,094 cached tokens on its second call (neo-tokyo) and on its third (er-doctor, on the third attempt after two hangs).
+    - Sol: 6 lines and 6 writes, one per line. All 12 warm valid calls read the whole fixed prefix, and 66% of input tokens came from the cache on both arms.
+    - Luna rewriteSlim: 5 lines. All 84 warm valid calls read the cache, 47% of input tokens. The smoke's line was still warm 20 minutes after its write (13:20 → 13:40 UTC).
+    - The ending line's write came from a hung attempt. Its third attempt read 4,388 cached tokens that no recorded call wrote, so the hung call had started (its prefill ran).
+    - gpt-4.1-mini (implicit cache, no breakpoint): 38 of 43 calls read it, 58% of input tokens. gpt-4.1 setup: 14% with examples, 54% without.
+  - **Hangs: 43, all on GPT-6.** Each is an `outcome` `timeout` at 300 s, retried, and left out of validity and waits.
+    - Sol hung on 5 of 23 attempts and Luna on 38 of 126. No job was lost.
+    - For comparison: Round 1 had 4 hangs in 1,309 GPT-6 calls, and Stage 3 none in 635 (09:49–10:24 UTC the same day).
+    - They were spread evenly over 13:26–14:20 UTC. Warm calls hung on 42 of 138 attempts, cold calls on 1 of 11.
+    - gpt-4.1-mini had none in 43 calls on the same split request.
+  - **Runaways: 3 of 13 gpt-4.1 setup attempts hit the 32,768-token output limit** (`finishReason` `length`), at $0.27–0.30 each.
+    - Each is a whitespace loop (`\r`, `\t`) that starts inside a story element's `facts` array, right after its second fact.
+    - Table SS enforces exactly 3 facts in the schema and took "Three" out of the description. So the model writes 2, the constrained decoder won't let it close the array, and it pads until the limit.
+    - `junkChars` reads 0 on these, because it counts only replies that parse.
+  - **My reading, not measured:** the GPT-6 hangs are probably the same loop.
+    - Stage 4 is the first stage whose schemas enforce counts. Beats enforce 3 options, 3 interludes and 3 show-don't-tell points.
+    - A hung call had started.
+    - With no `maxTokens`, GPT-6's output limit lets a loop outlast the 300 s timeout.
+    - A replay of a few hung cases with `max_completion_tokens` set would show where the loop starts. If this reading holds, the count enforcement, or the counts' removal from the descriptions, needs revisiting before any adoption.
+  - No 400s, and no invalid replies other than the 3 runaways.
 
 ## Suggested Follow-Up Work
 
