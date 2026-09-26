@@ -6,13 +6,16 @@ import { modelAttemptsByStep, validityReading, type ValidityReading } from "./va
 
 /*
  * Per-arm statistics from the call records and the automatic checks:
- * validity, rule rates and their noise floor, latencies, tokens, state counts
- * and cost on the billed and the uncached basis.
+ * validity, rule rates and their noise floor, latencies, tokens, state counts,
+ * cache reads and writes, and cost on the billed and the uncached basis.
  */
 
 type Quantiles = { n: number; p50?: number; p95?: number };
 
-/** Billed: as charged. Uncached: priced as if nothing came from cache (gpt-4.1 caches implicitly). */
+/**
+ * Billed: as charged. Uncached: caching off, every input token at the input
+ * rate, cache reads (gpt-4.1 caches implicitly) and cache writes alike.
+ */
 export type CostBasis = "billed" | "uncached";
 export const COST_BASES: CostBasis[] = ["billed", "uncached"];
 
@@ -56,6 +59,13 @@ export type ArmStats = {
   /** check count name -> mean over usable final calls whose check reports it (facts, newElements, switches, …) */
   meanCounts: Record<string, number>;
   cost: Record<CostBasis, CostReading>;
+  /**
+   * Over all attempts: cached and cache-write shares of input tokens, the
+   * attempts that wrote a cache, and the distinct cache lines (split requests)
+   */
+  cache: { readShare: number; writeShare: number; writingCalls: number; lines: number };
+  /** Mean input cost of a call, every attempt summed (output left out) */
+  inputCost: Record<CostBasis, number>;
 };
 
 export function percentile(values: number[], p: number): number | undefined {
@@ -114,12 +124,13 @@ function meanCountsOf(records: CallRecord[], checks: Map<string, CheckResult>): 
   return Object.fromEntries(Object.entries(sums).map(([name, s]) => [name, s.total / s.n]));
 }
 
+/** Caching off: cache reads and writes both priced as plain input. */
 function uncachedCost(r: CallRecord): number {
   return r.costSource === "usage"
     ? costFromUsage(r.model, {
         inputTokens: r.inputTokens,
         cachedTokens: 0,
-        cacheWriteTokens: r.cacheWriteTokens,
+        cacheWriteTokens: 0,
         outputTokens: r.outputTokens,
       })
     : r.costUsd;
@@ -129,6 +140,24 @@ const PRICE: Record<CostBasis, (r: CallRecord) => number> = {
   billed: (r) => r.costUsd,
   uncached: uncachedCost,
 };
+
+/** The input part of a call's cost, from its token counts (no usage, no input cost). */
+const INPUT_PRICE: Record<CostBasis, (r: CallRecord) => number> = {
+  billed: (r) =>
+    costFromUsage(r.model, { inputTokens: r.inputTokens, cachedTokens: r.cachedTokens, cacheWriteTokens: r.cacheWriteTokens, outputTokens: 0 }),
+  uncached: (r) => costFromUsage(r.model, { inputTokens: r.inputTokens, cachedTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }),
+};
+
+function cacheReading(records: CallRecord[]): ArmStats["cache"] {
+  const sum = (pick: (r: CallRecord) => number) => records.reduce((total, r) => total + pick(r), 0);
+  const input = sum((r) => r.inputTokens);
+  return {
+    readShare: rate(sum((r) => r.cachedTokens), input),
+    writeShare: rate(sum((r) => r.cacheWriteTokens), input),
+    writingCalls: records.filter((r) => r.cacheWriteTokens > 0).length,
+    lines: new Set(records.flatMap((r) => (r.cacheLine ? [r.cacheLine] : []))).size,
+  };
+}
 
 const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
 
@@ -205,6 +234,11 @@ export function armStatsOf(
     },
     meanCounts: meanCountsOf(good, checks),
     cost: { billed: costReading(records, PRICE.billed), uncached: costReading(records, PRICE.uncached) },
+    cache: cacheReading(records),
+    inputCost: {
+      billed: costReading(records, INPUT_PRICE.billed).perCall,
+      uncached: costReading(records, INPUT_PRICE.uncached).perCall,
+    },
   };
 }
 

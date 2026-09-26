@@ -1,4 +1,4 @@
-import { armKey, makeArm, prodSiblingKey } from "../../../../src/evals/textModelEval/arms.js";
+import { armKey, armsFor, armSettings, baselineArm, makeArm, referenceKey } from "../../../../src/evals/textModelEval/arms.js";
 import {
   costFromUsage,
   estimateCall,
@@ -34,11 +34,28 @@ describe("arm keys and estimates", () => {
     expect(armKey({ model: "gpt-6-sol", reasoningEffort: "low", verbosity: "low" }, "prod")).toBe("gpt-6-sol@low+vlow/prod");
   });
 
-  it("maps a trimmed arm to its full (prod) form, and nothing else", () => {
-    expect(prodSiblingKey("gpt-6-luna@medium/minimal")).toBe("gpt-6-luna@medium/prod");
-    expect(prodSiblingKey("gpt-6-sol@low+vlow/slim")).toBe("gpt-6-sol@low+vlow/prod");
-    expect(prodSiblingKey("gpt-6-luna@medium/prod")).toBeUndefined();
-    expect(prodSiblingKey("pipeline:gpt-6-luna@low/minimal>gpt-6-luna@medium/minimal")).toBeUndefined();
+  it("maps a variant arm to its reference: the same arm without verbosity, else its variant's base", () => {
+    expect(referenceKey("gpt-6-luna@medium/minimal")).toBe("gpt-6-luna@medium/prod");
+    expect(referenceKey("gpt-6-luna@medium/rewriteSlim")).toBe("gpt-6-luna@medium/slim");
+    expect(referenceKey("gpt-6-luna@medium+vlow/rewriteSlim")).toBe("gpt-6-luna@medium/rewriteSlim");
+    expect(referenceKey("gpt-6-sol@low/rewriteZeroShot")).toBe("gpt-6-sol@low/rewrite");
+    expect(referenceKey("gpt-4.1-mini@t0.2/rewrite")).toBe("gpt-4.1-mini@t0.2/prod");
+  });
+
+  it("gives no reference for a prod arm or a chain key", () => {
+    expect(referenceKey("gpt-6-luna@medium/prod")).toBeUndefined();
+    expect(referenceKey("pipeline:gpt-6-luna@low/minimal>gpt-6-luna@medium/minimal")).toBeUndefined();
+  });
+
+  it("runs Stage 4's gpt-4.1 and gpt-4.1-mini arms on production's default settings", () => {
+    const todays = (role: "setup" | "beat") =>
+      armsFor("4", role)
+        .map((plan) => plan.arm)
+        .filter((arm) => arm.model.startsWith("gpt-4.1"));
+    for (const role of ["setup", "beat"] as const) {
+      expect(todays(role).length).toBeGreaterThan(0);
+      for (const arm of todays(role)) expect(armSettings(arm)).toEqual(armSettings(baselineArm(role, false, {})));
+    }
   });
 
   it("switches from the table to measured medians once enough records exist", () => {

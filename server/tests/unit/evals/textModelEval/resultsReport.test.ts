@@ -37,6 +37,8 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
     latencyByPlayers: {},
     medianTokens: { input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, visible: 0 },
     meanCounts: {},
+    cache: { readShare: 0, writeShare: 0, writingCalls: 0, lines: 0 },
+    inputCost: { billed: 0, uncached: 0 },
     ...priced(0.01),
     ...overrides,
   };
@@ -89,7 +91,21 @@ describe("renderResults: the variant section", () => {
     renderResults({ records, checks: new Map(), tags: new Map([["a", tags()]]), caps: resolveCaps({}).caps, generatedAt: new Date(0) });
 
   it("renders nothing without comparisons", () => {
-    expect(render([call(MEDIUM_PROD)])).not.toContain("### Stage 3");
+    expect(render([call(MEDIUM_PROD)])).not.toContain("### Variants against their reference");
+  });
+
+  it("names each arm's reference, and reads input and caching against it", () => {
+    const rewrite = "gpt-6-luna@medium/rewriteSlim";
+    const slim = "gpt-6-luna@medium/slim";
+    const text = render([
+      call(rewrite, { cacheLine: "A", inputTokens: 10_000, cachedTokens: 4_000, cacheWriteTokens: 0, outputTokens: 1_000 }),
+      call(slim, { inputTokens: 12_000, outputTokens: 1_000 }),
+    ]);
+    expect(text).toContain("### Variants against their reference (Stage 3 trims, Stage 4 rewrite)");
+    expect(text).toContain(`| beat | ${rewrite} | ${slim} | 1 |`);
+    expect(text).toContain("**Input and caching**");
+    // Cache lines 0 -> 1, read share 0% -> 40%, median input tokens 12000 -> 10000
+    expect(text).toMatch(new RegExp(`\\| beat \\| ${rewrite} \\| 0 → 1 \\| 0 → 0 \\| 0\\.0% → 40\\.0% \\| 12000 → 10000 \\(-17%\\) \\|`));
   });
 
   it("shows full -> trimmed with the change in tokens, waits and cost", () => {
@@ -191,6 +207,14 @@ describe("computeArmStats", () => {
     expect(stats.cost.billed.perCall).toBeCloseTo(0.015);
     expect(stats.cost.billed.byPlayers).toEqual({ 1: 0.02, 2: 0.01 });
     expect(stats.validity).toMatchObject({ calls: 2, firstAttemptValid: 1, validWithinRetries: 2 });
+  });
+
+  it("prices cache writes as plain input on the uncached basis (caching off)", () => {
+    // Luna per 1M: input $0.10, cache write $0.125, output $0.50
+    const written = record({ caseId: "a", model: "gpt-6-luna", inputTokens: 1_000_000, cacheWriteTokens: 400_000, outputTokens: 0, costUsd: 0.11 });
+    const [stats] = computeArmStats([written], new Map(), new Map([["a", tags()]]));
+    expect(stats.cost.uncached.perCall).toBeCloseTo(0.1, 10);
+    expect(stats.inputCost).toEqual({ billed: expect.closeTo(0.11, 10), uncached: expect.closeTo(0.1, 10) });
   });
 
   it("leaves a rejected request out of the call count, and reads its rate over all records", () => {

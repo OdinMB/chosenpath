@@ -5,14 +5,15 @@ import {
   type ReasoningEffort,
   type TextModelSettings,
   type TextRole,
+  type Verbosity,
 } from "shared/llm/textModelSettings.js";
 import type { VariantId } from "./variants.js";
 
 /*
- * The arm matrix per stage and role, the arm and chain key formats, and the
- * pipeline plans. Arms are hard-coded here; the baseline follows production
- * config (resolveTextModelConfig), so "as in production" is literal. Prices
- * and estimates live in pricing.ts.
+ * The arm matrix per stage and role, the arm and chain key formats, each
+ * variant arm's reference arm, and the pipeline plans. Arms are hard-coded
+ * here; the baseline follows production config (resolveTextModelConfig), so
+ * "as in production" is literal. Prices and estimates live in pricing.ts.
  */
 
 export type EvalRole = "setup" | "beat" | "switch" | "thread" | "iteration";
@@ -59,14 +60,34 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
 }
 
 /**
- * The full form of a trimmed arm: the same model and setting with the
- * "prod" variant. Undefined for a prod key and for anything that is not
+ * The variant each variant builds on: the Stage 3 trims and today's-scaffold
+ * rewrite on production's form, the slim rewrite on the slim trim, and the
+ * rewrite without examples on the rewrite with them.
+ */
+const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
+  prod: undefined,
+  slim: "prod",
+  minimal: "prod",
+  rewrite: "prod",
+  rewriteSlim: "slim",
+  rewriteZeroShot: "rewrite",
+};
+
+const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
+
+/**
+ * The arm a variant arm is read against: with a verbosity part, the same key
+ * without it; otherwise the same model and setting on its variant's base
+ * (VARIANT_REFERENCE). Undefined for a prod key and for anything that is not
  * an arm key (a pipeline chain's key, for one).
  */
-export function prodSiblingKey(key: string): string | undefined {
-  const match = /^([^@/>]+@[^@/>]+)\/(\w+)$/.exec(key);
-  if (!match || match[2] === "prod") return undefined;
-  return `${match[1]}/prod`;
+export function referenceKey(key: string): string | undefined {
+  const match = /^([^@/>+]+@[^@/>+]+)(\+v[^@/>+]+)?\/(\w+)$/.exec(key);
+  if (!match) return undefined;
+  const [, modelAndSetting, verbosity, variant] = match;
+  if (verbosity) return `${modelAndSetting}/${variant}`;
+  const base = isVariant(variant) ? VARIANT_REFERENCE[variant] : undefined;
+  return base ? `${modelAndSetting}/${base}` : undefined;
 }
 
 /** A pipeline chain's key: "pipeline:<analysis arm key>><beat arm key>". */
@@ -99,16 +120,19 @@ export function baselineArm(role: EvalRole, multiplayer: boolean, env: Env = pro
   return makeArm(settingsFor(config, productionRole(role), { multiplayer }), "prod", true);
 }
 
-const luna = (effort: ReasoningEffort, variant: VariantId = "prod") =>
-  makeArm({ model: "gpt-6-luna", reasoningEffort: effort }, variant);
-const sol = (effort: ReasoningEffort, variant: VariantId = "prod") =>
-  makeArm({ model: "gpt-6-sol", reasoningEffort: effort }, variant);
+const luna = (effort: ReasoningEffort, variant: VariantId = "prod", verbosity?: Verbosity) =>
+  makeArm({ model: "gpt-6-luna", reasoningEffort: effort, ...(verbosity ? { verbosity } : {}) }, variant);
+const sol = (effort: ReasoningEffort, variant: VariantId = "prod", verbosity?: Verbosity) =>
+  makeArm({ model: "gpt-6-sol", reasoningEffort: effort, ...(verbosity ? { verbosity } : {}) }, variant);
+/** Today's model at production's default settings, on another variant. */
+const todays = (model: string, variant: VariantId) => makeArm({ model, temperature: 0.2 }, variant);
 
 export const RARE_FAILURE_CALLS_PER_ARM = 50;
 
 /**
- * Stage 3's Sol setup premises: 3 per player count, every multiplayer game
- * mode, a Kids premise and three dark ones (frozen setup case ids).
+ * The Sol setup premises of Stages 3 and 4: 3 per player count, every
+ * multiplayer game mode, a Kids premise and three dark ones (frozen setup
+ * case ids).
  */
 export const STAGE3_SETUP_PREMISES = [
   "setup-pretend-er-doctor",
@@ -124,8 +148,8 @@ export const STAGE3_SETUP_PREMISES = [
 
 /**
  * Candidate arms (the baseline runs separately, first), one static matrix per
- * stage. Stage 1-2 follows the owner decisions of 2026-09-26, Stage 3 the
- * coordinator's carry-forward (Milestone 3). Stage 4 has no arms yet.
+ * stage. Stage 1-2 follows the owner decisions of 2026-09-26, Stages 3 and 4
+ * the coordinator's carry-forward (Milestone 3).
  */
 export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
   switch (stage) {
@@ -133,6 +157,8 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return stage12Arms(role);
     case "3":
       return stage3Arms(role);
+    case "4":
+      return stage4Arms(role);
     default:
       return [];
   }
@@ -193,6 +219,36 @@ function stage3Arms(role: EvalRole): ArmPlan[] {
     case "switch":
     case "thread":
       return [{ arm: luna("low", "minimal"), samples: 2, scope: "all" }];
+    case "iteration":
+      return [];
+  }
+}
+
+/**
+ * Stage 4: the GPT-6-style rewrite (storyTextRewrite/), each arm read against
+ * its reference (referenceKey). In the owner's priority order, so a cap stop
+ * cuts the verbosity arm and the full-scaffold hedge first. Analysis is not
+ * rewritten.
+ */
+function stage4Arms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "setup":
+      return [
+        { arm: sol("low", "rewrite"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+        { arm: sol("low", "rewriteZeroShot"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+        { arm: todays("gpt-4.1", "rewrite"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+        { arm: todays("gpt-4.1", "rewriteZeroShot"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+      ];
+    case "beat":
+      return [
+        { arm: luna("medium", "rewriteSlim"), samples: 2, scope: "single-player" },
+        { arm: todays("gpt-4.1-mini", "rewrite"), samples: 1, scope: "single-player" },
+        { arm: luna("medium", "rewriteSlim", "low"), samples: 1, scope: "single-player" },
+        // The full-scaffold hedge, in case the owner rates slim below full
+        { arm: luna("medium", "rewrite"), samples: 1, scope: "single-player" },
+      ];
+    case "switch":
+    case "thread":
     case "iteration":
       return [];
   }

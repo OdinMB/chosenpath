@@ -114,6 +114,14 @@ describe("checkBeatSet", () => {
     expect(result.unknownIds).toEqual(["fact:ghost_ship"]);
   });
 
+  it("counts prose words without image tags, and the plan's JSON length", () => {
+    const text = `[image id=inn source=story desc="The old inn by the river"] The door creaks.\n\nRain falls on the roof tonight.`;
+    const beat = beatGeneration({ text });
+    const { counts } = checkBeatSet(beatSet(1, { player1: beat }), story);
+    expect(counts.words).toBe(9);
+    expect(counts.planChars).toBe(JSON.stringify(beat.plan).length);
+  });
+
   it("flags an image tag in the last paragraph and an unused requested image", () => {
     const text = `${paragraphs(4)}\n\n[image id=inn source=story desc="The inn"] ${PARAGRAPH}`;
     const beat = beatGeneration({ text, imageRequest: { caption: "Hall", id: "hall", referenceImageIds: [], prompt: "hall" } });

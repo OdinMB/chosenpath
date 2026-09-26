@@ -7,7 +7,7 @@ import {
   baselineArm,
   chainKey,
   pipelinePlan,
-  prodSiblingKey,
+  referenceKey,
   type Arm,
   type ArmPlan,
   type EvalRole,
@@ -25,7 +25,7 @@ import { isSplitRequest, requestFor, requestText, type EvalRequest, type Request
  * subset, single-player cases, or a case list), the rare-failure batch, and
  * pipeline chains (analysis, then the beat built from it) in pipeline mode.
  * Filters narrow the plan; estimates use measured output sizes once there
- * are enough, and a new variant borrows its prod sibling's until then.
+ * are enough, and a new variant borrows from its reference chain until then.
  * Cases are queued in turn order, and a split request's job carries its
  * cache line, which the runner warms first.
  */
@@ -130,16 +130,22 @@ export function measuredOutputs(records: CallRecord[]): Map<string, number[]> {
   return measured;
 }
 
+/** The longest reference chain: a verbosity arm on rewriteZeroShot, then rewrite, then prod. */
+const MAX_REFERENCE_STEPS = 4;
+
 /**
- * The arm's own measured outputs once it has MIN_MEASURED_RECORDS; until then
- * its prod sibling's (a trim writes less than its full form, so this errs
- * high), else whatever it has.
+ * The measured outputs of the first key with MIN_MEASURED_RECORDS of them,
+ * walking from the arm's own key along its reference chain (referenceKey);
+ * else whatever the arm has. A trim writes less than its full form, so its
+ * borrowed estimate errs high.
  */
 function measuredFor(measured: Map<string, number[]>, role: EvalRole, arm: Arm): number[] | undefined {
-  const own = measured.get(`${role}|${arm.key}`);
-  if ((own?.length ?? 0) >= MIN_MEASURED_RECORDS) return own;
-  const sibling = prodSiblingKey(arm.key);
-  return (sibling ? measured.get(`${role}|${sibling}`) : undefined) ?? own;
+  let key: string | undefined = arm.key;
+  for (let step = 0; key && step <= MAX_REFERENCE_STEPS; step++, key = referenceKey(key)) {
+    const outputs = measured.get(`${role}|${key}`);
+    if ((outputs?.length ?? 0) >= MIN_MEASURED_RECORDS) return outputs;
+  }
+  return measured.get(`${role}|${arm.key}`);
 }
 
 function planned(

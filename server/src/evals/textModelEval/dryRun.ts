@@ -117,6 +117,8 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     // Planning builds every trimmed request, so these rows also show that each trim applies to every frozen case
     ["Stage 3 candidates (isolated)", "3", plan("3", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
     ["Stage 3 pipeline chains", "3", plan("3", "postfix", analysis).filter((j) => !j.baseline)],
+    // Likewise every rewrite request on every case in scope; estimates ignore caching
+    ["Stage 4 candidates (isolated)", "4", plan("4", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
   ];
   const caps = resolveCaps({}).caps;
   const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0);
@@ -128,7 +130,6 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     const minutes = Math.ceil(estimateMinutes(open, input.tpm, input.maxInFlight));
     log(`${label}: ${open.length} jobs ${JSON.stringify(byRole)}, est $${cost.toFixed(2)} (stage cap $${caps.stageCaps[stage]}), at least ${minutes} min`);
   }
-  log("Stage 4: no arms yet (its variants arrive with the next milestone).");
 
   const spend = spentByStage([...records, ...input.extraSpend]);
   log("\nSpend so far vs caps:");

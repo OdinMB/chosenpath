@@ -4,7 +4,8 @@ import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricin
 import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import { requestFor } from "../../../../src/evals/textModelEval/variants.js";
-import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
+import type { Story } from "core/models/Story.js";
+import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
 import { evalCase, record, tags } from "./fixtures.js";
 
@@ -80,6 +81,78 @@ describe("planJobs: execution order and cache lines", () => {
   it("gives a production request no cache line", () => {
     const cases = [evalCase("sp", "beat", { state: createMockStoryState() })];
     expect(planJobs(cases, baselineOnly(["beat"])).map((j) => j.cacheLine)).toEqual([undefined]);
+  });
+});
+
+describe("planJobs: Stage 4", () => {
+  const stage4 = (overrides: Partial<PlanOptions> = {}): PlanOptions => ({
+    stage: "4",
+    promptState: "postfix",
+    roles: ["beat"],
+    mode: "isolated",
+    subset15: false,
+    records: [],
+    env: {},
+    ...overrides,
+  });
+  const candidates = (jobs: Job[]) => jobs.filter((j) => !j.baseline);
+  const perArm = (jobs: Job[]) => jobs.reduce<Record<string, number>>((acc, j) => ((acc[j.armKey] = (acc[j.armKey] ?? 0) + 1), acc), {});
+  const beatCase = (id: string, story: Story) => evalCase(id, "beat", { state: story.getState() });
+
+  it("runs the beat arms on single-player cases and the setup arms on the Stage 3 premises, at the matrix's samples", () => {
+    const setup = (id: string) =>
+      evalCase(id, "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
+    const cases = [
+      beatCase("sp", threadBeat(1)),
+      evalCase("mp", "beat", { state: createMockMultiplayerStory(2).getState(), tags: tags({ multiplayer: true, players: 2 }) }),
+      setup("setup-learn-lemonade"),
+      setup("setup-vent-subscription"),
+    ];
+    const jobs = candidates(planJobs(cases, stage4({ roles: ["setup", "beat"] })));
+    expect(new Set(jobs.filter((j) => j.group === "beat").map((j) => j.caseId))).toEqual(new Set(["sp"]));
+    expect(new Set(jobs.filter((j) => j.group === "setup").map((j) => j.caseId))).toEqual(new Set(["setup-learn-lemonade"]));
+    expect(perArm(jobs)).toEqual({
+      "gpt-6-sol@low/rewrite": 1,
+      "gpt-6-sol@low/rewriteZeroShot": 1,
+      "gpt-4.1@t0.2/rewrite": 1,
+      "gpt-4.1@t0.2/rewriteZeroShot": 1,
+      "gpt-6-luna@medium/rewriteSlim": 2,
+      "gpt-4.1-mini@t0.2/rewrite": 1,
+      "gpt-6-luna@medium+vlow/rewriteSlim": 1,
+      "gpt-6-luna@medium/rewrite": 1,
+    });
+  });
+
+  it("puts split requests with the same schema and fixed text on one cache line, and an image-on case and an ending on their own", () => {
+    const cases = [
+      beatCase("thread-a", threadBeat(1, { id: "story-a" })),
+      beatCase("thread-b", threadBeat(1, { id: "story-b" })),
+      beatCase("thread-images", threadBeat(1, { id: "story-c", templateId: "tpl-1" })),
+      beatCase("ending", endingBeat(1, { id: "story-d" })),
+    ];
+    const jobs = planJobs(cases, stage4({ armKeys: ["gpt-6-luna@medium/rewriteSlim"], samples: 1 }));
+    const line = (caseId: string) => jobs.find((j) => j.caseId === caseId)?.cacheLine;
+    expect(line("thread-a")).toMatch(/^[0-9a-f]{12}$/);
+    expect(line("thread-b")).toBe(line("thread-a"));
+    expect(new Set([line("thread-a"), line("thread-images"), line("ending")]).size).toBe(3);
+    // Another arm with the same request is another line
+    const mini = planJobs(cases, stage4({ armKeys: ["gpt-4.1-mini@t0.2/rewrite"], samples: 1 }));
+    expect(mini.find((j) => j.caseId === "thread-a")?.cacheLine).not.toBe(line("thread-a"));
+  });
+
+  it("estimates a Stage 4 arm from the first arm on its reference chain with enough measured outputs", () => {
+    const cases = [beatCase("sp", threadBeat(1))];
+    const outputs = (armKey: string, size: number): CallRecord[] =>
+      Array.from({ length: MIN_MEASURED_RECORDS }, (_, i) => record({ jobKey: `${armKey}-${i}`, role: "beat", armKey, callArmKey: armKey, outputTokens: size }));
+    const estimate = (armKey: string, records: CallRecord[]) =>
+      planJobs(cases, stage4({ records, armKeys: [armKey], samples: 1 }))[0].first.estimate.outputTokens;
+    const slim = outputs("gpt-6-luna@medium/slim", 1_500);
+    expect(estimate("gpt-6-luna@medium/rewriteSlim", slim)).toBe(1_500);
+    // The verbosity arm reads rewriteSlim's once it has enough, else slim's
+    expect(estimate("gpt-6-luna@medium+vlow/rewriteSlim", slim)).toBe(1_500);
+    expect(estimate("gpt-6-luna@medium+vlow/rewriteSlim", [...slim, ...outputs("gpt-6-luna@medium/rewriteSlim", 1_200)])).toBe(1_200);
+    // Today's model on the rewrite reads the baseline's
+    expect(estimate("gpt-4.1-mini@t0.2/rewrite", outputs("gpt-4.1-mini@t0.2/prod", 1_700))).toBe(1_700);
   });
 });
 
@@ -169,7 +242,7 @@ describe("planJobs: Stage 3 scopes, estimates and chains", () => {
     expect(onArm(narrowed, "gpt-6-sol@low/minimal")).toEqual([]);
   });
 
-  it("estimates a new variant from its prod sibling's measured outputs until it has enough of its own", () => {
+  it("estimates a new variant from its reference's measured outputs until it has enough of its own", () => {
     const cases = [evalCase("sp", "beat", { state: createMockStoryState() })];
     const measured = (armKey: string, outputTokens: number): CallRecord[] =>
       Array.from({ length: MIN_MEASURED_RECORDS }, (_, i) =>

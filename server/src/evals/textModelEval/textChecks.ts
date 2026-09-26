@@ -179,6 +179,9 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
     newElements: beat.plan.newGameElements.length,
     introductions: beat.plan.newIntroductionsOfStoryElements.length,
     paragraphs: paragraphs.length,
+    // Prose and planning lengths apart: whether verbosity reaches strings inside the JSON is undocumented
+    words: prose.split(/\s+/).filter(Boolean).length,
+    planChars: JSON.stringify(beat.plan).length,
   };
   return { checks, counts, unknown };
 }

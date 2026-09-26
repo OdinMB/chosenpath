@@ -31,7 +31,7 @@ function checked(entries: [CallRecord, Record<string, boolean>, Record<string, n
 }
 
 describe("variantComparisons", () => {
-  it("pairs a trimmed arm with its prod sibling in the same group and prompt state", () => {
+  it("pairs a trimmed arm with its prod reference in the same group and prompt state", () => {
     const records = [
       call(MEDIUM_MINIMAL, "a", 1),
       call(MEDIUM_PROD, "a", 1),
@@ -40,11 +40,31 @@ describe("variantComparisons", () => {
     ];
     const [comparison, ...rest] = variantComparisons(records, new Map(), caseTags("a"), "postfix");
     expect(rest).toHaveLength(0);
-    expect(comparison).toMatchObject({ group: "beat", trimmedKey: MEDIUM_MINIMAL, fullKey: MEDIUM_PROD, pairs: 1 });
-    expect(comparison.full.calls).toBe(1);
+    expect(comparison).toMatchObject({ group: "beat", armKey: MEDIUM_MINIMAL, referenceKey: MEDIUM_PROD, pairs: 1 });
+    expect(comparison.reference.calls).toBe(1);
   });
 
-  it("reads the full arm only on the trimmed arm's (case, sample) pairs", () => {
+  it("pairs each Stage 4 arm with its reference arm", () => {
+    const keys = ["gpt-6-luna@medium/slim", "gpt-6-luna@medium/rewriteSlim", "gpt-6-luna@medium+vlow/rewriteSlim"];
+    const comparisons = variantComparisons(keys.map((key) => call(key, "a", 1)), new Map(), caseTags("a"), "postfix");
+    expect(comparisons.map((c) => [c.armKey, c.referenceKey]).sort()).toEqual([
+      ["gpt-6-luna@medium+vlow/rewriteSlim", "gpt-6-luna@medium/rewriteSlim"],
+      ["gpt-6-luna@medium/rewriteSlim", "gpt-6-luna@medium/slim"],
+    ]);
+  });
+
+  it("reads the baseline's records as a reference, and never the baseline as a candidate", () => {
+    const today = "gpt-4.1-mini@t0.2/prod";
+    const records = [
+      call(today, "a", 1, { model: "gpt-4.1-mini", baseline: true }),
+      call("gpt-4.1-mini@t0.2/rewrite", "a", 1, { model: "gpt-4.1-mini" }),
+    ];
+    const comparisons = variantComparisons(records, new Map(), caseTags("a"), "postfix");
+    expect(comparisons.map((c) => [c.armKey, c.referenceKey])).toEqual([["gpt-4.1-mini@t0.2/rewrite", today]]);
+    expect(comparisons[0].reference.baseline).toBe(true);
+  });
+
+  it("reads the reference arm only on the arm's (case, sample) pairs", () => {
     const records = [
       call(MEDIUM_MINIMAL, "a", 1, { outputTokens: 500 }),
       call(MEDIUM_MINIMAL, "b", 1, { outputTokens: 500 }),
@@ -59,9 +79,9 @@ describe("variantComparisons", () => {
     ];
     const [comparison] = variantComparisons(records, new Map(), caseTags("a", "b", "c"), "postfix");
     expect(comparison.pairs).toBe(2);
-    expect(comparison.full.calls).toBe(2);
-    expect(comparison.full.validity).toMatchObject({ calls: 2, firstAttemptValid: 1 });
-    expect(comparison.full.medianTokens.output).toBe(1_000);
+    expect(comparison.reference.calls).toBe(2);
+    expect(comparison.reference.validity).toMatchObject({ calls: 2, firstAttemptValid: 1 });
+    expect(comparison.reference.medianTokens.output).toBe(1_000);
   });
 
   it("pairs chains on both sides and reads them by their beat step", () => {
@@ -73,12 +93,12 @@ describe("variantComparisons", () => {
       call("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", "s", 1, { group: "pipeline", step: 1, jobKey: "step1" }),
     ];
     const [comparison] = variantComparisons(records, new Map(), caseTags("s"), "postfix");
-    expect(comparison.fullKey).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");
-    expect(comparison.full.turnLatencies).toEqual([40]);
-    expect(comparison.trimmed.turnLatencies).toEqual([30]);
+    expect(comparison.referenceKey).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");
+    expect(comparison.reference.turnLatencies).toEqual([40]);
+    expect(comparison.arm.turnLatencies).toEqual([30]);
   });
 
-  it("flags a check beyond the full form's noise floor, and not one inside it", () => {
+  it("flags a check beyond the reference's noise floor, and not one inside it", () => {
     const trimmed = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call(MEDIUM_MINIMAL, c, sample)));
     const full = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call(MEDIUM_PROD, c, sample)));
     const [t1a, t1b, t2a, t2b] = trimmed;
@@ -101,24 +121,67 @@ describe("variantComparisons", () => {
     expect(flag("knownIds")).toBe("lower");
     expect(flag("sentences")).toBeUndefined();
     expect(flag("paragraphs")).toBe("higher");
-    expect(comparison.counts).toEqual([{ name: "facts", full: 3, trimmed: 1, noise: 2 }]);
+    expect(comparison.counts).toEqual([{ name: "facts", reference: 3, arm: 1, noise: 2 }]);
   });
 
-  it("lists no flags when only one sample is matched", () => {
+  it("gives a one-sample arm the noise of the reference's two samples on the matched cases, and flags beyond it", () => {
+    const setup = { group: "setup" as const };
+    const arm = [call("gpt-6-sol@low/rewrite", "a", 1, setup), call("gpt-6-sol@low/rewrite", "b", 1, setup)];
+    const reference = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call("gpt-6-sol@low/prod", c, sample, setup)));
+    // A reference sample on a case the arm did not run is not part of the noise
+    const unmatched = call("gpt-6-sol@low/prod", "c", 2, setup);
+    const checks = checked([
+      [arm[0], { playerStats: false, sharedStats: true }, { storyElements: 5 }],
+      [arm[1], { playerStats: true, sharedStats: true }, { storyElements: 5 }],
+      // playerStats: reference 100% on both samples (noise 0), arm 50% -> lower
+      // sharedStats: reference 100% / 50% on the matched cases (noise 50%), arm 100% -> inside the floor
+      [reference[0], { playerStats: true, sharedStats: true }, { storyElements: 8 }],
+      [reference[1], { playerStats: true, sharedStats: true }, { storyElements: 8 }],
+      [reference[2], { playerStats: true, sharedStats: true }, { storyElements: 7 }],
+      [reference[3], { playerStats: true, sharedStats: false }, { storyElements: 7 }],
+      [unmatched, { playerStats: false, sharedStats: false }, { storyElements: 1 }],
+    ]);
+    const [comparison] = variantComparisons([...arm, ...reference, unmatched], checks, caseTags("a", "b", "c"), "postfix");
+    expect(comparison.pairs).toBe(2);
+    expect(comparison.hasNoise).toBe(true);
+    expect(comparison.checks.find((c) => c.name === "playerStats")).toEqual({ name: "playerStats", reference: 1, arm: 0.5, flag: "lower" });
+    expect(comparison.checks.find((c) => c.name === "sharedStats")?.flag).toBeUndefined();
+    // The reference itself is read on the matched pairs (sample 1); the noise on both samples
+    expect(comparison.counts).toEqual([{ name: "storyElements", reference: 8, arm: 5, noise: 1 }]);
+  });
+
+  it("lists no flags when the reference has only one sample on the matched cases", () => {
     const trimmed = call(MEDIUM_MINIMAL, "a", 1, { group: "setup" });
-    const full = [call(MEDIUM_PROD, "a", 1, { group: "setup" }), call(MEDIUM_PROD, "a", 2, { group: "setup" })];
+    const full = call(MEDIUM_PROD, "a", 1, { group: "setup" });
     const checks = checked([
       [trimmed, { playerStats: false }, { storyElements: 5 }],
-      [full[0], { playerStats: true }, { storyElements: 8 }],
-      [full[1], { playerStats: true }, { storyElements: 8 }],
+      [full, { playerStats: true }, { storyElements: 8 }],
     ]);
-    const [comparison] = variantComparisons([trimmed, ...full], checks, caseTags("a"), "postfix");
+    const [comparison] = variantComparisons([trimmed, full], checks, caseTags("a"), "postfix");
     expect(comparison.hasNoise).toBe(false);
-    expect(comparison.checks).toEqual([{ name: "playerStats", full: 1, trimmed: 0 }]);
-    expect(comparison.counts).toEqual([{ name: "storyElements", full: 8, trimmed: 5 }]);
+    expect(comparison.checks).toEqual([{ name: "playerStats", reference: 1, arm: 0 }]);
+    expect(comparison.counts).toEqual([{ name: "storyElements", reference: 8, arm: 5 }]);
   });
 
-  it("finds nothing in a prompt state without trimmed arms", () => {
+  it("reads cache shares, writing calls, lines and input cost, billed and uncached", () => {
+    const rewrite = "gpt-6-luna@medium/rewriteSlim";
+    // Line A: the first call writes 40K of 100K input; the second reads 40K. Line B: one call that writes 20K.
+    const records = [
+      call(rewrite, "a", 1, { cacheLine: "A", inputTokens: 100_000, cachedTokens: 0, cacheWriteTokens: 40_000, outputTokens: 1_000 }),
+      call(rewrite, "b", 1, { cacheLine: "A", inputTokens: 100_000, cachedTokens: 40_000, cacheWriteTokens: 0, outputTokens: 1_000 }),
+      call(rewrite, "c", 1, { cacheLine: "B", inputTokens: 100_000, cachedTokens: 0, cacheWriteTokens: 20_000, outputTokens: 1_000 }),
+      ...["a", "b", "c"].map((c) => call("gpt-6-luna@medium/slim", c, 1, { inputTokens: 100_000 })),
+    ];
+    const [comparison] = variantComparisons(records, new Map(), caseTags("a", "b", "c"), "postfix");
+    expect(comparison.arm.cache).toEqual({ readShare: 40_000 / 300_000, writeShare: 60_000 / 300_000, writingCalls: 2, lines: 2 });
+    expect(comparison.reference.cache).toEqual({ readShare: 0, writeShare: 0, writingCalls: 0, lines: 0 });
+    // Luna per 1M: input $0.10, cached $0.01, cache write $0.125
+    const billed = [60_000 * 0.1 + 40_000 * 0.125, 60_000 * 0.1 + 40_000 * 0.01, 80_000 * 0.1 + 20_000 * 0.125].map((x) => x / 1e6);
+    expect(comparison.arm.inputCost.billed).toBeCloseTo(billed.reduce((a, b) => a + b) / 3, 10);
+    expect(comparison.arm.inputCost.uncached).toBeCloseTo((100_000 * 0.1) / 1e6, 10);
+  });
+
+  it("finds nothing in a prompt state without variant arms", () => {
     expect(variantComparisons([call(MEDIUM_PROD, "a", 1)], new Map(), caseTags("a"), "postfix")).toEqual([]);
   });
 });

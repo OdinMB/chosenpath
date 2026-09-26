@@ -27,10 +27,11 @@ import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
  * Renders results.md: spend, probe, per-arm validity, latency, tokens and
  * cost, rule rates against the baseline's noise floor, and the owner's gate
  * readings as views (single-player with and without pregeneration,
- * multiplayer, setup), then the Stage 3 trimmed-against-full section. The
- * statistics live in armStats.ts, the readings in gateReadings.ts and the
- * Stage 3 pairing in variantComparison.ts; this file only lays them out, all
- * of them. It marks each reading within or over and never picks a winner.
+ * multiplayer, setup), then the variants against their reference (Stage 3
+ * trims, Stage 4 rewrite), with input and caching. The statistics live in
+ * armStats.ts, the readings in gateReadings.ts and the variant pairing in
+ * variantComparison.ts; this file only lays them out, all of them. It marks
+ * each reading within or over and never picks a winner.
  */
 
 export type ResultsInput = {
@@ -228,14 +229,16 @@ function renderValidityGate(stats: ArmStats[], promptState: string): string[] {
   return lines;
 }
 
-// ------------------------------------------------ Stage 3: trimmed against full
+// ------------------------------------------------ Variants against their reference
 
-/** "full → trimmed (±n%)" */
-function fromTo(full: number | undefined, trimmed: number | undefined, format: (x?: number) => string): string {
+/** "reference → arm (±n%)" */
+function fromTo(reference: number | undefined, arm: number | undefined, format: (x?: number) => string): string {
   const change =
-    full && trimmed !== undefined ? ` (${trimmed >= full ? "+" : "-"}${Math.abs(Math.round(((trimmed - full) / full) * 100))}%)` : "";
-  return `${format(full)} → ${format(trimmed)}${change}`;
+    reference && arm !== undefined ? ` (${arm >= reference ? "+" : "-"}${Math.abs(Math.round(((arm - reference) / reference) * 100))}%)` : "";
+  return `${format(reference)} → ${format(arm)}${change}`;
 }
+
+const share = (x?: number) => (x === undefined ? "–" : pct(x));
 
 /** Calls of this role in a single-player story with pregeneration (85/19/21, and one setup). */
 function callsPerStory(group: CallRecord["group"]): number | undefined {
@@ -251,22 +254,50 @@ function callsPerStory(group: CallRecord["group"]): number | undefined {
   }
 }
 
-function storyShare(stats: ArmStats): number | undefined {
+/** A call's share of a single-player story with pregeneration, at its 1-player cost where it has one. */
+function storyShare(stats: ArmStats, basis: CostBasis = "billed"): number | undefined {
   const calls = callsPerStory(stats.group);
-  const onePlayer = stats.cost.billed.byPlayers[1] ?? stats.cost.billed.perCall;
+  const onePlayer = stats.cost[basis].byPlayers[1] ?? stats.cost[basis].perCall;
   return calls === undefined ? undefined : calls * onePlayer;
 }
 
 function renderArmRows(comparisons: VariantComparison[]): string[] {
   const lines = [
-    "| Role | Trimmed arm | Pairs | 1st-attempt valid trim / full | Visible tokens | Reasoning tokens | p50 wait | p95 wait | $/call billed | Per 1-player story with pregeneration |",
-    "|---|---|---|---|---|---|---|---|---|---|",
+    "| Role | Arm | Reference | Pairs | 1st-attempt valid | Visible tokens | Reasoning tokens | p50 wait | p95 wait | $/call billed | Per 1-player story with pregeneration |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
   ];
-  for (const { group, trimmedKey, pairs, trimmed: t, full: f } of comparisons) {
+  for (const { group, armKey, referenceKey, pairs, arm: a, reference: r } of comparisons) {
     const valid = (s: ArmStats) => `${s.validity.firstAttemptValid}/${s.validity.calls}`;
     lines.push(
-      `| ${group} | ${trimmedKey} | ${pairs} | ${valid(t)} / ${valid(f)} | ${fromTo(f.medianTokens.visible, t.medianTokens.visible, tokens)} | ${fromTo(f.medianTokens.reasoning, t.medianTokens.reasoning, tokens)} | ${fromTo(f.latency.p50, t.latency.p50, secs)} | ${fromTo(f.latency.p95, t.latency.p95, secs)} | ${fromTo(f.cost.billed.perCall, t.cost.billed.perCall, usd)} | ${fromTo(storyShare(f), storyShare(t), usd)} |`
+      `| ${group} | ${armKey} | ${referenceKey} | ${pairs} | ${valid(r)} → ${valid(a)} | ${fromTo(r.medianTokens.visible, a.medianTokens.visible, tokens)} | ${fromTo(r.medianTokens.reasoning, a.medianTokens.reasoning, tokens)} | ${fromTo(r.latency.p50, a.latency.p50, secs)} | ${fromTo(r.latency.p95, a.latency.p95, secs)} | ${fromTo(r.cost.billed.perCall, a.cost.billed.perCall, usd)} | ${fromTo(storyShare(r), storyShare(a), usd)} |`
     );
+  }
+  return lines;
+}
+
+/** Caching per comparison: what the arm's split requests read and wrote, and what input costs with caching and without. */
+function renderInputRows(comparisons: VariantComparison[]): string[] {
+  const lines = [
+    "",
+    "**Input and caching** (reference → arm; uncached is caching off, every input token at the input rate).",
+    "",
+    "| Role | Arm | Cache lines | Calls that wrote | Cache read share | Median input tokens | Input $/call billed | Input $/call uncached | $/call billed | $/call uncached | Per 1-player story billed | Per 1-player story uncached |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  for (const { group, armKey, arm: a, reference: r } of comparisons) {
+    const cells = [
+      fromTo(r.cache.lines, a.cache.lines, tokens),
+      fromTo(r.cache.writingCalls, a.cache.writingCalls, tokens),
+      fromTo(r.cache.readShare, a.cache.readShare, share),
+      fromTo(r.medianTokens.input, a.medianTokens.input, tokens),
+      fromTo(r.inputCost.billed, a.inputCost.billed, usd),
+      fromTo(r.inputCost.uncached, a.inputCost.uncached, usd),
+      fromTo(r.cost.billed.perCall, a.cost.billed.perCall, usd),
+      fromTo(r.cost.uncached.perCall, a.cost.uncached.perCall, usd),
+      fromTo(storyShare(r, "billed"), storyShare(a, "billed"), usd),
+      fromTo(storyShare(r, "uncached"), storyShare(a, "uncached"), usd),
+    ];
+    lines.push(`| ${group} | ${armKey} | ${cells.join(" | ")} |`);
   }
   return lines;
 }
@@ -274,18 +305,18 @@ function renderArmRows(comparisons: VariantComparison[]): string[] {
 function renderStateRows(comparisons: VariantComparison[]): string[] {
   const lines = [
     "",
-    "| Role | Trimmed arm | State counts per call, full (±noise) → trim | Checks lower than full beyond noise | Checks higher than full beyond noise |",
+    "| Role | Arm | State counts per call, reference (±noise) → arm | Checks lower than the reference beyond noise | Checks higher than the reference beyond noise |",
     "|---|---|---|---|---|",
   ];
-  const rates = (checks: CheckReading[]) => checks.map((c) => `${c.name} ${pct(c.full)} → ${pct(c.trimmed)}`).join("; ") || "–";
+  const rates = (checks: CheckReading[]) => checks.map((c) => `${c.name} ${pct(c.reference)} → ${pct(c.arm)}`).join("; ") || "–";
   for (const c of comparisons) {
     const counts = c.counts
-      .map((n) => `${n.name} ${n.full.toFixed(2)}${n.noise === undefined ? "" : ` (±${n.noise.toFixed(2)})`} → ${n.trimmed.toFixed(2)}`)
+      .map((n) => `${n.name} ${n.reference.toFixed(2)}${n.noise === undefined ? "" : ` (±${n.noise.toFixed(2)})`} → ${n.arm.toFixed(2)}`)
       .join("; ");
     const flagged = c.hasNoise
       ? `${rates(c.checks.filter((k) => k.flag === "lower"))} | ${rates(c.checks.filter((k) => k.flag === "higher"))}`
-      : `one sample, no noise floor; raw rates: ${rates(c.checks)} | –`;
-    lines.push(`| ${c.group} | ${c.trimmedKey} | ${counts || "–"} | ${flagged} |`);
+      : `one reference sample, no noise floor; raw rates: ${rates(c.checks)} | –`;
+    lines.push(`| ${c.group} | ${c.armKey} | ${counts || "–"} | ${flagged} |`);
   }
   return lines;
 }
@@ -293,25 +324,25 @@ function renderStateRows(comparisons: VariantComparison[]): string[] {
 function renderSetupWaits(comparisons: VariantComparison[]): string[] {
   const setups = comparisons.filter((c) => c.group === "setup");
   if (setups.length === 0) return [];
-  const byPlayers = ({ trimmed, full }: VariantComparison) =>
-    Object.keys(trimmed.latencyByPlayers)
+  const byPlayers = ({ arm, reference }: VariantComparison) =>
+    Object.keys(arm.latencyByPlayers)
       .map(Number)
       .sort((a, b) => a - b)
-      .map((n) => `${n}p ${fromTo(percentile(full.latencyByPlayers[n] ?? [], 50), percentile(trimmed.latencyByPlayers[n], 50), secs)}`)
+      .map((n) => `${n}p ${fromTo(percentile(reference.latencyByPlayers[n] ?? [], 50), percentile(arm.latencyByPlayers[n], 50), secs)}`)
       .join("; ");
-  return ["", "Setup median wait by player count, full → trim:", ...setups.map((c) => `- ${c.trimmedKey}: ${byPlayers(c)}`)];
+  return ["", "Setup median wait by player count, reference → arm:", ...setups.map((c) => `- ${c.armKey}: ${byPlayers(c)}`)];
 }
 
 function renderChainWaits(comparisons: VariantComparison[]): string[] {
   const chains = comparisons.filter((c) => c.group === "pipeline");
   if (chains.length === 0) return [];
   const wait = (c: VariantComparison, p: number) =>
-    fromTo(percentile(c.full.turnLatencies, p), percentile(c.trimmed.turnLatencies, p), secs);
+    fromTo(percentile(c.reference.turnLatencies, p), percentile(c.arm.turnLatencies, p), secs);
   return [
     "",
-    "| Chain (analysis-turn wait, single-player) | p50 full → trim | p95 full → trim |",
+    "| Chain (analysis-turn wait, single-player) | p50 reference → arm | p95 reference → arm |",
     "|---|---|---|",
-    ...chains.map((c) => `| ${c.trimmedKey} | ${wait(c, 50)} | ${wait(c, 95)} |`),
+    ...chains.map((c) => `| ${c.armKey} | ${wait(c, 50)} | ${wait(c, 95)} |`),
   ];
 }
 
@@ -319,11 +350,12 @@ function renderVariantComparison(comparisons: VariantComparison[]): string[] {
   if (comparisons.length === 0) return [];
   return [
     "",
-    "### Stage 3: trimmed variants against their full form",
+    "### Variants against their reference (Stage 3 trims, Stage 4 rewrite)",
     "",
-    "Readings on paired cases: each trimmed arm against the full (prod) arm of the same model and effort, on the (case, sample) pairs both finished. Columns read full → trimmed. Waits carry server drift, because the full forms ran earlier; tokens and cost do not. Nothing is dropped or picked.",
+    "Readings on paired cases: each variant arm against its reference arm (a trim against its full form; a rewrite against the form it rewrites, today's baseline included; a verbosity arm against the same arm without it), on the (case, sample) pairs both finished. Columns read reference → arm. Checks are flagged beyond the reference's own noise: its sample 1 against its sample 2 on the matched cases. Waits carry server drift where the reference ran earlier; tokens and cost do not. Nothing is dropped or picked.",
     "",
     ...renderArmRows(comparisons),
+    ...renderInputRows(comparisons),
     ...renderStateRows(comparisons),
     ...renderSetupWaits(comparisons),
     ...renderChainWaits(comparisons),
