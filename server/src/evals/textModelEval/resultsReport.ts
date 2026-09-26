@@ -49,7 +49,7 @@ export type ArmStats = {
   latency: Quantiles;
   /** Single-player beat calls on turns without analysis */
   beatOnlyLatencies: number[];
-  /** Pipeline chains: analysis plus beat */
+  /** Single-player pipeline chains: analysis plus beat */
   turnLatencies: number[];
   latencyByPlayers: Record<number, number[]>;
   medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number };
@@ -156,7 +156,7 @@ function statsFor(
     beatOnlyLatencies: good
       .filter((r) => r.group === "beat" && r.players === 1 && !tags.get(r.caseId)?.analysisTurn)
       .map(seconds),
-    turnLatencies: good.filter((r) => r.turnLatencyMs !== undefined).map((r) => (r.turnLatencyMs ?? 0) / 1000),
+    turnLatencies: good.filter((r) => r.turnLatencyMs !== undefined && r.players === 1).map((r) => (r.turnLatencyMs ?? 0) / 1000),
     latencyByPlayers,
     medianTokens: {
       input: median(good.map((r) => r.inputTokens)),
@@ -207,13 +207,19 @@ export function storyCost(config: GameplayConfig): { withPregen: number; without
   return { withPregen: per(PER_STORY_WITH_PREGEN), withoutPregen: per(PER_STORY_WITHOUT_PREGEN) };
 }
 
+/** A single-player wait quantile: multiplayer calls carry more output and would inflate it. */
+function onePlayerLatency(stats: ArmStats | undefined, p: number): number | undefined {
+  if (!stats) return undefined;
+  return percentile(stats.latencyByPlayers[1] ?? [], p) ?? (p === 50 ? stats.latency.p50 : stats.latency.p95);
+}
+
 /** Analysis-turn waits: pipeline chains when measured, else beat plus the slower analysis (summed p95s). */
 function analysisTurnP95(config: GameplayConfig): { p95?: number; source: "pipeline" | "summed" } {
   if (config.beat.turnLatencies.length > 0) {
     return { p95: percentile(config.beat.turnLatencies, 95), source: "pipeline" };
   }
-  const beat = config.beat.latency.p95;
-  const analysis = Math.max(config.switch?.latency.p95 ?? 0, config.thread?.latency.p95 ?? 0);
+  const beat = onePlayerLatency(config.beat, 95);
+  const analysis = Math.max(onePlayerLatency(config.switch, 95) ?? 0, onePlayerLatency(config.thread, 95) ?? 0);
   return { p95: beat === undefined ? undefined : beat + analysis, source: "summed" };
 }
 
@@ -239,7 +245,7 @@ export function gates(config: GameplayConfig, baseline: GameplayConfig): Gates {
 
   const analysisLatencies = config.beat.turnLatencies.length
     ? config.beat.turnLatencies
-    : config.beat.beatOnlyLatencies.map((s) => s + (config.thread?.latency.p50 ?? config.switch?.latency.p50 ?? 0));
+    : config.beat.beatOnlyLatencies.map((s) => s + (onePlayerLatency(config.thread, 50) ?? onePlayerLatency(config.switch, 50) ?? 0));
   const mixed = [
     ...config.beat.beatOnlyLatencies.map((value) => ({ value, weight: TURN_MIX.beatOnly / config.beat.beatOnlyLatencies.length })),
     ...analysisLatencies.map((value) => ({ value, weight: TURN_MIX.analysis / analysisLatencies.length })),

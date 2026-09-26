@@ -95,6 +95,12 @@ describe("gates", () => {
     expect(slowAnalysis.pregenTurn).toMatchObject({ pass: false, source: "pipeline", beatOnlyP95: 30 });
   });
 
+  it("sums single-player waits for an analysis turn when single-player calls exist", () => {
+    const beat = arm({ beatOnlyLatencies: [20], latency: { n: 3, p50: 20, p95: 50 }, latencyByPlayers: { 1: [20, 25], 3: [50] } });
+    const thread = arm({ latency: { n: 3, p50: 6, p95: 20 }, latencyByPlayers: { 1: [5, 6], 3: [20] } });
+    expect(gates({ ...baseline, beat, thread }, baseline).pregenTurn.analysisTurnP95).toBe(31);
+  });
+
   it("caps cost at the baseline's per-story cost", () => {
     expect(gates({ ...baseline, beat: arm({ costPerCall: 0.009 }) }, baseline).costCap.pass).toBe(true);
     expect(gates({ ...baseline, beat: arm({ costPerCall: 0.011 }) }, baseline).costCap.pass).toBe(false);
