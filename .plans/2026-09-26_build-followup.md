@@ -208,7 +208,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - Two corrections to earlier entries: the Stage 4 dry-run gap (Borderline Insights) is mostly this undercount, not the shorter rewrite; and Stage 3's 13% setup overrun (Implementation Issues, "Estimates") came from it too, not from the output borrowing. The estimator fix is under Suggested Follow-Up Work.
 - Milestone 3 (eval run): **Round 3 items avoid every case on the Round 1 and Round 2 turn pages, so the page holds only plain mid-thread turns.** `--cases` was limited to the 18 single-player turn cases that neither earlier key names. All 44 single-player cases have a usable sample 1 on both `gpt-6-luna@medium/slim` and `gpt-6-luna@medium/rewriteSlim`, and 26 of them were on an earlier page.
   - The price: every single-player first beat (3), ending (3) and analysis turn (11) was already on Round 1 or Round 2, so none is on Round 3. The rewrite's first-beat, later-switch and ending instructions (table B rows B13 and B23–B25) get no rating. The automatic checks are their only reading.
-  - The 8 items: 4 from story 8988006e, 2 from 6edd813c, 1 from 2ee343b6 and 1 image-off synthetic turn from 7492b211. 6 show images and 2 don't. The control (slim against slim, samples 1 and 2) is on `cont-8988006e-t2-o0`, which was on neither earlier page either.
+  - The 8 items: 4 from story 8988006e, 2 from 6edd813c, 1 from 2ee343b6 and 1 image-off synthetic turn from 7492b211. 7 show pictures and 1 doesn't. In 2 of them the story generates no new pictures (the `images` case tag), but item 3's versions still place pictures from the story's library. The control (slim against slim, samples 1 and 2) is on `cont-8988006e-t2-o0`, which was on neither earlier page either.
   - The fallback (re-admit Round 1 cases if fewer than 9 qualified) was not needed, so I did not use it. Re-admitting Round 1's first beats and endings would have covered those branches, at the price of showing the owner cases a second time.
 
 ## Skipped Items
@@ -221,9 +221,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   Check desktop and mobile, `n`/`p` keys, export, reload (autosave) and the console.
 - Milestone 1: **the "guard can fail" proof.** The plan was to disable the blinding scan, the stage cap, the creator-field strip and the log-tag allow-list one at a time, confirm a test goes red, then restore. The environment's safety classifier refused the temporary guard-disabling edits, so this was not done. Tests for each guard exist (`rating.test.ts`, `armsBudget.test.ts`, `cases.test.ts`, `usageRecorder.test.ts`). The disable-and-see-red check needs a person.
 - Run A: **Rating-page trial, what was not exercised.** Multi-option ranking, the repeated item and the baseline-against-baseline item need two arms or two baseline samples, so they wait for the post-fix baseline. The turn page was not trialled; the task asked for the setup set.
-- Milestone 2 (eval run): **Stages 3 and 4 were not started;** they were out of scope for this run. The owner's ratings come first.
 - Milestone 2 (eval run): **Setup page reload check.** The Playwright connection dropped just after the export, before the reload step. Autosave was shown instead by the ratings surviving the browser relaunch, and by a full reload on the turn page (ratings, current item and last-export time all restored).
-- Milestone 3 (implementer): **Runbook steps 3–6 of the Stage 3 plan are not done:** the four paid runs, the Round 2 page and its check, and the owner report. The task said not to run paid stages. The dry run puts Stage 3 at $2.56, under the plan's $2.75 shrink threshold, so step 2 needs no shrink and the runs can start as written: setup, then beats, then analysis, then chains, all with `--stage 3 --prompt-state postfix`. No rating page was built, so no visual check happened.
 - Milestone 3 (eval run): **No visual check of the Round 2 page.** The Playwright MCP server was disconnected. Instead, I served `rating/` (and not `keys/`) on 127.0.0.1 and ran a throwaway Jest test against the served HTML. It checked:
   - 14 items: 12 regular, the repeat of turn-01 at turn-14 at least 3 items apart, and the today-against-today control at turn-07 with samples 1 and 2 on an unused case;
   - 3 options per regular item, each with the same three arms, at sample 1, on a single-player case;
@@ -234,7 +232,6 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   A synthetic export was then scored with `--score`. The test, the export and the scores were deleted. Layout, the `n`/`p` keys, reload and the in-browser export were not exercised; the page template is unchanged since Round 1's browser check.
 - Milestone 3 (planner): **No Round 3 setup page.** Test plan §4.5 judges the setup rewrite by the automatic checks and the play-test.
 - Run A: **The 29–58 s gaps between local pregeneration files** (test plan §2.6) were not investigated. Today's text calls take about 10–17 s per turn, and pregeneration runs its options in parallel. Production `[TurnTiming]` lines will show the real pregeneration time.
-- Milestone 3 (implementer): **Stage 4 Runbook steps 2–7 are not done:** the smoke, the six paid invocations, reading the variant section, the Round 3 page and its check, the owner report, and the closing records. This workflow allowed no paid calls (no `--run`). The Stage 4 spend and pointers in `.context/text-model-eval.md` Known limits wait for the run. So do this plan's status and its move to `.plans/completed/`.
 - Milestone 3 (implementer): **Two jobPlan test cases moved from commit 4 to commit 5.** Both are cache-line cases on split requests: one line for two cases with the same schema and fixed text, and separate lines for an image-on case and an ending. `planJobs` can plan a split request only from the Stage 4 matrix, which arrives in commit 5. Commit 4 carries the other half, "a production request has no cache line". The commit 5 case was proven able to fail by disabling the cache-line assignment.
 - Milestone 3 (implementer): **No visual check.** Nothing in this change touches the client or a rating page.
 
@@ -282,19 +279,25 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (eval run): **The setup trim, my reading: don't adopt it on its own.** It saves under half a cent per story and no measurable wait. On Luna low it pushed 2 of 36 setups to 5 visible player stats (full: 0 of 36). Stage 4's rewrite covers the setup prompt anyway.
 - Milestone 3 (planner): **Round 3 (8 items, about 20 minutes) comes after Rounds 1 and 2.** If Round 2 rates slim below full, read the Luna medium rewrite on the full scaffold instead; a second sample costs about $0.1.
 - Milestone 3 (eval run): **Stage 4 stopped at its cap, and the ledger probably understates what OpenAI billed.** Borderline Insights has the figures. Two things need you:
-  - **Check the OpenAI usage page** for gpt-6-sol and gpt-6-luna on 2026-09-26, 13:26–14:30 UTC.
+  - **Check the OpenAI usage page** for gpt-6-sol and gpt-6-luna on 2026-09-26, 13:20–14:40 UTC. Stage 4's GPT-6 calls ran 13:20:21–14:33:22, and the last hang timed out at 14:31:07.
     - The harness books a hung call at its estimate: $0.41 for the 5 Sol hangs and $0.10 for the 38 Luna hangs.
-    - If those calls kept generating for the full 300 s, at the smoke's measured speeds (Sol about 80, Luna about 110 tokens per second), the bill is about $1.4 higher (DERIVED from the price table). That makes about $26.1 in total, not $24.76.
+    - The answered GPT-6 calls in that window cost $1.61 ($1.42 Sol, $0.20 Luna). About that on the page means the hangs were not billed.
+    - If those calls kept generating for the full 300 s, at the smoke's measured speeds (Sol about 80, Luna about 110 tokens per second), they cost about $1.8 of output, so the page shows about $3.4, and the bill is about $1.3 higher than the ledger (DERIVED from the price table). That makes about $26.1 in total, not $24.76.
     - It is more if OpenAI kept generating after the client disconnected.
-  - **Decide whether the rest is worth funding.** Not run:
+    - A whole-day view mixes in about $14.3 of earlier GPT-6 spend (Stages 1–2 and 3, before 10:25 UTC).
+  - **Decide whether the rest is worth funding.** Every option takes the ledger past the $25 target ($24.76 now), and the total may be past it already if the hangs were billed. Cheapest first:
+    - replay 3–4 hung cases with an output cap (a few cents; the run path has no `max_completion_tokens` option yet, so it needs a small eval-only flag) to confirm the counting loop before paying for the fix;
+    - relax the enforced counts and re-run the lead's 88 turns (about $0.25);
     - the verbosity arm (est $0.12);
-    - the full-scaffold hedge ($0.14);
+    - the full-scaffold hedge ($0.14), which is the comparison Round 3 would need if Round 2 rates slim below full;
     - gpt-4.1 setup on the other 3 premises plus the open job without examples (about $0.45).
     
     Raising the Stage 4 cap takes `--over-target-reason`, and that is your call. Fixing the enforced-count loop first would make those runs cheaper and their reading cleaner.
+- Milestone 3 (eval run): **4 of 88 Luna rewrite turns would fail in production.** Each hung three times at 300 s and answered only on a fourth attempt, which the eval's transport budget (3 retries on a timeout, `runner.ts`) allows and production's (`PRODUCTION_MAX_RETRIES = 2`) does not. In production that turn fails after about 9 minutes (3 × 180 s). One Sol setup (the ER doctor with examples) used all 3 attempts production allows. This decides nothing on its own while the rewrite isn't adopted, but it belongs in any adoption decision on the rewrite as measured.
+- Milestone 3 (eval run): **The shorter GPT-6 turn timeout (Suggested Follow-Up Work, Milestone 2) now has Stage 4 data.** A 90 s beat timeout would halve a hang's wait and cap its possible output cost at about $0.005 per Luna call. The one Luna rewrite turn that recovered (176 s) would have been cut off and retried, and 60 s would cut off normal 3-player turns (Round 1 p95 62 s). It changes production behaviour, so it is your call.
 - Milestone 3 (eval run): **Rate Round 3 after Rounds 1 and 2:** `DOCS/2026-09-26_gpt6-text-eval/rating/round3-turns.html`. It has 10 items (8 regular, a repeat and a control), 2 options each, about 20 minutes.
   - The export downloads as `ratings-text-turn-291fb89390.json`. Hand it to the next session for `--score`. It finds the renamed key `keys/round3-turns-291fb89390.json` by its page id (checked with a test export).
-  - One of the two versions sometimes leaves an interlude empty. The page shows it as a blank bullet, as the game would show a blank interlude slide. The Borderline Insights entry "empty interludes" names the arm, so read it after rating if you want Round 3 blind.
+  - One of the two versions sometimes leaves an interlude empty. The page shows it as a blank bullet (two on item 7), as the game would show a blank interlude slide. The Borderline Insights entry "empty interludes" names the arm, so read it after rating if you want Round 3 blind.
 
 ## Implementation Issues
 
@@ -460,7 +463,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     | # | Arms | Jobs | Estimate | Spent | Outcome |
     |---|---|---|---|---|---|
     | 1 | Sol low setup, with and without examples, 9 premises | 17 open (+1 smoke) | $1.36 | $1.73 ($1.32 replies, $0.41 for 5 hangs) | all 18 valid |
-    | 2 | Luna medium rewriteSlim ×2 | 87 open (+1 smoke) | $0.23 | $0.30 ($0.20 replies, $0.10 for 38 hangs) | all 88 valid; 4 jobs on their fourth and last attempt |
+    | 2 | Luna medium rewriteSlim ×2 | 87 open (+1 smoke) | $0.23 | $0.30 ($0.20 replies, $0.10 for 38 hangs) | all 88 valid; 25 jobs needed a retry, and 4 needed a fourth attempt (one more than production allows) |
     | 3 | gpt-4.1-mini rewrite ×1 | 43 open (+1 smoke) | $0.32 | $0.20 | all valid on the first attempt |
     | 4 | gpt-4.1 setup, shrunk to 6 premises | 11 open (+1 smoke) | $0.83 | $1.59 ($0.73 for 10 replies, $0.86 for 3 runaways) | cap stop: 11 valid, 1 job open |
     | 5 | Luna medium verbosity low ×1 | 44 | $0.12 | – | not run: $0.01 left |
@@ -473,15 +476,16 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - **Caching reads work.** The first line (Sol rewrite, 1 player) read 18,094 cached tokens on its second call (neo-tokyo) and on its third (er-doctor, on the third attempt after two hangs).
     - Sol: 6 lines and 6 writes, one per line. All 12 warm valid calls read the whole fixed prefix, and 66% of input tokens came from the cache on both arms.
     - Luna rewriteSlim: 5 lines. All 84 warm valid calls read the cache, 47% of input tokens. The smoke's line was still warm 20 minutes after its write (13:20 → 13:40 UTC).
-    - The ending line's write came from a hung attempt. Its third attempt read 4,388 cached tokens that no recorded call wrote, so the hung call had started (its prefill ran).
+    - The ending line's write probably came from a hung attempt. Its third attempt read 4,388 cached tokens that no recorded call wrote, and only hung calls carry no usage, so a hung call probably started (its prefill ran).
     - gpt-4.1-mini (implicit cache, no breakpoint): 38 of 43 calls read it, 58% of input tokens. gpt-4.1 setup: 14% with examples, 54% without.
   - **Hangs: 43, all on GPT-6.** Each is an `outcome` `timeout` at 300 s, retried, and left out of validity and waits.
     - Sol hung on 5 of 23 attempts and Luna on 38 of 126. No job was lost.
     - For comparison: Round 1 had 4 hangs in 1,309 GPT-6 calls, and Stage 3 none in 635 (09:49–10:24 UTC the same day).
-    - They were spread evenly over 13:26–14:20 UTC. Warm calls hung on 42 of 138 attempts, cold calls on 1 of 11.
+    - Sol's 5 started 13:26:55–13:32:25, four of them within about a minute. Luna's 38 started 13:40:38–14:26:07 (the last timed out at 14:31:07).
+    - Later calls on a cache line hung on 42 of 138 attempts, first calls on 1 of 11. Every first call started when an invocation began (13:20, 13:22, 13:25:46, 13:40:38), and hung calls record no usage, so this doesn't show that reading the cache hangs.
     - gpt-4.1-mini had none in 43 calls on the same split request.
   - **Runaways: 3 of 13 gpt-4.1 setup attempts hit the 32,768-token output limit** (`finishReason` `length`), at $0.27–0.30 each.
-    - Each is a whitespace loop (`\r`, `\t`) that starts inside a story element's `facts` array, right after its second fact.
+    - Each is a whitespace loop (spaces and `\r`; the co-founders one also `\t`) that starts inside a story element's `facts` array, right after its second fact.
     - Table SS enforces exactly 3 facts in the schema and took "Three" out of the description. So the model writes 2, the constrained decoder won't let it close the array, and it pads until the limit.
     - `junkChars` reads 0 on these, because it counts only replies that parse.
   - **My reading, not measured:** the GPT-6 hangs are probably the same loop.
@@ -501,12 +505,23 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - console: only the test server's favicon 404. The page made one request, itself.
   - `--score` on that export found the renamed key. Then I removed the test rating from the browser's storage, deleted the test scores and the export, stopped the server, closed the browser, and deleted this run's `.playwright-mcp/` files. The Jump-to menu was not exercised.
 - Milestone 3 (eval run): **Empty interludes: the enforced interlude count shows in the rewrite's output (read this after rating Round 3 if you want it blind).**
-  - 12 of 88 `gpt-6-luna@medium/rewriteSlim` outputs have an interlude with empty text (13 interludes in all), most with an empty `imageId` and source `none`. Slim has none in 88.
+  - 13 of 88 `gpt-6-luna@medium/rewriteSlim` outputs have a blank interlude: 12 with empty text (13 interludes in all, most with an empty `imageId` and source `none`) and one whose third interlude is a single space (`cont-8988006e-t4-o1` s1). `cont-8988006e-t3-o0` s1 (Round 3 item 7) blanked its second and third, so it wrote one interlude, below B32's minimum of two. One more output (`cont-6edd813c-t3-o2` s1) has a blank third option. Slim and the gpt-4.1-mini rewrite have none (88 and 44).
   - Table BS enforces exactly 3 interludes, while rule B32 asks for 1 player interlude, 1–2 about elements and 0–1 world detail, which allows 2. When the model wants 2, it pads a blank third one.
   - This is the same mechanism as gpt-4.1's facts runaways: Luna escapes with an empty string instead of whitespace. It supports the reading that the enforced counts need revisiting.
   - No automatic check flags an empty interlude, so validity and the checks read 100% on it. The game would show a blank interlude slide (`Interlude.tsx` renders `text || ""`).
   - On the Round 3 page, the rewrite's option carries it on 3 of the 8 regular items and on the repeat, so a rater can learn to spot the rewrite.
   - The page also shows one rewrite option as a single four-sentence paragraph (536 characters). That fits the variant section: rewriteSlim's paragraph check falls from 97.7% to 88.6%, and its prose from 334 to 259 words.
+- Milestone 3 (eval run): **Stage 4 headline numbers** (full report: `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage4-report.md`).
+  - **Spend:** Stage 4 $3.99 of $4 (first test $0.17, Sol setup $1.73, Luna turns $0.30, gpt-4.1-mini turns $0.20, gpt-4.1 setup $1.59). Inside it: $0.51 for 43 hung calls at their estimate and $0.86 for 3 gpt-4.1 runaways. Ledger total $24.76 of $30; about $26.1 if OpenAI billed the hangs as 300 s replies.
+  - **Caching:** the explicit breakpoint caches the reply format plus the fixed rules. Read share 66% on Sol setups and 47% on Luna turns. Input per call $0.045 → $0.019 (Sol setup) and $0.0012 → $0.0005 (Luna turn). All 96 later calls that answered read their line's write.
+  - **Hangs:** 43 of 149 GPT-6 attempts (Luna 38 of 126, Sol 5 of 23), against 4 in 1,309 in Round 1 and none in 635 in Stage 3. 25 of 88 Luna jobs needed a retry, 4 of them a fourth attempt.
+  - **Enforced counts:** gpt-4.1 ran away on 3 of 12 first setup attempts (whitespace inside `facts` to 32,768 tokens). Luna left a blank interlude in 13 of 88 turns and a blank option in 1; Sol left blank items in 3 of 18 setups. The reference forms had none.
+  - **Luna medium turns, slim → rewrite (88 pairs):** input 12,117 → 8,900 tokens, visible 1,600 → 1,327, reasoning 1,535 → 1,884, p50 26.6 → 26.4 s, p95 35.1 → 40.9 s, $0.0027 → $0.00225 per turn on replies only ($0.0034 with hangs at their estimate). Words 334 → 259, facts 3.20 → 3.47; sentences 96.6% → 81.8% and paragraphs 97.7% → 88.6%.
+  - **The lead per single-player story** (rewrite turns, Stage 3's Luna low minimal planning, Sol low rewrite setup): $0.295 billed and $0.345 caching off on replies only; $0.449 and $0.499 with hangs at their estimate. Round 1's lead reads $0.411 on the same matched basis, Stage 3's $0.362. 60 s reading 48.5 s (added).
+  - **Sol low setup:** median 62.5 → 79.2 s with examples, 77.6 s without; single-player 60.2 → 68.2 / 63.4 s, against the 57.6 s cap. Replies-only cost $0.105 → $0.082 → $0.075.
+  - **gpt-4.1-mini turns, today → rewrite:** −19% uncached, 11 of 44 turns open with "You" (was all), sentences 61.4% → 31.8% and paragraphs 100% → 84.1%.
+  - **Report corrections before hand-off.** Two independent checkers read the report against `calls.jsonl`, the outputs and the earlier reports. I corrected: the 4 turns past production's retries, the blank-item counts (13 and 1, not 12), the 176 s turn's blank run (30,601 characters, not 38,000), the hang windows, the usage-page window and its expected figures, Sol's waits without examples, Round 1's lead on the matched basis ($0.411), the cache-read inferences, the setup cache lines per player count, the runaways' whitespace mix, the bounty-hunter blanks (21 of 21 lists), gpt-4.1's waits with runaways, the "still over" single-player wording, the Round 3 picture count, the ±15 non-reading, the timeout trade-off, and the internal wording.
+- Milestone 3 (eval run): **Privacy page and AI transparency record: checked, no change** (Stage 4 run). No production model, feature or data flow changed. The eval sent the frozen cases and premises to the same OpenAI models as Rounds 1 and 2; the rewrite, caching and warm-first runner live only in the eval harness.
 
 ## Suggested Follow-Up Work
 
@@ -514,7 +529,6 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 1: `run.ts` is 476 lines: the CLI plus six modes. If Stages 3 and 4 add modes, move each mode into its own module.
 - Milestone 1: A seeded or idempotent thread resolution would let the eval re-resolve threads at replay time, instead of freezing states. Not needed now.
 - Milestone 1: `.context/ai-transparency.md` could name the new call and turn logs in its processors and data section. That depends on the privacy-page decision above.
-- Run A: **Stage 4: is the schema in the cacheable prefix?** The schema is 64% of a setup call's input and about a third of a 1-player beat's. Whether explicit caching can cover it decides how much Stage 4 saves.
 - Run A: The rating page repeats the instructions above every item. Now that the item bar is sticky, the instructions could fold into a `<details>` after the first item.
 - Run A: Probe full completions do not record `usageFields`, and a refusal was never provoked. A deliberately borderline filter premise would show how a refusal surfaces through the production path.
 - Milestone 2 (planner): The beat's ±15 cap per modifier against a stat's "major" ±20 effect: a remaining cross-role mismatch for the owner or Stage 4.
@@ -532,20 +546,21 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 2 (eval run): **`results.md` pairs each candidate beat arm with the same-effort analysis arm** (`configsFor`), but the lead is Luna medium beats with Luna low analysis. The round-1 report computed the cross pairs with the harness's own `storyCost`/`gates` in a throwaway test. A gameplay view keyed by (beat arm, analysis arm) would make this reproducible. It belongs with the planned `resultsReport.ts` split.
 - Milestone 2 (eval run): **`results.md` has no setup waits by player count,** although single-player vs group decides whether Sol low fits the cap (55.2 s vs 63–75 s median). The same view should show a candidate against today's production (Run A) as well as the post-fix baseline, since the owner's caps name Run A's figures.
 - Milestone 2 (eval run): **Price multiplayer estimates by player count** (`estimateCall` uses one median over all player counts; see Implementation Issues).
-- Milestone 2 (eval run): **Report hangs as their own reading:** count of `timeout` attempts per arm, and the summed wait per call including the hung attempt. Today they are visible only in `calls.jsonl`.
+- Milestone 2 (eval run): **Report hangs as their own reading:** count of `timeout` attempts per arm, and the summed wait per call including the hung attempt. Today they are visible only in `calls.jsonl`. Stage 4 adds a reason: the runner gives a timeout 3 retries, production 2, so the reading should also count jobs that needed more attempts than production allows (4 of 88 Luna rewrite turns did).
 - Milestone 2 (eval run): **The distinct-openings metric depends on how many turns an arm has** (a count of distinct two-word openings). It could be read per sample, or on a fixed-size draw, so arms with 19, 140 and 203 turns compare fairly.
 - Milestone 2 (implementer): `SwitchPromptService.createInstructionsSection` now has three example-output branches (opening multiplayer, later multiplayer, single-player). If Stage 4 adds another, move the examples into a map keyed by situation.
 - Milestone 3 (planner): Delete `server/src/game/services/storyTextTrims.ts` and its test once Stage 3 is decided and Stage 4's rewrite supersedes it.
 - Milestone 3 (planner): The optional "facts after the text" variant (A6 `factsAfterText`) and a `statGroups` trim for story setup were not run.
 - Milestone 3 (planner): Automatic checks for repeated options within a thread and for text–facts agreement. The research names both as what trims might hurt, and today only the rating sees them.
-- Milestone 3 (implementer): **If Stage 4 adds a third matrix, split `server/src/evals/textModelEval/arms.ts` in two.** Prices and estimates (`PRICES`, `costFromUsage`, `estimateCall`, `outputTokensPerSecond` and the §2.2 tables) would go to `pricing.ts`. The stage matrices and key formats would stay in `arms.ts`. Today the two concerns share a file of about 330 lines, and every stage adds to the matrix part.
-- Milestone 3 (implementer): `variantComparison.ts` both computes and renders the Stage 3 section, as the plan placed it. If Stage 4 reuses the pairing (rewrite against full), move `renderVariantComparison` into `resultsReport.ts`. That puts all rendering in one module and leaves the comparison as pure readings.
 - Milestone 3 (eval run): **Share one paragraph normaliser between the client and the eval.** `server/src/evals/textModelEval/playerText.ts` is a copy of `normalizeStoryText` in `client/src/game/utils/storyTextProcessor.ts`, because the server cannot import client code. Moving the function to `core/utils/` and importing it from both would remove the copy. That touches production client code, so it was left for a normal build with a visual check.
 - Milestone 3 (eval run): **`checkThread` could check that each thread's `outcomeId` exists in the story** (it checks only duration and steps). The switch check already does this for flavor switches. Case `thread-tpl-e401abf2-p1-t1` would fail it on every arm.
-- Milestone 3 (eval run): **Stage 4 options from Stage 3:** start the rewrite from the slim or minimal turn form, whichever Round 2 supports, and keep the minimal planning forms. Planning lost nothing measurable and is about 30–55% shorter. The fewer established facts (−9%) on reasoning efforts is the one thing to watch; a "facts after the text" layout (A6) is the planned probe for it.
+- Milestone 3 (eval run): **A rewrite on the minimal turn form,** if Round 2 supports minimal over slim (Stage 4 built on slim). Keep the minimal planning forms on adoption: they lost nothing measurable and are about 30–55% shorter. Stage 4's rewrite brought the fact count back (3.20 → 3.47), so the "facts after the text" probe (A6) matters less than Stage 3 suggested.
 - Milestone 3 (planner): A multiplayer beat rewrite, measured, before any multiplayer adoption.
 - Milestone 3 (planner): Rewrite and cache the switch and thread analysis calls (their prompts are about 6K input tokens each).
 - Milestone 3 (planner): Cache-aware estimates in `pricing.ts`, once Stage 4 has measured the read shares per role.
 - Milestone 3 (planner): On adoption: move the message shaping to `shared/llm/` beside the factory, and decide an explicit cache TTL there (a production request-shape change, the owner's call).
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
+- Milestone 3 (eval run): **Relax the rewrite's enforced counts** in `storyTextRewrite/` (tables BS and SS): let each list hold what its rule allows (interludes 2–4, facts 2–3 or `minItems` only, identities and backgrounds as production words them) and put the count back in the description. Then re-run the lead's turns (about $0.25) to see whether the hangs and blank items go away. Needs the owner's cap decision first (User Input Needed).
+- Milestone 3 (eval run): **An automatic check for blank list items** (empty or whitespace-only strings in interludes, options, facts, identities and stat lists). Stage 4's blank items were found by hand; validity and every rule check read 100% on them.
+- Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.

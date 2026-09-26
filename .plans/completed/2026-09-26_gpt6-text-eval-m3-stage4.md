@@ -1,7 +1,7 @@
 # GPT-6 text eval, Milestone 3, Stage 4: the GPT-6-style rewrite with caching (eval variants), its run, and the rewrite-against-reference readings
 
 - **Date**: 2026-09-26
-- **Status**: draft
+- **Status**: implemented
 - **Type**: feature (eval variants, harness scheduling and readings). It includes two scoped pure-move refactors. Both are named debts whose tripwire this task hits: prices and estimates move out of `arms.ts` (Stage 4 adds the third matrix), and the comparison's rendering moves into `resultsReport.ts` (Stage 4 reuses the pairing).
 - **Complexity**: complex
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
