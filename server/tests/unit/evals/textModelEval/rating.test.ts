@@ -115,6 +115,20 @@ describe("planRatingSet: rotating candidates (perItem)", () => {
     expect(new Set(pairs).size).toBe(9);
   });
 
+  it("spreads each candidate evenly over the strata: 2 of 3 items per player count", () => {
+    const { key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 9, 2, "strata");
+    const players = new Map(Array.from({ length: 12 }, (_, i) => [`setup-case-${i}`, 1 + (i % 3)]));
+    const perStratum: Record<string, number> = {};
+    for (const item of regular(key)) {
+      for (const ref of Object.values(item.labels)) {
+        if (ref.armKey === BASELINE.key) continue;
+        const k = `${ref.armKey}|${players.get(item.caseId)}p`;
+        perStratum[k] = (perStratum[k] ?? 0) + 1;
+      }
+    }
+    expect(Object.values(perStratum)).toEqual(new Array(9).fill(2));
+  });
+
   it("keeps a 4-candidate rotation within one appearance of even over 15 items", () => {
     const { key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM, LUNA_MEDIUM], 15, 2);
     const counts = appearances(key);

@@ -208,9 +208,12 @@ function refsFor(arms: ArmRef[], caseId: string, sample = 1): { baseline: LabelR
 }
 
 /**
- * The picked items. The baseline's position cycles through the labels, so it
- * is balanced; with rotating candidates it is also offset once per rotation
- * cycle, so each candidate subset meets the baseline at different labels.
+ * The picked items. Arms and the baseline's label are assigned in stratum
+ * order, so a rotation cycle spreads each candidate over the strata; the
+ * page then shows the items in salted order. The baseline's position cycles
+ * through the labels, so it is balanced; with rotating candidates it is also
+ * offset once per rotation cycle, so each candidate subset meets the baseline
+ * at different labels.
  */
 function itemDrafts(spec: RatingSpec, picked: EvalCase[], salt: string): Draft[] {
   const [baseline, ...candidates] = spec.arms;
@@ -218,14 +221,16 @@ function itemDrafts(spec: RatingSpec, picked: EvalCase[], salt: string): Draft[]
   const rotation = candidateRotation(candidates.length, perItem, picked.length);
   const cycle = combinations(candidates.length, perItem).length;
   const shown = perItem + 1;
+  const pageOrder = byHash(`${salt}|order`);
   return [...picked]
-    .sort((a, b) => byHash(`${salt}|order`)(a.id, b.id))
-    .map((c, index) => {
+    .sort((a, b) => stratum(a).localeCompare(stratum(b)) || byHash(`${salt}|assign`)(a.id, b.id))
+    .map((c, index): Draft => {
       const arms = [baseline, ...rotation[index].map((i) => candidates[i])];
       const { baseline: base, others } = refsFor(arms, c.id);
       const position = cycle > 1 ? (index + Math.floor(index / cycle)) % shown : index % shown;
       return { caseId: c.id, refs: orderRefs(base, others, `${salt}|${c.id}`, position) };
-    });
+    })
+    .sort((a, b) => pageOrder(a.caseId, b.caseId));
 }
 
 /** Adds the repeated item and the baseline-against-baseline item, or notes why not. */
