@@ -43,15 +43,16 @@ function setupHtml(card: SetupCard): string {
     paragraphs(card.introduction.text.split(/\n\s*\n/)),
     `<h4>World</h4>`,
     paragraphs([card.world.world]),
-    card.world.tone.length ? `<p class="muted">Tone: ${e(card.world.tone.join("; "))}</p>` : "",
-    card.world.conflicts.length ? `<p class="muted">Conflicts: ${e(card.world.conflicts.join("; "))}</p>` : "",
+    // Lists, not a joined line: the items often end in their own full stop
+    card.world.tone.length ? `<p class="muted">Tone:</p>${listOf(card.world.tone)}` : "",
+    card.world.conflicts.length ? `<p class="muted">Conflicts:</p>${listOf(card.world.conflicts)}` : "",
     `<h4>Story elements</h4>`,
     `<ul>${card.elements.map((el) => `<li><strong>${e(el.name)}</strong>: ${e(el.description)}</li>`).join("")}</ul>`,
     `<h4>Shared stats</h4><ul>${card.sharedStats.map(stat).join("")}</ul>`,
     `<h4>Player stats</h4><ul>${card.playerStats.map(stat).join("")}</ul>`,
     ...card.players.map(
       (p) =>
-        `<h4>Characters to choose from (${e(p.slot)})</h4>` +
+        `<h4>Characters to choose from (${e(p.slot.replace(/^player(\d+)$/, "player $1"))})</h4>` +
         `<ul>${p.identities.map((i) => `<li><strong>${e(i.name)}</strong>${i.description ? `: ${e(i.description)}` : ""}</li>`).join("")}</ul>` +
         `<p class="muted">Backgrounds:</p><ul>${p.backgrounds.map((b) => `<li><strong>${e(b.title)}</strong>: ${e(b.description)}</li>`).join("")}</ul>`
     ),
@@ -128,6 +129,9 @@ fieldset{border:1px solid var(--line);border-radius:6px;margin:.75rem 0;padding:
 input[type=radio]{width:22px;height:22px}
 .note{display:block;margin:.5rem 0} .note input{width:100%;min-height:44px;font:inherit;padding:.25rem .5rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
 nav{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.bar{position:sticky;top:0;z-index:1;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar nav{max-width:1600px;margin:0 auto;padding:.5rem 1.25rem}
+.item{scroll-margin-top:8rem}
 button,select{font:inherit;min-height:44px;padding:0 1rem;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
 button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
@@ -147,17 +151,17 @@ function rated(item){var r=state.ratings[item.id]||{};return item.labels.every(f
 function progress(){var done=data.items.filter(rated).length;document.getElementById("progress").textContent="Item "+(state.current+1)+" of "+data.items.length+" \\u00b7 "+done+" fully rated";
 var jump=document.getElementById("jump");for(var i=0;i<jump.options.length;i++){jump.options[i].textContent=(i+1)+(rated(data.items[i])?" \\u2713":"");}jump.value=String(state.current);
 document.getElementById("last-export").textContent=state.lastExport?"Last export: "+state.lastExport:"Not exported yet";}
-function show(i){state.current=Math.max(0,Math.min(sections.length-1,i));sections.forEach(function(s,j){s.hidden=j!==state.current;});save();progress();window.scrollTo(0,0);}
+function show(i,scroll){state.current=Math.max(0,Math.min(sections.length-1,i));sections.forEach(function(s,j){s.hidden=j!==state.current;});save();progress();if(scroll){sections[state.current].scrollIntoView({block:"start"});}}
 function restore(){document.querySelectorAll("[data-field]").forEach(function(input){var r=((state.ratings[input.dataset.item]||{})[input.dataset.label])||{};var v=r[input.dataset.field];
 if(input.type==="radio"){input.checked=v!==undefined&&String(v)===input.value;}else{input.value=v||"";}});}
 document.addEventListener("change",onInput);document.addEventListener("input",function(ev){if(ev.target.type==="text")onInput(ev);});
 function onInput(ev){var t=ev.target;if(!t.dataset||!t.dataset.field)return;var item=state.ratings[t.dataset.item]=state.ratings[t.dataset.item]||{};var opt=item[t.dataset.label]=item[t.dataset.label]||{};
 opt[t.dataset.field]=t.dataset.field==="rank"?Number(t.value):t.value;save();progress();}
-document.getElementById("prev").addEventListener("click",function(){show(state.current-1);});
-document.getElementById("next").addEventListener("click",function(){show(state.current+1);});
-document.getElementById("jump").addEventListener("change",function(ev){show(Number(ev.target.value));});
+document.getElementById("prev").addEventListener("click",function(){show(state.current-1,true);});
+document.getElementById("next").addEventListener("click",function(){show(state.current+1,true);});
+document.getElementById("jump").addEventListener("change",function(ev){show(Number(ev.target.value),true);});
 document.addEventListener("keydown",function(ev){var tag=(ev.target.tagName||"").toLowerCase();if(tag==="input"&&ev.target.type==="text"||tag==="textarea"||tag==="select")return;
-if(ev.key==="n"){show(state.current+1);}else if(ev.key==="p"){show(state.current-1);}});
+if(ev.key==="n"){show(state.current+1,true);}else if(ev.key==="p"){show(state.current-1,true);}});
 document.getElementById("export").addEventListener("click",function(){var exportedAt=new Date().toISOString();
 var blob=new Blob([JSON.stringify({pageId:data.pageId,setId:data.setId,exportedAt:exportedAt,ratings:state.ratings},null,2)],{type:"application/json"});
 var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ratings-"+data.setId+"-"+data.pageId+".json";document.body.appendChild(a);a.click();
@@ -194,13 +198,15 @@ ${set.preview ? `<div class="banner" role="status">Preview — not for rating</d
 <h1>${e(set.title)}</h1>
 ${set.instructions.map((line) => `<p>${e(line)}</p>`).join("")}
 <p class="notice" id="storage-notice" hidden>Autosave is off in this browser — export before closing.</p>
+</header>
+<div class="bar">
 <nav aria-label="Items">
 <button type="button" id="prev">Previous</button>
 <label>Jump to <select id="jump">${jump}</select></label>
 <button type="button" id="next">Next</button>
 <span id="progress" aria-live="polite"></span>
 </nav>
-</header>
+</div>
 <main>
 ${set.items.map((item, index) => itemHtml(item, index, total)).join("\n")}
 </main>

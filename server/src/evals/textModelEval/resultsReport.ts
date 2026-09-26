@@ -1,4 +1,4 @@
-import { costFromUsage, type Stage } from "./arms.js";
+import { costFromUsage, STAGES } from "./arms.js";
 import type { Caps } from "./budget.js";
 import { spentByStage } from "./budget.js";
 import type { CaseTags } from "./cases.js";
@@ -373,11 +373,18 @@ export function renderResults(input: ResultsInput): string {
     "",
     "| Stage | Spent | Cap |",
     "|---|---|---|",
-    ...(Object.keys(spend.byStage) as Stage[]).map((stage) => `| ${stage} | $${spend.byStage[stage].toFixed(2)} | $${input.caps.stageCaps[stage].toFixed(2)} |`),
+    ...STAGES.map((stage) => `| ${stage} | $${spend.byStage[stage].toFixed(2)} | $${input.caps.stageCaps[stage].toFixed(2)} |`),
     `| total | $${spend.total.toFixed(2)} | $${input.caps.globalCap.toFixed(2)} |`,
   ];
   if (input.probe) {
-    lines.push("", "## Probe", "", ...input.probe.results.map((r) => `- ${r.id}: ${r.outcome}${r.note ? ` (${r.note})` : ""}`));
+    lines.push(
+      "",
+      "## Probe",
+      "",
+      ...input.probe.results.map(
+        (r) => `- ${r.model} ${r.id}: ${r.outcome}${r.status ? ` ${r.status}` : ""}${r.param ? ` param=${r.param}` : ""}${r.note ? ` (${r.note})` : ""}`
+      )
+    );
   }
   for (const promptState of [...new Set(stats.map((s) => s.promptState))]) {
     lines.push("", `## Prompt state: ${promptState}`, "", "### Validity, latency, tokens and cost per call", "");
