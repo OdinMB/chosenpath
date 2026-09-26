@@ -1,11 +1,13 @@
 import {
   computeArmStats,
   gates,
+  renderResults,
   storyCost,
   weightedQuantile,
   type ArmStats,
   type GameplayConfig,
 } from "../../../../src/evals/textModelEval/resultsReport.js";
+import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import type { CheckResult } from "../../../../src/evals/textModelEval/textChecks.js";
 import type { CaseTags } from "../../../../src/evals/textModelEval/cases.js";
 import { record, tags } from "./fixtures.js";
@@ -43,6 +45,25 @@ describe("storyCost", () => {
     const cost = storyCost(config);
     expect(cost.withPregen).toBeCloseTo(0.85 + 0.038 + 0.084 + 0.1);
     expect(cost.withoutPregen).toBeCloseTo(0.29 + 0.014 + 0.028 + 0.1);
+  });
+
+  it("prices a single-player story from single-player calls when there are any", () => {
+    const config: GameplayConfig = { beat: arm({ costPerCall: 0.02, singlePlayerCostPerCall: 0.01 }) };
+    expect(storyCost(config).withPregen).toBeCloseTo(0.85);
+  });
+});
+
+describe("renderResults", () => {
+  it("counts the probe's spend against Stage 0", () => {
+    const text = renderResults({
+      records: [record({ costUsd: 0.25 })],
+      checks: new Map(),
+      tags: new Map(),
+      caps: resolveCaps({}).caps,
+      probe: { generatedAt: "", results: [], totalCostUsd: 0.5, priorSpendUsd: 0.25 },
+      generatedAt: new Date(0),
+    });
+    expect(text).toContain("| 0 | $1.00 | $6.00 |");
   });
 });
 

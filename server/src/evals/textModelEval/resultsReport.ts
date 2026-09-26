@@ -54,6 +54,8 @@ export type ArmStats = {
   latencyByPlayers: Record<number, number[]>;
   medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number };
   costPerCall: number;
+  /** Over single-player calls only, which is what a single-player story pays; undefined without any */
+  singlePlayerCostPerCall?: number;
   uncachedCostPerCall: number;
 };
 
@@ -116,6 +118,7 @@ function statsFor(
   const latencyByPlayers: Record<number, number[]> = {};
   for (const r of good) (latencyByPlayers[r.players] ??= []).push(seconds(r));
   const costs = finals.map((r) => r.costUsd);
+  const singlePlayerCosts = finals.filter((r) => r.players === 1).map((r) => r.costUsd);
   // As if no input had been served from cache (gpt-4.1 caches implicitly)
   const uncached = finals.map((r) =>
     r.costSource === "usage"
@@ -163,6 +166,9 @@ function statsFor(
       reasoning: median(good.map((r) => r.reasoningTokens)),
     },
     costPerCall: costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0,
+    singlePlayerCostPerCall: singlePlayerCosts.length
+      ? singlePlayerCosts.reduce((a, b) => a + b, 0) / singlePlayerCosts.length
+      : undefined,
     uncachedCostPerCall: uncached.length ? uncached.reduce((a, b) => a + b, 0) / uncached.length : 0,
   };
 }
@@ -186,13 +192,18 @@ export function computeArmStats(
 
 export type GameplayConfig = { beat: ArmStats; switch?: ArmStats; thread?: ArmStats; setup?: ArmStats };
 
+/** A single-player story pays single-player calls: multiplayer beats carry about 3x the output. */
+function storyCallCost(stats: ArmStats | undefined): number {
+  return stats ? (stats.singlePlayerCostPerCall ?? stats.costPerCall) : 0;
+}
+
 /** Text cost per 25-turn single-player story, with and without pregeneration. */
 export function storyCost(config: GameplayConfig): { withPregen: number; withoutPregen: number } {
   const per = (counts: typeof PER_STORY_WITH_PREGEN) =>
-    counts.beat * config.beat.costPerCall +
-    counts.switch * (config.switch?.costPerCall ?? 0) +
-    counts.thread * (config.thread?.costPerCall ?? 0) +
-    (config.setup?.costPerCall ?? 0);
+    counts.beat * storyCallCost(config.beat) +
+    counts.switch * storyCallCost(config.switch) +
+    counts.thread * storyCallCost(config.thread) +
+    storyCallCost(config.setup);
   return { withPregen: per(PER_STORY_WITH_PREGEN), withoutPregen: per(PER_STORY_WITHOUT_PREGEN) };
 }
 
@@ -350,7 +361,9 @@ function renderViews(stats: ArmStats[], promptState: string): string[] {
 
 export function renderResults(input: ResultsInput): string {
   const stats = computeArmStats(input.records, input.checks, input.tags);
-  const spend = spentByStage(input.records);
+  // Probe spend lives in probe.json, not calls.jsonl; it counts against Stage 0 as the caps do
+  const probeSpend = input.probe ? input.probe.totalCostUsd + (input.probe.priorSpendUsd ?? 0) : 0;
+  const spend = spentByStage([...input.records, { stage: "0", costUsd: probeSpend }]);
   const lines: string[] = [
     "# Text-model eval: results",
     "",
