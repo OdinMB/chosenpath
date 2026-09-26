@@ -1,10 +1,7 @@
 import type { CaseTags } from "../../../../src/evals/textModelEval/cases.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import type { CheckResult } from "../../../../src/evals/textModelEval/textChecks.js";
-import {
-  renderVariantComparison,
-  variantComparisons,
-} from "../../../../src/evals/textModelEval/variantComparison.js";
+import { variantComparisons } from "../../../../src/evals/textModelEval/variantComparison.js";
 import { record, tags } from "./fixtures.js";
 
 const MEDIUM_MINIMAL = "gpt-6-luna@medium/minimal";
@@ -123,25 +120,5 @@ describe("variantComparisons", () => {
 
   it("finds nothing in a prompt state without trimmed arms", () => {
     expect(variantComparisons([call(MEDIUM_PROD, "a", 1)], new Map(), caseTags("a"), "postfix")).toEqual([]);
-  });
-});
-
-describe("renderVariantComparison", () => {
-  it("renders nothing without comparisons", () => {
-    expect(renderVariantComparison([])).toEqual([]);
-  });
-
-  it("shows full -> trimmed with the change in tokens, waits and cost", () => {
-    const records = [
-      call(MEDIUM_MINIMAL, "a", 1, { outputTokens: 700, reasoningTokens: 200, latencyMs: 20_000, costUsd: 0.001 }),
-      call(MEDIUM_PROD, "a", 1, { outputTokens: 1_400, reasoningTokens: 400, latencyMs: 40_000, costUsd: 0.002 }),
-    ];
-    const text = renderVariantComparison(variantComparisons(records, new Map(), caseTags("a"), "postfix")).join("\n");
-    expect(text).toContain("1000 → 500 (-50%)");
-    expect(text).toContain("400 → 200 (-50%)");
-    expect(text).toContain("40.0 s → 20.0 s (-50%)");
-    expect(text).toContain("$0.0020 → $0.0010 (-50%)");
-    // 85 beats per single-player story with pregeneration
-    expect(text).toContain("$0.1700 → $0.0850");
   });
 });

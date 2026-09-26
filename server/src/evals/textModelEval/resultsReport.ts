@@ -1,5 +1,5 @@
 import { chainSides, STAGES } from "./arms.js";
-import { COST_BASES, computeArmStats, type ArmStats, type CostBasis } from "./armStats.js";
+import { COST_BASES, computeArmStats, percentile, type ArmStats, type CostBasis } from "./armStats.js";
 import type { Caps } from "./budget.js";
 import { spentByStage } from "./budget.js";
 import type { CaseTags } from "./cases.js";
@@ -8,6 +8,7 @@ import {
   gates,
   MULTIPLAYER_SLACK_S,
   NO_PREGEN_BAR,
+  PER_STORY_WITH_PREGEN,
   PREGEN_TURN_CAP_S,
   SETUP_WAIT_FACTOR,
   setupReading,
@@ -18,7 +19,7 @@ import type { ProbeReport } from "./probe.js";
 import type { CheckResult } from "./textChecks.js";
 import type { CallRecord } from "./runner.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
-import { renderVariantComparison, variantComparisons } from "./variantComparison.js";
+import { variantComparisons, type CheckReading, type VariantComparison } from "./variantComparison.js";
 import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
 
@@ -28,8 +29,8 @@ import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
  * readings as views (single-player with and without pregeneration,
  * multiplayer, setup), then the Stage 3 trimmed-against-full section. The
  * statistics live in armStats.ts, the readings in gateReadings.ts and the
- * Stage 3 pairing in variantComparison.ts; this file only lays them out. It
- * marks each reading within or over and never picks a winner.
+ * Stage 3 pairing in variantComparison.ts; this file only lays them out, all
+ * of them. It marks each reading within or over and never picks a winner.
  */
 
 export type ResultsInput = {
@@ -44,7 +45,8 @@ export type ResultsInput = {
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const secs = (x?: number) => (x === undefined ? "–" : `${x.toFixed(1)} s`);
-const usd = (x: number) => `$${x.toFixed(4)}`;
+const usd = (x?: number) => (x === undefined ? "–" : `$${x.toFixed(4)}`);
+const tokens = (x?: number) => (x === undefined ? "–" : String(Math.round(x)));
 const rate = (hits: number, n: number) => (n === 0 ? 0 : hits / n);
 
 function configsFor(stats: ArmStats[], promptState: string) {
@@ -224,6 +226,108 @@ function renderValidityGate(stats: ArmStats[], promptState: string): string[] {
     );
   }
   return lines;
+}
+
+// ------------------------------------------------ Stage 3: trimmed against full
+
+/** "full → trimmed (±n%)" */
+function fromTo(full: number | undefined, trimmed: number | undefined, format: (x?: number) => string): string {
+  const change =
+    full && trimmed !== undefined ? ` (${trimmed >= full ? "+" : "-"}${Math.abs(Math.round(((trimmed - full) / full) * 100))}%)` : "";
+  return `${format(full)} → ${format(trimmed)}${change}`;
+}
+
+/** Calls of this role in a single-player story with pregeneration (85/19/21, and one setup). */
+function callsPerStory(group: CallRecord["group"]): number | undefined {
+  switch (group) {
+    case "setup":
+      return 1;
+    case "beat":
+    case "switch":
+    case "thread":
+      return PER_STORY_WITH_PREGEN[group];
+    default:
+      return undefined;
+  }
+}
+
+function storyShare(stats: ArmStats): number | undefined {
+  const calls = callsPerStory(stats.group);
+  const onePlayer = stats.cost.billed.byPlayers[1] ?? stats.cost.billed.perCall;
+  return calls === undefined ? undefined : calls * onePlayer;
+}
+
+function renderArmRows(comparisons: VariantComparison[]): string[] {
+  const lines = [
+    "| Role | Trimmed arm | Pairs | 1st-attempt valid trim / full | Visible tokens | Reasoning tokens | p50 wait | p95 wait | $/call billed | Per 1-player story with pregeneration |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  for (const { group, trimmedKey, pairs, trimmed: t, full: f } of comparisons) {
+    const valid = (s: ArmStats) => `${s.validity.firstAttemptValid}/${s.validity.calls}`;
+    lines.push(
+      `| ${group} | ${trimmedKey} | ${pairs} | ${valid(t)} / ${valid(f)} | ${fromTo(f.medianTokens.visible, t.medianTokens.visible, tokens)} | ${fromTo(f.medianTokens.reasoning, t.medianTokens.reasoning, tokens)} | ${fromTo(f.latency.p50, t.latency.p50, secs)} | ${fromTo(f.latency.p95, t.latency.p95, secs)} | ${fromTo(f.cost.billed.perCall, t.cost.billed.perCall, usd)} | ${fromTo(storyShare(f), storyShare(t), usd)} |`
+    );
+  }
+  return lines;
+}
+
+function renderStateRows(comparisons: VariantComparison[]): string[] {
+  const lines = [
+    "",
+    "| Role | Trimmed arm | State counts per call, full (±noise) → trim | Checks lower than full beyond noise | Checks higher than full beyond noise |",
+    "|---|---|---|---|---|",
+  ];
+  const rates = (checks: CheckReading[]) => checks.map((c) => `${c.name} ${pct(c.full)} → ${pct(c.trimmed)}`).join("; ") || "–";
+  for (const c of comparisons) {
+    const counts = c.counts
+      .map((n) => `${n.name} ${n.full.toFixed(2)}${n.noise === undefined ? "" : ` (±${n.noise.toFixed(2)})`} → ${n.trimmed.toFixed(2)}`)
+      .join("; ");
+    const flagged = c.hasNoise
+      ? `${rates(c.checks.filter((k) => k.flag === "lower"))} | ${rates(c.checks.filter((k) => k.flag === "higher"))}`
+      : `one sample, no noise floor; raw rates: ${rates(c.checks)} | –`;
+    lines.push(`| ${c.group} | ${c.trimmedKey} | ${counts || "–"} | ${flagged} |`);
+  }
+  return lines;
+}
+
+function renderSetupWaits(comparisons: VariantComparison[]): string[] {
+  const setups = comparisons.filter((c) => c.group === "setup");
+  if (setups.length === 0) return [];
+  const byPlayers = ({ trimmed, full }: VariantComparison) =>
+    Object.keys(trimmed.latencyByPlayers)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((n) => `${n}p ${fromTo(percentile(full.latencyByPlayers[n] ?? [], 50), percentile(trimmed.latencyByPlayers[n], 50), secs)}`)
+      .join("; ");
+  return ["", "Setup median wait by player count, full → trim:", ...setups.map((c) => `- ${c.trimmedKey}: ${byPlayers(c)}`)];
+}
+
+function renderChainWaits(comparisons: VariantComparison[]): string[] {
+  const chains = comparisons.filter((c) => c.group === "pipeline");
+  if (chains.length === 0) return [];
+  const wait = (c: VariantComparison, p: number) =>
+    fromTo(percentile(c.full.turnLatencies, p), percentile(c.trimmed.turnLatencies, p), secs);
+  return [
+    "",
+    "| Chain (analysis-turn wait, single-player) | p50 full → trim | p95 full → trim |",
+    "|---|---|---|",
+    ...chains.map((c) => `| ${c.trimmedKey} | ${wait(c, 50)} | ${wait(c, 95)} |`),
+  ];
+}
+
+function renderVariantComparison(comparisons: VariantComparison[]): string[] {
+  if (comparisons.length === 0) return [];
+  return [
+    "",
+    "### Stage 3: trimmed variants against their full form",
+    "",
+    "Readings on paired cases: each trimmed arm against the full (prod) arm of the same model and effort, on the (case, sample) pairs both finished. Columns read full → trimmed. Waits carry server drift, because the full forms ran earlier; tokens and cost do not. Nothing is dropped or picked.",
+    "",
+    ...renderArmRows(comparisons),
+    ...renderStateRows(comparisons),
+    ...renderSetupWaits(comparisons),
+    ...renderChainWaits(comparisons),
+  ];
 }
 
 export function renderResults(input: ResultsInput): string {

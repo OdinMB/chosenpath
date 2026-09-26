@@ -9,6 +9,7 @@ import { renderResults } from "../../../../src/evals/textModelEval/resultsReport
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import type { CheckResult } from "../../../../src/evals/textModelEval/textChecks.js";
 import type { CaseTags } from "../../../../src/evals/textModelEval/cases.js";
+import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { record, tags } from "./fixtures.js";
 
 const flat = (perCall: number, byPlayers: Record<number, number> = {}): CostReading => ({ perCall, byPlayers });
@@ -76,6 +77,32 @@ describe("renderResults", () => {
       generatedAt: new Date(0),
     });
     expect(text).toContain("| 0 | $1.00 | $8.00 |");
+  });
+});
+
+describe("renderResults: the variant section", () => {
+  const MEDIUM_MINIMAL = "gpt-6-luna@medium/minimal";
+  const MEDIUM_PROD = "gpt-6-luna@medium/prod";
+  const call = (armKey: string, overrides: Partial<CallRecord> = {}): CallRecord =>
+    record({ jobKey: `a|${armKey}|postfix|s1`, promptState: "postfix", armKey, callArmKey: armKey, model: "gpt-6-luna", baseline: false, caseId: "a", ...overrides });
+  const render = (records: CallRecord[]) =>
+    renderResults({ records, checks: new Map(), tags: new Map([["a", tags()]]), caps: resolveCaps({}).caps, generatedAt: new Date(0) });
+
+  it("renders nothing without comparisons", () => {
+    expect(render([call(MEDIUM_PROD)])).not.toContain("### Stage 3");
+  });
+
+  it("shows full -> trimmed with the change in tokens, waits and cost", () => {
+    const text = render([
+      call(MEDIUM_MINIMAL, { outputTokens: 700, reasoningTokens: 200, latencyMs: 20_000, costUsd: 0.001 }),
+      call(MEDIUM_PROD, { outputTokens: 1_400, reasoningTokens: 400, latencyMs: 40_000, costUsd: 0.002 }),
+    ]);
+    expect(text).toContain("1000 → 500 (-50%)");
+    expect(text).toContain("400 → 200 (-50%)");
+    expect(text).toContain("40.0 s → 20.0 s (-50%)");
+    expect(text).toContain("$0.0020 → $0.0010 (-50%)");
+    // 85 beats per single-player story with pregeneration
+    expect(text).toContain("$0.1700 → $0.0850");
   });
 });
 

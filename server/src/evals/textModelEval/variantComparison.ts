@@ -1,16 +1,16 @@
-import { armStatsOf, isResultRecord, percentile, type ArmStats } from "./armStats.js";
+import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
 import { chainKey, chainSides, prodSiblingKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
-import { PER_STORY_WITH_PREGEN } from "./gateReadings.js";
 import type { CallRecord } from "./runner.js";
 import type { CheckResult } from "./textChecks.js";
 
 /*
- * The Stage 3 reading: each trimmed-variant arm against the full (prod) arm
+ * The Stage 3 readings: each trimmed-variant arm against the full (prod) arm
  * of the same model and effort, on the (case, sample) pairs both finished.
  * Tokens, waits, cost, validity, state counts, and the rule checks that read
  * lower or higher than the full form beyond its own noise floor (sample 1
- * against sample 2). Readings, not verdicts: nothing is dropped or picked.
+ * against sample 2). Readings only, rendered by resultsReport.ts; nothing is
+ * dropped or picked.
  */
 
 export type CheckReading = { name: string; full: number; trimmed: number; flag?: "lower" | "higher" };
@@ -124,111 +124,4 @@ export function variantComparisons(
     if (comparison) comparisons.push(comparison);
   }
   return comparisons;
-}
-
-// ---------------------------------------------------------------- rendering
-
-const secs = (x?: number) => (x === undefined ? "–" : `${x.toFixed(1)} s`);
-const usd = (x?: number) => (x === undefined ? "–" : `$${x.toFixed(4)}`);
-const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-const tokens = (x?: number) => (x === undefined ? "–" : String(Math.round(x)));
-
-/** "full → trimmed (±n%)" */
-function fromTo(full: number | undefined, trimmed: number | undefined, format: (x?: number) => string): string {
-  const change =
-    full && trimmed !== undefined ? ` (${trimmed >= full ? "+" : "-"}${Math.abs(Math.round(((trimmed - full) / full) * 100))}%)` : "";
-  return `${format(full)} → ${format(trimmed)}${change}`;
-}
-
-/** Calls of this role in a single-player story with pregeneration (85/19/21, and one setup). */
-function callsPerStory(group: CallRecord["group"]): number | undefined {
-  switch (group) {
-    case "setup":
-      return 1;
-    case "beat":
-    case "switch":
-    case "thread":
-      return PER_STORY_WITH_PREGEN[group];
-    default:
-      return undefined;
-  }
-}
-
-function storyShare(stats: ArmStats): number | undefined {
-  const calls = callsPerStory(stats.group);
-  const onePlayer = stats.cost.billed.byPlayers[1] ?? stats.cost.billed.perCall;
-  return calls === undefined ? undefined : calls * onePlayer;
-}
-
-function renderArmRows(comparisons: VariantComparison[]): string[] {
-  const lines = [
-    "| Role | Trimmed arm | Pairs | 1st-attempt valid trim / full | Visible tokens | Reasoning tokens | p50 wait | p95 wait | $/call billed | Per 1-player story with pregeneration |",
-    "|---|---|---|---|---|---|---|---|---|---|",
-  ];
-  for (const { group, trimmedKey, pairs, trimmed: t, full: f } of comparisons) {
-    const valid = (s: ArmStats) => `${s.validity.firstAttemptValid}/${s.validity.calls}`;
-    lines.push(
-      `| ${group} | ${trimmedKey} | ${pairs} | ${valid(t)} / ${valid(f)} | ${fromTo(f.medianTokens.visible, t.medianTokens.visible, tokens)} | ${fromTo(f.medianTokens.reasoning, t.medianTokens.reasoning, tokens)} | ${fromTo(f.latency.p50, t.latency.p50, secs)} | ${fromTo(f.latency.p95, t.latency.p95, secs)} | ${fromTo(f.cost.billed.perCall, t.cost.billed.perCall, usd)} | ${fromTo(storyShare(f), storyShare(t), usd)} |`
-    );
-  }
-  return lines;
-}
-
-function renderStateRows(comparisons: VariantComparison[]): string[] {
-  const lines = [
-    "",
-    "| Role | Trimmed arm | State counts per call, full (±noise) → trim | Checks lower than full beyond noise | Checks higher than full beyond noise |",
-    "|---|---|---|---|---|",
-  ];
-  const rates = (checks: CheckReading[]) => checks.map((c) => `${c.name} ${pct(c.full)} → ${pct(c.trimmed)}`).join("; ") || "–";
-  for (const c of comparisons) {
-    const counts = c.counts
-      .map((n) => `${n.name} ${n.full.toFixed(2)}${n.noise === undefined ? "" : ` (±${n.noise.toFixed(2)})`} → ${n.trimmed.toFixed(2)}`)
-      .join("; ");
-    const flagged = c.hasNoise
-      ? `${rates(c.checks.filter((k) => k.flag === "lower"))} | ${rates(c.checks.filter((k) => k.flag === "higher"))}`
-      : `one sample, no noise floor; raw rates: ${rates(c.checks)} | –`;
-    lines.push(`| ${c.group} | ${c.trimmedKey} | ${counts || "–"} | ${flagged} |`);
-  }
-  return lines;
-}
-
-function renderSetupWaits(comparisons: VariantComparison[]): string[] {
-  const setups = comparisons.filter((c) => c.group === "setup");
-  if (setups.length === 0) return [];
-  const byPlayers = ({ trimmed, full }: VariantComparison) =>
-    Object.keys(trimmed.latencyByPlayers)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map((n) => `${n}p ${fromTo(percentile(full.latencyByPlayers[n] ?? [], 50), percentile(trimmed.latencyByPlayers[n], 50), secs)}`)
-      .join("; ");
-  return ["", "Setup median wait by player count, full → trim:", ...setups.map((c) => `- ${c.trimmedKey}: ${byPlayers(c)}`)];
-}
-
-function renderChainWaits(comparisons: VariantComparison[]): string[] {
-  const chains = comparisons.filter((c) => c.group === "pipeline");
-  if (chains.length === 0) return [];
-  const wait = (c: VariantComparison, p: number) =>
-    fromTo(percentile(c.full.turnLatencies, p), percentile(c.trimmed.turnLatencies, p), secs);
-  return [
-    "",
-    "| Chain (analysis-turn wait, single-player) | p50 full → trim | p95 full → trim |",
-    "|---|---|---|",
-    ...chains.map((c) => `| ${c.trimmedKey} | ${wait(c, 50)} | ${wait(c, 95)} |`),
-  ];
-}
-
-export function renderVariantComparison(comparisons: VariantComparison[]): string[] {
-  if (comparisons.length === 0) return [];
-  return [
-    "",
-    "### Stage 3: trimmed variants against their full form",
-    "",
-    "Readings on paired cases: each trimmed arm against the full (prod) arm of the same model and effort, on the (case, sample) pairs both finished. Columns read full → trimmed. Waits carry server drift, because the full forms ran earlier; tokens and cost do not. Nothing is dropped or picked.",
-    "",
-    ...renderArmRows(comparisons),
-    ...renderStateRows(comparisons),
-    ...renderSetupWaits(comparisons),
-    ...renderChainWaits(comparisons),
-  ];
 }
