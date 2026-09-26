@@ -1,7 +1,7 @@
 import { htmlLeaks, metadataLeaks } from "../../../../src/evals/textModelEval/blinding.js";
-import { withPictureNotes } from "../../../../src/evals/textModelEval/ratingContent.js";
+import { SETUP_FIELD_LABELS, setupCard, withPictureNotes } from "../../../../src/evals/textModelEval/ratingContent.js";
 import { renderRatingPage } from "../../../../src/evals/textModelEval/ratingPage.js";
-import { planRatingSet, ratingSetFromKey, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
+import { planRatingSet, ratingSetFromKey, type RatingSet, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
 import { scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
@@ -10,15 +10,110 @@ import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
 
 const ARMS = [BASELINE, LUNA, SOL].map((a) => ({ promptState: "prefix", armKey: a.key }));
 
+/** A whole setup reply in production's shape, the character-selection plan included. */
 function setupOutput(title: string) {
   return {
+    guidelines: {
+      world: "A harbour town.",
+      rules: ["Tides rule the town."],
+      tone: ["warm"],
+      conflicts: ["storm"],
+      decisions: ["Whom to trust"],
+      typesOfThreads: ["Harbour chase", "Tavern talk"],
+      switchAndThreadInstructions: [],
+    },
+    difficultyLevel: { modifier: 10, title: "Calm Seas" },
+    storyElements: [
+      { id: "harbour", name: "Harbour", role: "where boats come in", instructions: "Use it for arrivals.", appearance: "", facts: ["Built of stone", "Busy at dawn"] },
+    ],
+    sharedOutcomes: [
+      {
+        id: "shared_storm",
+        question: "Does the town survive the storm?",
+        possibleResolutions: { favorable: "It stands.", unfavorable: "It floods.", mixed: "Half stands." },
+        resonance: "Home matters.",
+        intendedNumberOfMilestones: 3,
+        milestones: [],
+      },
+    ],
+    statGroups: ["Crew", "Town"],
+    sharedStats: [
+      {
+        type: "number",
+        name: "Supplies",
+        id: "shared_supplies",
+        possibleValues: "",
+        effectOnPoints: ["Under 3 supplies: -10 points"],
+        optionsToSacrifice: "Spend 1 supply",
+        optionsToGainAsReward: "None",
+        canBeChangedInBeatResolutions: true,
+        narrativeImplications: ["0 supplies means hunger"],
+        adjustmentsAfterThreads: ["-1 after each thread"],
+        isVisible: true,
+        partOfPlayerBackgrounds: false,
+        initialValue: 5,
+        tooltip: "What you have",
+        group: "Town",
+      },
+    ],
+    playerStats: [
+      {
+        type: "string[]",
+        name: "Courage",
+        id: "player_courage",
+        possibleValues: "Bold, Steady (max 2)",
+        effectOnPoints: ["+10 points when Bold"],
+        optionsToSacrifice: "None",
+        optionsToGainAsReward: "Rest to steady yourself",
+        canBeChangedInBeatResolutions: false,
+        narrativeImplications: ["Bold sailors lead"],
+        adjustmentsAfterThreads: ["Gain Bold after a rescue"],
+        isVisible: false,
+        partOfPlayerBackgrounds: true,
+        initialValue: [],
+        tooltip: "How brave",
+        group: "Crew",
+      },
+    ],
+    characterSelectionPlan: {
+      multiplayerCoordination: [],
+      playerStatConversionRates: ["PLAN-SCRATCH one Bold is worth 2 supplies"],
+      backgroundArchetypes: ["PLAN-SCRATCH brave but poor"],
+    },
+    player1: {
+      outcomes: [
+        {
+          id: "player1_home",
+          question: "Does Ada find a home?",
+          possibleResolutions: { resolution1: "She settles.", resolution2: "She sails on.", resolution3: "She founds a guild." },
+          resonance: "She grew up an orphan.",
+          intendedNumberOfMilestones: 2,
+          milestones: ["Met the harbourmaster"],
+        },
+      ],
+      possibleCharacterIdentities: [{ name: "Ada", pronouns: { personal: "she", object: "her", possessive: "her", reflexive: "herself" }, appearance: "tall" }],
+      possibleCharacterBackgrounds: [
+        {
+          title: "Sailor",
+          fluffTemplate: "{name} sails.",
+          initialPlayerStatValues: [
+            { statId: "player_courage", value: ["Bold"] },
+            { statId: "shared_supplies", value: 2 },
+          ],
+        },
+      ],
+    },
     title,
     characterSelectionIntroduction: { title: "Welcome", text: "Luna waits at the gate." },
-    guidelines: { world: "A harbour town.", tone: ["warm"], conflicts: ["storm"] },
-    storyElements: [{ name: "Harbour", role: "where boats come in" }],
-    sharedStats: [{ name: "Supplies", tooltip: "What you have", initialValue: 5 }],
-    playerStats: [{ name: "Courage", tooltip: "How brave" }],
-    player1: { possibleCharacterIdentities: [{ name: "Ada", appearance: "tall" }], possibleCharacterBackgrounds: [{ title: "Sailor", fluffTemplate: "{name} sails." }] },
+    imageInstructions: {
+      visualStyle: "Watercolor",
+      atmosphere: "Salt and fog.",
+      colorPalette: "muted blues",
+      settingDetails: "Stone quays",
+      characterStyle: "Weathered faces",
+      artInfluences: "Maritime painting",
+      coverPrompt: "A harbour at dawn",
+    },
   };
 }
 
@@ -211,6 +306,221 @@ describe("blinding", () => {
     expect(metadataLeaks({ ...set, instructions: ["Low effort answers first."] })).toEqual([expect.stringContaining("instructions")]);
     const html = renderRatingPage(set).replace("</body>", `<!-- ${LUNA.key} --></body>`);
     expect(htmlLeaks(html, key)).toEqual(expect.arrayContaining([LUNA.key, "gpt-6-luna", "@low"]));
+  });
+
+  it("checks every fixed string of a setup card with the word pattern", () => {
+    const { set } = plan("labels");
+    expect(set.fieldLabels).toEqual(expect.arrayContaining(Object.values(SETUP_FIELD_LABELS)));
+    expect(metadataLeaks({ ...set, fieldLabels: [...set.fieldLabels, "Effort"] })).toEqual([expect.stringContaining("field label")]);
+  });
+});
+
+describe("setupCard: the whole design", () => {
+  const card = setupCard(setupOutput("Tides"));
+
+  it("reads the guidelines, difficulty and introduction", () => {
+    expect(card).toMatchObject({
+      title: "Tides",
+      introduction: { title: "Welcome", text: "Luna waits at the gate." },
+      difficulty: [{ title: "Calm Seas", modifier: "+10" }],
+      guidelines: {
+        world: "A harbour town.",
+        rules: ["Tides rule the town."],
+        tone: ["warm"],
+        conflicts: ["storm"],
+        decisions: ["Whom to trust"],
+        typesOfThreads: ["Harbour chase", "Tavern talk"],
+        switchAndThreadInstructions: [],
+      },
+      statGroups: ["Crew", "Town"],
+    });
+  });
+
+  it("reads every field of every stat", () => {
+    expect(card.sharedStats).toEqual([
+      {
+        id: "shared_supplies",
+        name: "Supplies",
+        type: "number",
+        group: "Town",
+        tooltip: "What you have",
+        initialValue: ["5"],
+        possibleValues: "",
+        isVisible: true,
+        partOfPlayerBackgrounds: false,
+        canBeChangedInBeatResolutions: true,
+        effectOnPoints: ["Under 3 supplies: -10 points"],
+        narrativeImplications: ["0 supplies means hunger"],
+        adjustmentsAfterThreads: ["-1 after each thread"],
+        optionsToSacrifice: "Spend 1 supply",
+        optionsToGainAsReward: "None",
+      },
+    ]);
+    expect(card.playerStats?.[0]).toMatchObject({ initialValue: [], isVisible: false, partOfPlayerBackgrounds: true, possibleValues: "Bold, Steady (max 2)" });
+  });
+
+  it("reads outcomes with their resolutions in order and their milestones", () => {
+    expect(card.sharedOutcomes).toEqual([
+      {
+        id: "shared_storm",
+        question: "Does the town survive the storm?",
+        resonance: "Home matters.",
+        resolutions: [
+          { key: "favorable", text: "It stands." },
+          { key: "unfavorable", text: "It floods." },
+          { key: "mixed", text: "Half stands." },
+        ],
+        intendedNumberOfMilestones: "3",
+        milestones: [],
+      },
+    ]);
+    expect(card.players[0].outcomes?.[0]).toMatchObject({ id: "player1_home", milestones: ["Met the harbourmaster"], intendedNumberOfMilestones: "2" });
+  });
+
+  it("reads story elements, identities, and backgrounds with starting stats by name", () => {
+    expect(card.storyElements).toEqual([
+      { id: "harbour", name: "Harbour", role: "where boats come in", instructions: "Use it for arrivals.", appearance: "", facts: ["Built of stone", "Busy at dawn"] },
+    ]);
+    expect(card.players[0].identities).toEqual([{ name: "Ada", pronouns: "she/her/her/herself", appearance: "tall" }]);
+    expect(card.players[0].backgrounds).toEqual([
+      {
+        title: "Sailor",
+        fluffTemplate: "{name} sails.",
+        initialStats: [
+          { stat: "Courage", known: true, value: ["Bold"] },
+          { stat: "shared_supplies", known: false, value: ["2"] },
+        ],
+      },
+    ]);
+  });
+
+  it("reads the image instructions in schema order", () => {
+    expect(card.imageInstructions.map((i) => i.key)).toEqual([
+      "visualStyle",
+      "atmosphere",
+      "colorPalette",
+      "settingDetails",
+      "characterStyle",
+      "artInfluences",
+      "coverPrompt",
+    ]);
+  });
+
+  it("leaves out the character-selection plan", () => {
+    expect(JSON.stringify(card)).not.toContain("PLAN-SCRATCH");
+  });
+
+  it("reads a template's difficulty levels and teaser", () => {
+    const template = setupCard({ teaser: "Sail away.", difficultyLevels: [{ modifier: -10, title: "Squall" }, { modifier: 0, title: "Fair" }] });
+    expect(template.teaser).toBe("Sail away.");
+    expect(template.difficulty).toEqual([
+      { title: "Squall", modifier: "-10" },
+      { title: "Fair", modifier: "0" },
+    ]);
+  });
+
+  it("does not throw on missing or malformed fields, and leaves absent ones undefined", () => {
+    const bare = {
+      kind: "setup",
+      title: "",
+      teaser: "",
+      introduction: { title: "", text: "" },
+      difficulty: [],
+      guidelines: { world: "" },
+      players: [],
+      imageInstructions: [],
+    };
+    for (const output of [undefined, null, "junk", 42, {}]) expect(setupCard(output)).toEqual(bare);
+    const malformed = setupCard({
+      guidelines: "x",
+      sharedStats: "x",
+      difficultyLevel: null,
+      player2: { outcomes: {}, possibleCharacterBackgrounds: [{ initialPlayerStatValues: "x" }] },
+      player1: null,
+    });
+    expect(malformed.sharedStats).toBeUndefined();
+    expect(malformed.players.map((p) => p.slot)).toEqual(["player1", "player2"]);
+    expect(malformed.players[1]).toEqual({ slot: "player2", backgrounds: [{ title: "", fluffTemplate: "" }] });
+  });
+});
+
+describe("renderRatingPage: the setup design", () => {
+  function setupPage(output: unknown): string {
+    const set: RatingSet = {
+      setId: "text-setup",
+      pageId: "page",
+      kind: "setup",
+      title: "Setups",
+      instructions: [],
+      fieldLabels: [],
+      items: [{ id: "setup-01", context: [], options: [{ label: "A", content: setupCard(output) }] }],
+      preview: false,
+    };
+    return renderRatingPage(set);
+  }
+  const L = SETUP_FIELD_LABELS;
+  const html = setupPage(setupOutput("Tides"));
+
+  it("shows each section in a foldable section that starts open", () => {
+    for (const title of [L.characterSelection, L.guidelines, L.sharedOutcomes, L.stats, L.storyElements, `${L.player} 1`, L.imageInstructions]) {
+      expect(html).toContain(`<details class="part" open><summary><h4>${title}</h4></summary>`);
+    }
+    for (const title of [L.sharedStats, L.playerStats]) {
+      expect(html).toContain(`<details class="part" open><summary><h5>${title}</h5></summary>`);
+    }
+  });
+
+  it("shows every guideline and the difficulty", () => {
+    expect(html).toContain("Calm Seas (modifier +10)");
+    for (const label of [L.world, L.rules, L.tone, L.conflicts, L.decisions, L.typesOfThreads]) expect(html).toContain(`<dt>${label}</dt>`);
+    for (const text of ["Tides rule the town.", "Whom to trust", "Harbour chase"]) expect(html).toContain(text);
+    expect(html).toContain(`<dt>${L.switchAndThreadInstructions}</dt><dd>${L.empty}</dd>`);
+  });
+
+  it("shows every field of a stat, and an empty initial list as empty", () => {
+    for (const label of [L.tooltip, L.initialValue, L.possibleValues, L.effectOnPoints, L.narrativeImplications, L.adjustmentsAfterThreads, L.optionsToSacrifice, L.optionsToGainAsReward]) {
+      expect(html).toContain(`<dt>${label}</dt>`);
+    }
+    for (const label of [L.type, L.group, L.isVisible, L.partOfPlayerBackgrounds, L.canBeChangedInBeatResolutions]) {
+      expect(html).toContain(`<span class="k">${label}:</span>`);
+    }
+    for (const text of ["Under 3 supplies: -10 points", "0 supplies means hunger", "-1 after each thread", "Spend 1 supply", "Bold, Steady (max 2)", "shared_supplies"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain(`<dt>${L.initialValue}</dt><dd>${L.empty}</dd>`);
+    expect(html).toContain(`<span class="k">${L.statGroups}:</span> Crew, Town`);
+  });
+
+  it("shows outcomes with their resolutions and milestones", () => {
+    for (const text of [`<span class="k">${L.unfavorable}:</span> It floods.`, `<span class="k">${L.resolution3}:</span> She founds a guild.`, "Home matters.", "Met the harbourmaster"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain(`<dt>${L.intendedMilestones}</dt><dd>3</dd>`);
+    expect(html).toContain(`<dt>${L.milestones}</dt><dd>${L.empty}</dd>`);
+  });
+
+  it("shows story elements, identities, backgrounds and image instructions", () => {
+    for (const text of ["Use it for arrivals.", "Busy at dawn", "she/her/her/herself", "{name} sails.", "Maritime painting", "A harbour at dawn"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain(`<span class="k">Courage:</span> Bold`);
+    expect(html).toContain(`<span class="k">shared_supplies (${L.notAPlayerStat}):</span> 2`);
+    // An empty appearance renders no row
+    expect(html.match(new RegExp(`<dt>${L.appearance}</dt>`, "g"))).toBeNull();
+  });
+
+  it("never shows the character-selection plan", () => {
+    expect(html).not.toContain("PLAN-SCRATCH");
+  });
+
+  it("renders nothing for absent fields, without throwing", () => {
+    const bare = setupPage({ title: "Bare" });
+    expect(bare).toContain("Bare");
+    expect(bare).not.toMatch(/<details|<dl|class="block"|class="meta"/);
+    const partial = setupPage({ sharedStats: [{ name: "Supplies", tooltip: "What you have" }] });
+    expect(partial).toContain(`<dt>${L.tooltip}</dt><dd>What you have</dd>`);
+    for (const label of [L.effectOnPoints, L.initialValue, L.playerStats, L.storyElements]) expect(partial).not.toContain(label);
+    expect(() => setupPage({ player1: { possibleCharacterBackgrounds: [{ initialPlayerStatValues: [{}] }] } })).not.toThrow();
   });
 });
 

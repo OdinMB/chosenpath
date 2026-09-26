@@ -1,4 +1,15 @@
-import type { ContextSection, OptionContent, SetupCard, TurnContent } from "./ratingContent.js";
+import {
+  SETUP_FIELD_LABELS,
+  type ContextSection,
+  type OptionContent,
+  type SetupBackground,
+  type SetupCard,
+  type SetupElement,
+  type SetupOutcome,
+  type SetupPlayer,
+  type SetupStat,
+  type TurnContent,
+} from "./ratingContent.js";
 import type { RatingItem, RatingSet } from "./ratingSets.js";
 
 /*
@@ -34,28 +45,187 @@ function listOf(items: string[]): string {
   return items.length ? `<ul>${items.map((i) => `<li>${e(i)}</li>`).join("")}</ul>` : "";
 }
 
+/*
+ * A setup card: the whole design, in collapsible sections that start open.
+ * Every fixed string comes from SETUP_FIELD_LABELS (checked by the blinding
+ * word pattern); an absent field renders nothing, an empty list "(empty)".
+ */
+const L = SETUP_FIELD_LABELS;
+
+/** One labelled row; nothing without a body. */
+function row(label: string, body: string): string {
+  return body ? `<dt>${e(label)}</dt><dd>${body}</dd>` : "";
+}
+
+const textRow = (label: string, value: string) => row(label, value ? e(value) : "");
+
+// Lists, not a joined line: the items often end in their own full stop
+const listRow = (label: string, items: string[] | undefined) =>
+  row(label, items === undefined ? "" : items.length ? listOf(items) : e(L.empty));
+
+const valueText = (value: string[] | undefined) => (value === undefined ? "" : value.length ? value.join(", ") : L.empty);
+
+const flagText = (value: boolean | undefined) => (value === undefined ? "" : value ? L.yes : L.no);
+
+function fields(...rows: string[]): string {
+  const inner = rows.join("");
+  return inner ? `<dl class="fields">${inner}</dl>` : "";
+}
+
+/** Short labelled values on one line: "Type: string · Group: City". */
+function meta(pairs: [string, string][]): string {
+  const shown = pairs.filter(([, value]) => value);
+  return shown.length
+    ? `<p class="meta">${shown.map(([label, value]) => `<span class="k">${e(label)}:</span> ${e(value)}`).join(" · ")}</p>`
+    : "";
+}
+
+function blockTitle(name: string, id = ""): string {
+  return name || id ? `<p class="block-title"><strong>${e(name)}</strong>${id ? ` <code class="id">${e(id)}</code>` : ""}</p>` : "";
+}
+
+/** A collapsible section, open by default; nothing without a body. */
+function part(title: string, body: string, level: 4 | 5 = 4): string {
+  return body ? `<details class="part" open><summary><h${level}>${e(title)}</h${level}></summary>${body}</details>` : "";
+}
+
+function subheading(title: string, body: string): string {
+  return body ? `<h5>${e(title)}</h5>${body}` : "";
+}
+
+/** One block per object: nothing when the array is absent, "(empty)" when it is empty. */
+function blocks<T>(entries: T[] | undefined, render: (entry: T) => string): string {
+  if (entries === undefined) return "";
+  return entries.length ? entries.map((entry) => `<div class="block">${render(entry)}</div>`).join("") : `<p class="muted">${e(L.empty)}</p>`;
+}
+
+const RESOLUTION_LABELS: Record<string, string> = {
+  favorable: L.favorable,
+  unfavorable: L.unfavorable,
+  mixed: L.mixed,
+  sideAWins: L.sideAWins,
+  sideBWins: L.sideBWins,
+  resolution1: L.resolution1,
+  resolution2: L.resolution2,
+  resolution3: L.resolution3,
+};
+
+const resolutionLabel = (key: string) => RESOLUTION_LABELS[key] ?? key;
+
+function outcomeHtml(o: SetupOutcome): string {
+  const resolutions = o.resolutions.length
+    ? `<ul>${o.resolutions.map((r) => `<li><span class="k">${e(resolutionLabel(r.key))}:</span> ${e(r.text)}</li>`).join("")}</ul>`
+    : "";
+  return (
+    blockTitle(o.question, o.id) +
+    fields(
+      textRow(L.resonance, o.resonance),
+      row(L.resolutions, resolutions),
+      textRow(L.intendedMilestones, o.intendedNumberOfMilestones),
+      listRow(L.milestones, o.milestones)
+    )
+  );
+}
+
+function statHtml(s: SetupStat): string {
+  return (
+    blockTitle(s.name, s.id) +
+    meta([
+      [L.type, s.type],
+      [L.group, s.group],
+      [L.isVisible, flagText(s.isVisible)],
+      [L.partOfPlayerBackgrounds, flagText(s.partOfPlayerBackgrounds)],
+      [L.canBeChangedInBeatResolutions, flagText(s.canBeChangedInBeatResolutions)],
+    ]) +
+    fields(
+      textRow(L.tooltip, s.tooltip),
+      textRow(L.initialValue, valueText(s.initialValue)),
+      textRow(L.possibleValues, s.possibleValues),
+      listRow(L.effectOnPoints, s.effectOnPoints),
+      listRow(L.narrativeImplications, s.narrativeImplications),
+      listRow(L.adjustmentsAfterThreads, s.adjustmentsAfterThreads),
+      textRow(L.optionsToSacrifice, s.optionsToSacrifice),
+      textRow(L.optionsToGainAsReward, s.optionsToGainAsReward)
+    )
+  );
+}
+
+function elementHtml(el: SetupElement): string {
+  return (
+    blockTitle(el.name, el.id) +
+    fields(textRow(L.role, el.role), textRow(L.instructions, el.instructions), textRow(L.appearance, el.appearance), listRow(L.facts, el.facts))
+  );
+}
+
+function startingStats(stats: SetupBackground["initialStats"]): string {
+  if (stats === undefined) return "";
+  if (stats.length === 0) return e(L.empty);
+  return `<ul>${stats
+    .map(
+      (s) =>
+        `<li><span class="k">${e(s.stat)}${s.known ? "" : ` (${e(L.notAPlayerStat)})`}:</span> ${e(valueText(s.value))}</li>`
+    )
+    .join("")}</ul>`;
+}
+
+function backgroundHtml(b: SetupBackground): string {
+  return blockTitle(b.title) + (b.fluffTemplate ? paragraphs([b.fluffTemplate]) : "") + fields(row(L.startingStats, startingStats(b.initialStats)));
+}
+
+function playerHtml(p: SetupPlayer): string {
+  const identities =
+    p.identities === undefined
+      ? ""
+      : p.identities.length
+        ? `<ul>${p.identities
+            .map(
+              (i) =>
+                `<li><strong>${e(i.name)}</strong>${i.pronouns ? ` <span class="muted">(${e(i.pronouns)})</span>` : ""}${i.appearance ? `: ${e(i.appearance)}` : ""}</li>`
+            )
+            .join("")}</ul>`
+        : `<p class="muted">${e(L.empty)}</p>`;
+  return (
+    subheading(L.outcomes, blocks(p.outcomes, outcomeHtml)) +
+    subheading(L.identities, identities) +
+    subheading(L.backgrounds, blocks(p.backgrounds, backgroundHtml))
+  );
+}
+
 function setupHtml(card: SetupCard): string {
-  const stat = (s: { name: string; description: string; initial?: string }) =>
-    `<li><strong>${e(s.name)}</strong>${s.initial ? ` (${e(s.initial)})` : ""}${s.description ? `: ${e(s.description)}` : ""}</li>`;
+  const g = card.guidelines;
+  const difficulty = card.difficulty
+    .map((d) => [d.title, d.modifier ? `(${L.modifier} ${d.modifier})` : ""].filter(Boolean).join(" "))
+    .join(" · ");
+  const intro =
+    (card.introduction.title ? `<p><strong>${e(card.introduction.title)}</strong></p>` : "") +
+    (card.introduction.text ? paragraphs(card.introduction.text.split(/\n\s*\n/)) : "");
   return [
     `<h3 class="card-title">${e(card.title)}</h3>`,
-    `<h4>${e(card.introduction.title)}</h4>`,
-    paragraphs(card.introduction.text.split(/\n\s*\n/)),
-    `<h4>World</h4>`,
-    paragraphs([card.world.world]),
-    // Lists, not a joined line: the items often end in their own full stop
-    card.world.tone.length ? `<p class="muted">Tone:</p>${listOf(card.world.tone)}` : "",
-    card.world.conflicts.length ? `<p class="muted">Conflicts:</p>${listOf(card.world.conflicts)}` : "",
-    `<h4>Story elements</h4>`,
-    `<ul>${card.elements.map((el) => `<li><strong>${e(el.name)}</strong>: ${e(el.description)}</li>`).join("")}</ul>`,
-    `<h4>Shared stats</h4><ul>${card.sharedStats.map(stat).join("")}</ul>`,
-    `<h4>Player stats</h4><ul>${card.playerStats.map(stat).join("")}</ul>`,
-    ...card.players.map(
-      (p) =>
-        `<h4>Characters to choose from (${e(p.slot.replace(/^player(\d+)$/, "player $1"))})</h4>` +
-        `<ul>${p.identities.map((i) => `<li><strong>${e(i.name)}</strong>${i.description ? `: ${e(i.description)}` : ""}</li>`).join("")}</ul>` +
-        `<p class="muted">Backgrounds:</p><ul>${p.backgrounds.map((b) => `<li><strong>${e(b.title)}</strong>: ${e(b.description)}</li>`).join("")}</ul>`
+    meta([[L.difficulty, difficulty]]),
+    fields(textRow(L.teaser, card.teaser)),
+    part(L.characterSelection, intro),
+    part(
+      L.guidelines,
+      fields(
+        row(L.world, g.world ? paragraphs([g.world]) : ""),
+        listRow(L.rules, g.rules),
+        listRow(L.tone, g.tone),
+        listRow(L.conflicts, g.conflicts),
+        listRow(L.decisions, g.decisions),
+        listRow(L.typesOfThreads, g.typesOfThreads),
+        listRow(L.switchAndThreadInstructions, g.switchAndThreadInstructions)
+      )
     ),
+    part(L.sharedOutcomes, blocks(card.sharedOutcomes, outcomeHtml)),
+    part(
+      L.stats,
+      meta([[L.statGroups, valueText(card.statGroups)]]) +
+        part(L.sharedStats, blocks(card.sharedStats, statHtml), 5) +
+        part(L.playerStats, blocks(card.playerStats, statHtml), 5)
+    ),
+    part(L.storyElements, blocks(card.storyElements, elementHtml)),
+    ...card.players.map((p) => part(`${L.player} ${p.slot.replace(/^player/, "")}`, playerHtml(p))),
+    part(L.imageInstructions, fields(...card.imageInstructions.map((i) => textRow(L[i.key], i.text)))),
   ].join("");
 }
 
@@ -122,8 +292,24 @@ h1{font-size:1.5rem;margin:.5rem 0} h2{font-size:1.25rem} h3{font-size:1.1rem;ma
 .context{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.5rem 1rem;margin-bottom:1rem}
 .options{display:grid;grid-template-columns:1fr;gap:1rem}
 @media (min-width:1400px){.options{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}}
-.option{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.75rem 1rem}
+.option{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.75rem 1rem;min-width:0}
 .label{color:var(--accent)}
+.content{overflow-wrap:break-word}
+details.part{border-top:1px solid var(--line);margin:.25rem 0}
+details.part>summary{cursor:pointer;padding:.55rem 0;min-height:44px}
+details.part>summary>h4,details.part>summary>h5{display:inline;margin:0}
+details.part details.part{margin-left:.25rem}
+h5{font-size:.95rem;margin:.75rem 0 .25rem;color:var(--muted)}
+.fields{margin:.25rem 0 .5rem}
+.fields dt{font-weight:600;font-size:.85rem;color:var(--muted);margin-top:.5rem}
+.fields dd{margin:0}
+.fields dd p{margin:.1rem 0}
+.fields ul,.block ul{margin:.1rem 0;padding-left:1.25rem}
+.block{border-left:3px solid var(--line);padding:0 0 0 .75rem;margin:.75rem 0}
+.block-title{margin:.25rem 0}
+.meta{color:var(--muted);font-size:.9rem;margin:.25rem 0}
+.k{font-weight:600}
+code.id{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
 fieldset{border:1px solid var(--line);border-radius:6px;margin:.75rem 0;padding:.25rem .75rem}
 .choice{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;min-width:44px;margin-right:1rem;cursor:pointer}
 input[type=radio]{width:22px;height:22px}

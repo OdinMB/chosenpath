@@ -2,6 +2,7 @@ import type { StoryState } from "core/types/index.js";
 import type { EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import {
+  SETUP_FIELD_LABELS,
   setupCard,
   turnContent,
   turnContext,
@@ -93,6 +94,7 @@ const TITLES: Record<RatingKind, string> = {
 const INSTRUCTIONS: Record<RatingKind, string[]> = {
   setup: [
     "Each item shows one premise and several story setups written from it, in random order.",
+    "Each setup shows its whole design, as the game uses it. Click a section heading to fold it.",
     "Acceptable? is the minimum bar: coherent and true to the premise, sensible stats, and distinct playable characters.",
     "Rank the options from best (1) to worst. Ties are allowed.",
     "A note is optional. Your answers save in this browser as you go; export them when you are done.",
@@ -340,7 +342,9 @@ export function planRatingSet(
 }
 
 function pageSet(kind: RatingKind, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
-  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels: FIELD_LABELS, items, preview };
+  // A setup card's fixed text is checked with the page's own labels
+  const fieldLabels = kind === "setup" ? [...FIELD_LABELS, ...Object.values(SETUP_FIELD_LABELS)] : FIELD_LABELS;
+  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels, items, preview };
 }
 
 /** One item as the rater sees it: the case's context and each keyed output. */

@@ -210,6 +210,20 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - The price: every single-player first beat (3), ending (3) and analysis turn (11) was already on Round 1 or Round 2, so none is on Round 3. The rewrite's first-beat, later-switch and ending instructions (table B rows B13 and B23–B25) get no rating. The automatic checks are their only reading.
   - The 8 items: 4 from story 8988006e, 2 from 6edd813c, 1 from 2ee343b6 and 1 image-off synthetic turn from 7492b211. 7 show pictures and 1 doesn't. In 2 of them the story generates no new pictures (the `images` case tag), but item 3's versions still place pictures from the story's library. The control (slim against slim, samples 1 and 2) is on `cont-8988006e-t2-o0`, which was on neither earlier page either.
   - The fallback (re-admit Round 1 cases if fewer than 9 qualified) was not needed, so I did not use it. Re-admitting Round 1's first beats and endings would have covered those branches, at the price of showing the owner cases a second time.
+- Rating pages (owner request): **Setup options now show the whole design the game uses, and leave out the character-selection plan.**
+  - Each option shows, in sections that start open and fold on a click:
+    - the difficulty and the character-selection screen;
+    - every guideline: world, world rules, tone, conflicts, decisions, types of threads, switch and thread instructions;
+    - the shared outcomes: question, resolutions, resonance, intended milestones and milestones;
+    - the stat groups, and every field of each shared and player stat: type, group, visible, set by background, can change in beat resolutions, tooltip, initial value, possible values, effect on points, narrative implications, adjustments after threads, and the sacrifice and reward options;
+    - every field of each story element;
+    - per player: outcomes, identities with pronouns, and backgrounds with their fluff and starting stats, by stat name;
+    - the image instructions;
+    - a template's teaser and difficulty levels, when present.
+  - Left out: the character-selection plan (conversion rates, background archetypes, multiplayer coordination). It is the model's planning scratch, and the game never reads it.
+  - Added beyond the request: the image instructions, because the game reads them for every picture. Ids of stats, outcomes and elements show in small type. A starting value for a stat that is not a player stat is marked, so a broken reference is visible.
+  - An absent field shows nothing. A list that is present but empty shows "(empty)", so a stat that starts empty, or a setup with no switch instructions, is visible.
+  - `round1-setup.html` was re-rendered with `--rerender-page 3434afcc6f`. The page id, items, option order and labels are unchanged, so ratings already saved in the browser still apply. Those ratings were made on the thinner card, and each can still be changed. The earlier copy is `rating/superseded/round1-setup-before-full-design.html`. The page grew from 245 KB to 1.1 MB.
 
 ## Skipped Items
 

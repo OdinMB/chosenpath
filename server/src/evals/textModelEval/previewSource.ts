@@ -50,10 +50,13 @@ function setupFromState(state: StoryState): Record<string, unknown> {
   return {
     title: state.title,
     characterSelectionIntroduction: state.characterSelectionIntroduction,
+    difficultyLevel: state.difficultyLevel,
     guidelines: state.guidelines,
     storyElements: state.storyElements,
+    sharedOutcomes: state.sharedOutcomes,
     sharedStats: state.sharedStats,
     playerStats: state.playerStats,
+    imageInstructions: state.imageInstructions,
     ...state.characterSelectionOptions,
   };
 }

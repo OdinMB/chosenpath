@@ -94,6 +94,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
   - `--cases a,b,…` limits the regular items to those cases; the baseline-against-baseline control still comes from the other cases.
   - Post-fix pages need `--prompt-state postfix` (or `postfix:<armKey>` refs), because a bare arm key defaults to `prefix`.
   - `--preview` allows a single arm and shows a banner. `--preview --stored` builds a layout-only page from stored beats and custom-story setups, with no eval output needed.
+  - A setup option shows the whole design the game reads (`setupCard` in `ratingContent.ts`), in folding sections that start open: difficulty, character-selection screen, every guideline, outcomes, every stat field, story elements, each player's outcomes, identities and backgrounds with starting stats, and image instructions. The character-selection plan is left out, because the game never reads it. The card's fixed text is `SETUP_FIELD_LABELS`, which joins the page's field labels, so the blinding word check reads it.
 - `--rerender-page <pageId>`: renders the page of an existing key afresh from the stored outputs, after a rendering fix. The page id, items and labels stay the same, so ratings a browser has already saved still apply, and the key is not rewritten. It writes `rating/text-<kind>-<pageId>.html`, so rename it over the handed-out file.
 - `--score <ratings-export.json>`: scores an export against its answer key.
 
