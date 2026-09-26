@@ -5,6 +5,14 @@ import type { CaseTags } from "./cases.js";
 import type { ProbeReport } from "./probe.js";
 import type { CheckResult } from "./textChecks.js";
 import { usable, type CallRecord } from "./runner.js";
+import {
+  FIRST_ATTEMPT_FLOOR,
+  modelAttemptsByStep,
+  validityReading,
+  validityVerdict,
+  type ValidityReading,
+} from "./validityGate.js";
+import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
 
 /*
  * results.md from the call records and the automatic checks: validity,
@@ -32,8 +40,9 @@ export type ArmStats = {
   model: string;
   baseline: boolean;
   calls: number;
+  validity: ValidityReading;
+  /** Over each call's first model attempt, so a re-send cannot hide them (rejectedParam: over all records) */
   rates: {
-    firstAttemptValid: number;
     repaired: number;
     refusal: number;
     length: number;
@@ -110,7 +119,8 @@ function statsFor(
   const first = records[0];
   const finals = records.filter((r) => r.final);
   const good = finals.filter(usable);
-  const firstAttempts = records.filter((r) => r.attempt === 1);
+  const firstAttempts = modelAttemptsByStep(records).calls.map((attempts) => attempts[0]);
+  const firstRate = (hit: (r: CallRecord) => boolean) => rate(firstAttempts.filter(hit).length, firstAttempts.length);
   const seconds = (r: CallRecord) => r.latencyMs / 1000;
   const bySample = (n: number) => ruleRatesOf(good.filter((r) => r.sample === n), checks);
   const s1 = bySample(1);
@@ -137,14 +147,14 @@ function statsFor(
     model: first.model,
     baseline: first.baseline,
     calls: finals.length,
+    validity: validityReading(records),
     rates: {
-      firstAttemptValid: rate(firstAttempts.filter((r) => r.outcome === "valid").length, firstAttempts.length),
-      repaired: rate(finals.filter((r) => r.outcome === "repaired").length, finals.length),
-      refusal: rate(finals.filter((r) => r.outcome === "refusal").length, finals.length),
-      length: rate(finals.filter((r) => r.outcome === "length").length, finals.length),
+      repaired: firstRate((r) => r.outcome === "repaired"),
+      refusal: firstRate((r) => r.outcome === "refusal"),
+      length: firstRate((r) => r.outcome === "length"),
       rejectedParam: rate(records.filter((r) => r.rejectedParam).length, records.length),
-      textAfterJson: rate(finals.filter((r) => r.textAfterJson).length, finals.length),
-      junk: rate(finals.filter((r) => r.junkChars > 0).length, finals.length),
+      textAfterJson: firstRate((r) => r.textAfterJson === true),
+      junk: firstRate((r) => r.junkChars > 0),
     },
     ruleRates: ruleRatesOf(good, checks),
     noiseFloor: Object.fromEntries(
@@ -365,6 +375,32 @@ function renderViews(stats: ArmStats[], promptState: string): string[] {
   return lines;
 }
 
+/** Per isolated arm; pipeline chains are left out (the isolated arms carry validity). */
+function renderValidityGate(stats: ArmStats[], promptState: string): string[] {
+  const inState = stats.filter((s) => s.promptState === promptState && s.group !== "pipeline");
+  const lines = [
+    "",
+    `### Validity gate (first attempt at least ${pct(FIRST_ATTEMPT_FLOOR)}; 100% within production's ${PRODUCTION_MAX_RETRIES} retries; worse than the role's baseline only at Fisher p < 0.05; transport failures left out)`,
+    "",
+    "| Role | Arm | Calls | 1st-attempt valid | Valid within retries | p (worse than baseline) | Verdict |",
+    "|---|---|---|---|---|---|---|",
+  ];
+  for (const s of inState) {
+    const baseline = s.baseline ? undefined : inState.find((b) => b.baseline && b.group === s.group);
+    const v = validityVerdict(s.validity, baseline?.validity);
+    const reasons = [
+      v.firstAttemptOk ? "" : "below floor",
+      v.withinRetriesOk ? "" : "invalid after retries",
+      v.worseThanBaseline ? "worse than baseline" : "",
+    ].filter(Boolean);
+    const { calls, firstAttemptValid, validWithinRetries, transportOnly } = s.validity;
+    lines.push(
+      `| ${s.group} | ${s.armKey}${s.baseline ? " (baseline)" : ""} | ${calls}${transportOnly ? ` (+${transportOnly} transport-only)` : ""} | ${firstAttemptValid}/${calls} (${pct(rate(firstAttemptValid, calls))}) | ${validWithinRetries}/${calls} | ${v.pWorse === undefined ? "–" : v.pWorse.toFixed(3)} | ${v.pass ? "pass" : `FAIL: ${reasons.join(", ")}`} |`
+    );
+  }
+  return lines;
+}
+
 export function renderResults(input: ResultsInput): string {
   const stats = computeArmStats(input.records, input.checks, input.tags);
   // Probe spend lives in probe.json, not calls.jsonl; it counts against Stage 0 as the caps do
@@ -395,15 +431,16 @@ export function renderResults(input: ResultsInput): string {
   for (const promptState of [...new Set(stats.map((s) => s.promptState))]) {
     lines.push("", `## Prompt state: ${promptState}`, "", "### Validity, latency, tokens and cost per call", "");
     lines.push(
-      "| Role | Arm | Calls | 1st-attempt valid | Repaired | Refusal | Length | Rejected param | Text after JSON | Junk | p50 | p95 | Median tokens in / cached / write / out / reasoning | $/call billed (uncached) |",
-      "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"
+      "| Role | Arm | Calls | Repaired | Refusal | Length | Rejected param | Text after JSON | Junk | p50 | p95 | Median tokens in / cached / write / out / reasoning | $/call billed (uncached) |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
     );
     for (const s of stats.filter((x) => x.promptState === promptState)) {
       const t = s.medianTokens;
       lines.push(
-        `| ${s.group} | ${s.armKey}${s.baseline ? " (baseline)" : ""} | ${s.calls} | ${pct(s.rates.firstAttemptValid)} | ${pct(s.rates.repaired)} | ${pct(s.rates.refusal)} | ${pct(s.rates.length)} | ${pct(s.rates.rejectedParam)} | ${pct(s.rates.textAfterJson)} | ${pct(s.rates.junk)} | ${secs(s.latency.p50)} | ${secs(s.latency.p95)} | ${t.input} / ${t.cached} / ${t.cacheWrite} / ${t.output} / ${t.reasoning} | ${usd(s.costPerCall)} (${usd(s.uncachedCostPerCall)}) |`
+        `| ${s.group} | ${s.armKey}${s.baseline ? " (baseline)" : ""} | ${s.calls} | ${pct(s.rates.repaired)} | ${pct(s.rates.refusal)} | ${pct(s.rates.length)} | ${pct(s.rates.rejectedParam)} | ${pct(s.rates.textAfterJson)} | ${pct(s.rates.junk)} | ${secs(s.latency.p50)} | ${secs(s.latency.p95)} | ${t.input} / ${t.cached} / ${t.cacheWrite} / ${t.output} / ${t.reasoning} | ${usd(s.costPerCall)} (${usd(s.uncachedCostPerCall)}) |`
       );
     }
+    lines.push(...renderValidityGate(stats, promptState));
     lines.push("", "### Rule and state checks (pass rate; baseline noise floor in brackets)", "");
     for (const group of [...new Set(stats.filter((s) => s.promptState === promptState).map((s) => s.group))]) {
       const inGroup = stats.filter((s) => s.promptState === promptState && s.group === group);

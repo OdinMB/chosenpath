@@ -1,15 +1,18 @@
+import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
 import { costFromUsage, type Arm, type EvalRole, type Estimate, type Stage } from "./arms.js";
 import { budgetCheck, spentByStage, type Caps, type SpendRecord } from "./budget.js";
 import { sha256, type CallSpec, type ExecutedCall } from "./executor.js";
-import { USABLE_OUTCOMES, type Outcome } from "./responseCheck.js";
+import { USABLE_OUTCOMES, type CallCheck, type Outcome } from "./responseCheck.js";
 
 /*
  * Schedules planned eval jobs and records every attempt: setup first, then
  * beats, analysis and pipeline chains, then iteration; within a role every
  * case's baseline first, candidates only where the baseline worked. Paced by
- * a rolling per-model token window, retried only when a retry can help,
- * stopped by the spend caps, and resumable from earlier records.
+ * a rolling per-model token window, stopped by the spend caps, and
+ * resumable from earlier records. Transport failures retry after a backoff;
+ * a reply production could not parse is re-sent at once, up to
+ * production's retries, as LangChain does in production.
  */
 
 export type PlannedCall = {
@@ -129,14 +132,20 @@ export function usable(record: { outcome: Outcome }): boolean {
 
 const RETRY_CODES = new Set(["slow_down", "server_is_overloaded", "rate_limit_exceeded"]);
 
-/** 429, 5xx, timeouts and dropped connections; never a 4xx the request caused. */
-export function isRetryable(executed: Pick<ExecutedCall, "check">): boolean {
-  const { outcome, status, code } = executed.check;
+/** 429, 5xx, timeouts and dropped connections; never a 4xx the request caused. Takes a check or a record. */
+export function isRetryable(check: Pick<CallCheck, "outcome" | "status" | "code">): boolean {
+  const { outcome, status, code } = check;
   if (outcome === "timeout" || outcome === "network-error") return true;
   if (outcome !== "http-error") return false;
   if (code && RETRY_CODES.has(code)) return true;
   return status === 429 || (status !== undefined && status >= 500);
 }
+
+/**
+ * Replies production's LangChain parse rejects, and so re-sends within its
+ * retries. "repaired" (text after the JSON) is usable here but fails there.
+ */
+export const PRODUCTION_RETRIED_OUTCOMES: Outcome[] = ["repaired", "invalid-json", "schema-mismatch", "length", "refusal"];
 
 function attemptCost(
   call: PlannedCall,
@@ -282,7 +291,11 @@ export async function runJobs(
     return drift;
   };
 
-  /** Runs one call with retries. Returns the final executed call, or undefined when stopped. */
+  /**
+   * Runs one call with retries: transport failures after a backoff, on their
+   * own budget; unparseable replies at once, at most PRODUCTION_MAX_RETRIES
+   * times. Returns the final executed call, or undefined when stopped.
+   */
   const runStep = async (
     job: Job,
     call: PlannedCall,
@@ -291,6 +304,8 @@ export async function runJobs(
     chainLatencyMs: number
   ): Promise<{ record: CallRecord; executed: ExecutedCall } | undefined> => {
     const request = call.request();
+    let transportRetries = 0;
+    let validityRetries = 0;
     for (let attempt = 1; ; attempt++) {
       if (!reserve(job.stage, call.estimate.costUsd)) return undefined;
       let executed: ExecutedCall;
@@ -306,7 +321,10 @@ export async function runJobs(
       } finally {
         reserved -= call.estimate.costUsd;
       }
-      const final = !(isRetryable(executed) && attempt <= backoffs.length);
+      const transportRetry = isRetryable(executed.check) && transportRetries < backoffs.length;
+      const resend =
+        PRODUCTION_RETRIED_OUTCOMES.includes(executed.check.outcome) && validityRetries < PRODUCTION_MAX_RETRIES;
+      const final = !transportRetry && !resend;
       const record = attemptRecord({
         job,
         call,
@@ -322,7 +340,12 @@ export async function runJobs(
       invocationSpent += record.costUsd;
       addRecord(record);
       if (final) return { record, executed };
-      await deps.sleep(executed.capture.retryAfterMs ?? backoffs[attempt - 1]);
+      if (transportRetry) {
+        await deps.sleep(executed.capture.retryAfterMs ?? backoffs[transportRetries]);
+        transportRetries++;
+      } else {
+        validityRetries++;
+      }
     }
   };
 

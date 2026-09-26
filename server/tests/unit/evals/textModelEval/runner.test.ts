@@ -72,11 +72,58 @@ describe("runJobs", () => {
       job("good", "beat", BASELINE),
       job("bad", "beat", BASELINE),
     ];
+    // The "bad" baseline (calls 2-4) fails its first attempt and both re-sends
     const { d, calls } = deps((spec) =>
-      spec.arm.baseline && calls.length === 2 ? executed("invalid-json") : executed("valid")
+      spec.arm.baseline && calls.length >= 2 ? executed("invalid-json") : executed("valid")
     );
     await runJobs(jobs, d, { caps, previous: [], maxInFlight: 1 });
-    expect(calls.map((c) => c.arm.key)).toEqual([BASELINE.key, BASELINE.key, LUNA.key]);
+    expect(calls.map((c) => c.arm.key)).toEqual([BASELINE.key, BASELINE.key, BASELINE.key, BASELINE.key, LUNA.key]);
+  });
+
+  describe("re-sends replies production could not parse, as its LangChain retry does", () => {
+    const run = async (queue: ExecutedCall[]) => {
+      const harness = deps(() => queue.shift() as ExecutedCall);
+      await runJobs([job("a", "beat", BASELINE)], harness.d, { caps, previous: [], maxInFlight: 1 });
+      return harness;
+    };
+
+    it("re-sends an invalid reply at once and stops at the valid one", async () => {
+      const { calls, records, sleeps } = await run([executed("invalid-json"), executed("valid")]);
+      expect(calls).toHaveLength(2);
+      expect(sleeps).toEqual([]);
+      expect(records.map((r) => [r.attempt, r.final, r.outcome])).toEqual([
+        [1, false, "invalid-json"],
+        [2, true, "valid"],
+      ]);
+    });
+
+    it("gives up after two re-sends", async () => {
+      const { calls, records } = await run([executed("invalid-json"), executed("schema-mismatch"), executed("repaired"), executed("valid")]);
+      expect(calls).toHaveLength(3);
+      expect(records.map((r) => [r.attempt, r.final, r.outcome])).toEqual([
+        [1, false, "invalid-json"],
+        [2, false, "schema-mismatch"],
+        [3, true, "repaired"],
+      ]);
+    });
+
+    it("keeps both re-sends after a transport retry", async () => {
+      const { calls, records, sleeps } = await run([
+        executed("http-error", { status: 429 }),
+        executed("invalid-json"),
+        executed("invalid-json"),
+        executed("valid"),
+      ]);
+      expect(calls).toHaveLength(4);
+      expect(sleeps).toEqual([30_000]);
+      expect(records.map((r) => r.final)).toEqual([false, false, false, true]);
+    });
+
+    it("never re-sends a request the API rejected", async () => {
+      const { calls, records } = await run([executed("http-error", { status: 400, param: "temperature", rejectedParam: true }), executed("valid")]);
+      expect(calls).toHaveLength(1);
+      expect(records[0].final).toBe(true);
+    });
   });
 
   it("runs setup before beats", async () => {
