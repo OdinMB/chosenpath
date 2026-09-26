@@ -2,6 +2,7 @@
 import type {
   BeatGeneration,
   BeatOption,
+  ChallengeOption,
   SetOfBeatGenerationSchema,
   SwitchAnalysis,
   Thread,
@@ -22,7 +23,7 @@ export function explorationOptions(): BeatOption[] {
   }));
 }
 
-export function challengeOptions(): BeatOption[] {
+export function challengeOptions(): ChallengeOption[] {
   return [1, 2, 3].map((n) => ({
     optionType: "challenge" as const,
     resourceType: "normal" as const,

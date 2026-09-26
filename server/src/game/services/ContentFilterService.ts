@@ -20,7 +20,7 @@ dotenv.config();
  * the text through. Background: .context/content-safety.md.
  */
 
-const contentFilterSchema = z.object({
+export const contentFilterSchema = z.object({
   isAppropriate: z.boolean(),
   reason: z.string(),
 });
