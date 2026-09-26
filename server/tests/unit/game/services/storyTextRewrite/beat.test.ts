@@ -151,7 +151,7 @@ const BEAT_RULES: Rule[] = [
   { id: "B9 last paragraph", part: "fixed", applies: always, pattern: "The last paragraph never mentions or hints" },
   { id: "B10 inconsistent state", part: "fixed", applies: always, pattern: "use the most plausible reading and continue" },
   { id: "B11 how the game works", part: "fixed", applies: always, pattern: "It takes 50 points to turn a 33/34/33 distribution" },
-  { id: "B12 stat changes", part: "fixed", applies: always, pattern: "only stats marked as changeable in beat resolutions" },
+  { id: "B12 stat changes", part: "fixed", applies: always, pattern: 'only stats marked "Can be adjusted anytime" change' },
   { id: "B13 thread resolved", part: "perCall", applies: (s) => laterSwitch(s) || type(s) === "ending", pattern: "any stat may change now" },
   { id: "B14 story elements", part: "fixed", applies: always, pattern: "only when it is likely to come back in later beats" },
   { id: "B15 facts", part: "fixed", applies: always, pattern: "3 or more per switch and per thread step" },

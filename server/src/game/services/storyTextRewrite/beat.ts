@@ -66,7 +66,7 @@ const BEAT_FIXED = [
   "",
   "Changes to the story state",
   "- A player who chose a sacrifice option loses what they sacrificed, and a player who chose a reward option gains the reward. To replace an item in a string[] stat, remove it with removeElement and add the new one with addElement.",
-  "- Within a thread, only stats marked as changeable in beat resolutions change (sacrifices and rewards aside), and only a little.",
+  '- Within a thread, only stats marked "Can be adjusted anytime" change (sacrifices and rewards aside), and only a little.',
   "- Add a new story element only when it is likely to come back in later beats; most beats add none. NPCs and locations are the usual kinds, and items, organizations, mysteries, conflicts, rumors and projects work too.",
   "- When the player meets a story element for the first time, introduce it properly and record the introduction. Refer to elements the player already knows without introducing them again.",
   "- Record only facts that the story state does not hold yet: from the second beat on, 3 or more per switch and per thread step. Link each fact to the element it is about, and use world only when no element fits. Elements created in this beat get no facts.",
