@@ -224,6 +224,28 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - Added beyond the request: the image instructions, because the game reads them for every picture. Ids of stats, outcomes and elements show in small type. A starting value for a stat that is not a player stat is marked, so a broken reference is visible.
   - An absent field shows nothing. A list that is present but empty shows "(empty)", so a stat that starts empty, or a setup with no switch instructions, is visible.
   - `round1-setup.html` was re-rendered with `--rerender-page 3434afcc6f`. The page id, items, option order and labels are unchanged, so ratings already saved in the browser still apply. Those ratings were made on the thinner card, and each can still be changed. The earlier copy is `rating/superseded/round1-setup-before-full-design.html`. The page grew from 245 KB to 1.1 MB.
+- Milestone 3 (count fix): **What each enforced count needs in the game, and what the worded form (v2) says.** The worded form drops every `minItems`, keeps `maxItems` only as a cap, and says each count in words in its description.
+  - Beat options: exactly three. An exploration choice resolves as `resolution${choice % options + 1}` (`BeatResolutionService.getExplorationBeatResolution`), and an exploration step has exactly three resolutions, so two options never reach resolution 3 and four wrap round. Production's schema says "Exactly 3". v2: "Exactly three choices …", max 3. The ending keeps Stage 4's "this list stays empty" without a count keyword: `maxItems: 0` has never been sent, and a 400 would cost a smoke.
+  - Interludes: the client carousel (`Interlude.tsx`) shows any number. Production says "exactly 3", but its own breakdown (1 thought, 1–2 elements, 0–1 world) allows two to four, and so does rule B32. v2: "Two to four snippets …", max 4.
+  - Show-don't-tell points: planning only, and production gives no count. v2: "One to three …", max 3, which only keeps the plan short.
+  - Modifiers: the game sums any number; production says "2 most relevant". v2: "Up to two …", max 2 (Stage 4 had the same cap).
+  - Setup identities and backgrounds: `CharacterSelection.tsx` renders any number and `GameHandler` checks the chosen index against the list. Production says "Generate exactly 3", and v2 keeps that description with max 3.
+  - Story-element facts, the list gpt-4.1 ran away in: free-form, any count works. v2 keeps production's "Three additional facts", max 3.
+  - Story elements: production's prompt asks for 6-8, while the rewrite's fixed rules give only the 2–4 mix, so the v2 description reads "List of 6-8 important elements", max 8.
+  - Thread types (6-8, max 8), switch and thread instructions (0-3, max 3) and stat groups (at most 3, max 3): production's descriptions come back unchanged.
+  - Effects on points: production says "at least 3" twice. v2 says "List at least 3 ways" once, with no cap and no minimum.
+  - Conversion rates, background archetypes and multiplayer coordination: nothing reads them after generation. v2 restores production's "three" as a cap (max 3).
+  - Outcomes: max 3, as in Stage 4. The count stays in section 3 of the fixed rules, because saying it again in the description would state it twice.
+- Milestone 3 (count fix): **v1 stays buildable byte for byte, through a counts parameter** (`RewriteCounts`, `"exact" | "worded"`, default `"exact"`) on `rewriteBeatRequest` and `rewriteSetupRequest`. A throwaway test rebuilt all 207 Stage 4 records' requests through `planJobs` on the frozen cases. Every prompt hash matched, and so did every cache line, which hashes the JSON schema and the fixed text. I deleted the test afterwards, because it reads `DOCS/`.
+- Milestone 3 (count fix): **Variants and arms.** The new variants are `rewrite2` (setup with examples, and beats on the full scaffold), `rewrite2Slim` and `rewrite2ZeroShot`.
+  - References are v1's: `rewrite2Slim` → slim, `rewrite2` → prod, `rewrite2ZeroShot` → `rewrite2`.
+  - Estimates walk a new `estimateBaseKey`, which tries the arm's Stage 4 form before its reference. A walk along the references alone would have priced `rewrite2Slim` from slim.
+  - The Stage 4b block is planned first in `armsFor("4", …)`, so a cap stop cuts Stage 4's leftovers (the verbosity arm, the hedge, gpt-4.1's open setups) before it.
+  - There is no separate dry-run row. `--role`/`--arms` filters give the row for each invocation.
+- Milestone 3 (count fix): **The no-empty rule is one line in the fixed text** ("Every item in a list carries real content; a list never holds an empty or blank item."), just before "The field descriptions … are part of these instructions", in both beats and setup, so it caches. It deliberately doesn't say that a list may be shorter, because options must be exactly three.
+- Milestone 3 (count fix): **The blank-item check (`noBlankItems`) flags a whole reply**, the unit the report counted. A list item is blank when it is an empty or whitespace-only string, or an object whose own text field (`text`, `name`, `title`, `question`, `fact`, `newMilestone`) is. Other empty strings are legitimate (an interlude without a picture, an abstract element's appearance, a percentage stat's possible values).
+- Milestone 3 (count fix): **`threeInterludes` still reads production's exactly-3 contract.** A v2 arm that writes 2 or 4 interludes reads lower there by design (rule B32 allows both), so read it beside `noBlankItems`.
+- Milestone 3 (count fix): **The cap raise is a CLI flag, so no code changed.** Every Stage 4 `--run` passes `--stage 4 --stage-cap 6 --over-target-reason "Owner approved 2026-09-26: fix the rewrite's forced counts, re-run Luna medium turns and Sol low setup"`. The flag lasts one invocation, and each use appends a line to `budget-overrides.jsonl`. `DEFAULT_STAGE_CAPS` and the $30 hard cap are unchanged.
 
 ## Skipped Items
 
@@ -248,6 +270,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Run A: **The 29–58 s gaps between local pregeneration files** (test plan §2.6) were not investigated. Today's text calls take about 10–17 s per turn, and pregeneration runs its options in parallel. Production `[TurnTiming]` lines will show the real pregeneration time.
 - Milestone 3 (implementer): **Two jobPlan test cases moved from commit 4 to commit 5.** Both are cache-line cases on split requests: one line for two cases with the same schema and fixed text, and separate lines for an image-on case and an ending. `planJobs` can plan a split request only from the Stage 4 matrix, which arrives in commit 5. Commit 4 carries the other half, "a production request has no cache line". The commit 5 case was proven able to fail by disabling the cache-line assignment.
 - Milestone 3 (implementer): **No visual check.** Nothing in this change touches the client or a rating page.
+- Milestone 3 (count fix): **No paid calls, and no Round 3 rebuild.** Both belong to the run that follows, as the task scoped it. There was no visual check either: nothing touches the client or a rating page.
 
 ## User Input Needed
 
@@ -300,13 +323,12 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - It is more if OpenAI kept generating after the client disconnected.
     - A whole-day view mixes in about $14.3 of earlier GPT-6 spend (Stages 1–2 and 3, before 10:25 UTC).
   - **Decide whether the rest is worth funding.** Every option takes the ledger past the $25 target ($24.76 now), and the total may be past it already if the hangs were billed. Cheapest first:
-    - replay 3–4 hung cases with an output cap (a few cents; the run path has no `max_completion_tokens` option yet, so it needs a small eval-only flag) to confirm the counting loop before paying for the fix;
-    - relax the enforced counts and re-run the lead's 88 turns (about $0.25);
+    - replay 3–4 hung cases with an output cap (a few cents; the run path has no `max_completion_tokens` option yet, so it needs a small eval-only flag) to see where a loop starts;
     - the verbosity arm (est $0.12);
     - the full-scaffold hedge ($0.14), which is the comparison Round 3 would need if Round 2 rates slim below full;
     - gpt-4.1 setup on the other 3 premises plus the open job without examples (about $0.45).
     
-    Raising the Stage 4 cap takes `--over-target-reason`, and that is your call. Fixing the enforced-count loop first would make those runs cheaper and their reading cleaner.
+    You approved the count fix and its re-runs on 2026-09-26, at a $6 Stage 4 cap (Milestone 3 (count fix) entries). The options above can run only in what the count fix leaves under that cap (roughly $0–0.4 by its dry run). The cap goes no higher without your go-ahead.
 - Milestone 3 (eval run): **4 of 88 Luna rewrite turns would fail in production.** Each hung three times at 300 s and answered only on a fourth attempt, which the eval's transport budget (3 retries on a timeout, `runner.ts`) allows and production's (`PRODUCTION_MAX_RETRIES = 2`) does not. In production that turn fails after about 9 minutes (3 × 180 s). One Sol setup (the ER doctor with examples) used all 3 attempts production allows. This decides nothing on its own while the rewrite isn't adopted, but it belongs in any adoption decision on the rewrite as measured.
 - Milestone 3 (eval run): **The shorter GPT-6 turn timeout (Suggested Follow-Up Work, Milestone 2) now has Stage 4 data.** A 90 s beat timeout would halve a hang's wait and cap its possible output cost at about $0.005 per Luna call. The one Luna rewrite turn that recovered (176 s) would have been cut off and retried, and 60 s would cut off normal 3-player turns (Round 1 p95 62 s). It changes production behaviour, so it is your call.
 - Milestone 3 (eval run): **Rate Round 3 after Rounds 1 and 2:** `DOCS/2026-09-26_gpt6-text-eval/rating/round3-turns.html`. It has 10 items (8 regular, a repeat and a control), 2 options each, about 20 minutes.
@@ -536,6 +558,22 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - **gpt-4.1-mini turns, today → rewrite:** −19% uncached, 11 of 44 turns open with "You" (was all), sentences 61.4% → 31.8% and paragraphs 100% → 84.1%.
   - **Report corrections before hand-off.** Two independent checkers read the report against `calls.jsonl`, the outputs and the earlier reports. I corrected: the 4 turns past production's retries, the blank-item counts (13 and 1, not 12), the 176 s turn's blank run (30,601 characters, not 38,000), the hang windows, the usage-page window and its expected figures, Sol's waits without examples, Round 1's lead on the matched basis ($0.411), the cache-read inferences, the setup cache lines per player count, the runaways' whitespace mix, the bounty-hunter blanks (21 of 21 lists), gpt-4.1's waits with runaways, the "still over" single-player wording, the Round 3 picture count, the ±15 non-reading, the timeout trade-off, and the internal wording.
 - Milestone 3 (eval run): **Privacy page and AI transparency record: checked, no change** (Stage 4 run). No production model, feature or data flow changed. The eval sent the frozen cases and premises to the same OpenAI models as Rounds 1 and 2; the rewrite, caching and warm-first runner live only in the eval harness.
+- Milestone 3 (count fix): **Dry-run rows** (free, 2026-09-26, 112 frozen cases). Planning built every v2 request on every case in scope, with no throw.
+  - The whole Stage 4 row: 201 open jobs (setup 25, beat 176), est $2.47. That is Stage 4b's 106 plus Stage 4's 95 leftovers: the verbosity arm (44), the hedge (44) and gpt-4.1's setups (7).
+  - Invocation 1, `--role beat --arms gpt-6-luna@medium/rewrite2Slim`: 88 jobs, est $0.24, at least 7 min.
+  - Invocation 2, `--role setup --arms gpt-6-sol@low/rewrite2,gpt-6-sol@low/rewrite2ZeroShot`: 18 jobs, est $1.52 (with examples 9 for $0.82, without 9 for $0.70), at least 4 min.
+  - Spend: $24.76 of $30, Stage 4 $3.99 of $4 (the dry run shows the default cap; the flag raises it to $6 for one `--run`).
+- Milestone 3 (count fix): **Budget arithmetic for the run (DERIVED).** $2.01 is left under the $6 cap.
+  - Luna turns: about $0.20, at Stage 4's measured $0.00225 per turn on replies only. The $0.24 estimate ignores caching.
+  - Sol setups: at the hand rate of $0.10 per reply, 18 cost $1.80. With Luna's estimate that is $2.04, $0.03 over. At Stage 4's measured replies-only costs with caching ($0.082 with examples, $0.075 without), they cost about $1.41, so about $1.6 in total.
+  - Hung calls are booked at their estimate: about $0.09 per Sol setup and $0.003 per Luna turn.
+  - Suggested order: Luna first, then check the Stage 4 spend plus 18 × $0.10 against $6 before the Sol invocation. A cap stop in it lands on the last setups without examples (3-player premises), since jobs run in plan order.
+- Milestone 3 (count fix): **The blank-item check over the existing records reproduces the Stage 4 report's hand count exactly.**
+  - Luna medium rewriteSlim: 14 of 88 (13 blank interludes and 1 blank option).
+  - Sol low rewrite: 2 of 9 (co-founders, animal rescue). Without examples: 1 of 9 (bounty hunters).
+  - 0 on every other arm, Stages 0–3 included: slim 0 of 88, Sol prod 0 of 36, Sol minimal 0 of 9, gpt-4.1 prod 0 of 36, gpt-4.1 rewrite 0 of 11, gpt-4.1-mini rewrite 0 of 44.
+  - In a re-render of `results.md` (scratchpad only; the one in `DOCS/` is untouched, and the next `--run` rewrites it with the check), the variant section flags Luna rewriteSlim 100% → 84.1% and Sol rewrite 100% → 77.8% lower. It shows rewriteZeroShot at 77.8% → 88.9% raw, since its reference has one sample.
+- Milestone 3 (count fix): **Privacy page and AI transparency record: checked, no change.** The count fix, the new variants and the blank check live only in the eval harness. No production prompt, schema, model or default changed.
 
 ## Suggested Follow-Up Work
 
@@ -575,6 +613,5 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (planner): On adoption: move the message shaping to `shared/llm/` beside the factory, and decide an explicit cache TTL there (a production request-shape change, the owner's call).
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
-- Milestone 3 (eval run): **Relax the rewrite's enforced counts** in `storyTextRewrite/` (tables BS and SS): let each list hold what its rule allows (interludes 2–4, facts 2–3 or `minItems` only, identities and backgrounds as production words them) and put the count back in the description. Then re-run the lead's turns (about $0.25) to see whether the hangs and blank items go away. Needs the owner's cap decision first (User Input Needed).
-- Milestone 3 (eval run): **An automatic check for blank list items** (empty or whitespace-only strings in interludes, options, facts, identities and stat lists). Stage 4's blank items were found by hand; validity and every rule check read 100% on them.
+- Milestone 3 (count fix): **Run Stage 4b and rebuild Round 3 from it.** The worded counts, the arms and the blank check are in the code. Run Luna medium `rewrite2Slim`, then Sol low `rewrite2` and `rewrite2ZeroShot`, each with `--stage 4 --stage-cap 6 --over-target-reason "…"` (Controversial Decisions). Then build the Round 3 page from `rewrite2Slim` against slim.
 - Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.
