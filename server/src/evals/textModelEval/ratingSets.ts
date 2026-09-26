@@ -28,6 +28,11 @@ export type RatingSpec = {
   arms: ArmRef[];
   items: number;
   preview: boolean;
+  /**
+   * Candidates shown beside the baseline on each item, rotated so every
+   * candidate appears about equally often; every candidate when unset.
+   */
+  perItem?: number;
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -164,18 +169,59 @@ function orderRefs(baseline: LabelRef, others: LabelRef[], seed: string, baselin
   return ordered;
 }
 
-function refsFor(spec: RatingSpec, caseId: string, sample = 1): { baseline: LabelRef; others: LabelRef[] } {
-  const [baseline, ...others] = spec.arms.map((arm) => ({ ...arm, sample, caseId }));
+function combinations(n: number, k: number): number[][] {
+  if (k === 0) return [[]];
+  const result: number[][] = [];
+  for (let first = 0; first <= n - k; first++) {
+    for (const rest of combinations(n - first - 1, k - 1)) result.push([first, ...rest.map((i) => i + first + 1)]);
+  }
+  return result;
+}
+
+/**
+ * Which candidates each item shows: every k-subset once per cycle, each
+ * pick the one whose members have appeared least, so a partial cycle stays
+ * within about one appearance of even.
+ */
+export function candidateRotation(candidates: number, perItem: number, items: number): number[][] {
+  const subsets = combinations(candidates, perItem);
+  const counts = new Array<number>(candidates).fill(0);
+  const load = (subset: number[]) => subset.reduce((sum, i) => sum + counts[i], 0);
+  const rotation: number[][] = [];
+  let unused: number[][] = [];
+  while (rotation.length < items) {
+    if (unused.length === 0) unused = [...subsets];
+    const next = unused.reduce((best, subset) => (load(subset) < load(best) ? subset : best));
+    unused = unused.filter((subset) => subset !== next);
+    for (const i of next) counts[i]++;
+    rotation.push(next);
+  }
+  return rotation;
+}
+
+function refsFor(arms: ArmRef[], caseId: string, sample = 1): { baseline: LabelRef; others: LabelRef[] } {
+  const [baseline, ...others] = arms.map((arm) => ({ ...arm, sample, caseId }));
   return { baseline, others };
 }
 
-/** The picked items; the baseline's position cycles through the labels, so it is balanced. */
+/**
+ * The picked items. The baseline's position cycles through the labels, so it
+ * is balanced; with rotating candidates it is also offset once per rotation
+ * cycle, so each candidate subset meets the baseline at different labels.
+ */
 function itemDrafts(spec: RatingSpec, picked: EvalCase[], salt: string): Draft[] {
+  const [baseline, ...candidates] = spec.arms;
+  const perItem = spec.perItem !== undefined && spec.perItem < candidates.length ? spec.perItem : candidates.length;
+  const rotation = candidateRotation(candidates.length, perItem, picked.length);
+  const cycle = combinations(candidates.length, perItem).length;
+  const shown = perItem + 1;
   return [...picked]
     .sort((a, b) => byHash(`${salt}|order`)(a.id, b.id))
     .map((c, index) => {
-      const { baseline, others } = refsFor(spec, c.id);
-      return { caseId: c.id, refs: orderRefs(baseline, others, `${salt}|${c.id}`, index % spec.arms.length) };
+      const arms = [baseline, ...rotation[index].map((i) => candidates[i])];
+      const { baseline: base, others } = refsFor(arms, c.id);
+      const position = cycle > 1 ? (index + Math.floor(index / cycle)) % shown : index % shown;
+      return { caseId: c.id, refs: orderRefs(base, others, `${salt}|${c.id}`, position) };
     });
 }
 
@@ -194,9 +240,13 @@ function withControls(
     return result;
   }
   if (result.length >= REPEAT_MIN_DISTANCE) {
-    const { baseline, others } = refsFor(spec, result[0].caseId);
-    const position = parseInt(sha256(`${salt}|repeat`).slice(0, 8), 16) % spec.arms.length;
-    result.push({ caseId: result[0].caseId, refs: orderRefs(baseline, others, `${salt}|repeat`, position), repeat: true });
+    // The same arms the first item showed, in a fresh order
+    const first = result[0];
+    const isBaseline = (ref: LabelRef) => ref.armKey === spec.arms[0].armKey && ref.promptState === spec.arms[0].promptState;
+    const baseline = first.refs.find(isBaseline) as LabelRef;
+    const others = first.refs.filter((ref) => !isBaseline(ref));
+    const position = parseInt(sha256(`${salt}|repeat`).slice(0, 8), 16) % first.refs.length;
+    result.push({ caseId: first.caseId, refs: orderRefs(baseline, others, `${salt}|repeat`, position), repeat: true });
   } else {
     notes.push(`No repeated item: fewer than ${REPEAT_MIN_DISTANCE} items.`);
   }

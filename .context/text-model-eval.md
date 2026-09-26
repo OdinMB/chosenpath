@@ -58,7 +58,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
   - Findings of 2026-09-26 (about $0.47): every schema accepted on both models; temperature 0.2 accepted at none and rejected above it; `minimal` rejected (the API lists none, low, medium, high and xhigh); explicit caching writes nothing, the implicit default writes the whole prompt; a breakpoint is read back on the repeat; cached, cache-write and reasoning tokens are all reported.
 - `--build-cases [--rebuild-cases] [--max-spend 0.75]`: plays templates forward with the baseline and freezes every case. It refuses to overwrite frozen cases without `--rebuild-cases`, because rebuilding changes the inputs.
 - `--run --stage 0|1-2|3|4 --prompt-state <tag>`: the replay. It refuses to start when the estimate exceeds a cap, stops scheduling when the next call would, and resumes from `calls.jsonl`. It rewrites `results.md` at the end.
-  - Filters: `--role setup,beat,switch,thread,iteration` (`analysis` means switch plus thread), `--mode isolated|pipeline`, `--arms`, `--cases`, `--samples N`, `--subset15`, and `--no-mp-continuations` (leaves out multiplayer beats other than first beats and endings). The dry run takes the same filters.
+  - Filters: `--role setup,beat,switch,thread,iteration` (`analysis` means switch plus thread), `--mode isolated|pipeline`, `--arms`, `--cases`, `--samples N`, `--subset15`, `--no-mp-continuations` (leaves out multiplayer beats other than first beats and endings), and `--rare-failure skip|only` (leaves out the rare-failure batch, or plans only it, so it can run after the analysis and the chains). The dry run takes the same filters.
   - Prompt states: `prefix` is before the prompt-bug fixes (Run A), `postfix` after. `--run` refuses `prefix`: the pre-fix prompts exist only in Run A's records, so a resumed prefix run would mix post-fix prompts into pre-fix results.
   - The post-fix prompts (Milestone 2, test plan A7) fix these on today's models:
     - thread beats see their own thread's beat texts;
@@ -79,8 +79,9 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
     - 3–5 sentences per paragraph;
     - 3–4 *visible* shared and player stats plus any invisible ones.
   - The checkers follow the corrected rules: visible stat counts, and sacrifice and reward at exactly ±30.
-- `--rating-page setup|turn --arms <baseline,cand1,…> [--items N]`: a blind rating page.
+- `--rating-page setup|turn --arms <baseline,cand1,…> [--items N] [--per-item K]`: a blind rating page.
   - An arm is `armKey` or `promptState:armKey`; the first arm is the baseline.
+  - `--per-item K` shows the baseline plus K candidates per item. Every K-subset appears once per cycle, the least-shown first, so with 3 candidates, K = 2 and 9 items each candidate is on 6 items. The baseline's label also shifts once per cycle, so each pair meets it at every label. The repeated item keeps the arms of the item it repeats. Every arm still needs a usable sample 1 on a case for that case to qualify.
   - `--preview` allows a single arm and shows a banner. `--preview --stored` builds a layout-only page from stored beats and custom-story setups, with no eval output needed.
 - `--score <ratings-export.json>`: scores an export against its answer key.
 

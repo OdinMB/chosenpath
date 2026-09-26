@@ -37,6 +37,11 @@ export type PlanOptions = {
   subset15: boolean;
   /** --no-mp-continuations: leave out multiplayer beats that are neither a first beat nor an ending */
   skipMultiplayerContinuations?: boolean;
+  /**
+   * --rare-failure skip|only: leave the rare-failure batch out, or plan only
+   * it (no baseline, no regular samples), so it can run after everything else
+   */
+  rareFailure?: "skip" | "only";
   /** Earlier records, for measured output sizes */
   records: CallRecord[];
   env?: Env;
@@ -194,8 +199,9 @@ function armAllowed(options: PlanOptions, key: string): boolean {
 
 function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measured: Map<string, number[]>): Job[] {
   const jobs: Job[] = [];
+  const regular = options.rareFailure !== "only";
   const baselineSamples = options.samples ?? DEFAULT_BASELINE_SAMPLES;
-  for (const evalCase of casesFor(cases, role, options)) {
+  for (const evalCase of regular ? casesFor(cases, role, options) : []) {
     const arm = baselineArm(role, evalCase.tags.multiplayer, options.env);
     if (!armAllowed(options, arm.key)) continue;
     for (let sample = 1; sample <= baselineSamples; sample++) jobs.push(callJob(options, evalCase, arm, sample, measured));
@@ -204,11 +210,11 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
     if (!armAllowed(options, plan.arm.key)) continue;
     const scoped = casesFor(cases, role, options, plan.scope);
     const samples = options.samples ?? plan.samples;
-    for (const evalCase of scoped) {
+    for (const evalCase of regular ? scoped : []) {
       for (let sample = 1; sample <= samples; sample++) jobs.push(callJob(options, evalCase, plan.arm, sample, measured));
     }
     // Rare-failure batch: extra single samples, spread over the cases in hash order
-    const ordered = hashOrder(scoped, (c) => c.id);
+    const ordered = options.rareFailure === "skip" ? [] : hashOrder(scoped, (c) => c.id);
     for (let i = 0; plan.extraCalls && ordered.length && i < plan.extraCalls; i++) {
       const sample = samples + 1 + Math.floor(i / ordered.length);
       jobs.push(callJob(options, ordered[i % ordered.length], plan.arm, sample, measured));

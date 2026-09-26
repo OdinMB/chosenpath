@@ -3,6 +3,7 @@ import { renderRatingPage } from "../../../../src/evals/textModelEval/ratingPage
 import { planRatingSet, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
 import { scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
+import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
 import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
 
@@ -20,9 +21,9 @@ function setupOutput(title: string) {
   };
 }
 
-/** 10 setup cases; every arm has sample 1, the baseline also sample 2. */
-function fixture() {
-  const cases = Array.from({ length: 10 }, (_, i) =>
+/** Setup cases; every arm has sample 1, the baseline also sample 2. */
+function fixture(arms: Arm[] = [BASELINE, LUNA, SOL], caseCount = 10) {
+  const cases = Array.from({ length: caseCount }, (_, i) =>
     evalCase(`setup-case-${i}`, "setup", {
       setup: { premise: `Premise ${i} </script><b>bold</b>`, playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 },
       tags: tags({ gameMode: "single-player", players: 1 + (i % 3) }),
@@ -31,7 +32,7 @@ function fixture() {
   const records: CallRecord[] = [];
   const outputs = new Map<string, unknown>();
   for (const c of cases) {
-    for (const [index, arm] of [BASELINE, LUNA, SOL].entries()) {
+    for (const [index, arm] of arms.entries()) {
       for (const sample of arm.baseline ? [1, 2] : [1]) {
         const outputFile = `${c.id}-${arm.key}-${sample}`;
         outputs.set(outputFile, setupOutput(`Title ${c.id} option ${index} s${sample}`));
@@ -74,6 +75,67 @@ describe("planRatingSet", () => {
       [BASELINE.key, 2],
     ]);
     expect(set.items.every((i) => /^setup-\d{2}$/.test(i.id))).toBe(true);
+  });
+});
+
+describe("planRatingSet: rotating candidates (perItem)", () => {
+  const SOL_MEDIUM = makeArm({ model: "gpt-6-sol", reasoningEffort: "medium" });
+  const LUNA_MEDIUM = makeArm({ model: "gpt-6-luna", reasoningEffort: "medium" });
+
+  function rotated(arms: Arm[], items: number, perItem: number, salt = "rotate") {
+    const { cases, records, load } = fixture(arms, items + 3);
+    const refs = arms.map((a) => ({ promptState: "prefix", armKey: a.key }));
+    return planRatingSet({ kind: "setup", arms: refs, items, preview: false, perItem }, records, cases, { loadOutput: load, salt, now: new Date(0) });
+  }
+  const regular = (key: ReturnType<typeof rotated>["key"]) => Object.values(key.items).filter((i) => !i.repeatOf && !i.control);
+  const appearances = (key: ReturnType<typeof rotated>["key"]) =>
+    regular(key).reduce<Record<string, number>>((acc, item) => {
+      for (const ref of Object.values(item.labels)) acc[ref.armKey] = (acc[ref.armKey] ?? 0) + 1;
+      return acc;
+    }, {});
+
+  it("shows the baseline plus 2 of 3 candidates, each candidate in 6 of 9 items", () => {
+    const { set, key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 9, 2);
+    expect(regular(key)).toHaveLength(9);
+    // Every item but the baseline-against-baseline control shows three options
+    const optionCounts = set.items.filter((i) => !key.items[i.id].control).map((i) => i.options.length);
+    expect(optionCounts).toEqual(new Array(10).fill(3));
+    expect(appearances(key)).toEqual({ [BASELINE.key]: 9, [LUNA.key]: 6, [SOL.key]: 6, [SOL_MEDIUM.key]: 6 });
+    expect(key.labelDistribution).toEqual({ A: 3, B: 3, C: 3 });
+  });
+
+  it("pairs every candidate pair with every baseline position once over 9 items", () => {
+    const { key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 9, 2);
+    const pairs = regular(key).map((item) => {
+      const labels = Object.entries(item.labels);
+      const baselineAt = labels.find(([, ref]) => ref.armKey === BASELINE.key)?.[0];
+      const pair = labels.filter(([, ref]) => ref.armKey !== BASELINE.key).map(([, ref]) => ref.armKey).sort().join("+");
+      return `${pair}@${baselineAt}`;
+    });
+    expect(new Set(pairs).size).toBe(9);
+  });
+
+  it("keeps a 4-candidate rotation within one appearance of even over 15 items", () => {
+    const { key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM, LUNA_MEDIUM], 15, 2);
+    const counts = appearances(key);
+    expect(counts[BASELINE.key]).toBe(15);
+    const candidates = [LUNA, SOL, SOL_MEDIUM, LUNA_MEDIUM].map((a) => counts[a.key]);
+    expect(candidates.reduce((a, b) => a + b, 0)).toBe(30);
+    expect(Math.max(...candidates) - Math.min(...candidates)).toBeLessThanOrEqual(1);
+  });
+
+  it("repeats an item with the same arms it first showed", () => {
+    const { key } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 9, 2);
+    const repeat = Object.values(key.items).find((i) => i.repeatOf);
+    const armsOf = (item: (typeof key.items)[string]) => Object.values(item.labels).map((r) => r.armKey).sort();
+    expect(repeat).toBeDefined();
+    expect(armsOf(repeat as (typeof key.items)[string])).toEqual(armsOf(key.items[repeat?.repeatOf ?? ""]));
+    expect(Object.keys(repeat?.labels ?? {})).toHaveLength(3);
+  });
+
+  it("shows every arm on every item when perItem is unset or covers all candidates", () => {
+    const { set } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 6, 3);
+    expect(set.items.filter((i) => i.options.length === 4)).toHaveLength(set.items.length - 1);
   });
 });
 

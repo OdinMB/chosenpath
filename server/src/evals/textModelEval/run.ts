@@ -32,11 +32,13 @@ import { PRE_FIX_PROMPT_STATE } from "./variants.js";
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
  *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses "prefix": Run A recorded it)
- *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--preview [--stored]]
+ *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--preview [--stored]]
+ *     (--per-item K: the baseline plus K rotating candidates per item)
  *   --score <export.json>
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
- *   --no-mp-continuations (drops multiplayer beats other than first beats and endings)
+ *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
+ *   --rare-failure skip|only (leaves out, or plans only, the rare-failure batch)
  * Budget: --max-spend <usd> (this invocation), --global-cap, --stage-cap,
  *   --over-target-reason "<text>"; --tpm <tokens/min per model>; --out <dir>
  * Reads only local files under data/ and the frozen cases; never touches a database.
@@ -55,6 +57,7 @@ type Args = {
   samples?: number;
   subset15: boolean;
   skipMultiplayerContinuations: boolean;
+  rareFailure?: "skip" | "only";
   maxSpend?: number;
   globalCap?: number;
   stageCap?: number;
@@ -64,6 +67,8 @@ type Args = {
   rebuildCases: boolean;
   ratingKind?: RatingKind;
   items?: number;
+  /** Rating pages: candidates shown beside the baseline per item, rotated */
+  perItem?: number;
   preview: boolean;
   /** Preview pages from stored beats and setups (no eval output needed) */
   stored: boolean;
@@ -157,6 +162,15 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--no-mp-continuations":
         args.skipMultiplayerContinuations = true;
+        break;
+      case "--rare-failure": {
+        const value = next();
+        if (value !== "skip" && value !== "only") throw new UsageError("--rare-failure is skip or only");
+        args.rareFailure = value;
+        break;
+      }
+      case "--per-item":
+        args.perItem = numberArg(arg, next());
         break;
       case "--max-spend":
         args.maxSpend = numberArg(arg, next());
@@ -264,6 +278,7 @@ function planOptions(args: Args, stage: Stage, promptState: string, records: Pla
     samples: args.samples,
     subset15: args.subset15,
     skipMultiplayerContinuations: args.skipMultiplayerContinuations,
+    rareFailure: args.rareFailure,
     records,
     ...extra,
   };
@@ -437,7 +452,7 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
   if (arms.length === 0) throw new UsageError("--rating-page needs --arms <baseline,candidate,…>.");
   if (arms.length === 1 && !args.preview) throw new UsageError("A real rating page needs at least two arms (or --preview).");
   const { set, key } = planRatingSet(
-    { kind, arms, items: args.items ?? DEFAULT_ITEMS[kind], preview: args.preview },
+    { kind, arms, items: args.items ?? DEFAULT_ITEMS[kind], preview: args.preview, perItem: args.perItem },
     records,
     cases,
     { loadOutput, salt: crypto.randomBytes(16).toString("hex"), now: new Date() }
