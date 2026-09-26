@@ -1,4 +1,4 @@
-import { STAGES } from "./arms.js";
+import { chainSides, STAGES } from "./arms.js";
 import { COST_BASES, computeArmStats, type ArmStats, type CostBasis } from "./armStats.js";
 import type { Caps } from "./budget.js";
 import { spentByStage } from "./budget.js";
@@ -18,6 +18,7 @@ import type { ProbeReport } from "./probe.js";
 import type { CheckResult } from "./textChecks.js";
 import type { CallRecord } from "./runner.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
+import { renderVariantComparison, variantComparisons } from "./variantComparison.js";
 import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
 
@@ -25,9 +26,10 @@ import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
  * Renders results.md: spend, probe, per-arm validity, latency, tokens and
  * cost, rule rates against the baseline's noise floor, and the owner's gate
  * readings as views (single-player with and without pregeneration,
- * multiplayer, setup). The statistics live in armStats.ts and the readings in
- * gateReadings.ts; this file only lays them out. It marks each reading within
- * or over and never picks a winner.
+ * multiplayer, setup), then the Stage 3 trimmed-against-full section. The
+ * statistics live in armStats.ts, the readings in gateReadings.ts and the
+ * Stage 3 pairing in variantComparison.ts; this file only lays them out. It
+ * marks each reading within or over and never picks a winner.
  */
 
 export type ResultsInput = {
@@ -49,9 +51,9 @@ function configsFor(stats: ArmStats[], promptState: string) {
   const inState = stats.filter((s) => s.promptState === promptState);
   const find = (group: CallRecord["group"], key?: string) =>
     inState.find((s) => s.group === group && (key === undefined ? s.baseline : s.armKey === key));
-  // Pipeline chains ("pipeline:<analysis>><beat>") measure the beat arm's analysis-turn wait
+  // Pipeline chains measure the beat arm's analysis-turn wait
   const withChains = (beat: ArmStats): ArmStats => {
-    const chain = inState.find((s) => s.group === "pipeline" && s.baseline === beat.baseline && s.armKey.endsWith(`>${beat.armKey}`));
+    const chain = inState.find((s) => s.group === "pipeline" && s.baseline === beat.baseline && chainSides(s.armKey)?.beat === beat.armKey);
     return chain ? { ...beat, turnLatencies: chain.turnLatencies } : beat;
   };
   const baselineBeat = find("beat");
@@ -280,6 +282,7 @@ export function renderResults(input: ResultsInput): string {
       lines.push("");
     }
     lines.push("### Views: single-player with and without pregeneration, multiplayer, setup", ...renderViews(stats, promptState));
+    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState)));
   }
   if (input.prose) {
     lines.push("", "## Prose aggregates (beats)", "", "| Arm | Beats | Distinct openings | Opens with \"You\" | Stock phrases / 1000 words |", "|---|---|---|---|---|");

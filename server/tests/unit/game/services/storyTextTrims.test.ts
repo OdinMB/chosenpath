@@ -386,10 +386,13 @@ describe("a trimmed reply works in production code", () => {
     expect(Object.keys(parsed)).toEqual(["coordinationPatternSummary", "switches"]);
     expect(Object.keys(parsed.switches[0])).not.toContain("relevantSuggestedThreadTypes");
 
-    const prompt = beatStep.request(switchStep.apply(story, parsed)).prompt;
+    const next = switchStep.apply(story, parsed);
+    const prompt = beatStep.request(next).prompt;
     for (const text of [reply.coordinationPatternSummary, "The only switch in this turn.", "The Lighthouse Gambit", ...topicChoices]) {
       expect(prompt).toContain(text);
     }
+    // A Stage 3 chain builds the trimmed beat on this story
+    expect(fromMarker(trimmedBeatRequest(next, "minimal").prompt, STATE_MARKER)).toBe(fromMarker(prompt, STATE_MARKER));
   });
 
   it("thread, minimal: thread types, duration and production's thread beat", () => {
@@ -415,6 +418,7 @@ describe("a trimmed reply works in production code", () => {
     for (const text of ["Storming the Archive", question, "The ledger is theirs", "The ledger burns"]) {
       expect(prompt).toContain(text);
     }
+    expect(fromMarker(trimmedBeatRequest(next, "minimal").prompt, STATE_MARKER)).toBe(fromMarker(prompt, STATE_MARKER));
   });
 
   it.each(SETUP_INPUTS)("setup, minimal, %i players: every field story creation reads is kept", (players, gameMode) => {

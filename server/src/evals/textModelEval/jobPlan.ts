@@ -5,9 +5,11 @@ import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import {
   armsFor,
   baselineArm,
+  chainKey,
   estimateCall,
-  PIPELINE_ANALYSIS_ARM,
-  pipelineBeatArms,
+  MIN_MEASURED_RECORDS,
+  pipelinePlan,
+  prodSiblingKey,
   type Arm,
   type ArmPlan,
   type EvalRole,
@@ -19,10 +21,11 @@ import { requestFor, type RequestInput } from "./variants.js";
 
 /*
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
- * case's baseline, the candidate arms (all cases or the 15-case subset),
- * the rare-failure batch, and pipeline chains (analysis, then the beat
- * built from it) in pipeline mode. Filters narrow the plan; estimates use
- * measured output sizes once there are enough.
+ * case's baseline, the candidate arms on their scope (all cases, the 15-case
+ * subset, single-player cases, or a case list), the rare-failure batch, and
+ * pipeline chains (analysis, then the beat built from it) in pipeline mode.
+ * Filters narrow the plan; estimates use measured output sizes once there
+ * are enough, and a new variant borrows its prod sibling's until then.
  */
 
 export type PlanOptions = {
@@ -85,6 +88,18 @@ export function measuredOutputs(records: CallRecord[]): Map<string, number[]> {
   return measured;
 }
 
+/**
+ * The arm's own measured outputs once it has MIN_MEASURED_RECORDS; until then
+ * its prod sibling's (a trim writes less than its full form, so this errs
+ * high), else whatever it has.
+ */
+function measuredFor(measured: Map<string, number[]>, role: EvalRole, arm: Arm): number[] | undefined {
+  const own = measured.get(`${role}|${arm.key}`);
+  if ((own?.length ?? 0) >= MIN_MEASURED_RECORDS) return own;
+  const sibling = prodSiblingKey(arm.key);
+  return (sibling ? measured.get(`${role}|${sibling}`) : undefined) ?? own;
+}
+
 function planned(
   role: EvalRole,
   arm: Arm,
@@ -105,7 +120,7 @@ function planned(
       arm,
       players,
       promptChars: promptChars ?? requestChars(request()),
-      measuredOutputTokens: measured.get(`${role}|${arm.key}`),
+      measuredOutputTokens: measuredFor(measured, role, arm),
     }),
   };
 }
@@ -142,13 +157,13 @@ function chainJob(
     arm: beatArm,
     players,
     promptChars: beatPromptChars,
-    measuredOutputTokens: measured.get(`beat|${beatArm.key}`),
+    measuredOutputTokens: measuredFor(measured, "beat", beatArm),
   });
   return {
     stage: options.stage,
     promptState: options.promptState,
     caseId: evalCase.id,
-    armKey: `pipeline:${analysisArm.key}>${beatArm.key}`,
+    armKey: chainKey(analysisArm.key, beatArm.key),
     sample,
     baseline: analysisArm.baseline && beatArm.baseline,
     group: "pipeline",
@@ -181,14 +196,21 @@ function isMultiplayerContinuation(c: EvalCase): boolean {
   return c.role === "beat" && c.tags.multiplayer && !c.tags.firstBeat && !c.tags.ending;
 }
 
-/** The role's cases after the filters; the 15-case subset narrows beats only. */
-function casesFor(cases: EvalCase[], role: EvalRole, options: PlanOptions, scope: ArmPlan["scope"] = "all"): EvalCase[] {
-  const subsetOnly = role === "beat" && (options.subset15 || scope === "subset15");
+/** The role's cases after the filters and the arm's scope and case list; the 15-case subset narrows beats only. */
+function casesFor(
+  cases: EvalCase[],
+  role: EvalRole,
+  options: PlanOptions,
+  plan: Pick<ArmPlan, "scope" | "caseIds"> = { scope: "all" }
+): EvalCase[] {
+  const subsetOnly = role === "beat" && (options.subset15 || plan.scope === "subset15");
   return cases.filter(
     (c) =>
       c.role === role &&
       (!options.caseIds || options.caseIds.includes(c.id)) &&
+      (!plan.caseIds || plan.caseIds.includes(c.id)) &&
       (!subsetOnly || c.tags.subset15) &&
+      !(plan.scope === "single-player" && c.tags.multiplayer) &&
       !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
   );
 }
@@ -208,7 +230,7 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
   }
   for (const plan of armsFor(options.stage, role)) {
     if (!armAllowed(options, plan.arm.key)) continue;
-    const scoped = casesFor(cases, role, options, plan.scope);
+    const scoped = casesFor(cases, role, options, plan);
     const samples = options.samples ?? plan.samples;
     for (const evalCase of regular ? scoped : []) {
       for (let sample = 1; sample <= samples; sample++) jobs.push(callJob(options, evalCase, plan.arm, sample, measured));
@@ -229,19 +251,21 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
     ? [...beatCases.map((c) => requestChars(requestFor("prod", inputFor(c))))].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
     : 80_000;
   const jobs: Job[] = [];
-  const samples = options.samples ?? DEFAULT_BASELINE_SAMPLES;
-  for (const evalCase of casesFor(cases, role, options)) {
-    const pairs: [Arm, Arm][] = [
-      [baselineArm(role, evalCase.tags.multiplayer, options.env), baselineArm("beat", evalCase.tags.multiplayer, options.env)],
-      ...pipelineBeatArms(options.stage).map((beat): [Arm, Arm] => [PIPELINE_ANALYSIS_ARM, beat]),
-    ];
-    for (const [analysisArm, beatArm] of pairs) {
-      const key = `pipeline:${analysisArm.key}>${beatArm.key}`;
-      if (options.armKeys && !options.armKeys.includes(key) && !options.armKeys.includes(beatArm.key)) continue;
-      for (let sample = 1; sample <= samples; sample++) {
-        jobs.push(chainJob(options, evalCase, analysisArm, beatArm, sample, measured, beatChars));
-      }
+  const plan = pipelinePlan(options.stage);
+  const candidateCases = new Set(plan ? casesFor(cases, role, options, plan).map((c) => c.id) : []);
+  const chains = (evalCase: EvalCase, analysisArm: Arm, beatArm: Arm, samples: number) => {
+    const key = chainKey(analysisArm.key, beatArm.key);
+    if (options.armKeys && !options.armKeys.includes(key) && !options.armKeys.includes(beatArm.key)) return;
+    for (let sample = 1; sample <= samples; sample++) {
+      jobs.push(chainJob(options, evalCase, analysisArm, beatArm, sample, measured, beatChars));
     }
+  };
+  // Per case: the baseline chain (every case), then the stage's candidate chains (their scope)
+  for (const evalCase of casesFor(cases, role, options)) {
+    const multiplayer = evalCase.tags.multiplayer;
+    chains(evalCase, baselineArm(role, multiplayer, options.env), baselineArm("beat", multiplayer, options.env), options.samples ?? DEFAULT_BASELINE_SAMPLES);
+    if (!plan || !candidateCases.has(evalCase.id)) continue;
+    for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
   }
   return jobs;
 }

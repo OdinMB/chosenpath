@@ -6,8 +6,8 @@ import { modelAttemptsByStep, validityReading, type ValidityReading } from "./va
 
 /*
  * Per-arm statistics from the call records and the automatic checks:
- * validity, rule rates and their noise floor, latencies, tokens and cost on
- * the billed and the uncached basis.
+ * validity, rule rates and their noise floor, latencies, tokens, state counts
+ * and cost on the billed and the uncached basis.
  */
 
 type Quantiles = { n: number; p50?: number; p95?: number };
@@ -51,7 +51,10 @@ export type ArmStats = {
   /** Single-player pipeline chains: analysis plus beat */
   turnLatencies: number[];
   latencyByPlayers: Record<number, number[]>;
-  medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number };
+  /** visible = output minus reasoning */
+  medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; visible: number };
+  /** check count name -> mean over usable final calls whose check reports it (facts, newElements, switches, …) */
+  meanCounts: Record<string, number>;
   cost: Record<CostBasis, CostReading>;
 };
 
@@ -96,6 +99,19 @@ function ruleRatesOf(records: CallRecord[], checks: Map<string, CheckResult>): R
     }
   }
   return Object.fromEntries(Object.entries(passes).map(([name, p]) => [name, rate(p.ok, p.n)]));
+}
+
+function meanCountsOf(records: CallRecord[], checks: Map<string, CheckResult>): Record<string, number> {
+  const sums: Record<string, { total: number; n: number }> = {};
+  for (const record of records) {
+    const result = record.outputFile ? checks.get(record.outputFile) : undefined;
+    for (const [name, value] of Object.entries(result?.counts ?? {})) {
+      sums[name] ??= { total: 0, n: 0 };
+      sums[name].total += value;
+      sums[name].n++;
+    }
+  }
+  return Object.fromEntries(Object.entries(sums).map(([name, s]) => [name, s.total / s.n]));
 }
 
 function uncachedCost(r: CallRecord): number {
@@ -184,9 +200,20 @@ export function armStatsOf(
       cacheWrite: median(good.map((r) => r.cacheWriteTokens)),
       output: median(good.map((r) => r.outputTokens)),
       reasoning: median(good.map((r) => r.reasoningTokens)),
+      visible: median(good.map((r) => r.outputTokens - r.reasoningTokens)),
     },
+    meanCounts: meanCountsOf(good, checks),
     cost: { billed: costReading(records, PRICE.billed), uncached: costReading(records, PRICE.uncached) },
   };
+}
+
+/**
+ * Whether a record counts towards an arm's results: frozen cases only (case
+ * building on other inputs counts as spend, not as results), and chains by
+ * their beat step.
+ */
+export function isResultRecord(record: CallRecord, tags: Map<string, CaseTags>): boolean {
+  return tags.has(record.caseId) && (record.group !== "pipeline" || record.step === 2);
 }
 
 /** One entry per prompt state, group and arm, over the frozen cases. Chains are summarised by their beat step. */
@@ -197,9 +224,7 @@ export function computeArmStats(
 ): ArmStats[] {
   const groups = new Map<string, CallRecord[]>();
   for (const record of records) {
-    // Case-building calls on inputs that are not frozen cases count as spend, not as results
-    if (!tags.has(record.caseId)) continue;
-    if (record.group === "pipeline" && record.step !== 2) continue;
+    if (!isResultRecord(record, tags)) continue;
     const key = `${record.promptState}|${record.group}|${record.armKey}`;
     groups.set(key, [...(groups.get(key) ?? []), record]);
   }

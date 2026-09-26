@@ -31,7 +31,10 @@ export type Arm = TextModelSettings & {
 export type ArmPlan = {
   arm: Arm;
   samples: number;
-  scope: "all" | "subset15";
+  /** subset15 narrows beats only; single-player leaves out multiplayer cases of any role */
+  scope: "all" | "subset15" | "single-player";
+  /** Only these cases (still intersected with --cases) */
+  caseIds?: string[];
   /** Rare-failure batch: this many extra single-sample calls spread over the cases */
   extraCalls?: number;
 };
@@ -64,6 +67,28 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
   return `${settings.model}@${setting}${verbosity}/${variant}`;
 }
 
+/**
+ * The full form of a trimmed arm: the same model and setting with the
+ * "prod" variant. Undefined for a prod key and for anything that is not
+ * an arm key (a pipeline chain's key, for one).
+ */
+export function prodSiblingKey(key: string): string | undefined {
+  const match = /^([^@/>]+@[^@/>]+)\/(\w+)$/.exec(key);
+  if (!match || match[2] === "prod") return undefined;
+  return `${match[1]}/prod`;
+}
+
+/** A pipeline chain's key: "pipeline:<analysis arm key>><beat arm key>". */
+export function chainKey(analysisKey: string, beatKey: string): string {
+  return `pipeline:${analysisKey}>${beatKey}`;
+}
+
+/** The two arm keys of a chain key; undefined for anything else. */
+export function chainSides(key: string): { analysis: string; beat: string } | undefined {
+  const match = /^pipeline:([^>]+)>([^>]+)$/.exec(key);
+  return match ? { analysis: match[1], beat: match[2] } : undefined;
+}
+
 export function makeArm(
   settings: TextModelSettings,
   variant: VariantId = "prod",
@@ -83,23 +108,46 @@ export function baselineArm(role: EvalRole, multiplayer: boolean, env: Env = pro
   return makeArm(settingsFor(config, productionRole(role), { multiplayer }), "prod", true);
 }
 
-const luna = (effort: ReasoningEffort) => makeArm({ model: "gpt-6-luna", reasoningEffort: effort });
-const sol = (effort: ReasoningEffort) => makeArm({ model: "gpt-6-sol", reasoningEffort: effort });
-
-/** The Luna effort the pipeline chains use for their analysis call (as in the lead configurations). */
-export const PIPELINE_ANALYSIS_ARM = luna("low");
+const luna = (effort: ReasoningEffort, variant: VariantId = "prod") =>
+  makeArm({ model: "gpt-6-luna", reasoningEffort: effort }, variant);
+const sol = (effort: ReasoningEffort, variant: VariantId = "prod") =>
+  makeArm({ model: "gpt-6-sol", reasoningEffort: effort }, variant);
 
 export const RARE_FAILURE_CALLS_PER_ARM = 50;
 
 /**
- * Candidate arms (the baseline runs separately, first). Stage 1-2 follows the
- * owner decisions of 2026-09-26; Stages 3 and 4 need variants that later
- * milestones add, so they have no arms yet.
+ * Stage 3's Sol setup premises: 3 per player count, every multiplayer game
+ * mode, a Kids premise and three dark ones (frozen setup case ids).
+ */
+export const STAGE3_SETUP_PREMISES = [
+  "setup-pretend-er-doctor",
+  "setup-custom-neo-tokyo",
+  "setup-learn-lemonade",
+  "setup-fiction-bounty-hunters",
+  "setup-kids-animal-rescue",
+  "setup-flexible-soul-flat",
+  "setup-vent-berlin-flat",
+  "setup-flexible-secret-society",
+  "setup-pretend-cofounders",
+];
+
+/**
+ * Candidate arms (the baseline runs separately, first), one static matrix per
+ * stage. Stage 1-2 follows the owner decisions of 2026-09-26, Stage 3 the
+ * coordinator's carry-forward (Milestone 3). Stage 4 has no arms yet.
  */
 export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
-  if (stage !== "1-2") {
-    return [];
+  switch (stage) {
+    case "1-2":
+      return stage12Arms(role);
+    case "3":
+      return stage3Arms(role);
+    default:
+      return [];
   }
+}
+
+function stage12Arms(role: EvalRole): ArmPlan[] {
   switch (role) {
     case "setup":
       return [
@@ -131,9 +179,53 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
   }
 }
 
-/** Beat arms that run as pipeline chains after PIPELINE_ANALYSIS_ARM. */
-export function pipelineBeatArms(stage: Stage): Arm[] {
-  return stage === "1-2" ? [luna("none"), luna("low"), luna("medium")] : [];
+/**
+ * Stage 3: the trimmed variants (slim, minimal) of the carry-forward arms.
+ * Their full forms are the Stage 1-2 prod arms. In this order, so a cap stop
+ * cuts the Luna none control first.
+ */
+function stage3Arms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "setup":
+      return [
+        { arm: sol("low", "minimal"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+        { arm: luna("low", "minimal"), samples: 2, scope: "all" },
+      ];
+    case "beat":
+      return [
+        { arm: luna("medium", "minimal"), samples: 2, scope: "single-player" },
+        { arm: luna("medium", "slim"), samples: 2, scope: "single-player" },
+        { arm: luna("low", "minimal"), samples: 2, scope: "single-player" },
+        { arm: luna("low", "slim"), samples: 2, scope: "single-player" },
+        { arm: luna("none", "minimal"), samples: 2, scope: "single-player" },
+      ];
+    case "switch":
+    case "thread":
+      return [{ arm: luna("low", "minimal"), samples: 2, scope: "all" }];
+    case "iteration":
+      return [];
+  }
+}
+
+/** Pipeline chains: this analysis arm, then each beat arm built from its output. */
+export type PipelinePlan = { analysis: Arm; beats: Arm[]; samples: number; scope: ArmPlan["scope"] };
+
+/** The stage's candidate chains (the baseline chain runs in every stage). */
+export function pipelinePlan(stage: Stage): PipelinePlan | undefined {
+  switch (stage) {
+    case "1-2":
+      // Luna low analysis, as in the lead configurations
+      return { analysis: luna("low"), beats: [luna("none"), luna("low"), luna("medium")], samples: 2, scope: "all" };
+    case "3":
+      return {
+        analysis: luna("low", "minimal"),
+        beats: [luna("medium", "minimal"), luna("low", "minimal")],
+        samples: 1,
+        scope: "single-player",
+      };
+    default:
+      return undefined;
+  }
 }
 
 type Price = { input: number; cached: number; cacheWrite: number; output: number };

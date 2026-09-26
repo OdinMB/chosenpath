@@ -4,6 +4,7 @@ import {
   estimateCall,
   makeArm,
   MIN_MEASURED_RECORDS,
+  prodSiblingKey,
 } from "../../../../src/evals/textModelEval/arms.js";
 import {
   budgetCheck,
@@ -33,6 +34,13 @@ describe("arm keys and estimates", () => {
     expect(armKey({ model: "gpt-6-luna", reasoningEffort: "medium" }, "prod")).toBe("gpt-6-luna@medium/prod");
     expect(armKey({ model: "gpt-4.1-mini", temperature: 0.2 }, "prod")).toBe("gpt-4.1-mini@t0.2/prod");
     expect(armKey({ model: "gpt-6-sol", reasoningEffort: "low", verbosity: "low" }, "prod")).toBe("gpt-6-sol@low+vlow/prod");
+  });
+
+  it("maps a trimmed arm to its full (prod) form, and nothing else", () => {
+    expect(prodSiblingKey("gpt-6-luna@medium/minimal")).toBe("gpt-6-luna@medium/prod");
+    expect(prodSiblingKey("gpt-6-sol@low+vlow/slim")).toBe("gpt-6-sol@low+vlow/prod");
+    expect(prodSiblingKey("gpt-6-luna@medium/prod")).toBeUndefined();
+    expect(prodSiblingKey("pipeline:gpt-6-luna@low/minimal>gpt-6-luna@medium/minimal")).toBeUndefined();
   });
 
   it("switches from the table to measured medians once enough records exist", () => {

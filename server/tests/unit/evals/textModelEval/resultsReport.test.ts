@@ -34,7 +34,8 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
     beatOnlyLatencies: [10, 12, 20],
     turnLatencies: [],
     latencyByPlayers: {},
-    medianTokens: { input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0 },
+    medianTokens: { input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, visible: 0 },
+    meanCounts: {},
     ...priced(0.01),
     ...overrides,
   };
@@ -183,5 +184,22 @@ describe("computeArmStats", () => {
     expect(stats.noiseFloor.paragraphs).toBeCloseTo(0.5);
     // Only the case without analysis counts as a beat-only turn
     expect(stats.beatOnlyLatencies).toEqual([10, 10]);
+  });
+
+  it("averages the checks' state counts over usable final calls, and reads visible tokens as output minus reasoning", () => {
+    const checks = new Map<string, CheckResult>([
+      ["o1", { checks: {}, counts: { facts: 2, threads: 1 }, unknownIds: [] }],
+      ["o2", { checks: {}, counts: { facts: 4 }, unknownIds: [] }],
+      ["o3", { checks: {}, counts: { facts: 90 }, unknownIds: [] }],
+    ]);
+    const records = [
+      record({ jobKey: "a", caseId: "a", outputFile: "o1", outputTokens: 1_500, reasoningTokens: 500 }),
+      record({ jobKey: "b", caseId: "a", outputFile: "o2", outputTokens: 1_500, reasoningTokens: 500 }),
+      // An unusable final call does not count
+      record({ jobKey: "c", caseId: "a", outputFile: "o3", outcome: "invalid-json" }),
+    ];
+    const [stats] = computeArmStats(records, checks, new Map([["a", tags()]]));
+    expect(stats.meanCounts).toEqual({ facts: 3, threads: 1 });
+    expect(stats.medianTokens.visible).toBe(1_000);
   });
 });
