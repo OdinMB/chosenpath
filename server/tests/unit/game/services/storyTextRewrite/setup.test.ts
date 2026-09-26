@@ -45,11 +45,24 @@ describe("rewriteSetupRequest", () => {
     expect(withExamples.replace(section, "")).toBe(rewrite(players, mode, false).fixed);
   });
 
-  it("carries production's example stat setups byte for byte", () => {
-    const examples = productionExamples(production(1, GameModes.SinglePlayer).prompt);
-    expect(examples.startsWith("Premise:")).toBe(true);
-    expect(production(1, GameModes.SinglePlayer).prompt).toContain(examples);
-    expect(rewrite(1, GameModes.SinglePlayer, true).fixed).toContain(examples);
+  it.each([[1, GameModes.SinglePlayer], [3, GameModes.Cooperative]] as [PlayerCount, GameMode][])(
+    "%i players, %s: the examples section is production's slice between its two headings, byte for byte",
+    (players, mode) => {
+      // Worked out here from literal anchors, not through the code under test
+      const prompt = production(players, mode).prompt;
+      const from = "EXAMPLE STAT SETUPS";
+      const expected = prompt.slice(prompt.indexOf(from) + from.length, prompt.indexOf("Character Selection Instructions")).trim();
+      expect(productionExamples(prompt)).toBe(expected);
+      expect(expected).toContain("Premise: Nature spirits guard the forest");
+      expect(expected).toContain("Premise: The last rock band on Mars");
+      expect(expected.endsWith("Initial value: 70")).toBe(true);
+      expect(rewrite(players, mode, true).fixed).toContain(`\n\n${EXAMPLES_HEADING}\n\n${expected}\n\n7. Characters`);
+    }
+  );
+
+  it("refuses production's prompt when an examples heading occurs more than once before the configuration", () => {
+    const prompt = "EXAMPLE STAT SETUPS a EXAMPLE STAT SETUPS b Character Selection Instructions c Number of players: 1";
+    expect(() => productionExamples(prompt)).toThrow('"EXAMPLE STAT SETUPS" found 2 times before the configuration');
   });
 
   it.each(CASES)("with examples %s, %i players, %s: the per-call message is production's configuration block, premise included", (withExamples, players, mode) => {
@@ -161,5 +174,38 @@ describe("stated once, without shouting (the examples and the configuration bloc
     const texts = [fixed, ...descriptionsOf(toJsonSchema(request.schema))];
     expect(repeatedSentences(texts)).toEqual([]);
     expect(texts.flatMap(allCapsWords)).toEqual([]);
+  });
+});
+
+/**
+ * Clauses of production's field descriptions that restate a rule the
+ * rewrite's fixed text carries. The exact-sentence check cannot see a
+ * paraphrase, so they are pinned by name: the rewrite's descriptions leave
+ * them out.
+ */
+const RESTATED_BY_PRODUCTION_DESCRIPTIONS = [
+  "Generate 3-4 visible shared stats",
+  "Generate 3-4 visible player stats",
+  "consider adding an opposite stat to track who is in the lead",
+  "As a general tendency, favor string and string[]",
+  "Must be specific and immediately convey the stat's meaning and function",
+  "Set to false for hidden mechanics",
+  "Set to false if the player stat should always have the same initial value",
+  "Don't use stats to directly track progress toward outcomes",
+  "make sure that the backgrounds don't overlap",
+  "no option being clearly better than another",
+];
+
+describe("no rule in the fixed text is restated in a field description", () => {
+  it.each(INPUTS)("%i players, %s", (players, mode) => {
+    const inProduction = descriptionsOf(toJsonSchema(production(players, mode).schema)).join("\n");
+    const inRewrite = descriptionsOf(toJsonSchema(rewrite(players, mode, true).schema)).join("\n");
+    for (const clause of RESTATED_BY_PRODUCTION_DESCRIPTIONS) {
+      expect({ clause, inProduction: inProduction.includes(clause), inRewrite: inRewrite.includes(clause) }).toEqual({
+        clause,
+        inProduction: true,
+        inRewrite: false,
+      });
+    }
   });
 });

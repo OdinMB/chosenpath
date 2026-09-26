@@ -214,4 +214,45 @@ describe("stated once, without shouting", () => {
     expect(repeatedSentences(texts)).toEqual([]);
     expect(texts.flatMap(allCapsWords)).toEqual([]);
   });
+
+  it("asks for facts only from the second beat on, since the first beat adds none", () => {
+    const first = rewriteBeatRequest(firstSwitchBeat(1), "slim");
+    expect(first.perCall).toContain("Add no new story elements and no new facts");
+    expect(first.fixed).toMatch(/from the second beat on, 3 or more per switch and per thread step/);
+  });
+});
+
+/**
+ * Clauses of production's field descriptions that restate a rule the
+ * rewrite's prompt carries. The exact-sentence check cannot see a
+ * paraphrase, so they are pinned by name: the rewrite's descriptions leave
+ * them out.
+ */
+const RESTATED_BY_PRODUCTION_DESCRIPTIONS = [
+  "If a switch: [title of the switch]",
+  "Create one item for each outcome of each thread that has been concluded",
+  "Include stat sacrifices and rewards",
+  "'adjustments after threads' parameters",
+  "that is likely to be used in later beats",
+  "that are likely to be used in later beats",
+  "Plan a detail that makes the player curious",
+  "Use 'world' as the story element",
+];
+
+describe("no rule in the prompt is restated in a field description", () => {
+  const productionDescriptions = (story: Story) => descriptionsOf(toJsonSchema(beatStep.request(story).schema)).join("\n");
+
+  it("every pinned clause is production's (a later switch on the full scaffold carries them all)", () => {
+    const production = productionDescriptions(laterSwitchBeat(1));
+    for (const clause of RESTATED_BY_PRODUCTION_DESCRIPTIONS) {
+      expect({ clause, inProduction: production.includes(clause) }).toEqual({ clause, inProduction: true });
+    }
+  });
+
+  it.each(CASES)("%s, %s", (scaffold, _, build) => {
+    const schema = partsOf(build(), scaffold).schema;
+    for (const clause of RESTATED_BY_PRODUCTION_DESCRIPTIONS) {
+      expect({ clause, inRewrite: schema.includes(clause) }).toEqual({ clause, inRewrite: false });
+    }
+  });
 });

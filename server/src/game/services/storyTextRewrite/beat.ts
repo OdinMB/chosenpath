@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION } from "../prompts/BeatPromptService.js";
 import { beatStep } from "../storyTextSteps.js";
-import { asArray, asDiscriminatedUnion, asObject, asUnion, textFrom, type SplitTextRequest } from "./common.js";
+import { asArray, asDiscriminatedUnion, asObject, asUnion, reworded, textFrom, type SplitTextRequest } from "./common.js";
 
 /*
  * Stage 4 of the text-model eval: the single-player beat request rewritten
@@ -10,7 +10,8 @@ import { asArray, asDiscriminatedUnion, asObject, asUnion, textFrom, type SplitT
  * cache) state each rule once; the per-call message holds this beat's
  * branch instructions, then production's story state verbatim; the schema
  * is production's field set and key order with the named descriptions
- * rewritten and the array counts enforced. Eval only: the harness's
+ * rewritten, the rules the prompt states cut from the others, and the array
+ * counts enforced. Eval only: the harness's
  * variants.ts is the one caller, and production keeps storyTextSteps.ts.
  */
 
@@ -68,7 +69,7 @@ const BEAT_FIXED = [
   "- Within a thread, only stats marked as changeable in beat resolutions change (sacrifices and rewards aside), and only a little.",
   "- Add a new story element only when it is likely to come back in later beats; most beats add none. NPCs and locations are the usual kinds, and items, organizations, mysteries, conflicts, rumors and projects work too.",
   "- When the player meets a story element for the first time, introduce it properly and record the introduction. Refer to elements the player already knows without introducing them again.",
-  "- Record only facts that the story state does not hold yet, 3 or more per switch and per thread step. Link each fact to the element it is about, and use world only when no element fits. Elements created in this beat get no facts.",
+  "- Record only facts that the story state does not hold yet: from the second beat on, 3 or more per switch and per thread step. Link each fact to the element it is about, and use world only when no element fits. Elements created in this beat get no facts.",
   "- Plant one detail in the world that makes the player curious without explaining what is going on.",
   "",
   "Options",
@@ -264,12 +265,32 @@ function rewrittenPlan(plan: z.AnyZodObject, scaffold: RewriteScaffold): z.AnyZo
     .describe(
       "The most important actions and developments this beat covers, each with a short pointer on how to show it rather than tell it (concrete actions, direct speech). From the second beat on, the first is the player carrying out the action they chose, and how it plays out."
     );
-  if (scaffold === "full") return plan.extend({ showDontTell });
+  // The fixed rules state when to add an element and how to link a fact; these descriptions keep what the field holds
+  const kept = {
+    showDontTell,
+    newGameElements: reworded(
+      asArray(plan.shape.newGameElements, "newGameElements"),
+      " Only use this if a new story element is to be created in this beat that is likely to be used in later beats.",
+      ""
+    ),
+    establishedFacts: reworded(
+      asArray(plan.shape.establishedFacts, "establishedFacts"),
+      " Use 'world' as the story element if you want to add a fact that doesn't belong to any specific story element.",
+      ""
+    ),
+  };
+  if (scaffold === "full") {
+    const worldBuilding = [
+      " Check if you should add a new story element to the story state that are likely to be used in later beats.",
+      " Plan a detail that makes the player curious about a detail in the world without spelling out what's going on.",
+    ].reduce<z.ZodTypeAny>((schema, passage) => reworded(schema, passage, ""), plan.shape.worldBuilding);
+    return plan.extend({ ...kept, worldBuilding });
+  }
   const considerations = asUnion(plan.shape.optionConsiderations, "optionConsiderations");
   const [asText, detailed] = considerations.options;
   const slimConsiderations = z.union([asText, asObject(detailed, "optionConsiderations object").omit(omitting(SLIM_DROPPED_OPTION_CHECKS))]);
   return plan.omit(omitting(SLIM_DROPPED_PLAN_STRINGS)).extend({
-    showDontTell,
+    ...kept,
     optionConsiderations:
       considerations.description === undefined ? slimConsiderations : slimConsiderations.describe(considerations.description),
   });
@@ -282,6 +303,8 @@ function rewrittenPlayer(player: z.AnyZodObject, story: Story, scaffold: Rewrite
   const imageRequest: z.ZodTypeAny | undefined = player.shape.imageRequest;
   return player.extend({
     plan: rewrittenPlan(asObject(player.shape.plan, "plan"), scaffold),
+    // The per-call instructions name this beat's title
+    title: player.shape.title.describe("The beat's title, as this beat's instructions give it."),
     ...(imageRequest ? { imageRequest: imageRequest.describe(`${imageRequest.description ?? ""} ${IMAGE_REQUEST_ADDITION}`) } : {}),
     text: player.shape.text.describe(textDescription(story)),
     options: ending
@@ -294,7 +317,20 @@ function rewrittenPlayer(player: z.AnyZodObject, story: Story, scaffold: Rewrite
 function rewrittenSchema(production: z.AnyZodObject, story: Story, scaffold: RewriteScaffold): z.AnyZodObject {
   const root =
     scaffold === "slim" ? production.omit(omitting(["statsAffectingDecisionConsequences", "multiplayerCoordination"])) : production;
-  return root.extend({ player1: rewrittenPlayer(asObject(production.shape.player1, "player1"), story, scaffold) });
+  // The fixed rules and the thread-resolved instruction carry the sacrifice, reward, adjustment and milestone rules
+  const milestones: z.ZodTypeAny = production.shape.newMilestones;
+  return root.extend({
+    statChanges: reworded(
+      asArray(production.shape.statChanges, "statChanges"),
+      " Include stat sacrifices and rewards if players chose these types of options. If an entire thread was just resolved, remember to check all stat's 'adjustments after threads' parameters (more meaningful changes to stats might be warrented).",
+      ""
+    ),
+    // An empty literal when no thread was resolved
+    ...(milestones instanceof z.ZodArray
+      ? { newMilestones: reworded(milestones, " Create one item for each outcome of each thread that has been concluded.", "") }
+      : {}),
+    player1: rewrittenPlayer(asObject(production.shape.player1, "player1"), story, scaffold),
+  });
 }
 
 /** The Stage 4 request for a single-player beat; a multiplayer story throws. */

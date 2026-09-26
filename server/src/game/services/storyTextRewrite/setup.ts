@@ -10,7 +10,8 @@ import { asArray, asObject, reworded, textBetween, textFrom, type SplitTextReque
  * cache); the with-examples arm adds production's example stat setups
  * verbatim. The per-call message is production's configuration block with
  * the premise, verbatim. The schema is production's story-kind setup schema
- * with array counts enforced and the counts dropped from the descriptions.
+ * with array counts enforced, and with the counts and the rules the fixed
+ * text states dropped from the descriptions.
  * Eval only: the harness's variants.ts is the one caller.
  */
 
@@ -56,7 +57,7 @@ function statLines(multiplayer: boolean): string[] {
     "- The mix of stats sets the story's focus: in a space opera, three percentage stats for relationships with crew members make the story about those relationships, while a string[] stat for crew morale puts the focus elsewhere.",
     "- Vary the stat types. For a teenage wizard story: a string[] for friends, a string for the love interest, a string[] for mastered spells, a string for reputation at school, a percentage for academic performance and a number for pocket money.",
     "- Use a shared stat for what is the same for all players: when the players share a ship, its fuel level is shared. When the players keep a relationship with an NPC as a group, that relationship is a shared stat; when only one player has it, it is a player stat.",
-    "- Hide the stats the player should not see with isVisible.",
+    "- Hide with isVisible the stats the player should not see: hidden mechanics, story flags and future reveals.",
     '- Set partOfPlayerBackgrounds to false for a player stat that starts the same whichever background the player picks: health starts as "unscathed", or status as "Neonate".',
     '- A stat\'s name tells the player at once what it is for; when a name cannot convey the stat\'s meaning and function, leave the stat out. Names are specific and have no placeholders (not "Relationship with NPC": which NPC?).',
     `- Leave to the game's other mechanics what they already track: progress towards outcomes (milestones track it${multiplayer ? ", except for contested outcomes in multiplayer games" : ""}), the remaining turns, and ordinary player decisions.`,
@@ -148,6 +149,10 @@ function once<T extends z.ZodTypeAny>(rewrite: (production: z.ZodTypeAny) => T):
   };
 }
 
+/** The schema with each passage cut from its description; every passage must occur exactly once. */
+const without = <T extends z.ZodTypeAny>(schema: T, ...passages: string[]): T =>
+  passages.reduce((result, passage) => reworded(result, passage, ""), schema);
+
 function rewrittenStat(stat: z.ZodTypeAny): z.AnyZodObject {
   const object = asObject(stat, "stat");
   const effects = reworded(
@@ -159,11 +164,36 @@ function rewrittenStat(stat: z.ZodTypeAny): z.AnyZodObject {
     "\nRemember: at least 3 items in this list!",
     ""
   );
-  return object.extend({ effectOnPoints: effects.min(3) });
+  // The fixed rules (section 4) carry the type preference, naming, visibility, backgrounds and outcome-tracking rules
+  return without(
+    object.extend({
+      type: without(
+        object.shape.type,
+        "\nAs a general tendency, favor string and string[] over percentage/opposites/number unless for countable things whose management is central to the story (number), and percentages/opposites for aspects that must be managed by the player often and granularly."
+      ),
+      name: without(object.shape.name, "\n- Must be specific and immediately convey the stat's meaning and function."),
+      effectOnPoints: effects.min(3),
+      isVisible: object.shape.isVisible.describe("Whether this stat is visible to the player."),
+      partOfPlayerBackgrounds: without(
+        object.shape.partOfPlayerBackgrounds,
+        "\nSet to false if the player stat should always have the same initial value no matter the background that the player chooses."
+      ),
+    }),
+    "\nDon't use stats to directly track progress toward outcomes. (This is done separately.) Exception: Contested outcomes in multiplayer games."
+  );
+}
+
+/** Production's background with the multiplayer rule the fixed rules (sections 4 and 7) carry left out of its description. */
+function rewrittenBackground(background: z.ZodTypeAny): z.AnyZodObject {
+  return without(
+    asObject(background, "character background"),
+    " For multiplayer games, make sure that the backgrounds don't overlap and that the background options for different players are consistent with each other."
+  );
 }
 
 function rewrittenPlayer(player: z.ZodTypeAny): z.AnyZodObject {
   const object = asObject(player, "player");
+  const backgrounds = asArray(object.shape.possibleCharacterBackgrounds, "possibleCharacterBackgrounds");
   return object.extend({
     // sharedOutcomes carries the same sentence; the player's copy says it without repeating it
     outcomes: reworded(
@@ -174,11 +204,10 @@ function rewrittenPlayer(player: z.ZodTypeAny): z.AnyZodObject {
     possibleCharacterIdentities: asArray(object.shape.possibleCharacterIdentities, "possibleCharacterIdentities")
       .length(3)
       .describe("Identities the player can choose from."),
-    possibleCharacterBackgrounds: reworded(
-      asArray(object.shape.possibleCharacterBackgrounds, "possibleCharacterBackgrounds"),
-      "Generate exactly 3 possible backgrounds",
-      "Possible backgrounds"
-    ).length(3),
+    possibleCharacterBackgrounds: described(
+      z.array(rewrittenBackground(backgrounds.element)).length(3),
+      reworded(backgrounds, "Generate exactly 3 possible backgrounds", "Possible backgrounds")
+    ),
   });
 }
 
@@ -188,10 +217,10 @@ function rewrittenCharacterPlan(plan: z.AnyZodObject, multiplayer: boolean): z.A
     ...(multiplayer
       ? { multiplayerCoordination: reworded(coordination, " List three mechanisms", " Mechanisms").length(3) }
       : {}),
-    playerStatConversionRates: reworded(
-      asArray(plan.shape.playerStatConversionRates, "playerStatConversionRates"),
-      "List three rough conversion rates",
-      "Rough conversion rates"
+    // Section 7 of the fixed rules says the backgrounds balance
+    playerStatConversionRates: without(
+      reworded(asArray(plan.shape.playerStatConversionRates, "playerStatConversionRates"), "List three rough conversion rates", "Rough conversion rates"),
+      " This will help ensure that the background options for each player are balanced, with no option being clearly better than another."
     ).length(3),
     backgroundArchetypes: reworded(asArray(plan.shape.backgroundArchetypes, "backgroundArchetypes"), "Outline exactly 3 generic", "Outline generic").length(3),
   });
@@ -205,10 +234,8 @@ function rewrittenSchema(production: z.AnyZodObject, playerCount: PlayerCount): 
   const difficulty = asObject(shape.difficultyLevel, "difficultyLevel");
   const stat = once(rewrittenStat);
   const player = once(rewrittenPlayer);
-  const statList = (key: string) => {
-    const list = asArray(shape[key], key);
-    return described(z.array(stat(list.element)), list);
-  };
+  // Section 4 of the fixed rules gives the counts and what goes in each list; the descriptions keep what the field is
+  const statList = (key: string, description: string) => z.array(stat(asArray(shape[key], key).element)).describe(description);
   const slots = Object.keys(shape).filter((key) => PLAYER_SLOTS.includes(key));
   return production.extend({
     guidelines: guidelines.extend({
@@ -238,8 +265,8 @@ function rewrittenSchema(production: z.AnyZodObject, playerCount: PlayerCount): 
       elements
     ),
     statGroups: reworded(asArray(shape.statGroups, "statGroups"), " Maximum of 3 groups.", "").max(3),
-    sharedStats: statList("sharedStats"),
-    playerStats: statList("playerStats"),
+    sharedStats: statList("sharedStats", "Stats that are not tied to one player."),
+    playerStats: statList("playerStats", "Stats tied to one player. In multiplayer games, each player has their own values for them."),
     characterSelectionPlan: rewrittenCharacterPlan(asObject(shape.characterSelectionPlan, "characterSelectionPlan"), playerCount > 1),
     ...Object.fromEntries(slots.map((slot) => [slot, player(shape[slot])])),
   });
