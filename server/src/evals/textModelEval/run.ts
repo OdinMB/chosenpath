@@ -23,7 +23,7 @@ import { renderRatingPage } from "./ratingPage.js";
 import { planRatingSet, ratingSetFromKey, type ArmRef, type RatingKind } from "./ratingSets.js";
 import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
-import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, keyOf, runJobs, usable } from "./runner.js";
+import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable } from "./runner.js";
 import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 
 /*
@@ -379,7 +379,8 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
       buildSpent += result.records.reduce((sum, r) => sum + r.costUsd, 0);
       records.push(...result.records);
       if (result.stoppedReason) console.warn(`Stopped: ${result.stoppedReason}`);
-      const final = records.find((r) => r.jobKey === keyOf(job) && r.jobFinal);
+      // The record that finished the job, from this invocation or an earlier one (never a stale rejected request)
+      const final = finishingRecord(records, keyOf(job));
       return final && usable(final) ? files.loadOutput(final) : undefined;
     },
     log: (line) => console.log(line),

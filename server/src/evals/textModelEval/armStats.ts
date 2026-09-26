@@ -58,13 +58,15 @@ export type ArmStats = {
   medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; visible: number };
   /** check count name -> mean over usable final calls whose check reports it (facts, newElements, switches, …) */
   meanCounts: Record<string, number>;
+  /** Rejected requests (planned again, never billed) are not calls here, as in `calls` */
   cost: Record<CostBasis, CostReading>;
   /**
-   * Over all attempts: cached and cache-write shares of input tokens, the
-   * attempts that wrote a cache, and the distinct cache lines (split requests)
+   * Over all attempts but rejected requests: cached and cache-write shares of
+   * input tokens, the attempts that wrote a cache, and the distinct cache
+   * lines (split requests)
    */
   cache: { readShare: number; writeShare: number; writingCalls: number; lines: number };
-  /** Mean input cost of a call, every attempt summed (output left out) */
+  /** Mean input cost of a call, every attempt summed (output left out; rejected requests are not calls) */
   inputCost: Record<CostBasis, number>;
 };
 
@@ -161,7 +163,11 @@ function cacheReading(records: CallRecord[]): ArmStats["cache"] {
 
 const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
 
-/** Every attempt of a call (job and step) summed, then averaged over calls, overall and by player count. */
+/**
+ * Every attempt of a call (job and step) summed, then averaged over calls,
+ * overall and by player count. Takes priced records only: a rejected request
+ * is not a call.
+ */
 function costReading(records: CallRecord[], price: (r: CallRecord) => number): CostReading {
   const calls = new Map<string, { players: number; usd: number }>();
   for (const r of records) {
@@ -186,6 +192,8 @@ export function armStatsOf(
 ): ArmStats {
   const first = records[0];
   const finals = records.filter((r) => r.final);
+  // A rejected request is not billed (4xx, no tokens) and is planned again, so it is no call to price
+  const priced = records.filter((r) => !r.rejectedParam);
   const good = finals.filter(usable);
   const firstAttempts = modelAttemptsByStep(records).calls.map((attempts) => attempts[0]);
   const firstRate = (hit: (r: CallRecord) => boolean) => rate(firstAttempts.filter(hit).length, firstAttempts.length);
@@ -233,11 +241,11 @@ export function armStatsOf(
       visible: median(good.map((r) => r.outputTokens - r.reasoningTokens)),
     },
     meanCounts: meanCountsOf(good, checks),
-    cost: { billed: costReading(records, PRICE.billed), uncached: costReading(records, PRICE.uncached) },
-    cache: cacheReading(records),
+    cost: { billed: costReading(priced, PRICE.billed), uncached: costReading(priced, PRICE.uncached) },
+    cache: cacheReading(priced),
     inputCost: {
-      billed: costReading(records, INPUT_PRICE.billed).perCall,
-      uncached: costReading(records, INPUT_PRICE.uncached).perCall,
+      billed: costReading(priced, INPUT_PRICE.billed).perCall,
+      uncached: costReading(priced, INPUT_PRICE.uncached).perCall,
     },
   };
 }

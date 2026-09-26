@@ -181,6 +181,48 @@ describe("variantComparisons", () => {
     expect(comparison.arm.inputCost.uncached).toBeCloseTo((100_000 * 0.1) / 1e6, 10);
   });
 
+  describe("a request the API rejected, not yet re-run", () => {
+    const rewrite = "gpt-4.1-mini@t0.2/rewrite";
+    const today = "gpt-4.1-mini@t0.2/prod";
+    const rejectedCall = (caseId: string) =>
+      call(rewrite, caseId, 1, {
+        model: "gpt-4.1-mini",
+        outcome: "http-error",
+        status: 400,
+        param: "response_format",
+        rejectedParam: true,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        costSource: "none",
+        outputFile: undefined,
+      });
+    const reference = ["a", "b"].map((c) => call(today, c, 1, { model: "gpt-4.1-mini", baseline: true, outputTokens: c === "a" ? 1_000 : 9_000, costUsd: 0.02 }));
+
+    it("is not a finished pair: the reference is read only where the arm has a reply", () => {
+      const records = [call(rewrite, "a", 1, { model: "gpt-4.1-mini", costUsd: 0.02 }), rejectedCall("b"), ...reference];
+      const [comparison] = variantComparisons(records, new Map(), caseTags("a", "b"), "postfix");
+      expect(comparison.pairs).toBe(1);
+      expect(comparison.reference.calls).toBe(1);
+      expect(comparison.reference.medianTokens.output).toBe(1_000);
+      // Nor a $0 call on the arm's side
+      expect(comparison.arm.cost.billed.perCall).toBeCloseTo(0.02, 10);
+    });
+
+    it("gives an arm with only rejected requests no comparison", () => {
+      expect(variantComparisons([rejectedCall("a"), rejectedCall("b"), ...reference], new Map(), caseTags("a", "b"), "postfix")).toEqual([]);
+    });
+
+    it("pairs again once the job was re-run", () => {
+      const rerun = call(rewrite, "b", 1, { model: "gpt-4.1-mini", attempt: 2, costUsd: 0.02 });
+      const records = [call(rewrite, "a", 1, { model: "gpt-4.1-mini", costUsd: 0.02 }), rejectedCall("b"), rerun, ...reference];
+      const [comparison] = variantComparisons(records, new Map(), caseTags("a", "b"), "postfix");
+      expect(comparison.pairs).toBe(2);
+      expect(comparison.arm.calls).toBe(2);
+      expect(comparison.arm.cost.billed.perCall).toBeCloseTo(0.02, 10);
+    });
+  });
+
   it("finds nothing in a prompt state without variant arms", () => {
     expect(variantComparisons([call(MEDIUM_PROD, "a", 1)], new Map(), caseTags("a"), "postfix")).toEqual([]);
   });

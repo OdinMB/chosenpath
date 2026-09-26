@@ -227,6 +227,32 @@ describe("computeArmStats", () => {
     expect(stats.rates.rejectedParam).toBeCloseTo(0.5);
   });
 
+  it("prices only calls with a model attempt: a job left with a rejected request is no $0 call", () => {
+    const rejected = record({
+      jobKey: "b|arm|postfix|s1",
+      caseId: "b",
+      outcome: "http-error",
+      status: 400,
+      rejectedParam: true,
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      costSource: "none",
+      cacheLine: "B",
+    });
+    // Luna per 1M: input $0.10, output $0.50, so $0.01 of input and $0.01 of output
+    const valid = record({ jobKey: "a|arm|postfix|s1", caseId: "a", model: "gpt-6-luna", inputTokens: 100_000, outputTokens: 20_000, costUsd: 0.02, cacheLine: "A" });
+    const [stats] = computeArmStats([valid, rejected], new Map(), new Map([["a", tags()], ["b", tags()]]));
+    expect(stats.calls).toBe(1);
+    expect(stats.cost.billed).toEqual({ perCall: 0.02, byPlayers: { 1: 0.02 } });
+    expect(stats.cost.uncached.perCall).toBeCloseTo(0.02, 10);
+    expect(stats.inputCost.billed).toBeCloseTo(0.01, 10);
+    expect(stats.inputCost.uncached).toBeCloseTo(0.01, 10);
+    // A line whose only call was rejected is not a cache line
+    expect(stats.cache.lines).toBe(1);
+    expect(stats.rates.rejectedParam).toBeCloseTo(0.5);
+  });
+
   it("takes the noise floor from the gap between baseline samples 1 and 2", () => {
     const checks = new Map<string, CheckResult>([
       ["o1", { checks: { paragraphs: true }, counts: {}, unknownIds: [] }],

@@ -1,7 +1,7 @@
 import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
 import { chainKey, chainSides, referenceKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
-import type { CallRecord } from "./runner.js";
+import { finishesJob, type CallRecord } from "./runner.js";
 import type { CheckResult } from "./textChecks.js";
 
 /*
@@ -47,7 +47,8 @@ function referenceKeyOf(armKey: string): string | undefined {
 }
 
 const pairOf = (r: CallRecord) => `${r.caseId}|${r.sample}`;
-const finishedPairs = (records: CallRecord[]) => new Set(records.filter((r) => r.jobFinal).map(pairOf));
+/** The runner's "finished": a pair whose only final record is a rejected request waits for its re-run, so it is not one. */
+const finishedPairs = (records: CallRecord[]) => new Set(records.filter(finishesJob).map(pairOf));
 
 type Inputs = { checks: Map<string, CheckResult>; tags: Map<string, CaseTags> };
 

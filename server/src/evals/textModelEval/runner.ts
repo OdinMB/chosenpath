@@ -133,9 +133,23 @@ export function keyOf(job: Job): string {
   return jobKey(job.caseId, job.armKey, job.promptState, job.sample);
 }
 
-/** Jobs with a final record; a request the API rejected says nothing about the model, so it is planned again. */
+/**
+ * Whether a record finishes its job: a final record, unless it is a request
+ * the API rejected, which says nothing about the model and is planned again.
+ * The one definition of "finished" for resuming, case building and the
+ * variant pairing.
+ */
+export function finishesJob(record: Pick<CallRecord, "jobFinal" | "rejectedParam">): boolean {
+  return record.jobFinal && !record.rejectedParam;
+}
+
 export function finishedJobKeys(records: CallRecord[]): Set<string> {
-  return new Set(records.filter((r) => r.jobFinal && !r.rejectedParam).map((r) => r.jobKey));
+  return new Set(records.filter(finishesJob).map((r) => r.jobKey));
+}
+
+/** The record that finished the job (at most one: a finished job is never sent again), if any. */
+export function finishingRecord(records: CallRecord[], key: string): CallRecord | undefined {
+  return records.find((r) => r.jobKey === key && finishesJob(r));
 }
 
 /** Whether a record's output can be used (valid or repaired) */
@@ -309,6 +323,11 @@ export async function runJobs(
    * Runs one call with retries: transport failures after a backoff, on their
    * own budget; unparseable replies at once, at most PRODUCTION_MAX_RETRIES
    * times. Returns the final executed call, or undefined when stopped.
+   *
+   * Attempts are numbered after those already recorded for the job and step
+   * (a re-planned rejected request, or a job resumed part-way), so each
+   * attempt keeps its own callId and outputs/<callId>.json is never
+   * overwritten. A job without records starts at attempt 1, as it always did.
    */
   const runStep = async (
     job: Job,
@@ -318,16 +337,18 @@ export async function runJobs(
     chainLatencyMs: number
   ): Promise<{ record: CallRecord; executed: ExecutedCall } | undefined> => {
     const request = call.request();
+    const key = keyOf(job);
+    const recorded = allRecords.filter((r) => r.jobKey === key && r.step === step).map((r) => r.attempt);
     let transportRetries = 0;
     let validityRetries = 0;
-    for (let attempt = 1; ; attempt++) {
+    for (let attempt = 1 + Math.max(0, ...recorded); ; attempt++) {
       if (!reserve(job.stage, call.estimate.costUsd)) return undefined;
       let executed: ExecutedCall;
       const startedAt = deps.now();
       try {
         await waitForTokens(call.arm.model, tokensOf(call.estimate));
         executed = await deps.execute({
-          callId: sha256(`${keyOf(job)}|${step}|${attempt}`).slice(0, 20),
+          callId: sha256(`${key}|${step}|${attempt}`).slice(0, 20),
           role: call.role,
           arm: call.arm,
           request,

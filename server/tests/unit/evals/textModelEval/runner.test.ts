@@ -1,7 +1,8 @@
 import { jest } from "@jest/globals";
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
-import type { CallSpec, ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
+import { sha256, type CallSpec, type ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import {
+  finishingRecord,
   jobKey,
   keyOf,
   runJobs,
@@ -175,7 +176,38 @@ describe("runJobs", () => {
     const { d, calls, records } = deps(() => executed("valid"));
     await runJobs([rejected, invalid], d, { caps, previous });
     expect(calls).toHaveLength(1);
-    expect(records.map((r) => [r.caseId, r.attempt, r.outcome])).toEqual([["rejected", 1, "valid"]]);
+    // The re-run's attempts are numbered after the rejected one
+    expect(records.map((r) => [r.caseId, r.attempt, r.outcome])).toEqual([["rejected", 2, "valid"]]);
+  });
+
+  it("gives a re-run attempt its own callId, so the output file of an earlier attempt is never overwritten", async () => {
+    const rejected = job("rejected", "beat", BASELINE);
+    const fresh = job("fresh", "beat", BASELINE);
+    const previous = [
+      record({ jobKey: keyOf(rejected), caseId: "rejected", outcome: "http-error", status: 400, param: "prompt_cache_breakpoint", rejectedParam: true }),
+    ];
+    const { d, calls } = deps(() => executed("valid"));
+    await runJobs([rejected, fresh], d, { caps, previous, maxInFlight: 1 });
+    const [rerun, first] = calls.map((c) => c.callId);
+    expect(rerun).not.toBe(sha256(`${keyOf(rejected)}|1|1`).slice(0, 20));
+    expect(rerun).toBe(sha256(`${keyOf(rejected)}|1|2`).slice(0, 20));
+    // A job without earlier records keeps the callId it always had
+    expect(first).toBe(sha256(`${keyOf(fresh)}|1|1`).slice(0, 20));
+  });
+
+  describe("finishingRecord", () => {
+    it("is the final record that finished the job, not an earlier rejected request", () => {
+      const rejected = record({ jobKey: "k", outcome: "http-error", status: 400, rejectedParam: true, costUsd: 0, costSource: "none" });
+      const rerun = record({ jobKey: "k", attempt: 2 });
+      expect(finishingRecord([rejected, rerun], "k")).toBe(rerun);
+      expect(finishingRecord([rejected], "k")).toBeUndefined();
+      expect(finishingRecord([record({ jobKey: "other" })], "k")).toBeUndefined();
+    });
+
+    it("is a final record whatever its outcome, as a finished job's is", () => {
+      const invalid = record({ jobKey: "k", outcome: "invalid-json" });
+      expect(finishingRecord([record({ jobKey: "k", final: false, jobFinal: false, outcome: "invalid-json" }), invalid], "k")).toBe(invalid);
+    });
   });
 
   describe("warm-first: the first call of a cache line runs alone", () => {

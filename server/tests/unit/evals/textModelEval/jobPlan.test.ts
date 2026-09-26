@@ -1,9 +1,10 @@
 import { jest } from "@jest/globals";
+import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes } from "core/types/index.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
-import { requestFor } from "../../../../src/evals/textModelEval/variants.js";
+import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import type { Story } from "core/models/Story.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
@@ -135,9 +136,17 @@ describe("planJobs: Stage 4", () => {
     expect(line("thread-a")).toMatch(/^[0-9a-f]{12}$/);
     expect(line("thread-b")).toBe(line("thread-a"));
     expect(new Set([line("thread-a"), line("thread-images"), line("ending")]).size).toBe(3);
-    // Another arm with the same request is another line
-    const mini = planJobs(cases, stage4({ armKeys: ["gpt-4.1-mini@t0.2/rewrite"], samples: 1 }));
-    expect(mini.find((j) => j.caseId === "thread-a")?.cacheLine).not.toBe(line("thread-a"));
+    // Another arm with the same request is another line: verbosity lives only in the arm key
+    const vlow = planJobs(cases, stage4({ armKeys: ["gpt-6-luna@medium+vlow/rewriteSlim"], samples: 1 }));
+    const vlowJob = vlow.find((j) => j.caseId === "thread-a");
+    const slimJob = jobs.find((j) => j.caseId === "thread-a");
+    const sent = (j: Job | undefined) => {
+      const request = j?.first.request();
+      return request && { text: requestText(request), schema: JSON.stringify(toJsonSchema(request.schema)) };
+    };
+    expect(sent(vlowJob)).toEqual(sent(slimJob));
+    expect(vlowJob?.cacheLine).toMatch(/^[0-9a-f]{12}$/);
+    expect(vlowJob?.cacheLine).not.toBe(slimJob?.cacheLine);
   });
 
   it("estimates a Stage 4 arm from the first arm on its reference chain with enough measured outputs", () => {
