@@ -4,7 +4,14 @@ import { GameModes } from "core/types/index.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
-import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
+import {
+  isSplitRequest,
+  requestFor,
+  requestText,
+  type RequestInput,
+  type VariantId,
+} from "../../../../src/evals/textModelEval/variants.js";
+import { NO_EMPTY_ITEMS } from "../../../../src/game/services/storyTextRewrite/common.js";
 import type { Story } from "core/models/Story.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
@@ -121,7 +128,37 @@ describe("planJobs: Stage 4", () => {
       "gpt-4.1-mini@t0.2/rewrite": 1,
       "gpt-6-luna@medium+vlow/rewriteSlim": 1,
       "gpt-6-luna@medium/rewrite": 1,
+      // Stage 4b, the count fix
+      "gpt-6-sol@low/rewrite2": 1,
+      "gpt-6-sol@low/rewrite2ZeroShot": 1,
+      "gpt-6-luna@medium/rewrite2Slim": 2,
     });
+  });
+
+  it("plans Stage 4b first in each role, so a cap stop cuts Stage 4's leftovers before it", () => {
+    const setup = evalCase("setup-learn-lemonade", "setup", {
+      setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 },
+    });
+    const order = (role: "setup" | "beat") => [
+      ...new Set(candidates(planJobs([setup, beatCase("sp", threadBeat(1))], stage4({ roles: [role] }))).map((j) => j.armKey)),
+    ];
+    expect(order("setup").slice(0, 2)).toEqual(["gpt-6-sol@low/rewrite2", "gpt-6-sol@low/rewrite2ZeroShot"]);
+    expect(order("beat")[0]).toBe("gpt-6-luna@medium/rewrite2Slim");
+  });
+
+  it("sends the count fix's worded form, on its own cache lines", () => {
+    const cases = [beatCase("thread-a", threadBeat(1, { id: "story-a" }))];
+    const job = (armKey: string) => planJobs(cases, stage4({ armKeys: [armKey], samples: 1 }))[0];
+    const worded = job("gpt-6-luna@medium/rewrite2Slim");
+    const exact = job("gpt-6-luna@medium/rewriteSlim");
+    const fixed = (j: Job) => {
+      const request = j.first.request();
+      return "fixed" in request ? request.fixed : "";
+    };
+    expect(fixed(worded)).toContain(NO_EMPTY_ITEMS);
+    expect(fixed(exact)).not.toContain(NO_EMPTY_ITEMS);
+    expect(worded.cacheLine).toMatch(/^[0-9a-f]{12}$/);
+    expect(worded.cacheLine).not.toBe(exact.cacheLine);
   });
 
   it("puts split requests with the same schema and fixed text on one cache line, and an image-on case and an ending on their own", () => {
@@ -162,14 +199,49 @@ describe("planJobs: Stage 4", () => {
     expect(estimate("gpt-6-luna@medium+vlow/rewriteSlim", [...slim, ...outputs("gpt-6-luna@medium/rewriteSlim", 1_200)])).toBe(1_200);
     // Today's model on the rewrite reads the baseline's
     expect(estimate("gpt-4.1-mini@t0.2/rewrite", outputs("gpt-4.1-mini@t0.2/prod", 1_700))).toBe(1_700);
+    // The count fix borrows its Stage 4 form's outputs before its reference's
+    const rewriteSlim = outputs("gpt-6-luna@medium/rewriteSlim", 1_300);
+    expect(estimate("gpt-6-luna@medium/rewrite2Slim", [...slim, ...rewriteSlim])).toBe(1_300);
+    expect(estimate("gpt-6-luna@medium/rewrite2Slim", slim)).toBe(1_500);
+    expect(estimate("gpt-6-luna@medium/rewrite2Slim", [...rewriteSlim, ...outputs("gpt-6-luna@medium/rewrite2Slim", 900)])).toBe(900);
+  });
+
+  it("estimates the count fix's setup arms from their Stage 4 forms", () => {
+    const cases = [evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } })];
+    const outputs = (armKey: string, size: number): CallRecord[] =>
+      Array.from({ length: MIN_MEASURED_RECORDS }, (_, i) => record({ jobKey: `${armKey}-${i}`, role: "setup", armKey, callArmKey: armKey, outputTokens: size }));
+    const records = [...outputs("gpt-6-sol@low/prod", 6_000), ...outputs("gpt-6-sol@low/rewrite", 6_400), ...outputs("gpt-6-sol@low/rewriteZeroShot", 6_100)];
+    const estimate = (armKey: string) =>
+      planJobs(cases, stage4({ roles: ["setup"], records, armKeys: [armKey], samples: 1 }))[0].first.estimate.outputTokens;
+    expect(estimate("gpt-6-sol@low/rewrite2")).toBe(6_400);
+    expect(estimate("gpt-6-sol@low/rewrite2ZeroShot")).toBe(6_100);
   });
 });
 
 describe("requestFor: the Stage 4 variants", () => {
+  const setupInput = { role: "setup" as const, setup: { premise: "A premise", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 } };
+
   it("refuses a role a rewrite variant does not cover", () => {
-    const setupInput = { role: "setup" as const, setup: { premise: "A premise", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 } };
     expect(() => requestFor("rewriteSlim", setupInput)).toThrow("Variant rewriteSlim does not cover role setup");
     expect(() => requestFor("rewriteZeroShot", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant rewriteZeroShot does not cover role beat");
+    expect(() => requestFor("rewrite2Slim", setupInput)).toThrow("Variant rewrite2Slim does not cover role setup");
+    expect(() => requestFor("rewrite2ZeroShot", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant rewrite2ZeroShot does not cover role beat");
+  });
+
+  it("builds each count-fix variant as its Stage 4 variant with worded counts", () => {
+    const story = threadBeat(1);
+    const pairs: [VariantId, VariantId, RequestInput][] = [
+      ["rewrite2", "rewrite", setupInput],
+      ["rewrite2ZeroShot", "rewriteZeroShot", setupInput],
+      ["rewrite2", "rewrite", { role: "beat", story }],
+      ["rewrite2Slim", "rewriteSlim", { role: "beat", story }],
+    ];
+    for (const [worded, exact, input] of pairs) {
+      const [a, b] = [requestFor(worded, input), requestFor(exact, input)];
+      if (!isSplitRequest(a) || !isSplitRequest(b)) throw new Error("expected split requests");
+      expect({ worded, fixed: a.fixed.replace(`${NO_EMPTY_ITEMS}\n`, ""), perCall: a.perCall }).toEqual({ worded, fixed: b.fixed, perCall: b.perCall });
+      expect(a.fixed).toContain(NO_EMPTY_ITEMS);
+    }
   });
 });
 

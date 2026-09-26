@@ -122,6 +122,21 @@ describe("checkBeatSet", () => {
     expect(counts.planChars).toBe(JSON.stringify(beat.plan).length);
   });
 
+  it("flags a reply with a blank list item: an empty or whitespace-only string, or an item whose own text is", () => {
+    const check = (edit: (beat: ReturnType<typeof beatGeneration>) => void) => {
+      const beat = beatGeneration();
+      edit(beat);
+      return checkBeatSet(beatSet(1, { player1: beat }), story).checks.noBlankItems;
+    };
+    expect(check(() => undefined)).toBe(true);
+    expect(check((beat) => (beat.interludes[2] = { ...beat.interludes[2], text: "" }))).toBe(false);
+    expect(check((beat) => (beat.interludes[2] = { ...beat.interludes[2], text: " " }))).toBe(false);
+    expect(check((beat) => (beat.options[2] = { ...beat.options[2], text: "\t\r\n" }))).toBe(false);
+    expect(check((beat) => (beat.plan.showDontTell = ["The ferryman takes the coin.", ""]))).toBe(false);
+    // An interlude without a picture is not blank: its text is what the player reads
+    expect(check((beat) => (beat.interludes[0] = { ...beat.interludes[0], imageId: "", imageSource: "none" }))).toBe(true);
+  });
+
   it("flags an image tag in the last paragraph and an unused requested image", () => {
     const text = `${paragraphs(4)}\n\n[image id=inn source=story desc="The inn"] ${PARAGRAPH}`;
     const beat = beatGeneration({ text, imageRequest: { caption: "Hall", id: "hall", referenceImageIds: [], prompt: "hall" } });
@@ -157,6 +172,24 @@ describe("checkSetup", () => {
     expect(checkSetup(withInvisibleExtra, input).counts).toMatchObject({ sharedStats: 5, playerStats: 5 });
     const tooFewVisible = setup({ playerStats: [{}, {}, hidden, hidden] });
     expect(checkSetup(tooFewVisible, input).checks.playerStats).toBe(false);
+  });
+
+  it("flags a setup with a blank list item: a fact, a stat list item, or an identity without a name", () => {
+    const pronouns = { personal: "she", object: "her", possessive: "her", reflexive: "herself" };
+    const identity = (name: string) => ({ name, pronouns, appearance: name ? "Tall, with a red scarf." : "" });
+    const element = (facts: string[]) => ({ id: "inn", name: "The Inn", appearance: "", facts });
+    const stat = (effectOnPoints: string[]) => ({ name: "Courage", isVisible: true, possibleValues: "", effectOnPoints });
+    const clean = setup({
+      storyElements: [element(["Old.", "Cold.", "Loud."])],
+      sharedStats: [stat(["+10 in fights"]), stat(["-10 when tired"]), stat(["+20 at dawn"])],
+      player1: { possibleCharacterIdentities: [identity("Ada"), identity("Bo"), identity("Cy")] },
+    });
+    // Empty strings outside a list (an abstract element's appearance, a percentage stat's possible values) are fine
+    expect(checkSetup(clean, input).checks.noBlankItems).toBe(true);
+    expect(checkSetup({ ...clean, storyElements: [element(["Old.", "Cold.", ""])] }, input).checks.noBlankItems).toBe(false);
+    expect(checkSetup({ ...clean, sharedStats: [stat(["+10 in fights", " "]), ...clean.sharedStats.slice(1)] }, input).checks.noBlankItems).toBe(false);
+    const blankIdentity = { possibleCharacterIdentities: [identity("Ada"), identity("Bo"), identity("")] };
+    expect(checkSetup({ ...clean, player1: blankIdentity }, input).checks.noBlankItems).toBe(false);
   });
 });
 

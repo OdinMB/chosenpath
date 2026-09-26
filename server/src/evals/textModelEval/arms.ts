@@ -62,7 +62,8 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
 /**
  * The variant each variant builds on: the Stage 3 trims and today's-scaffold
  * rewrite on production's form, the slim rewrite on the slim trim, and the
- * rewrite without examples on the rewrite with them.
+ * rewrite without examples on the rewrite with them. The count fix (rewrite2*)
+ * reads against the same bases as the Stage 4 form it re-runs.
  */
 const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   prod: undefined,
@@ -71,9 +72,26 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   rewrite: "prod",
   rewriteSlim: "slim",
   rewriteZeroShot: "rewrite",
+  rewrite2: "prod",
+  rewrite2Slim: "slim",
+  rewrite2ZeroShot: "rewrite2",
+};
+
+/** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
+const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
+  rewrite2: "rewrite",
+  rewrite2Slim: "rewriteSlim",
+  rewrite2ZeroShot: "rewriteZeroShot",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
+
+/** An arm key's parts: `<model>@<setting>`, the verbosity part if any, and the variant; undefined for anything else. */
+function armKeyParts(key: string): { modelAndSetting: string; verbosity?: string; variant: VariantId } | undefined {
+  const match = /^([^@/>+]+@[^@/>+]+)(\+v[^@/>+]+)?\/(\w+)$/.exec(key);
+  if (!match || !isVariant(match[3])) return undefined;
+  return { modelAndSetting: match[1], verbosity: match[2], variant: match[3] };
+}
 
 /**
  * The arm a variant arm is read against: with a verbosity part, the same key
@@ -82,12 +100,22 @@ const isVariant = (variant: string): variant is VariantId => Object.prototype.ha
  * an arm key (a pipeline chain's key, for one).
  */
 export function referenceKey(key: string): string | undefined {
-  const match = /^([^@/>+]+@[^@/>+]+)(\+v[^@/>+]+)?\/(\w+)$/.exec(key);
-  if (!match) return undefined;
-  const [, modelAndSetting, verbosity, variant] = match;
-  if (verbosity) return `${modelAndSetting}/${variant}`;
-  const base = isVariant(variant) ? VARIANT_REFERENCE[variant] : undefined;
-  return base ? `${modelAndSetting}/${base}` : undefined;
+  const parts = armKeyParts(key);
+  if (!parts) return undefined;
+  if (parts.verbosity) return `${parts.modelAndSetting}/${parts.variant}`;
+  const base = VARIANT_REFERENCE[parts.variant];
+  return base ? `${parts.modelAndSetting}/${base}` : undefined;
+}
+
+/**
+ * The next arm whose measured outputs an estimate may borrow: a count-fix
+ * arm's Stage 4 form (same model and setting, EARLIER_FORM), else the arm's
+ * reference.
+ */
+export function estimateBaseKey(key: string): string | undefined {
+  const parts = armKeyParts(key);
+  const earlier = parts && !parts.verbosity ? EARLIER_FORM[parts.variant] : undefined;
+  return parts && earlier ? `${parts.modelAndSetting}/${earlier}` : referenceKey(key);
 }
 
 /** A pipeline chain's key: "pipeline:<analysis arm key>><beat arm key>". */
@@ -149,7 +177,8 @@ export const STAGE3_SETUP_PREMISES = [
 /**
  * Candidate arms (the baseline runs separately, first), one static matrix per
  * stage. Stage 1-2 follows the owner decisions of 2026-09-26, Stages 3 and 4
- * the coordinator's carry-forward (Milestone 3).
+ * the coordinator's carry-forward (Milestone 3), and Stage 4b (planned with
+ * Stage 4) the owner's count fix.
  */
 export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
   switch (stage) {
@@ -158,7 +187,7 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
     case "3":
       return stage3Arms(role);
     case "4":
-      return stage4Arms(role);
+      return [...stage4bArms(role), ...stage4Arms(role)];
     default:
       return [];
   }
@@ -247,6 +276,30 @@ function stage4Arms(role: EvalRole): ArmPlan[] {
         // The full-scaffold hedge, in case the owner rates slim below full
         { arm: luna("medium", "rewrite"), samples: 1, scope: "single-player" },
       ];
+    case "switch":
+    case "thread":
+    case "iteration":
+      return [];
+  }
+}
+
+/**
+ * Stage 4b, the count fix (owner, 2026-09-26): the lead's turns and Sol low
+ * setup, with and without the examples, re-run on the rewrite with its list
+ * counts in words and caps only (rewrite2*), each read against the same base
+ * as its Stage 4 form. Planned before Stage 4's arms, so a cap stop cuts
+ * Stage 4's leftovers (the verbosity arm, the hedge, gpt-4.1's open setups)
+ * first.
+ */
+function stage4bArms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "setup":
+      return [
+        { arm: sol("low", "rewrite2"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+        { arm: sol("low", "rewrite2ZeroShot"), samples: 1, scope: "all", caseIds: STAGE3_SETUP_PREMISES },
+      ];
+    case "beat":
+      return [{ arm: luna("medium", "rewrite2Slim"), samples: 2, scope: "single-player" }];
     case "switch":
     case "thread":
     case "iteration":

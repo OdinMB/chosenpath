@@ -6,8 +6,8 @@ import {
   armsFor,
   baselineArm,
   chainKey,
+  estimateBaseKey,
   pipelinePlan,
-  referenceKey,
   type Arm,
   type ArmPlan,
   type EvalRole,
@@ -25,7 +25,8 @@ import { isSplitRequest, requestFor, requestText, type EvalRequest, type Request
  * subset, single-player cases, or a case list), the rare-failure batch, and
  * pipeline chains (analysis, then the beat built from it) in pipeline mode.
  * Filters narrow the plan; estimates use measured output sizes once there
- * are enough, and a new variant borrows from its reference chain until then.
+ * are enough, and a new variant borrows until then (estimateBaseKey: a
+ * count-fix variant from its Stage 4 form, others along the reference chain).
  * Cases are queued in turn order, and a split request's job carries its
  * cache line, which the runner warms first.
  */
@@ -130,18 +131,18 @@ export function measuredOutputs(records: CallRecord[]): Map<string, number[]> {
   return measured;
 }
 
-/** The longest reference chain: a verbosity arm on rewriteZeroShot, then rewrite, then prod. */
+/** The longest borrowing chain: a verbosity arm on rewrite2ZeroShot, then rewriteZeroShot, then rewrite, then prod. */
 const MAX_REFERENCE_STEPS = 4;
 
 /**
  * The measured outputs of the first key with MIN_MEASURED_RECORDS of them,
- * walking from the arm's own key along its reference chain (referenceKey);
- * else whatever the arm has. A trim writes less than its full form, so its
- * borrowed estimate errs high.
+ * walking from the arm's own key along estimateBaseKey (a count-fix arm's
+ * Stage 4 form, else the reference chain); else whatever the arm has. A trim
+ * writes less than its full form, so its borrowed estimate errs high.
  */
 function measuredFor(measured: Map<string, number[]>, role: EvalRole, arm: Arm): number[] | undefined {
   let key: string | undefined = arm.key;
-  for (let step = 0; key && step <= MAX_REFERENCE_STEPS; step++, key = referenceKey(key)) {
+  for (let step = 0; key && step <= MAX_REFERENCE_STEPS; step++, key = estimateBaseKey(key)) {
     const outputs = measured.get(`${role}|${key}`);
     if ((outputs?.length ?? 0) >= MIN_MEASURED_RECORDS) return outputs;
   }

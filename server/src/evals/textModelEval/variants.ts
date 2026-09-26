@@ -17,7 +17,7 @@ import {
   trimmedThreadRequest,
 } from "../../game/services/storyTextTrims.js";
 import { rewriteBeatRequest, type RewriteScaffold } from "../../game/services/storyTextRewrite/beat.js";
-import type { SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
+import type { RewriteCounts, SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
 import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.js";
 
 /*
@@ -38,10 +38,33 @@ import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.
  *   custom-story setup with production's example stat setups;
  * - "rewriteSlim": single-player beats on Stage 3's slim planning fields;
  * - "rewriteZeroShot": custom-story setup without the examples.
+ * These three keep Stage 4's enforced list counts, so its records stay
+ * reproducible. Stage 4b's count fix builds the same three with the counts
+ * in words and caps only ("worded", see storyTextRewrite/common.ts):
+ * "rewrite2", "rewrite2Slim" and "rewrite2ZeroShot".
  */
 
-export type VariantId = "prod" | "slim" | "minimal" | "rewrite" | "rewriteSlim" | "rewriteZeroShot";
-export const VARIANTS: VariantId[] = ["prod", "slim", "minimal", "rewrite", "rewriteSlim", "rewriteZeroShot"];
+export type VariantId =
+  | "prod"
+  | "slim"
+  | "minimal"
+  | "rewrite"
+  | "rewriteSlim"
+  | "rewriteZeroShot"
+  | "rewrite2"
+  | "rewrite2Slim"
+  | "rewrite2ZeroShot";
+export const VARIANTS: VariantId[] = [
+  "prod",
+  "slim",
+  "minimal",
+  "rewrite",
+  "rewriteSlim",
+  "rewriteZeroShot",
+  "rewrite2",
+  "rewrite2Slim",
+  "rewrite2ZeroShot",
+];
 
 /** What a variant sends: one user message (production's shape), or fixed rules then a per-call message. */
 export type EvalRequest = TextRequest | SplitTextRequest;
@@ -140,14 +163,14 @@ function minimalRequest(input: RequestInput): TextRequest {
   }
 }
 
-/** A Stage 4 variant: its setup builder (with or without examples) and its beat scaffold, where it covers them. */
-function rewriteVariant(variant: VariantId, covers: { setupWithExamples?: boolean; beat?: RewriteScaffold }) {
+/** A Stage 4 variant: its counts form, its setup builder (with or without examples) and its beat scaffold, where it covers them. */
+function rewriteVariant(variant: VariantId, counts: RewriteCounts, covers: { setupWithExamples?: boolean; beat?: RewriteScaffold }) {
   return (input: RequestInput): SplitTextRequest => {
     if (input.role === "setup" && covers.setupWithExamples !== undefined) {
       const { premise, playerCount, gameMode, maxTurns } = input.setup;
-      return rewriteSetupRequest(premise, playerCount, gameMode, maxTurns, covers.setupWithExamples);
+      return rewriteSetupRequest(premise, playerCount, gameMode, maxTurns, covers.setupWithExamples, counts);
     }
-    if (input.role === "beat" && covers.beat) return rewriteBeatRequest(input.story, covers.beat);
+    if (input.role === "beat" && covers.beat) return rewriteBeatRequest(input.story, covers.beat, counts);
     throw new Error(`Variant ${variant} does not cover role ${input.role}`);
   };
 }
@@ -156,9 +179,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
   minimal: minimalRequest,
-  rewrite: rewriteVariant("rewrite", { setupWithExamples: true, beat: "full" }),
-  rewriteSlim: rewriteVariant("rewriteSlim", { beat: "slim" }),
-  rewriteZeroShot: rewriteVariant("rewriteZeroShot", { setupWithExamples: false }),
+  rewrite: rewriteVariant("rewrite", "exact", { setupWithExamples: true, beat: "full" }),
+  rewriteSlim: rewriteVariant("rewriteSlim", "exact", { beat: "slim" }),
+  rewriteZeroShot: rewriteVariant("rewriteZeroShot", "exact", { setupWithExamples: false }),
+  rewrite2: rewriteVariant("rewrite2", "worded", { setupWithExamples: true, beat: "full" }),
+  rewrite2Slim: rewriteVariant("rewrite2Slim", "worded", { beat: "slim" }),
+  rewrite2ZeroShot: rewriteVariant("rewrite2ZeroShot", "worded", { setupWithExamples: false }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

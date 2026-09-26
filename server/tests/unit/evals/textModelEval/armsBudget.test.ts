@@ -1,4 +1,12 @@
-import { armKey, armsFor, armSettings, baselineArm, makeArm, referenceKey } from "../../../../src/evals/textModelEval/arms.js";
+import {
+  armKey,
+  armsFor,
+  armSettings,
+  baselineArm,
+  estimateBaseKey,
+  makeArm,
+  referenceKey,
+} from "../../../../src/evals/textModelEval/arms.js";
 import {
   costFromUsage,
   estimateCall,
@@ -40,6 +48,22 @@ describe("arm keys and estimates", () => {
     expect(referenceKey("gpt-6-luna@medium+vlow/rewriteSlim")).toBe("gpt-6-luna@medium/rewriteSlim");
     expect(referenceKey("gpt-6-sol@low/rewriteZeroShot")).toBe("gpt-6-sol@low/rewrite");
     expect(referenceKey("gpt-4.1-mini@t0.2/rewrite")).toBe("gpt-4.1-mini@t0.2/prod");
+  });
+
+  it("reads the count fix against the same bases as the Stage 4 rewrite", () => {
+    expect(referenceKey("gpt-6-luna@medium/rewrite2Slim")).toBe("gpt-6-luna@medium/slim");
+    expect(referenceKey("gpt-6-sol@low/rewrite2")).toBe("gpt-6-sol@low/prod");
+    expect(referenceKey("gpt-6-sol@low/rewrite2ZeroShot")).toBe("gpt-6-sol@low/rewrite2");
+  });
+
+  it("estimates the count fix from its Stage 4 form, and everything else from its reference", () => {
+    expect(estimateBaseKey("gpt-6-luna@medium/rewrite2Slim")).toBe("gpt-6-luna@medium/rewriteSlim");
+    expect(estimateBaseKey("gpt-6-sol@low/rewrite2")).toBe("gpt-6-sol@low/rewrite");
+    expect(estimateBaseKey("gpt-6-sol@low/rewrite2ZeroShot")).toBe("gpt-6-sol@low/rewriteZeroShot");
+    expect(estimateBaseKey("gpt-6-luna@medium+vlow/rewrite2Slim")).toBe("gpt-6-luna@medium/rewrite2Slim");
+    expect(estimateBaseKey("gpt-6-luna@medium/rewriteSlim")).toBe("gpt-6-luna@medium/slim");
+    expect(estimateBaseKey("gpt-6-luna@medium/prod")).toBeUndefined();
+    expect(estimateBaseKey("pipeline:gpt-6-luna@low/minimal>gpt-6-luna@medium/minimal")).toBeUndefined();
   });
 
   it("gives no reference for a prod arm or a chain key", () => {

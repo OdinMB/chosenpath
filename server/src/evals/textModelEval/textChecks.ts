@@ -190,6 +190,35 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * The fields that carry a list item's own text (an option's or interlude's
+ * text, an identity's or stat's name, a background's title, an outcome's
+ * question, a fact, a milestone). Other empty strings are legitimate: an
+ * interlude without a picture, an abstract element's appearance, a
+ * percentage stat's possible values.
+ */
+const ITEM_TEXT_KEYS = ["text", "name", "title", "question", "fact", "newMilestone"];
+
+const isBlankString = (value: unknown) => typeof value === "string" && value.trim() === "";
+
+function isBlankItem(item: unknown): boolean {
+  if (isBlankString(item)) return true;
+  if (item === null || typeof item !== "object" || Array.isArray(item)) return false;
+  return Object.entries(item).some(([key, value]) => ITEM_TEXT_KEYS.includes(key) && isBlankString(value));
+}
+
+/**
+ * How many list items anywhere in a reply are blank: an empty or
+ * whitespace-only string, or an object whose own text is. A model that
+ * cannot close a list early (an enforced minimum) pads it this way, and the
+ * player sees an empty slide, choice or character.
+ */
+export function blankItems(value: unknown): number {
+  if (Array.isArray(value)) return value.reduce((sum: number, item) => sum + (isBlankItem(item) ? 1 : 0) + blankItems(item), 0);
+  if (value === null || typeof value !== "object") return 0;
+  return Object.values(value).reduce((sum: number, inner) => sum + blankItems(inner), 0);
+}
+
 function merge(results: CheckResult[]): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
@@ -217,7 +246,11 @@ export function checkBeatSet(output: SetOfBeatGenerationSchema, story: Story): C
     if (change.type === "statChange" && !ids.stats.has(change.stat)) unknown.push(`stat:${change.stat}`);
     if (change.type === "newMilestone" && !ids.outcomes.has(change.outcome)) unknown.push(`outcome:${change.outcome}`);
   }
-  const set: CheckResult = { checks: { knownChangeIds: unknown.length === 0 }, counts: { statChanges: output.statChanges.length }, unknownIds: unknown };
+  const set: CheckResult = {
+    checks: { knownChangeIds: unknown.length === 0, noBlankItems: blankItems(output) === 0 },
+    counts: { statChanges: output.statChanges.length },
+    unknownIds: unknown,
+  };
   return merge([...perPlayer, set]);
 }
 
@@ -251,6 +284,7 @@ export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
       sharedStats: between(visibleCount(output.sharedStats), 3, 4),
       playerStats: between(visibleCount(output.playerStats), 3, 4),
       threadTypes: between(output.guidelines.typesOfThreads.length, 6, 8),
+      noBlankItems: blankItems(output) === 0,
     },
     counts: {
       sharedStats: output.sharedStats.length,
