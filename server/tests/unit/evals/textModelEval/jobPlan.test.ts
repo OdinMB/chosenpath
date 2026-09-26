@@ -4,6 +4,7 @@ import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricin
 import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import { requestFor } from "../../../../src/evals/textModelEval/variants.js";
+import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
 import { evalCase, record, tags } from "./fixtures.js";
 
@@ -38,11 +39,55 @@ describe("planJobs: --no-mp-continuations", () => {
   });
 
   it("drops multiplayer continuation beats and keeps first beats, endings and single-player beats", () => {
-    expect(planJobs(cases, options(true)).map((j) => j.caseId)).toEqual(["sp-continuation", "mp-first", "mp-ending"]);
+    expect(new Set(planJobs(cases, options(true)).map((j) => j.caseId))).toEqual(new Set(["sp-continuation", "mp-first", "mp-ending"]));
   });
 
   it("keeps every beat case without the flag", () => {
-    expect(planJobs(cases, options(false)).map((j) => j.caseId)).toEqual(cases.map((c) => c.id));
+    expect(new Set(planJobs(cases, options(false)).map((j) => j.caseId))).toEqual(new Set(cases.map((c) => c.id)));
+  });
+});
+
+describe("planJobs: execution order and cache lines", () => {
+  const baselineOnly = (roles: PlanOptions["roles"]): PlanOptions => ({
+    stage: "0",
+    promptState: "postfix",
+    roles,
+    mode: "isolated",
+    samples: 1,
+    subset15: false,
+    records: [],
+    env: {},
+  });
+
+  it("runs beat cases in story order, then turn order, whatever their ids", () => {
+    const cases = [
+      evalCase("a-thread-story-b", "beat", { state: threadBeat(1, { id: "story-b" }).getState() }),
+      evalCase("b-later-story-a", "beat", { state: laterSwitchBeat(1, { id: "story-a" }).getState() }),
+      evalCase("c-first-story-a", "beat", { state: firstSwitchBeat(1, { id: "story-a" }).getState() }),
+    ];
+    expect(planJobs(cases, baselineOnly(["beat"])).map((j) => j.caseId)).toEqual(["c-first-story-a", "b-later-story-a", "a-thread-story-b"]);
+  });
+
+  it("runs setup cases by player count", () => {
+    const setup = (id: string, playerCount: 1 | 2 | 3) =>
+      evalCase(id, "setup", {
+        setup: { premise: "A premise", playerCount, gameMode: playerCount === 1 ? GameModes.SinglePlayer : GameModes.Cooperative, maxTurns: 25 },
+      });
+    const cases = [setup("setup-a", 3), setup("setup-b", 1), setup("setup-c", 2)];
+    expect(planJobs(cases, baselineOnly(["setup"])).map((j) => j.caseId)).toEqual(["setup-b", "setup-c", "setup-a"]);
+  });
+
+  it("gives a production request no cache line", () => {
+    const cases = [evalCase("sp", "beat", { state: createMockStoryState() })];
+    expect(planJobs(cases, baselineOnly(["beat"])).map((j) => j.cacheLine)).toEqual([undefined]);
+  });
+});
+
+describe("requestFor: the Stage 4 variants", () => {
+  it("refuses a role a rewrite variant does not cover", () => {
+    const setupInput = { role: "setup" as const, setup: { premise: "A premise", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 } };
+    expect(() => requestFor("rewriteSlim", setupInput)).toThrow("Variant rewriteSlim does not cover role setup");
+    expect(() => requestFor("rewriteZeroShot", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant rewriteZeroShot does not cover role beat");
   });
 });
 

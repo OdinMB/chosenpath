@@ -14,9 +14,10 @@ import {
   type Stage,
 } from "./arms.js";
 import { caseStory, hashOrder, type EvalCase } from "./cases.js";
+import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
 import { usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
-import { requestFor, type RequestInput } from "./variants.js";
+import { isSplitRequest, requestFor, requestText, type EvalRequest, type RequestInput } from "./variants.js";
 
 /*
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
@@ -25,6 +26,8 @@ import { requestFor, type RequestInput } from "./variants.js";
  * pipeline chains (analysis, then the beat built from it) in pipeline mode.
  * Filters narrow the plan; estimates use measured output sizes once there
  * are enough, and a new variant borrows its prod sibling's until then.
+ * Cases are queued in turn order, and a split request's job carries its
+ * cache line, which the runner warms first.
  */
 
 export type PlanOptions = {
@@ -72,8 +75,48 @@ function inputFor(evalCase: EvalCase): RequestInput {
  * schema, which OpenAI bills as input. The probe of 2026-09-26 measured 4K to
  * 16.5K input tokens for the production schemas alone (setup about 14K).
  */
-export function requestChars(request: TextRequest): number {
-  return request.prompt.length + JSON.stringify(toJsonSchema(request.schema)).length;
+export function requestChars(request: EvalRequest): number {
+  return requestText(request).length + JSON.stringify(toJsonSchema(request.schema)).length;
+}
+
+/**
+ * A split request's cache line: the prefix it shares with other calls (arm,
+ * JSON schema and fixed rules). Production-shaped requests have none.
+ */
+function cacheLineOf(armKey: string, request: EvalRequest): string | undefined {
+  if (!isSplitRequest(request)) return undefined;
+  return sha256(`${armKey}|${JSON.stringify(toJsonSchema(request.schema))}|${request.fixed}`).slice(0, 12);
+}
+
+/** Turn-order sort keys, once per case: building a case's story is not free, and a sort asks often. */
+const TURN_KEYS = new WeakMap<EvalCase, [string, number]>();
+
+function turnKey(evalCase: EvalCase): [string, number] {
+  const known = TURN_KEYS.get(evalCase);
+  if (known) return known;
+  let key: [string, number];
+  if (evalCase.role === "setup") key = ["", evalCase.setup?.playerCount ?? 0];
+  else if (evalCase.role === "iteration") key = ["", 0];
+  else {
+    const story = caseStory(evalCase);
+    key = [story.getId(), story.getCurrentTurn()];
+  }
+  TURN_KEYS.set(evalCase, key);
+  return key;
+}
+
+/**
+ * Execution order only: beat, switch and thread cases by story, then turn,
+ * then id; setup by player count, then id. Consecutive calls on one story
+ * share the state prefix that gpt-4.1-mini's implicit cache reads (GPT-6's
+ * fixed block is story-independent).
+ */
+function inTurnOrder(cases: EvalCase[]): EvalCase[] {
+  return [...cases].sort((a, b) => {
+    const [storyA, turnA] = turnKey(a);
+    const [storyB, turnB] = turnKey(b);
+    return storyA.localeCompare(storyB) || turnA - turnB || a.id.localeCompare(b.id);
+  });
 }
 
 /** role|armKey -> output tokens of usable final calls */
@@ -103,11 +146,11 @@ function planned(
   role: EvalRole,
   arm: Arm,
   players: number,
-  build: () => TextRequest,
+  build: () => EvalRequest,
   measured: Map<string, number[]>,
   promptChars?: number
 ): PlannedCall {
-  let cached: TextRequest | undefined;
+  let cached: EvalRequest | undefined;
   const request = () => (cached ??= build());
   return {
     role,
@@ -125,6 +168,8 @@ function planned(
 }
 
 function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: number, measured: Map<string, number[]>): Job {
+  // The estimate has already built the request, so the cache line costs no extra build
+  const first = planned(evalCase.role, arm, evalCase.tags.players, () => requestFor(arm.variant, inputFor(evalCase)), measured);
   return {
     stage: options.stage,
     promptState: options.promptState,
@@ -133,7 +178,8 @@ function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: num
     sample,
     baseline: arm.baseline,
     group: evalCase.role,
-    first: planned(evalCase.role, arm, evalCase.tags.players, () => requestFor(arm.variant, inputFor(evalCase)), measured),
+    first,
+    cacheLine: cacheLineOf(arm.key, first.request()),
   };
 }
 
@@ -195,7 +241,10 @@ function isMultiplayerContinuation(c: EvalCase): boolean {
   return c.role === "beat" && c.tags.multiplayer && !c.tags.firstBeat && !c.tags.ending;
 }
 
-/** The role's cases after the filters and the arm's scope and case list; the 15-case subset narrows beats only. */
+/**
+ * The role's cases after the filters and the arm's scope and case list, in
+ * turn order; the 15-case subset narrows beats only.
+ */
 function casesFor(
   cases: EvalCase[],
   role: EvalRole,
@@ -203,14 +252,16 @@ function casesFor(
   plan: Pick<ArmPlan, "scope" | "caseIds"> = { scope: "all" }
 ): EvalCase[] {
   const subsetOnly = role === "beat" && (options.subset15 || plan.scope === "subset15");
-  return cases.filter(
-    (c) =>
-      c.role === role &&
-      (!options.caseIds || options.caseIds.includes(c.id)) &&
-      (!plan.caseIds || plan.caseIds.includes(c.id)) &&
-      (!subsetOnly || c.tags.subset15) &&
-      !(plan.scope === "single-player" && c.tags.multiplayer) &&
-      !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
+  return inTurnOrder(
+    cases.filter(
+      (c) =>
+        c.role === role &&
+        (!options.caseIds || options.caseIds.includes(c.id)) &&
+        (!plan.caseIds || plan.caseIds.includes(c.id)) &&
+        (!subsetOnly || c.tags.subset15) &&
+        !(plan.scope === "single-player" && c.tags.multiplayer) &&
+        !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
+    )
   );
 }
 

@@ -165,6 +165,83 @@ describe("runJobs", () => {
     expect(records[0].promptHashDrift).toBe(true);
   });
 
+  it("plans a job again when its final record is a request the API rejected, and resumes other finals as finished", async () => {
+    const rejected = job("rejected", "beat", BASELINE);
+    const invalid = job("invalid", "beat", BASELINE);
+    const previous = [
+      record({ jobKey: keyOf(rejected), caseId: "rejected", outcome: "http-error", status: 400, param: "prompt_cache_breakpoint", rejectedParam: true }),
+      record({ jobKey: keyOf(invalid), caseId: "invalid", outcome: "invalid-json" }),
+    ];
+    const { d, calls, records } = deps(() => executed("valid"));
+    await runJobs([rejected, invalid], d, { caps, previous });
+    expect(calls).toHaveLength(1);
+    expect(records.map((r) => [r.caseId, r.attempt, r.outcome])).toEqual([["rejected", 1, "valid"]]);
+  });
+
+  describe("warm-first: the first call of a cache line runs alone", () => {
+    /** Each job's prompt is its case id, so a call names its case (baseline jobs, so none waits on a baseline). */
+    const lineJob = (caseId: string, cacheLine?: string): Job => ({
+      ...job(caseId, "beat", BASELINE),
+      cacheLine,
+      first: plannedCall("beat", BASELINE, 0.01, caseId),
+    });
+    const caseOf = (spec: CallSpec) => ("prompt" in spec.request ? spec.request.prompt : "");
+
+    /** An execute whose first call per case finishes only when the test releases that case. */
+    function controlled(result: () => ExecutedCall = () => executed("valid")) {
+      const started: string[] = [];
+      const releases = new Map<string, () => void>();
+      const d: RunnerDeps = {
+        ...deps(result).d,
+        execute: async (spec) => {
+          const caseId = caseOf(spec);
+          const first = !started.includes(caseId);
+          started.push(caseId);
+          if (first) await new Promise<void>((resolve) => releases.set(caseId, resolve));
+          return result();
+        },
+      };
+      return { d, started, release: (caseId: string) => releases.get(caseId)?.() };
+    }
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+    it("holds the rest of a line until its first call finishes, runs other lines alongside, and never holds a job without a line", async () => {
+      const jobs = [lineJob("a1", "A"), lineJob("a2", "A"), lineJob("a3", "A"), lineJob("b1", "B"), lineJob("free")];
+      const { d, started, release } = controlled();
+      const run = runJobs(jobs, d, { caps, previous: [], maxInFlight: 3 });
+      await settle();
+      expect(started).toEqual(["a1", "b1", "free"]);
+      release("free");
+      await settle();
+      // The freed worker waits: a2 and a3 are on line A, which is still warming
+      expect(started).toEqual(["a1", "b1", "free"]);
+      release("a1");
+      await settle();
+      expect(started.slice(3).sort()).toEqual(["a2", "a3"]);
+      for (const id of ["a2", "a3", "b1"]) release(id);
+      const result = await run;
+      expect(result.stoppedReason).toBeUndefined();
+      expect(result.records.map((r) => [r.caseId, r.cacheLine])).toEqual(
+        expect.arrayContaining([["a1", "A"], ["a2", "A"], ["a3", "A"], ["b1", "B"], ["free", undefined]])
+      );
+    });
+
+    it("ends the run when a cap stops it while workers wait on a warm-up", async () => {
+      // $0.035 fits three $0.01 reservations at once, so without warm-first all three would start
+      const small = resolveCaps({ maxSpend: 0.035 }).caps;
+      const jobs = [lineJob("a1", "A"), lineJob("a2", "A"), lineJob("a3", "A")];
+      // Every attempt is a 503, billed at its estimate, so a1's fourth reservation passes the cap
+      const { d, started, release } = controlled(() => executed("http-error", { status: 503 }));
+      const run = runJobs(jobs, d, { caps: small, previous: [], maxInFlight: 3 });
+      await settle();
+      expect(started).toEqual(["a1"]);
+      release("a1");
+      const result = await run;
+      expect(result.stoppedReason).toMatch(/max-spend/);
+      expect(new Set(started)).toEqual(new Set(["a1"]));
+    });
+  });
+
   it("runs a pipeline chain's beat on the analysis output and sums the turn latency", async () => {
     const built: unknown[] = [];
     const chain: Job = {

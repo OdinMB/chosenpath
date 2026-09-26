@@ -8,7 +8,9 @@ import { isRetryable, type CallRecord } from "./runner.js";
  * when a one-sided Fisher exact test on first-attempt failures gives
  * p < 0.05 (1 invalid in 100 against 0 in 115 gives p = 0.47, so a single
  * bad reply does not fail an arm by itself). Transport failures (429, 5xx,
- * timeouts, dropped connections) say nothing about the reply and are left out.
+ * timeouts, dropped connections) and rejected requests (a 400 naming a
+ * parameter, which the runner plans again) say nothing about the reply and
+ * are left out.
  */
 
 export const FIRST_ATTEMPT_FLOOR = 0.98;
@@ -21,7 +23,7 @@ export type ValidityReading = {
   invalidFirstAttempts: number;
   /** Calls with a valid reply among their first 1 + PRODUCTION_MAX_RETRIES model attempts */
   validWithinRetries: number;
-  /** Calls made only of transport failures, left out of the counts above */
+  /** Calls without a model attempt (transport failures or rejected requests), left out of the counts above */
   transportOnly: number;
 };
 
@@ -36,7 +38,8 @@ export type ValidityVerdict = {
 
 /**
  * Each call's model attempts in attempt order (one entry per job and step),
- * transport failures dropped; calls left with none are counted as transport-only.
+ * transport failures and rejected requests dropped; calls left with none are
+ * counted as transport-only.
  */
 export function modelAttemptsByStep(records: CallRecord[]): { calls: CallRecord[][]; transportOnly: number } {
   const byStep = new Map<string, CallRecord[]>();
@@ -47,7 +50,7 @@ export function modelAttemptsByStep(records: CallRecord[]): { calls: CallRecord[
   const calls: CallRecord[][] = [];
   let transportOnly = 0;
   for (const attempts of byStep.values()) {
-    const model = attempts.filter((r) => !isRetryable(r)).sort((a, b) => a.attempt - b.attempt);
+    const model = attempts.filter((r) => !isRetryable(r) && !r.rejectedParam).sort((a, b) => a.attempt - b.attempt);
     if (model.length === 0) transportOnly++;
     else calls.push(model);
   }

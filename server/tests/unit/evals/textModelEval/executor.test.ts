@@ -3,7 +3,8 @@ import os from "os";
 import path from "path";
 import { z } from "zod";
 import { executeCall, type FetchFn } from "../../../../src/evals/textModelEval/executor.js";
-import { LUNA } from "./fixtures.js";
+import { MESSAGE_SEPARATOR } from "../../../../src/evals/textModelEval/variants.js";
+import { BASELINE, LUNA } from "./fixtures.js";
 
 function replyWith(content: string): FetchFn {
   return async () =>
@@ -37,5 +38,51 @@ describe("executeCall", () => {
     const stored = JSON.parse(fs.readFileSync(path.join(outDir, result.outputFile), "utf-8"));
     expect(stored.rawBody).toContain("and some extra words");
     expect(fs.readFileSync(path.join(outDir, "prompts", `${result.promptHash}.txt`), "utf-8")).toBe("write");
+  });
+
+  describe("the request body, by request shape and model family", () => {
+    type Body = { messages: { role: string; content: unknown }[] };
+    const schema = z.object({ answer: z.string() });
+    const split = { fixed: "The fixed rules.", perCall: "This call's facts.", schema };
+
+    /** Sends the request and returns the JSON body the API would have received. */
+    async function sent(arm: typeof LUNA, request: Parameters<typeof executeCall>[0]["request"]) {
+      const bodies: Body[] = [];
+      const fetch: FetchFn = async (input, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return replyWith('{"answer":"yes"}')(input, init);
+      };
+      const result = await executeCall({ callId: `call-${bodies.length}`, role: "beat", arm, request }, { outDir, now: () => 0, fetch });
+      expect(result.check.outcome).toBe("valid");
+      return { body: bodies[0], result };
+    }
+
+    it("sends a split request to gpt-6 as a developer message with an explicit cache breakpoint, then the user message", async () => {
+      const { body } = await sent(LUNA, split);
+      expect(body.messages).toEqual([
+        { role: "developer", content: [{ type: "text", text: "The fixed rules.", prompt_cache_breakpoint: { mode: "explicit" } }] },
+        { role: "user", content: "This call's facts." },
+      ]);
+    });
+
+    it("sends a split request to gpt-4.1-mini as system and user strings, with no breakpoint anywhere", async () => {
+      const { body } = await sent(BASELINE, split);
+      expect(body.messages).toEqual([
+        { role: "system", content: "The fixed rules." },
+        { role: "user", content: "This call's facts." },
+      ]);
+      expect(JSON.stringify(body)).not.toContain("prompt_cache_breakpoint");
+    });
+
+    it("stores a split request's prompt as both parts around the separator", async () => {
+      const { result } = await sent(LUNA, split);
+      const stored = fs.readFileSync(path.join(outDir, "prompts", `${result.promptHash}.txt`), "utf-8");
+      expect(stored).toBe(`The fixed rules.${MESSAGE_SEPARATOR}This call's facts.`);
+    });
+
+    it("still sends a plain request as one user message", async () => {
+      const { body } = await sent(LUNA, { prompt: "write", schema });
+      expect(body.messages).toEqual([{ role: "user", content: "write" }]);
+    });
   });
 });

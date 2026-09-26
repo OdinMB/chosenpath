@@ -369,11 +369,41 @@ export async function runJobs(
     await runStep(job, job.then.build(first.executed.check.parsed), 2, true, first.record.latencyMs);
   };
 
+  /**
+   * Warm-first: a worker takes the first queued job that has no cache line,
+   * or whose line is already warm or not being warmed. A job that starts a
+   * line warms it: the line is warm once that job finishes, whatever its
+   * outcome. When every queued job is on a line being warmed, the worker
+   * waits for a warm-up to finish, then checks for a stop again. A waiting
+   * worker never deadlocks: each line being warmed has a job in flight.
+   */
   const runPhase = async (phase: Job[]) => {
     const queue = phase.filter((job) => !finished.has(keyOf(job)));
+    const warm = new Set<string>();
+    const warming = new Set<string>();
+    let waiting: (() => void)[] = [];
+    const takeable = (job: Job) => !job.cacheLine || warm.has(job.cacheLine) || !warming.has(job.cacheLine);
     const worker = async () => {
-      for (let job = queue.shift(); job && !stoppedReason; job = queue.shift()) {
-        await runJob(job);
+      while (queue.length > 0 && !stoppedReason) {
+        const index = queue.findIndex(takeable);
+        if (index < 0) {
+          await new Promise<void>((resolve) => waiting.push(resolve));
+          continue;
+        }
+        const [job] = queue.splice(index, 1);
+        const line = job.cacheLine !== undefined && !warm.has(job.cacheLine) ? job.cacheLine : undefined;
+        if (line !== undefined) warming.add(line);
+        try {
+          await runJob(job);
+        } finally {
+          if (line !== undefined) {
+            warming.delete(line);
+            warm.add(line);
+            const woken = waiting;
+            waiting = [];
+            for (const wake of woken) wake();
+          }
+        }
       }
     };
     await Promise.all(Array.from({ length: maxInFlight }, () => worker()));

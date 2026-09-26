@@ -39,6 +39,14 @@ describe("validityReading", () => {
     expect(modelAttemptsByStep(call("a", [429, "valid"])).calls[0].map((r) => r.attempt)).toEqual([2]);
   });
 
+  it("counts a rejected request (a 400 naming a parameter) as neither a call nor an invalid first attempt", () => {
+    // The rejected job is re-planned, so its re-run starts again at attempt 1
+    const rejected = record({ jobKey: "r|arm|postfix|s1", caseId: "r", outcome: "http-error", status: 400, param: "prompt_cache_breakpoint", rejectedParam: true });
+    const rerun = record({ jobKey: "r|arm|postfix|s1", caseId: "r" });
+    expect(validityReading([rejected, rerun])).toEqual({ calls: 1, firstAttemptValid: 1, invalidFirstAttempts: 0, validWithinRetries: 1, transportOnly: 0 });
+    expect(validityReading([rejected])).toMatchObject({ calls: 0, invalidFirstAttempts: 0, transportOnly: 1 });
+  });
+
   it("counts a repaired first attempt as invalid, and valid only within production's retries", () => {
     const result = validityReading([
       ...call("third", ["repaired", "invalid-json", "valid"]),

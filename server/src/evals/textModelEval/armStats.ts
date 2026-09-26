@@ -172,7 +172,8 @@ export function armStatsOf(
     armKey: first.armKey,
     model: first.model,
     baseline: first.baseline,
-    calls: finals.length,
+    // A rejected request is planned again, so it is not a call
+    calls: finals.filter((r) => !r.rejectedParam).length,
     validity: validityReading(records),
     rates: {
       repaired: firstRate((r) => r.outcome === "repaired"),

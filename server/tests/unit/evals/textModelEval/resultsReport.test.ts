@@ -193,6 +193,16 @@ describe("computeArmStats", () => {
     expect(stats.validity).toMatchObject({ calls: 2, firstAttemptValid: 1, validWithinRetries: 2 });
   });
 
+  it("leaves a rejected request out of the call count, and reads its rate over all records", () => {
+    const records = [
+      record({ jobKey: "a|arm|postfix|s1", caseId: "a", outcome: "http-error", status: 400, rejectedParam: true, costUsd: 0, costSource: "none" }),
+      record({ jobKey: "a|arm|postfix|s1", caseId: "a" }),
+    ];
+    const [stats] = computeArmStats(records, new Map(), new Map([["a", tags()]]));
+    expect(stats.calls).toBe(1);
+    expect(stats.rates.rejectedParam).toBeCloseTo(0.5);
+  });
+
   it("takes the noise floor from the gap between baseline samples 1 and 2", () => {
     const checks = new Map<string, CheckResult>([
       ["o1", { checks: { paragraphs: true }, counts: {}, unknownIds: [] }],
