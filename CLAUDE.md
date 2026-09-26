@@ -156,6 +156,7 @@ React SPA with:
 - `/.context/ui.md` - Style guide
 - `/.context/story.md` - Story state and Story model classes
 - `/.context/image-generation.md` - Image generation flows, models/settings (which env var drives which flow; the image model and quality defaults come from the owner's blind rating of 2026-09-24, so change them only on a new rating), the image-model eval harness, and the owner's rating principles for image models
+- `/.context/text-model-eval.md` - Text models: every text `ChatOpenAI` must come from `shared/llm/chatModel.ts` (a closed set of model families, per-role env settings, capped retries), and prompts/schemas live in `storyTextSteps.ts`, which the eval replays. It covers the env names, the `[LLM]`/`[TurnTiming]` log lines, and how to run the capped text-model eval and its blind rating pages
 - `/.context/pregenerations.md` - Flows for pregenerating possible future story states (to reduce wait times for users)
 - `/.context/security.md` - Security layers and components
 - `/.context/template-hiding-ids.md` - Automated story element ID generation and deferred image file operations

@@ -20,7 +20,7 @@ The tests loop over the live list and check that every rule reaches every filter
 - AI Draft prompts (`POST /templates/generate`) and AI Iteration feedback (`POST /templates/:id/iterate`). These use the premise prompt: the rules, plus the older general-audience and copyright rules;
 - template-editor image requests (element image, identity portrait, cover), via `server/src/images/imageRequestScreening.ts`. These use the rules only, applied to the description plus the image-instruction text. The filter is told how many reference images come with the request; it cannot see them.
 
-The filter fails closed. The classifier gets one retry, on top of the OpenAI SDK's own retries for transient HTTP errors. If that fails, `ContentFilterUnavailableError` is thrown and nothing goes through:
+The filter fails closed. The classifier gets one retry. Each attempt is one LangChain call that itself retries at most twice (logged as `[LLM] retry`) and times out after 60 s, so the worst case is 2 attempts × 3 calls. If both attempts fail, `ContentFilterUnavailableError` is thrown and nothing goes through:
 
 - The story and AI Draft/Iteration routes refuse with their existing generic 500 message.
 - The image routes refuse with the existing `TECHNICAL` image error.
