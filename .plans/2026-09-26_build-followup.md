@@ -319,28 +319,28 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (eval run): **Do about 9% fewer established facts per turn matter?** Both turn trims record fewer facts on Luna medium (3.51 → 3.2) and Luna low (3.60 → 3.3–3.4), and more introductions and stat changes instead. Luna none does not. Later beats read the facts, so the Round 2 rating is the check.
 - Milestone 3 (eval run): **The setup trim, my reading: don't adopt it on its own.** It saves under half a cent per story and no measurable wait. On Luna low it pushed 2 of 36 setups to 5 visible player stats (full: 0 of 36). Stage 4's rewrite covers the setup prompt anyway.
 - Milestone 3 (planner): **Round 3 (8 items, about 20 minutes) comes after Rounds 1 and 2.** If Round 2 rates slim below full, read the Luna medium rewrite on the full scaffold instead; a second sample costs about $0.1.
-- Milestone 3 (eval run): **Stage 4 stopped at its cap, and the ledger probably understates what OpenAI billed.** Borderline Insights has the figures. Two things need you:
+- Milestone 3 (eval run): **Stage 4 stopped at its cap, and the ledger probably understates what OpenAI billed.** Borderline Insights has the figures. One thing needs you:
   - **Check the OpenAI usage page** for gpt-6-sol and gpt-6-luna on 2026-09-26, 13:20–14:40 UTC. Stage 4's GPT-6 calls ran 13:20:21–14:33:22, and the last hang timed out at 14:31:07.
     - The harness books a hung call at its estimate: $0.41 for the 5 Sol hangs and $0.10 for the 38 Luna hangs.
     - The answered GPT-6 calls in that window cost $1.61 ($1.42 Sol, $0.20 Luna). About that on the page means the hangs were not billed.
     - If those calls kept generating for the full 300 s, at the smoke's measured speeds (Sol about 80, Luna about 110 tokens per second), they cost about $1.8 of output, so the page shows about $3.4, and the bill is about $1.3 higher than the ledger (DERIVED from the price table). That makes about $26.1 in total, not $24.76.
     - It is more if OpenAI kept generating after the client disconnected.
     - A whole-day view mixes in about $14.3 of earlier GPT-6 spend (Stages 1–2 and 3, before 10:25 UTC).
-  - **Decide whether the rest is worth funding.** Every option takes the ledger past the $25 target ($24.76 now), and the total may be past it already if the hangs were billed. Cheapest first:
-    - replay 3–4 hung cases with an output cap (a few cents; the run path has no `max_completion_tokens` option yet, so it needs a small eval-only flag) to see where a loop starts;
-    - the verbosity arm (est $0.12);
-    - the full-scaffold hedge ($0.14), which is the comparison Round 3 would need if Round 2 rates slim below full;
-    - gpt-4.1 setup on the other 3 premises plus the open job without examples (about $0.45).
-    
-    You approved the count fix and its re-runs on 2026-09-26, at a $6 Stage 4 cap (Milestone 3 (count fix) entries). They are done, and Stage 4 stands at $5.61, so $0.39 is left under that cap. The verbosity arm and the hedge would fit it together (about $0.26 by their estimates); gpt-4.1's setups would not. The cap goes no higher without your go-ahead.
-- Milestone 3 (eval run): **4 of 88 Luna rewrite turns would fail in production.** Each hung three times at 300 s and answered only on a fourth attempt, which the eval's transport budget (3 retries on a timeout, `runner.ts`) allows and production's (`PRODUCTION_MAX_RETRIES = 2`) does not. In production that turn fails after about 9 minutes (3 × 180 s). One Sol setup (the ER doctor with examples) used all 3 attempts production allows. This decides nothing on its own while the rewrite isn't adopted, but it belongs in any adoption decision on the rewrite as measured.
-- Milestone 3 (eval run): **The shorter GPT-6 turn timeout (Suggested Follow-Up Work, Milestone 2) now has Stage 4 data.** A 90 s beat timeout would halve a hang's wait and cap its possible output cost at about $0.005 per Luna call. The one Luna rewrite turn that recovered (176 s) would have been cut off and retried, and 60 s would cut off normal 3-player turns (Round 1 p95 62 s). It changes production behaviour, so it is your call.
+    - Stage 4b adds only 3 hung Luna calls (16:48–17:14 UTC), at most about $0.05 even if billed (DERIVED).
 - Milestone 3 (count fix): **Rate Round 3 after Rounds 1 and 2:** `DOCS/2026-09-26_gpt6-text-eval/rating/round3-turns.html`, rebuilt from the count fix. It has 10 items (8 regular, a repeat and a control), 2 options each, about 20 minutes.
   - The export downloads as `ratings-text-turn-c4867b2d79.json`. Hand it to the next session for `--score`, which finds `keys/round3-turns-c4867b2d79.json` by its page id (checked with a test export).
   - The v1 page is kept, unrated, as `rating/superseded/round3-turns-v1.html` (key `keys/superseded/round3-turns-v1-291fb89390.json`). Don't rate it. If you had started rating it, those answers stay under its own page id and don't carry over.
   - No option on the new page has a blank item, so the v1 page's blank-bullet tell is gone.
-  - Two structural differences remain, both real content that a player would see. On 2 of the 8 regular items (items 2 and 4), one version writes 2 interludes where the other writes 3. On every regular item, one version's story text is 57–89 words shorter. The Stage 4b entries in Borderline Insights say which version does which, so read them after rating if you want Round 3 blind.
-  - The Stage 4 report's section 9 still describes the v1 page (its export name and the blank-interlude caveat). Suggested Follow-Up Work has the update.
+  - Two structural differences remain, both real content that a player would see. On 2 of the 8 regular items (items 2 and 4), one version writes 2 interludes where the other writes 3. On every regular item, one version's story text is 56–89 words shorter. The Stage 4b entries in Borderline Insights say which version does which, so read them after rating if you want Round 3 blind.
+- Milestone 3 (count fix): **Owner decisions left after Stage 4b** (the owner report's section 2; the usage-page check and the Round 3 rating are the entries above).
+  - **The setup wait cap** (open since Round 1, Milestone 2 entry above). On Stage 4's 9 premises every Sol setup median is over the 57.6 s cap: today's form 62.5 s (single-player 60.2 s), v2 80.0 s with examples and 81.6 s without (single-player 77.2 and 70.5 s). Round 1's 16 single-player setups on today's form read 55.2 s, within it. If the cap is loosened, my reading is to carry v2 without examples forward on cost (10% cheaper, from the 18% shorter prompt), with the play-test as the quality check: 9 setups with no noise floor don't separate the two forms on quality.
+  - **The shorter GPT-6 turn timeout and a production output cap, decided together** (they replace the Stage 4 timeout entry; the Milestone 2 timeout suggestion under Suggested Follow-Up Work stays). Either bounds a padded reply. At 90 s the two v2 replies past 180 s (208 and 275 s) would be retried sooner, and a hang would cost 1.5 minutes instead of 3; no unpadded v2 turn took longer than 57.2 s, but Luna medium's 3-player p95 was 62 s in Round 1. On output, the longest unpadded v2 turn wrote 6,770 tokens and Luna medium's 3-player turns up to 8,938, so a cap near 12,000 would have stopped the two long padded replies (24,500 and 39,530) and no normal turn (DERIVED). Both change production (an output cap changes the request shape, since production sends none).
+  - **Whether to use the $0.39 left under the $6 Stage 4 cap.** The raise was recorded for the count fix only, so each option needs the owner's go-ahead:
+    - replay the story 8988006e turn 4 cases with an output cap (a few cents, plus the eval-only option under Suggested Follow-Up Work) to see where the padding starts and whether a hang is padding past 300 s;
+    - the verbosity arm and the full-scaffold hedge (about $0.26 by their estimates), which are still defined on the `exact` counts (`stage4Arms` in `arms.ts`) and would need `worded` versions first, or they reproduce v1's hangs and blanks. The hedge matters only if Round 2 rates slim below full;
+    - gpt-4.1's open setups (about $0.45, doesn't fit), also on the `exact` counts.
+    
+    The cap goes no higher without the owner's go-ahead.
 
 ## Implementation Issues
 
@@ -631,7 +631,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
     - `end-8988006e-t4-o0` s1 at 17:08:43;
     - `synth-8988006e-t4-pregeneration_3_player1_1` s2 at 17:14:04.
 
-    All three are story 8988006e turn 4, which hung on 8 of its first 10 v1 attempts. There was also one connection error (`cont-8988006e-t3-o2` s1, 17:12:54, after 37 ms), retried at once. No job needed more than 2 attempts, so none would have failed within production's 3. On v1, 4 jobs needed a fourth attempt.
+    All three are story 8988006e turn 4, which hung on 8 of its first 10 v1 attempts. There was also one connection error (`cont-8988006e-t3-o2` s1, 17:12:54, after 37 ms), retried at once. No job needed more than 2 attempts in the eval. That is not a production result: the two padded replies past 180 s (below) finished inside the eval's 300 s, so production's retries of them were never observed. On v1, 4 jobs needed a fourth attempt.
   - **Padding after the beat closes.** Four v2 turns wrote a run of whitespace after the interludes list and the player object had closed, just before the reply's last brace:
 
     | Case | Whitespace characters | Output tokens | Wait |
@@ -679,7 +679,7 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - **Blank items: none, on either version.** A jq scan of all 18 stored replies behind the page found no empty or whitespace-only list item and no item with blank text. The rendered page has no empty bullet. Turn-07 (`cont-8988006e-t3-o0`), where v1 blanked two of three interludes, now writes three.
   - **The tells that remain are real content.**
     - Interludes: v2 writes 2 on turn-02 and turn-04 (at A both times), and slim writes 3 on every item.
-    - Length: v2's story text is shorter on all 8 regular items, 223–333 words against slim's 294–390 (57–89 fewer; image tags stripped).
+    - Length: v2's story text is shorter on all 8 regular items, 223–333 words against slim's 294–390 (56–89 fewer; image tags stripped).
     - Openings: 1 of the 8 v2 texts opens with "You", against 4 of slim's 8.
     - Options (3) and show-don't-tell points (3) are the same on every option.
   - **The browser check** (Playwright, with `rating/` only served on 127.0.0.1):
@@ -691,10 +691,31 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
   - `--score` on the captured export found `keys/round3-turns-c4867b2d79.json`. Then I deleted the test scores and the export, and removed the test rating from the browser's storage. I checked the origin's storage was empty from a same-origin 404 page, because the rating page writes its state again whenever it loads. Then I closed the browser, stopped the server and deleted this run's `.playwright-mcp/` files. The three files from 2026-03-15 are untouched.
 - Milestone 3 (count fix): **Stage 4b owner report: `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage4-fix-report.md`.** Figures the earlier entries don't have (DERIVED from `calls.jsonl` and `results.md`, which was current at 17:33 UTC and not rewritten):
   - **Story 8988006e turn 4 is where v2's trouble sits.** On that turn, 6 of v2's 17 attempts (14 jobs) hung or padded, against 0 of slim's 14 and 5 of Round 1's 95 GPT-6 beat attempts (2 hangs, 3 padded). Elsewhere v2 had no hang and one padded reply (`first-tpl-e401abf2-p1`, which hung once in Round 1 on Luna none prod).
-  - **The lead on v2** (Luna medium v2 turns, Luna low minimal planning, Sol low v2 setup with examples, 1 player): $0.328 billed and $0.379 caching off, replies only; $0.339 and $0.390 with hung and failed calls at their estimate; $0.295 and $0.346 without the 4 padded replies. Caching off per turn is $0.00302, 10% above slim's $0.00274.
+  - **The lead on v2** (Luna medium v2 turns, Luna low minimal planning, Sol low v2 setup with examples, 1 player): $0.328 billed and $0.379 caching off, replies only; $0.339 and $0.390 with hung and failed calls at their estimate; $0.295 and $0.346 without the 4 padded replies. Caching off per turn is $0.00302, 10% above slim's $0.00274, all of it from the 4 padded replies ($0.00264 without them, 4% below slim).
   - **60 s reading:** thread planning p95 7.6 s + v2 turn p95 54.2 s = 61.8 s, over by 1.8 s; 56.1 s on the 84 unpadded replies (turn p95 48.5 s, nearest rank as `percentile` computes it).
   - **Sol v2 single-player slowest:** 82.1 s with examples, 71.1 s without, both over the 68.3 s p95 cap (v1 without examples read 67.0 s, within). At Round 1's 93 tokens a second the medians would be about 61 s and 60 s, still over 57.6 s.
   - **Billing if hangs are billed:** v2's hang rate would add about $0.03–0.05 per story (v1: $0.36–0.61); Stage 4b's 3 hangs at most about $0.05 in total.
+- Milestone 3 (count fix): **Stage 4b headline numbers, as the owner report states them after its check.**
+  - **Spend:** Stage 4b $1.62; Stage 4 $5.61 of the $6 raise; ledger total $26.38 of $30 ($1.38 over the ~$25 target; about $27.7 if Stage 4's 43 hangs were billed).
+  - **Fixed:** blank items 14 → 0 of 88 Luna turns and 3 → 0 of 18 Sol setups; hangs 43 of 149 → 3 of 110 GPT-6 attempts; no list left short; at most 2 attempts per job in the eval.
+  - **Left:** padding after the beat closed on 4 of 88 Luna turns (slim and v1 none), 3 of them on story 8988006e turn 4, where 4 of v2's 17 attempts would have run past production's 180 s (about a 1% chance per turn there of failing all 3 production attempts, DERIVED as (4/17)³). Production would retry 5 of 88 v2 turns (v1: 25).
+  - **Luna v2 against slim:** words 334 → 267, facts 3.20 → 3.58, "You" openings 48 → 9; p50 26.6 → 32.0 s, p95 35.1 → 54.2 s; $0.00274 → $0.00264 per turn billed (replies only), $0.00226 without the padded replies. v1 on the same basis (without its one padded reply) is $0.00212, so v2 is about 7% above v1.
+  - **The lead on v2:** $0.328 billed, $0.379 caching off (replies only); $0.295 and $0.346 without the padded replies, below Stage 3's $0.362 on both. 60 s reading 61.8 s (56.1 s without the padded replies).
+  - **Sol v2 setup:** every check 100% without examples, two count slips with examples; $0.0805 and $0.0726 per setup billed against $0.1053 today; every wait reading over the setup caps.
+- Milestone 3 (count fix): **Report corrections before hand-off.** Independent checkers read the fix report against `calls.jsonl`, the outputs, `results.md`, `arms.ts` and the Stage 4 report. Corrected:
+  - the Round 3 length tell is 56–89 words, not 57–89 (item 9: 329 against 273), here too;
+  - "every Sol setup median is over the cap, today's form included" now names Stage 4's 9 premises and gives Round 1's within-cap 55.2 s single-player reading beside it;
+  - "no turn would fail in production" became "at most 2 attempts in the eval", with the two unobserved production retries and the turn-4 rate;
+  - the caching-off cost rise over slim is the padded replies, not the reasoning, and v2 is compared with v1 on the same unpadded basis;
+  - the blind-rating note now lists the sections that give the versions away (1, 3, 4, 5, 8 and 11) and sends the rater to section 9 only;
+  - section 2 now carries the turn-4 replay, a production output cap beside the timeout, and says the verbosity arm, the hedge and gpt-4.1's setups are still on the `exact` counts and that the $0.39 needs the owner's go-ahead;
+  - the list-count checks' new findings are stated as new (Sol v1 neo-Tokyo's 5 outcomes, which the Stage 4 report read as "all pass"; gpt-4.1 v1's three-outcome misses);
+  - v1's one padded reply is no longer counted as the same after-the-end pattern;
+  - "without examples is the better form" is now a cost reading, with the play-test as the quality check;
+  - wording: the runaway sentence, the retry column's label, "a warm call", and the results file's post-fix caps (unchanged since Round 1).
+  - Rejected in part: the checker's turn-4 failure estimate of about 4% per turn, (6/17)³. It counted the two padded replies that finished in 54 and 68 s, which production's 180 s timeout would not cut off; the report uses 4 of 17 (about 1%). And gpt-4.1 v1 without examples misses the three-outcome count on 4 of 5 setups, not 1 of 5 (the results file reads 20% passing).
+  - The Stage 4 report now points to the fix report under its header, and its Round 3 note and section 9 link point to `rating/superseded/round3-turns-v1.html`.
+- Milestone 3 (count fix): **Privacy page and AI transparency record: checked, no change** (the report and docs step). No production model, feature, prompt, schema, default or data flow changed; this step edited only the eval's reports, `.context/text-model-eval.md` and this file.
 
 ## Suggested Follow-Up Work
 
@@ -734,7 +755,4 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (planner): On adoption: move the message shaping to `shared/llm/` beside the factory, and decide an explicit cache TTL there (a production request-shape change, the owner's call).
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
-- Milestone 3 (count fix): **Docs for Stage 4b.** The runs, the Round 3 rebuild and the owner report (`DOCS/2026-09-26_gpt6-text-eval/2026-09-26_stage4-fix-report.md`) are done. What's left:
-  - The Stage 4 report's section 9 (and its blind-rating note at the top) still describes the v1 page: its export name `ratings-text-turn-291fb89390.json` and the blank-interlude caveat. The new page's export is `ratings-text-turn-c4867b2d79.json`, and its remaining tells are the interlude count and the length (User Input Needed).
-  - `.context/text-model-eval.md` Known limits still names `keys/round3-turns-291fb89390.json` (now in `keys/superseded/`), calls the worded counts "the fix under test", and doesn't record Stage 4b's spend.
 - Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.
