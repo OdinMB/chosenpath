@@ -6,6 +6,7 @@ import {
   Resolution,
   ResolutionExploration,
   DifficultyLevel,
+  PlayerSlot,
 } from "core/types/index.js";
 import {
   POINTS_FOR_FAVORABLE_RESOLUTION,
@@ -20,6 +21,76 @@ export interface ChallengeResolutionResult {
   details: ResolutionDetails;
 }
 export class BeatResolutionService {
+  /**
+   * Resolves the choice already recorded on a player's current beat: an
+   * exploration option maps to its resolution, a challenge option rolls
+   * against its points and stores the roll's details.
+   */
+  static resolveChoice(
+    story: Story,
+    playerSlot: PlayerSlot,
+    optionIndex: number,
+    difficultyLevel: DifficultyLevel
+  ): Story {
+    const currentBeat = story.getCurrentBeat(playerSlot);
+
+    // If no beat exists, return the story unchanged
+    if (!currentBeat) {
+      console.log(
+        "[BeatResolutionService] ERROR: No current beat found for",
+        playerSlot
+      );
+      return story;
+    }
+
+    // For Exploration Beats, just set the resolution directly
+    if (currentBeat.options[optionIndex].optionType === "exploration") {
+      const beatResolution = this.getExplorationBeatResolution(currentBeat);
+      console.log(
+        "[BeatResolutionService] Updating exploration beat resolution for",
+        playerSlot,
+        "to",
+        beatResolution
+      );
+      return story.updateBeatResolution(playerSlot, beatResolution);
+    }
+
+    // Process challenge beat resolution
+    const threadLastStepResolution =
+      story.getCurrentThreadLastStepResolution(playerSlot);
+
+    // Ensure difficultyLevel is valid
+    const dLevel = difficultyLevel || {
+      title: "Error: Missing Difficulty",
+      modifier: 0,
+    };
+
+    if (!difficultyLevel) {
+      console.error(
+        `[BeatResolutionService] resolveChoice called with null/undefined difficultyLevel for story ${story.getId()}. Using default.`
+      );
+    }
+
+    const result = this.getChallengeBeatResolution(
+      currentBeat,
+      threadLastStepResolution,
+      dLevel,
+      story
+    );
+
+    console.log(
+      "[BeatResolutionService] Updating challenge beat resolution for",
+      playerSlot,
+      "to",
+      result.resolution
+    );
+
+    // First add resolution details, then the actual resolution
+    return story
+      .updateBeatResolutionDetails(playerSlot, result.details)
+      .updateBeatResolution(playerSlot, result.resolution);
+  }
+
   static getExplorationBeatResolution(beat: Beat): ResolutionExploration {
     // For exploration beats, the resolution is based on the option index
     // Get the total number of available options

@@ -7,6 +7,7 @@ import {
 import { AIImageGenerator } from "../../images/AIImageGenerator.js";
 import { ChangeService } from "./ChangeService.js";
 import { ThreadResolutionService } from "./ThreadResolutionService.js";
+import { analysisBefore } from "./storyTextSteps.js";
 import { pregenerationService } from "./PregenerationService.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
 import { Logger } from "shared/logger.js";
@@ -59,15 +60,10 @@ export class StoryProgressionService {
       );
     }
 
-    let currentStory = story.clone();
-
-    // Handle thread resolutions if needed
-    if (this.checkNeedsThreadResolution(currentStory)) {
-      // console.log(
-      //   "[StoryProgressionService] Determining resolutions for previous set of beats"
-      // );
-      currentStory = await this.processThreadResolutions(currentStory);
-    }
+    // Resolve the current threads' latest steps (and milestones) if needed
+    let currentStory = ThreadResolutionService.resolveCurrentThreads(
+      story.clone()
+    );
 
     // Determine next beat type and handle preparatory steps
     const nextBeatType = this.checkNextBeatType(currentStory);
@@ -139,93 +135,10 @@ export class StoryProgressionService {
   }
 
   /**
-   * Check if thread resolution is needed
-   */
-  private checkNeedsThreadResolution(story: Story): boolean {
-    return (
-      story.getCurrentBeatType() === "thread" &&
-      !story.isCurrentThreadResolved()
-    );
-  }
-
-  /**
    * Determine the next beat type to create
    */
   private checkNextBeatType(story: Story): BeatType {
     return story.determineNextBeatType();
-  }
-
-  /**
-   * Process thread resolutions for the story
-   */
-  private async processThreadResolutions(story: Story): Promise<Story> {
-    // console.log(
-    //   "[StoryProgressionService] Starting thread resolution determination"
-    // );
-
-    let updatedStory: Story = story.clone();
-    const threadAnalysis = updatedStory.getCurrentThreadAnalysis();
-
-    if (!threadAnalysis) {
-      console.log(
-        "[StoryProgressionService] ERROR: No thread analysis found, returning story unchanged"
-      );
-      return story;
-    }
-
-    // Process each thread to determine its next step's resolution
-    for (const thread of threadAnalysis.threads) {
-      const resolution = ThreadResolutionService.getThreadResolution(
-        thread,
-        updatedStory
-      );
-      // console.log(
-      //   `[StoryProgressionService] Determined resolution for thread ${thread.id}: ${resolution}`
-      // );
-      updatedStory = updatedStory.updateThreadResolution(thread, resolution);
-    }
-
-    // If the threads are resolved, set the milestones
-    if (updatedStory.isCurrentThreadResolved()) {
-      // console.log(
-      //   "[StoryProgressionService] Threads are resolved, setting milestones"
-      // );
-
-      const updatedThreadAnalysis = updatedStory.getCurrentThreadAnalysis();
-      if (!updatedThreadAnalysis) {
-        console.log(
-          "[StoryProgressionService] ERROR: No thread analysis found after resolution"
-        );
-        return updatedStory;
-      }
-
-      for (const thread of updatedThreadAnalysis.threads) {
-        if (!thread.resolution) {
-          console.log(
-            `[StoryProgressionService] ERROR: Thread ${thread.id} has no resolution, skipping milestone`
-          );
-          continue;
-        }
-
-        const milestone = ThreadResolutionService.getMilestone(
-          thread,
-          thread.resolution
-        );
-        // console.log(
-        //   `[StoryProgressionService] Setting milestone for thread ${thread.id}: ${milestone}`
-        // );
-
-        if (milestone) {
-          updatedStory = updatedStory.updateThreadMilestone(thread, milestone);
-        } else {
-          console.log(
-            `[StoryProgressionService] ERROR: No milestone generated for thread ${thread.id}`
-          );
-        }
-      }
-    }
-
-    return updatedStory;
   }
 
   /**
@@ -236,26 +149,18 @@ export class StoryProgressionService {
     nextBeatType: BeatType,
     context: GenerationContext
   ): Promise<Story> {
-    let updatedStory = story.clone();
+    const updatedStory = story.clone();
 
-    if (nextBeatType === "switch") {
-      console.log("[StoryProgressionService] Generating switches");
-      updatedStory = await this.aiStoryGenerator.generateSwitches(
-        updatedStory,
-        context
-      );
-    } else if (
-      nextBeatType === "thread" &&
-      updatedStory.getCurrentThreadBeatsCompleted() === 0
-    ) {
-      console.log("[StoryProgressionService] Generating threads");
-      updatedStory = await this.aiStoryGenerator.generateThreads(
-        updatedStory,
-        context
-      );
+    switch (analysisBefore(updatedStory, nextBeatType)) {
+      case "switch":
+        console.log("[StoryProgressionService] Generating switches");
+        return this.aiStoryGenerator.generateSwitches(updatedStory, context);
+      case "thread":
+        console.log("[StoryProgressionService] Generating threads");
+        return this.aiStoryGenerator.generateThreads(updatedStory, context);
+      default:
+        return updatedStory;
     }
-
-    return updatedStory;
   }
 
   /**

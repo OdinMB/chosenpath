@@ -7,6 +7,66 @@ import type { Story } from "core/models/Story.js";
  */
 export class ThreadResolutionService {
   /**
+   * Before the next beat: when the current thread phase is not resolved yet,
+   * resolves each thread's latest step and, once the threads are resolved,
+   * sets their milestones. Returns the story unchanged otherwise.
+   */
+  static resolveCurrentThreads(story: Story): Story {
+    if (
+      story.getCurrentBeatType() !== "thread" ||
+      story.isCurrentThreadResolved()
+    ) {
+      return story;
+    }
+
+    let updatedStory: Story = story.clone();
+    const threadAnalysis = updatedStory.getCurrentThreadAnalysis();
+
+    if (!threadAnalysis) {
+      console.log(
+        "[ThreadResolutionService] ERROR: No thread analysis found, returning story unchanged"
+      );
+      return story;
+    }
+
+    for (const thread of threadAnalysis.threads) {
+      const resolution = this.getThreadResolution(thread, updatedStory);
+      updatedStory = updatedStory.updateThreadResolution(thread, resolution);
+    }
+
+    if (!updatedStory.isCurrentThreadResolved()) {
+      return updatedStory;
+    }
+
+    const updatedThreadAnalysis = updatedStory.getCurrentThreadAnalysis();
+    if (!updatedThreadAnalysis) {
+      console.log(
+        "[ThreadResolutionService] ERROR: No thread analysis found after resolution"
+      );
+      return updatedStory;
+    }
+
+    for (const thread of updatedThreadAnalysis.threads) {
+      if (!thread.resolution) {
+        console.log(
+          `[ThreadResolutionService] ERROR: Thread ${thread.id} has no resolution, skipping milestone`
+        );
+        continue;
+      }
+      const milestone = this.getMilestone(thread, thread.resolution);
+      if (milestone) {
+        updatedStory = updatedStory.updateThreadMilestone(thread, milestone);
+      } else {
+        console.log(
+          `[ThreadResolutionService] ERROR: No milestone generated for thread ${thread.id}`
+        );
+      }
+    }
+
+    return updatedStory;
+  }
+
+  /**
    * Determines the resolution for a thread based on its type and step resolutions
    * @param thread The thread to determine resolution for
    * @param story The story to determine the resolution for

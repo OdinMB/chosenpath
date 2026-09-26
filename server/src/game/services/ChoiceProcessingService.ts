@@ -69,68 +69,7 @@ export class ChoiceProcessingService {
     optionIndex: number,
     difficultyLevel: DifficultyLevel
   ): Story {
-    const currentBeat = story.getCurrentBeat(playerSlot);
-
-    // If no beat exists, return the story unchanged
-    if (!currentBeat) {
-      console.log(
-        "[ChoiceProcessingService] ERROR: No current beat found for",
-        playerSlot
-      );
-      return story;
-    }
-
-    let updatedStory = story;
-
-    // For Exploration Beats, just set the resolution directly
-    if (currentBeat.options[optionIndex].optionType === "exploration") {
-      const beatResolution = BeatResolutionService.getExplorationBeatResolution(currentBeat);
-      console.log(
-        "[ChoiceProcessingService] Updating exploration beat resolution for",
-        playerSlot,
-        "to",
-        beatResolution
-      );
-      return story.updateBeatResolution(playerSlot, beatResolution);
-    }
-
-    // Process challenge beat resolution
-    const threadLastStepResolution = story.getCurrentThreadLastStepResolution(playerSlot);
-
-    // Ensure difficultyLevel is valid
-    const dLevel = difficultyLevel || {
-      title: "Error: Missing Difficulty",
-      modifier: 0,
-    };
-
-    if (!difficultyLevel) {
-      console.error(
-        `[ChoiceProcessingService] processBeatResolution called with null/undefined difficultyLevel for story ${story.getId()}. Using default.`
-      );
-    }
-
-    const result = BeatResolutionService.getChallengeBeatResolution(
-      currentBeat,
-      threadLastStepResolution,
-      dLevel,
-      story
-    );
-
-    console.log(
-      "[ChoiceProcessingService] Updating challenge beat resolution for",
-      playerSlot,
-      "to",
-      result.resolution
-    );
-
-    // First add resolution details
-    updatedStory = story.updateBeatResolutionDetails(
-      playerSlot,
-      result.details
-    );
-
-    // Then update the actual resolution
-    return updatedStory.updateBeatResolution(playerSlot, result.resolution);
+    return BeatResolutionService.resolveChoice(story, playerSlot, optionIndex, difficultyLevel);
   }
 
   /**

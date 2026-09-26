@@ -7,8 +7,6 @@ import type {
   TemplateSetupGeneration,
   PlayerOptionsGeneration,
   Change,
-  Beat,
-  BeatGeneration,
   SetOfBeatGenerationSchema,
   ImageRequest,
   SwitchAnalysis,
@@ -18,20 +16,9 @@ import type {
   DifficultyLevel,
   StatValueEntry,
 } from "core/types/index.js";
-import {
-  createStorySetupSchema,
-  createSwitchAnalysisSchema,
-  threadAnalysisSchema,
-  PLAYER_SLOTS,
-  PlayerState,
-} from "core/types/index.js";
+import { PlayerState } from "core/types/index.js";
 import { Logger } from "shared/logger.js";
 import { getPlayerSlots } from "core/utils/playerUtils.js";
-import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
-import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
-import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
-import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
-import { BeatPromptService } from "./prompts/BeatPromptService.js";
 import { Story } from "core/models/Story.js";
 import {
   MOCK_STORIES_IN_DEVELOPMENT,
@@ -47,8 +34,13 @@ import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
-import { z } from "zod";
-import { templateIterationSections } from "core/utils/templateIterationSections.js";
+import {
+  beatStep,
+  partialTemplateSchema,
+  setupStep,
+  switchStep,
+  threadStep,
+} from "./storyTextSteps.js";
 
 dotenv.config();
 
@@ -197,23 +189,23 @@ export class AIStoryGenerator {
     gameMode: GameMode,
     maxTurns: number
   ): Promise<TemplateSetupGeneration<typeof playerCount>> {
-    const schema = createStorySetupSchema(playerCount, "template");
-    const structuredModel =
-      this.modelFor("templateGeneration").withStructuredOutput(schema);
+    const request = setupStep.request(
+      prompt,
+      playerCount,
+      gameMode,
+      maxTurns,
+      "template"
+    );
+    const structuredModel = this.modelFor(
+      "templateGeneration"
+    ).withStructuredOutput(request.schema);
 
     try {
       Logger.Story.log(
         `Generating template setup with playerCount: ${playerCount}`
       );
 
-      const setupPrompt = StorySetupPromptService.createSetupPrompt(
-        prompt,
-        playerCount,
-        gameMode,
-        maxTurns
-      );
-
-      const result = await structuredModel.invoke(setupPrompt, {
+      const result = await structuredModel.invoke(request.prompt, {
         metadata: { players: playerCount },
       });
       Logger.Story.log("Template setup generated");
@@ -268,22 +260,23 @@ export class AIStoryGenerator {
     }
 
     // Generate a new story setup using the LLM
-    const schema = createStorySetupSchema(playerCount);
-    const structuredModel = this.modelFor("setup").withStructuredOutput(schema);
+    const request = setupStep.request(
+      prompt,
+      playerCount,
+      gameMode,
+      maxTurns,
+      "story"
+    );
+    const structuredModel = this.modelFor("setup").withStructuredOutput(
+      request.schema
+    );
 
     try {
       Logger.Story.log(
         `Generating story setup with playerCount: ${playerCount}`
       );
 
-      const setupPrompt = StorySetupPromptService.createSetupPrompt(
-        prompt,
-        playerCount,
-        gameMode,
-        maxTurns
-      );
-
-      const result = await structuredModel.invoke(setupPrompt, {
+      const result = await structuredModel.invoke(request.prompt, {
         metadata: { players: playerCount },
       });
       // Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
@@ -318,86 +311,36 @@ export class AIStoryGenerator {
     story: Story,
     context?: GenerationContext
   ): Promise<Story> {
-    const schema = createSwitchAnalysisSchema(
-      Object.keys(story.getPlayers()).length as PlayerCount
-    );
+    const request = switchStep.request(story);
     const structuredModel = this.modelFor(
       "switchAnalysis",
       story.isMultiplayer()
-    ).withStructuredOutput(schema);
-    const prompt = SwitchPromptService.createSwitchAnalysisPrompt(story);
+    ).withStructuredOutput(request.schema);
 
-    const response = (await structuredModel.invoke(prompt, {
+    const response = (await structuredModel.invoke(request.prompt, {
       metadata: storyTags(story, context),
     })) as SwitchAnalysis;
-    // Logger.Story.log(JSON.stringify(response, null, 2));
     Logger.Story.log("Switches generated");
 
-    const currentBeatIndex = story.getCurrentTurn() - 1;
-    const firstBeatIndexOfSwitch = currentBeatIndex + 1;
-
-    // Create the transformed SwitchAnalysis
-    const transformedResponse: SwitchAnalysis = {
-      ...response,
-      firstBeatIndex: firstBeatIndexOfSwitch,
-      duration: 1,
-    };
-
-    return story.addPhase(transformedResponse);
+    return switchStep.apply(story, response);
   }
 
   async generateThreads(
     story: Story,
     context?: GenerationContext
   ): Promise<Story> {
-    const schema = threadAnalysisSchema;
+    const request = threadStep.request(story);
     const structuredModel = this.modelFor(
       "threadAnalysis",
       story.isMultiplayer()
-    ).withStructuredOutput(schema);
-    const prompt = ThreadPromptService.createThreadPrompt(story);
+    ).withStructuredOutput(request.schema);
 
-    const response = (await structuredModel.invoke(prompt, {
+    const response = (await structuredModel.invoke(request.prompt, {
       metadata: storyTags(story, context),
     })) as ThreadAnalysis;
-    // Logger.Story.log(JSON.stringify(response, null, 2));
     Logger.Story.log("Threads generated");
 
-    const currentBeatIndex = story.getCurrentTurn() - 1;
-    const firstBeatIndexOfThread = currentBeatIndex + 1;
-
-    // Transform the threads to include the new properties
-    const transformedThreads = response.threads.map((thread) => {
-      // Transform each ThreadStep to include resolution
-      const transformedSteps = thread.progression.map((step) => ({
-        ...step,
-        resolution: null,
-      }));
-
-      // Transform the Thread to include the new properties
-      return {
-        ...thread,
-        firstBeatIndex: firstBeatIndexOfThread,
-        duration: response.duration,
-        progression: transformedSteps,
-        resolution: null,
-        milestone: null,
-      };
-    });
-
-    // Create the transformed ThreadAnalysis
-    const transformedResponse: ThreadAnalysis = {
-      ...response,
-      firstBeatIndex: firstBeatIndexOfThread,
-      threads: transformedThreads,
-    };
-
-    // Modify players' previousTypesOfThreads to include the new thread type
-    const updatedStory =
-      story.updatePlayerPreviousThreadTypes(transformedThreads);
-
-    // Add the phase to the updated story
-    return updatedStory.addPhase(transformedResponse);
+    return threadStep.apply(story, response);
   }
 
   async generateBeats(
@@ -407,14 +350,7 @@ export class AIStoryGenerator {
   ): Promise<[Story, Change[], ImageRequest[]]> {
     try {
       const response = await this.generateBeatsResponse(story, context);
-      const [updatedStory, imageRequests] = this.processBeatsResponse(
-        story,
-        response,
-        skipImageRequests
-      );
-      const mergedChanges = this.mergeChanges(response);
-
-      return [updatedStory, mergedChanges, imageRequests];
+      return beatStep.apply(story, response, skipImageRequests);
     } catch (error) {
       Logger.Story.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");
@@ -425,33 +361,20 @@ export class AIStoryGenerator {
     story: Story,
     context?: GenerationContext
   ): Promise<SetOfBeatGenerationSchema> {
-    const schema = createSetOfBeatGenerationSchema(
-      story.getNumberOfPlayers(),
-      // canAddMilestones = true only if it's the ending or (a switch and not the beginning of the story)
-      story.getCurrentBeatType() === "ending" ||
-        (story.getCurrentBeatType() === "switch" && !story.isFirstBeat()),
-      // multiplayerCoordination = true only if it's a multiplayer game
-      story.isMultiplayer(),
-      // Pass the generateImages flag from the story
-      story.generatesImages(),
-      // Pass the hasImages flag from the story
-      story.hasImages()
-    );
+    const request = beatStep.request(story);
     const structuredModel = this.modelFor(
       "beat",
       story.isMultiplayer()
-    ).withStructuredOutput(schema);
+    ).withStructuredOutput(request.schema);
 
     Logger.Story.log(
       `Generating beats for turn: ${story.getCurrentTurn() + 1}`
     );
 
-    const response = (await structuredModel.invoke(
-      BeatPromptService.createBeatPrompt(story),
-      { metadata: storyTags(story, context, story.getCurrentBeatType()) }
-    )) as SetOfBeatGenerationSchema;
+    const response = (await structuredModel.invoke(request.prompt, {
+      metadata: storyTags(story, context, story.getCurrentBeatType()),
+    })) as SetOfBeatGenerationSchema;
 
-    // Logger.Story.log(JSON.stringify(response, null, 2));
     Logger.Story.log("Beats generated");
     return response;
   }
@@ -459,77 +382,6 @@ export class AIStoryGenerator {
   async generateEnding(story: Story): Promise<Story> {
     // TODO: Generate ending
     return story;
-  }
-
-  private processBeatsResponse(
-    story: Story,
-    response: SetOfBeatGenerationSchema,
-    skipImageRequests: boolean = false
-  ): [Story, ImageRequest[]] {
-    let updatedStory = story.clone();
-    const imageRequests: ImageRequest[] = [];
-
-    Object.entries(response).forEach(([key, value]) => {
-      if (this.isPlayerBeat(key)) {
-        const playerSlot = key.toLowerCase();
-        const beatData = value as BeatGeneration;
-
-        if (updatedStory.getPlayer(playerSlot)) {
-          const beat: Beat = {
-            ...beatData,
-            choice: -1,
-            resolution: null,
-          };
-
-          updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
-
-          // If the imageRequest is an object, add it to the imageRequests array
-          // Only collect image requests if generateImages is true AND we're not skipping them
-          if (
-            !skipImageRequests &&
-            story.generatesImages() &&
-            beat.imageRequest &&
-            typeof beat.imageRequest === "object"
-          ) {
-            imageRequests.push(beat.imageRequest as ImageRequest);
-          }
-        } else {
-          throw new Error(
-            `Player ${playerSlot} not found in story. This should never happen.`
-          );
-        }
-      }
-    });
-
-    return [updatedStory, imageRequests];
-  }
-
-  private isPlayerBeat(key: string): boolean {
-    return PLAYER_SLOTS.includes(key.toLowerCase());
-  }
-
-  private mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
-    const playerBeats = Object.entries(response)
-      .filter(([key]) => this.isPlayerBeat(key))
-      .map(([, value]) => value as BeatGeneration);
-
-    const allEstablishedFacts = playerBeats.flatMap(
-      (beat) => beat.plan.establishedFacts || []
-    );
-    const allNewGameElements = playerBeats.flatMap(
-      (beat) => beat.plan.newGameElements || []
-    );
-    const allNewIntroductions = playerBeats.flatMap(
-      (beat) => beat.plan.newIntroductionsOfStoryElements || []
-    );
-
-    return [
-      ...(response.statChanges || []),
-      ...(response.newMilestones || []),
-      ...allEstablishedFacts,
-      ...allNewGameElements,
-      ...allNewIntroductions,
-    ];
   }
 
   /**
@@ -550,40 +402,9 @@ export class AIStoryGenerator {
         sections
       );
 
-      // Get the full schema
-      const fullSchema = createStorySetupSchema(playerCount, "template");
-      const shapeEntries = Object.entries(fullSchema.shape);
+      const partialSchema = partialTemplateSchema(sections, playerCount);
+      Logger.Story.log("Fields to keep:", Object.keys(partialSchema.shape));
 
-      // Set to track fields to keep
-      const fieldsToKeep = new Set<string>();
-      // Add fields based on requested sections using templateIterationSections
-      for (const section of sections) {
-        if (section in templateIterationSections) {
-          const sectionFields =
-            templateIterationSections[
-              section as keyof typeof templateIterationSections
-            ];
-          sectionFields.forEach((field) => fieldsToKeep.add(field));
-        }
-      }
-      // Special handling for player fields to match current playerCount
-      if (sections.includes("players")) {
-        // Add correct player fields for the current playerCount
-        for (let i = 1; i <= playerCount; i++) {
-          fieldsToKeep.add(`player${i}`);
-        }
-      }
-      Logger.Story.log("Fields to keep:", Array.from(fieldsToKeep));
-
-      // Filter the shape entries to only include fields we want to keep
-      const filteredShapeEntries = shapeEntries.filter(([key]) =>
-        fieldsToKeep.has(key)
-      );
-      // Create a new schema with just the fields we want
-      const filteredShape = Object.fromEntries(filteredShapeEntries);
-      const partialSchema = z.object(filteredShape);
-
-      // Create a structured model with the partial schema
       const structuredModel =
         this.modelFor("templateIteration").withStructuredOutput(partialSchema);
       const result = await structuredModel.invoke(prompt, {
