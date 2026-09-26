@@ -6,32 +6,24 @@ import { DEFAULT_TURNS } from "core/config.js";
 import type { PlayerCount, StoryTemplate } from "core/types/index.js";
 import { getStoragePath } from "shared/storageUtils.js";
 import { createStoryStateFromTemplate } from "../../game/services/StoryStateFactory.js";
-import { beatStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import { loadStoryStates, loadTemplates } from "../imageModelEval/cases.js";
-import {
-  baselineArm,
-  estimateCall,
-  EVAL_ROLES,
-  outputTokensPerSecond,
-  STAGES,
-  type EvalRole,
-  type Stage,
-} from "./arms.js";
+import { baselineArm, EVAL_ROLES, STAGES, type EvalRole, type Stage } from "./arms.js";
 import { htmlLeaks, metadataLeaks } from "./blinding.js";
 import { resolveCaps, spentByStage, type Caps, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
-import { caseStory, loadStoredSnapshots, type EvalCase } from "./cases.js";
+import { loadStoredSnapshots, type EvalCase } from "./cases.js";
+import { localCases, printDryRun, type LocalCaseSources } from "./dryRun.js";
 import { evalFiles, type EvalFiles } from "./evalFiles.js";
 import { executeCall } from "./executor.js";
-import { planJobs, requestJob, type PlanOptions } from "./jobPlan.js";
+import { jobEstimateUsd, planJobs, requestJob, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
-import { estimateCheckCost, probeChecks, runProbe } from "./probe.js";
+import { runProbe } from "./probe.js";
 import { renderRatingPage } from "./ratingPage.js";
 import { planRatingSet, type ArmRef, type RatingKind } from "./ratingSets.js";
 import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
-import { DEFAULT_TOKENS_PER_MINUTE, keyOf, runJobs, usable, finishedJobKeys, type Job } from "./runner.js";
+import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, keyOf, runJobs, usable } from "./runner.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
@@ -254,23 +246,6 @@ function capsFor(args: Args, files: EvalFiles, stage: Stage, defaultMaxSpend?: n
   return caps;
 }
 
-const jobCost = (job: Job) => job.first.estimate.costUsd + (job.then?.estimate.costUsd ?? 0);
-
-/** At least the token-per-minute limit, and at least the calls' writing time over the in-flight slots. */
-function estimateMinutes(jobs: Job[], tpm: number): number {
-  const tokens = new Map<string, number>();
-  let seconds = 0;
-  for (const job of jobs) {
-    for (const call of [job.first, ...(job.then ? [{ arm: job.then.arm, estimate: job.then.estimate }] : [])]) {
-      const t = call.estimate.inputTokens + call.estimate.outputTokens;
-      tokens.set(call.arm.model, (tokens.get(call.arm.model) ?? 0) + t);
-      seconds += 2 + call.estimate.outputTokens / outputTokensPerSecond(call.arm.model);
-    }
-  }
-  const tokenMinutes = Math.max(0, ...[...tokens.values()].map((t) => t / tpm));
-  return Math.max(tokenMinutes, seconds / MAX_IN_FLIGHT / 60);
-}
-
 function planOptions(args: Args, stage: Stage, promptState: string, records: PlanOptions["records"], extra: Partial<PlanOptions> = {}): PlanOptions {
   return {
     stage,
@@ -286,88 +261,28 @@ function planOptions(args: Args, stage: Stage, promptState: string, records: Pla
   };
 }
 
-/** Cases without API calls: stored, endings, premises, iteration; synthetic analysis turns and template builds wait. */
-async function localCases(dirs: ReturnType<typeof guardEnvironment>) {
-  const requests: { role: EvalRole; caseId: string; request: TextRequest; players: number }[] = [];
-  const { cases, report } = await buildCases({
+function localSources(dirs: ReturnType<typeof guardEnvironment>): LocalCaseSources {
+  return {
     snapshots: loadStoredSnapshots(dirs.storiesDir, dirs.checkpointsDir),
     templates: loadTemplates(dirs.templatesDir),
     newStory,
-    callBaseline: async (role, caseId, request, players) => {
-      requests.push({ role, caseId, request, players });
-      return undefined;
-    },
-    log: () => undefined,
-  });
-  return { cases, report, requests };
+  };
 }
 
-/**
- * What --build-cases would spend: the first call of every build is known
- * (a switch analysis); each template build then needs a first beat (median
- * stored beat prompt) and, for multiplayer continuations, a thread analysis.
- */
-function buildEstimate(local: Awaited<ReturnType<typeof localCases>>): number {
-  const beatChars = local.cases
-    .filter((c) => c.role === "beat")
-    .map((c) => beatStep.request(caseStory(c)).prompt.length)
-    .sort((a, b) => a - b);
-  const medianBeatChars = beatChars[Math.floor(beatChars.length / 2)] ?? 60_000;
-  return local.requests.reduce((sum, r) => {
-    const est = (role: EvalRole, promptChars: number) =>
-      estimateCall({ role, arm: baselineArm(role, r.players > 1), players: r.players, promptChars }).costUsd;
-    const known = est(r.role, r.request.prompt.length);
-    if (!r.caseId.startsWith("switch-tpl-")) return sum + known;
-    const beat = est("beat", medianBeatChars + 4_000 * (r.players - 1));
-    const thread = r.players > 1 ? est("thread", r.request.prompt.length) : 0;
-    return sum + known + beat + thread;
-  }, 0);
-}
-
-async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvironment>) {
+function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvironment>) {
   const records = files.readRecords();
-  const finished = finishedJobKeys(records);
-  const frozen = files.casesExist();
-  let cases: EvalCase[];
-  console.log(`Output folder: ${files.outDir}`);
-  if (frozen) {
-    cases = files.readCases();
-    console.log(`Frozen cases: ${cases.length}`);
-  } else {
-    const local = await localCases(dirs);
-    cases = local.cases;
-    console.log(`No frozen cases yet. Local cases (no API calls): ${JSON.stringify(local.report.counts)}`);
-    console.log(`Stored units per story: ${JSON.stringify(local.report.storedUnitsByStory)}`);
-    console.log(`Case building (--build-cases): about $${buildEstimate(local).toFixed(2)}`);
-    console.log("The stage estimates below leave out the cases --build-cases adds (first beats, multiplayer, template analysis).");
-  }
-
-  const spend = spentByStage([...records, ...extraSpend(files)]);
-  const caps = resolveCaps({}).caps;
-  const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0) + 0.06;
-  const rows: [string, Stage, Job[]][] = [
-    ["Stage 0 pre-fix baseline (1 sample, isolated)", "0", planJobs(cases, planOptions(args, "0", "prefix", records, { samples: args.samples ?? 1, mode: "isolated" }))],
-    ["Stage 0 post-fix baseline (2 samples, isolated)", "0", planJobs(cases, planOptions(args, "0", "postfix", records, { samples: args.samples ?? 2, mode: "isolated" }))],
-    ["Stage 0 post-fix baseline pipeline chains", "0", planJobs(cases, planOptions(args, "0", "postfix", records, { mode: "pipeline", roles: ["switch", "thread"] })).filter((j) => j.group === "pipeline")],
-    ["Stages 1-2 candidates (isolated)", "1-2", planJobs(cases, planOptions(args, "1-2", "postfix", records, { mode: "isolated" })).filter((j) => !j.baseline)],
-    ["Stages 1-2 pipeline chains", "1-2", planJobs(cases, planOptions(args, "1-2", "postfix", records, { mode: "pipeline", roles: ["switch", "thread"] })).filter((j) => !j.baseline)],
-  ];
-  console.log(`\nProbe: about $${probeEstimate.toFixed(2)} (checks over the cap are skipped)`);
-  for (const [label, stage, jobs] of rows) {
-    const open = jobs.filter((j) => !finished.has(keyOf(j)));
-    const cost = open.reduce((sum, j) => sum + jobCost(j), 0);
-    const byRole = open.reduce<Record<string, number>>((acc, j) => ((acc[j.group] = (acc[j.group] ?? 0) + 1), acc), {});
-    console.log(
-      `${label}: ${open.length} jobs ${JSON.stringify(byRole)}, est $${cost.toFixed(2)} (stage cap $${caps.stageCaps[stage]}), at least ${Math.ceil(estimateMinutes(open, args.tpm))} min`
-    );
-  }
-  console.log("Stages 3 and 4: no arms yet (their variants arrive with later milestones).");
-  console.log("\nSpend so far vs caps:");
-  for (const stage of STAGES) {
-    console.log(`  Stage ${stage}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
-  }
-  console.log(`  Total: $${spend.total.toFixed(2)} of $${caps.globalCap} (never above $50)`);
-  console.log(`Baseline arms from production config: setup ${baselineArm("setup", false).key}, beat ${baselineArm("beat", false).key}, analysis ${baselineArm("switch", false).key}`);
+  return printDryRun({
+    outDir: files.outDir,
+    records,
+    extraSpend: extraSpend(files),
+    frozenCases: files.casesExist() ? files.readCases() : undefined,
+    sources: localSources(dirs),
+    options: (stage, promptState, extra) => planOptions(args, stage, promptState, records, extra),
+    samples: args.samples,
+    tpm: args.tpm,
+    maxInFlight: MAX_IN_FLIGHT,
+    log: (line) => console.log(line),
+  });
 }
 
 function refuseIfOverCaps(caps: Caps, files: EvalFiles, stage: Stage, estimate: number) {
@@ -422,13 +337,15 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
   refuseIfOverCaps(caps, files, "0", 0);
   const records = files.readRecords();
   const deps = runnerDeps(files);
+  // Each build call is its own runner pass, so --max-spend is carried across them here
+  let buildSpent = 0;
   const { cases, report } = await buildCases({
-    snapshots: loadStoredSnapshots(dirs.storiesDir, dirs.checkpointsDir),
-    templates: loadTemplates(dirs.templatesDir),
-    newStory,
+    ...localSources(dirs),
     callBaseline: async (role, caseId, request, players) => {
       const job = requestJob({ stage: "0", promptState: "prefix", caseId, role, arm: baselineArm(role, players > 1), players, request, records });
-      const result = await runJobs([job], deps, { caps, previous: records, extraSpend: extraSpend(files), tokensPerMinute: args.tpm });
+      const remaining: Caps = { ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - buildSpent };
+      const result = await runJobs([job], deps, { caps: remaining, previous: records, extraSpend: extraSpend(files), tokensPerMinute: args.tpm });
+      buildSpent += result.records.reduce((sum, r) => sum + r.costUsd, 0);
       records.push(...result.records);
       if (result.stoppedReason) console.warn(`Stopped: ${result.stoppedReason}`);
       const final = records.find((r) => r.jobKey === keyOf(job) && r.jobFinal);
@@ -450,7 +367,7 @@ async function run(args: Args, files: EvalFiles) {
   const cases = files.readCases();
   const jobs = planJobs(cases, planOptions(args, args.stage, args.promptState, records));
   const finished = finishedJobKeys(records);
-  const estimate = jobs.filter((j) => !finished.has(keyOf(j))).reduce((sum, j) => sum + jobCost(j), 0);
+  const estimate = jobs.filter((j) => !finished.has(keyOf(j))).reduce((sum, j) => sum + jobEstimateUsd(j), 0);
   refuseIfOverCaps(caps, files, args.stage, estimate);
   console.log(`${jobs.length} jobs (${jobs.filter((j) => !finished.has(keyOf(j))).length} open), est $${estimate.toFixed(2)}`);
   const result = await runJobs(jobs, runnerDeps(files), {
@@ -496,7 +413,7 @@ async function ratingMaterial(args: Args, files: EvalFiles, dirs: ReturnType<typ
     return { arms: armRefs(args), cases: files.readCases(), records: files.readRecords(), loadOutput: files.loadOutput };
   }
   if (!args.preview) throw new UsageError("--stored is for --preview pages only.");
-  const cases = files.casesExist() ? files.readCases() : (await localCases(dirs)).cases;
+  const cases = files.casesExist() ? files.readCases() : (await localCases(localSources(dirs))).cases;
   const custom = loadStoryStates(dirs.storiesDir).filter((s) => !s.templateId);
   return { arms: [STORED_ARM], ...previewSource(kind, cases, custom) };
 }

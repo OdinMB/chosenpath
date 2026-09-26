@@ -222,6 +222,11 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
   return jobs;
 }
 
+/** Estimated dollars for a job: its call, plus the beat call of a chain. */
+export function jobEstimateUsd(job: Job): number {
+  return job.first.estimate.costUsd + (job.then?.estimate.costUsd ?? 0);
+}
+
 /** A single call with a ready request (case building). */
 export function requestJob(input: {
   stage: Stage;

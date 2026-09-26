@@ -167,7 +167,7 @@ function statsFor(
   };
 }
 
-/** One entry per prompt state, group and arm. Chains are summarised by their beat step. */
+/** One entry per prompt state, group and arm, over the frozen cases. Chains are summarised by their beat step. */
 export function computeArmStats(
   records: CallRecord[],
   checks: Map<string, CheckResult>,
@@ -175,6 +175,8 @@ export function computeArmStats(
 ): ArmStats[] {
   const groups = new Map<string, CallRecord[]>();
   for (const record of records) {
+    // Case-building calls on inputs that are not frozen cases count as spend, not as results
+    if (!tags.has(record.caseId)) continue;
     if (record.group === "pipeline" && record.step !== 2) continue;
     const key = `${record.promptState}|${record.group}|${record.armKey}`;
     groups.set(key, [...(groups.get(key) ?? []), record]);
@@ -294,14 +296,19 @@ function configsFor(stats: ArmStats[], promptState: string) {
   const inState = stats.filter((s) => s.promptState === promptState);
   const find = (group: CallRecord["group"], key?: string) =>
     inState.find((s) => s.group === group && (key === undefined ? s.baseline : s.armKey === key));
+  // Pipeline chains ("pipeline:<analysis>><beat>") measure the beat arm's analysis-turn wait
+  const withChains = (beat: ArmStats): ArmStats => {
+    const chain = inState.find((s) => s.group === "pipeline" && s.baseline === beat.baseline && s.armKey.endsWith(`>${beat.armKey}`));
+    return chain ? { ...beat, turnLatencies: chain.turnLatencies } : beat;
+  };
   const baselineBeat = find("beat");
   if (!baselineBeat) return undefined;
-  const baseline: GameplayConfig = { beat: baselineBeat, switch: find("switch"), thread: find("thread"), setup: find("setup") };
+  const baseline: GameplayConfig = { beat: withChains(baselineBeat), switch: find("switch"), thread: find("thread"), setup: find("setup") };
   const candidates = inState
     .filter((s) => s.group === "beat" && !s.baseline)
     .map((beat): [string, GameplayConfig] => [
       beat.armKey,
-      { beat, switch: find("switch", beat.armKey) ?? baseline.switch, thread: find("thread", beat.armKey) ?? baseline.thread, setup: baseline.setup },
+      { beat: withChains(beat), switch: find("switch", beat.armKey) ?? baseline.switch, thread: find("thread", beat.armKey) ?? baseline.thread, setup: baseline.setup },
     ]);
   return { baseline, candidates, setupArms: inState.filter((s) => s.group === "setup") };
 }
