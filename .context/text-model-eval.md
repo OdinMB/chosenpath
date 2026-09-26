@@ -26,6 +26,7 @@
 - **Model-free seams.** `server/src/game/services/storyTextSteps.ts` holds the exact prompt and schema of each story role (`setupStep`, `beatStep`, `switchStep`, `threadStep`, `partialTemplateSchema`), how a reply changes the story (`apply`), and `analysisBefore`. Thread resolution is `ThreadResolutionService.resolveCurrentThreads`, and choice resolution is `BeatResolutionService.resolveChoice`. None of these touch the database. Production and the eval both build their requests here, so a prompt change here changes what the eval measures.
   - `setupStep.request` passes its kind to the prompt: a custom story asks for one difficulty level, a template for 3–5.
   - AI Iteration (`TemplateService.iterateTemplate`) and the eval build their prompt with `StorySetupPromptService.createIterationPrompt`. It drops the template's `creatorId` and `creatorUsername` before the template is sent to OpenAI.
+  - `storyTextTrims.ts` (eval only) derives the Stage 3 variants from these requests. Each is production's request minus the planning fields nothing reads after generation, and minus the prompt lines asking for them. Kept schema fields stay production's zod instances, shared across player slots where production shares them. Prompt edits are anchored on production's wording and apply only before the story state or premise. Each must match exactly once, so a production prompt edit near an anchor fails `storyTextTrims.test.ts` instead of silently undoing a trim: fix the anchor, not the prompt. Only `variants.ts` calls it. Delete it once Stage 3 is decided and Stage 4's rewrite supersedes it.
 
 ## Call and turn logs (no text, no user ids)
 
@@ -108,16 +109,25 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - A 400 is never retried. Every attempt is a record in `calls.jsonl`.
 
 **Arms.** They are hard-coded in `arms.ts`. The baseline alone follows production config (`baselineArm` → `resolveTextModelConfig`), so "as in production" is literal.
-- Arm key format: `<model>@<effort | t<temperature>>[+v<verbosity>]/<variant>`, for example `gpt-6-luna@medium/prod` or `gpt-4.1-mini@t0.2/prod`.
+- Arm key format: `<model>@<effort | t<temperature>>[+v<verbosity>]/<variant>`, for example `gpt-6-luna@medium/prod` or `gpt-4.1-mini@t0.2/prod`. A chain's key is `pipeline:<analysis key>><beat key>`. `arms.ts` owns both formats (`armKey`, `prodSiblingKey`, `chainKey`, `chainSides`), so build and parse keys only through them.
+- Variants (`variants.ts`): `prod` is what production sends, and Stage 3's "full" form. `slim` (beats only) drops the stats list, the multiplayer coordination note and six plan strings; `showDontTell` stays, and the options check keeps `previousOptionsToAvoid` and `upToOneSacrificeOrRewardOption`. `minimal` (setup, beats, switch, thread) drops every field test plan §5 lets Stage 3 drop. Every rule a dropped line carried stays as one sentence, so Stage 3 measures "written plan versus private plan", not "fewer rules".
+- Scopes: `all`, `subset15` (beats only), `single-player` (any role), plus an optional per-arm case list. `--cases` still intersects.
 - Stage 1–2 (owner decisions, 2026-09-26):
   - Setup: Sol low ×2, medium ×1, none ×1; Luna none, low and medium ×2.
   - Beats: Luna medium, none and low on all cases ×2; Luna high on the 15-case subset ×2; Sol low on the subset ×1.
   - Analysis: Luna none, low and medium ×2.
   - Pipeline: Luna low analysis, then each Luna beat arm.
   - Rare-failure batch: 50 extra single-sample Luna beat calls per effort.
-- Stages 3 and 4 have no arms until their variants exist (`variants.ts`; only `prod` so far).
+- Stage 3 (Milestone 3). This is the coordinator's carry-forward, chosen before the owner rated Round 1. The full forms are the Stage 1–2 `prod` records and are not re-run. So run Stage 3 with `--prompt-state postfix`: the comparison pairs arms only within one prompt state.
+  - Setup: Sol low minimal on 9 premises (`STAGE3_SETUP_PREMISES`: 3 per player count, every game mode, a Kids premise and three dark ones) ×1. Luna low minimal on all 18 ×2.
+  - Beats: Luna medium and Luna low, each slim and minimal, and a Luna none minimal control, on single-player cases ×2. The control comes last, so a cap stop cuts it first.
+  - Analysis: Luna low minimal ×2.
+  - Pipeline: Luna low minimal analysis, then Luna medium minimal and Luna low minimal beats, on single-player analysis cases ×1 (`pipelinePlan`). The baseline chain stays on every case.
+  - Dry run of 2026-09-26: $2.38 isolated plus $0.18 for chains, against the $3 cap.
+- Stage 4 has no arms yet.
 - Prices per 1M tokens are in `arms.ts`. Cost = (I − C − W)·in + C·cached + W·write + O·out, where O already includes reasoning.
 - Estimates count the JSON schema as input (`requestChars` in `jobPlan.ts`), because OpenAI bills it: the production schemas alone are 4K to 16.5K tokens (setup about 14K, a 1-player beat about 4.5K, a 3-player beat about 15K).
+- Until a new variant has `MIN_MEASURED_RECORDS` measured outputs, it borrows its `prod` sibling's. A trim writes less, so this errs high. Without it, Luna medium would be priced at the §2.2 guess of 6,200 reasoning tokens (measured: about 1,600), and the cap would refuse a run that fits.
 
 **Isolated versus pipeline.**
 - Isolated: every beat arm gets the same fixed analysis (the stored one, or the baseline's for built cases).
@@ -144,6 +154,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - The page is written only if nothing leaks. Keys go to `keys/`, never next to the pages.
 
 **Gate readings in `results.md`.** These are readings, not verdicts. Each is marked within or over, no arm is dropped, and the owner decides which reading applies. Each post-fix section also prints today's production (the pre-fix baseline's per-story cost and setup waits).
+- Modules: `armStats.ts` computes the per-arm statistics, `gateReadings.ts` the readings below, and `variantComparison.ts` the Stage 3 pairing and its section. `resultsReport.ts` only lays them out.
 - **Validity** (`validityGate.ts`), per isolated arm:
   - at least 98% valid on the first model attempt;
   - 100% valid within production's 2 retries;
@@ -161,6 +172,11 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
   - Above the baseline p95 + 5 s, the arm is marked "needs multiplayer pregeneration"; above 60 s it fails.
   - The cost per custom story by player count is shown without multiplayer pregeneration (29/7/7 calls) and with it (85/19/21, an approximation: it pregenerates the last player's options), on both bases.
 - **No pregeneration** (reported, not gated): flagged when the full-turn median is at most 5 s and its p95 at most 8 s. The full turn mixes beat-only and analysis turns at 15/29 and 14/29.
+- **Stage 3, trimmed against full.** Each trimmed arm is read against its `prod` sibling in the same group and prompt state. Both sides are read on the (case, sample) pairs both finished. The full arm's other cases and its rare-failure samples are left out.
+  - Rows: median visible and reasoning tokens, p50/p95 waits, $/call and its share of a single-player story (85/19/21 calls, one setup), first-attempt validity, and mean state counts per call (facts, new elements, introductions, stat changes; setup elements and stats; switches; threads).
+  - Noise: the full form's sample 1 against sample 2. Rule checks are flagged lower or higher only beyond that noise floor. With one matched sample (Sol setup), raw rates are shown and nothing is flagged.
+  - Chains give the analysis-turn wait, and setup shows medians by player count.
+  - The generic views pair a trimmed beat arm with the analysis arm of the same key (`configsFor`), so read Stage 3 from its own section.
 
 **Known limits.**
 - The built multiplayer and ending cases come from the baseline or from synthetic settings, not from real play.
@@ -169,4 +185,5 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - The baseline's billed cost includes gpt-4.1's implicit cache hits, which depend on how close together the eval sends its calls. `results.md` shows the uncached figure beside it.
 - Waits count each attempt alone, not the re-sends in front of it. If re-sends pass about 1%, the 60 s gate should read the summed wait per call.
 - A call that hangs until the 300 s timeout is a transport failure. It is retried, left out of validity, and absent from every wait percentile. Round 1 had 4 such hangs in 714 Luna turn calls, so count them separately (`outcome` `timeout` in `calls.jsonl`).
+- Stage 3's full forms are Round 1's records, so the trimmed waits carry server drift; tokens and cost do not. Multiplayer trims are unit-tested but not measured, because Stage 3 turns run single-player only.
 - Round 1 (2026-09-26) ran the post-fix baseline ($4.03) and Stages 1–2 ($12.09). Total spend is $18.51. The owner's report is `DOCS/2026-09-26_gpt6-text-eval/2026-09-26_round1-report.md`. The rating pages are `rating/round1-setup.html` and `rating/round1-turns.html`; their keys are `keys/round1-*.json`.

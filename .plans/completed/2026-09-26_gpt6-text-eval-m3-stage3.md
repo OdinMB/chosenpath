@@ -1,7 +1,7 @@
 # GPT-6 text eval, Milestone 3, Stage 3: planning-field trim variants (slim, minimal), their run, and the comparison against the full forms
 
 - **Date**: 2026-09-26
-- **Status**: draft
+- **Status**: implemented (code, tests, docs and the free dry run: commits aa9cd0f, a6a313f, 0466673 and the docs commit, 2026-09-26). Runbook steps 3–6 are still to do: the paid runs, the Round 2 page and the owner report. The dry run reads $2.56, so step 2 needs no shrink.
 - **Type**: feature (eval variants and harness readings). It includes one scoped refactor: the `resultsReport.ts` split, which is named debt that this task would otherwise overload.
 - **Complexity**: complex
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
