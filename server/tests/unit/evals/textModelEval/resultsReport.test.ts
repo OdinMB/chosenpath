@@ -114,7 +114,7 @@ describe("renderResults: the variant section", () => {
       call(rewrite, { cacheLine: "A", inputTokens: 10_000, cachedTokens: 4_000, cacheWriteTokens: 0, outputTokens: 1_000 }),
       call(slim, { inputTokens: 12_000, outputTokens: 1_000 }),
     ]);
-    expect(text).toContain("### Variants against their reference (Stage 3 trims, Stage 4 rewrite)");
+    expect(text).toContain("### Variants against their reference (Stage 3 trims, Stage 4 rewrite, setup and turn rounds)");
     expect(text).toContain(`| beat | ${rewrite} | ${slim} | 1 |`);
     expect(text).toContain("**Input and caching**");
     // Cache lines 0 -> 1, read share 0% -> 40%, median input tokens 12000 -> 10000
@@ -132,6 +132,40 @@ describe("renderResults: the variant section", () => {
     expect(text).toContain("$0.0020 → $0.0010 (-50%)");
     // 85 beats per single-player story with pregeneration
     expect(text).toContain("$0.1700 → $0.0850");
+  });
+
+  it("names a stored reference by its prompt state, and lists shares beyond the noise with the checks", () => {
+    const ROUND1 = "gpt-6-luna@low/setupR1";
+    const LUNA_PROD = "gpt-6-luna@low/prod";
+    const setupCall = (promptState: string, armKey: string, sample: number) =>
+      record({
+        jobKey: `a|${armKey}|${promptState}|s${sample}`,
+        promptState,
+        role: "setup",
+        group: "setup",
+        armKey,
+        callArmKey: armKey,
+        model: "gpt-6-luna",
+        baseline: false,
+        caseId: "a",
+        sample,
+        promptHash: "today",
+        outputFile: `${promptState}|${armKey}|${sample}`,
+      });
+    const records = [1, 2].flatMap((sample) => [setupCall("round0", ROUND1, sample), setupCall("postfix", LUNA_PROD, sample)]);
+    const checks = new Map<string, CheckResult>(
+      records.map((r) => [r.outputFile as string, { checks: {}, counts: { spendablePlayerStats: r.armKey === ROUND1 ? 4 : 2, visiblePlayerStats: 4 }, unknownIds: [] }])
+    );
+    const text = renderResults({
+      records,
+      checks,
+      tags: new Map([["a", tags()]]),
+      caps: resolveCaps({}).caps,
+      storedReference: (r) => r.promptHash === "today",
+      generatedAt: new Date(0),
+    });
+    expect(text).toContain(`| setup | ${ROUND1} | postfix:${LUNA_PROD} (stored) | 2 |`);
+    expect(text).toContain("spendableShare 50.0% → 100.0%");
   });
 });
 

@@ -227,3 +227,61 @@ describe("variantComparisons", () => {
     expect(variantComparisons([call(MEDIUM_PROD, "a", 1)], new Map(), caseTags("a"), "postfix")).toEqual([]);
   });
 });
+
+describe("variantComparisons: stored references from another prompt state", () => {
+  const ROUND1 = "gpt-6-luna@low/setupR1";
+  const LUNA_PROD = "gpt-6-luna@low/prod";
+  const setup = { group: "setup" as const, role: "setup" as const };
+  /** A setup call of an arm under a prompt state, its request hashed as the executor would */
+  const inState = (promptState: string, armKey: string, caseId: string, sample: number, promptHash = `today-${caseId}`) =>
+    call(armKey, caseId, sample, { ...setup, promptState, jobKey: `${caseId}|${armKey}|${promptState}|s${sample}`, promptHash, outputFile: `${promptState}|${armKey}|${caseId}|${sample}` });
+  const candidate = [1, 2].flatMap((sample) => ["a", "b"].map((c) => inState("round0", ROUND1, c, sample)));
+  const stored = [1, 2].flatMap((sample) => ["a", "b"].map((c) => inState("postfix", LUNA_PROD, c, sample)));
+  /** Today's code builds the stored request byte for byte */
+  const rebuilt = (r: CallRecord) => r.promptHash === `today-${r.caseId}`;
+
+  it("reads a round's candidate against the stored reference that today's code rebuilds, with that reference's two-sample noise", () => {
+    const [comparison, ...rest] = variantComparisons([...candidate, ...stored], new Map(), caseTags("a", "b"), "round0", rebuilt);
+    expect(rest).toEqual([]);
+    expect(comparison).toMatchObject({ group: "setup", armKey: ROUND1, referenceKey: LUNA_PROD, referenceState: "postfix", pairs: 4, hasNoise: true });
+    expect(comparison.reference.promptState).toBe("postfix");
+  });
+
+  it("leaves out stored records whose request today's code no longer builds", () => {
+    const drifted = stored.map((r) => ({ ...r, promptHash: "an older prompt" }));
+    expect(variantComparisons([...candidate, ...drifted], new Map(), caseTags("a", "b"), "round0", rebuilt)).toEqual([]);
+    // One case rebuilt, one not: only the rebuilt case pairs
+    const mixed = stored.map((r) => (r.caseId === "b" ? { ...r, promptHash: "an older prompt" } : r));
+    expect(variantComparisons([...candidate, ...mixed], new Map(), caseTags("a", "b"), "round0", rebuilt)[0].pairs).toBe(2);
+  });
+
+  it("prefers a reference in the candidate's own prompt state", () => {
+    const own = [1, 2].flatMap((sample) => ["a", "b"].map((c) => inState("round0", LUNA_PROD, c, sample)));
+    const [comparison] = variantComparisons([...candidate, ...stored, ...own], new Map(), caseTags("a", "b"), "round0", rebuilt);
+    expect(comparison.referenceState).toBeUndefined();
+    expect(comparison.reference.promptState).toBe("round0");
+  });
+
+  it("reads no other prompt state without the rebuild check", () => {
+    expect(variantComparisons([...candidate, ...stored], new Map(), caseTags("a", "b"), "round0")).toEqual([]);
+  });
+
+  it("reads the design checks' pooled shares beside the checks, flagged beyond the reference's noise", () => {
+    const counts = (spendable: number, visible = 4) => ({ spendablePlayerStats: spendable, visiblePlayerStats: visible });
+    const [c1a, c1b, c2a, c2b] = candidate;
+    const [s1a, s1b, s2a, s2b] = stored;
+    const checks = checked([
+      // Reference: 2/4 and 2/4 on sample 1, 2/4 and 2/4 on sample 2 (50%, noise 0); candidate 4/4 everywhere (100%) -> higher
+      [s1a, {}, counts(2)],
+      [s1b, {}, counts(2)],
+      [s2a, {}, counts(2)],
+      [s2b, {}, counts(2)],
+      [c1a, {}, counts(4)],
+      [c1b, {}, counts(4)],
+      [c2a, {}, counts(4)],
+      [c2b, {}, counts(4)],
+    ]);
+    const [comparison] = variantComparisons([...candidate, ...stored], checks, caseTags("a", "b"), "round0", rebuilt);
+    expect(comparison.shares).toEqual([{ name: "spendableShare", reference: 0.5, arm: 1, noise: 0, flag: "higher" }]);
+  });
+});

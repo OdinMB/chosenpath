@@ -1,0 +1,586 @@
+import { z } from "zod";
+import { createStorySetupSchema, GameModes, PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
+import { templateIterationSections } from "core/utils/templateIterationSections.js";
+import { StorySetupPromptService } from "../prompts/StorySetupPromptService.js";
+import type { TextRequest } from "../storyTextSteps.js";
+
+/*
+ * Setup round 1 of DOCS/2026-09-27_setup-generation-improvements.md (section
+ * 4, "Round 1"), eval only until the owner adopts it: proposals 1 (outcome
+ * slates), 2 (the setup side of the scoreboard), 3 (the engine facts), 4
+ * (stats that act in play), 5 (one worked example) and 6 (outcome questions
+ * that name what is at stake), plus the one sentence that no list item is
+ * blank. The wording is the document's Appendix A (A1 to A6), adjusted only
+ * where the current code or round 1's scope says otherwise; each adjustment
+ * is listed in .plans/2026-09-26_build-followup.md under "Setup rounds".
+ *
+ * It edits production's own request: the prompt at anchors in production's
+ * wording (each must occur exactly once in the instructions before the
+ * configuration block, so a production edit there fails the tests instead of
+ * silently undoing a change), and the schema by extending production's zod
+ * instances, so the stat, outcome and player instances stay shared across
+ * lists and seats. One user message, production's shape. Custom stories,
+ * templates and AI Iteration each get the document's text where it says so.
+ * The eval's variants.ts is the one caller.
+ */
+
+type Kind = "story" | "template" | "iteration";
+
+type On = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[] };
+
+const ALL_SECTIONS = Object.keys(templateIterationSections);
+
+const SEPARATOR = "#".repeat(50);
+
+const isContestMode = (mode: GameMode) => mode === GameModes.Competitive || mode === GameModes.CooperativeCompetitive;
+const contested = (on: On) => on.players > 1 && isContestMode(on.mode);
+const asks = (on: On, ...sections: string[]) => sections.some((section) => on.sections.includes(section));
+const asksOutcomes = (on: On) => asks(on, "sharedOutcomes", "players");
+const asksStatRules = (on: On) => asks(on, "stats", "players");
+/** The per-call slate speaks about outcomes and stats. */
+const asksSlate = (on: On) => asks(on, "sharedOutcomes", "players", "stats");
+
+// ---------------------------------------------------------------- the text
+
+export const ENGINE_HEADING = "How the game plays your setup";
+export const THIS_SETUP_HEADING = "This setup";
+export const WORKED_EXAMPLE_HEADING = "WORKED EXAMPLE";
+
+/** Round 1's one sentence about list items: the count fix's (storyTextRewrite/common.ts NO_EMPTY_ITEMS), stated in production's prompt. */
+export const NO_BLANK_ITEMS = "Every item in a list carries real content; a list never holds an empty or blank item.";
+
+/**
+ * A3.1, checked against the code on 2026-09-27: the roll (beatResolutionUtils,
+ * BeatResolutionService, which now clamps each stat to ±15 and counts two),
+ * and who reads what (the state sections of the switch, thread and beat
+ * prompts). The beats' detailed stat view shows possible values since round
+ * 0, and never the tooltip or group, nor the adjustments inside a thread.
+ */
+const ENGINE = [
+  ENGINE_HEADING,
+  "- A story runs Switch, Thread, Switch, Thread, ..., Ending. A switch is one beat in which the player chooses what the next thread is about (topic switch) or, when the story has already fixed the topic (something urgent happened, the last thread must be followed up, or an outcome is running out of time), how to approach it (flavor switch). A thread is a mini-chapter of 2 to 4 beats that ends by adding one milestone to one outcome. At the end, one beat per player writes that player's ending from the outcomes' milestones.",
+  "- Thread kinds: challenge threads (the default) are rolled as favorable, mixed or unfavorable, and stats shift the odds. Exploration threads have no roll: the option the player picks decides the result. Contest threads (competitive and cooperative-competitive multiplayer only) set side A against side B.",
+  "- The roll: an even roll is 33/34/33 (favorable/mixed/unfavorable), and 50 points turn it into 50/50/0. Points come from the previous beat of the thread (+30 favorable, -30 unfavorable), the difficulty (-20 to +20), how sensible the chosen option is (+5 to -15), and at most two stats, each between -15 and +15. A sacrifice option always adds 30 points and its cost is always paid; a reward option always subtracts 30 and its gain is always received. So stats count only in challenge and contest threads, and one stat moves a roll by at most 15 points.",
+  "- Who reads what. The switch and thread designers see the guidelines, the story elements, the outcomes with their milestone counts, the thread types, the switch/thread instructions, and for each stat only its name, value and narrative implications. The beats inside a thread see every stat field except the tooltip and the group, which only the players see, and the adjustments after threads; they don't see the switch/thread instructions and, of the outcomes, only the question the current thread pushes. The beat after each thread applies each stat's adjustments after threads and records the milestone. The ending reads the outcomes with their resonance and milestones, and the stats.",
+  "- Design the parts together: the outcomes are the questions the ending answers, the thread types are the scenes in which players push them, the switch/thread instructions set this story's rhythm, and the stats are what those scenes put at stake.",
+  "- These are facts about the engine. Don't restate them anywhere in the setup.",
+].join("\n");
+
+/** A1.1 */
+const INVENTORY_OUTCOMES = '\n- Outcomes: see the Outcomes section below and the "This setup" block at the end.';
+
+/** A2.1, printed for competitive and cooperative-competitive games only. */
+const SCOREBOARD_LINE: Record<2 | 3, string> = {
+  2: '--- A scoreboard for each contested shared outcome: exactly one shared opposites stat that shows who is ahead. Name its two sides after the two players\' roles in this story (for example "Enclave\'s Voice|Printers\' Voice"), never a player\'s seat ("Player 1") or a player character\'s name, because every player sees this name and players choose their characters\' names later; NPC names are fine. The first side is player1\'s. It starts at 50, cannot be changed in beat resolutions, and moves only after a thread about that contest: 10 to 20 points toward the side that won the thread, none after a mixed result. Its tooltip says it is the score of that contest and which role holds which side. Give the side that is behind one way to catch up (for example a bonus when it takes a risk), so the race stays open. Never keep one counter per player.',
+  3: '--- A scoreboard for each contested shared outcome: one shared string stat whose values name who currently leads, by role, plus "Nobody yet" (for example "Nobody yet, The Archivist, The Performer, The Neighbor"). List these values in its narrative implications and its tooltip, and say there which role belongs to which player. It cannot be changed in beat resolutions and changes only after threads about that contest.',
+};
+
+/**
+ * A1.2, with A2.2's contested-resonance line (contest modes only). The
+ * document's "(in short stories, as many as the "This setup" block says)"
+ * is left out: story length is proposal 10, in round 3.
+ */
+function outcomesSection(on: On): string {
+  return [
+    "Outcomes",
+    "- Outcomes are the questions the ending answers. Milestones earned in threads move each outcome toward one of its three resolutions; they are the story's only progress bar. Give an outcome 1 milestone for a side question, 2 as a default, and 3 for the question the ending hinges on.",
+    "- Each player's outcomes cover both sides of that character's story: the story's main conflict (the public question) and the character's private life (a relationship, a belief, a secret, who they are becoming).",
+    "- No two outcomes ask the same question in other words. A shared outcome is never repeated as a personal one, and no two players get the same personal outcome.",
+    "- The field descriptions say which question form fits which kind of resolutions.",
+    '- The "This setup" block at the end of these instructions says how many outcomes of which kind this setup has and how many milestones each carries.',
+    ...(on.players > 1
+      ? [
+          "- In multiplayer games there are one or two shared outcomes, never more. Every player keeps at least one personal outcome, and each player's personal outcomes carry at least 2 of that player's milestones.",
+          '- Each player seat has its own role in this story, shared by all three of that seat\'s backgrounds. Each background\'s text says the role. A player\'s personal outcomes grow out of that role and must fit every identity and background that player can choose, so refer to the character by role or as "player2\'s character", never by a name, unless the premise itself names the player characters.',
+          "- When the premise names the player characters, use those names in outcomes and stats, and give each seat three identities that keep the name and vary in appearance and details.",
+        ]
+      : []),
+    ...(contested(on) ? ['- A contested outcome\'s resonance ends with "Scored by <name of its scoreboard stat>."'] : []),
+  ].join("\n");
+}
+
+/** A2.2, after the NPC-relationship rule (contest modes only). */
+const CONTESTED_FAVOR = "--- If the players compete for one NPC's favor, that favor is a contest: one shared scoreboard stat, not a relationship stat for each player.";
+
+/** A4.1, in place of the "Don't use stats for things that are covered by other mechanics" lines. */
+const STATS_THAT_ACT = [
+  "- Every stat earns its place in play in at least two ways: it shifts chances in challenge scenes the thread types create (effects), it can be spent or earned in a scene (sacrifice or reward), or its thresholds change which threads and scenes happen (narrative implications).",
+  "- Name the stats after what the premise says the characters care about or have to manage or balance: its resources, relationships and pressures (for example the Queen's opinion in a court intrigue, fuel on a long voyage, burnout for an activist).",
+  "- Most player stats can be spent or earned in a scene: resources, reserves, contacts, items, moods. Only special powers, standings earned over the whole story (a rank, a faction's stance on a four-step scale) and trust that must be earned in a thread are 'None'.",
+  "- Player stats are about the person: their values, their approach, their resilience, the people who support them. A relationship between the player characters themselves is one shared stat, not a copy for each player.",
+  "- No progress meters. Milestones already track how close an outcome is to its resolution, and nothing in the game reads a stat to decide an outcome or to end the story. Weak: 'Reform Progress (0-100%)', 'Fragments collected', 'Dream: Beginning → Fulfillment'. A list of concrete clues, allies or items is fine when each item opens options on its own. The one exception is the scoreboard of a contested outcome.",
+  "- No two stats track the same thing. A stat may bear on an outcome as a lever the player spends or protects (a standing with the court, next to an outcome about the court's verdict), but no stat counts progress toward an outcome (the scoreboard of a contested outcome is the exception).",
+  "- Don't track the remaining turns or the players' ordinary decisions; the game tracks both.",
+].join("\n");
+
+/** A5's one-line catalogue, with A2.3's opposites line. */
+const STAT_TYPES = [
+  "Stat types",
+  "- string: a state that changes in steps (a condition, a relationship state, a rank, a faction's standing).",
+  "- string[]: a collection where having an item matters (abilities, inventory, contacts). Not for progress toward an outcome.",
+  "- percentage: a capacity that is managed often and in small steps (health, energy, fuel; one relationship only if managing it is central).",
+  "- opposites: two percentages in one; the second is 100 minus the first. Use it for a balance that moves both ways: a disposition or alignment the player shifts, a tug of war in the world, or the scoreboard of a two-player contest (which moves after threads). Not for a pair where one side is simply better for the players, unless it is a tug of war the story is about.",
+  "- number: a countable quantity whose management is central (money, ammunition). Not for skills, influence, goals or friends, and not for counting progress.",
+  "In general, favor string and string[] over numbers and percentages.",
+].join("\n");
+
+/** A5, verbatim. */
+const WORKED_EXAMPLE = `${WORKED_EXAMPLE_HEADING} (a different premise from yours; it shows how the parts fit, not what your setup should contain. Your counts come from the list above.)
+
+Premise: A goblin activist fights for goblin rights in a kingdom where heroes hunt goblins for fame. (1 player)
+
+Guidelines
+- A rule that creates conflict: "Heroes are legally permitted to kill goblins for fame and fortune."
+- Tone: "Moments of dark humor and satire, especially regarding the hypocrisy of 'heroic' culture."
+- A conflict (a dilemma that returns, not a plot event): "Deciding when to compromise and when to stand firm."
+- Thread types, public and private, with more than one way to fight:
+  "Public protest (challenge, 3): rally goblins in a square the Hero Guild patrols without handing the Guild an excuse to crack down"
+  "Secret negotiation (challenge, 3): win over a powerful figure who can't be seen with you"
+  "Sabotage (challenge, 3): strike at a guild's trophy hall when talking has failed"
+  "Rescue (challenge, 4): get goblins out of a hunting ground before the heroes' hunt begins"
+  "Old friends (challenge, 2): keep a friend from the old neighbourhood on side when the movement puts them at risk"
+  "A walk with Mia (exploration, 2): time with a hero's daughter, far from the movement's eyes"
+- Switch and thread instructions:
+  "Personal threads are 2 beats and public threads 3; after two public threads in a row, the next topic switch offers a personal thread."
+  "If the activist is ever hurt physically, the next thread is about healing their wounds."
+  "Around the middle of the story, someone launches a personal attack on the activist, socially or physically."
+  "When Public Support falls below 30%, the next thread is about winning back the crowd."
+
+Story element
+- Gruk. Role: "Leader of the largest goblin enclave in the city, Gruk is a pragmatic organizer who sometimes clashes with more radical activists." Instructions: "Gruk can mobilize goblins for protests or provide sanctuary, but expects loyalty and dislikes reckless risks." A fact that is a hook: "Has a secret truce with a local hero, which he keeps hidden from most goblins."
+
+Outcomes (all three are the player's own)
+- Public, 3 milestones: "Will the Hero Guilds reform their anti-goblin policies?" Favorable: "The Hero Guilds adopt new codes that protect goblin rights and punish violence against them." Mixed: "Some reforms are enacted, but enforcement is weak and many heroes resist change." Unfavorable: "The Hero Guilds double down on anti-goblin violence, forcing goblins further underground."
+- Private, 2: "Can the activist keep the trust of the goblins who knew them before, once humans know their face?" (favorable, mixed, unfavorable)
+- Side, 1: "What will the activist's friendship with Mia, a hero's daughter, look like in the end?" (three paths)
+
+Stats: the movement, the person, the people around them (groups: Movement, Personal, Relationships). One of each kind is shown; a real setup has the counts from the list above.
+- Public Support (shared, percentage, not changeable in beats). Effects: "Above 70%: +10 in public challenges"; "Below 30%: -10 in public challenges". Sacrifice: "Give up 10% Public Support to push a controversial action through." Reward: "Gain 5% Public Support by making a dramatic gesture instead of a safe plea." Narrative: "Below 30%: onlookers are hostile, and the next thread is about winning back the crowd"; "Above 70%: crowds join protests and offer help." After threads: "+10% after a favorable public protest, -10% after an unfavorable one."
+- Energy (player, percentage, changeable in beats): activist burnout. Effects: "Below 30%: -10 in every challenge." Sacrifice: "Spend 15% Energy to push through exhaustion." Reward: "Regain 10% Energy by resting instead of acting." Narrative: "At 10% or below: the next switch forces an old-friends thread." After threads: "+10% after an old-friends thread."
+- Community Standing (player, string: Newcomer, Respected Advocate, Movement Leader; not changeable in beats). Effects: "Respected Advocate or above: +10 when rallying goblins." Sacrifice: None. Reward: None (it is earned over the whole story). Narrative: "A Movement Leader is recognized on sight, by allies and by heroes." After threads: "One step up after a favorable public protest that the activist led."
+- Friends (player, list) and Romantic Interest (player, string) carry the private and side outcomes. Friends sacrifice: "Ask one friend for a risky favor; they leave the list until an old-friends thread."
+Not stats: "Personal Safety" (the Hero Guilds' hostility already covers it), and any meter of how close the reforms are (the milestones track that).
+
+In a cooperative version for two activists, the reform question is the shared outcome, and each activist keeps two personal outcomes from their role (player1 the enclave's organizer, player2 the movement's printer). In a competitive version where the two compete to lead the movement, "Who will speak for the goblins at the Queen's council?" is the contested outcome, and "Enclave's Voice|Printers' Voice" (opposites, starts at 50, moves 15 toward the winner of each leadership contest, not in single beats; its tooltip says which role holds which side) is its scoreboard.
+
+Not like this: "Reform Progress (0-100%)" (milestones already track progress); "+25 points when using a power" (a stat gives at most 15); "Can risk 10 followers for a +20 bonus" (a sacrifice names only its cost, and the cost is certain); "Followers (Player 1)" and "Followers (Player 2)" (one contest has one shared scoreboard, named by role).`;
+
+/** A1.5: the setup's game-mode sentences. */
+const GAME_MODES: Record<Exclude<GameMode, GameModes.SinglePlayer>, string> = {
+  [GameModes.Competitive]:
+    "The players compete against each other. At least one shared outcome is contested between them, and no shared outcome is a goal they pursue together; something they share, such as a friendship, can still be a shared question.",
+  [GameModes.Cooperative]:
+    "The players cooperate. At least one shared outcome is a goal they can only reach together. Each player also has a private arc that competes with the shared goal for their attention but never opposes it.",
+  [GameModes.CooperativeCompetitive]:
+    "The players cooperate on one shared goal and compete over one contested shared outcome, and each has a private arc. They balance helping each other against getting ahead.",
+};
+
+/**
+ * Where a slate points at the scoreboard rule. The document says "in STATS",
+ * but A2.1 puts the rule in the list of elements to include.
+ */
+const SCOREBOARD_POINTER = "(see the scoreboard rule in the list of elements to include)";
+
+const THREE_PATH_RACE =
+  "Write its resolutions as three paths: resolution1, player1's character wins; resolution2, player2's; resolution3, player3's. (This is the three-player exception to the question-form rule in the outcome description.)";
+const LEAD_STRING =
+  'Keep the contested outcome\'s score in one shared string stat whose values name who currently leads, by role, plus "Nobody yet". List those values in the stat\'s narrative implications, which the story\'s planners read, and in its tooltip, which the players read.';
+
+/**
+ * A1.3, only this call's mode and player count. The document's first line
+ * ("Story length: about 25 turns, so ...") is proposal 10, in round 3; round
+ * 1 keeps production's fixed budget of 6 milestones, so it says only that.
+ */
+function slateLines(on: On): string[] {
+  const earns = (outcomes: "outcome" | "outcomes") => `- Each player earns about 6 milestones in total, counting the shared ${outcomes}.`;
+  if (on.players === 1) {
+    return [
+      "- The player earns about 6 milestones in total.",
+      "- No shared outcomes. The player has three outcomes of their own: the story's main conflict as it lands on this character (3 milestones), the character's private life (2 milestones), and a smaller side question that pulls against one of the others, such as a person, a promise or a price (1 milestone).",
+      "- Shared stats describe the world and the people around the player. No stat keeps a score.",
+    ];
+  }
+  switch (on.mode) {
+    case GameModes.Cooperative:
+      return [
+        earns("outcome"),
+        "- One shared outcome for the goal the players can only reach together: the story's main conflict, 3 milestones. Its resonance names what each player, by role, stands to gain or lose.",
+        "- For each player, two personal outcomes, with 2 milestones and 1 milestone, that grow out of that player's role: a stake in the shared goal that only this player has, a relationship the goal strains, a doubt. They never oppose the shared goal, but they compete with it for the player's attention. They differ from the other players' outcomes.",
+        "- The players do not compete, so no stat keeps a score.",
+      ];
+    case GameModes.Competitive:
+      return on.players === 2
+        ? [
+            earns("outcomes"),
+            "- One shared contested outcome about what the players compete for: 3 milestones. Side A is player1's character, side B is player2's.",
+            '- For each player, two personal outcomes, with 2 milestones and 1 milestone, about what winning or losing costs that character: a relationship the rivalry strains, a principle, a person they protect. Never split the prize into one personal outcome per player ("Does A win X?" and "Does B win X?").',
+            "- If the rivalry puts something the two characters share at risk, such as their friendship, make it a second shared outcome (2 milestones) instead of two mirrored personal outcomes. Then the contest has 2 milestones, and each player keeps one personal outcome with 2.",
+            `- Keep the contested outcome's score in exactly one shared opposites stat ${SCOREBOARD_POINTER}.`,
+          ]
+        : [
+            earns("outcome"),
+            `- One shared contested outcome about what the players compete for: 3 milestones. ${THREE_PATH_RACE}`,
+            "- For each player, two personal outcomes, with 2 milestones and 1 milestone, about what winning or losing costs that character. They differ from the other players' outcomes.",
+            `- ${LEAD_STRING}`,
+          ];
+    default:
+      // Cooperative-competitive; three players race over three paths (A1.3's "as the 2-player version, but ...")
+      return [
+        earns("outcomes"),
+        "- One shared outcome the players can only achieve together: 2 milestones.",
+        on.players === 2
+          ? "- One shared contested outcome about what the premise says the players compete for: 2 milestones. Side A is player1's character, side B is player2's."
+          : `- One shared contested outcome about what the premise says the players compete for: 2 milestones. ${THREE_PATH_RACE}`,
+        `- For each player, one personal outcome about that character's private stake: 2 milestones. The ${on.players === 2 ? "two players'" : "players'"} personal outcomes differ.`,
+        on.players === 2 ? `- Keep the contested outcome's score in exactly one shared opposites stat ${SCOREBOARD_POINTER}.` : `- ${LEAD_STRING}`,
+      ];
+  }
+}
+
+const thisSetup = (on: On) => [THIS_SETUP_HEADING, ...slateLines(on)].join("\n");
+
+/** A1.6 (multiplayer only: a single player's shared list stays empty). */
+const ONE_OUTCOME_LIST =
+  "You are regenerating only one of the shared outcomes and the player outcomes. Keep the other's outcomes as they are, and fit yours to them so that every player still has three outcomes and the same milestone total.";
+/** Proposal 2's AI Iteration risk: a stats-only iteration must not rename what the outcomes and rules name. */
+const KEEP_IDS = "Keep existing stats and outcomes under their current ids unless you remove them.";
+
+// ---------------------------------------------------------------- prompt edits
+
+function count(text: string, passage: string): number {
+  return text.split(passage).length - 1;
+}
+
+function mustBeOnce(text: string, passage: string): void {
+  const n = count(text, passage);
+  if (n !== 1) throw new Error(`Setup round 1: "${passage.slice(0, 70)}" found ${n} times in production's setup instructions`);
+}
+
+/** The text with one passage replaced; the passage must occur exactly once. */
+function replaceOnce(text: string, passage: string, replacement: string): string {
+  mustBeOnce(text, passage);
+  return text.split(passage).join(replacement);
+}
+
+/** The text with everything from `from` through `through` (both included) replaced; each must occur exactly once, in order. */
+function replaceThrough(text: string, from: string, through: string, replacement: string): string {
+  mustBeOnce(text, from);
+  mustBeOnce(text, through);
+  const start = text.indexOf(from);
+  const end = text.indexOf(through) + through.length;
+  if (end - through.length < start) throw new Error(`Setup round 1: "${through.slice(0, 70)}" comes before "${from.slice(0, 70)}"`);
+  return text.slice(0, start) + replacement + text.slice(end);
+}
+
+/** The text with an insertion before the first of the markers that occurs. */
+function insertBeforeFirst(text: string, markers: string[], insertion: string): string {
+  const at = markers.map((marker) => text.indexOf(marker)).filter((i) => i >= 0);
+  if (at.length === 0) throw new Error(`Setup round 1: none of ${markers.map((m) => `"${m.slice(0, 40)}"`).join(", ")} found`);
+  const index = Math.min(...at);
+  return text.slice(0, index) + insertion + text.slice(index);
+}
+
+/** Round 1's general instructions: production's, with A1 to A6 applied. */
+function round1Instructions(production: string, on: On): string {
+  let text = production;
+  const opening = text.indexOf("\n\n") + 2;
+  if (!/^(Create a setup|We already have a setup) for an interactive fiction game/.test(text)) {
+    throw new Error("Setup round 1: production's setup prompt no longer opens as expected");
+  }
+  // A3.1 sits right after the opening line, so everything after it reads in its light
+  text = `${text.slice(0, opening)}${ENGINE}\n\n${text.slice(opening)}`;
+
+  if (asksOutcomes(on)) {
+    text = replaceThrough(text, "\n- A total of 3 outcomes for each player", "there should be 0 individual outcomes.", INVENTORY_OUTCOMES);
+    text =
+      on.players > 1
+        ? replaceThrough(text, "Outcomes\n- Every player should have 3 outcomes", "become the new spirit leader?'\n\n\n", `${outcomesSection(on)}\n\n`)
+        : replaceThrough(text, "Outcomes\n- The player should have 3 outcomes", "and one mixed.\n\n", `${outcomesSection(on)}\n\n`);
+  }
+  if (asks(on, "stats") && on.players > 1) {
+    const line = contested(on) ? `\n${SCOREBOARD_LINE[on.players as 2 | 3]}` : "";
+    text = replaceOnce(text, "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)", line);
+  }
+  if (asksStatRules(on)) {
+    text = replaceOnce(text, "Detective/Investigation/Contacts (for a mystery story)", "Detective/City/Contacts (for a mystery story)");
+    if (contested(on)) {
+      const rule = "If only one specific player has a relationship with that NPC, use a character stat.\n";
+      text = replaceOnce(text, rule, `${rule}${CONTESTED_FAVOR}\n`);
+    }
+    text = replaceThrough(text, "- Don't use stats for things that are covered by other mechanics.", "--- Don't track ordinary player decisions (tracked separately)\n", `${STATS_THAT_ACT}\n`);
+    // The long catalogue, the old engine paragraph (now A3.1) and the "For each stat" block
+    text = replaceThrough(text, "Type of stats and what they are good for:", "interesting part in the story.\n\n", `${STAT_TYPES}\n\n`);
+  }
+  // A5: the worked example where production's examples sit (production leaves them out of iteration; round 1 keeps its short one)
+  text =
+    on.kind === "iteration"
+      ? insertBeforeFirst(text, ["Character Selection Instructions", "Difficulty Levels\n", SEPARATOR], `${WORKED_EXAMPLE}\n\n`)
+      : replaceThrough(text, "EXAMPLE STAT SETUPS", "Initial value: 70\n\n", `${WORKED_EXAMPLE}\n\n`);
+  return replaceOnce(text, `${SEPARATOR}\n\n`, `${NO_BLANK_ITEMS}\n\n${SEPARATOR}\n\n`);
+}
+
+/** Round 1's configuration block: A1.5's game-mode sentence, then A1.3's slate; for AI Iteration also A1.6. */
+function round1Configuration(configuration: string, on: On): string {
+  const at = configuration.indexOf("Game mode: ");
+  const lineEnd = configuration.indexOf("\n", at);
+  if (at < 0 || lineEnd < 0) throw new Error("Setup round 1: no Game mode line in production's configuration block");
+  const players = on.kind === "iteration" ? `Number of players: ${on.players}\n` : "";
+  const mode = on.players > 1 ? GAME_MODES[on.mode as keyof typeof GAME_MODES] : configuration.slice(at + "Game mode: ".length, lineEnd);
+  const slate = on.kind !== "iteration" || asksSlate(on) ? `\n${thisSetup(on)}\n` : "";
+  let text = `${configuration.slice(0, at)}${players}Game mode: ${mode}\n${slate}${configuration.slice(lineEnd + 1)}`;
+  if (on.kind === "iteration") {
+    // These come after the user's feedback, so the last occurrence is production's own
+    const oneList = on.players > 1 && asks(on, "sharedOutcomes") !== asks(on, "players");
+    if (oneList) {
+      const sections = `You must ONLY regenerate the following sections:\n${on.sections.join(", ")}\n`;
+      const end = text.lastIndexOf(sections) + sections.length;
+      text = `${text.slice(0, end)}\n${ONE_OUTCOME_LIST}\n${text.slice(end)}`;
+    }
+    if (asksSlate(on)) {
+      const consistency = "Maintain consistency with the other parts of the template that you are not changing.";
+      const end = text.lastIndexOf(consistency) + consistency.length;
+      text = `${text.slice(0, end)} ${KEEP_IDS}${text.slice(end)}`;
+    }
+  }
+  return text;
+}
+
+function round1Prompt(production: string, on: On): string {
+  // Edits apply to the general instructions only; the premise, template and feedback come after the separator
+  const split = production.indexOf(`${SEPARATOR}\n\n`) + SEPARATOR.length + 2;
+  return round1Instructions(production.slice(0, split), on) + round1Configuration(production.slice(split), on);
+}
+
+// ---------------------------------------------------------------- schema
+
+function asObject(schema: unknown, label: string): z.AnyZodObject {
+  if (!(schema instanceof z.ZodObject)) throw new Error(`Setup round 1: ${label} is not an object schema`);
+  return schema;
+}
+
+function asArray(schema: unknown, label: string): z.ZodArray<z.ZodTypeAny> {
+  if (!(schema instanceof z.ZodArray)) throw new Error(`Setup round 1: ${label} is not an array schema`);
+  return schema;
+}
+
+function asUnion(schema: unknown, label: string): z.ZodUnion<[z.ZodTypeAny, ...z.ZodTypeAny[]]> {
+  if (!(schema instanceof z.ZodUnion)) throw new Error(`Setup round 1: ${label} is not a union schema`);
+  return schema;
+}
+
+/** The schema with one passage of its description replaced; the passage must occur exactly once. */
+function reworded<T extends z.ZodTypeAny>(schema: T, passage: string, replacement: string): T {
+  const description = schema.description ?? "";
+  const n = count(description, passage);
+  if (n !== 1) throw new Error(`Setup round 1: "${passage.slice(0, 70)}" found ${n} times in a description`);
+  return schema.describe(description.split(passage).join(replacement));
+}
+
+const appended = <T extends z.ZodTypeAny>(schema: T, addition: string): T => schema.describe(`${schema.description ?? ""} ${addition}`.trim());
+
+/** A6.1, verbatim. */
+const OUTCOME = [
+  "A question the story's ending answers, from the milestones the players earn along the way.",
+  '- Ask about one thing, in the story\'s own names (a person, faction, place or object from the story elements). Don\'t restate the premise, and don\'t join two questions with "and" or "without".',
+  "- The question's form matches its resolutions: 'Will / Does / Can …?' takes favorable, mixed and unfavorable; 'Who / Which player …?' about one prize two players compete for takes the contest resolutions; 'What / How / Which path …?' about a character's choice takes three paths. In a three-player race, 'Who …?' takes three paths, one per player.",
+  "- Each resolution is a concrete end state someone could picture. The favorable one may carry a price; the mixed and unfavorable ones are endings worth playing toward.",
+  '- A player\'s outcomes fit every identity and background that player can choose, so refer to the character by role or as "player2\'s character", never by a name, unless the premise itself names the player characters.',
+  "Examples (a story about goblin activists): 'Will the Hero Guilds reform their anti-goblin policies?' Favorable: the Guilds adopt codes that protect goblins and punish violence against them. Mixed: some reforms pass, but enforcement is weak and many heroes resist. Unfavorable: the Guilds double down, forcing goblins further underground. Contested: 'Who will become the King's Black Hand?' Three paths: 'What will the activist's friendship with Mia look like in the end?'",
+  "Weak: 'Do the players successfully complete their mission?' It restates the premise and names nothing.",
+].join("\n");
+
+/** A6.2, verbatim. */
+const RESONANCE = [
+  "Why the answer matters, in one or two sentences.",
+  "- Personal outcome: which need, fear, hope, relationship or secret of this character it tests, in a way that fits all of the player's backgrounds.",
+  "- Shared outcome: what each player, by role, stands to gain or lose, and why they can't settle it alone.",
+  "- Contested outcome: what drives each side and what winning would cost them (and, see the Outcomes section, which stat keeps its score).",
+].join("\n");
+
+/**
+ * A6.3's three-path object description, after A6's replacement of the
+ * schema's Alex example; the two are one description of one object.
+ */
+const THREE_PATHS =
+  "Use this for outcomes about a character's choice between paths. Example: 'What will the activist's friendship with Mia look like in the end?' Three paths the character can end up on, each an end state. Exploration threads offer these paths as choices, so none is simply better.";
+
+const MILESTONES = "1 for a side question that one thread decides, 2 as a default, 3 for the question the ending hinges on.";
+
+/** A1.4 and A6: one outcome instance for the shared list and every seat. */
+function round1Outcome(production: z.ZodTypeAny, generation: boolean): z.AnyZodObject {
+  const outcome = asObject(production, "outcome");
+  const union = asUnion(outcome.shape.possibleResolutions, "possibleResolutions");
+  const [challenge, contest, paths] = union.options.map((option, i) => asObject(option, `resolution kind ${i + 1}`));
+  const eachPath = () => z.string().describe("A distinct path; none of them is a failure.");
+  const resolutions = z
+    .union([
+      challenge.extend({
+        favorable: challenge.shape.favorable.describe(
+          "The best ending for this question, or the most interesting one, as a concrete state of the world or the character. It may carry a price."
+        ),
+        unfavorable: challenge.shape.unfavorable.describe("A concrete ending the story can land on, not just 'they fail'."),
+        mixed: challenge.shape.mixed.describe("A real compromise: part of it is won, and something is lost or left open."),
+      }),
+      contest.extend({
+        sideAWins: contest.shape.sideAWins.describe("Side A (player1's character in a two-player game) wins."),
+        sideBWins: contest.shape.sideBWins.describe("Side B (player2's character in a two-player game) wins."),
+        mixed: contest.shape.mixed.describe("A draw or a compromise between them."),
+      }),
+      paths.extend({ resolution1: eachPath(), resolution2: eachPath(), resolution3: eachPath() }).describe(THREE_PATHS),
+    ])
+    .describe(union.description ?? "");
+  return outcome
+    .extend({
+      question: outcome.shape.question.describe("The question, in one sentence, about one thing."),
+      possibleResolutions: resolutions,
+      resonance: outcome.shape.resonance.describe(RESONANCE),
+      // In the generation field list only (the difficulty precedent); the stored type stays a number, which the editor writes
+      intendedNumberOfMilestones: generation
+        ? z.union([z.literal(1), z.literal(2), z.literal(3)]).describe(MILESTONES)
+        : outcome.shape.intendedNumberOfMilestones.describe(MILESTONES),
+    })
+    .describe(OUTCOME);
+}
+
+/** A3.2 */
+const STAT =
+  "A variable the game tracks. In a challenge or contest scene it adds between -15 and +15 points to a choice (for scale: difficulty adds -20 to +20 to every roll, the previous beat's result ±30). A player can spend it for the game's fixed sacrifice bonus, or gain it by accepting the fixed reward malus. Its narrative implications are what the story's planners read to decide what happens next. No stat tracks progress toward an outcome, because milestones do that; the one exception is the scoreboard of a contested outcome.";
+const EFFECTS =
+  "How this stat shifts the chance of success in challenge and contest scenes. Two or three effects, each a situation or threshold and a value in absolute terms: +5 slight, +10 clear, +15 decisive (and the same below zero), never beyond 15 either way and never a formula. At most two stats count for any one choice, so write effects for the situations in which this stat is the one that matters, in scenes this story's thread types create. Examples: 'Above 70%: +10 in social challenges'; '-15 when the ship is Damaged and a risky maneuver is needed'.";
+/** A4.2 */
+const SACRIFICE =
+  "What the player gives up from this stat, in its own units, to get the game's fixed sacrifice bonus in one scene: 'Spend 10% energy', 'Burn one contact to call in a favor'. The bonus is always the same, so never state it, and the loss is certain, never a risk. Write 'None' only for a stat that must not change within one scene: a special power, a standing earned over the whole story, trust that must be earned in a thread.";
+const REWARD =
+  "What the player gains of this stat, in its own units, for accepting the game's fixed reward malus in one scene: 'Regain 10% energy by resting instead of pressing on'. The gain is certain. Write 'None' only for a stat that must not change within one scene.";
+/**
+ * A4.2 in its fallback form: keying a change on a thread type's name needs
+ * the thread designer to name its thread after one (A8's typeOfThread line),
+ * which play does not ask yet; round 0 already shows the type where the
+ * adjustments are applied. So a change is keyed on the kind of thread.
+ */
+const ADJUSTMENTS =
+  "One or two changes after threads, each keyed on the kind of thread and its result: favorable, mixed or unfavorable; for a contest, which side won. Example: '+10% after a favorable challenge thread about the crowd'. Size changes so the stat can move across its range over about six threads (a percentage by 5 to 15). Changes after unfavorable results can be real setbacks.";
+const TOOLTIP = "One sentence for the player: what the stat is and the value or use that matters. No disclaimers about what it does not mean.";
+/** A2.4, with smaller decision S8 */
+const NAME_ADDITION =
+  "Never a player's seat ('Player 1') or a player character's name: every player sees this name, and players choose their characters' names later. NPC names are fine. When the premise names the player characters, their names are fine too.";
+
+/** A2.4, A3.2 and A4.2: one stat instance for the shared and the player list. */
+function round1Stat(production: z.ZodTypeAny): z.AnyZodObject {
+  const stat = asObject(production, "stat");
+  return stat
+    .extend({
+      name: appended(stat.shape.name, NAME_ADDITION),
+      effectOnPoints: asArray(stat.shape.effectOnPoints, "effectOnPoints").max(3).describe(EFFECTS),
+      optionsToSacrifice: stat.shape.optionsToSacrifice.describe(SACRIFICE),
+      optionsToGainAsReward: stat.shape.optionsToGainAsReward.describe(REWARD),
+      adjustmentsAfterThreads: asArray(stat.shape.adjustmentsAfterThreads, "adjustmentsAfterThreads").max(2).describe(ADJUSTMENTS),
+      tooltip: stat.shape.tooltip.describe(TOOLTIP),
+    })
+    .describe(STAT);
+}
+
+/** A1.4 */
+const PLAYER_OUTCOMES =
+  "This player's own outcomes. Only elements of the ending, no intermediate goals. They must fit every identity and background this player can choose. In multiplayer games, questions that concern all players go into sharedOutcomes instead.";
+const SHARED_OUTCOMES =
+  "Outcomes that concern all players: goals they pursue together and prizes they compete over. Each counts toward every player's outcomes and milestones. Only elements of the ending, no intermediate goals.";
+const SINGLE_PLAYER_SHARED_OUTCOMES = "Single-player template: leave this list empty; every outcome belongs to player1.";
+const COORDINATION =
+  "For multiplayer games: give each player seat its own role in this story, meaning what that character does for the group or wants that the others don't. All three of that seat's identities and backgrounds stay within the role, and so do its personal outcomes. If the shared outcomes or stats above already name the roles, use those names. Example: 'player1 is the enclave's organizer (backgrounds: veteran, newcomer, defector); player2 is the movement's printer (…)'. List up to three such mechanisms. For single-player games, leave this empty.";
+const ROLE_IN_BACKGROUND = "In multiplayer games, name the seat's role in the story.";
+const CONSIDER_A_SCORE =
+  " For multiplayer games with a competitive element, consider adding an opposite stat to track who is in the lead (for 2 players) or a string to track which player currently has the most momentum (for 3+ players).";
+const SCOREBOARD_STATS = " In competitive and cooperative-competitive games, one of these is the scoreboard of each contested shared outcome, as the stat rules describe.";
+
+/** One player instance for every seat: the outcome slate's list, and in multiplayer backgrounds that name the seat's role. */
+function round1Player(production: z.ZodTypeAny, outcome: z.AnyZodObject, multiplayer: boolean): z.AnyZodObject {
+  const player = asObject(production, "player");
+  const backgrounds = asArray(player.shape.possibleCharacterBackgrounds, "possibleCharacterBackgrounds");
+  const background = asObject(backgrounds.element, "character background");
+  const fields: z.ZodRawShape = { outcomes: z.array(outcome).max(3).describe(PLAYER_OUTCOMES) };
+  if (multiplayer) {
+    const withRole = background.extend({ fluffTemplate: appended(background.shape.fluffTemplate, ROLE_IN_BACKGROUND) });
+    fields.possibleCharacterBackgrounds = z.array(withRole).describe(backgrounds.description ?? "");
+  }
+  return player.extend(fields);
+}
+
+/**
+ * Round 1's full setup schema: for a custom story or a template, the
+ * generation field list (no shared list for one player, milestone counts 1 to
+ * 3); for AI Iteration, the template schema it is cut from (one player keeps
+ * the shared list, to be left empty; milestone counts stay numbers).
+ */
+export function round1SetupSchema(playerCount: PlayerCount, gameMode: GameMode, kind: Kind): z.AnyZodObject {
+  const production = asObject(createStorySetupSchema(playerCount, kind === "iteration" ? "template" : kind), "setup");
+  const on: On = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS };
+  const multiplayer = playerCount > 1;
+  const shape = production.shape;
+  const outcome = round1Outcome(asArray(shape.sharedOutcomes, "sharedOutcomes").element, kind !== "iteration");
+  const stat = round1Stat(asArray(shape.sharedStats, "sharedStats").element);
+  const player = round1Player(shape.player1, outcome, multiplayer);
+  const plan = asObject(shape.characterSelectionPlan, "characterSelectionPlan");
+  const slots = Object.keys(shape).filter((key) => PLAYER_SLOTS.includes(key));
+  // Existing keys keep their place in production's order (zod's extend)
+  const fields: z.ZodRawShape = {
+    sharedStats: z.array(stat).describe(reworded(shape.sharedStats, CONSIDER_A_SCORE, contested(on) ? SCOREBOARD_STATS : "").description ?? ""),
+    playerStats: z.array(stat).describe(shape.playerStats.description ?? ""),
+    ...Object.fromEntries(slots.map((slot) => [slot, player])),
+  };
+  if (multiplayer) {
+    fields.sharedOutcomes = z.array(outcome).max(2).describe(SHARED_OUTCOMES);
+    const coordination = asArray(plan.shape.multiplayerCoordination, "multiplayerCoordination").describe(COORDINATION);
+    fields.characterSelectionPlan = plan.extend({ multiplayerCoordination: coordination });
+  } else if (kind === "iteration") {
+    fields.sharedOutcomes = z.array(outcome).describe(SINGLE_PLAYER_SHARED_OUTCOMES);
+  }
+  // A new story or template with one player has no shared list; the code fills in an empty one (setup doc B1.8)
+  const base = multiplayer || kind === "iteration" ? production : production.omit({ sharedOutcomes: true });
+  return base.extend(fields);
+}
+
+/** A template schema cut to the requested sections and this player count, as production's partialTemplateSchema cuts its own. */
+export function cutToSections(schema: z.AnyZodObject, sections: string[], playerCount: PlayerCount): z.AnyZodObject {
+  const keep = new Set<string>();
+  for (const section of sections) {
+    if (section in templateIterationSections) templateIterationSections[section].forEach((field) => keep.add(field));
+  }
+  if (sections.includes("players")) {
+    for (let i = 1; i <= playerCount; i++) keep.add(`player${i}`);
+  }
+  return z.object(Object.fromEntries(Object.entries(schema.shape).filter(([key]) => keep.has(key))) as z.ZodRawShape);
+}
+
+// ---------------------------------------------------------------- requests
+
+/** Round 1's request for a new custom story or template from a premise (production's setupStep.request with A1 to A6). */
+export function setupRound1Request(
+  premise: string,
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  maxTurns: number,
+  kind: "story" | "template"
+): TextRequest {
+  const on: On = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS };
+  return {
+    prompt: round1Prompt(StorySetupPromptService.createSetupPrompt(premise, playerCount, gameMode, maxTurns, kind), on),
+    schema: round1SetupSchema(playerCount, gameMode, kind),
+  };
+}
+
+/** Round 1's AI Iteration request (production's TemplateService.iterateTemplate request with A1 to A6). */
+export function iterationRound1Request(
+  feedback: string,
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  maxTurns: number,
+  sections: string[],
+  template: object
+): TextRequest {
+  const on: On = { players: playerCount, mode: gameMode, kind: "iteration", sections };
+  return {
+    prompt: round1Prompt(StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template), on),
+    schema: cutToSections(round1SetupSchema(playerCount, gameMode, "iteration"), sections, playerCount),
+  };
+}

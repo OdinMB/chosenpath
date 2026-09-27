@@ -85,7 +85,9 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
  * The variant each variant builds on: the Stage 3 trims and today's-scaffold
  * rewrite on production's form, the slim rewrite on the slim trim, and the
  * rewrite without examples on the rewrite with them. The count fix (rewrite2*)
- * reads against the same bases as the Stage 4 form it re-runs.
+ * reads against the same bases as the Stage 4 form it re-runs. A setup round's
+ * candidate reads against production's form of the same arm (the stored
+ * postfix setups, which today's code rebuilds byte for byte).
  */
 const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   prod: undefined,
@@ -97,6 +99,7 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   rewrite2: "prod",
   rewrite2Slim: "slim",
   rewrite2ZeroShot: "rewrite2",
+  setupR1: "prod",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -210,10 +213,28 @@ export const STAGE3_SETUP_PREMISES = [
 ];
 
 /**
+ * The nine premises of the owner's round-1 setup page (key 3434afcc6f, the
+ * Casablanca control left out): three per player count. Not
+ * STAGE3_SETUP_PREMISES, which has neo-tokyo instead of Avalon.
+ */
+export const ROUND1_SETUP_PAGE_PREMISES = [
+  "setup-custom-avalon",
+  "setup-pretend-er-doctor",
+  "setup-learn-lemonade",
+  "setup-fiction-bounty-hunters",
+  "setup-kids-animal-rescue",
+  "setup-flexible-soul-flat",
+  "setup-vent-berlin-flat",
+  "setup-flexible-secret-society",
+  "setup-pretend-cofounders",
+];
+
+/**
  * Candidate arms (the baseline runs separately, first), one static matrix per
  * stage. Stage 1-2 follows the owner decisions of 2026-09-26, Stages 3 and 4
  * the coordinator's carry-forward (Milestone 3), and Stage 4b (planned with
- * Stage 4) the owner's count fix.
+ * Stage 4) the owner's count fix. The setup rounds follow the setup document
+ * with the owner's decisions of 2026-09-27.
  */
 export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
   switch (stage) {
@@ -223,12 +244,30 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return stage3Arms(role);
     case "4":
       return [...stage4bArms(role), ...stage4Arms(role)];
+    case "setup-rounds":
+      return setupRoundArms(role);
     case "migration":
       return migrationArms(role);
     default:
-      // The setup and turn rounds get their candidates with the eval-only variants they test
+      // The turn rounds get their candidates with the eval-only variants they test
       return [];
   }
+}
+
+/**
+ * The setup rounds (setup doc section 4). Round 1 (setupR1): custom-story
+ * setup runs on Luna low, the production default, on all 18 premises at two
+ * samples, so its checks read against the reference's two-sample noise; Sol
+ * low runs beside it once on the owner's round-1 page premises, in round 1
+ * only, to decide whether template generation moves to Sol. gpt-4.1 is never a
+ * new arm. Luna first, so a cap stop cuts Sol.
+ */
+function setupRoundArms(role: EvalRole): ArmPlan[] {
+  if (role !== "setup") return [];
+  return [
+    { arm: luna("low", "setupR1"), samples: 2, scope: "all" },
+    { arm: sol("low", "setupR1"), samples: 1, scope: "all", caseIds: ROUND1_SETUP_PAGE_PREMISES },
+  ];
 }
 
 /** Production's own default for a settings group (TEXT_MODEL_GROUPS), as an arm on production's form. */

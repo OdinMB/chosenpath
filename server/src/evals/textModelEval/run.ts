@@ -29,7 +29,7 @@ import {
   runFilterCheck,
   scoreFilterCheck,
 } from "./filterCheck.js";
-import { jobEstimateUsd, planJobs, requestInputFor, requestJob, type PlanOptions } from "./jobPlan.js";
+import { jobEstimateUsd, planJobs, rebuiltToday, requestJob, todaysRequestHash, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
 import { prepSpend } from "./prepCalls.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
@@ -49,7 +49,7 @@ import {
   spendBeside,
   type PrepContext,
 } from "./turnPrep.js";
-import { PRE_FIX_PROMPT_STATE, requestFor, requestText, retiredPromptStateProblem } from "./variants.js";
+import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
@@ -538,6 +538,7 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       filterCheckUsd: filterSpendUsd(files.readFilterRecords()),
       sideSpend: prepSpend(files.readPrepRecords()),
       prose,
+      storedReference: rebuiltToday(cases),
       generatedAt: new Date(),
     })
   );
@@ -700,21 +701,14 @@ function checkBaselinesMode(args: Args, files: EvalFiles) {
     }
     return [{ key, exported }];
   });
-  // Today's production-form request for a case, as the executor hashes it; a case today's code cannot build has none
-  const todaysPromptHash = (evalCase: EvalCase) => {
-    try {
-      return sha256(requestText(requestFor("prod", requestInputFor(evalCase))));
-    } catch {
-      return undefined;
-    }
-  };
   const report = checkBaselines({
     records,
     cases,
     design,
     all: checks,
     rated,
-    todaysPromptHash,
+    // Today's production-form request for a case, as the executor hashes it; a case today's code cannot build has none
+    todaysPromptHash: (evalCase) => todaysRequestHash(evalCase),
     readouts: readoutSamples(records, cases, files),
     generatedAt: new Date(),
   });

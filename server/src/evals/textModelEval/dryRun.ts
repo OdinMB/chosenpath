@@ -79,6 +79,16 @@ export function estimateMinutes(jobs: Job[], tpm: number, maxInFlight: number): 
   return Math.max(tokenMinutes, seconds / maxInFlight / 60);
 }
 
+/** The stages whose rows also list their arms. */
+const ROUND_STAGES: Stage[] = ["setup-rounds", "turn-rounds"];
+
+/** Jobs by arm key, in plan order. */
+function byArm(jobs: Job[]): Map<string, Job[]> {
+  const arms = new Map<string, Job[]>();
+  for (const job of jobs) arms.set(job.armKey, [...(arms.get(job.armKey) ?? []), job]);
+  return arms;
+}
+
 export type DryRunInput = {
   outDir: string;
   records: CallRecord[];
@@ -144,6 +154,13 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     const byRole = open.reduce<Record<string, number>>((acc, j) => ((acc[j.group] = (acc[j.group] ?? 0) + 1), acc), {});
     const minutes = Math.ceil(estimateMinutes(open, input.tpm, input.maxInFlight));
     log(`${label}: ${open.length} jobs ${JSON.stringify(byRole)}, est $${cost.toFixed(2)} (stage cap $${caps.stageCaps[stage]}), at least ${minutes} min`);
+    // A round's arms are its candidates: each one's open jobs and estimate, for the check by hand before a paid run
+    if (ROUND_STAGES.includes(stage)) {
+      for (const [armKey, armJobs] of byArm(open)) {
+        const armCost = armJobs.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
+        log(`  ${armKey}: ${armJobs.length} open job${armJobs.length === 1 ? "" : "s"}, est $${armCost.toFixed(3)}`);
+      }
+    }
   }
 
   log(`Filter check (--filter-check): ${FILTER_CASES.length} cases per arm, about $${filterCheckEstimateUsd(FILTER_CASES, DEFAULT_FILTER_ARMS).toFixed(2)} for the default arms (cap $${caps.stageCaps.filter})`);

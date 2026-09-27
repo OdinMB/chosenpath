@@ -1,8 +1,14 @@
 import { jest } from "@jest/globals";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
-import { GameModes } from "core/types/index.js";
+import { GameModes, type GameMode } from "core/types/index.js";
+import { exampleBlock } from "../../../../src/evals/textModelEval/setupDesignChecks.js";
+import {
+  WORKED_EXAMPLE_HEADING,
+  iterationRound1Request,
+  setupRound1Request,
+} from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
-import { planJobs, storyAfterAnalysis, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
+import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
   isSplitRequest,
@@ -248,8 +254,14 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("3").some((j) => j.baseline)).toBe(true);
   });
 
-  it("plans nothing in the round stages until their candidates are defined", () => {
-    expect(plan("setup-rounds")).toEqual([]);
+  it("plans setup round 1 in the setup rounds, and nothing yet in the turn rounds", () => {
+    // The lemonade premise is on the owner's round-1 page, so Sol low runs it too
+    expect(perArm(plan("setup-rounds"))).toEqual({
+      "gpt-6-luna@low/setupR1": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-sol@low/setupR1": ["setup-learn-lemonade s1"],
+    });
+    expect(plan("setup-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
+    expect(plan("turn-rounds")).toEqual([]);
     expect(plan("turn-rounds", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
   });
 
@@ -305,6 +317,64 @@ describe("requestFor: the Stage 4 variants", () => {
       expect({ worded, fixed: a.fixed.replace(`${NO_EMPTY_ITEMS}\n`, ""), perCall: a.perCall }).toEqual({ worded, fixed: b.fixed, perCall: b.perCall });
       expect(a.fixed).toContain(NO_EMPTY_ITEMS);
     }
+  });
+});
+
+describe("requestFor: setup round 1", () => {
+  const MULTIPLAYER_MODES = [GameModes.Cooperative, GameModes.Competitive, GameModes.CooperativeCompetitive];
+  const INPUTS: [1 | 2 | 3, GameMode][] = [[1, GameModes.SinglePlayer], ...([2, 3] as const).flatMap((n) => MULTIPLAYER_MODES.map((m): [2 | 3, GameMode] => [n, m]))];
+  const setup = (playerCount: 1 | 2 | 3, gameMode: GameMode): RequestInput => ({ role: "setup", setup: { premise: "A premise", playerCount, gameMode, maxTurns: 25 } });
+
+  it.each(INPUTS)("%i players, %s: builds the custom-story request in production's one-message shape", (players, mode) => {
+    const request = requestFor("setupR1", setup(players, mode));
+    expect(isSplitRequest(request)).toBe(false);
+    const expected = setupRound1Request("A premise", players, mode, 25, "story");
+    expect(requestText(request)).toBe(expected.prompt);
+    expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+  });
+
+  it("builds AI Iteration with round 1's text, and refuses the turn roles", () => {
+    const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: 2 as const, gameMode: GameModes.Competitive, maxTurns: 25 };
+    const request = requestFor("setupR1", { role: "iteration", iteration });
+    expect(requestText(request)).toBe(iterationRound1Request("More rivalry", 2, GameModes.Competitive, 25, ["stats"], { title: "T" }).prompt);
+    expect(() => requestFor("setupR1", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant setupR1 does not cover role beat");
+  });
+
+  it.each(INPUTS)("%i players, %s: the Stage 3 and Stage 4 setup variants still build on production's anchors", (players, mode) => {
+    for (const variant of ["minimal", "rewrite", "rewriteZeroShot", "rewrite2", "rewrite2ZeroShot"] as VariantId[]) {
+      expect(() => requestFor(variant, setup(players, mode))).not.toThrow();
+    }
+  });
+
+  it("gives the example-copy check round 1's own worked example to read", () => {
+    const block = exampleBlock(requestText(requestFor("setupR1", setup(2, GameModes.Competitive))));
+    expect(block?.startsWith(WORKED_EXAMPLE_HEADING)).toBe(true);
+    expect(block).toContain("Not like this:");
+    expect(block).not.toContain("Character Selection Instructions");
+  });
+});
+
+describe("rebuiltToday: stored records that may stand in as a round's reference", () => {
+  const setupCase = evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
+  const stored = (armKey: string, promptHash: string | undefined, caseId = setupCase.id) =>
+    record({ caseId, armKey, callArmKey: armKey, promptHash, role: "setup", group: "setup", promptState: "postfix" });
+
+  it("accepts a record whose request today's code builds byte for byte on the record's own variant, and nothing else", () => {
+    const current = rebuiltToday([setupCase]);
+    const prod = todaysRequestHash(setupCase);
+    const round1 = todaysRequestHash(setupCase, "setupR1");
+    expect(prod).toBeDefined();
+    expect(round1).not.toBe(prod);
+    expect(current(stored("gpt-6-luna@low/prod", prod))).toBe(true);
+    expect(current(stored("gpt-6-luna@low/setupR1", round1))).toBe(true);
+    expect(current(stored("gpt-6-luna@low/setupR1", prod))).toBe(false);
+    expect(current(stored("gpt-6-luna@low/prod", "an older prompt"))).toBe(false);
+    expect(current(stored("gpt-6-luna@low/prod", undefined))).toBe(false);
+    expect(current(stored("gpt-6-luna@low/prod", prod, "a case that is not frozen"))).toBe(false);
+  });
+
+  it("has no hash for a request today's code cannot build", () => {
+    expect(todaysRequestHash(setupCase, "rewriteSlim")).toBeUndefined();
   });
 });
 

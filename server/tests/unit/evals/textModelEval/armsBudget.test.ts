@@ -7,9 +7,11 @@ import {
   makeArm,
   productionArm,
   referenceKey,
+  ROUND1_SETUP_PAGE_PREMISES,
   STAGES,
   stageRunsBaseline,
 } from "../../../../src/evals/textModelEval/arms.js";
+import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import {
   costFromUsage,
   estimateCall,
@@ -140,6 +142,43 @@ describe("arm keys and estimates", () => {
     const chars = requestChars({ prompt: "p".repeat(1_000), schema });
     expect(chars).toBeGreaterThan(3_000);
     expect(chars).toBeLessThan(3_500);
+  });
+});
+
+describe("the setup rounds' arms (setup doc section 4, round 1)", () => {
+  it("runs round 1 on Luna low at two samples on every premise, and Sol low once on the owner's round-1 page premises", () => {
+    expect(armsFor("setup-rounds", "setup").map((plan) => [plan.arm.key, plan.samples, plan.scope, plan.caseIds])).toEqual([
+      ["gpt-6-luna@low/setupR1", 2, "all", undefined],
+      ["gpt-6-sol@low/setupR1", 1, "all", ROUND1_SETUP_PAGE_PREMISES],
+    ]);
+    for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("setup-rounds", role)).toEqual([]);
+    // gpt-4.x is never a new arm; its stored records are comparisons only
+    expect(armsFor("setup-rounds", "setup").every((plan) => plan.arm.model.startsWith("gpt-6-") && !plan.arm.baseline)).toBe(true);
+  });
+
+  it("reads round 1 against production's form of the same arm, and estimates it from there", () => {
+    expect(referenceKey("gpt-6-luna@low/setupR1")).toBe("gpt-6-luna@low/prod");
+    expect(referenceKey("gpt-6-sol@low/setupR1")).toBe("gpt-6-sol@low/prod");
+    expect(estimateBaseKey("gpt-6-sol@low/setupR1")).toBe("gpt-6-sol@low/prod");
+  });
+
+  it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {
+    expect([...ROUND1_SETUP_PAGE_PREMISES].sort()).toEqual(
+      [
+        "setup-custom-avalon",
+        "setup-pretend-er-doctor",
+        "setup-learn-lemonade",
+        "setup-fiction-bounty-hunters",
+        "setup-kids-animal-rescue",
+        "setup-flexible-soul-flat",
+        "setup-vent-berlin-flat",
+        "setup-flexible-secret-society",
+        "setup-pretend-cofounders",
+      ].sort()
+    );
+    const premises = new Map(SETUP_PREMISES.map((p) => [p.id, p]));
+    const players = ROUND1_SETUP_PAGE_PREMISES.map((id) => premises.get(id)?.playerCount);
+    expect([1, 2, 3].map((n) => players.filter((p) => p === n).length)).toEqual([3, 3, 3]);
   });
 });
 

@@ -19,7 +19,7 @@ import { caseStory, hashOrder, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
 import { usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
-import { isSplitRequest, requestFor, requestText, type EvalRequest, type RequestInput } from "./variants.js";
+import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type VariantId } from "./variants.js";
 
 /*
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
@@ -72,6 +72,39 @@ export function requestInputFor(evalCase: EvalCase): RequestInput {
     case "thread":
       return { role: evalCase.role, story: caseStory(evalCase, false) };
   }
+}
+
+/**
+ * The sha256 of the request today's code builds for a case on a variant, as
+ * the executor hashes a request's text (promptHash); undefined when today's
+ * code cannot build it. A stored record whose promptHash matches is today's
+ * form, so it can stand in as a reference under a newer prompt state.
+ */
+export function todaysRequestHash(evalCase: EvalCase, variant: VariantId = "prod"): string | undefined {
+  try {
+    return sha256(requestText(requestFor(variant, requestInputFor(evalCase))));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether a stored record's request is the one today's code builds for its
+ * case on its arm's variant, byte for byte, so a round can read it as its
+ * reference (variantComparison.ts, StoredReference); memoised per case and
+ * variant.
+ */
+export function rebuiltToday(cases: EvalCase[]): (record: CallRecord) => boolean {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const hashes = new Map<string, string | undefined>();
+  return (record) => {
+    const evalCase = byId.get(record.caseId);
+    const variant = record.armKey.split("/").pop() as VariantId;
+    if (!evalCase || !record.promptHash || !VARIANTS.includes(variant)) return false;
+    const key = `${record.caseId}|${variant}`;
+    if (!hashes.has(key)) hashes.set(key, todaysRequestHash(evalCase, variant));
+    return hashes.get(key) === record.promptHash;
+  };
 }
 
 /**

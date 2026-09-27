@@ -19,6 +19,7 @@ import {
 import { rewriteBeatRequest, type RewriteScaffold } from "../../game/services/storyTextRewrite/beat.js";
 import type { RewriteCounts, SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
 import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.js";
+import { iterationRound1Request, setupRound1Request } from "../../game/services/storyTextRounds/setupRound1.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -42,6 +43,11 @@ import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.
  * reproducible. Stage 4b's count fix builds the same three with the counts
  * in words and caps only ("worded", see storyTextRewrite/common.ts):
  * "rewrite2", "rewrite2Slim" and "rewrite2ZeroShot".
+ * The setup rounds' candidates edit production's request in its own shape
+ * (storyTextRounds/): "setupR1" is setup round 1 of the setup document
+ * (outcome slates, the scoreboard, the engine facts, stats that act, one
+ * worked example, questions that name the stake), for custom-story setup and
+ * AI Iteration; its template form is setupRound1Request's "template" kind.
  */
 
 export type VariantId =
@@ -53,7 +59,8 @@ export type VariantId =
   | "rewriteZeroShot"
   | "rewrite2"
   | "rewrite2Slim"
-  | "rewrite2ZeroShot";
+  | "rewrite2ZeroShot"
+  | "setupR1";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -64,6 +71,7 @@ export const VARIANTS: VariantId[] = [
   "rewrite2",
   "rewrite2Slim",
   "rewrite2ZeroShot",
+  "setupR1",
 ];
 
 /** What a variant sends: one user message (production's shape), or fixed rules then a per-call message. */
@@ -202,6 +210,19 @@ function rewriteVariant(variant: VariantId, counts: RewriteCounts, covers: { set
   };
 }
 
+/** Setup round 1: custom-story setup and AI Iteration in production's one-message shape. */
+function setupRound1(input: RequestInput): TextRequest {
+  if (input.role === "setup") {
+    const { premise, playerCount, gameMode, maxTurns } = input.setup;
+    return setupRound1Request(premise, playerCount, gameMode, maxTurns, "story");
+  }
+  if (input.role === "iteration") {
+    const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
+    return iterationRound1Request(feedback, playerCount, gameMode, maxTurns, sections, template);
+  }
+  throw new Error(`Variant setupR1 does not cover role ${input.role}`);
+}
+
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
@@ -212,6 +233,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   rewrite2: rewriteVariant("rewrite2", "worded", { setupWithExamples: true, beat: "full" }),
   rewrite2Slim: rewriteVariant("rewrite2Slim", "worded", { beat: "slim" }),
   rewrite2ZeroShot: rewriteVariant("rewrite2ZeroShot", "worded", { setupWithExamples: false }),
+  setupR1: setupRound1,
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

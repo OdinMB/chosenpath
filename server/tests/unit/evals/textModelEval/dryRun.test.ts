@@ -1,5 +1,7 @@
 import { jest } from "@jest/globals";
+import { GameModes } from "core/types/index.js";
 import { baselineArm } from "../../../../src/evals/textModelEval/arms.js";
+import type { EvalCase } from "../../../../src/evals/textModelEval/cases.js";
 import { printDryRun, type DryRunInput } from "../../../../src/evals/textModelEval/dryRun.js";
 import type { PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { jobKey, type CallRecord } from "../../../../src/evals/textModelEval/runner.js";
@@ -23,15 +25,15 @@ describe("printDryRun: the prompt state it plans under", () => {
     return record({ jobKey: jobKey("sp", armKey, promptState, 1), promptState, caseId: "sp", armKey, callArmKey: armKey });
   };
 
-  async function dryRun(records: CallRecord[], promptState?: string): Promise<string[]> {
+  async function dryRun(records: CallRecord[], promptState?: string, cases: EvalCase[] = [beatCase], roles: PlanOptions["roles"] = ["beat"]): Promise<string[]> {
     const lines: string[] = [];
     const input: DryRunInput = {
       outDir: "out",
       records,
       extraSpend: [],
-      frozenCases: [beatCase],
+      frozenCases: cases,
       sources: { snapshots: [], templates: [], newStory: () => { throw new Error("frozen cases need no new stories"); } },
-      options: (stage, tag, extra): PlanOptions => ({ stage, promptState: tag, roles: ["beat"], mode: "isolated", subset15: false, records, ...extra }),
+      options: (stage, tag, extra): PlanOptions => ({ stage, promptState: tag, roles, mode: "isolated", subset15: false, records, ...extra }),
       promptState,
       tpm: 1_000_000,
       maxInFlight: 6,
@@ -65,6 +67,16 @@ describe("printDryRun: the prompt state it plans under", () => {
     // The one single-player beat case at production's beat arm, two samples, and no baseline
     expect(lines.some((line) => /^Migration check \(production defaults, isolated\): 2 jobs .*\(stage cap \$1\.2\)/.test(line))).toBe(true);
     expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
+  });
+
+  it("lists the round stages' open jobs per arm, each with its estimate", async () => {
+    const setupCase = evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
+    const lines = await dryRun([], undefined, [setupCase], ["setup"]);
+    expect(lines.some((line) => /^Setup rounds candidates \(isolated\): 3 jobs \{"setup":3\}, est \$\d+\.\d\d \(stage cap \$3\)/.test(line))).toBe(true);
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-luna@low\/setupR1: 2 open jobs, est \$\d+\.\d{3}$/));
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-sol@low\/setupR1: 1 open job, est \$\d+\.\d{3}$/));
+    // Rows outside the round stages keep their one line
+    expect(lines.filter((line) => line.startsWith("  gpt-6-luna@low/prod"))).toEqual([]);
   });
 
   it("refuses a retired tag, as --run does", async () => {

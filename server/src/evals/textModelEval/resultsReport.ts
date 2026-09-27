@@ -19,7 +19,7 @@ import type { ProbeReport } from "./probe.js";
 import type { CheckResult } from "./textChecks.js";
 import type { CallRecord } from "./runner.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
-import { variantComparisons, type CheckReading, type VariantComparison } from "./variantComparison.js";
+import { variantComparisons, type CheckReading, type StoredReference, type VariantComparison } from "./variantComparison.js";
 import { PRE_FIX_PROMPT_STATE } from "./variants.js";
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
 
@@ -45,6 +45,8 @@ export type ResultsInput = {
   /** Other spend beside calls.jsonl: the turn rounds' preparation calls (prep-calls.jsonl), under their stage */
   sideSpend?: SpendRecord[];
   prose?: Record<string, { distinctOpenings: number; youOpenings: number; beats: number; stockPhrasesPer1000Words: number }>;
+  /** Stored records of another prompt state that may stand in as a variant's reference (today's code rebuilds them) */
+  storedReference?: StoredReference;
   generatedAt: Date;
 };
 
@@ -265,15 +267,19 @@ function storyShare(stats: ArmStats, basis: CostBasis = "billed"): number | unde
   return calls === undefined ? undefined : calls * onePlayer;
 }
 
+/** The reference's key, with its prompt state when it is a stored reference from another state. */
+const referenceLabel = (c: VariantComparison) => (c.referenceState ? `${c.referenceState}:${c.referenceKey} (stored)` : c.referenceKey);
+
 function renderArmRows(comparisons: VariantComparison[]): string[] {
   const lines = [
     "| Role | Arm | Reference | Pairs | 1st-attempt valid | Visible tokens | Reasoning tokens | p50 wait | p95 wait | $/call billed | Per 1-player story with pregeneration |",
     "|---|---|---|---|---|---|---|---|---|---|---|",
   ];
-  for (const { group, armKey, referenceKey, pairs, arm: a, reference: r } of comparisons) {
+  for (const comparison of comparisons) {
+    const { group, armKey, pairs, arm: a, reference: r } = comparison;
     const valid = (s: ArmStats) => `${s.validity.firstAttemptValid}/${s.validity.calls}`;
     lines.push(
-      `| ${group} | ${armKey} | ${referenceKey} | ${pairs} | ${valid(r)} → ${valid(a)} | ${fromTo(r.medianTokens.visible, a.medianTokens.visible, tokens)} | ${fromTo(r.medianTokens.reasoning, a.medianTokens.reasoning, tokens)} | ${fromTo(r.latency.p50, a.latency.p50, secs)} | ${fromTo(r.latency.p95, a.latency.p95, secs)} | ${fromTo(r.cost.billed.perCall, a.cost.billed.perCall, usd)} | ${fromTo(storyShare(r), storyShare(a), usd)} |`
+      `| ${group} | ${armKey} | ${referenceLabel(comparison)} | ${pairs} | ${valid(r)} → ${valid(a)} | ${fromTo(r.medianTokens.visible, a.medianTokens.visible, tokens)} | ${fromTo(r.medianTokens.reasoning, a.medianTokens.reasoning, tokens)} | ${fromTo(r.latency.p50, a.latency.p50, secs)} | ${fromTo(r.latency.p95, a.latency.p95, secs)} | ${fromTo(r.cost.billed.perCall, a.cost.billed.perCall, usd)} | ${fromTo(storyShare(r), storyShare(a), usd)} |`
     );
   }
   return lines;
@@ -309,7 +315,7 @@ function renderInputRows(comparisons: VariantComparison[]): string[] {
 function renderStateRows(comparisons: VariantComparison[]): string[] {
   const lines = [
     "",
-    "| Role | Arm | State counts per call, reference (±noise) → arm | Checks lower than the reference beyond noise | Checks higher than the reference beyond noise |",
+    "| Role | Arm | State counts per call, reference (±noise) → arm | Checks and shares lower than the reference beyond noise | Checks and shares higher than the reference beyond noise |",
     "|---|---|---|---|---|",
   ];
   const rates = (checks: CheckReading[]) => checks.map((c) => `${c.name} ${pct(c.reference)} → ${pct(c.arm)}`).join("; ") || "–";
@@ -317,9 +323,11 @@ function renderStateRows(comparisons: VariantComparison[]): string[] {
     const counts = c.counts
       .map((n) => `${n.name} ${n.reference.toFixed(2)}${n.noise === undefined ? "" : ` (±${n.noise.toFixed(2)})`} → ${n.arm.toFixed(2)}`)
       .join("; ");
+    // The design checks' pooled shares read like rates (outcomes naming an element, spendable player stats, …)
+    const readings: CheckReading[] = [...c.checks, ...c.shares];
     const flagged = c.hasNoise
-      ? `${rates(c.checks.filter((k) => k.flag === "lower"))} | ${rates(c.checks.filter((k) => k.flag === "higher"))}`
-      : `one reference sample, no noise floor; raw rates: ${rates(c.checks)} | –`;
+      ? `${rates(readings.filter((k) => k.flag === "lower"))} | ${rates(readings.filter((k) => k.flag === "higher"))}`
+      : `one reference sample, no noise floor; raw rates: ${rates(readings)} | –`;
     lines.push(`| ${c.group} | ${c.armKey} | ${counts || "–"} | ${flagged} |`);
   }
   return lines;
@@ -354,9 +362,9 @@ function renderVariantComparison(comparisons: VariantComparison[]): string[] {
   if (comparisons.length === 0) return [];
   return [
     "",
-    "### Variants against their reference (Stage 3 trims, Stage 4 rewrite)",
+    "### Variants against their reference (Stage 3 trims, Stage 4 rewrite, setup and turn rounds)",
     "",
-    "Readings on paired cases: each variant arm against its reference arm (a trim against its full form; a rewrite against the form it rewrites, today's baseline included; a verbosity arm against the same arm without it), on the (case, sample) pairs both finished. Columns read reference → arm. Checks are flagged beyond the reference's own noise: its sample 1 against its sample 2 on the matched cases. Waits carry server drift where the reference ran earlier; tokens and cost do not. Nothing is dropped or picked.",
+    "Readings on paired cases: each variant arm against its reference arm (a trim against its full form; a rewrite against the form it rewrites, today's baseline included; a verbosity arm against the same arm without it; a round's candidate against production's form of the same arm), on the (case, sample) pairs both finished. A reference marked (stored) comes from the prompt state it names, read only where today's code rebuilds its request byte for byte. Columns read reference → arm. Checks and the design checks' pooled shares are flagged beyond the reference's own noise: its sample 1 against its sample 2 on the matched cases. Waits carry server drift where the reference ran earlier; tokens and cost do not. Nothing is dropped or picked.",
     "",
     ...renderArmRows(comparisons),
     ...renderInputRows(comparisons),
@@ -427,7 +435,7 @@ export function renderResults(input: ResultsInput): string {
       lines.push("");
     }
     lines.push("### Views: single-player with and without pregeneration, multiplayer, setup", ...renderViews(stats, promptState));
-    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState)));
+    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference)));
   }
   if (input.prose) {
     lines.push("", "## Prose aggregates (beats)", "", "| Arm | Beats | Distinct openings | Opens with \"You\" | Stock phrases / 1000 words |", "|---|---|---|---|---|");
