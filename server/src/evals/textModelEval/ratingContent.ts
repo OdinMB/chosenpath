@@ -82,7 +82,16 @@ export const SETUP_FIELD_LABELS = {
   no: "no",
 } as const;
 
-const IMAGE_KEYS = ["visualStyle", "atmosphere", "colorPalette", "settingDetails", "characterStyle", "artInfluences", "coverPrompt"] as const;
+/** Every fixed string a turn option shows; they join the page's field labels likewise. */
+export const TURN_FIELD_LABELS = {
+  forPlayer: "For",
+  title: "Title",
+  text: "Text",
+  options: "Options",
+  interludes: "Interludes",
+} as const;
+
+export const IMAGE_KEYS = ["visualStyle", "atmosphere", "colorPalette", "settingDetails", "characterStyle", "artInfluences", "coverPrompt"] as const;
 
 export type SetupStat = {
   id: string;

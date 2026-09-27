@@ -1,14 +1,49 @@
-import { htmlLeaks, metadataLeaks } from "../../../../src/evals/textModelEval/blinding.js";
-import { SETUP_FIELD_LABELS, setupCard, withPictureNotes } from "../../../../src/evals/textModelEval/ratingContent.js";
-import { renderRatingPage } from "../../../../src/evals/textModelEval/ratingPage.js";
-import { planRatingSet, ratingSetFromKey, type RatingSet, type RatingSpec } from "../../../../src/evals/textModelEval/ratingSets.js";
+import { LEAK_PATTERN, htmlLeaks, metadataLeaks } from "../../../../src/evals/textModelEval/blinding.js";
+import {
+  SETUP_FIELD_LABELS,
+  TURN_FIELD_LABELS,
+  setupCard,
+  withPictureNotes,
+  type TurnBeat,
+  type TurnContent,
+} from "../../../../src/evals/textModelEval/ratingContent.js";
+import { WIDE_FROM, renderRatingPage } from "../../../../src/evals/textModelEval/ratingPage.js";
+import { ENTRY_STARTS_OPEN, startsOpen } from "../../../../src/evals/textModelEval/ratingRows.js";
+import {
+  LABELS,
+  pageFieldLabels,
+  planRatingSet,
+  ratingSetFromKey,
+  type RatingSet,
+  type RatingSpec,
+} from "../../../../src/evals/textModelEval/ratingSets.js";
 import { scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
 import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
+import { all, closest, kids, parseHtml, select, textOf, type HtmlNode } from "./htmlTree.js";
 
 const ARMS = [BASELINE, LUNA, SOL].map((a) => ({ promptState: "prefix", armKey: a.key }));
+
+const GUIDELINE_FIELD: Record<string, string> = {
+  World: "world",
+  "World rules": "rules",
+  Tone: "tone",
+  Conflicts: "conflicts",
+  Decisions: "decisions",
+  "Types of threads": "typesOfThreads",
+  "Switch and thread instructions": "switchAndThreadInstructions",
+};
+
+/** The one aligned section with this key (a row across every option of the item). */
+function sectionAt(root: HtmlNode, key: string): HtmlNode {
+  const found = all(root, (n) => n.tag === "details" && n.attrs["data-sec"] === key);
+  if (found.length !== 1) throw new Error(`Expected one section "${key}", found ${found.length}`);
+  return found[0];
+}
+
+const sectionKeys = (root: HtmlNode) => all(root, (n) => n.tag === "details" && n.attrs["data-sec"] !== undefined).map((n) => n.attrs["data-sec"]);
 
 /** A whole setup reply in production's shape, the character-selection plan included. */
 function setupOutput(title: string) {
@@ -460,21 +495,16 @@ describe("renderRatingPage: the setup design", () => {
   }
   const L = SETUP_FIELD_LABELS;
   const html = setupPage(setupOutput("Tides"));
-
-  it("shows each section in a foldable section that starts open", () => {
-    for (const title of [L.characterSelection, L.guidelines, L.sharedOutcomes, L.stats, L.storyElements, `${L.player} 1`, L.imageInstructions]) {
-      expect(html).toContain(`<details class="part" open><summary><h4>${title}</h4></summary>`);
-    }
-    for (const title of [L.sharedStats, L.playerStats]) {
-      expect(html).toContain(`<details class="part" open><summary><h5>${title}</h5></summary>`);
-    }
-  });
+  const tree = parseHtml(html);
+  const bodyOf = (key: string) => textOf(kids(sectionAt(tree, key), "div.body")[0]);
 
   it("shows every guideline and the difficulty", () => {
-    expect(html).toContain("Calm Seas (modifier +10)");
-    for (const label of [L.world, L.rules, L.tone, L.conflicts, L.decisions, L.typesOfThreads]) expect(html).toContain(`<dt>${label}</dt>`);
+    expect(bodyOf("difficulty")).toBe("A Calm Seas (modifier +10)");
+    for (const label of [L.world, L.rules, L.tone, L.conflicts, L.decisions, L.typesOfThreads, L.switchAndThreadInstructions]) {
+      expect(textOf(kids(sectionAt(tree, `guidelines.${GUIDELINE_FIELD[label]}`), "summary")[0])).toContain(label);
+    }
     for (const text of ["Tides rule the town.", "Whom to trust", "Harbour chase"]) expect(html).toContain(text);
-    expect(html).toContain(`<dt>${L.switchAndThreadInstructions}</dt><dd>${L.empty}</dd>`);
+    expect(bodyOf("guidelines.switchAndThreadInstructions")).toBe(`A ${L.empty}`);
   });
 
   it("shows every field of a stat, and an empty initial list as empty", () => {
@@ -488,7 +518,7 @@ describe("renderRatingPage: the setup design", () => {
       expect(html).toContain(text);
     }
     expect(html).toContain(`<dt>${L.initialValue}</dt><dd>${L.empty}</dd>`);
-    expect(html).toContain(`<span class="k">${L.statGroups}:</span> Crew, Town`);
+    expect(bodyOf("stats.statGroups")).toBe("A Crew, Town");
   });
 
   it("shows outcomes with their resolutions and milestones", () => {
@@ -516,11 +546,266 @@ describe("renderRatingPage: the setup design", () => {
   it("renders nothing for absent fields, without throwing", () => {
     const bare = setupPage({ title: "Bare" });
     expect(bare).toContain("Bare");
-    expect(bare).not.toMatch(/<details|<dl|class="block"|class="meta"/);
+    expect(bare).not.toMatch(/<details|<dl|class="meta"/);
     const partial = setupPage({ sharedStats: [{ name: "Supplies", tooltip: "What you have" }] });
     expect(partial).toContain(`<dt>${L.tooltip}</dt><dd>What you have</dd>`);
     for (const label of [L.effectOnPoints, L.initialValue, L.playerStats, L.storyElements]) expect(partial).not.toContain(label);
     expect(() => setupPage({ player1: { possibleCharacterBackgrounds: [{ initialPlayerStatValues: [{}] }] } })).not.toThrow();
+  });
+});
+
+const optionsOf = (cells: HtmlNode[]) => cells.map((c) => c.attrs["data-option"]);
+const headCells = (section: HtmlNode) => select(kids(section, "summary")[0], ".cell");
+const bodyCells = (section: HtmlNode) => kids(kids(section, "div.body")[0], "div.cell");
+const gists = (section: HtmlNode) => headCells(section).map((c) => select(c, "span.gist").map(textOf).join(""));
+
+/** Setups of one item that differ in length and in what they carry, two players each. */
+function comparisonOutputs(): unknown[] {
+  const twoPlayers = (output: ReturnType<typeof setupOutput>): Record<string, unknown> => ({ ...output, player2: output.player1 });
+  const storm = setupOutput("Storm");
+  const longer = twoPlayers({
+    ...storm,
+    guidelines: { ...storm.guidelines, tone: ["grim", "wry"], world: "A long world. ".repeat(40) },
+    sharedStats: [...storm.sharedStats, { ...storm.sharedStats[0], id: "shared_morale", name: "Morale", type: "string" }],
+    storyElements: [...storm.storyElements, { ...storm.storyElements[0], id: "tavern", name: "Tavern" }],
+  });
+  const thinner = twoPlayers(setupOutput("Fog"));
+  delete thinner.storyElements;
+  delete thinner.statGroups;
+  return [twoPlayers(setupOutput("Tides")), longer, thinner];
+}
+
+function comparisonSet(outputs: unknown[]): RatingSet {
+  return {
+    setId: "text-setup",
+    pageId: "page",
+    kind: "setup",
+    title: "Setups",
+    instructions: [],
+    fieldLabels: [],
+    items: [
+      {
+        id: "setup-01",
+        premise: "A harbour town in a storm.",
+        context: [],
+        options: outputs.map((output, i) => ({ label: LABELS[i], content: setupCard(output) })),
+      },
+    ],
+    preview: false,
+  };
+}
+
+describe("renderRatingPage: setups side by side, every section aligned and foldable", () => {
+  const L = SETUP_FIELD_LABELS;
+  const html = renderRatingPage(comparisonSet(comparisonOutputs()));
+  const tree = parseHtml(html);
+  const item = select(tree, "section.item")[0];
+  const compare = select(item, "div.compare")[0];
+  const options = ["A", "B", "C"];
+  const players = ["player1", "player2"].flatMap((p) => [p, `${p}.outcomes`, `${p}.identities`, `${p}.backgrounds`]);
+  const images = ["visualStyle", "atmosphere", "colorPalette", "settingDetails", "characterStyle", "artInfluences", "coverPrompt"];
+  const EXPECTED_KEYS = [
+    "premise",
+    "difficulty",
+    "characterSelection",
+    "guidelines",
+    ...Object.values(GUIDELINE_FIELD).map((k) => `guidelines.${k}`),
+    "sharedOutcomes",
+    "stats",
+    "stats.statGroups",
+    "stats.sharedStats",
+    "stats.playerStats",
+    "storyElements",
+    ...players,
+    "imageInstructions",
+    ...images.map((k) => `imageInstructions.${k}`),
+  ];
+
+  it("makes every section and sub-section foldable", () => {
+    expect(sectionKeys(item)).toEqual(EXPECTED_KEYS);
+    for (const details of select(item, "details")) expect(details.children[0].tag).toBe("summary");
+    // The only headings outside a fold are the item's, the option labels and the setup titles
+    const loose = all(item, (n) => /^h[3-6]$/.test(n.tag) && !closest(n, "summary"));
+    expect(loose.every((h) => ["label", "card-title"].includes(h.attrs.class ?? ""))).toBe(true);
+  });
+
+  it("lays each section out as one row: a header cell and a body cell per option, in label order", () => {
+    for (const key of EXPECTED_KEYS.filter((k) => k !== "premise")) {
+      const section = sectionAt(item, key);
+      expect(optionsOf(headCells(section))).toEqual(options);
+      const [body] = kids(section, "div.body");
+      const [nested] = kids(section, "div.kids");
+      if (body) expect(optionsOf(bodyCells(section))).toEqual(options);
+      else expect(kids(nested, "details.sec").length).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives every option the same section keys in the same order, one element per section, so one toggle folds it everywhere", () => {
+    const perOption = options.map((label) =>
+      select(item, "details.sec")
+        .filter((section) => headCells(section).some((c) => c.attrs["data-option"] === label))
+        .map((section) => section.attrs["data-sec"])
+    );
+    for (const keys of perOption) expect(keys).toEqual(perOption[0]);
+    expect(new Set(sectionKeys(item)).size).toBe(sectionKeys(item).length);
+  });
+
+  it("starts with exactly the owner's defaults folded", () => {
+    const folded = select(item, "details").filter((d) => d.attrs["data-sec"] !== undefined && d.attrs.open === undefined);
+    expect(folded.map((d) => d.attrs["data-sec"])).toEqual([
+      "guidelines",
+      "guidelines.tone",
+      "guidelines.decisions",
+      "guidelines.typesOfThreads",
+      "storyElements",
+      "player1.backgrounds",
+      "player2.backgrounds",
+      "imageInstructions",
+    ]);
+    const entries = select(item, "details.entry");
+    expect(new Set(entries.map((d) => d.attrs["data-entry"]))).toEqual(new Set(["stat", "element", "background", "outcome", "identity"]));
+    for (const entry of entries) expect(entry.attrs.open !== undefined).toBe(["outcome", "identity"].includes(entry.attrs["data-entry"]));
+  });
+
+  it("keeps the fold rule in one place", () => {
+    expect(ENTRY_STARTS_OPEN).toEqual({ stat: false, element: false, background: false, outcome: true, identity: true });
+    const folded = ["guidelines", "guidelines.tone", "guidelines.decisions", "guidelines.typesOfThreads", "storyElements", "player3.backgrounds", "imageInstructions"];
+    expect(folded.filter((k) => startsOpen("setup", k))).toEqual([]);
+    const open = ["premise", "difficulty", "teaser", "characterSelection", "guidelines.world", "guidelines.rules", "guidelines.conflicts", "guidelines.switchAndThreadInstructions"];
+    const openToo = ["sharedOutcomes", "stats", "stats.statGroups", "stats.sharedStats", "player3", "player3.outcomes", "player3.identities", "imageInstructions.coverPrompt"];
+    expect([...open, ...openToo].filter((k) => !startsOpen("setup", k))).toEqual([]);
+    expect([...folded, "text", "context-1"].filter((k) => !startsOpen("turn", k))).toEqual([]);
+  });
+
+  it("folds each stat, element, outcome, identity and background on its own, inside one option's cell", () => {
+    for (const entry of select(item, "details.entry")) {
+      expect(kids(entry, "summary")).toHaveLength(1);
+      expect(closest(entry, "div.cell")?.attrs["data-option"]).toMatch(/^[ABC]$/);
+      expect(closest(entry, "details.entry")).toBeUndefined();
+    }
+    const stats = select(sectionAt(item, "stats.sharedStats"), "details.entry");
+    expect(stats.map((s) => closest(s, "div.cell")?.attrs["data-option"])).toEqual(["A", "B", "B", "C"]);
+  });
+
+  it("says in each header what it folds away", () => {
+    expect(gists(sectionAt(item, "guidelines.tone"))).toEqual(["1", "2", "1"]);
+    expect(gists(sectionAt(item, "stats.sharedStats"))).toEqual(["1", "2", "1"]);
+    expect(gists(sectionAt(item, "storyElements"))).toEqual(["1", "2", ""]);
+    expect(gists(sectionAt(item, "player1.backgrounds"))).toEqual(["1", "1", "1"]);
+    const summaries = (root: HtmlNode, kind: string) =>
+      select(root, "details.entry")
+        .filter((d) => d.attrs["data-entry"] === kind)
+        .map((d) => textOf(kids(d, "summary")[0]));
+    expect(summaries(sectionAt(item, "stats.sharedStats"), "stat")).toEqual(["Supplies number", "Supplies number", "Morale string", "Supplies number"]);
+    expect(summaries(item, "element")).toEqual(["Harbour", "Harbour", "Tavern"]);
+    expect(summaries(item, "background")[0]).toBe("Sailor");
+    expect(summaries(item, "identity")[0]).toBe("Ada (she/her/her/herself)");
+    expect(summaries(item, "outcome")[0]).toBe("Does the town survive the storm?");
+  });
+
+  it("marks a section an option lacks with a dash, and a list that is present but empty as empty", () => {
+    expect(textOf(bodyCells(sectionAt(item, "storyElements"))[2])).toBe("C —");
+    expect(textOf(bodyCells(sectionAt(item, "guidelines.switchAndThreadInstructions"))[0])).toBe(`A ${L.empty}`);
+  });
+
+  it("keeps one set of rating controls per option, in the last row, with unchanged names, ids and page data", () => {
+    const [controls] = kids(compare, "div.controls");
+    expect(compare.children[compare.children.length - 1]).toBe(controls);
+    expect(optionsOf(kids(controls, "div.cell"))).toEqual(options);
+    for (const cell of kids(controls, "div.cell")) {
+      expect(select(cell, "input").every((i) => i.attrs["data-label"] === cell.attrs["data-option"])).toBe(true);
+    }
+    const expected = options.flatMap((l) => [
+      `<input type="radio" name="setup-01-${l}-acceptable" value="yes" data-item="setup-01" data-label="${l}" data-field="acceptable">`,
+      `<input type="radio" name="setup-01-${l}-acceptable" value="no" data-item="setup-01" data-label="${l}" data-field="acceptable">`,
+      ...[1, 2, 3].map((r) => `<input type="radio" name="setup-01-${l}-rank" value="${r}" data-item="setup-01" data-label="${l}" data-field="rank">`),
+      `<input type="text" data-item="setup-01" data-label="${l}" data-field="note">`,
+    ]);
+    expect(html.match(/<input\b[^>]*>/g)).toEqual(expected);
+    expect(html).toContain(
+      `<script type="application/json" id="page-data">{"pageId":"page","setId":"text-setup","items":[{"id":"setup-01","labels":["A","B","C"]}]}</script>`
+    );
+    const ids = all(tree, (n) => n.attrs.id !== undefined).map((n) => n.attrs.id);
+    expect(ids).toEqual(["storage-notice", "prev", "jump", "next", "progress", "item-setup-01", "export", "last-export", "page-data"]);
+  });
+
+  it("stacks the options on a narrow screen: the same rows, each cell labelled with its option letter", () => {
+    expect(compare.attrs.class).toContain("n3");
+    const cells = select(compare, ".cell").filter((c) => !closest(c, "div.labels") && !closest(c, "div.controls"));
+    expect(cells.length).toBeGreaterThan(EXPECTED_KEYS.length * 3);
+    for (const cell of cells) expect(textOf(kids(cell, "span.tag")[0])).toBe(cell.attrs["data-option"]);
+    for (const cell of kids(kids(compare, "div.controls")[0], "div.cell")) expect(textOf(cell)).toMatch(new RegExp(`^Option ${cell.attrs["data-option"]} `));
+    const css = select(tree, "style")[0].text.join("");
+    // One column by default; side by side only from the width where the columns fit
+    expect(css).toContain(".grid{display:grid;grid-template-columns:minmax(0,1fr)");
+    expect(css).toContain(`@media (min-width:${WIDE_FROM[3]}px){.n3 .grid{grid-template-columns:repeat(3,minmax(0,1fr))}`);
+    expect(WIDE_FROM[2]).toBeGreaterThan(390);
+    // Nothing forces a width a 390 px screen cannot hold (media conditions aside)
+    const widths = [...css.replace(/@media \([^)]*\)/g, "").matchAll(/(?:^|[;{])(?:min-)?width:([\d.]+)(px|rem)/g)];
+    expect(widths.length).toBeGreaterThan(3);
+    expect(widths.map(([, n, unit]) => Number(n) * (unit === "rem" ? 18 : 1)).filter((px) => px > 44)).toEqual([]);
+  });
+
+  it("keeps n and p for the items, but not while typing a note", () => {
+    const script = select(tree, "script").filter((s) => s.attrs.type === undefined)[0].text.join("");
+    expect(script).toContain(`if(tag==="input"&&ev.target.type==="text"||tag==="textarea"||tag==="select")return;`);
+    expect(script).toContain(`if(ev.key==="n"){show(state.current+1,true);}else if(ev.key==="p"){show(state.current-1,true);}`);
+  });
+
+  it("shows a template's teaser and difficulty levels as rows of their own", () => {
+    const template = { ...setupOutput("Tides"), teaser: "Sail away.", difficultyLevels: [{ modifier: -10, title: "Squall" }, { modifier: 0, title: "Fair" }] };
+    const page = parseHtml(renderRatingPage(comparisonSet([template, template])));
+    expect(sectionKeys(page).slice(0, 4)).toEqual(["premise", "difficulty", "teaser", "characterSelection"]);
+    expect(textOf(kids(sectionAt(page, "teaser"), "div.body")[0])).toBe("A Sail away. B Sail away.");
+    expect(textOf(bodyCells(sectionAt(page, "difficulty"))[0])).toBe("A Squall (modifier -10) · Fair (modifier 0)");
+  });
+
+  it("aligns players by slot, with a dash where an option has no such player", () => {
+    const duo = { ...setupOutput("Duo"), player2: setupOutput("x").player1 };
+    const page = parseHtml(renderRatingPage(comparisonSet([setupOutput("Solo"), duo])));
+    expect(optionsOf(headCells(sectionAt(page, "player2")))).toEqual(["A", "B"]);
+    expect(textOf(bodyCells(sectionAt(page, "player2.outcomes"))[0])).toBe("A —");
+  });
+});
+
+describe("renderRatingPage: turns side by side", () => {
+  const beat = (slot: string, playerName: string, title: string, extra = 0): TurnBeat => ({
+    slot,
+    playerName,
+    title,
+    paragraphs: ["You wake.", ...new Array<string>(extra).fill("More happens.")],
+    options: ["Go", "Stay", "Hide"],
+    interludes: ["A gull cries."],
+  });
+  function turnSet(beats: (label: string) => TurnBeat[]): RatingSet {
+    const context = [
+      { heading: "Before this turn: player 1", lines: ["Character: Ada"] },
+      { heading: "Before this turn: player 2", lines: ["Character: Bo"] },
+    ];
+    const options = ["A", "B"].map((label) => ({ label, content: { kind: "turn", beats: beats(label) } as TurnContent }));
+    return { setId: "text-turn", pageId: "page", kind: "turn", title: "Turns", instructions: [], fieldLabels: [], items: [{ id: "turn-01", context, options }], preview: false };
+  }
+  const multi = parseHtml(renderRatingPage(turnSet((l) => [beat("player1", "Ada", `Dawn ${l}`, l === "B" ? 5 : 0), beat("player2", "Bo", `Dusk ${l}`)])));
+  const parts = (p: string) => [p, `${p}.title`, `${p}.text`, `${p}.options`, `${p}.interludes`];
+
+  it("aligns the context and, per player, title, text, options and interludes, all foldable and all open", () => {
+    expect(sectionKeys(multi)).toEqual(["context-1", "context-2", ...parts("player1"), ...parts("player2")]);
+    expect(select(multi, "details").every((d) => d.attrs.open !== undefined)).toBe(true);
+    for (const section of select(multi, "details.sec")) expect(optionsOf(headCells(section))).toEqual(["A", "B"]);
+    expect(textOf(headCells(sectionAt(multi, "player1"))[0])).toContain("For Ada");
+    expect(gists(sectionAt(multi, "player1.options"))).toEqual(["3", "3"]);
+    expect(textOf(bodyCells(sectionAt(multi, "player1.title"))[1])).toBe("B Dawn B");
+  });
+
+  it("leaves out the player row on a single-player turn", () => {
+    const single = parseHtml(renderRatingPage(turnSet((l) => [beat("player1", "Ada", `Dawn ${l}`)])));
+    expect(sectionKeys(single)).toEqual(["context-1", "context-2", "title", "text", "options", "interludes"]);
+  });
+
+  it("registers every fixed string with the blinding word check", () => {
+    expect(pageFieldLabels("turn")).toEqual(expect.arrayContaining(Object.values(TURN_FIELD_LABELS)));
+    expect(pageFieldLabels("setup")).toEqual(expect.arrayContaining(Object.values(SETUP_FIELD_LABELS)));
+    expect([...pageFieldLabels("turn"), ...pageFieldLabels("setup")].filter((label) => LEAK_PATTERN.test(label))).toEqual([]);
   });
 });
 

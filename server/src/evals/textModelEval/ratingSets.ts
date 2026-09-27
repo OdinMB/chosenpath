@@ -3,6 +3,7 @@ import type { EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import {
   SETUP_FIELD_LABELS,
+  TURN_FIELD_LABELS,
   setupCard,
   turnContent,
   turnContext,
@@ -83,7 +84,7 @@ export type RatingKey = {
 };
 
 export const LABELS = ["A", "B", "C", "D"];
-export const FIELD_LABELS = ["Acceptable?", "Yes", "No", "Rank", "Note (optional)", "Previous", "Next", "Export ratings"];
+export const FIELD_LABELS = ["Option", "Premise", "Acceptable?", "Yes", "No", "Rank", "Note (optional)", "Previous", "Next", "Export ratings"];
 export const REPEAT_MIN_DISTANCE = 3;
 
 const TITLES: Record<RatingKind, string> = {
@@ -94,13 +95,15 @@ const TITLES: Record<RatingKind, string> = {
 const INSTRUCTIONS: Record<RatingKind, string[]> = {
   setup: [
     "Each item shows one premise and several story setups written from it, in random order.",
-    "Each setup shows its whole design, as the game uses it. Click a section heading to fold it.",
+    "Each setup shows its whole design, as the game uses it, in its own column. Every section starts at the same height in each column.",
+    "Click a section heading to open or fold that section in every column at once. Some sections start folded; single stats, story elements, outcomes, identities and backgrounds open one by one.",
     "Acceptable? is the minimum bar: coherent and true to the premise, sensible stats, and distinct playable characters.",
     "Rank the options from best (1) to worst. Ties are allowed.",
     "A note is optional. Your answers save in this browser as you go; export them when you are done.",
   ],
   turn: [
-    "Each item shows what happened just before, then several versions of the next turn, in random order.",
+    "Each item shows what happened just before, then several versions of the next turn, in random order, one column each.",
+    "Click a heading to fold that part in every column at once.",
     "Acceptable? is the minimum bar: no continuity error (a wrong name, fact, stat, or outcome of the choice), it shows the chosen action and its result in second person, the three options are meaningfully different, and there is no commentary about the game itself.",
     "Rank the options from best (1) to worst. Ties are allowed.",
     "A note is optional. Your answers save in this browser as you go; export them when you are done.",
@@ -341,10 +344,13 @@ export function planRatingSet(
   };
 }
 
+/** The page's fixed text, which the blinding word check reads: its own labels and each option card's. */
+export function pageFieldLabels(kind: RatingKind): string[] {
+  return [...FIELD_LABELS, ...Object.values(kind === "setup" ? SETUP_FIELD_LABELS : TURN_FIELD_LABELS)];
+}
+
 function pageSet(kind: RatingKind, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
-  // A setup card's fixed text is checked with the page's own labels
-  const fieldLabels = kind === "setup" ? [...FIELD_LABELS, ...Object.values(SETUP_FIELD_LABELS)] : FIELD_LABELS;
-  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels, items, preview };
+  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels: pageFieldLabels(kind), items, preview };
 }
 
 /** One item as the rater sees it: the case's context and each keyed output. */
