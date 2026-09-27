@@ -281,7 +281,8 @@ export function trimmedSwitchRequest(story: Story): TextRequest {
 function threadEdits(story: Story): PromptEdit[] {
   return when([
     [
-      story.isMultiplayer() && story.getCurrentTurn() !== 0,
+      // Production's later-thread branch: the first thread plan gets the first-thread rule instead
+      story.isMultiplayer() && story.hasThreadAnalysis(),
       {
         name: "T1 set-up summary",
         find: "A summary of how you want to set up the threads based on the switch configuration and player choices.",

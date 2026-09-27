@@ -1,7 +1,7 @@
 # Play fixes, Round 0: what the game loses between a model reply and the story, and the eval checks that read it
 
 - **Date**: 2026-09-27
-- **Status**: in progress (units 1, 2 and 3 done)
+- **Status**: in progress (units 1, 2, 3 and 4 done)
 - **Type**: bugfix (production play code, template editor, eval harness). No prompt-wording proposals.
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
 - **Sources** (both gitignored, read-only):
@@ -114,6 +114,8 @@ None of these lines is a trim or rewrite anchor (ST-8's lines sit before the sta
 
 ### Unit 4: plans are checked, repaired or retried once (A1 and A7 code)
 
+**Done** (2026-09-27): PL-1 to PL-13. Repair kinds, problem wording and the decisions beyond this table are in `.plans/2026-09-26_build-followup.md`, "Round 0 play fixes (implementer)".
+
 A pure `checkSwitchPlan(story, reply)` / `checkThreadPlan(story, reply)` returns `{ plan, repairs, problem? }`. `AIStoryGenerator.generateSwitches` / `generateThreads` run the call, check it, apply the repaired plan when there is no problem, and otherwise call once more (via `withOneRetry`) with this line appended to the prompt: `Your previous plan could not be used: <problem>. Write the plan again.` A second problem throws ("Failed to generate a usable switch/thread plan"), which reaches the queue like a failed call. When the story holds no outcomes at all, every outcome rule is skipped (note, logged once per story).
 
 | Id | Bug today | Intended behaviour | Tests to write first | Source |
@@ -156,7 +158,7 @@ The units run in this order, each as one commit. Only `AIStoryGenerator.ts` (dif
 | 1 | Turn replies keep what they write (done) | TR-1 to TR-10 | new `server/src/game/services/beatRepairs.ts`, new `server/src/game/services/textRepairs.ts`, `server/src/game/services/storyTextSteps.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateBeats`), `server/src/game/services/ThreadResolutionService.ts`, `server/src/game/services/BeatResolutionService.ts`, `core/config.ts`, `core/models/PlayerManager.ts`, `.context/story.md` | – |
 | 2 | What the state shows the models (done) | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
 | 3 | Stories start with the outcomes they need (done) | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
-| 4 | Plans are checked, repaired or retried once | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |
+| 4 | Plans are checked, repaired or retried once (done) | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |
 | 5 | The eval reads what the game keeps | EV-1 to EV-6 | `server/src/evals/textModelEval/outputChecks.ts`, `jobPlan.ts`, `textChecks.ts`, `budget.ts`, `dryRun.ts`, `run.ts`, `variants.ts`, `.context/text-model-eval.md` | 1, 3, 4 |
 
 `.context/story.md` gets a short "Checks and repairs on model replies" section: what the beat repair, the plan checks and the start rule do, the retry rule, the clamp, and the pointers to `beatRepairs.ts`, `planChecks.ts` and `outcomeReadiness.ts`. `.context/ai-transparency.md`, `.context/content-safety.md` and `client/src/page/static/Privacy.tsx` need no change: no disclosed practice or AI feature changes (a retried call is the same feature). Check `.context/pregenerations.md` for a sentence on repaired siblings.

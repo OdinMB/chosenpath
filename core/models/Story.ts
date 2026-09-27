@@ -214,6 +214,11 @@ export class Story {
     return "threads" in phase;
   }
 
+  /** Whether the story holds a thread plan: false until its first thread analysis is added. */
+  hasThreadAnalysis(): boolean {
+    return this.state.storyPhases.some((phase) => this.isThreadAnalysis(phase));
+  }
+
   getCurrentSwitchAnalysis(): SwitchAnalysis | null {
     const currentPhase = this.getCurrentPhase();
     return this.isSwitchAnalysis(currentPhase) ? currentPhase : null;

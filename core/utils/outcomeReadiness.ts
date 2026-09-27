@@ -33,6 +33,12 @@ export type SeatedOutcomes = { sharedOutcomes?: OutcomeList } & {
 
 const holdsOutcome = (list: OutcomeList): boolean => (list?.length ?? 0) > 0;
 
+/** Whether players compete over this outcome: its resolutions are side A wins, mixed, side B wins. */
+export function isContestedOutcome(outcome: Outcome): boolean {
+  const resolutions: unknown = outcome.possibleResolutions;
+  return typeof resolutions === "object" && resolutions !== null && "sideAWins" in resolutions;
+}
+
 /** Why a story with these outcomes can't start, or null when it can. */
 export function storyStartProblem({
   sharedOutcomes,

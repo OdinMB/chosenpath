@@ -103,7 +103,8 @@ A duration for this thread (or set of threads) between 2-4 beats.
 - Choose a duration that works for all threads`;
 
     if (story.isMultiplayer()) {
-      if (story.getCurrentTurn() === 0) {
+      // The first thread plan runs after the opening switch beat, at turn 1
+      if (!story.hasThreadAnalysis()) {
         instructions += `
 
 MANDATORY FIRST THREAD REQUIREMENT: 
@@ -172,7 +173,7 @@ Create a list of threads, each with:
    - Each progression step is defined by a question about how the players are acting to deal with this step's challenge or decision. Bad: "What do [insert player names] find in the cellar?" Good: "How do [insert player names] search for clues in the cellar?"
    - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
 ${
-  story.isMultiplayer() && story.getCurrentTurn() === 0
+  story.isMultiplayer() && !story.hasThreadAnalysis()
     ? `
 
 IMPORTANT REMINDER: For this first thread of the game, you MUST create a single thread that includes ALL players together. No player should be in a separate thread.`

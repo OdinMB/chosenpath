@@ -2,6 +2,7 @@ import type { Outcome, StoryState } from "core/types/index.js";
 import {
   NO_OUTCOMES_PROBLEM,
   NO_SHARED_OUTCOME_PROBLEM,
+  isContestedOutcome,
   storyStartProblem,
   storyStateStartProblem,
   templateStartProblem,
@@ -78,5 +79,15 @@ describe("storyStateStartProblem", () => {
     expect(storyStateStartProblem(state([], { player1: [], player2: mine }), 2)).toBe(NO_SHARED_OUTCOME_PROBLEM);
     expect(storyStateStartProblem(state([], { player1: [] }), 1)).toBe(NO_OUTCOMES_PROBLEM);
     expect(storyStateStartProblem(state(shared, { player1: [], player2: [] }), 2)).toBeNull();
+  });
+});
+
+describe("isContestedOutcome", () => {
+  it("is true for an outcome with side A and side B resolutions only", () => {
+    const contest = outcome("shared_crown", {
+      possibleResolutions: { sideAWins: "A takes the crown.", mixed: "They share it.", sideBWins: "B takes the crown." },
+    });
+    expect(isContestedOutcome(contest)).toBe(true);
+    expect(isContestedOutcome(outcome("shared_ritual_stopped"))).toBe(false);
   });
 });

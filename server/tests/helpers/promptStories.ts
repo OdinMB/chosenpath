@@ -56,6 +56,11 @@ export function firstSwitchBeat(players = 1, overrides: Overrides = {}): Story {
   return storyAt(players, 0, [switchAnalysis(slotsOf(players), 0)], overrides);
 }
 
+/** The first thread analysis, after the players chose in the opening switch beat (turn 1, no thread plan yet). */
+export function firstThreadAnalysis(players = 1, overrides: Overrides = {}): Story {
+  return storyAt(players, 1, [switchAnalysis(slotsOf(players), 0)], overrides);
+}
+
 /** Step 2 of a 3-beat challenge thread that started at history index 2 (step 1 resolved). */
 export function threadBeat(players = 1, overrides: Overrides = {}): Story {
   const thread = threadAnalysis("challenge", 3, 2, slotsOf(players));

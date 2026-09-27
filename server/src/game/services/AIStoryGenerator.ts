@@ -35,6 +35,7 @@ import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { repairBeatReply } from "./beatRepairs.js";
+import { checkedSwitchPlan, checkedThreadPlan } from "./planChecks.js";
 import { logRepairs } from "./textRepairs.js";
 import {
   beatStep,
@@ -319,12 +320,18 @@ export class AIStoryGenerator {
       story.isMultiplayer()
     ).withStructuredOutput(request.schema);
 
-    const response = (await structuredModel.invoke(request.prompt, {
-      metadata: storyTags(story, context),
-    })) as SwitchAnalysis;
+    // Checked before it becomes the story: repaired, or asked for once more
+    const plan = await checkedSwitchPlan(
+      story,
+      request.prompt,
+      async (prompt) =>
+        (await structuredModel.invoke(prompt, {
+          metadata: storyTags(story, context),
+        })) as SwitchAnalysis
+    );
     Logger.Story.log("Switches generated");
 
-    return switchStep.apply(story, response);
+    return switchStep.apply(story, plan);
   }
 
   async generateThreads(
@@ -337,12 +344,18 @@ export class AIStoryGenerator {
       story.isMultiplayer()
     ).withStructuredOutput(request.schema);
 
-    const response = (await structuredModel.invoke(request.prompt, {
-      metadata: storyTags(story, context),
-    })) as ThreadAnalysis;
+    // Checked before it becomes the story: repaired, or asked for once more
+    const plan = await checkedThreadPlan(
+      story,
+      request.prompt,
+      async (prompt) =>
+        (await structuredModel.invoke(prompt, {
+          metadata: storyTags(story, context),
+        })) as ThreadAnalysis
+    );
     Logger.Story.log("Threads generated");
 
-    return threadStep.apply(story, response);
+    return threadStep.apply(story, plan);
   }
 
   async generateBeats(

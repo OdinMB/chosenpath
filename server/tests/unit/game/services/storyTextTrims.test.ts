@@ -30,6 +30,7 @@ import { createMockMultiplayerStory, createMockStory } from "../../../helpers/te
 import {
   endingBeat,
   firstSwitchBeat,
+  firstThreadAnalysis,
   laterSwitchBeat,
   slotsOf,
   switchAnalysisAfterThread,
@@ -103,6 +104,7 @@ const SWITCH_BRANCHES: Branch[] = [
 const THREAD_BRANCHES: Branch[] = [
   ["single-player", () => threadAnalysisAfterSwitch(1), "there is always only one thread"],
   ["multiplayer at turn 0", () => firstSwitchBeat(2), "MANDATORY FIRST THREAD REQUIREMENT"],
+  ["multiplayer first thread at turn 1", () => firstThreadAnalysis(2), "MANDATORY FIRST THREAD REQUIREMENT"],
   ["multiplayer later", () => threadAnalysisAfterSwitch(2), "A summary of how you want to set up the threads"],
 ];
 
