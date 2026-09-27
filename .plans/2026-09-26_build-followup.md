@@ -800,3 +800,11 @@ Unit 1 (turn replies keep what they write, TR-1 to TR-10). Decisions beyond `.pl
 - **TR-10 log line:** `[PlayerManager] Filled <n> background stat value(s) that <slot>'s background left out` (count and seat, no stat ids).
 - **Shared code:** `isPlayerBeat` and `canAddMilestones` are exported from `storyTextSteps.ts`, so the schema and the repair read one rule each. `expectedOptionType` in `beatRepairs.ts` is a copy of the eval's until unit 5 imports it. Test fixtures `stat()` and `outcome()` are in `server/tests/helpers/textFixtures.ts` for the later units.
 - **Dry run:** after unit 1, `npm run eval:text` (no `--run`) builds every stage; stages 0-3 have no pending jobs (all stored), Stage 4 plans its 95 jobs. No anchored passage changed in this unit.
+
+Unit 2 (what the state shows the models, ST-1 to ST-8). Decisions beyond the plan:
+
+- **Empty switch and thread instructions** print no line either (ST-4's "an empty list prints no line" applied to the same section): today an empty `switchAndThreadInstructions` list, which every mock story and any template without such instructions carries, printed a stray `- ` line under "SPECIAL SWITCH/THREAD INSTRUCTIONS:". The section's empty entries are filtered, so an empty thread-type list leaves no blank line. The instructions keep their one `- item` per line form.
+- **Guidelines:** a missing World line no longer leaves a blank line in STORY GUIDELINES (the section now filters its empty entries so that an empty list prints no line).
+- **Possible values** sit right after the stat's header line in the detailed view (before "Narrative"), trimmed; a value of only whitespace counts as blank.
+- **Thread type line** prints only when the resolved thread has a non-empty `typeOfThread`.
+- **Dry run:** no anchored passage changed; `npm run eval:text` (no `--run`) builds every stage, stages 0-3 have no pending jobs, Stage 4 plans its 95 jobs.

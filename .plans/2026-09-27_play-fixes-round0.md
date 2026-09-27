@@ -1,7 +1,7 @@
 # Play fixes, Round 0: what the game loses between a model reply and the story, and the eval checks that read it
 
 - **Date**: 2026-09-27
-- **Status**: in progress (unit 1 done)
+- **Status**: in progress (units 1 and 2 done)
 - **Type**: bugfix (production play code, template editor, eval harness). No prompt-wording proposals.
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
 - **Sources** (both gitignored, read-only):
@@ -87,6 +87,8 @@ Logging: `AIStoryGenerator.generateBeats` calls `repairBeatReply(story, response
 
 ### Unit 2: what the state shows the models
 
+**Done** (2026-09-27): ST-1 to ST-8. Decisions beyond this table (the empty switch-and-thread-instructions line, the possible-values placement) are in `.plans/2026-09-26_build-followup.md`, "Round 0 play fixes (implementer)".
+
 | Id | Bug today | Intended behaviour | Files | Tests to write first | Source |
 |---|---|---|---|---|---|
 | ST-1 | Opposites values reach every turn and plan as a bare "60" (`StoryStatePromptService.ts:231`), so the scoreboard's split is unreadable. | `case "opposites"` prints `60\|40`, for shared and player stats alike. Per-side labels stay out. | `StoryStatePromptService.ts` | new `server/tests/unit/game/services/prompts/StoryStatePromptService.test.ts` (through `createStoryStatePrompt`): a shared opposites stat at 60 shows `: 60\|40`; a player's opposites value in CHARACTER STAT VALUES too. | setup fix 1, B2.6 |
@@ -150,7 +152,7 @@ The units run in this order, each as one commit. Only `AIStoryGenerator.ts` (dif
 | # | Unit | Fixes | Files | Depends on |
 |---|---|---|---|---|
 | 1 | Turn replies keep what they write (done) | TR-1 to TR-10 | new `server/src/game/services/beatRepairs.ts`, new `server/src/game/services/textRepairs.ts`, `server/src/game/services/storyTextSteps.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateBeats`), `server/src/game/services/ThreadResolutionService.ts`, `server/src/game/services/BeatResolutionService.ts`, `core/config.ts`, `core/models/PlayerManager.ts`, `.context/story.md` | – |
-| 2 | What the state shows the models | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
+| 2 | What the state shows the models (done) | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
 | 3 | Stories start with the outcomes they need | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
 | 4 | Plans are checked, repaired or retried once | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |
 | 5 | The eval reads what the game keeps | EV-1 to EV-6 | `server/src/evals/textModelEval/outputChecks.ts`, `jobPlan.ts`, `textChecks.ts`, `budget.ts`, `dryRun.ts`, `run.ts`, `variants.ts`, `.context/text-model-eval.md` | 1, 3, 4 |

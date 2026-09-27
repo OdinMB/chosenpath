@@ -113,21 +113,23 @@ ${modeDescriptions[story.getGameMode()]}
 
   private static createGuidelinesSection(story: Story): string {
     const guidelines = story.getGuidelines();
-    return [
-      "STORY GUIDELINES",
+    const lines = [
       guidelines.world ? `- World: ${guidelines.world}` : "",
-      guidelines.rules ? `- Rules: ${guidelines.rules.join(", ")}` : "",
-      guidelines.tone ? `- Tone: ${guidelines.tone.join(", ")}` : "",
-      guidelines.conflicts
-        ? `- Core conflicts: ${guidelines.conflicts.join(", ")}`
-        : "",
-      guidelines.decisions
-        ? `- Types of decisions that players will make: ${guidelines.decisions.join(
-            ", "
-          )}`
-        : "",
-      "",
-    ].join("\n");
+      this.formatList("- Rules:", guidelines.rules),
+      this.formatList("- Tone:", guidelines.tone),
+      this.formatList("- Core conflicts:", guidelines.conflicts),
+      this.formatList(
+        "- Types of decisions that players will make:",
+        guidelines.decisions
+      ),
+    ].filter(Boolean);
+    return ["STORY GUIDELINES", ...lines, ""].join("\n");
+  }
+
+  /** A heading line and one "  - item" line per item; nothing for an empty list. */
+  private static formatList(heading: string, items: string[] | undefined): string {
+    if (!items?.length) return "";
+    return [heading, ...items.map((item) => `  - ${item}`)].join("\n");
   }
 
   private static createWorldFactsSection(story: Story): string {
@@ -228,7 +230,7 @@ ${modeDescriptions[story.getGameMode()]}
         return typeof stat.value === "number"
           ? `${stat.value}%`
           : String(stat.value);
-      case "opposite":
+      case "opposites":
         if (typeof stat.value === "number") {
           return `${stat.value}|${100 - stat.value}`;
         }
@@ -257,21 +259,20 @@ ${modeDescriptions[story.getGameMode()]}
       stat.type
     }): ${formattedValue}`;
 
+    const narrativeImplications = stat.narrativeImplications?.length
+      ? `\n  - Narrative: ${stat.narrativeImplications.join(", ")}`
+      : "";
+
     if (!detailed) {
       // Only include narrative implications for non-detailed view
-      const narrativeImplications = stat.narrativeImplications?.length
-        ? `\n${
-            detailed ? "  - Narrative: " : ""
-          }${stat.narrativeImplications.join(", ")}`
-        : "";
       return basicInfo + narrativeImplications;
     }
 
     // Detailed stat information
     const visibility =
       stat.isVisible === false ? " (not visible to the player)" : "";
-    const narrativeImplications = stat.narrativeImplications?.length
-      ? `\n  - Narrative: ${stat.narrativeImplications.join(", ")}`
+    const possibleValues = stat.possibleValues?.trim()
+      ? `\n  - Possible values: ${stat.possibleValues.trim()}`
       : "";
     const effectOnPoints = stat.effectOnPoints?.length
       ? `\n  - Effects on challenge success: ${stat.effectOnPoints.join(", ")}`
@@ -294,11 +295,13 @@ ${modeDescriptions[story.getGameMode()]}
       ? `\n  - Can be adjusted anytime`
       : "\n  - Can only be changed when a thread gets resolved or through sacrifice/reward options";
 
-    return `${basicInfo}${visibility}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}${canBeChangedInBeatResolutions}`;
+    return `${basicInfo}${visibility}${possibleValues}${narrativeImplications}${effectOnPoints}${optionsToSacrifice}${optionsToGainAsReward}${adjustmentsAfterThreads}${canBeChangedInBeatResolutions}`;
   }
 
   private static createOutcomesSection(story: Story): string {
     // Only display shared outcomes
+    if (story.getSharedOutcomes().length === 0) return "";
+
     return [
       "SHARED OUTCOMES that will affect all players:",
       this.createOutcomesListSection(story.getSharedOutcomes()),
@@ -351,11 +354,12 @@ ${modeDescriptions[story.getGameMode()]}
 
           // Include previous thread types if requested
           if (sections?.previousThreads) {
+            const previousTypes = playerState.previousTypesOfThreads?.length
+              ? playerState.previousTypesOfThreads
+              : ["None"];
             playerSections.push(
-              "PREVIOUS THREAD TYPES (to be avoided for upcoming threads):\n- ",
-              playerState.previousTypesOfThreads?.length
-                ? playerState.previousTypesOfThreads.join("\n- ")
-                : "None",
+              "PREVIOUS THREAD TYPES (to be avoided for upcoming threads):",
+              ...previousTypes.map((type) => `- ${type}`),
               ""
             );
           }
@@ -628,8 +632,15 @@ ${modeDescriptions[story.getGameMode()]}
           story
         );
 
+        // A resolved thread names its type, which after-thread adjustments are keyed on
+        const threadTypeLine =
+          thread.resolution && thread.typeOfThread
+            ? `Thread type: ${thread.typeOfThread}`
+            : "";
+
         return [
           `==== ${threadTypeString}: ${thread.title} (${thread.id}) ====`,
+          threadTypeLine,
           milestonesSection,
           threadResolutionSection,
           beatProgressionItems,
@@ -958,16 +969,19 @@ ${modeDescriptions[story.getGameMode()]}
   private static createSwitchAndThreadInstructionsSection(
     story: Story
   ): string {
+    const { typesOfThreads, switchAndThreadInstructions } =
+      story.getGuidelines();
     return [
       "SPECIAL SWITCH/THREAD INSTRUCTIONS:",
-      story.getGuidelines().typesOfThreads
-        ? `- Types of threads that are a good fit for the story (if and when appropriate): ${story
-            .getGuidelines()
-            .typesOfThreads.join(", ")}`
+      this.formatList(
+        "- Types of threads that are a good fit for the story (if and when appropriate):",
+        typesOfThreads
+      ),
+      switchAndThreadInstructions?.length
+        ? `- ${switchAndThreadInstructions.join("\n- ")}`
         : "",
-      story.getGuidelines().switchAndThreadInstructions
-        ? `- ${story.getGuidelines().switchAndThreadInstructions.join("\n- ")}`
-        : "",
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 }

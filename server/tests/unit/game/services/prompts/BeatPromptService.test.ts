@@ -11,6 +11,7 @@ import {
   laterSwitchBeat,
   threadBeat,
 } from "../../../../helpers/promptStories.js";
+import { outcome } from "../../../../helpers/textFixtures.js";
 
 beforeEach(() => {
   // The story-state section logs that the mock story has no elements
@@ -66,12 +67,30 @@ describe("BeatPromptService: what each beat is shown", () => {
   });
 
   it("shows the ending the thread it wraps up, and the outcomes", () => {
-    const prompt = BeatPromptService.createBeatPrompt(endingBeat());
+    const prompt = BeatPromptService.createBeatPrompt(endingBeat(1, { sharedOutcomes: [outcome("shared_goal")] }));
 
     expect(prompt).toContain("Final Thread");
     expect(prompt).not.toContain("Older Thread");
-    expect(prompt).toContain("SHARED OUTCOMES that will affect all players:");
+    expect(prompt).toContain("SHARED OUTCOMES that will affect all players:\nID: shared_goal");
     expect(prompt).toContain("OUTCOMES that will define this character's story ending:");
+  });
+
+  it("prints no shared-outcomes header in an ending without shared outcomes", () => {
+    const prompt = BeatPromptService.createBeatPrompt(endingBeat());
+
+    expect(prompt).not.toContain("SHARED OUTCOMES");
+    expect(prompt).toContain("OUTCOMES that will define this character's story ending:");
+  });
+
+  it.each([
+    ["a later switch beat", () => laterSwitchBeat(1)],
+    ["a thread beat", () => threadBeat(1)],
+  ])("names the anytime flag as the stat view does in %s", (_beat, build) => {
+    const prompt = BeatPromptService.createBeatPrompt(build());
+
+    expect(prompt).toContain("'Can be adjusted anytime'");
+    expect(prompt).not.toContain("can be changed in beat resolutions");
+    expect(prompt).not.toContain("can always be adjusted");
   });
 
   it("asks only switch beats to create the next switch", () => {
