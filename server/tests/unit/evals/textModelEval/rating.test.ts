@@ -17,7 +17,7 @@ import {
   type RatingSet,
   type RatingSpec,
 } from "../../../../src/evals/textModelEval/ratingSets.js";
-import { scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
+import { renderScores, scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
@@ -906,5 +906,127 @@ describe("scoreRatings", () => {
 
   it("rejects an export for another page", () => {
     expect(() => scoreRatings({ ...exportWith(() => 1), pageId: "other" }, key)).toThrow(/key for/);
+  });
+
+  const itemIds = Object.keys(key.items);
+  const regularIds = itemIds.filter((id) => !key.items[id].control && !key.items[id].repeatOf);
+  const repeatId = itemIds.find((id) => key.items[id].repeatOf) ?? "";
+  const controlId = itemIds.find((id) => key.items[id].control) ?? "";
+  const armOf = (a: Arm) => `prefix:${a.key}`;
+
+  /** Ranks only, as the owner exports them with no Acceptable? verdict; an undefined rank leaves the option out, a skipped item leaves the item out. */
+  function rankOnly(rank: (itemId: string, armKey: string) => number | undefined, skip: string[] = []): ExportedRatings {
+    const ratings: ExportedRatings["ratings"] = {};
+    for (const [itemId, item] of Object.entries(key.items)) {
+      if (skip.includes(itemId)) continue;
+      ratings[itemId] = Object.fromEntries(
+        Object.entries(item.labels).flatMap(([label, ref]) => {
+          const r = rank(itemId, ref.armKey);
+          return r === undefined ? [] : [[label, { rank: r }]];
+        })
+      );
+    }
+    return { pageId: key.pageId, setId: key.setId, exportedAt: "2026-09-27T00:00:00Z", ratings };
+  }
+
+  const lunaFirst = (_: string, armKey: string) => (armKey === LUNA.key ? 1 : armKey === BASELINE.key ? 2 : 3);
+
+  it("scores a rank-only export and reads the acceptable columns as not marked", () => {
+    const scores = scoreRatings(rankOnly(lunaFirst), key);
+    expect(scores.arms.map((a) => a.arm)).toEqual([armOf(BASELINE), armOf(LUNA), armOf(SOL)]);
+    const [baseline, luna, sol] = scores.arms;
+    expect(baseline).toMatchObject({ ranked: 3, meanRank: 2, rank1: 0, acceptableMarked: 0, acceptableRate: null });
+    expect(luna).toMatchObject({ ranked: 3, meanRank: 1, rank1: 3, wins: 3, ties: 0, losses: 0, equalOrBetterThanBaseline: 1, acceptableRate: null });
+    expect(sol).toMatchObject({ ranked: 3, meanRank: 3, rank1: 0, wins: 0, ties: 0, losses: 3, equalOrBetterThanBaseline: 0 });
+    expect(scores.completeness.acceptableMarked).toBe(false);
+
+    const md = renderScores(scores);
+    const row = md.split("\n").find((line) => line.startsWith(`| ${armOf(LUNA)} `)) ?? "";
+    expect(row).toContain("| 3 | 1.00 | 3 |");
+    expect(row).toContain("not marked");
+    expect(md).not.toMatch(/NaN|Infinity/);
+    expect(md).toContain("Every option of every item was ranked.");
+    expect(md).toContain("No option carries an Acceptable? verdict");
+  });
+
+  it("computes the acceptable columns over the options that carry a verdict", () => {
+    const exported = rankOnly(lunaFirst);
+    const first = regularIds[0];
+    exported.ratings[first][labelOf(first, LUNA.key)].acceptable = "yes";
+    exported.ratings[first][labelOf(first, SOL.key)].acceptable = "no";
+    const scores = scoreRatings(exported, key);
+    const luna = scores.arms.find((a) => a.arm === armOf(LUNA));
+    const sol = scores.arms.find((a) => a.arm === armOf(SOL));
+    const baseline = scores.arms.find((a) => a.arm === armOf(BASELINE));
+    expect(luna).toMatchObject({ acceptableMarked: 1, acceptableYes: 1, acceptableRate: 1 });
+    expect(sol).toMatchObject({ acceptableMarked: 1, acceptableYes: 0, acceptableRate: 0 });
+    expect(baseline).toMatchObject({ acceptableMarked: 0, acceptableRate: null });
+    expect(scores.completeness.acceptableMarked).toBe(true);
+    expect(scores.completeness.unmarked.find((u) => u.item === first)?.options.map((o) => o.label)).toEqual([labelOf(first, BASELINE.key)]);
+  });
+
+  it("scores a partly ranked item and names its unranked options", () => {
+    const [onlyBaseline, onlyLuna] = regularIds;
+    const scores = scoreRatings(
+      rankOnly((itemId, armKey) => {
+        if (itemId === onlyBaseline) return armKey === BASELINE.key ? 1 : undefined;
+        if (itemId === onlyLuna) return armKey === LUNA.key ? 1 : undefined;
+        return lunaFirst(itemId, armKey);
+      }),
+      key
+    );
+    const luna = scores.arms.find((a) => a.arm === armOf(LUNA));
+    const baseline = scores.arms.find((a) => a.arm === armOf(BASELINE));
+    const sol = scores.arms.find((a) => a.arm === armOf(SOL));
+    // Luna's rank on the item without a baseline rank counts for its mean, not against the baseline
+    expect(luna).toMatchObject({ ranked: 2, meanRank: 1, rank1: 2, wins: 1, ties: 0, losses: 0 });
+    expect(baseline).toMatchObject({ ranked: 2, meanRank: 1.5, rank1: 1 });
+    expect(sol).toMatchObject({ ranked: 1, meanRank: 3, losses: 1 });
+
+    const unranked = (itemId: string) => scores.completeness.unranked.find((u) => u.item === itemId)?.options.map((o) => o.label).sort();
+    expect(unranked(onlyBaseline)).toEqual([labelOf(onlyBaseline, LUNA.key), labelOf(onlyBaseline, SOL.key)].sort());
+    expect(unranked(onlyLuna)).toEqual([labelOf(onlyLuna, BASELINE.key), labelOf(onlyLuna, SOL.key)].sort());
+    expect(scores.completeness.unratedItems).toEqual([]);
+
+    const md = renderScores(scores);
+    expect(md).not.toContain("Every option of every item was ranked.");
+    const line = (itemId: string, ranked: string) =>
+      `- ${itemId}: ${Object.entries(key.items[itemId].labels)
+        .filter(([, ref]) => ref.armKey !== ranked)
+        .map(([label, ref]) => `${label} (prefix:${ref.armKey} s1)`)
+        .join(", ")} unranked.`;
+    expect(md).toContain(line(onlyBaseline, BASELINE.key));
+    expect(md).toContain(line(onlyLuna, LUNA.key));
+  });
+
+  it("lists an item missing from the export as not rated at all", () => {
+    const missing = regularIds[1];
+    const scores = scoreRatings(rankOnly(lunaFirst, [missing]), key);
+    expect(scores.completeness.unratedItems).toEqual([missing]);
+    expect(scores.completeness.unranked.find((u) => u.item === missing)).toBeUndefined();
+    expect(scores.arms.find((a) => a.arm === armOf(LUNA))).toMatchObject({ ranked: 2, wins: 2 });
+    const md = renderScores(scores);
+    expect(md).toMatch(new RegExp(`Not rated at all: ${missing}\\b`));
+    expect(md).not.toContain("Every option of every item was ranked.");
+  });
+
+  it("says the repeat and control readings are unavailable when their items have no ratings", () => {
+    const scores = scoreRatings(rankOnly(lunaFirst, [repeatId, controlId]), key);
+    expect(scores.repeat).toMatchObject({ item: repeatId, acceptableAgreement: null, sameRankOrder: null });
+    expect(scores.completeness.unratedItems.sort()).toEqual([repeatId, controlId].sort());
+    const md = renderScores(scores);
+    expect(md).toContain(`Repeated item ${repeatId} (of ${scores.repeat?.of}): unavailable, ${repeatId} has no ratings.`);
+    expect(md).toContain(`Baseline against baseline (${controlId}): unavailable, ${controlId} has no ratings.`);
+    expect(md).not.toMatch(/agree on \d+%/);
+    expect(md).not.toMatch(/rank order (identical|differs)/);
+    expect(md).toMatch(new RegExp(`Not rated at all: .*${repeatId} \\(repeat of`));
+  });
+
+  it("reads a ranked repeat's order without verdicts, and leaves acceptable agreement unavailable", () => {
+    const scores = scoreRatings(rankOnly(lunaFirst), key);
+    expect(scores.repeat).toMatchObject({ item: repeatId, acceptableAgreement: null, sameRankOrder: true, rankCompared: 3 });
+    const md = renderScores(scores);
+    expect(md).toContain("rank order identical");
+    expect(md).not.toMatch(/agree on \d+%/);
   });
 });
