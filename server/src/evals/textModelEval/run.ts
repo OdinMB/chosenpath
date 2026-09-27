@@ -24,14 +24,14 @@ import { planRatingSet, ratingSetFromKey, type ArmRef, type RatingKind } from ".
 import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable } from "./runner.js";
-import { PRE_FIX_PROMPT_STATE } from "./variants.js";
+import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
  *   --dry-run (default)           cases, calls, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses "prefix": Run A recorded it)
+ *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses the retired "prefix" and "postfix")
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
@@ -395,11 +395,8 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
 
 async function run(args: Args, files: EvalFiles) {
   if (!args.stage || !args.promptState) throw new UsageError("--run needs --stage and --prompt-state.");
-  if (args.promptState === PRE_FIX_PROMPT_STATE) {
-    throw new UsageError(
-      'The pre-fix prompts no longer exist in the code (Run A recorded them), so --prompt-state prefix would mix post-fix prompts into pre-fix results. Use "postfix".'
-    );
-  }
+  const retired = retiredPromptStateProblem(args.promptState);
+  if (retired) throw new UsageError(retired);
   requireApiKey();
   if (!files.casesExist()) throw new UsageError("No frozen cases. Run --build-cases first.");
   const caps = capsFor(args, files, args.stage);

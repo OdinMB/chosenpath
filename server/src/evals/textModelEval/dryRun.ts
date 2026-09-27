@@ -108,7 +108,9 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   const plan = (stage: Stage, promptState: string, extra: Partial<PlanOptions>) =>
     planJobs(cases ?? [], input.options(stage, promptState, extra));
   const analysis: Partial<PlanOptions> = { mode: "pipeline", roles: ["switch", "thread"] };
-  // The pre-fix baseline finished in Run A, and --run now refuses "prefix"
+  // The pre-fix baseline finished in Run A, and --run now refuses "prefix". The rows read
+  // the "postfix" records, which --run refuses too since the Round 0 play fixes; the
+  // stages of the next rounds get rows under their own tag
   const rows: [string, Stage, Job[]][] = [
     ["Stage 0 post-fix baseline (2 samples, isolated)", "0", plan("0", "postfix", { samples: input.samples ?? 2, mode: "isolated" })],
     ["Stage 0 post-fix baseline pipeline chains", "0", plan("0", "postfix", analysis).filter((j) => j.group === "pipeline")],
@@ -136,7 +138,7 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   for (const stage of STAGES) {
     log(`  Stage ${stage}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
   }
-  log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap; the owner's target is about $25)`);
+  log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $30 by the owner on 2026-09-27; the first target was about $25)`);
   log(
     `Baseline arms from production config: setup ${baselineArm("setup", false).key}, beat ${baselineArm("beat", false).key}, analysis ${baselineArm("switch", false).key}`
   );

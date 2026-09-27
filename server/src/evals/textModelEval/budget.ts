@@ -6,13 +6,15 @@ import type { Stage } from "./arms.js";
  * extra spend only when obviously useful and recorded. Going a little over
  * $25 is justified because the owner explicitly prioritised Sol for story
  * setups, and setup inputs are 21-23K tokens with the schema, not the 15K
- * the plan assumed. The stage caps are $8 / $13 / $3 / $4; a stage cap above
- * its default needs a recorded reason, and the global cap can only be
- * lowered. The probe and case building count as Stage 0.
+ * the plan assumed. The owner raised the hard cap to $33 on 2026-09-27, for
+ * the setup and turn rounds after the Round 0 play fixes. The stage caps are
+ * $8 / $13 / $3 / $4; a stage cap above its default needs a recorded reason,
+ * and the global cap can only be lowered. The probe and case building count
+ * as Stage 0.
  */
 
 export const DEFAULT_STAGE_CAPS: Record<Stage, number> = { "0": 8, "1-2": 13, "3": 3, "4": 4 };
-export const HARD_CEILING = 30;
+export const HARD_CEILING = 33;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
 export type Caps = {

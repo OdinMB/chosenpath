@@ -7,7 +7,7 @@
 
 ### Checks and repairs on model replies
 
-The game keeps what a model reply means, not only what matches an id exactly. Each repair is a `Repair` record (`server/src/game/services/textRepairs.ts`); `logRepairs` prints one `[LLM] repair` line per reply with the role, story id, turn and the count per kind (notes apart). The line carries no story text and no model-written ids; the records do, for tests and the eval.
+The game keeps what a model reply means, not only what matches an id exactly. Each repair is a `Repair` record (`server/src/game/services/textRepairs.ts`); `logRepairs` prints one `[LLM] repair` line per reply with the role, story id, turn and the count per kind (notes apart). The line carries no story text and no model-written ids; the records do, for tests and the eval, which checks replies after these repairs and counts them per kind (`.context/text-model-eval.md`, "Checks on what the game keeps").
 
 **Beat replies** (`server/src/game/services/beatRepairs.ts`, `repairBeatReply`). `AIStoryGenerator.generateBeats` runs it on every reply, pregeneration siblings included, before `beatStep.apply`, so the beats are stored already repaired. `ChangeService` still applies exact ids only.
 

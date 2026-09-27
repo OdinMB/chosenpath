@@ -1,5 +1,7 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
+import type { Story } from "core/models/Story.js";
 import type { Env } from "shared/llm/textModelSettings.js";
+import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
 import { switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import {
@@ -23,7 +25,8 @@ import { isSplitRequest, requestFor, requestText, type EvalRequest, type Request
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
  * case's baseline, the candidate arms on their scope (all cases, the 15-case
  * subset, single-player cases, or a case list), the rare-failure batch, and
- * pipeline chains (analysis, then the beat built from it) in pipeline mode.
+ * pipeline chains (analysis, then the beat built from the plan the game
+ * keeps, storyAfterAnalysis) in pipeline mode.
  * Filters narrow the plan; estimates use measured output sizes once there
  * are enough, and a new variant borrows until then (estimateBaseKey: a
  * count-fix variant from its Stage 4 form, others along the reference chain).
@@ -190,7 +193,28 @@ function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: num
   };
 }
 
-/** Analysis, then the beat built from its output: the real wait on an analysis turn. */
+/**
+ * The story after an analysis turn, as the game keeps it: the plan checked
+ * (planChecks.ts) and its repaired form applied. A plan the game would ask
+ * for again is applied as written, because the eval cannot retry; its
+ * planUsable check fails (outputChecks.ts).
+ */
+export function storyAfterAnalysis(
+  story: Story,
+  kind: "switch" | "thread",
+  analysis: SwitchAnalysis | ThreadAnalysis
+): Story {
+  if (kind === "switch") {
+    const written = analysis as SwitchAnalysis;
+    const checked = checkSwitchPlan(story, written);
+    return switchStep.apply(story, checked.problem === undefined ? checked.plan : written);
+  }
+  const written = analysis as ThreadAnalysis;
+  const checked = checkThreadPlan(story, written);
+  return threadStep.apply(story, checked.problem === undefined ? checked.plan : written);
+}
+
+/** Analysis, then the beat built from its checked output: the real wait on an analysis turn. */
 function chainJob(
   options: PlanOptions,
   evalCase: EvalCase,
@@ -230,11 +254,7 @@ function chainJob(
           beatArm,
           players,
           () => {
-            const base = story();
-            const next =
-              kind === "switch"
-                ? switchStep.apply(base, analysis as SwitchAnalysis)
-                : threadStep.apply(base, analysis as ThreadAnalysis);
+            const next = storyAfterAnalysis(story(), kind, analysis as SwitchAnalysis | ThreadAnalysis);
             return requestFor(beatArm.variant, { role: "beat", story: next });
           },
           measured

@@ -2,19 +2,27 @@ import { jest } from "@jest/globals";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes } from "core/types/index.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
-import { planJobs, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
+import { planJobs, storyAfterAnalysis, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
   isSplitRequest,
   requestFor,
   requestText,
+  retiredPromptStateProblem,
   type RequestInput,
   type VariantId,
 } from "../../../../src/evals/textModelEval/variants.js";
 import { NO_EMPTY_ITEMS } from "../../../../src/game/services/storyTextRewrite/common.js";
 import type { Story } from "core/models/Story.js";
-import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
+import {
+  endingBeat,
+  firstSwitchBeat,
+  laterSwitchBeat,
+  threadAnalysisAfterSwitch,
+  threadBeat,
+} from "../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStoryState } from "../../../helpers/testHelpers.js";
+import { outcome, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { evalCase, record, tags } from "./fixtures.js";
 
 beforeEach(() => {
@@ -242,6 +250,53 @@ describe("requestFor: the Stage 4 variants", () => {
       expect({ worded, fixed: a.fixed.replace(`${NO_EMPTY_ITEMS}\n`, ""), perCall: a.perCall }).toEqual({ worded, fixed: b.fixed, perCall: b.perCall });
       expect(a.fixed).toContain(NO_EMPTY_ITEMS);
     }
+  });
+});
+
+describe("storyAfterAnalysis: chains go on with the plan the game keeps", () => {
+  /** A thread plan of duration 3 whose one thread has 2 steps: the game's check takes the length from the steps */
+  const shortPlan = () => {
+    const plan = threadAnalysis("challenge", 3, 0);
+    plan.threads[0].progression.pop();
+    return plan;
+  };
+
+  it("applies the checked plan: a thread's length equals its steps", () => {
+    const plan = storyAfterAnalysis(threadAnalysisAfterSwitch(1), "thread", shortPlan()).getCurrentThreadAnalysis();
+    expect(plan?.duration).toBe(2);
+    expect(plan?.threads.map((t) => t.duration)).toEqual([2]);
+  });
+
+  it("applies an unusable plan as written, since the eval cannot ask again", () => {
+    // The fixture's thread pushes outcome_1, which this story does not hold
+    const story = threadAnalysisAfterSwitch(1, { sharedOutcomes: [outcome("shared_escape")] });
+    expect(storyAfterAnalysis(story, "thread", shortPlan()).getCurrentThreadAnalysis()?.duration).toBe(3);
+  });
+
+  it("builds a chain's beat on the checked plan", () => {
+    const cases = [evalCase("thread-case", "thread", { state: threadAnalysisAfterSwitch(1).getState() })];
+    const [job] = planJobs(cases, {
+      stage: "0",
+      promptState: "round0",
+      roles: ["thread"],
+      mode: "pipeline",
+      samples: 1,
+      subset15: false,
+      records: [],
+      env: {},
+    });
+    const beat = job.then?.build(shortPlan());
+    const text = beat ? requestText(beat.request()) : "";
+    expect(text).toContain("Beat 1/2");
+    expect(text).not.toContain("Beat 1/3");
+  });
+});
+
+describe("retiredPromptStateProblem: the tags --run refuses", () => {
+  it("refuses prefix and postfix, whose prompt code is gone, and accepts a new tag", () => {
+    expect(retiredPromptStateProblem("prefix")).toMatch(/Run A/);
+    expect(retiredPromptStateProblem("postfix")).toMatch(/round0/);
+    expect(retiredPromptStateProblem("round0")).toBeUndefined();
   });
 });
 

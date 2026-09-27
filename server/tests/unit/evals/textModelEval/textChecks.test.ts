@@ -9,6 +9,7 @@ import {
   PADDING_RUN_CHARS,
   paragraphsOf,
   withPadding,
+  withRepairs,
   type SetupShape,
 } from "../../../../src/evals/textModelEval/textChecks.js";
 import { createMockStory } from "../../../helpers/testHelpers.js";
@@ -17,6 +18,7 @@ import {
   beatGeneration,
   beatSet,
   challengeOptions,
+  explorationOptions,
   threadAnalysis,
 } from "../../../helpers/textFixtures.js";
 
@@ -163,6 +165,24 @@ describe("checkBeatSet", () => {
   });
 });
 
+describe("checkBeatSet: game words in what the player sees", () => {
+  const story = createMockStory();
+  const withImage = (desc: string) => `[image id=player1 source=story desc="${desc}"] ${paragraphs(5)}`;
+  const noMetaWords = (overrides: Parameters<typeof beatGeneration>[0]) =>
+    checkBeatSet(beatSet(1, { player1: beatGeneration(overrides) }), story).checks.noMetaWords;
+
+  it("reads an image tag as the caption the player sees, so a portrait's id is not a game word", () => {
+    expect(noMetaWords({ text: withImage("Mira at the gate") })).toBe(true);
+  });
+
+  it("still flags a game word in a caption or an option", () => {
+    expect(noMetaWords({ text: withImage("Player 2 at the gate") })).toBe(false);
+    const options = explorationOptions();
+    options[1] = { ...options[1], text: "Ask player1 for help" };
+    expect(noMetaWords({ options })).toBe(false);
+  });
+});
+
 describe("checkSetup", () => {
   const input = { premise: "p", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 };
   const setup = (overrides: Partial<SetupShape> = {}): SetupShape => ({
@@ -256,6 +276,15 @@ describe("checkSetup", () => {
       expect(failing({ sharedOutcomes: [], player1: player({ outcomes: 3 }), player2: player({ outcomes: 3 }) })).toEqual([]);
     });
 
+    it("fails startable where the game would refuse the story: no outcomes, or several players and no shared one", () => {
+      expect(checkSetup(complete(), twoPlayers).checks.startable).toBe(true);
+      expect(checkSetup(complete({ sharedOutcomes: [] }), twoPlayers).checks.startable).toBe(false);
+      expect(checkSetup(complete({ sharedOutcomes: undefined }), twoPlayers).checks.startable).toBe(false);
+      // Single player: any outcome will do, and none at all is refused
+      expect(checkSetup(setup({ player1: player() }), input).checks.startable).toBe(true);
+      expect(checkSetup(setup({ player1: player({ outcomes: 0 }) }), input).checks.startable).toBe(false);
+    });
+
     it("fails a list that is missing altogether", () => {
       expect(failing({ player1: {} })).toEqual(["threeIdentities", "threeBackgrounds", "threeOutcomes"]);
       expect(failing({ storyElements: list(6, () => ({ id: "inn", facts: undefined })) })).toEqual(["threeFactsPerElement"]);
@@ -288,6 +317,26 @@ describe("withPadding", () => {
   it("passes a pretty-printed reply: indentation is not padding", () => {
     const pretty = JSON.stringify({ a: { b: { c: { d: { e: { f: ["x"] } } } } } }, null, 4);
     expect(withPadding(result, pretty).checks.noWhitespacePadding).toBe(true);
+  });
+});
+
+describe("withRepairs", () => {
+  const result = { checks: { knownChangeIds: true }, counts: { statChanges: 1 }, unknownIds: [] };
+
+  it("counts each repair and note by kind, and fails noRepairs on a repair only", () => {
+    const repairs = [{ kind: "statIdSeatForm" }, { kind: "statIdSeatForm" }, { kind: "offLadderValue", note: true }];
+    expect(withRepairs(result, repairs)).toEqual({
+      checks: { knownChangeIds: true, noRepairs: false },
+      counts: { statChanges: 1, "repair:statIdSeatForm": 2, "note:offLadderValue": 1 },
+      unknownIds: [],
+    });
+    expect(withRepairs(result, [{ kind: "offLadderValue", note: true }]).checks.noRepairs).toBe(true);
+  });
+
+  it("adds planUsable for a plan: false when its check found a problem", () => {
+    expect(withRepairs(result, [], { problem: "player2 is in no thread" }).checks.planUsable).toBe(false);
+    expect(withRepairs(result, [], {}).checks.planUsable).toBe(true);
+    expect(withRepairs(result, []).checks).not.toHaveProperty("planUsable");
   });
 });
 

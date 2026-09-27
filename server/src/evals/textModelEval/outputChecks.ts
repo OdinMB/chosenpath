@@ -1,6 +1,8 @@
 import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
-import { switchStep, threadStep } from "../../game/services/storyTextSteps.js";
+import { repairBeatReply } from "../../game/services/beatRepairs.js";
+import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
 import { caseStory, type EvalCase } from "./cases.js";
+import { storyAfterAnalysis } from "./jobPlan.js";
 import { usable, type CallRecord } from "./runner.js";
 import {
   aggregateProse,
@@ -8,7 +10,9 @@ import {
   checkSetup,
   checkSwitch,
   checkThread,
+  isRepairCount,
   withPadding,
+  withRepairs,
   type CheckResult,
   type SetupShape,
 } from "./textChecks.js";
@@ -16,8 +20,11 @@ import {
 /*
  * Applies the automatic checks to stored outputs: each usable call's parsed
  * output against the input it was written for (for a pipeline beat, the case
- * with that chain's own analysis applied), plus the whitespace padding in its
- * reply text. Also collects beat prose per arm.
+ * with that chain's own analysis applied as the game keeps it), plus the
+ * whitespace padding in its reply text. Beat, switch and thread replies are
+ * checked as the game keeps them: after the beat repairs (beatRepairs.ts) or
+ * the plan check (planChecks.ts), whose repairs are counted beside the checks
+ * (withRepairs). Also collects beat prose per arm.
  */
 
 function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[], load: (r: CallRecord) => unknown) {
@@ -26,9 +33,27 @@ function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[]
   const parsed = analysis ? load(analysis) : undefined;
   const base = caseStory(evalCase, false);
   if (parsed === undefined) return base;
-  return evalCase.role === "thread"
-    ? threadStep.apply(base, parsed as ThreadAnalysis)
-    : switchStep.apply(base, parsed as SwitchAnalysis);
+  return storyAfterAnalysis(base, evalCase.role === "thread" ? "thread" : "switch", parsed as SwitchAnalysis | ThreadAnalysis);
+}
+
+/**
+ * Every repair and note kind a role's replies show, counted on each of that
+ * role's replies (0 where absent). The report averages a count over the
+ * replies that carry it, so without the zeros a kind would read per repaired
+ * reply instead of per reply.
+ */
+function withEveryRepairKind(checks: Map<string, CheckResult>, roleOf: Map<string, string>): void {
+  const kinds = new Map<string, Set<string>>();
+  for (const [file, result] of checks) {
+    const role = roleOf.get(file) ?? "";
+    const seen = kinds.get(role) ?? new Set<string>();
+    Object.keys(result.counts).filter(isRepairCount).forEach((name) => seen.add(name));
+    kinds.set(role, seen);
+  }
+  for (const [file, result] of checks) {
+    const zeros = Object.fromEntries([...(kinds.get(roleOf.get(file) ?? "") ?? [])].map((name) => [name, 0]));
+    checks.set(file, { ...result, counts: { ...zeros, ...result.counts } });
+  }
 }
 
 /** `loadContent` gives a call's reply text, for the whitespace padding reading (withPadding) on every role. */
@@ -40,6 +65,7 @@ export function checksForRecords(
 ): { checks: Map<string, CheckResult>; prose: Record<string, ReturnType<typeof aggregateProse>> } {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const checks = new Map<string, CheckResult>();
+  const roleOf = new Map<string, string>();
   const texts = new Map<string, string[]>();
   for (const record of records) {
     const evalCase = byId.get(record.caseId);
@@ -50,21 +76,29 @@ export function checksForRecords(
     if (record.role === "setup" && evalCase.setup) {
       result = checkSetup(output as SetupShape, evalCase.setup);
     } else if (record.role === "beat") {
-      const beats = output as SetOfBeatGenerationSchema;
-      result = checkBeatSet(beats, beatInput(record, evalCase, records, load));
+      const story = beatInput(record, evalCase, records, load);
+      const { reply, repairs } = repairBeatReply(story, output as SetOfBeatGenerationSchema);
+      result = withRepairs(checkBeatSet(reply, story), repairs);
       const key = `${record.promptState}:${record.armKey}`;
-      const own = Object.entries(beats)
+      const own = Object.entries(reply)
         .filter(([slot]) => /^player\d+$/.test(slot))
         .map(([, beat]) => (beat && typeof beat === "object" && "text" in beat ? String(beat.text) : ""));
       texts.set(key, [...(texts.get(key) ?? []), ...own]);
     } else if (record.role === "switch") {
-      result = checkSwitch(output as SwitchAnalysis, caseStory(evalCase, false));
+      const story = caseStory(evalCase, false);
+      const checked = checkSwitchPlan(story, output as SwitchAnalysis);
+      result = withRepairs(checkSwitch(checked.plan, story), checked.repairs, checked);
     } else if (record.role === "thread") {
-      result = checkThread(output as ThreadAnalysis);
+      const checked = checkThreadPlan(caseStory(evalCase, false), output as ThreadAnalysis);
+      result = withRepairs(checkThread(checked.plan), checked.repairs, checked);
     }
     const content = result ? loadContent(record) : undefined;
-    if (result) checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
+    if (result) {
+      checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
+      roleOf.set(record.outputFile, record.role);
+    }
   }
+  withEveryRepairKind(checks, roleOf);
   const prose = Object.fromEntries([...texts.entries()].map(([arm, list]) => [arm, aggregateProse(list)]));
   return { checks, prose };
 }

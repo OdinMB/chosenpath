@@ -6,8 +6,10 @@ import type {
   SwitchAnalysis,
   ThreadAnalysis,
 } from "core/types/index.js";
-import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
+import { templateStartProblem, type SeatedOutcomes } from "core/utils/outcomeReadiness.js";
+import { expectedOptionType } from "../../game/services/beatRepairs.js";
+import { repairCounts, type Repair } from "../../game/services/textRepairs.js";
 import { playerParagraphs } from "./playerText.js";
 import { longestWhitespaceRun } from "./responseCheck.js";
 import type { SetupInput } from "./variants.js";
@@ -16,7 +18,9 @@ import type { SetupInput } from "./variants.js";
  * The rule and state checks of test plan §4.4 on parsed outputs. Each check
  * is a named pass/fail; the report compares rates against the baseline's.
  * These only rule arms out, they never pick a winner. Paragraphs are split
- * as the game shows them (playerText.ts).
+ * as the game shows them (playerText.ts). The checks are pure over the reply
+ * they get; outputChecks.ts hands them the reply the game keeps (after its
+ * repairs) and adds the repairs with withRepairs.
  */
 
 export type CheckResult = {
@@ -86,16 +90,9 @@ function basePointsInRange(option: BeatOption): boolean {
   return basePoints >= -15 && basePoints <= 5;
 }
 
-/** Which option type the story's current phase calls for, if it constrains one. */
-function expectedOptionType(story: Story, slot: string): BeatOption["optionType"] | undefined {
-  const beatType = story.getCurrentBeatType();
-  if (beatType === "switch") return "exploration";
-  if (beatType !== "thread") return undefined;
-  const thread = story
-    .getCurrentThreadAnalysis()
-    ?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
-  if (!thread) return undefined;
-  return getThreadType(thread) === "exploration" ? "exploration" : "challenge";
+/** A beat's text as the player reads it: each image tag replaced by its caption (the tag's desc). */
+function visibleText(text: string): string {
+  return text.replace(IMAGE_TAG, (_tag, attrs: string) => /\bdesc="([^"]*)"/.exec(attrs)?.[1] ?? "");
 }
 
 function knownIds(story: Story) {
@@ -135,7 +132,8 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
       ? request.id
       : undefined;
   const expected = expectedOptionType(story, slot);
-  const visible = [beat.title, beat.text, ...beat.options.map((o) => o.text), ...beat.interludes.map((i) => i.text)].join("\n");
+  // What the player sees: a portrait tag's id=player1 is not a game word, its caption can be
+  const visible = [beat.title, visibleText(beat.text), ...beat.options.map((o) => o.text), ...beat.interludes.map((i) => i.text)].join("\n");
   const prose = stripImageTags(beat.text);
   const newElementIds = new Set(beat.plan.newGameElements.map((c) => c.element.id));
   const unknown = [
@@ -241,6 +239,33 @@ export function withPadding(result: CheckResult, content: string): CheckResult {
   return merge([result, { checks: { noWhitespacePadding: run <= PADDING_RUN_CHARS }, counts: { longestWhitespaceRun: run }, unknownIds: [] }]);
 }
 
+const REPAIR_COUNT = "repair:";
+const NOTE_COUNT = "note:";
+
+/** Whether a count is one of withRepairs' per-kind counts. */
+export function isRepairCount(name: string): boolean {
+  return name.startsWith(REPAIR_COUNT) || name.startsWith(NOTE_COUNT);
+}
+
+/**
+ * A reply's check result with what the game put right before keeping it
+ * (beatRepairs.ts, planChecks.ts): a count per repair kind (repair:<kind>)
+ * and per note (note:<kind>, kept as written), the check noRepairs (notes
+ * don't count), and for a plan planUsable (its check found no problem, so the
+ * game would not ask again). The checks ran on the repaired reply, so these
+ * are what keeps the model's own compliance visible.
+ */
+export function withRepairs(result: CheckResult, repairs: Repair[], plan?: { problem?: string }): CheckResult {
+  const { repairs: byKind, notes } = repairCounts(repairs);
+  const counts = Object.fromEntries([
+    ...Object.entries(byKind).map(([kind, n]) => [`${REPAIR_COUNT}${kind}`, n]),
+    ...Object.entries(notes).map(([kind, n]) => [`${NOTE_COUNT}${kind}`, n]),
+  ]);
+  const checks: Record<string, boolean> = { noRepairs: Object.keys(byKind).length === 0 };
+  if (plan) checks.planUsable = plan.problem === undefined;
+  return merge([result, { checks, counts, unknownIds: [] }]);
+}
+
 function merge(results: CheckResult[]): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
@@ -310,7 +335,9 @@ const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + 
  * effects per stat, and per player 3 identities, 3 backgrounds and 3 outcomes
  * counting the shared ones. The worded rewrite enforces none of these as a
  * minimum, so a model can leave a list short instead of padding it with a
- * blank item, and noBlankItems cannot see a missing one.
+ * blank item, and noBlankItems cannot see a missing one. startable reads the
+ * game's own start rule (core/utils/outcomeReadiness.ts): a setup it would
+ * retry, then refuse.
  */
 export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
   const slots = Object.keys(output).filter((key) => /^player\d+$/.test(key));
@@ -339,6 +366,8 @@ export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
       threeBackgrounds: backgrounds.every((n) => n === 3),
       threeOutcomes: perPlayer("outcomes").every((n) => n + shared === 3),
       noBlankItems: blankItems(output) === 0,
+      // The rule reads only list lengths, so the reply's loose shape will do
+      startable: templateStartProblem(output as unknown as SeatedOutcomes, input.playerCount) === null,
     },
     counts: {
       sharedStats: output.sharedStats.length,

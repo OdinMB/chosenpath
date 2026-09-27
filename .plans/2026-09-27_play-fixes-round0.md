@@ -1,7 +1,7 @@
 # Play fixes, Round 0: what the game loses between a model reply and the story, and the eval checks that read it
 
 - **Date**: 2026-09-27
-- **Status**: in progress (units 1, 2, 3 and 4 done)
+- **Status**: done (units 1 to 5)
 - **Type**: bugfix (production play code, template editor, eval harness). No prompt-wording proposals.
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
 - **Sources** (both gitignored, read-only):
@@ -138,6 +138,8 @@ Files: new `server/src/game/services/planChecks.ts`; `AIStoryGenerator.ts` (`gen
 
 ### Unit 5: the eval reads what the game keeps
 
+**Done** (2026-09-27): EV-1 to EV-6. The count names, the zero fill, the shared chain helper and the decisions beyond this table are in `.plans/2026-09-26_build-followup.md`, "Round 0 play fixes (implementer)".
+
 | Id | Bug today | Intended behaviour | Files | Tests to write first | Source |
 |---|---|---|---|---|---|
 | EV-1 | The checks read the raw reply, not what the game keeps, and would throw on later reply shapes (`outputChecks.ts:52-64`). | `checksForRecords` runs `repairBeatReply` / `checkSwitchPlan` / `checkThreadPlan` against the case input first, runs the existing checks on the result, and merges `withRepairs(result, repairs, problem)`: a count `repair:<kind>` per kind, a check `noRepairs` (notes don't count) and, for plans, `planUsable` (no problem). `checkBeatSet`, `checkSwitch` and `checkThread` stay pure over what they get, so their tests hold. The eval's `expectedOptionType` comes from `beatRepairs.ts`. | `outputChecks.ts`, `textChecks.ts` | `outputChecks.test.ts`: a seat-form stat change passes `knownChangeIds` and counts `repair:statIdSeatForm`; a junk direction list is checked after the cut; an unusable plan fails `planUsable`. | turn C7 |
@@ -159,7 +161,7 @@ The units run in this order, each as one commit. Only `AIStoryGenerator.ts` (dif
 | 2 | What the state shows the models (done) | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
 | 3 | Stories start with the outcomes they need (done) | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
 | 4 | Plans are checked, repaired or retried once (done) | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |
-| 5 | The eval reads what the game keeps | EV-1 to EV-6 | `server/src/evals/textModelEval/outputChecks.ts`, `jobPlan.ts`, `textChecks.ts`, `budget.ts`, `dryRun.ts`, `run.ts`, `variants.ts`, `.context/text-model-eval.md` | 1, 3, 4 |
+| 5 | The eval reads what the game keeps (done) | EV-1 to EV-6 | `server/src/evals/textModelEval/outputChecks.ts`, `jobPlan.ts`, `textChecks.ts`, `budget.ts`, `dryRun.ts`, `run.ts`, `variants.ts`, `.context/text-model-eval.md` | 1, 3, 4 |
 
 `.context/story.md` gets a short "Checks and repairs on model replies" section: what the beat repair, the plan checks and the start rule do, the retry rule, the clamp, and the pointers to `beatRepairs.ts`, `planChecks.ts` and `outcomeReadiness.ts`. `.context/ai-transparency.md`, `.context/content-safety.md` and `client/src/page/static/Privacy.tsx` need no change: no disclosed practice or AI feature changes (a retried call is the same feature). Check `.context/pregenerations.md` for a sentence on repaired siblings.
 

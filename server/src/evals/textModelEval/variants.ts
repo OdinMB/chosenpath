@@ -82,10 +82,30 @@ export function requestText(request: EvalRequest): string {
 
 /**
  * Prompt states tag which version of the production prompt code a run
- * measured. "prefix" is Run A's, before Milestone 2 fixed the prompts; that
- * code no longer exists, so only its records do.
+ * measured. "prefix" is Run A's, before Milestone 2 fixed the prompts;
+ * "postfix" is Round 1's to Stage 4b's, before the Round 0 play fixes
+ * (2026-09-27) changed the state text and the multiplayer first-thread rule.
+ * Neither code exists any more, so only their records do: they are still
+ * read (pages, scores, reports), but a --run under either tag would mix two
+ * prompt versions in one state, so it is refused.
  */
 export const PRE_FIX_PROMPT_STATE = "prefix";
+
+const RETIRED_PROMPT_STATES = new Map<string, string>([
+  [
+    PRE_FIX_PROMPT_STATE,
+    'The pre-fix prompts no longer exist in the code (Run A recorded them), so --prompt-state prefix would mix post-fix prompts into pre-fix results. Use a new tag such as "round0".',
+  ],
+  [
+    "postfix",
+    'The production prompts changed after the postfix records (the Round 0 play fixes of 2026-09-27), so --prompt-state postfix would mix two prompt versions. Use a new tag such as "round0".',
+  ],
+]);
+
+/** Why --run refuses this prompt state, or undefined when it may record under it. */
+export function retiredPromptStateProblem(promptState: string): string | undefined {
+  return RETIRED_PROMPT_STATES.get(promptState);
+}
 
 export type SetupInput = {
   premise: string;
