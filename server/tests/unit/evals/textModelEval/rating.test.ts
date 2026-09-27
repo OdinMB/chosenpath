@@ -965,7 +965,15 @@ describe("scoreRatings", () => {
     expect(scores.completeness.unmarked.find((u) => u.item === first)?.options.map((o) => o.label)).toEqual([labelOf(first, BASELINE.key)]);
   });
 
-  it("scores a partly ranked item and names its unranked options", () => {
+  /** The Completeness line naming an item's options other than the ranked arms. */
+  const unrankedLine = (itemId: string, ranked: string[], label: string) =>
+    `- ${itemId}: ${Object.entries(key.items[itemId].labels)
+      .filter(([, ref]) => !ranked.includes(ref.armKey))
+      .map(([l, ref]) => `${l} (prefix:${ref.armKey} s1)`)
+      .join(", ")} ${label}.`;
+  const READ_AS_WORSE = "unranked (read as worse, unordered)";
+
+  it("reads the options left unranked beside a single rank as tied with each other and worse than it", () => {
     const [onlyBaseline, onlyLuna] = regularIds;
     const scores = scoreRatings(
       rankOnly((itemId, armKey) => {
@@ -978,10 +986,10 @@ describe("scoreRatings", () => {
     const luna = scores.arms.find((a) => a.arm === armOf(LUNA));
     const baseline = scores.arms.find((a) => a.arm === armOf(BASELINE));
     const sol = scores.arms.find((a) => a.arm === armOf(SOL));
-    // Luna's rank on the item without a baseline rank counts for its mean, not against the baseline
-    expect(luna).toMatchObject({ ranked: 2, meanRank: 1, rank1: 2, wins: 1, ties: 0, losses: 0 });
-    expect(baseline).toMatchObject({ ranked: 2, meanRank: 1.5, rank1: 1 });
-    expect(sol).toMatchObject({ ranked: 1, meanRank: 3, losses: 1 });
+    // Only a 1 given, so the unranked options count as 2: Luna loses where only the baseline is ranked, Sol ties the baseline where only Luna is
+    expect(luna).toMatchObject({ ranked: 3, meanRank: 4 / 3, rank1: 2, wins: 2, ties: 0, losses: 1 });
+    expect(baseline).toMatchObject({ ranked: 3, meanRank: 5 / 3, rank1: 1 });
+    expect(sol).toMatchObject({ ranked: 3, meanRank: 7 / 3, rank1: 0, wins: 0, ties: 1, losses: 2 });
 
     const unranked = (itemId: string) => scores.completeness.unranked.find((u) => u.item === itemId)?.options.map((o) => o.label).sort();
     expect(unranked(onlyBaseline)).toEqual([labelOf(onlyBaseline, LUNA.key), labelOf(onlyBaseline, SOL.key)].sort());
@@ -990,13 +998,75 @@ describe("scoreRatings", () => {
 
     const md = renderScores(scores);
     expect(md).not.toContain("Every option of every item was ranked.");
-    const line = (itemId: string, ranked: string) =>
-      `- ${itemId}: ${Object.entries(key.items[itemId].labels)
-        .filter(([, ref]) => ref.armKey !== ranked)
-        .map(([label, ref]) => `${label} (prefix:${ref.armKey} s1)`)
-        .join(", ")} unranked.`;
-    expect(md).toContain(line(onlyBaseline, BASELINE.key));
-    expect(md).toContain(line(onlyLuna, LUNA.key));
+    expect(md).toContain(unrankedLine(onlyBaseline, [BASELINE.key], READ_AS_WORSE));
+    expect(md).toContain(unrankedLine(onlyLuna, [LUNA.key], READ_AS_WORSE));
+    expect(md).toContain("the rank one below the worst rank given on that item");
+  });
+
+  it("reads an option left unranked beside two ranks as one below the worst of them, ties included", () => {
+    const [lunaThenBaseline, tiedFirst] = regularIds;
+    const scores = scoreRatings(
+      rankOnly((itemId, armKey) => {
+        if (itemId === lunaThenBaseline) return armKey === LUNA.key ? 1 : armKey === BASELINE.key ? 2 : undefined;
+        if (itemId === tiedFirst) return armKey === LUNA.key ? undefined : 1;
+        return lunaFirst(itemId, armKey);
+      }),
+      key
+    );
+    const luna = scores.arms.find((a) => a.arm === armOf(LUNA));
+    const baseline = scores.arms.find((a) => a.arm === armOf(BASELINE));
+    const sol = scores.arms.find((a) => a.arm === armOf(SOL));
+    // Sol reads as 3 below Luna 1 and the baseline 2; Luna reads as 2 below the baseline and Sol tied at 1
+    expect(sol).toMatchObject({ ranked: 3, meanRank: 7 / 3, rank1: 1, wins: 0, ties: 1, losses: 2 });
+    expect(luna).toMatchObject({ ranked: 3, meanRank: 4 / 3, rank1: 2, wins: 2, ties: 0, losses: 1 });
+    expect(baseline).toMatchObject({ ranked: 3, meanRank: 5 / 3, rank1: 1 });
+
+    const md = renderScores(scores);
+    expect(md).toContain(unrankedLine(lunaThenBaseline, [LUNA.key, BASELINE.key], READ_AS_WORSE));
+    expect(md).toContain(unrankedLine(tiedFirst, [BASELINE.key, SOL.key], READ_AS_WORSE));
+  });
+
+  it("leaves an item without any rank unrated, whether it carries only verdicts or only a note", () => {
+    const [verdictsOnly, noteOnly] = regularIds;
+    const exported = rankOnly((itemId, armKey) => ([verdictsOnly, noteOnly].includes(itemId) ? undefined : lunaFirst(itemId, armKey)));
+    exported.ratings[verdictsOnly] = Object.fromEntries(Object.keys(key.items[verdictsOnly].labels).map((label) => [label, { acceptable: "yes" }]));
+    exported.ratings[noteOnly] = { [labelOf(noteOnly, LUNA.key)]: { note: "not sure yet" } };
+    const scores = scoreRatings(exported, key);
+    expect(scores.arms.map((a) => a.ranked)).toEqual([1, 1, 1]);
+    expect(scores.arms.find((a) => a.arm === armOf(SOL))).toMatchObject({ meanRank: 3, wins: 0, ties: 0, losses: 1 });
+    expect(scores.completeness.unratedItems).toEqual([noteOnly]);
+
+    const md = renderScores(scores);
+    expect(md).toContain(unrankedLine(verdictsOnly, [], "unranked"));
+    expect(md).not.toMatch(new RegExp(`${verdictsOnly}:.*read as worse`));
+    expect(md).toMatch(new RegExp(`Not rated at all: ${noteOnly}\\b`));
+  });
+
+  it("reads the repeat with its unranked options as worse, unordered", () => {
+    const first = key.items[repeatId].repeatOf ?? "";
+    const scores = scoreRatings(
+      rankOnly((itemId, armKey) => {
+        if (itemId === repeatId) return armKey === LUNA.key ? 1 : undefined;
+        if (itemId === first) return armKey === LUNA.key ? 1 : 2;
+        return lunaFirst(itemId, armKey);
+      }),
+      key
+    );
+    expect(scores.repeat).toMatchObject({ item: repeatId, rankCompared: 3, sameRankOrder: true });
+    expect(renderScores(scores)).toContain(unrankedLine(repeatId, [LUNA.key], READ_AS_WORSE).replace(`${repeatId}:`, `${repeatId} (repeat of ${first}):`));
+  });
+
+  it("reads the control's unranked sample as worse than the ranked one", () => {
+    const exported = rankOnly(lunaFirst);
+    const [ranked, unranked] = Object.keys(key.items[controlId].labels);
+    exported.ratings[controlId] = { [ranked]: { rank: 1 }, [unranked]: {} };
+    const scores = scoreRatings(exported, key);
+    const sampleOf = (label: string) => key.items[controlId].labels[label].sample;
+    expect(scores.control?.samples.find((s) => s.sample === sampleOf(ranked))).toMatchObject({ rank: 1, readAsWorse: false });
+    expect(scores.control?.samples.find((s) => s.sample === sampleOf(unranked))).toMatchObject({ rank: 2, readAsWorse: true });
+    const md = renderScores(scores);
+    expect(md).toContain(`sample ${sampleOf(unranked)} rank 2 (unranked, read as worse)`);
+    expect(md).toContain(`sample ${sampleOf(ranked)} rank 1,`);
   });
 
   it("lists an item missing from the export as not rated at all", () => {
