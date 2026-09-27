@@ -242,9 +242,13 @@ describe("planJobs: the round stages and the migration check", () => {
       [
         evalCase("sp", "beat", { state: threadBeat(1).getState() }),
         evalCase("mp", "beat", { state: createMockMultiplayerStory(2).getState(), tags: tags(multiplayer) }),
+        evalCase("round-sp", "beat", { state: threadBeat(1, { id: "story-round-sp" }).getState(), tags: tags({ source: "round" }) }),
+        evalCase("round-mp", "beat", { state: createMockMultiplayerStory(2).getState(), tags: tags({ ...multiplayer, source: "round" }) }),
         evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } }),
         evalCase("sp-switch", "switch", { state: createMockStoryState() }),
         evalCase("mp-switch", "switch", { state: createMockMultiplayerStory(2).getState(), tags: tags(multiplayer) }),
+        evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-sp-thread" }).getState() }),
+        evalCase("mp-thread", "thread", { state: threadAnalysisAfterSwitch(2, { id: "story-mp-thread" }).getState(), tags: tags(multiplayer) }),
       ],
       { stage, promptState: "round1", roles: ["setup", "beat", "switch"], mode: "isolated", subset15: false, records: [], ...overrides }
     );
@@ -277,31 +281,59 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("turn-rounds", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
   });
 
-  it("runs production's GPT-6 defaults in the migration check, per player count, at two samples", () => {
-    expect(perArm(plan("migration"))).toEqual({
-      "gpt-6-luna@low/prod": ["setup-learn-lemonade s1", "setup-learn-lemonade s2", "mp s1", "mp s2", "mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2"],
-      "gpt-6-luna@medium/prod": ["sp s1", "sp s2"],
+  it("builds the turn rounds' references in the migration check: production's GPT-6 defaults per player count, no setup", () => {
+    // Single-player beats on Luna medium, twice on the stored cases and once on the round cases; multiplayer beats on
+    // Luna low once, on the stored cases only; the planners on Luna low twice everywhere. Setup reads the stored
+    // setups, which today's code rebuilds byte for byte.
+    expect(perArm(plan("migration", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
+      "gpt-6-luna@medium/prod": ["sp s1", "sp s2", "round-sp s1"],
+      "gpt-6-luna@low/prod": [
+        "mp s1",
+        "mp-switch s1",
+        "mp-switch s2",
+        "sp-switch s1",
+        "sp-switch s2",
+        "mp-thread s1",
+        "mp-thread s2",
+        "sp-thread s1",
+        "sp-thread s2",
+      ],
     });
   });
 
-  it("chains the migration check's single-player analysis into production's single-player beat arm, at one sample", () => {
-    const chains = plan("migration", { mode: "pipeline", roles: ["switch"] });
-    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([["sp-switch", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1]]);
+  it("chains the migration check's planner into its first turn on the chapter-plan cases only, with production's pair per player count, at one sample", () => {
+    expect(plan("migration", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
+    const chains = plan("migration", { mode: "pipeline", roles: ["switch", "thread"] });
+    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([
+      ["mp-thread", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@low/prod", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1],
+    ]);
+  });
+
+  it("still plans AI Iteration in the migration check when asked for it", () => {
+    const iteration = evalCase("iter-a", "iteration", {
+      iteration: { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 },
+    });
+    const jobs = planJobs([iteration], { stage: "migration", promptState: "round1", roles: ["iteration"], mode: "isolated", subset15: false, records: [] });
+    expect(jobs.map((j) => `${j.armKey} s${j.sample}`)).toEqual(["gpt-6-luna@low/prod s1", "gpt-6-luna@low/prod s2"]);
   });
 
   it("keeps the round cases out of the closed Stages 0 to 4, isolated and chained, and plans them in the migration check", () => {
     const cases = [
       evalCase("sp-switch", "switch", { state: createMockStoryState() }),
       evalCase("round-switch-late", "switch", { state: createMockStoryState(), tags: tags({ source: "round" }) }),
+      evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1).getState() }),
+      evalCase("round-thread-short", "thread", { state: threadAnalysisAfterSwitch(1).getState(), tags: tags({ source: "round" }) }),
     ];
-    const caseIds = (stage: PlanOptions["stage"], mode: PlanOptions["mode"]) =>
-      [...new Set(planJobs(cases, { stage, promptState: "round1", roles: ["switch"], mode, subset15: false, records: [] }).map((j) => j.caseId))].sort();
+    const caseIds = (stage: PlanOptions["stage"], mode: PlanOptions["mode"], role: "switch" | "thread") =>
+      [...new Set(planJobs(cases, { stage, promptState: "round1", roles: [role], mode, subset15: false, records: [] }).map((j) => j.caseId))].sort();
     for (const stage of ["0", "1-2", "3", "4"] as const) {
-      expect(caseIds(stage, "isolated")).toEqual(["sp-switch"]);
-      expect(caseIds(stage, "pipeline")).toEqual(["sp-switch"]);
+      expect(caseIds(stage, "isolated", "switch")).toEqual(["sp-switch"]);
+      expect(caseIds(stage, "pipeline", "switch")).toEqual(["sp-switch"]);
+      expect(caseIds(stage, "pipeline", "thread")).toEqual(["sp-thread"]);
     }
-    expect(caseIds("migration", "isolated")).toEqual(["round-switch-late", "sp-switch"]);
-    expect(caseIds("migration", "pipeline")).toEqual(["round-switch-late", "sp-switch"]);
+    expect(caseIds("migration", "isolated", "switch")).toEqual(["round-switch-late", "sp-switch"]);
+    expect(caseIds("migration", "pipeline", "thread")).toEqual(["round-thread-short", "sp-thread"]);
   });
 });
 

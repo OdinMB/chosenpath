@@ -8,7 +8,7 @@ import {
   baselineArm,
   chainKey,
   estimateBaseKey,
-  pipelinePlan,
+  pipelinePlans,
   stageRunsBaseline,
   type Arm,
   type ArmPlan,
@@ -302,24 +302,28 @@ function isMultiplayerContinuation(c: EvalCase): boolean {
 }
 
 /**
- * The role's cases after the filters and the arm's scope and case list, in
- * turn order; the 15-case subset narrows beats only. The cases built for the
- * rounds (source "round") stay out of the closed Stages 0 to 4, the stages
- * that run the baseline, so their dry-run rows and records stay as they ran.
+ * The role's cases after the filters and the arm's scope, source and case
+ * list, in turn order; the 15-case subset narrows beats only. The cases built
+ * for the rounds (source "round") stay out of the closed Stages 0 to 4, the
+ * stages that run the baseline, so their dry-run rows and records stay as
+ * they ran.
  */
 function casesFor(
   cases: EvalCase[],
   role: EvalRole,
   options: PlanOptions,
-  plan: Pick<ArmPlan, "scope" | "caseIds"> = { scope: "all" }
+  plan: Pick<ArmPlan, "scope" | "caseIds" | "source"> = { scope: "all" }
 ): EvalCase[] {
   const subsetOnly = role === "beat" && (options.subset15 || plan.scope === "subset15");
   const roundCasesOut = stageRunsBaseline(options.stage);
+  const isRound = (c: EvalCase) => c.tags.source === "round";
   return inTurnOrder(
     cases.filter(
       (c) =>
         c.role === role &&
-        !(roundCasesOut && c.tags.source === "round") &&
+        !(roundCasesOut && isRound(c)) &&
+        !(plan.source === "stored" && isRound(c)) &&
+        !(plan.source === "round" && !isRound(c)) &&
         (!options.caseIds || options.caseIds.includes(c.id)) &&
         (!plan.caseIds || plan.caseIds.includes(c.id)) &&
         (!subsetOnly || c.tags.subset15) &&
@@ -367,8 +371,10 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
     ? [...beatCases.map((c) => requestChars(requestFor("prod", requestInputFor(c))))].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
     : 80_000;
   const jobs: Job[] = [];
-  const plan = pipelinePlan(options.stage);
-  const candidateCases = new Set(plan ? casesFor(cases, role, options, plan).map((c) => c.id) : []);
+  // Each plan on its scope, and only on the planners' cases it names
+  const plans = pipelinePlans(options.stage)
+    .filter((plan) => !plan.roles || plan.roles.includes(role))
+    .map((plan) => ({ plan, cases: new Set(casesFor(cases, role, options, plan).map((c) => c.id)) }));
   const chains = (evalCase: EvalCase, analysisArm: Arm, beatArm: Arm, samples: number) => {
     const key = chainKey(analysisArm.key, beatArm.key);
     if (options.armKeys && !options.armKeys.includes(key) && !options.armKeys.includes(beatArm.key)) return;
@@ -381,8 +387,10 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
     if (stageRunsBaseline(options.stage)) {
       chains(evalCase, baselineArm(role), baselineArm("beat"), options.samples ?? DEFAULT_BASELINE_SAMPLES);
     }
-    if (!plan || !candidateCases.has(evalCase.id)) continue;
-    for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
+    for (const { plan, cases: planCases } of plans) {
+      if (!planCases.has(evalCase.id)) continue;
+      for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
+    }
   }
   return jobs;
 }

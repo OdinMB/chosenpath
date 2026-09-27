@@ -5,6 +5,7 @@ import type { RatingKey } from "./ratingSets.js";
 import { readRanks, type ExportedRatings } from "./ratingScore.js";
 import { usable, type CallRecord } from "./runner.js";
 import type { CheckResult } from "./textChecks.js";
+import { turnKindOf } from "./turnWaits.js";
 
 /*
  * The baselines of the improvement documents' new automatic checks over the
@@ -234,15 +235,6 @@ function pageSeparation(key: RatingKey, exported: ExportedRatings, records: Call
   return { pageId: key.pageId, items: items.length, checks, counts };
 }
 
-/** The turn kind a beat case is (turn doc A.C). */
-function beatKind(evalCase: EvalCase): string {
-  if (evalCase.tags.firstBeat) return "first turn";
-  if (evalCase.tags.ending) return "ending";
-  if (evalCase.fixedAnalysis?.kind === "switch") return "switch turn after a chapter";
-  if (evalCase.fixedAnalysis?.kind === "thread") return "chapter opening";
-  return "chapter step";
-}
-
 function turnKindWaits(records: CallRecord[], caseById: Map<string, EvalCase>): BaselineReport["turnKinds"] {
   const bucket = (list: { arm: string; kind: string; seconds: number }[]): TurnKindWait[] => {
     const groups = new Map<string, number[]>();
@@ -259,7 +251,8 @@ function turnKindWaits(records: CallRecord[], caseById: Map<string, EvalCase>): 
     .filter((r) => r.role === "beat" && r.group === "beat")
     .flatMap((r) => {
       const evalCase = caseById.get(r.caseId);
-      return evalCase ? [{ arm: `${r.promptState}:${r.armKey}`, kind: beatKind(evalCase), seconds: r.latencyMs / 1000 }] : [];
+      const kind = evalCase ? turnKindOf(evalCase) : undefined;
+      return kind ? [{ arm: `${r.promptState}:${r.armKey}`, kind, seconds: r.latencyMs / 1000 }] : [];
     });
   const planners = singlePlayer
     .filter((r) => (r.role === "switch" || r.role === "thread") && r.group === r.role)

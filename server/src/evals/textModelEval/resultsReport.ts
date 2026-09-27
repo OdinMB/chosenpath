@@ -19,6 +19,7 @@ import type { ProbeReport } from "./probe.js";
 import type { Direction } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
 import type { CallRecord } from "./runner.js";
+import { renderTurnWaits, turnWaitReadings, type TurnKind } from "./turnWaits.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
 import {
   variantComparisons,
@@ -55,6 +56,8 @@ export type ResultsInput = {
   prose?: Record<string, { distinctOpenings: number; youOpenings: number; beats: number; stockPhrasesPer1000Words: number }>;
   /** Stored records of another prompt state that may stand in as a variant's reference (today's code rebuilds them) */
   storedReference?: StoredReference;
+  /** The turn each frozen case measures (turnWaits.ts), for the turn rounds' wait allowance per turn kind */
+  turnKinds?: Map<string, TurnKind>;
   generatedAt: Date;
 };
 
@@ -467,6 +470,10 @@ export function renderResults(input: ResultsInput): string {
       lines.push("");
     }
     lines.push("### Views: single-player with and without pregeneration, multiplayer, setup", ...renderViews(stats, promptState));
+    if (input.turnKinds) {
+      const inState = input.records.filter((r) => r.promptState === promptState && input.tags.has(r.caseId));
+      lines.push(...renderTurnWaits(turnWaitReadings(inState, input.turnKinds)));
+    }
     lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference)));
   }
   if (input.prose) {

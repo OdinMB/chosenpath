@@ -1,0 +1,205 @@
+import { chainSides, productionArm } from "./arms.js";
+import { percentile } from "./armStats.js";
+import { caseStory, type EvalCase } from "./cases.js";
+import { PREGEN_TURN_CAP_S } from "./gateReadings.js";
+import { usable, type CallRecord } from "./runner.js";
+
+/*
+ * The turn rounds' wait allowance (stop rule, owner 2026-09-27): the p95 per
+ * turn kind at or under about 45 s on Luna medium and at or under 60 s
+ * everywhere. A switch turn waits for the switch planner and the switch
+ * turn, a chapter opening for the chapter planner and the chapter's first
+ * step, every other turn for itself (turn doc A.C). Where a chain measured
+ * the planner and the turn together, its wait is read; otherwise the
+ * planner's p95 is added to the turn's, which reads high. Per prompt state,
+ * isolated beat arm and player count. Hung calls (the eval's timeout) are in
+ * no percentile, so they are counted apart. Readings, not verdicts.
+ */
+
+export type TurnKind = "first turn" | "chapter step" | "chapter opening" | "switch turn" | "ending";
+
+/** The kinds a planner's wait sits in front of, and the planner role it is. */
+const PLANNED_KINDS: Partial<Record<TurnKind, "switch" | "thread">> = { "switch turn": "switch", "chapter opening": "thread" };
+
+/** Luna medium's allowance, with a 15 s margin under the 60 s cap (turn doc section 4, "Stop rule, per change"). */
+export const LUNA_MEDIUM_ALLOWANCE_S = 45;
+
+const LUNA_MEDIUM = /^gpt-6-luna@medium[+/]/;
+
+export function allowanceFor(armKey: string): number {
+  return LUNA_MEDIUM.test(armKey) ? LUNA_MEDIUM_ALLOWANCE_S : PREGEN_TURN_CAP_S;
+}
+
+/**
+ * The turn a case measures: a beat case's own kind, from its tags and fixed
+ * analysis; a planner case the turn it plans (a chapter plan opens a chapter;
+ * a switch plan on turn 0 is the first turn's, a later one a switch turn's).
+ */
+export function turnKindOf(evalCase: EvalCase): TurnKind | undefined {
+  switch (evalCase.role) {
+    case "beat":
+      if (evalCase.tags.firstBeat) return "first turn";
+      if (evalCase.tags.ending) return "ending";
+      if (evalCase.fixedAnalysis?.kind === "switch") return "switch turn";
+      if (evalCase.fixedAnalysis?.kind === "thread") return "chapter opening";
+      return "chapter step";
+    case "thread":
+      return "chapter opening";
+    case "switch":
+      return caseStory(evalCase, false).getCurrentTurn() === 0 ? "first turn" : "switch turn";
+    default:
+      return undefined;
+  }
+}
+
+export type TurnWaitSource = "turn" | "chain" | "summed" | "turn only";
+
+export type TurnWait = {
+  promptState: string;
+  /** The isolated beat arm */
+  armKey: string;
+  players: number;
+  kind: TurnKind;
+  /** Usable final calls of the turn alone */
+  turns: number;
+  turnP95?: number;
+  /**
+   * What the player waits for: the turn alone; on a switch turn or a chapter
+   * opening the chain's measured wait, else the turn's p95 plus the planner's
+   * ("turn only" when no planner was measured)
+   */
+  wait: { p95?: number; n: number; source: TurnWaitSource; planner?: string };
+  allowanceS: number;
+  within: boolean;
+  /** Attempts on these cases that hung until the eval's timeout, the chain's included where its wait is read */
+  hangs: number;
+};
+
+const seconds = (ms: number) => ms / 1000;
+const good = (r: CallRecord) => r.final && usable(r);
+
+/** The planner a beat arm is read with: the same key, else production's default for the role and player count, else the only one. */
+function plannerFor(beatArm: string, role: "switch" | "thread", players: number, available: string[]): string | undefined {
+  if (available.includes(beatArm)) return beatArm;
+  const production = productionArm(role, players).key;
+  if (available.includes(production)) return production;
+  return available.length === 1 ? available[0] : undefined;
+}
+
+type Bucket = { records: CallRecord[]; hangs: number };
+
+function bucketed(records: CallRecord[], keyOf: (r: CallRecord) => string | undefined): Map<string, Bucket> {
+  const buckets = new Map<string, Bucket>();
+  for (const r of records) {
+    const key = keyOf(r);
+    if (key === undefined) continue;
+    const bucket = buckets.get(key) ?? { records: [], hangs: 0 };
+    if (r.outcome === "timeout") bucket.hangs++;
+    if (good(r)) bucket.records.push(r);
+    buckets.set(key, bucket);
+  }
+  return buckets;
+}
+
+const SEP = "\u0000";
+
+/** p95 per turn kind for every isolated beat arm, per prompt state and player count, against its allowance. */
+export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnKind>): TurnWait[] {
+  const kindOf = (r: CallRecord) => kinds.get(r.caseId);
+  // Turns alone
+  const turns = bucketed(records, (r) => {
+    const kind = kindOf(r);
+    return r.group === "beat" && r.role === "beat" && kind ? [r.promptState, r.armKey, r.players, kind].join(SEP) : undefined;
+  });
+  // Planners alone, by role
+  const planners = bucketed(records, (r) =>
+    (r.group === "switch" || r.group === "thread") && r.role === r.group && kinds.has(r.caseId) ? [r.promptState, r.armKey, r.players, r.role].join(SEP) : undefined
+  );
+  // Chains, by their beat side and the kind of turn they open; every step counts for hangs, the beat step for the wait
+  const chains = bucketed(records, (r) => {
+    const sides = r.group === "pipeline" ? chainSides(r.armKey) : undefined;
+    const kind = kindOf(r);
+    return sides && kind ? [r.promptState, sides.beat, r.players, kind, sides.analysis].join(SEP) : undefined;
+  });
+
+  const readings: TurnWait[] = [];
+  const keys = new Set([...turns.keys(), ...[...chains.keys()].map((k) => k.split(SEP).slice(0, 4).join(SEP))]);
+  for (const key of [...keys].sort()) {
+    const [promptState, armKey, playersText, kindText] = key.split(SEP);
+    const players = Number(playersText);
+    const kind = kindText as TurnKind;
+    const alone = turns.get(key) ?? { records: [], hangs: 0 };
+    const turnP95 = percentile(alone.records.map((r) => seconds(r.latencyMs)), 95);
+    const role = PLANNED_KINDS[kind];
+    let wait: TurnWait["wait"] = { p95: turnP95, n: alone.records.length, source: "turn" };
+    let hangs = alone.hangs;
+    if (role) {
+      const chainPrefix = `${key}${SEP}`;
+      const chainAnalyses = [...chains.keys()].filter((k) => k.startsWith(chainPrefix)).map((k) => k.slice(chainPrefix.length));
+      const chainPlanner = plannerFor(armKey, role, players, chainAnalyses);
+      const chain = chainPlanner ? chains.get(`${chainPrefix}${chainPlanner}`) : undefined;
+      const measured = chain?.records.filter((r) => r.step === 2 && r.turnLatencyMs !== undefined) ?? [];
+      if (chain && measured.length) {
+        wait = { p95: percentile(measured.map((r) => seconds(r.turnLatencyMs as number)), 95), n: measured.length, source: "chain", planner: chainPlanner };
+        hangs += chain.hangs;
+      } else {
+        const plannerKey = (arm: string) => [promptState, arm, players, role].join(SEP);
+        const available = [...new Set([...planners.keys()].map((k) => k.split(SEP)[1]))].filter((arm) => planners.has(plannerKey(arm)));
+        const planner = plannerFor(armKey, role, players, available);
+        const plannerRecords = planner ? planners.get(plannerKey(planner))?.records ?? [] : [];
+        const plannerP95 = percentile(plannerRecords.map((r) => seconds(r.latencyMs)), 95);
+        wait =
+          planner && plannerP95 !== undefined && turnP95 !== undefined
+            ? { p95: turnP95 + plannerP95, n: alone.records.length, source: "summed", planner }
+            : { p95: turnP95, n: alone.records.length, source: "turn only" };
+      }
+    }
+    const allowanceS = allowanceFor(armKey);
+    readings.push({
+      promptState,
+      armKey,
+      players,
+      kind,
+      turns: alone.records.length,
+      turnP95,
+      wait,
+      allowanceS,
+      within: wait.p95 !== undefined && wait.p95 <= allowanceS,
+      hangs,
+    });
+  }
+  return readings;
+}
+
+const secs = (x?: number) => (x === undefined ? "–" : `${x.toFixed(1)} s`);
+
+function sourceText(wait: TurnWait["wait"]): string {
+  switch (wait.source) {
+    case "chain":
+      return `chain, ${wait.n}`;
+    case "summed":
+      return `summed with ${wait.planner}`;
+    case "turn only":
+      return "turn only; planner not measured";
+    default:
+      return "turn";
+  }
+}
+
+/** The readings as a table (resultsReport.ts renders one per prompt state). */
+export function renderTurnWaits(readings: TurnWait[]): string[] {
+  if (readings.length === 0) return [];
+  return [
+    "",
+    `### Turn waits per kind (the turn rounds' allowance: p95 at or under ${LUNA_MEDIUM_ALLOWANCE_S} s on Luna medium, at or under ${PREGEN_TURN_CAP_S} s everywhere)`,
+    "",
+    "A switch turn waits for the switch planner and the turn, a chapter opening for the chapter planner and the chapter's first step, every other turn for itself (turn doc A.C). Where a chain measured the pair, its wait is read (chain, with its count); otherwise the planner's p95 is added to the turn's (summed, which reads high). Hung calls hit the eval's timeout and are in no percentile, so they are counted apart. Readings, not verdicts.",
+    "",
+    "| Prompt state | Beat arm | Players | Kind | Turns | Turn alone p95 | Wait p95 (source) | Allowance | Reading | Hung calls |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+    ...readings.map(
+      (r) =>
+        `| ${r.promptState} | ${r.armKey} | ${r.players} | ${r.kind} | ${r.turns} | ${secs(r.turnP95)} | ${secs(r.wait.p95)} (${sourceText(r.wait)}) | ${r.allowanceS} s | ${r.within ? "within" : "over"} | ${r.hangs} |`
+    ),
+  ];
+}

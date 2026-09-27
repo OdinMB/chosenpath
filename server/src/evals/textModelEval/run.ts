@@ -40,6 +40,7 @@ import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type E
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { statReadouts } from "./turnDesignChecks.js";
+import { turnKindOf } from "./turnWaits.js";
 import {
   DEFAULT_JUDGE_SAMPLES,
   backfillChaptersMode,
@@ -549,6 +550,10 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       sideSpend: prepSpend(files.readPrepRecords()),
       prose,
       storedReference: rebuiltToday(cases),
+      turnKinds: new Map(cases.flatMap((c) => {
+        const kind = turnKindOf(c);
+        return kind ? [[c.id, kind] as const] : [];
+      })),
       generatedAt: new Date(),
     })
   );

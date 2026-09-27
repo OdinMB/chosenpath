@@ -58,6 +58,8 @@ export type ArmPlan = {
   scope: "all" | "subset15" | "single-player" | "multiplayer";
   /** Only these cases (still intersected with --cases) */
   caseIds?: string[];
+  /** "stored": every case but those built for the rounds (roundCases.ts); "round": only those */
+  source?: "stored" | "round";
   /** Rare-failure batch: this many extra single-sample calls spread over the cases */
   extraCalls?: number;
 };
@@ -358,18 +360,28 @@ const MIGRATION_SAMPLES = 2;
 
 /**
  * The migration check: production's GPT-6 defaults (the code's, never env) on
- * today's prompts, two samples each, so the round pages and checks have
- * references in today's form and the defaults have their validity, repairs
- * and waits measured under the current tag. AI Iteration has never been run.
+ * today's prompts, the turn rounds' references in today's form (coordinator,
+ * 2026-09-27: the Round 0 play fixes changed the state text every turn and
+ * plan reads, so no stored turn-side request rebuilds). Single-player beats on
+ * Luna medium, twice on the stored cases (their two-sample noise) and once on
+ * the round cases; multiplayer beats on Luna low once, on the stored cases
+ * (turn round 3's B10); both planners on Luna low twice on every case. No
+ * setup: today's code rebuilds every stored production-form setup byte for
+ * byte, so the setup rounds read those. AI Iteration (--role iteration, not a
+ * default role) has never been run.
  */
 function migrationArms(role: EvalRole): ArmPlan[] {
   switch (role) {
     case "setup":
-      return [{ arm: productionDefault("setup"), samples: MIGRATION_SAMPLES, scope: "all" }];
+      return [];
     case "iteration":
       return [{ arm: productionDefault("templateEditor"), samples: MIGRATION_SAMPLES, scope: "all" }];
     case "beat":
-      return perPlayerCount(productionDefault("beat"), productionDefault("multiplayerBeat"), MIGRATION_SAMPLES);
+      return [
+        { arm: productionDefault("beat"), samples: MIGRATION_SAMPLES, scope: "single-player", source: "stored" },
+        { arm: productionDefault("beat"), samples: 1, scope: "single-player", source: "round" },
+        { arm: productionDefault("multiplayerBeat"), samples: 1, scope: "multiplayer", source: "stored" },
+      ];
     case "switch":
     case "thread":
       return perPlayerCount(productionDefault("analysis"), productionDefault("multiplayerAnalysis"), MIGRATION_SAMPLES);
@@ -492,26 +504,40 @@ function stage4bArms(role: EvalRole): ArmPlan[] {
   }
 }
 
-/** Pipeline chains: this analysis arm, then each beat arm built from its output. */
-export type PipelinePlan = { analysis: Arm; beats: Arm[]; samples: number; scope: ArmPlan["scope"] };
+/**
+ * Pipeline chains: this analysis arm, then each beat arm built from its
+ * output, on the cases of `roles` (both planners when absent).
+ */
+export type PipelinePlan = { analysis: Arm; beats: Arm[]; samples: number; scope: ArmPlan["scope"]; roles?: ("switch" | "thread")[] };
 
-/** The stage's candidate chains (the baseline chain runs in every stage). */
-export function pipelinePlan(stage: Stage): PipelinePlan | undefined {
+/** The stage's candidate chains (the baseline chain runs in every stage that runs the baseline). */
+export function pipelinePlans(stage: Stage): PipelinePlan[] {
   switch (stage) {
     case "1-2":
       // Luna low analysis, as in the lead configurations
-      return { analysis: luna("low"), beats: [luna("none"), luna("low"), luna("medium")], samples: 2, scope: "all" };
+      return [{ analysis: luna("low"), beats: [luna("none"), luna("low"), luna("medium")], samples: 2, scope: "all" }];
     case "3":
-      return {
-        analysis: luna("low", "minimal"),
-        beats: [luna("medium", "minimal"), luna("low", "minimal")],
-        samples: 1,
-        scope: "single-player",
-      };
+      return [
+        {
+          analysis: luna("low", "minimal"),
+          beats: [luna("medium", "minimal"), luna("low", "minimal")],
+          samples: 1,
+          scope: "single-player",
+        },
+      ];
     case "migration":
-      // The analysis-turn wait of production's single-player pair
-      return { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: 1, scope: "single-player" };
+      // A chapter opening's wait (the chapter planner, then the chapter's first step), on production's pair per player count
+      return [
+        { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: 1, scope: "single-player", roles: ["thread"] },
+        {
+          analysis: productionDefault("multiplayerAnalysis"),
+          beats: [productionDefault("multiplayerBeat")],
+          samples: 1,
+          scope: "multiplayer",
+          roles: ["thread"],
+        },
+      ];
     default:
-      return undefined;
+      return [];
   }
 }
