@@ -328,6 +328,29 @@ describe("checkSetupDesign: facts (proposal 11) and example copies (proposal 5)"
     expect(checkSetupDesign(soloSetup(), solo).checks).not.toHaveProperty("noExampleCopy");
   });
 
+  it("counts the worked example's names in a setup whose premise doesn't carry them (setup doc B13 goblinLeak)", () => {
+    const leaky = soloSetup({
+      sharedStats: [stat("Public Support")],
+      playerStats: [stat("Energy", { id: "player_energy" })],
+      storyElements: [{ id: "gruk", name: "Gruk", facts: ["Leads the goblins of the harbour.", "Pronouns: he/him.", "Owes Mia a favor."] }],
+    });
+    // Public Support and Energy as stat names; Gruk, goblins and Mia anywhere
+    expect(checkSetupDesign(leaky, solo)).toMatchObject({ checks: { noExampleNameLeak: false }, counts: { exampleNameLeaks: 5 } });
+    // A premise that carries a name makes it no leak
+    const premise = "Gruk leads the goblins, and Mia rallies Public Support while saving her Energy.";
+    expect(checkSetupDesign(leaky, { ...solo, premise }).counts.exampleNameLeaks).toBe(0);
+    // Reported on every setup, with or without the prompt's example, so a production reference has its own rate
+    expect(checkSetupDesign(soloSetup(), solo)).toMatchObject({ checks: { noExampleNameLeak: true }, counts: { exampleNameLeaks: 0 } });
+  });
+
+  it("counts an example stat name only as a stat's name, and a name word only as a whole word", () => {
+    const ordinary = soloSetup({
+      playerStats: [stat("Stamina", { id: "player_stamina", tooltip: "Energy for the crossing and public support at the docks." })],
+      storyElements: [{ id: "mira", name: "Mira Holt", facts: ["Hobgoblins haunt her dreams.", "Pronouns: she/her.", "Owes the guild a debt."] }],
+    });
+    expect(checkSetupDesign(ordinary, solo).counts.exampleNameLeaks).toBe(0);
+  });
+
   it("reads the example block out of a setup prompt", () => {
     const prompt = "Intro.\nEXAMPLE STAT SETUPS\n\nPremise: spirits\n- Energy\n\nCharacter Selection Instructions\n\nMore.";
     expect(exampleBlock(prompt)).toBe("EXAMPLE STAT SETUPS\n\nPremise: spirits\n- Energy\n\n");

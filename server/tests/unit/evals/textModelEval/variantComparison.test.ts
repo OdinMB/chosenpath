@@ -255,11 +255,29 @@ describe("variantComparisons: stored references from another prompt state", () =
     expect(variantComparisons([...candidate, ...mixed], new Map(), caseTags("a", "b"), "round0", rebuilt)[0].pairs).toBe(2);
   });
 
-  it("prefers a reference in the candidate's own prompt state", () => {
+  it("prefers a reference in the candidate's own prompt state when it covers as many of the candidate's pairs", () => {
     const own = [1, 2].flatMap((sample) => ["a", "b"].map((c) => inState("round0", LUNA_PROD, c, sample)));
     const [comparison] = variantComparisons([...candidate, ...stored, ...own], new Map(), caseTags("a", "b"), "round0", rebuilt);
     expect(comparison.referenceState).toBeUndefined();
     expect(comparison.reference.promptState).toBe("round0");
+  });
+
+  it("keeps the stored reference when the own state's records cover fewer of the candidate's pairs (a partial or narrowed run)", () => {
+    const partial = [1, 2].map((sample) => inState("round0", LUNA_PROD, "a", sample));
+    const [comparison] = variantComparisons([...candidate, ...stored, ...partial], new Map(), caseTags("a", "b"), "round0", rebuilt);
+    expect(comparison).toMatchObject({ referenceState: "postfix", pairs: 4 });
+    // Once the own state covers them all, it takes over
+    const full = [...partial, ...[1, 2].map((sample) => inState("round0", LUNA_PROD, "b", sample))];
+    const [sameState] = variantComparisons([...candidate, ...stored, ...full], new Map(), caseTags("a", "b"), "round0", rebuilt);
+    expect(sameState.referenceState).toBeUndefined();
+    expect(sameState.pairs).toBe(4);
+  });
+
+  it("picks the stored state that covers most of the candidate's pairs, not the one with most records", () => {
+    // "older" holds more records, on cases the candidate never ran
+    const older = ["c", "d", "e"].flatMap((c) => [1, 2].map((sample) => inState("older", LUNA_PROD, c, sample)));
+    const [comparison] = variantComparisons([...candidate, ...stored, ...older], new Map(), caseTags("a", "b", "c", "d", "e"), "round0", rebuilt);
+    expect(comparison).toMatchObject({ referenceState: "postfix", pairs: 4 });
   });
 
   it("reads no other prompt state without the rebuild check", () => {

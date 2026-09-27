@@ -221,6 +221,32 @@ function allStrings(value: unknown): string[] {
   return [];
 }
 
+/**
+ * B13's goblinLeak: the names of setup round 1's worked example (A5) and of
+ * its schema examples, which an 8-word run never catches. The example's stat
+ * names count as a stat's name only; its world's names count anywhere. A
+ * name the premise carries is no leak. "Energy" is a common stat name and
+ * production's examples use it too, so the count reads against the
+ * reference's own rate, never alone.
+ */
+const EXAMPLE_NAMES: { pattern: RegExp; where: "statNames" | "anywhere" }[] = [
+  { pattern: /\bpublic support\b/i, where: "statNames" },
+  { pattern: /\bcommunity standing\b/i, where: "statNames" },
+  { pattern: /\benergy\b/i, where: "statNames" },
+  { pattern: /\b(enclave|printers)['’]s? voice\b/i, where: "statNames" },
+  { pattern: /\bgoblins?\b/i, where: "anywhere" },
+  { pattern: /\bgruk\b/i, where: "anywhere" },
+  { pattern: /\bmia\b/i, where: "anywhere" },
+  { pattern: /\bhero guilds?\b/i, where: "anywhere" },
+];
+
+/** How many of the example's names a setup carries that its premise doesn't. */
+function exampleNameLeaks(output: unknown, stats: Stat[], premise: string): number {
+  const texts = allStrings(output);
+  const names = stats.map((s) => s.name);
+  return EXAMPLE_NAMES.filter(({ pattern, where }) => !pattern.test(premise) && (where === "statNames" ? names : texts).some((text) => pattern.test(text))).length;
+}
+
 const EXAMPLE_STARTS = ["EXAMPLE STAT SETUPS", "WORKED EXAMPLE"];
 const EXAMPLE_END = "Character Selection Instructions";
 
@@ -368,6 +394,8 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   counts.hookFacts = facts.filter((fact) => HOOK.test(fact)).length;
   counts.pronounOnlyFacts = facts.filter((fact) => PRONOUN_ONLY.test(fact)).length;
   checks.noPronounOnlyFacts = counts.pronounOnlyFacts === 0;
+  counts.exampleNameLeaks = exampleNameLeaks(output, stats, input.premise);
+  checks.noExampleNameLeak = counts.exampleNameLeaks === 0;
   if (exampleText !== undefined) {
     const example = shingles(exampleText);
     const runs = new Set(allStrings(output).flatMap((text) => [...shingles(text)]));

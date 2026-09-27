@@ -16,11 +16,11 @@ import type { CheckResult } from "./textChecks.js";
  * rule checks that read lower or higher than the reference beyond its own
  * noise floor: the reference's sample 1 against its sample 2 on the matched
  * cases, so a one-sample arm is read against a two-sample reference's noise.
- * A reference is read in the arm's own prompt state; where it has no records
- * there, stored records of another state stand in when today's code rebuilds
- * their request byte for byte (the setup rounds read the stored postfix
- * setups). Readings only, rendered by resultsReport.ts; nothing is dropped or
- * picked.
+ * A reference is read in the arm's own prompt state, unless stored records of
+ * another state, whose request today's code rebuilds byte for byte, cover
+ * more of the arm's pairs (the setup rounds read the stored postfix setups
+ * until a full same-state run exists). Readings only, rendered by
+ * resultsReport.ts; nothing is dropped or picked.
  */
 
 export type CheckReading = { name: string; reference: number; arm: number; flag?: "lower" | "higher" };
@@ -154,32 +154,42 @@ function compare(armRecords: CallRecord[], referenceRecords: CallRecord[], key: 
   };
 }
 
+/** How many of the arm's finished (case, sample) pairs the reference finished too. */
+function coverage(armRecords: CallRecord[], referenceRecords: CallRecord[]): number {
+  const reference = finishedPairs(referenceRecords);
+  return [...finishedPairs(armRecords)].filter((pair) => reference.has(pair)).length;
+}
+
 /**
- * The reference's stored records from another prompt state, when the arm's
- * own state has none: those whose request today's code rebuilds, from the
- * one state that holds the most of them (so no two states' samples mix).
+ * The reference's stored records from another prompt state: those whose
+ * request today's code rebuilds, from the one state that covers most of the
+ * arm's pairs (so no two states' samples mix), then the one with most records.
  */
 function storedReferenceRecords(
   records: CallRecord[],
   tags: Map<string, CaseTags>,
-  group: CallRecord["group"],
+  armRecords: CallRecord[],
   key: string,
-  promptState: string,
   isCurrent: StoredReference
 ): CallRecord[] | undefined {
+  const { group, promptState } = armRecords[0];
   const byState = new Map<string, CallRecord[]>();
   for (const r of records) {
     if (r.promptState === promptState || r.group !== group || r.armKey !== key || !isResultRecord(r, tags) || !isCurrent(r)) continue;
     byState.set(r.promptState, [...(byState.get(r.promptState) ?? []), r]);
   }
-  const [best] = [...byState.values()].sort((a, b) => b.length - a.length || a[0].promptState.localeCompare(b[0].promptState));
-  return best;
+  const ranked = [...byState.values()].map((states) => ({ states, covered: coverage(armRecords, states) }));
+  ranked.sort((a, b) => b.covered - a.covered || b.states.length - a.states.length || a.states[0].promptState.localeCompare(b.states[0].promptState));
+  return ranked[0]?.states;
 }
 
 /**
  * Every non-baseline variant arm in the prompt state whose reference has
- * records in the same group: in that state, or else (with `storedReference`)
- * stored ones that today's code rebuilds.
+ * records in the same group: in that state, or (with `storedReference`)
+ * stored ones that today's code rebuilds, whichever covers more of the arm's
+ * pairs; the own state on a tie. So a partial run of the reference in the
+ * arm's state (a narrowed or capped migration run) never silently replaces a
+ * fuller stored one.
  */
 export function variantComparisons(
   records: CallRecord[],
@@ -201,8 +211,9 @@ export function variantComparisons(
     const key = referenceKeyOf(armKey);
     if (!key) continue;
     const own = byArm.get(`${group}|${key}`);
-    const stored = own || !storedReference ? undefined : storedReferenceRecords(records, tags, group, key, promptState, storedReference);
-    const referenceRecords = own ?? stored;
+    const candidate = storedReference ? storedReferenceRecords(records, tags, armRecords, key, storedReference) : undefined;
+    const stored = candidate && (!own || coverage(armRecords, candidate) > coverage(armRecords, own)) ? candidate : undefined;
+    const referenceRecords = stored ?? own;
     const comparison = referenceRecords ? compare(armRecords, referenceRecords, key, { checks, tags }) : undefined;
     if (comparison) comparisons.push(stored ? { ...comparison, referenceState: stored[0].promptState } : comparison);
   }

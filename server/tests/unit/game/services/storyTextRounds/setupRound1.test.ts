@@ -63,6 +63,10 @@ type Rule = { id: string; part: Part; applies: (on: On) => boolean; pattern: str
 
 const has = (on: On, ...sections: string[]) => sections.some((s) => on.sections.includes(s));
 const outcomesAsked = (on: On) => has(on, "sharedOutcomes", "players");
+/** Both outcome lists are written anew: a new setup, or an iteration that regenerates both */
+const bothOutcomeLists = (on: On) => on.kind !== "iteration" || (has(on, "sharedOutcomes") && has(on, "players"));
+/** The per-call slate prints for a new setup, and for an iteration that regenerates outcomes or stats */
+const slateAsked = (on: On) => on.kind !== "iteration" || has(on, "sharedOutcomes", "players", "stats");
 /** The stat instructions print for the stats and the players sections (backgrounds carry stat values) */
 const statsAsked = (on: On) => has(on, "stats", "players");
 /** The stat fields exist only where the stat lists do */
@@ -83,35 +87,54 @@ const RULES: Rule[] = [
   { id: "A1.2 fixed outcomes section", part: "prompt", applies: outcomesAsked, pattern: "Outcomes are the questions the ending answers." },
   { id: "A1.2 shared budget", part: "prompt", applies: (on) => multiplayer(on) && outcomesAsked(on), pattern: "one or two shared outcomes, never more" },
   { id: "A1.2 seat roles", part: "prompt", applies: (on) => multiplayer(on) && outcomesAsked(on), pattern: "Each player seat has its own role in this story" },
-  { id: "S8 premise names", part: "prompt", applies: (on) => multiplayer(on) && outcomesAsked(on), pattern: "When the premise names the player characters, use those names" },
-  { id: "A1.3 this setup", part: "prompt", applies: (on) => on.kind !== "iteration" || has(on, "sharedOutcomes", "players", "stats"), pattern: `\n${THIS_SETUP_HEADING}\n` },
-  { id: "A1.3 single player", part: "prompt", applies: (on) => on.players === 1 && (on.kind !== "iteration" || has(on, "sharedOutcomes", "players", "stats")), pattern: "No shared outcomes. The player has three outcomes of their own" },
+  { id: "A1.2 no two players alike", part: "prompt", applies: (on) => multiplayer(on) && outcomesAsked(on), pattern: "no two players get the same personal outcome" },
+  // S8 for every player count: a premise-named protagonist keeps the name across the seat's identities
+  { id: "S8 premise names", part: "prompt", applies: outcomesAsked, pattern: "three identities that keep the name and vary in appearance and details" },
+  { id: "A1.3 this setup", part: "prompt", applies: slateAsked, pattern: `\n${THIS_SETUP_HEADING}\n` },
+  { id: "A1.3 single player", part: "prompt", applies: (on) => on.players === 1 && slateAsked(on) && bothOutcomeLists(on), pattern: "No shared outcomes. The player has three outcomes of their own" },
+  // An iteration that keeps one outcome list: an older single-player template may hold outcomes in its shared list
+  { id: "A1.6 single player, one list kept", part: "prompt", applies: (on) => on.players === 1 && slateAsked(on) && !bothOutcomeLists(on), pattern: "The player has three outcomes in all, whether this template keeps them in player1's list or in its shared list" },
   { id: "A1.4 roles in the plan", part: "schema", applies: (on) => multiplayer(on) && has(on, "players"), pattern: "give each player seat its own role in this story" },
   { id: "A1.4 role in backgrounds", part: "schema", applies: (on) => multiplayer(on) && has(on, "players"), pattern: "In multiplayer games, name the seat's role in the story." },
   { id: "A1.4 own outcomes", part: "schema", applies: (on) => has(on, "players"), pattern: "This player's own outcomes." },
   { id: "A1.4 shared outcomes", part: "schema", applies: (on) => multiplayer(on) && has(on, "sharedOutcomes"), pattern: "Outcomes that concern all players" },
-  { id: "A1.4 single-player template", part: "schema", applies: (on) => on.players === 1 && on.kind === "iteration" && has(on, "sharedOutcomes"), pattern: "Single-player template: leave this list empty" },
+  { id: "A1.4 single-player template", part: "schema", applies: (on) => on.players === 1 && on.kind === "iteration" && has(on, "sharedOutcomes") && has(on, "players"), pattern: "Single-player template: leave this list empty" },
+  { id: "A1.6 single-player shared list kept", part: "schema", applies: (on) => on.players === 1 && on.kind === "iteration" && has(on, "sharedOutcomes") && !has(on, "players"), pattern: "keep the template's shared outcomes" },
   // Proposal 2: scoreboards, in the contest modes only
   { id: "A2.1 two-player scoreboard", part: "prompt", applies: (on) => contest(on) && on.players === 2 && has(on, "stats"), pattern: "exactly one shared opposites stat that shows who is ahead" },
-  // The three-player slate (A1.3) states the lead string again, in its own words; the per-call slate test reads that one
+  // The three-player slate (A1.3) points back to this rule instead of restating it
   { id: "A2.1 three-player scoreboard", part: "prompt", applies: (on) => contest(on) && on.players === 3 && has(on, "stats"), pattern: "--- A scoreboard for each contested shared outcome: one shared string stat whose values name who currently leads" },
+  { id: "A2.1 lead string's values", part: "prompt", applies: (on) => contest(on) && on.players === 3 && has(on, "stats"), pattern: 'plus "Nobody yet"' },
+  { id: "S8 on the scoreboard", part: "prompt", applies: (on) => contest(on) && has(on, "stats"), pattern: "the names the premise gives the player characters" },
+  { id: "A2.1 scoreboard only after threads", part: "prompt", applies: (on) => contest(on) && has(on, "stats"), pattern: "so it is not adjustable anytime and has no sacrifice or reward" },
   { id: "A2.2 contested favor", part: "prompt", applies: (on) => contest(on) && statsAsked(on), pattern: "If the players compete for one NPC's favor, that favor is a contest" },
   { id: "A2.2 scored by", part: "prompt", applies: (on) => contest(on) && outcomesAsked(on), pattern: 'resonance ends with "Scored by' },
+  { id: "A2.3 opposites scoreboard", part: "prompt", applies: (on) => contest(on) && on.players === 2 && statsAsked(on), pattern: "or the scoreboard of a two-player contest" },
   { id: "A2.4 shared stats", part: "schema", applies: (on) => contest(on) && has(on, "stats"), pattern: "one of these is the scoreboard of each contested shared outcome" },
   { id: "A2.4 names", part: "schema", applies: statsListed, pattern: "Never a player's seat ('Player 1') or a player character's name" },
+  { id: "A3.2 scoreboard exception", part: "schema", applies: (on) => contest(on) && statsListed(on), pattern: "because milestones do that, except the scoreboard of a contested outcome" },
   // Proposal 4: stats that act in play
   { id: "A4.1 two ways", part: "prompt", applies: statsAsked, pattern: "Every stat earns its place in play in at least two ways" },
-  { id: "A4.1 no progress meters", part: "prompt", applies: statsAsked, pattern: "No progress meters." },
+  { id: "A4.1 no progress meters", part: "prompt", applies: statsAsked, pattern: "- No progress meters" },
+  { id: "A4.1 scoreboard exception", part: "prompt", applies: (on) => contest(on) && statsAsked(on), pattern: "No progress meters (the one exception is the scoreboard of a contested outcome)." },
   { id: "A4.1 player stats are the person", part: "prompt", applies: statsAsked, pattern: "Player stats are about the person" },
+  { id: "A4.1 one shared relationship", part: "prompt", applies: (on) => multiplayer(on) && statsAsked(on), pattern: "A relationship between the player characters themselves is one shared stat" },
   { id: "A4.1 group example", part: "prompt", applies: statsAsked, pattern: "Detective/City/Contacts (for a mystery story)" },
   { id: "A4.2 certain sacrifice", part: "schema", applies: statsListed, pattern: "The bonus is always the same, so never state it, and the loss is certain, never a risk." },
+  // The flag in the stat view's own labels (StoryStatePromptService's detailed view), and apart from sacrifices and rewards
+  { id: "A4.2 flag label, true", part: "schema", applies: statsListed, pattern: "'Can be adjusted anytime'" },
+  { id: "A4.2 flag label, false", part: "schema", applies: statsListed, pattern: "'Can only be changed when a thread gets resolved or through sacrifice/reward options'" },
+  { id: "A4.2 flag apart from sacrifices", part: "schema", applies: statsListed, pattern: "A stat that is not adjustable anytime still gets a sacrifice." },
+  { id: "A4.2 scoreboard None", part: "schema", applies: (on) => contest(on) && statsListed(on), pattern: "or a contested outcome's scoreboard" },
   { id: "A4.2 tooltip", part: "schema", applies: statsListed, pattern: "No disclaimers about what it does not mean." },
   // Proposal 5: one worked example, one line per stat type
   { id: "A5 worked example", part: "prompt", applies: always, pattern: WORKED_EXAMPLE_HEADING },
   { id: "A5 stat types", part: "prompt", applies: statsAsked, pattern: "Stat types\n- string: a state that changes in steps" },
   // Proposal 6: questions that name what is at stake
   { id: "A6.1 one thing", part: "schema", applies: outcomesAsked, pattern: "Ask about one thing, in the story's own names" },
-  { id: "A6.2 resonance", part: "schema", applies: outcomesAsked, pattern: "what each player, by role, stands to gain or lose, and why they can't settle it alone" },
+  { id: "A6.2 resonance", part: "schema", applies: outcomesAsked, pattern: "Personal outcome: which need, fear, hope, relationship or secret" },
+  { id: "A6.2 shared resonance", part: "schema", applies: (on) => multiplayer(on) && outcomesAsked(on), pattern: "what each player, by role, stands to gain or lose, and why they can't settle it alone" },
+  { id: "A6.2 contested resonance", part: "schema", applies: (on) => contest(on) && outcomesAsked(on), pattern: "Contested outcome: what drives each side" },
   { id: "A6.3 three paths", part: "schema", applies: outcomesAsked, pattern: "Exploration threads offer these paths as choices" },
   // Round 1's one sentence about blank items
   { id: "no blank items", part: "prompt", applies: always, pattern: NO_BLANK_ITEMS },
@@ -178,6 +201,7 @@ const REPLACED_IN_SCHEMA: [string, string, (players: number) => boolean][] = [
   ["A3.2 the progress clause", "Don't use stats to directly track progress toward outcomes", () => true],
   ["A4.2 the long-term None rule", "if the stat represents a large, long-term aspect of the story", () => true],
   ["A4.2 the Cecay typo", "Cecay patterns", () => true],
+  ["A4.2 the flag's after-threads-only reading", "If false, the stat can only be changed after threads are resolved.", () => true],
   ["A6.1 the copied example", "Do the players successfully prevent the ritual?", () => true],
   ["A6.1 the three-path Alex example", "Example: Does Alex choose loyalty to the family or their own ambitions?", () => true],
 ];
@@ -191,6 +215,49 @@ describe("production passages round 1 replaces are gone (and were there)", () =>
     for (const [id, passage] of REPLACED_IN_SCHEMA) {
       expect({ id, inProduction: descriptions(theirs.schema).includes(passage), inRound1: descriptions(ours.schema).includes(passage) }).toEqual({ id, inProduction: true, inRound1: false });
     }
+  });
+});
+
+/** Production's game-mode sentences (StorySetupPromptService GAME_MODE_DESCRIPTIONS), which A1.5 replaces */
+const PRODUCTION_MODE_SENTENCES: Record<string, string[]> = {
+  [GameModes.Competitive]: ["The players in this game are competing against each other.", "at least one competing goal or interest and no shared goals."],
+  [GameModes.Cooperative]: ["The players in this game are cooperating with each other.", "but these should not conflict with the shared objective."],
+  [GameModes.CooperativeCompetitive]: [
+    "The players in this game have a mix of cooperative and competitive elements.",
+    "Include both shared goals/assets/interests that require collaboration AND individual goals",
+  ],
+};
+
+describe("production's game-mode sentences are gone (and were there)", () => {
+  it.each(INPUTS.filter(([players]) => players > 1))("%i players, %s: custom story, template and AI Iteration", (players, mode) => {
+    const pairs: [string, string, string][] = [
+      ...KINDS.map((kind): [string, string, string] => [kind, round1(players, mode, kind).prompt, production(players, mode, kind).prompt]),
+      ["iteration", iteration(players, mode, ALL_SECTIONS).prompt, StorySetupPromptService.createIterationPrompt(FEEDBACK, players, mode, 25, ALL_SECTIONS, TEMPLATE)],
+    ];
+    for (const [kind, ours, theirs] of pairs) {
+      for (const sentence of PRODUCTION_MODE_SENTENCES[mode]) {
+        expect({ kind, sentence, inProduction: theirs.includes(sentence), inRound1: ours.includes(sentence) }).toEqual({ kind, sentence, inProduction: true, inRound1: false });
+      }
+    }
+  });
+});
+
+describe("the can-change-in-beats flag, as the stat view reads it", () => {
+  /** Readings of the flag that let "not adjustable anytime" stand for "no sacrifice or reward" */
+  const OLD_READINGS = ["must not change within one scene", "changeable in beats", "cannot be changed in beat resolutions"];
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: no text reads the flag as 'no sacrifice or reward'", (kind, players, mode) => {
+    const request = round1(players, mode, kind);
+    for (const text of OLD_READINGS) {
+      expect({ text, prompt: request.prompt.includes(text), schema: descriptions(request.schema).includes(text) }).toEqual({ text, prompt: false, schema: false });
+    }
+  });
+
+  it("names the two labels the beats' stat view prints", () => {
+    // StoryStatePromptService's detailed stat view, for canBeChangedInBeatResolutions true and false
+    const flag = find(toJsonSchema(round1(1, GameModes.SinglePlayer).schema), ["properties", "sharedStats", "items", "properties", "canBeChangedInBeatResolutions"]) as { description: string };
+    expect(flag.description).toContain("'Can be adjusted anytime'");
+    expect(flag.description).toContain("'Can only be changed when a thread gets resolved or through sacrifice/reward options'");
   });
 });
 
@@ -251,7 +318,10 @@ describe("the per-call slate", () => {
     expect(text.includes("Side A is player1's character, side B is player2's.")).toBe(contested && players === 2);
     expect(text.includes("resolution1, player1's character wins")).toBe(contested && players === 3);
     expect(text.includes("exactly one shared opposites stat")).toBe(contested && players === 2);
-    expect(text.includes('plus "Nobody yet"')).toBe(contested && players === 3);
+    expect(text.includes("one shared string stat that names who leads")).toBe(contested && players === 3);
+    // Both point back to the scoreboard rule instead of restating it
+    expect(text.includes("(see the scoreboard rule in the list of elements to include)")).toBe(contested && players > 1);
+    expect(text).not.toContain('"Nobody yet"');
     expect(text.includes("One shared outcome the players can only achieve together")).toBe(mode === GameModes.CooperativeCompetitive);
     expect(text.includes("second shared outcome (2 milestones)")).toBe(mode === GameModes.Competitive && players === 2);
   });
@@ -260,6 +330,13 @@ describe("the per-call slate", () => {
     const text = block(round1(players, mode).prompt);
     expect(text).toMatch(/earns about 6 milestones in total/);
     expect(text).not.toMatch(/Story length|turns/);
+  });
+
+  it.each([2, 3] as PlayerCount[])("%i players: an AI Iteration without stats points to no scoreboard rule it doesn't print", (players) => {
+    const pointer = "(see the scoreboard rule in the list of elements to include)";
+    expect(block(iteration(players, GameModes.Competitive, ["stats"]).prompt)).toContain(pointer);
+    expect(block(iteration(players, GameModes.Competitive, ["sharedOutcomes", "players"]).prompt)).not.toContain(pointer);
+    expect(block(iteration(players, GameModes.Competitive, ["sharedOutcomes", "players"]).prompt)).toContain("Keep the contested outcome's score in");
   });
 });
 
@@ -334,12 +411,21 @@ describe("AI Iteration", () => {
     expect(iteration(players, mode, ["guidelines"]).prompt).not.toContain("under their current ids");
   });
 
-  it.each(INPUTS)("%i players, %s: fits one regenerated outcome list to the other, in multiplayer only", (players, mode) => {
+  it.each(INPUTS)("%i players, %s: fits one regenerated outcome list to the other, whatever the player count", (players, mode) => {
+    // A single-player template made before round 1 can hold outcomes in its shared list (setup doc B13: gpt-4.1 16 of 16)
     const line = "You are regenerating only one of the shared outcomes and the player outcomes.";
-    expect(occurrences(iteration(players, mode, ["sharedOutcomes"]).prompt, line)).toBe(players > 1 ? 1 : 0);
-    expect(occurrences(iteration(players, mode, ["players"]).prompt, line)).toBe(players > 1 ? 1 : 0);
+    expect(occurrences(iteration(players, mode, ["sharedOutcomes"]).prompt, line)).toBe(1);
+    expect(occurrences(iteration(players, mode, ["players"]).prompt, line)).toBe(1);
     expect(iteration(players, mode, ["sharedOutcomes", "players"]).prompt).not.toContain(line);
     expect(iteration(players, mode, ["stats"]).prompt).not.toContain(line);
+  });
+
+  it("folds a single-player template's shared outcomes into player1's when both lists are regenerated", () => {
+    const shared = (sections: string[]) =>
+      (find(toJsonSchema(iteration(1, GameModes.SinglePlayer, sections).schema), ["properties", "sharedOutcomes"]) as { description: string }).description;
+    expect(shared(["sharedOutcomes", "players"])).toContain("fold any of the template's shared outcomes you keep into player1's three");
+    // Regenerated alone, the shared list is kept, so a template whose outcomes are all shared keeps some
+    expect(shared(["sharedOutcomes"])).not.toContain("leave this list empty");
   });
 
   it("puts the worked example where production puts its examples, before the character selection", () => {
@@ -361,6 +447,53 @@ describe("the worked example", () => {
     const at = order.map((marker) => prompt.indexOf(marker));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  describe("follows the rules it sits beside", () => {
+    const request = round1(1, GameModes.SinglePlayer);
+    const example = request.prompt.slice(request.prompt.indexOf(WORKED_EXAMPLE_HEADING), request.prompt.indexOf("Character Selection Instructions"));
+    const between = (text: string, from: string, to: string) => {
+      const start = text.indexOf(from) + from.length;
+      return text.slice(start, text.indexOf(to, start));
+    };
+    const quoted = (text: string) => text.match(/"[^"]+"/g) ?? [];
+    const statLines = example.split("\n").filter((line) => line.includes(" Effects: "));
+    const threadTypes = quoted(between(example, "- Thread types", "- Switch and thread instructions:")).map((type) => type.slice(1).split(" (")[0].toLowerCase());
+    const instructions = quoted(between(example, "- Switch and thread instructions:", "\n\nStory element"));
+
+    it("reads its stats and thread types", () => {
+      expect(statLines.length).toBe(3);
+      expect(threadTypes).toEqual(["public protest", "secret negotiation", "sabotage", "rescue", "old friends", "a walk with mia"]);
+    });
+
+    it("gives every stat it shows two or three effects", () => {
+      const effects = statLines.map((line) => quoted(between(line, " Effects: ", " Sacrifice: ")).length);
+      expect(effects.every((n) => n >= 2 && n <= 3)).toBe(true);
+    });
+
+    it("keys every change after threads on a result, not on a thread type's name", () => {
+      for (const line of statLines) {
+        const after = line.slice(line.indexOf(" After threads: "));
+        expect({ after, result: /\b(favorable|mixed|unfavorable)\b/.test(after), typeName: threadTypes.filter((name) => after.toLowerCase().includes(name)) }).toEqual({ after, result: true, typeName: [] });
+      }
+    });
+
+    it("shows no more switch/thread instructions than the field asks for", () => {
+      const field = find(toJsonSchema(request.schema), ["properties", "guidelines", "properties", "switchAndThreadInstructions"]) as { description: string };
+      const most = Number(/Generate 0-(\d) instructions/.exec(field.description)?.[1]);
+      expect(instructions.length).toBeGreaterThan(0);
+      expect(instructions.length).toBeLessThanOrEqual(most);
+    });
+
+    it("states each steering rule once: no instruction repeats in a stat's narrative implications", () => {
+      const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
+      const rest = words(example.replace(between(example, "- Switch and thread instructions:", "\n\nStory element"), "")).join(" ");
+      for (const instruction of instructions) {
+        const own = words(instruction);
+        const runs = own.slice(0, -5).map((_, i) => own.slice(i, i + 6).join(" "));
+        expect({ instruction, repeated: runs.filter((run) => rest.includes(run)) }).toEqual({ instruction, repeated: [] });
+      }
+    });
   });
 
   it("is about 1,100 tokens, and the prompt loses about 3,700 against production's", () => {
