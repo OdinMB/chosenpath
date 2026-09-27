@@ -1,9 +1,11 @@
 import type { PlayerCount, StoryState, StoryTemplate } from "core/types/index.js";
 import { beatStep, type TextRequest } from "../../game/services/storyTextSteps.js";
-import { baselineArm, STAGES, type EvalRole, type Stage } from "./arms.js";
-import { HARD_CEILING, resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
+import { baselineArm, type EvalRole, type Stage } from "./arms.js";
+import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type Snapshot } from "./cases.js";
+import { FILTER_CASES } from "./filterCases.js";
+import { DEFAULT_FILTER_ARMS, filterCheckEstimateUsd } from "./filterCheck.js";
 import { jobEstimateUsd, planJobs, requestChars, type PlanOptions } from "./jobPlan.js";
 import { estimateCall, outputTokensPerSecond } from "./pricing.js";
 import { estimateCheckCost, probeChecks } from "./probe.js";
@@ -138,10 +140,13 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     log(`${label}: ${open.length} jobs ${JSON.stringify(byRole)}, est $${cost.toFixed(2)} (stage cap $${caps.stageCaps[stage]}), at least ${minutes} min`);
   }
 
+  log(`Filter check (--filter-check): ${FILTER_CASES.length} cases per arm, about $${filterCheckEstimateUsd(FILTER_CASES, DEFAULT_FILTER_ARMS).toFixed(2)} for the default arms (cap $${caps.stageCaps.filter})`);
+
   const spend = spentByStage([...records, ...input.extraSpend]);
   log("\nSpend so far vs caps:");
-  for (const stage of STAGES) {
-    log(`  Stage ${stage}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
+  for (const stage of LEDGER_STAGES) {
+    const label = stage === "filter" ? "Filter check" : `Stage ${stage}`;
+    log(`  ${label}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
   }
   log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $30 by the owner on 2026-09-27; the first target was about $25)`);
   log(

@@ -1,7 +1,7 @@
-import { chainSides, STAGES } from "./arms.js";
+import { chainSides } from "./arms.js";
 import { COST_BASES, computeArmStats, percentile, type ArmStats, type CostBasis } from "./armStats.js";
 import type { Caps } from "./budget.js";
-import { spentByStage } from "./budget.js";
+import { LEDGER_STAGES, spentByStage } from "./budget.js";
 import type { CaseTags } from "./cases.js";
 import {
   byBasis,
@@ -40,6 +40,8 @@ export type ResultsInput = {
   tags: Map<string, CaseTags>;
   caps: Caps;
   probe?: ProbeReport;
+  /** The filter check's spend (filter-check.jsonl), its own ledger stage */
+  filterCheckUsd?: number;
   prose?: Record<string, { distinctOpenings: number; youOpenings: number; beats: number; stockPhrasesPer1000Words: number }>;
   generatedAt: Date;
 };
@@ -366,7 +368,11 @@ export function renderResults(input: ResultsInput): string {
   const stats = computeArmStats(input.records, input.checks, input.tags);
   // Probe spend lives in probe.json, not calls.jsonl; it counts against Stage 0 as the caps do
   const probeSpend = input.probe ? input.probe.totalCostUsd + (input.probe.priorSpendUsd ?? 0) : 0;
-  const spend = spentByStage([...input.records, { stage: "0", costUsd: probeSpend }]);
+  const spend = spentByStage([
+    ...input.records,
+    { stage: "0", costUsd: probeSpend },
+    { stage: "filter", costUsd: input.filterCheckUsd ?? 0 },
+  ]);
   const lines: string[] = [
     "# Text-model eval: results",
     "",
@@ -376,7 +382,7 @@ export function renderResults(input: ResultsInput): string {
     "",
     "| Stage | Spent | Cap |",
     "|---|---|---|",
-    ...STAGES.map((stage) => `| ${stage} | $${spend.byStage[stage].toFixed(2)} | $${input.caps.stageCaps[stage].toFixed(2)} |`),
+    ...LEDGER_STAGES.map((stage) => `| ${stage} | $${spend.byStage[stage].toFixed(2)} | $${input.caps.stageCaps[stage].toFixed(2)} |`),
     `| total | $${spend.total.toFixed(2)} | $${input.caps.globalCap.toFixed(2)} |`,
   ];
   if (input.probe) {

@@ -3,6 +3,7 @@ import path from "path";
 import type { BudgetOverride } from "./budget.js";
 import type { BuildReport } from "./caseBuilder.js";
 import type { EvalCase } from "./cases.js";
+import type { FilterRecord } from "./filterCheck.js";
 import type { ProbeReport } from "./probe.js";
 import type { RatingKey } from "./ratingSets.js";
 import { replyContent } from "./responseCheck.js";
@@ -20,6 +21,8 @@ import type { CallRecord } from "./runner.js";
  *   keys/<set>-<page>.json answer keys (never next to the pages)
  *   scores/<set>-<page>.md|json
  *   results.md
+ *   filter-check.jsonl     one record per filter-check case and arm (--filter-check)
+ *   filter-check.md        its report, rewritten after each run
  */
 
 function readJsonl<T>(file: string): T[] {
@@ -93,6 +96,15 @@ export function evalFiles(outDir: string) {
     writeResults: (markdown: string) => {
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(at("results.md"), markdown);
+    },
+    readFilterRecords: (): FilterRecord[] => readJsonl<FilterRecord>(at("filter-check.jsonl")),
+    appendFilterRecord: (record: FilterRecord) => {
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.appendFileSync(at("filter-check.jsonl"), `${JSON.stringify(record)}\n`);
+    },
+    writeFilterReport: (markdown: string) => {
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(at("filter-check.md"), markdown);
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { Stage } from "./arms.js";
+import { STAGES, type Stage } from "./arms.js";
 
 /*
  * The spend caps. Owner (2026-09-26): target about $25 for the whole
@@ -10,15 +10,21 @@ import type { Stage } from "./arms.js";
  * the setup and turn rounds after the Round 0 play fixes. The stage caps are
  * $8 / $13 / $3 / $4; a stage cap above its default needs a recorded reason,
  * and the global cap can only be lowered. The probe and case building count
- * as Stage 0.
+ * as Stage 0. The content-filter check (--filter-check, filterCheck.ts) is
+ * its own ledger stage, "filter", capped at $0.30: its calls cost fractions
+ * of a cent, and it has no --run stage.
  */
 
-export const DEFAULT_STAGE_CAPS: Record<Stage, number> = { "0": 8, "1-2": 13, "3": 3, "4": 4 };
+/** A stage of the spend ledger: the --run stages plus the filter check. */
+export type LedgerStage = Stage | "filter";
+export const LEDGER_STAGES: LedgerStage[] = [...STAGES, "filter"];
+
+export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = { "0": 8, "1-2": 13, "3": 3, "4": 4, filter: 0.3 };
 export const HARD_CEILING = 33;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
 export type Caps = {
-  stageCaps: Record<Stage, number>;
+  stageCaps: Record<LedgerStage, number>;
   globalCap: number;
   /** Per invocation (--max-spend) */
   maxSpend?: number;
@@ -26,7 +32,7 @@ export type Caps = {
 
 export type BudgetOverride = {
   at: string;
-  stage?: Stage;
+  stage?: LedgerStage;
   stageCap?: number;
   globalCap?: number;
   reason: string;
@@ -35,7 +41,7 @@ export type BudgetOverride = {
 };
 
 export type CapArgs = {
-  stage?: Stage;
+  stage?: LedgerStage;
   stageCap?: number;
   globalCap?: number;
   maxSpend?: number;
@@ -99,12 +105,12 @@ export function resolveCaps(
   };
 }
 
-export type SpendRecord = { stage: Stage; costUsd: number };
+export type SpendRecord = { stage: LedgerStage; costUsd: number };
 
-export type Spend = { byStage: Record<Stage, number>; total: number };
+export type Spend = { byStage: Record<LedgerStage, number>; total: number };
 
 export function spentByStage(records: SpendRecord[]): Spend {
-  const byStage: Record<Stage, number> = { "0": 0, "1-2": 0, "3": 0, "4": 0 };
+  const byStage: Record<LedgerStage, number> = { "0": 0, "1-2": 0, "3": 0, "4": 0, filter: 0 };
   for (const record of records) {
     byStage[record.stage] += record.costUsd;
   }
@@ -121,7 +127,7 @@ export function budgetCheck(
   caps: Caps,
   spent: Spend,
   invocationSpent: number,
-  stage: Stage,
+  stage: LedgerStage,
   estimateUsd: number
 ): BudgetVerdict {
   const fmt = (usd: number) => `$${usd.toFixed(2)}`;

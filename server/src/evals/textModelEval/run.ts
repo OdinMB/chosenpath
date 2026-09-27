@@ -6,15 +6,27 @@ import { DEFAULT_TURNS } from "core/config.js";
 import type { PlayerCount, StoryTemplate } from "core/types/index.js";
 import { getStoragePath } from "shared/storageUtils.js";
 import { createStoryStateFromTemplate } from "../../game/services/StoryStateFactory.js";
+import { contentFilterClassifier } from "../../game/services/ContentFilterService.js";
 import { loadStoryStates, loadTemplates } from "../imageModelEval/cases.js";
-import { baselineArm, EVAL_ROLES, STAGES, type EvalRole, type Stage } from "./arms.js";
+import { armSettings, baselineArm, EVAL_ROLES, STAGES, type EvalRole, type Stage } from "./arms.js";
 import { htmlLeaks, metadataLeaks } from "./blinding.js";
-import { resolveCaps, spentByStage, type Caps, type SpendRecord } from "./budget.js";
+import { budgetCheck, resolveCaps, spentByStage, type Caps, type LedgerStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { loadStoredSnapshots, type EvalCase } from "./cases.js";
 import { localCases, printDryRun, type LocalCaseSources } from "./dryRun.js";
 import { evalFiles, type EvalFiles } from "./evalFiles.js";
 import { executeCall } from "./executor.js";
+import { FILTER_CASES } from "./filterCases.js";
+import {
+  DEFAULT_FILTER_ARMS,
+  FILTER_ARMS,
+  filterCheckEstimateUsd,
+  filterSpendUsd,
+  openFilterCases,
+  renderFilterReport,
+  runFilterCheck,
+  scoreFilterCheck,
+} from "./filterCheck.js";
 import { jobEstimateUsd, planJobs, requestJob, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
@@ -36,6 +48,9 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
+ *   --filter-check [--arms k1,k2] [--fresh] [--max-spend 0.30]  the content filter's fixed test set through
+ *     the production filter path (default arms: gpt-4.1-mini and Luna low); its own ledger stage, capped at
+ *     $0.30. Answered pairs are skipped unless --fresh.
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -46,7 +61,7 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  * Reads only local files under data/ and the frozen cases; never touches a database.
  */
 
-type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score";
+type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score" | "filter-check";
 
 type Args = {
   mode: Mode;
@@ -77,6 +92,8 @@ type Args = {
   scoreFile?: string;
   /** --rerender-page: the page whose key to render afresh */
   pageId?: string;
+  /** --filter-check --fresh: ask every case again; earlier records stay in the ledger */
+  fresh: boolean;
 };
 
 class UsageError extends Error {}
@@ -112,6 +129,7 @@ function parseArgs(argv: string[]): Args {
     rebuildCases: false,
     preview: false,
     stored: false,
+    fresh: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -121,6 +139,7 @@ function parseArgs(argv: string[]): Args {
       case "--probe":
       case "--build-cases":
       case "--run":
+      case "--filter-check":
         args.mode = arg.slice(2) as Mode;
         break;
       case "--rating-page": {
@@ -211,6 +230,9 @@ function parseArgs(argv: string[]): Args {
       case "--stored":
         args.stored = true;
         break;
+      case "--fresh":
+        args.fresh = true;
+        break;
       default:
         throw new UsageError(`Unknown argument: ${arg}`);
     }
@@ -255,13 +277,14 @@ function newStory(template: StoryTemplate, playerCount: PlayerCount, caseId: str
   return createStoryStateFromTemplate(caseId, template, playerCount, maxTurns, template.containsImages, true, difficulty, codes);
 }
 
-/** Probe spend lives in probe.json; it counts against Stage 0. */
+/** Probe spend lives in probe.json and counts against Stage 0; the filter check's in filter-check.jsonl. */
 function extraSpend(files: EvalFiles): SpendRecord[] {
   const probe = files.readProbe();
-  return probe ? [{ stage: "0", costUsd: probe.totalCostUsd + (probe.priorSpendUsd ?? 0) }] : [];
+  const probeSpend: SpendRecord[] = probe ? [{ stage: "0", costUsd: probe.totalCostUsd + (probe.priorSpendUsd ?? 0) }] : [];
+  return [...probeSpend, { stage: "filter", costUsd: filterSpendUsd(files.readFilterRecords()) }];
 }
 
-function capsFor(args: Args, files: EvalFiles, stage: Stage, defaultMaxSpend?: number): Caps {
+function capsFor(args: Args, files: EvalFiles, stage: LedgerStage, defaultMaxSpend?: number): Caps {
   const { caps, override } = resolveCaps({
     stage,
     stageCap: args.stageCap,
@@ -320,7 +343,7 @@ function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvir
   });
 }
 
-function refuseIfOverCaps(caps: Caps, files: EvalFiles, stage: Stage, estimate: number) {
+function refuseIfOverCaps(caps: Caps, files: EvalFiles, stage: LedgerStage, estimate: number) {
   const spend = spentByStage([...files.readRecords(), ...extraSpend(files)]);
   const problems = [
     spend.byStage[stage] + estimate > caps.stageCaps[stage] ? `Stage ${stage} cap $${caps.stageCaps[stage]} (spent $${spend.byStage[stage].toFixed(2)})` : "",
@@ -429,10 +452,60 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       tags: new Map(cases.map((c) => [c.id, c.tags])),
       caps,
       probe: files.readProbe(),
+      filterCheckUsd: filterSpendUsd(files.readFilterRecords()),
       prose,
       generatedAt: new Date(),
     })
   );
+}
+
+/** The content filter's fixed test set on each arm, through the production filter path. */
+async function filterCheck(args: Args, files: EvalFiles) {
+  requireApiKey();
+  const armKeys = args.armKeys?.length ? args.armKeys : DEFAULT_FILTER_ARMS;
+  const arms = armKeys.map((key) => {
+    const arm = FILTER_ARMS.find((a) => a.key === key);
+    if (!arm) throw new UsageError(`Unknown filter arm ${key}; one of ${FILTER_ARMS.map((a) => a.key).join(", ")}`);
+    return arm;
+  });
+  const caps = capsFor(args, files, "filter");
+  // --fresh asks every case again (after a prompt, model or limit change); the ledger keeps every record
+  const previous = args.fresh ? [] : files.readFilterRecords();
+  // Priced as if every open case ran on every arm: an upper bound, never low
+  refuseIfOverCaps(caps, files, "filter", filterCheckEstimateUsd(openFilterCases(FILTER_CASES, armKeys, previous), armKeys));
+  const base = spentByStage([...files.readRecords(), ...extraSpend(files)]);
+  const result = await runFilterCheck({
+    cases: FILTER_CASES,
+    arms,
+    previous,
+    deps: {
+      classifierFor: (arm, fetch) => contentFilterClassifier(armSettings(arm), { configuration: { fetch } }),
+      fetch: (input, init) => fetch(input, init),
+      now: Date.now,
+      record: (record) => files.appendFilterRecord(record),
+      budget: (estimateUsd, invocationSpent) =>
+        budgetCheck(
+          caps,
+          {
+            byStage: { ...base.byStage, filter: base.byStage.filter + invocationSpent },
+            total: base.total + invocationSpent,
+          },
+          invocationSpent,
+          "filter",
+          estimateUsd
+        ),
+      log: (line) => console.log(line),
+    },
+  });
+  const records = files.readFilterRecords();
+  // The report shows every arm with records; the console reads this run's arms
+  const reported = FILTER_ARMS.map((a) => a.key).filter((key) => records.some((r) => r.armKey === key));
+  const scores = scoreFilterCheck(records, FILTER_CASES, reported);
+  files.writeFilterReport(renderFilterReport(scores, records, FILTER_CASES, new Date()));
+  for (const s of scores.filter((score) => armKeys.includes(score.armKey))) {
+    console.log(`${s.armKey}: ${s.passes ? "passes" : "fails"} (missed refusals: ${s.missedRefusals.join(", ") || "none"}; refused allowed: ${s.refusedAllowed.join(", ") || "none"}; unavailable: ${s.unavailable.join(", ") || "none"})`);
+  }
+  console.log(`${result.stoppedReason ? `Stopped: ${result.stoppedReason}` : "Filter check complete"}. This run spent $${filterSpendUsd(result.records).toFixed(4)}. Wrote filter-check.md.`);
 }
 
 function armRefs(args: Args): ArmRef[] {
@@ -519,6 +592,8 @@ async function main() {
       return rerenderPage(args, files);
     case "score":
       return score(args, files);
+    case "filter-check":
+      return filterCheck(args, files);
     default:
       return dryRun(args, files, dirs);
   }
