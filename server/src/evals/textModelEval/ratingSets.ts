@@ -1,15 +1,8 @@
 import type { StoryState } from "core/types/index.js";
 import type { EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
-import {
-  SETUP_FIELD_LABELS,
-  TURN_FIELD_LABELS,
-  setupCard,
-  turnContent,
-  turnContext,
-  type ContextSection,
-  type OptionContent,
-} from "./ratingContent.js";
+import { SETUP_FIELD_LABELS, TURN_FIELD_LABELS, setupCard, turnContent, type OptionContent } from "./ratingContent.js";
+import { CONTEXT_LABELS, turnContext, type ContextSection } from "./ratingContext.js";
 import { usable, type CallRecord } from "./runner.js";
 
 /*
@@ -102,7 +95,7 @@ const INSTRUCTIONS: Record<RatingKind, string[]> = {
     "A note is optional. Your answers save in this browser as you go; export them when you are done.",
   ],
   turn: [
-    "Each item shows what happened just before, then several versions of the next turn, in random order, one column each.",
+    "Each item first shows the background: the chapter this turn belongs to, with its plan and the outcome it advances, every outcome, and what happened just before (the story so far and the story's world start folded). Then come several versions of the next turn, in random order, one column each.",
     "Click a heading to fold that part in every column at once.",
     "Acceptable? is the minimum bar: no continuity error (a wrong name, fact, stat, or outcome of the choice), it shows the chosen action and its result in second person, the three options are meaningfully different, and there is no commentary about the game itself.",
     "Rank the options from best (1) to worst. Ties are allowed.",
@@ -344,9 +337,10 @@ export function planRatingSet(
   };
 }
 
-/** The page's fixed text, which the blinding word check reads: its own labels and each option card's. */
+/** The page's fixed text, which the blinding word check reads: its own labels, each option card's and a turn's context. */
 export function pageFieldLabels(kind: RatingKind): string[] {
-  return [...FIELD_LABELS, ...Object.values(kind === "setup" ? SETUP_FIELD_LABELS : TURN_FIELD_LABELS)];
+  const own = kind === "setup" ? Object.values(SETUP_FIELD_LABELS) : [...Object.values(TURN_FIELD_LABELS), ...Object.values(CONTEXT_LABELS)];
+  return [...FIELD_LABELS, ...own];
 }
 
 function pageSet(kind: RatingKind, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
@@ -367,7 +361,8 @@ function buildItem(
   return {
     id,
     premise: evalCase.setup?.premise,
-    context: kind === "turn" && evalCase.state ? turnContext(evalCase.state) : [],
+    // The state the beat call saw: the frozen state with the fixed analysis (caseStory)
+    context: kind === "turn" && evalCase.state ? turnContext(evalCase.state, evalCase.fixedAnalysis) : [],
     options: Object.entries(keyItem.labels).map(([label, ref]) => {
       const record = findOutput(records, kind, ref);
       if (!record) throw new Error(`No usable output for ${id} option ${label}`);

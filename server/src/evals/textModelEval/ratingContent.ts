@@ -4,11 +4,11 @@ import { playerParagraphs } from "./playerText.js";
 /*
  * What a rater sees of one output: a setup as its whole design (everything
  * the game reads from the reply; the character-selection plan is the model's
- * scratch and is left out), a turn as each player's visible beat (title,
- * text, options, interludes), and the turn's context (previous beat, chosen
- * option and outcome, relevant stats). Read defensively, since later schema
- * variants may drop fields: an absent field is undefined (or "") and renders
- * nothing, a list present but empty is [] and renders as empty.
+ * scratch and is left out), and a turn as each player's visible beat (title,
+ * text, options, interludes); the context above a turn is ratingContext.ts.
+ * Read defensively, since later schema variants may drop fields: an absent
+ * field is undefined (or "") and renders nothing, a list present but empty
+ * is [] and renders as empty.
  */
 
 /**
@@ -177,24 +177,25 @@ export type TurnContent = { kind: "turn"; beats: TurnBeat[] };
 
 export type OptionContent = SetupCard | TurnContent;
 
-export type ContextSection = { heading: string; lines: string[] };
-
-function field(value: unknown, key: string): unknown {
+/** A key of an object, undefined for anything else. */
+export function field(value: unknown, key: string): unknown {
   return value && typeof value === "object" && key in value ? (value as Record<string, unknown>)[key] : undefined;
 }
 
-function text(value: unknown): string {
+/** A scalar as text, a list joined with commas, "" for anything else. */
+export function text(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) return value.map(text).join(", ");
   return "";
 }
 
-function list(value: unknown): unknown[] {
+export function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-function strings(value: unknown): string[] {
+/** A list's non-empty items as text. */
+export function strings(value: unknown): string[] {
   return list(value).map(text).filter((s) => s.length > 0);
 }
 
@@ -363,56 +364,4 @@ export function turnContent(output: unknown, state: StoryState): TurnContent {
       };
     });
   return { kind: "turn", beats };
-}
-
-const OUTCOME_WORDS: Record<string, string> = {
-  favorable: "it went well",
-  mixed: "it went partly well",
-  unfavorable: "it went badly",
-  sideAWins: "side A won the round",
-  sideBWins: "side B won the round",
-};
-
-function statLines(state: StoryState, slot: string): string[] {
-  const shared = state.sharedStats.map((stat) => {
-    const value = state.sharedStatValues.find((v) => v.statId === stat.id)?.value;
-    return `${stat.name}: ${text(value)}`;
-  });
-  const player = state.players[slot];
-  const own = state.playerStats.map((stat) => {
-    const value = player?.statValues.find((v) => v.statId === stat.id)?.value;
-    return `${stat.name}: ${text(value)}`;
-  });
-  return [...shared, ...own].filter((line) => !line.endsWith(": "));
-}
-
-/** The context shown above a turn's options: what happened just before, per player. */
-export function turnContext(state: StoryState): ContextSection[] {
-  const turn = Object.values(state.players)[0]?.beatHistory.length ?? 0;
-  if (turn === 0) {
-    return [
-      { heading: "Introduction", lines: [state.characterSelectionIntroduction?.title ?? "", state.characterSelectionIntroduction?.text ?? ""].filter(Boolean) },
-      {
-        heading: "Chosen characters",
-        lines: Object.entries(state.players).map(([slot, p]) => `${slot}: ${p.name}${p.fluff ? `, ${p.fluff}` : ""}`),
-      },
-    ];
-  }
-  const entries = Object.entries(state.players);
-  return entries.map(([slot, player], index) => {
-    const beat = player.beatHistory[turn - 1];
-    const chosen = beat && beat.choice >= 0 ? beat.options[beat.choice]?.text : undefined;
-    const outcome = beat?.resolution ? OUTCOME_WORDS[beat.resolution] : undefined;
-    return {
-      // Headings are fixed text: names are narrative and go in the lines
-      heading: entries.length > 1 ? `Before this turn: player ${index + 1}` : "Before this turn",
-      lines: [
-        `Character: ${player.name || slot}`,
-        beat ? `Previous beat: ${beat.summary}` : "",
-        chosen ? `Chosen: ${chosen}` : "",
-        outcome ? `Outcome: ${outcome}` : "",
-        ...statLines(state, slot),
-      ].filter(Boolean),
-    };
-  });
 }

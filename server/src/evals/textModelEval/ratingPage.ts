@@ -1,4 +1,5 @@
 import type { OptionContent, SetupCard, TurnContent } from "./ratingContent.js";
+import { MARK_TEXT, type ContextLine } from "./ratingContext.js";
 import { escapeHtml, paragraphs } from "./ratingHtml.js";
 import { setupRows, startsOpen, turnRows, type Row } from "./ratingRows.js";
 import type { RatingItem, RatingSet } from "./ratingSets.js";
@@ -45,14 +46,33 @@ function rowHtml(row: Row, labels: string[], depth: number): string {
   return `<details class="sec" data-sec="${e(row.key)}" data-depth="${depth}"${row.open ? " open" : ""}><summary><span class="head"><span class="row-title">${e(row.title)}</span>${head}</span></summary>${body}</details>`;
 }
 
+/** Structured context lines as nested lists: a bold label, the text, an outcome id small, and a badge on a marked line. */
+function contextLinesHtml(lines: ContextLine[] = []): string {
+  if (!lines.length) return "";
+  const item = (line: ContextLine) => {
+    const label = line.label ? `<span class="k">${e(line.label)}${line.text ? ":" : ""}</span>` : "";
+    const parts = [
+      label,
+      line.text ? `<span class="t">${e(line.text)}</span>` : "",
+      line.id ? `<code class="id">${e(line.id)}</code>` : "",
+      line.mark ? `<span class="badge">${e(MARK_TEXT[line.mark])}</span>` : "",
+    ].filter(Boolean);
+    return `<li${line.mark ? ` class="${line.mark}"` : ""}>${parts.join(" ")}${contextLinesHtml(line.sub)}</li>`;
+  };
+  return `<ul class="ctx-lines">${lines.map(item).join("")}</ul>`;
+}
+
 function contextHtml(item: RatingItem, kind: RatingSet["kind"]): string {
   const sections = [
-    ...(item.premise ? [{ key: "premise", heading: "Premise", lines: [item.premise] }] : []),
-    ...item.context.map((s, i) => ({ key: `context-${i + 1}`, ...s })),
+    ...(item.premise ? [{ key: "premise", heading: "Premise", lines: [item.premise], entries: undefined }] : []),
+    ...item.context.map((s, i) => ({ ...s, key: s.key ?? `context-${i + 1}` })),
   ];
   return sections.length
     ? `<div class="context">${sections
-        .map((s) => `<details class="ctx" data-sec="${e(s.key)}"${startsOpen(kind, s.key) ? " open" : ""}><summary><h3>${e(s.heading)}</h3></summary>${paragraphs(s.lines)}</details>`)
+        .map(
+          (s) =>
+            `<details class="ctx" data-sec="${e(s.key)}"${startsOpen(kind, s.key) ? " open" : ""}><summary><h3>${e(s.heading)}</h3></summary>${paragraphs(s.lines)}${contextLinesHtml(s.entries)}</details>`
+        )
         .join("")}</div>`
     : "";
 }
@@ -120,8 +140,8 @@ ${s} details.sec>summary:hover>.head>.cell{background:var(--hover)}}`;
 }
 
 const STYLE = `
-:root{color-scheme:light dark;--bg:#f7f6f2;--fg:#1f2328;--muted:#5d6570;--card:#ffffff;--line:#d8d4cc;--accent:#2f6f5e;--focus:#1a73e8;--hover:#f1efe9}
-@media (prefers-color-scheme:dark){:root{--bg:#1b1d1f;--fg:#e8e6e3;--muted:#a3a9b0;--card:#25282b;--line:#3a3e42;--accent:#7cc4ad;--focus:#8ab4f8;--hover:#2e3236}}
+:root{color-scheme:light dark;--bg:#f7f6f2;--fg:#1f2328;--muted:#5d6570;--card:#ffffff;--line:#d8d4cc;--accent:#2f6f5e;--focus:#1a73e8;--hover:#f1efe9;--mark:#fdf0cc}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1d1f;--fg:#e8e6e3;--muted:#a3a9b0;--card:#25282b;--line:#3a3e42;--accent:#7cc4ad;--focus:#8ab4f8;--hover:#2e3236;--mark:#3d3522}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:18px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 header,main,footer{max-width:1600px;margin:0 auto;padding:1rem 1.25rem}
@@ -134,6 +154,12 @@ h1{font-size:1.5rem;margin:.5rem 0} h2{font-size:1.25rem} h3{font-size:1.1rem;ma
 details.ctx>summary{cursor:pointer;min-height:44px;padding:.4rem 0}
 details.ctx>summary>h3{display:inline;margin:0}
 details.ctx+details.ctx{border-top:1px solid var(--line)}
+.ctx-lines{list-style:none;margin:.2rem 0 .6rem;padding:0;font-size:.95rem;line-height:1.5}
+.ctx-lines .ctx-lines{margin:.1rem 0 .2rem;padding-left:.9rem;border-left:2px solid var(--line);font-size:1em}
+.ctx-lines li{margin:.15rem 0}
+.ctx-lines li.current,.ctx-lines li.advances{background:var(--mark);border-radius:4px;padding:.1rem .4rem}
+.ctx-lines li.current{border-left:4px solid var(--accent)}
+.badge{display:inline-block;padding:0 .4rem;border-radius:4px;background:var(--accent);color:var(--bg);font-size:.8rem;font-weight:700;line-height:1.5;white-space:nowrap}
 .compare{margin:.5rem 0 1.5rem}
 .grid{display:grid;grid-template-columns:minmax(0,1fr);column-gap:1rem}
 .cell{min-width:0;background:var(--card);border:solid var(--line);border-width:0 1px;padding:.25rem .9rem;overflow-wrap:break-word}

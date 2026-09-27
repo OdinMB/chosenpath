@@ -1,3 +1,4 @@
+import type { ContextLine } from "./ratingContext.js";
 import type { RatingKey, RatingSet } from "./ratingSets.js";
 
 /*
@@ -22,8 +23,12 @@ function metadataStrings(set: RatingSet): { where: string; value: string }[] {
     ...set.instructions.map((value) => ({ where: "instructions", value })),
     ...set.fieldLabels.map((value) => ({ where: "field label", value })),
   ];
+  const labels = (lines: ContextLine[] = []): string[] => lines.flatMap((line) => [...(line.label ? [line.label] : []), ...labels(line.sub)]);
   for (const item of set.items) {
-    strings.push(...item.context.map((section) => ({ where: `${item.id} context heading`, value: section.heading })));
+    for (const section of item.context) {
+      strings.push({ where: `${item.id} context heading`, value: section.heading });
+      strings.push(...labels(section.entries).map((value) => ({ where: `${item.id} context label`, value })));
+    }
   }
   return strings;
 }

@@ -48,9 +48,16 @@ export const ENTRY_STARTS_OPEN: Record<EntryKind, boolean> = {
 
 const SETUP_FOLDED = new Set(["guidelines", "guidelines.tone", "guidelines.decisions", "guidelines.typesOfThreads", "storyElements", "imageInstructions"]);
 
-/** The owner's defaults: on a setup page these sections start folded, every player's backgrounds too; turn pages start open. */
+/** A turn's context folds (ratingContext.ts) that start folded: the long background. */
+const TURN_FOLDED = new Set(["storySoFar", "story"]);
+
+/**
+ * The owner's defaults: on a setup page these sections start folded, every
+ * player's backgrounds too; on a turn page only the story so far and the
+ * story's world start folded.
+ */
 export function startsOpen(kind: RatingKind, key: string): boolean {
-  if (kind === "turn") return true;
+  if (kind === "turn") return !TURN_FOLDED.has(key);
   return !SETUP_FOLDED.has(key) && !/^player\d+\.backgrounds$/.test(key);
 }
 
