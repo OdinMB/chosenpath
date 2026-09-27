@@ -1,10 +1,17 @@
-import { StoryTemplate, CharacterBackground } from "core/types";
+import {
+  StoryTemplate,
+  CharacterBackground,
+  Outcome,
+  PlayerCount,
+} from "core/types";
 import { TemplateImageManifest } from "core/types/api";
+import { templateStartProblem } from "core/utils/outcomeReadiness";
+import { getPlayerSlots } from "core/utils/playerUtils";
 import { checkPlayerBackgroundConsistency } from "../hooks/useTemplateWarnings";
 
 export interface ValidationIssue {
   type: "error" | "warning" | "info";
-  category: "stats" | "backgrounds" | "general" | "images";
+  category: "stats" | "backgrounds" | "general" | "images" | "outcomes";
   message: string;
   affectedItems?: string[];
   autoFixable?: boolean;
@@ -44,6 +51,9 @@ export const validateTemplateIntegrity = (
 
   // Validate player background consistency
   issues.push(...validatePlayerBackgroundConsistency(template));
+
+  // Validate that stories from this template can start
+  issues.push(...validateOutcomeReadiness(template));
 
   // Validate image requirements if manifest is provided
   // Check images regardless of containsImages flag to catch missing required images
@@ -327,6 +337,97 @@ const validateStatReferences = (template: StoryTemplate): ValidationIssue[] => {
       });
     }
   });
+
+  return issues;
+};
+
+/** Which of a template's stories a problem stops, e.g. "Multiplayer stories". */
+const storiesLabel = (
+  failing: PlayerCount[],
+  allowed: PlayerCount[]
+): string => {
+  const multiplayer = allowed.filter((count) => count > 1);
+  if (failing.length === allowed.length) return "Stories";
+  if (failing.length === 1 && failing[0] === 1) return "Single-player stories";
+  if (
+    failing.length === multiplayer.length &&
+    failing.every((count) => count > 1)
+  ) {
+    return "Multiplayer stories";
+  }
+  const last = failing[failing.length - 1];
+  return `Stories for ${failing.join(" or ")} player${last === 1 ? "" : "s"}`;
+};
+
+/**
+ * Validates that stories from this template can start: the server refuses a
+ * story whose seats in play and shared outcomes break the start rule
+ * (core/utils/outcomeReadiness.ts). Errors when no allowed player count can
+ * start, warnings when some can. Also warns about an outcome id held in more
+ * than one list, since milestones then land on one copy only.
+ */
+const validateOutcomeReadiness = (
+  template: StoryTemplate
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  const min = template.playerCountMin ?? 1;
+  const max = Math.max(template.playerCountMax ?? min, min) as PlayerCount;
+  const allowed = Array.from(
+    { length: max - min + 1 },
+    (_, i) => (min + i) as PlayerCount
+  );
+
+  const failingByProblem = new Map<string, PlayerCount[]>();
+  allowed.forEach((count) => {
+    const problem = templateStartProblem(template, count);
+    if (problem) {
+      failingByProblem.set(problem, [
+        ...(failingByProblem.get(problem) ?? []),
+        count,
+      ]);
+    }
+  });
+  const failingCounts = Array.from(failingByProblem.values()).flat().length;
+  const noneStarts = failingCounts === allowed.length;
+  failingByProblem.forEach((failing, problem) => {
+    issues.push({
+      type: noneStarts ? "error" : "warning",
+      category: "outcomes",
+      message: `${storiesLabel(failing, allowed)} from this World won't start: ${problem}.`,
+      affectedItems: [],
+      autoFixable: false,
+    });
+  });
+
+  const seats = template as unknown as Record<
+    string,
+    { outcomes?: Outcome[] } | undefined
+  >;
+  const lists: [string, Outcome[] | undefined][] = [
+    ["shared", template.sharedOutcomes],
+    ...getPlayerSlots(max).map((slot): [string, Outcome[] | undefined] => [
+      slot,
+      seats[slot]?.outcomes,
+    ]),
+  ];
+  const listsById = new Map<string, string[]>();
+  lists.forEach(([list, outcomes]) => {
+    new Set((outcomes ?? []).map((o) => o.id).filter((id) => !!id)).forEach(
+      (id) => listsById.set(id, [...(listsById.get(id) ?? []), list])
+    );
+  });
+  const heldTwice = Array.from(listsById).filter(([, held]) => held.length > 1);
+  if (heldTwice.length > 0) {
+    issues.push({
+      type: "warning",
+      category: "outcomes",
+      message: `Outcome IDs found in more than one list: ${heldTwice
+        .map(([id, held]) => `${id} (${held.join(", ")})`)
+        .join("; ")}. Their milestones land on one copy only, so give each outcome its own ID.`,
+      affectedItems: heldTwice.map(([id]) => id),
+      autoFixable: false,
+    });
+  }
 
   return issues;
 };

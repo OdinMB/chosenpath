@@ -15,7 +15,12 @@ import { TemplateService } from "../templates/TemplateService.js";
 import { AIStoryGenerator } from "../game/services/AIStoryGenerator.js";
 import { AIImageGenerator } from "../images/AIImageGenerator.js";
 import { Story } from "core/models/Story.js";
+import {
+  storyStateStartProblem,
+  templateStartProblem,
+} from "core/utils/outcomeReadiness.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
+import { withOneRetry } from "../game/services/retryOnce.js";
 import { storyRepository } from "./StoryRepository.js";
 import {
   sendSuccess,
@@ -211,15 +216,30 @@ export class StoryCreationService {
     try {
       Logger.Route.log(`Starting story generation for ${storyId}`);
 
-      // Create initial state
-      const storyState = await this.aiStoryGenerator.createInitialState(
-        storyId,
-        prompt,
-        generateImages,
-        playerCount,
-        maxTurns,
-        gameMode,
-        difficultyLevel
+      // Create initial state. A setup the story can't start from (no
+      // outcomes, or multiplayer without a shared one) is generated once more,
+      // a fresh sample of the same request.
+      const storyState = await withOneRetry(
+        () =>
+          this.aiStoryGenerator.createInitialState(
+            storyId,
+            prompt,
+            generateImages,
+            playerCount,
+            maxTurns,
+            gameMode,
+            difficultyLevel
+          ),
+        (state) => {
+          const problem = storyStateStartProblem(state, playerCount);
+          if (problem) {
+            Logger.Route.warn(
+              `Setup for story ${storyId} can't start: ${problem}`
+            );
+          }
+          return problem;
+        },
+        "story setup"
       );
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
 
@@ -344,6 +364,21 @@ export class StoryCreationService {
         `Player count ${playerCount} is outside template limits (${template.playerCountMin}-${template.playerCountMax})`,
         400
       ); // Send error and return
+      return;
+    }
+
+    const startProblem = templateStartProblem(template, playerCount);
+    if (startProblem) {
+      Logger.Route.warn(
+        `Template ${templateId} can't start a ${playerCount}-player story: ${startProblem}`
+      );
+      sendError(
+        res,
+        `This World can't start a story for ${playerCount} ${
+          playerCount === 1 ? "player" : "players"
+        } yet: ${startProblem}.`,
+        400
+      );
       return;
     }
 

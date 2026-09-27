@@ -1,7 +1,7 @@
 # Play fixes, Round 0: what the game loses between a model reply and the story, and the eval checks that read it
 
 - **Date**: 2026-09-27
-- **Status**: in progress (units 1 and 2 done)
+- **Status**: in progress (units 1, 2 and 3 done)
 - **Type**: bugfix (production play code, template editor, eval harness). No prompt-wording proposals.
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
 - **Sources** (both gitignored, read-only):
@@ -104,6 +104,8 @@ None of these lines is a trim or rewrite anchor (ST-8's lines sit before the sta
 
 ### Unit 3: stories start with the outcomes they need, and the editor says so
 
+**Done** (2026-09-27): SS-1 to SS-3. The helpers unit 4 and 5 use (`templateStartProblem` also reads a setup reply, `storyStateStartProblem`, `withOneRetry`'s third argument and `UnusableResultError`) and the decisions beyond this table are in `.plans/2026-09-26_build-followup.md`, "Round 0 play fixes (implementer)".
+
 | Id | Bug today | Intended behaviour | Files | Tests to write first | Source |
 |---|---|---|---|---|---|
 | SS-1 | A template story with no outcomes on the seats in play, or a multiplayer one without a shared outcome, starts; its plans then invent outcome ids or its first grouped thread has nothing to push. | New shared rule `storyStartProblem({ sharedOutcomes, seatOutcomes, playerCount })` in core: no outcomes at all (shared plus the seats in play) is a problem; `playerCount > 1` with no shared outcome is a problem. `createStoryFromTemplate` checks it after the player-count check and sends a 400 with a plain message before any DB entry. | new `core/utils/outcomeReadiness.ts`, `server/src/stories/StoryCreationService.ts` | new `server/tests/unit/core/outcomeReadiness.test.ts`: the two problems, single player with only shared outcomes passes, seats not in play ignored, and `templateStartProblem(template, playerCount)`. The service wiring is a guard around the tested helper. | turn A1 story start |
@@ -153,7 +155,7 @@ The units run in this order, each as one commit. Only `AIStoryGenerator.ts` (dif
 |---|---|---|---|---|
 | 1 | Turn replies keep what they write (done) | TR-1 to TR-10 | new `server/src/game/services/beatRepairs.ts`, new `server/src/game/services/textRepairs.ts`, `server/src/game/services/storyTextSteps.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateBeats`), `server/src/game/services/ThreadResolutionService.ts`, `server/src/game/services/BeatResolutionService.ts`, `core/config.ts`, `core/models/PlayerManager.ts`, `.context/story.md` | – |
 | 2 | What the state shows the models (done) | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
-| 3 | Stories start with the outcomes they need | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
+| 3 | Stories start with the outcomes they need (done) | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
 | 4 | Plans are checked, repaired or retried once | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |
 | 5 | The eval reads what the game keeps | EV-1 to EV-6 | `server/src/evals/textModelEval/outputChecks.ts`, `jobPlan.ts`, `textChecks.ts`, `budget.ts`, `dryRun.ts`, `run.ts`, `variants.ts`, `.context/text-model-eval.md` | 1, 3, 4 |
 

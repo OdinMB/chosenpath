@@ -488,6 +488,12 @@ Create a story from an existing template.
 
 Template-based stories are created synchronously and are ready immediately (no polling needed).
 
+**Error Cases:**
+
+- `400`: Player count outside the template's limits, or the template can't start a story for that many players (no outcomes on the shared list or the seats in play, or a multiplayer story without a shared outcome; `core/utils/outcomeReadiness.ts`)
+- `404`: Template not found
+- `500`: Story creation failed
+
 ---
 
 ### Check Story Status
