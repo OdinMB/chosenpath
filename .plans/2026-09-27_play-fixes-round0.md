@@ -1,7 +1,7 @@
 # Play fixes, Round 0: what the game loses between a model reply and the story, and the eval checks that read it
 
 - **Date**: 2026-09-27
-- **Status**: draft
+- **Status**: in progress (unit 1 done)
 - **Type**: bugfix (production play code, template editor, eval harness). No prompt-wording proposals.
 - **Branch**: `gpt6-text-eval` (already checked out; never switch, push, rebase or reset)
 - **Sources** (both gitignored, read-only):
@@ -65,6 +65,8 @@ Between a model's reply and the story, the game silently loses what the model wr
 ## The fixes
 
 ### Unit 1: turn replies keep what they write (change application, ids, milestones, clamp)
+
+**Done** (2026-09-27): TR-1 to TR-10. Repair kinds and the decisions beyond this table are in `.plans/2026-09-26_build-followup.md`, "Round 0 play fixes (implementer)".
 
 Where: a pure repair pass over the beat reply, run by `AIStoryGenerator.generateBeats` before `beatStep.apply` (so the option types are fixed before the beats are stored, and pregeneration siblings are repaired too). `ChangeService` keeps applying exact ids.
 
@@ -147,7 +149,7 @@ The units run in this order, each as one commit. Only `AIStoryGenerator.ts` (dif
 
 | # | Unit | Fixes | Files | Depends on |
 |---|---|---|---|---|
-| 1 | Turn replies keep what they write | TR-1 to TR-10 | new `server/src/game/services/beatRepairs.ts`, new `server/src/game/services/textRepairs.ts`, `server/src/game/services/storyTextSteps.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateBeats`), `server/src/game/services/ThreadResolutionService.ts`, `server/src/game/services/BeatResolutionService.ts`, `core/config.ts`, `core/models/PlayerManager.ts`, `.context/story.md` | – |
+| 1 | Turn replies keep what they write (done) | TR-1 to TR-10 | new `server/src/game/services/beatRepairs.ts`, new `server/src/game/services/textRepairs.ts`, `server/src/game/services/storyTextSteps.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateBeats`), `server/src/game/services/ThreadResolutionService.ts`, `server/src/game/services/BeatResolutionService.ts`, `core/config.ts`, `core/models/PlayerManager.ts`, `.context/story.md` | – |
 | 2 | What the state shows the models | ST-1 to ST-8 | `server/src/game/services/prompts/StoryStatePromptService.ts`, `server/src/game/services/prompts/BeatPromptService.ts`, `server/tests/unit/game/services/prompts/BeatPromptService.test.ts` | – |
 | 3 | Stories start with the outcomes they need | SS-1 to SS-3 | new `core/utils/outcomeReadiness.ts`, new `server/src/game/services/retryOnce.ts`, `server/src/stories/StoryCreationService.ts`, `client/src/resources/templates/utils/templateValidation.ts`, `.context/story.md` | – |
 | 4 | Plans are checked, repaired or retried once | PL-1 to PL-13 | new `server/src/game/services/planChecks.ts`, `server/src/game/services/AIStoryGenerator.ts` (`generateSwitches`, `generateThreads`), `server/src/game/services/prompts/ThreadPromptService.ts`, `server/src/game/services/storyTextTrims.ts`, `core/models/Story.ts`, `.context/story.md` | 3 |

@@ -3,11 +3,48 @@ import type {
   BeatGeneration,
   BeatOption,
   ChallengeOption,
+  Outcome,
   SetOfBeatGenerationSchema,
+  Stat,
   SwitchAnalysis,
   Thread,
   ThreadAnalysis,
 } from "core/types/index.js";
+
+/** A percentage stat named after its id unless overridden. */
+export function stat(id: string, overrides: Partial<Stat> = {}): Stat {
+  return {
+    type: "percentage",
+    name: id,
+    id,
+    possibleValues: "",
+    effectOnPoints: [],
+    optionsToSacrifice: "None",
+    optionsToGainAsReward: "None",
+    canBeChangedInBeatResolutions: true,
+    narrativeImplications: [],
+    adjustmentsAfterThreads: [],
+    isVisible: true,
+    partOfPlayerBackgrounds: false,
+    initialValue: 50,
+    tooltip: "",
+    group: "",
+    ...overrides,
+  };
+}
+
+/** A challenge outcome whose question names its id, with no milestones yet. */
+export function outcome(id: string, overrides: Partial<Outcome> = {}): Outcome {
+  return {
+    id,
+    question: `Question of ${id}?`,
+    possibleResolutions: { favorable: "Won.", mixed: "Half won.", unfavorable: "Lost." },
+    resonance: "It matters.",
+    intendedNumberOfMilestones: 2,
+    milestones: [],
+    ...overrides,
+  };
+}
 
 export const PARAGRAPH =
   "You step into the hall. The torches flicker. A guard looks up at you.";

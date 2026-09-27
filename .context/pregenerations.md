@@ -58,6 +58,8 @@ Safety and consistency
   - Progression adoption (complete pregen) updates beat number and timestamps immediately to match the adopted state.
 - Image library:
   - When storing pregens, the current actual story image library is merged into the stored pregen to avoid losing existing references.
+- Beat repairs:
+  - A complete pregeneration's beat reply goes through the same repair pass as a live turn (`repairBeatReply` in `AIStoryGenerator.generateBeats`, see `.context/story.md`), so an adopted sibling holds the same repaired beats and changes.
 - Idempotency:
   - Phase 1 checks for existing files and skips duplicates.
   - Phase 2 tracks in-progress to avoid multiple workers duplicating work.

@@ -37,8 +37,15 @@ export type TextRequest<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
 };
 
-function isPlayerBeat(key: string): boolean {
+/** Whether a beat reply's key holds a player's beat ("player1", …). */
+export function isPlayerBeat(key: string): boolean {
   return PLAYER_SLOTS.includes(key.toLowerCase());
+}
+
+/** Whether this turn may add milestones: the ending, or a switch after the first beat. */
+export function canAddMilestones(story: Story): boolean {
+  const beatType = story.getCurrentBeatType();
+  return beatType === "ending" || (beatType === "switch" && !story.isFirstBeat());
 }
 
 function applyBeats(
@@ -112,9 +119,7 @@ export const beatStep = {
   request(story: Story): TextRequest<ReturnType<typeof createSetOfBeatGenerationSchema>> {
     const schema = createSetOfBeatGenerationSchema(
       story.getNumberOfPlayers(),
-      // canAddMilestones = true only if it's the ending or (a switch and not the beginning of the story)
-      story.getCurrentBeatType() === "ending" ||
-        (story.getCurrentBeatType() === "switch" && !story.isFirstBeat()),
+      canAddMilestones(story),
       // multiplayerCoordination = true only if it's a multiplayer game
       story.isMultiplayer(),
       story.generatesImages(),

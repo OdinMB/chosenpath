@@ -34,6 +34,8 @@ import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
+import { repairBeatReply } from "./beatRepairs.js";
+import { logRepairs } from "./textRepairs.js";
 import {
   beatStep,
   partialTemplateSchema,
@@ -350,7 +352,10 @@ export class AIStoryGenerator {
   ): Promise<[Story, Change[], ImageRequest[]]> {
     try {
       const response = await this.generateBeatsResponse(story, context);
-      return beatStep.apply(story, response, skipImageRequests);
+      // Put what the reply wrote where the game reads it, before the beats are stored
+      const { reply, repairs } = repairBeatReply(story, response);
+      logRepairs("beat", story, repairs);
+      return beatStep.apply(story, reply, skipImageRequests);
     } catch (error) {
       Logger.Story.error("Failed to generate next beats:", error);
       throw new Error("Failed to generate next beats. Please try again.");

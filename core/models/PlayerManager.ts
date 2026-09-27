@@ -288,7 +288,14 @@ export class PlayerManager {
 
     // Initial player stats: background stats + player stats that are not part of backgrounds
     // Create a copy to avoid mutating the original background object
-    const backgroundStatValues = [...background.initialPlayerStatValues];
+    const backgroundStatValues: StatValueEntry[] = [
+      ...background.initialPlayerStatValues,
+      ...this.missingBackgroundStatValues(
+        state,
+        playerSlot,
+        background.initialPlayerStatValues
+      ),
+    ];
     const universalStatValues = state.playerStats
       .filter((stat) => stat.partOfPlayerBackgrounds === false)
       .map(
@@ -390,6 +397,43 @@ export class PlayerManager {
       );
       return null;
     }
+  }
+
+  /**
+   * Values for the background stats a background leaves out, so every player
+   * stat has a value: the stat's initialValue, or the template editor's
+   * default for its type when that is missing too.
+   */
+  private missingBackgroundStatValues(
+    state: StoryState,
+    playerSlot: PlayerSlot,
+    backgroundValues: StatValueEntry[]
+  ): StatValueEntry[] {
+    const present = new Set(backgroundValues.map((entry) => entry.statId));
+    const missing = state.playerStats
+      .filter(
+        (stat) =>
+          stat.partOfPlayerBackgrounds !== false && !present.has(stat.id)
+      )
+      .map(
+        (stat): StatValueEntry => ({
+          statId: stat.id,
+          value:
+            stat.initialValue !== undefined && stat.initialValue !== null
+              ? stat.initialValue
+              : stat.type === "string"
+              ? ""
+              : stat.type === "string[]"
+              ? []
+              : 50,
+        })
+      );
+    if (missing.length > 0) {
+      console.log(
+        `[PlayerManager] Filled ${missing.length} background stat value(s) that ${playerSlot}'s background left out`
+      );
+    }
+    return missing;
   }
 
   /**

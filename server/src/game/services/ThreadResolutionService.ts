@@ -308,6 +308,13 @@ export class ThreadResolutionService {
       //   `[ThreadResolutionService] Thread ${thread.id} milestone set to: ${milestone}`
       // );
       return milestone;
+    } else if (
+      "resolution1" in thread.possibleMilestones &&
+      (resolution === "resolution1" ||
+        resolution === "resolution2" ||
+        resolution === "resolution3")
+    ) {
+      return thread.possibleMilestones[resolution];
     }
 
     return null;

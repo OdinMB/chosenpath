@@ -16,6 +16,9 @@ export const POINTS_FOR_MIXED_RESOLUTION = 0;
 export const POINTS_FOR_UNFAVORABLE_RESOLUTION = -30;
 export const POINTS_FOR_SACRIFICE = 30;
 export const POINTS_FOR_REWARD = -30;
+// Stat bonuses on a challenge option: each clamped to +/- this, and only the first ones count
+export const MAX_STAT_MODIFIER_POINTS = 15;
+export const MAX_STAT_MODIFIERS_PER_OPTION = 2;
 
 export const DEFAULT_SELECTED_DIFFICULTY_MODIFIER = 0;
 

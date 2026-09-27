@@ -786,3 +786,17 @@ Branch: `gpt6-text-eval`. Test plan: `DOCS/2026-09-26_gpt6-text-model-test-plan.
 - Milestone 3 (planner): A Luna low rewrite arm, the next cheaper turn arm (about $0.1).
 - Milestone 3 (review): **Price the JSON schema at its real density in the estimates** (about 1.8 characters per token, not 4), or borrow measured input tokens along the reference chain as `measuredFor` does for outputs. Setup estimates read 28–32% low on input today. This changes every stage's estimates and the runner's reservations, so it wants its own change.
 - Milestone 3 (eval run): **An eval-only output cap for replays** (`max_completion_tokens` on `--run`, recorded on the call). The runner has none, so a hung case can't be replayed to see where a loop starts.
+
+## Round 0 play fixes (implementer)
+
+Unit 1 (turn replies keep what they write, TR-1 to TR-10). Decisions beyond `.plans/2026-09-27_play-fixes-round0.md`:
+
+- **Repair kinds** (`server/src/game/services/beatRepairs.ts`), which unit 5 counts as `repair:<kind>`: `statIdSeatForm`, `statGroupMoved`, `statChangeAmbiguous`, `statChangeUnknown`, `offLadderValue` (note), `factRefiled`, `introductionDropped`, `milestoneGroup`, `milestoneIdMapped`, `milestoneDropped`, `milestoneAmbiguousId` (note), `milestoneFromPlan`, `milestoneFromPlanSkipped` (note), `optionType`. One stat change can carry two repairs (a seat form filed under `shared` counts `statIdSeatForm` and `statGroupMoved`); a dropped change counts only its drop.
+- **Notes, not repairs:** an outcome id held in two lists (the template's problem, not the reply's) and a planned milestone that could not be used (nothing in the reply changed). Unit 5's `noRepairs` ignores notes, as the plan says for off-ladder values.
+- **Unknown milestone ids are mapped only on turns that may add milestones** (the ending, a switch after the first beat). On any other turn there is no just-ended thread, so an unknown id is dropped.
+- **Several ended threads on one outcome** (parallel threads pushing one shared outcome): the reply's milestones on that outcome are taken to cover those threads in plan order, and the rest get their planned milestones.
+- **Seat forms:** a seat form naming a seat that is not in the story (`player3_energy` in a two-player story) is dropped as unknown; in single player a player stat under any seat goes to player1 (`statGroupMoved`).
+- **Introductions of player slots** (`player2` introduced to player1) are dropped with the other unknown ids, as the plan's rule reads: slots are not story elements. The prompt's "introduced to" list then no longer shows them.
+- **TR-10 log line:** `[PlayerManager] Filled <n> background stat value(s) that <slot>'s background left out` (count and seat, no stat ids).
+- **Shared code:** `isPlayerBeat` and `canAddMilestones` are exported from `storyTextSteps.ts`, so the schema and the repair read one rule each. `expectedOptionType` in `beatRepairs.ts` is a copy of the eval's until unit 5 imports it. Test fixtures `stat()` and `outcome()` are in `server/tests/helpers/textFixtures.ts` for the later units.
+- **Dry run:** after unit 1, `npm run eval:text` (no `--run`) builds every stage; stages 0-3 have no pending jobs (all stored), Stage 4 plans its 95 jobs. No anchored passage changed in this unit.

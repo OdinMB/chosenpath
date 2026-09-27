@@ -9,6 +9,8 @@ import {
   PlayerSlot,
 } from "core/types/index.js";
 import {
+  MAX_STAT_MODIFIER_POINTS,
+  MAX_STAT_MODIFIERS_PER_OPTION,
   POINTS_FOR_FAVORABLE_RESOLUTION,
   POINTS_FOR_MIXED_RESOLUTION,
   POINTS_FOR_UNFAVORABLE_RESOLUTION,
@@ -253,7 +255,9 @@ export class BeatResolutionService {
 
   /**
    * Calculate the total points for a beat option and populate its specific modifiers.
-   * Modifiers are added to outOptionSpecificModifiers: ["Choice", basePoints], [statName, effect]
+   * Modifiers are added to outOptionSpecificModifiers: ["Choice", basePoints], [statName, effect].
+   * Only the first MAX_STAT_MODIFIERS_PER_OPTION stat modifiers count, each clamped to
+   * +/-MAX_STAT_MODIFIER_POINTS (old templates still describe +/-20 effects).
    * @param option The challenge option.
    * @param outOptionSpecificModifiers Array to populate with option's readable modifiers.
    * @param story The story object, used for stat lookups by ID.
@@ -295,8 +299,16 @@ export class BeatResolutionService {
     });
 
     if (option.modifiersToSuccessRate) {
-      for (const modifier of option.modifiersToSuccessRate) {
-        currentOptionPoints += modifier.effect;
+      const countedModifiers = option.modifiersToSuccessRate.slice(
+        0,
+        MAX_STAT_MODIFIERS_PER_OPTION
+      );
+      for (const modifier of countedModifiers) {
+        const effect = Math.max(
+          -MAX_STAT_MODIFIER_POINTS,
+          Math.min(MAX_STAT_MODIFIER_POINTS, modifier.effect)
+        );
+        currentOptionPoints += effect;
 
         let statName = modifier.statId; // Fallback to ID
         const foundStat = story.getStatById(modifier.statId);
@@ -306,7 +318,7 @@ export class BeatResolutionService {
 
         outOptionSpecificModifiers.push({
           name: statName,
-          value: modifier.effect,
+          value: effect,
           tooltip: modifier.reason,
         });
         // console.log(
