@@ -3,8 +3,9 @@ import fs from "fs";
 import path from "path";
 import OpenAI from "openai";
 import { DEFAULT_TURNS } from "core/config.js";
-import type { PlayerCount, StoryTemplate } from "core/types/index.js";
+import type { PlayerCount, SetOfBeatGenerationSchema, StoryTemplate } from "core/types/index.js";
 import { getStoragePath } from "shared/storageUtils.js";
+import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { createStoryStateFromTemplate } from "../../game/services/StoryStateFactory.js";
 import { contentFilterClassifier } from "../../game/services/ContentFilterService.js";
 import { loadStoryStates, loadTemplates } from "../imageModelEval/cases.js";
@@ -12,10 +13,11 @@ import { armSettings, baselineArm, EVAL_ROLES, STAGES, type EvalRole, type Stage
 import { htmlLeaks, metadataLeaks } from "./blinding.js";
 import { budgetCheck, resolveCaps, spentByStage, type Caps, type LedgerStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
-import { loadStoredSnapshots, type EvalCase } from "./cases.js";
+import { caseStory, loadStoredSnapshots, type EvalCase } from "./cases.js";
+import { checkBaselines, renderCheckBaselines, type BaselineReport } from "./checkBaselines.js";
 import { localCases, printDryRun, type LocalCaseSources } from "./dryRun.js";
 import { evalFiles, type EvalFiles } from "./evalFiles.js";
-import { executeCall } from "./executor.js";
+import { executeCall, sha256 } from "./executor.js";
 import { FILTER_CASES } from "./filterCases.js";
 import {
   DEFAULT_FILTER_ARMS,
@@ -27,27 +29,34 @@ import {
   runFilterCheck,
   scoreFilterCheck,
 } from "./filterCheck.js";
-import { jobEstimateUsd, planJobs, requestJob, type PlanOptions } from "./jobPlan.js";
+import { jobEstimateUsd, planJobs, requestInputFor, requestJob, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
 import { runProbe } from "./probe.js";
 import { renderRatingPage } from "./ratingPage.js";
 import { planRatingSet, ratingSetFromKey, type ArmRef, type RatingKind } from "./ratingSets.js";
-import { renderScores, scoreRatings, type ExportedRatings } from "./ratingScore.js";
+import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
-import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable } from "./runner.js";
-import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
+import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
+import { statReadouts } from "./turnDesignChecks.js";
+import { PRE_FIX_PROMPT_STATE, requestFor, requestText, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses the retired "prefix" and "postfix")
- *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--preview [--stored]]
- *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items)
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration --prompt-state <tag> [filters]
+ *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
+ *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
+ *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
+ *     --pairwise: exactly two arms, the reference then the candidate, Which is better? per item;
+ *     --no-repeat: leaves the repeated item out)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
+ *   --check-baselines [--ratings <export.json>,…]  the improvement documents' new checks over every stored
+ *     output, per arm with the two-sample noise, what separates the rated pages' rank-1 picks, waits per
+ *     turn kind and the stored references' currency; writes check-baselines.md and .json. No API calls.
  *   --filter-check [--arms k1,k2] [--fresh] [--max-spend 0.30]  the content filter's fixed test set through
  *     the production filter path (default arms: gpt-4.1-mini and Luna low); its own ledger stage, capped at
  *     $0.30. Answered pairs are skipped unless --fresh.
@@ -61,7 +70,7 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  * Reads only local files under data/ and the frozen cases; never touches a database.
  */
 
-type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score" | "filter-check";
+type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score" | "filter-check" | "check-baselines";
 
 type Args = {
   mode: Mode;
@@ -86,6 +95,10 @@ type Args = {
   items?: number;
   /** Rating pages: candidates shown beside the baseline per item, rotated */
   perItem?: number;
+  /** Rating pages: the reference against one candidate, Which is better? per item */
+  pairwise: boolean;
+  /** Rating pages: the repeated item (--no-repeat turns it off) */
+  repeat: boolean;
   preview: boolean;
   /** Preview pages from stored beats and setups (no eval output needed) */
   stored: boolean;
@@ -94,6 +107,8 @@ type Args = {
   pageId?: string;
   /** --filter-check --fresh: ask every case again; earlier records stay in the ledger */
   fresh: boolean;
+  /** --check-baselines --ratings: rating exports whose rank-1 picks to read the checks against */
+  ratingsFiles: string[];
 };
 
 class UsageError extends Error {}
@@ -101,6 +116,8 @@ class UsageError extends Error {}
 const DEFAULT_PROBE_MAX_SPEND = 1;
 const DEFAULT_BUILD_MAX_SPEND = 0.75;
 const DEFAULT_ITEMS: Record<RatingKind, number> = { setup: 6, turn: 15 };
+/** The round pages: nine setup premises (setup doc section 4), about 14 turns (turn doc round 1) */
+const DEFAULT_PAIRWISE_ITEMS: Record<RatingKind, number> = { setup: 9, turn: 14 };
 const MAX_IN_FLIGHT = 6;
 
 function numberArg(name: string, value: string | undefined): number {
@@ -127,9 +144,12 @@ function parseArgs(argv: string[]): Args {
     tpm: DEFAULT_TOKENS_PER_MINUTE,
     outDir: path.resolve(process.cwd(), "..", "DOCS", "2026-09-26_gpt6-text-eval"),
     rebuildCases: false,
+    pairwise: false,
+    repeat: true,
     preview: false,
     stored: false,
     fresh: false,
+    ratingsFiles: [],
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -140,7 +160,11 @@ function parseArgs(argv: string[]): Args {
       case "--build-cases":
       case "--run":
       case "--filter-check":
+      case "--check-baselines":
         args.mode = arg.slice(2) as Mode;
+        break;
+      case "--ratings":
+        args.ratingsFiles = (next() ?? "").split(",").filter(Boolean).map((file) => path.resolve(file));
         break;
       case "--rating-page": {
         args.mode = "rating-page";
@@ -199,6 +223,12 @@ function parseArgs(argv: string[]): Args {
       }
       case "--per-item":
         args.perItem = numberArg(arg, next());
+        break;
+      case "--pairwise":
+        args.pairwise = true;
+        break;
+      case "--no-repeat":
+        args.repeat = false;
         break;
       case "--max-spend":
         args.maxSpend = numberArg(arg, next());
@@ -444,7 +474,7 @@ async function run(args: Args, files: EvalFiles) {
 
 function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
   const records = files.readRecords();
-  const { checks, prose } = checksForRecords(records, cases, files.loadOutput, files.loadReplyContent);
+  const { checks, prose } = checksForRecords(records, cases, files.loadOutput, files.loadReplyContent, files.loadPrompt);
   files.writeResults(
     renderResults({
       records,
@@ -534,8 +564,12 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
   const { arms, cases, records, loadOutput } = await ratingMaterial(args, files, dirs, kind);
   if (arms.length === 0) throw new UsageError("--rating-page needs --arms <baseline,candidate,…>.");
   if (arms.length === 1 && !args.preview) throw new UsageError("A real rating page needs at least two arms (or --preview).");
+  if (args.pairwise && arms.length !== 2) {
+    throw new UsageError("--pairwise needs exactly two arms: --arms <reference>,<candidate>.");
+  }
+  const items = args.items ?? (args.pairwise ? DEFAULT_PAIRWISE_ITEMS : DEFAULT_ITEMS)[kind];
   const { set, key } = planRatingSet(
-    { kind, arms, items: args.items ?? DEFAULT_ITEMS[kind], preview: args.preview, perItem: args.perItem, caseIds: args.caseIds },
+    { kind, arms, items, preview: args.preview, perItem: args.perItem, caseIds: args.caseIds, pairwise: args.pairwise, repeat: args.repeat },
     records,
     cases,
     { loadOutput, salt: crypto.randomBytes(16).toString("hex"), now: new Date() }
@@ -570,9 +604,68 @@ function score(args: Args, files: EvalFiles) {
   const exported = JSON.parse(fs.readFileSync(args.scoreFile as string, "utf-8")) as ExportedRatings;
   const key = files.readKey(exported.pageId);
   if (!key) throw new UsageError(`No answer key for page ${exported.pageId} in ${files.at("keys")}.`);
-  const scores = scoreRatings(exported, key);
-  files.writeScores(`${key.setId}-${key.pageId}`, renderScores(scores), scores);
+  if (key.mode === "pairwise") {
+    const pairwise = scorePairwise(exported, key);
+    files.writeScores(`${key.setId}-${key.pageId}`, renderPairwiseScores(pairwise), pairwise);
+  } else {
+    const scores = scoreRatings(exported, key);
+    files.writeScores(`${key.setId}-${key.pageId}`, renderScores(scores), scores);
+  }
   console.log(`Wrote scores/${key.setId}-${key.pageId}.md and .json`);
+}
+
+const READOUT_SAMPLES = 40;
+
+/** The stat readouts on stored isolated beats, a hash-ordered sample for reading the check's false alarms by hand. */
+function readoutSamples(records: CallRecord[], cases: EvalCase[], files: EvalFiles): BaselineReport["readouts"] {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const hits = records.flatMap((r) => {
+    const evalCase = byId.get(r.caseId);
+    if (r.role !== "beat" || r.group !== "beat" || !r.final || !usable(r) || !r.outputFile || !evalCase?.state) return [];
+    const output = files.loadOutput(r);
+    if (output === undefined) return [];
+    const story = caseStory(evalCase);
+    const { reply } = repairBeatReply(story, output as SetOfBeatGenerationSchema);
+    return statReadouts(story, reply).map((hit) => ({ arm: `${r.promptState}:${r.armKey}`, outputFile: r.outputFile as string, hit }));
+  });
+  return hits.sort((a, b) => sha256(`${a.outputFile}|${a.hit}`).localeCompare(sha256(`${b.outputFile}|${b.hit}`))).slice(0, READOUT_SAMPLES);
+}
+
+/** The new checks over every stored output, with their noise, the rated pages' picks, waits per turn kind and reference currency. */
+function checkBaselinesMode(args: Args, files: EvalFiles) {
+  const records = files.readRecords();
+  const cases = files.readCases();
+  const { checks, design } = checksForRecords(records, cases, files.loadOutput, files.loadReplyContent, files.loadPrompt);
+  const rated = args.ratingsFiles.flatMap((file) => {
+    const exported = JSON.parse(fs.readFileSync(file, "utf-8")) as ExportedRatings;
+    const key = files.readKey(exported.pageId);
+    if (!key) throw new UsageError(`No answer key for page ${exported.pageId} in ${files.at("keys")}.`);
+    if (key.mode === "pairwise") {
+      console.log(`  ${file}: a pairwise page; the rank-1 reading needs ranks, so it is left out`);
+      return [];
+    }
+    return [{ key, exported }];
+  });
+  // Today's production-form request for a case, as the executor hashes it; a case today's code cannot build has none
+  const todaysPromptHash = (evalCase: EvalCase) => {
+    try {
+      return sha256(requestText(requestFor("prod", requestInputFor(evalCase))));
+    } catch {
+      return undefined;
+    }
+  };
+  const report = checkBaselines({
+    records,
+    cases,
+    design,
+    all: checks,
+    rated,
+    todaysPromptHash,
+    readouts: readoutSamples(records, cases, files),
+    generatedAt: new Date(),
+  });
+  files.writeCheckBaselines(renderCheckBaselines(report), report);
+  console.log(`Checked ${report.replies} stored replies. Wrote check-baselines.md and .json in ${files.outDir}`);
 }
 
 async function main() {
@@ -594,6 +687,8 @@ async function main() {
       return score(args, files);
     case "filter-check":
       return filterCheck(args, files);
+    case "check-baselines":
+      return checkBaselinesMode(args, files);
     default:
       return dryRun(args, files, dirs);
   }

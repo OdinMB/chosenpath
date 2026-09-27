@@ -81,6 +81,16 @@ describe("runJobs", () => {
     expect(calls.map((c) => c.arm.key)).toEqual([BASELINE.key, BASELINE.key, BASELINE.key, BASELINE.key, LUNA.key]);
   });
 
+  it("runs a round stage's candidates without a baseline record: its references are stored", async () => {
+    const { d, calls } = deps(() => executed("valid"));
+    await runJobs([job("new-case", "beat", LUNA, { stage: "turn-rounds" })], d, { caps, previous: [], maxInFlight: 1 });
+    expect(calls.map((c) => c.arm.key)).toEqual([LUNA.key]);
+    // An older stage still waits for the baseline on its case
+    const older = deps(() => executed("valid"));
+    await runJobs([job("new-case", "beat", LUNA, { stage: "3" })], older.d, { caps, previous: [], maxInFlight: 1 });
+    expect(older.calls).toEqual([]);
+  });
+
   describe("re-sends replies production could not parse, as its LangChain retry does", () => {
     const run = async (queue: ExecutedCall[]) => {
       const harness = deps(() => queue.shift() as ExecutedCall);

@@ -1,8 +1,10 @@
-import type {
-  ReasoningEffort,
-  TextModelSettings,
-  TextRole,
-  Verbosity,
+import {
+  TEXT_MODEL_GROUPS,
+  type ReasoningEffort,
+  type TextModelGroup,
+  type TextModelSettings,
+  type TextRole,
+  type Verbosity,
 } from "shared/llm/textModelSettings.js";
 import type { VariantId } from "./variants.js";
 
@@ -18,8 +20,29 @@ import type { VariantId } from "./variants.js";
 export type EvalRole = "setup" | "beat" | "switch" | "thread" | "iteration";
 export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "iteration"];
 
-export type Stage = "0" | "1-2" | "3" | "4";
-export const STAGES: Stage[] = ["0", "1-2", "3", "4"];
+/**
+ * The --run stages. 0 to 4 are the evaluation of 2026-09-26 (Stage 4 is
+ * closed). The rounds after the Round 0 play fixes (2026-09-27) each have their
+ * own: "setup-rounds" and "turn-rounds" for the candidates of the two
+ * improvement documents, and "migration" for checks of production's GPT-6
+ * defaults on today's prompts. Their caps and reasons are in budget.ts.
+ */
+export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration";
+export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration"];
+
+/** Stages that read against stored references: they plan no baseline job and gate no candidate on one. */
+const STORED_REFERENCE_STAGES: Stage[] = ["setup-rounds", "turn-rounds", "migration"];
+
+/**
+ * Whether a stage runs the comparison baseline (gpt-4.1, gpt-4.1-mini) on its
+ * cases and runs a candidate only where the baseline worked. The rounds and
+ * the migration check do neither: the owner keeps gpt-4.x out of new runs
+ * ("except maybe for comparison"), and every stored baseline record stays
+ * the comparison.
+ */
+export function stageRunsBaseline(stage: Stage): boolean {
+  return !STORED_REFERENCE_STAGES.includes(stage);
+}
 
 export type Arm = TextModelSettings & {
   key: string;
@@ -31,8 +54,8 @@ export type Arm = TextModelSettings & {
 export type ArmPlan = {
   arm: Arm;
   samples: number;
-  /** subset15 narrows beats only; single-player leaves out multiplayer cases of any role */
-  scope: "all" | "subset15" | "single-player";
+  /** subset15 narrows beats only; single-player leaves out multiplayer cases of any role, multiplayer the others */
+  scope: "all" | "subset15" | "single-player" | "multiplayer";
   /** Only these cases (still intersected with --cases) */
   caseIds?: string[];
   /** Rare-failure batch: this many extra single-sample calls spread over the cases */
@@ -200,8 +223,49 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return stage3Arms(role);
     case "4":
       return [...stage4bArms(role), ...stage4Arms(role)];
+    case "migration":
+      return migrationArms(role);
     default:
+      // The setup and turn rounds get their candidates with the eval-only variants they test
       return [];
+  }
+}
+
+/** Production's own default for a settings group (TEXT_MODEL_GROUPS), as an arm on production's form. */
+function productionDefault(group: TextModelGroup): Arm {
+  const { model, reasoningEffort } = TEXT_MODEL_GROUPS[group];
+  return makeArm({ model, reasoningEffort });
+}
+
+/** One plan per player-count group, or one on every case when both groups run the same arm. */
+function perPlayerCount(single: Arm, multi: Arm, samples: number): ArmPlan[] {
+  return single.key === multi.key
+    ? [{ arm: single, samples, scope: "all" }]
+    : [
+        { arm: single, samples, scope: "single-player" },
+        { arm: multi, samples, scope: "multiplayer" },
+      ];
+}
+
+const MIGRATION_SAMPLES = 2;
+
+/**
+ * The migration check: production's GPT-6 defaults (the code's, never env) on
+ * today's prompts, two samples each, so the round pages and checks have
+ * references in today's form and the defaults have their validity, repairs
+ * and waits measured under the current tag. AI Iteration has never been run.
+ */
+function migrationArms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "setup":
+      return [{ arm: productionDefault("setup"), samples: MIGRATION_SAMPLES, scope: "all" }];
+    case "iteration":
+      return [{ arm: productionDefault("templateEditor"), samples: MIGRATION_SAMPLES, scope: "all" }];
+    case "beat":
+      return perPlayerCount(productionDefault("beat"), productionDefault("multiplayerBeat"), MIGRATION_SAMPLES);
+    case "switch":
+    case "thread":
+      return perPlayerCount(productionDefault("analysis"), productionDefault("multiplayerAnalysis"), MIGRATION_SAMPLES);
   }
 }
 
@@ -337,6 +401,9 @@ export function pipelinePlan(stage: Stage): PipelinePlan | undefined {
         samples: 1,
         scope: "single-player",
       };
+    case "migration":
+      // The analysis-turn wait of production's single-player pair
+      return { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: 1, scope: "single-player" };
     default:
       return undefined;
   }

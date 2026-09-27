@@ -58,6 +58,15 @@ describe("printDryRun: the prompt state it plans under", () => {
     expect(lines.some((line) => line.includes("round1"))).toBe(true);
   });
 
+  it("plans a row for each round stage and the migration check against its own cap", async () => {
+    const lines = await dryRun([]);
+    expect(lines.some((line) => /^Setup rounds candidates \(isolated\): 0 jobs .*\(stage cap \$3\)/.test(line))).toBe(true);
+    expect(lines.some((line) => /^Turn rounds candidates \(isolated\): 0 jobs .*\(stage cap \$2\)/.test(line))).toBe(true);
+    // The one single-player beat case at production's beat arm, two samples, and no baseline
+    expect(lines.some((line) => /^Migration check \(production defaults, isolated\): 2 jobs .*\(stage cap \$1\.2\)/.test(line))).toBe(true);
+    expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
+  });
+
   it("refuses a retired tag, as --run does", async () => {
     await expect(dryRun([], "postfix")).rejects.toThrow(/round0/);
     await expect(dryRun([], "prefix")).rejects.toThrow(/Run A/);

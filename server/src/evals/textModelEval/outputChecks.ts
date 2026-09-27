@@ -4,6 +4,7 @@ import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks
 import { caseStory, type EvalCase } from "./cases.js";
 import { storyAfterAnalysis } from "./jobPlan.js";
 import { usable, type CallRecord } from "./runner.js";
+import { checkSetupDesign, exampleBlock } from "./setupDesignChecks.js";
 import {
   aggregateProse,
   checkBeatSet,
@@ -11,11 +12,13 @@ import {
   checkSwitch,
   checkThread,
   isRepairCount,
+  merge,
   withPadding,
   withRepairs,
   type CheckResult,
   type SetupShape,
 } from "./textChecks.js";
+import { checkBeatDesign, checkSwitchDesign, checkThreadDesign } from "./turnDesignChecks.js";
 
 /*
  * Applies the automatic checks to stored outputs: each usable call's parsed
@@ -24,7 +27,10 @@ import {
  * whitespace padding in its reply text. Beat, switch and thread replies are
  * checked as the game keeps them: after the beat repairs (beatRepairs.ts) or
  * the plan check (planChecks.ts), whose repairs are counted beside the checks
- * (withRepairs). Also collects beat prose per arm.
+ * (withRepairs). The design checks of the two improvement documents
+ * (setupDesignChecks.ts, turnDesignChecks.ts) run beside the rule checks; a
+ * setup's example copies read the example block of the prompt it was sent,
+ * when the prompt is stored. Also collects beat prose per arm.
  */
 
 function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[], load: (r: CallRecord) => unknown) {
@@ -56,15 +62,26 @@ function withEveryRepairKind(checks: Map<string, CheckResult>, roleOf: Map<strin
   }
 }
 
-/** `loadContent` gives a call's reply text, for the whitespace padding reading (withPadding) on every role. */
+/**
+ * `loadContent` gives a call's reply text, for the whitespace padding reading
+ * (withPadding) on every role; `loadPrompt` the text it was sent, for a
+ * setup's copies of its prompt's example (noExampleCopy), when stored.
+ */
 export function checksForRecords(
   records: CallRecord[],
   cases: EvalCase[],
   load: (record: CallRecord) => unknown,
-  loadContent: (record: CallRecord) => string | undefined
-): { checks: Map<string, CheckResult>; prose: Record<string, ReturnType<typeof aggregateProse>> } {
+  loadContent: (record: CallRecord) => string | undefined,
+  loadPrompt: (record: CallRecord) => string | undefined = () => undefined
+): {
+  checks: Map<string, CheckResult>;
+  /** The design checks alone (setupDesignChecks.ts, turnDesignChecks.ts), for their baselines */
+  design: Map<string, CheckResult>;
+  prose: Record<string, ReturnType<typeof aggregateProse>>;
+} {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const checks = new Map<string, CheckResult>();
+  const design = new Map<string, CheckResult>();
   const roleOf = new Map<string, string>();
   const texts = new Map<string, string[]>();
   for (const record of records) {
@@ -72,13 +89,19 @@ export function checksForRecords(
     if (!record.final || !usable(record) || !record.outputFile || !evalCase) continue;
     const output = load(record);
     if (output === undefined) continue;
-    let result: CheckResult | undefined;
+    // The rule checks and, beside them, the design checks of the two improvement documents
+    let rules: CheckResult | undefined;
+    let designed: CheckResult | undefined;
     if (record.role === "setup" && evalCase.setup) {
-      result = checkSetup(output as SetupShape, evalCase.setup);
+      const prompt = loadPrompt(record);
+      rules = checkSetup(output as SetupShape, evalCase.setup);
+      designed = checkSetupDesign(output, evalCase.setup, prompt === undefined ? undefined : exampleBlock(prompt));
     } else if (record.role === "beat") {
       const story = beatInput(record, evalCase, records, load);
-      const { reply, repairs } = repairBeatReply(story, output as SetOfBeatGenerationSchema);
-      result = withRepairs(checkBeatSet(reply, story), repairs);
+      const written = output as SetOfBeatGenerationSchema;
+      const { reply, repairs } = repairBeatReply(story, written);
+      rules = withRepairs(checkBeatSet(reply, story), repairs);
+      designed = checkBeatDesign(story, reply, written);
       const key = `${record.promptState}:${record.armKey}`;
       const own = Object.entries(reply)
         .filter(([slot]) => /^player\d+$/.test(slot))
@@ -87,18 +110,22 @@ export function checksForRecords(
     } else if (record.role === "switch") {
       const story = caseStory(evalCase, false);
       const checked = checkSwitchPlan(story, output as SwitchAnalysis);
-      result = withRepairs(checkSwitch(checked.plan, story), checked.repairs, checked);
+      rules = withRepairs(checkSwitch(checked.plan, story), checked.repairs, checked);
+      designed = checkSwitchDesign(story, checked.plan);
     } else if (record.role === "thread") {
-      const checked = checkThreadPlan(caseStory(evalCase, false), output as ThreadAnalysis);
-      result = withRepairs(checkThread(checked.plan), checked.repairs, checked);
+      const story = caseStory(evalCase, false);
+      const checked = checkThreadPlan(story, output as ThreadAnalysis);
+      rules = withRepairs(checkThread(checked.plan), checked.repairs, checked);
+      designed = checkThreadDesign(story, checked.plan);
     }
-    const content = result ? loadContent(record) : undefined;
-    if (result) {
-      checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
-      roleOf.set(record.outputFile, record.role);
-    }
+    if (!rules || !designed) continue;
+    const result = merge([rules, designed]);
+    const content = loadContent(record);
+    checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
+    design.set(record.outputFile, designed);
+    roleOf.set(record.outputFile, record.role);
   }
   withEveryRepairKind(checks, roleOf);
   const prose = Object.fromEntries([...texts.entries()].map(([arm, list]) => [arm, aggregateProse(list)]));
-  return { checks, prose };
+  return { checks, design, prose };
 }

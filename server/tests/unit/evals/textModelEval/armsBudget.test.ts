@@ -6,6 +6,8 @@ import {
   estimateBaseKey,
   makeArm,
   referenceKey,
+  STAGES,
+  stageRunsBaseline,
 } from "../../../../src/evals/textModelEval/arms.js";
 import {
   costFromUsage,
@@ -14,8 +16,13 @@ import {
 } from "../../../../src/evals/textModelEval/pricing.js";
 import {
   budgetCheck,
+  DEFAULT_STAGE_CAPS,
+  HARD_CEILING,
+  LEDGER_STAGES,
+  LEDGER_WHEN_ROUNDS_OPENED,
   resolveCaps,
   spentByStage,
+  STAGE_CAP_REASONS,
 } from "../../../../src/evals/textModelEval/budget.js";
 import { z } from "zod";
 import { requestChars } from "../../../../src/evals/textModelEval/jobPlan.js";
@@ -170,6 +177,29 @@ describe("budget caps", () => {
     expect(resolveCaps({ stage: "4", forRun: true }).caps.stageCaps["4"]).toBe(4);
     expect(resolveCaps({ stage: "4", stageCap: 3, forRun: true }).caps.stageCaps["4"]).toBe(3);
     expect(resolveCaps({ stage: "0", stageCap: 9, overTargetReason: reason }).override).not.toHaveProperty("arms");
+  });
+
+  it("gives the round stages and the migration check their own caps, each with a recorded reason", () => {
+    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "setup-rounds": 3, "turn-rounds": 2, migration: 1.2 });
+    for (const stage of LEDGER_STAGES) expect(STAGE_CAP_REASONS[stage].length).toBeGreaterThan(20);
+    // Stage 3 and 4 keep their caps; Stage 4 is closed
+    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "0": 8, "1-2": 13, "3": 3, "4": 4, filter: 0.3 });
+    // The new caps fit inside the $33 hard cap beside the ledger when they opened ($26.39), with the filter check's unspent cap too
+    const newCaps = DEFAULT_STAGE_CAPS["setup-rounds"] + DEFAULT_STAGE_CAPS["turn-rounds"] + DEFAULT_STAGE_CAPS.migration;
+    expect(LEDGER_WHEN_ROUNDS_OPENED + newCaps + DEFAULT_STAGE_CAPS.filter).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("books and checks spend of the new stages on their own caps", () => {
+    const spend = spentByStage([{ stage: "setup-rounds", costUsd: 2.95 }, { stage: "turn-rounds", costUsd: 1 }]);
+    expect(spend.byStage["setup-rounds"]).toBeCloseTo(2.95);
+    expect(spend.total).toBeCloseTo(3.95);
+    const { caps } = resolveCaps({});
+    expect(budgetCheck(caps, spend, 0, "setup-rounds", 0.1)).toMatchObject({ ok: false, reason: expect.stringMatching(/Stage setup-rounds cap \$3\.00/) });
+    expect(budgetCheck(caps, spend, 0, "turn-rounds", 0.1)).toEqual({ ok: true });
+  });
+
+  it("runs no baseline in the round and migration stages, and in every older stage", () => {
+    expect(STAGES.filter(stageRunsBaseline)).toEqual(["0", "1-2", "3", "4"]);
   });
 
   it("never lets the global cap pass $33, whatever the reason", () => {

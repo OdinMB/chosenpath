@@ -9,17 +9,27 @@ import { usable, type CallRecord } from "./runner.js";
  * Which items and options go on a blind rating page, their labels, and the
  * answer key: stratified items where every arm produced a usable sample-1
  * output, a salt-driven option order with the baseline's position balanced
- * across the set, one repeated item and one baseline-against-baseline item.
- * Item ids are neutral; the key lives in its own file.
+ * across the set, one repeated item (unless switched off) and one
+ * baseline-against-baseline item. Item ids are neutral; the key lives in its
+ * own file.
+ *
+ * A pairwise page (the rounds after 2026-09-27) shows exactly two options per
+ * item, the reference (the first arm) against the candidate, in balanced
+ * random order. The rater marks Acceptable? on both and picks the better one
+ * or neither ("About the same"), by the owner's criteria in the
+ * instructions; its repeat shows the pair with the labels swapped.
  */
 
 export type RatingKind = "setup" | "turn";
+
+/** A ranked page ranks every option; a pairwise page asks which of two is better. */
+export type RatingMode = "ranked" | "pairwise";
 
 export type ArmRef = { promptState: string; armKey: string };
 
 export type RatingSpec = {
   kind: RatingKind;
-  /** The first arm is the baseline */
+  /** The first arm is the baseline (on a pairwise page, the reference) */
   arms: ArmRef[];
   items: number;
   preview: boolean;
@@ -30,6 +40,10 @@ export type RatingSpec = {
   perItem?: number;
   /** Regular items come only from these cases (the control item may use any other) */
   caseIds?: string[];
+  /** Two arms, two options per item, Which is better? instead of ranks */
+  pairwise?: boolean;
+  /** The repeated item; on unless false (--no-repeat) */
+  repeat?: boolean;
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -46,6 +60,8 @@ export type RatingSet = {
   setId: string;
   pageId: string;
   kind: RatingKind;
+  /** Absent on a ranked page */
+  mode?: "pairwise";
   title: string;
   instructions: string[];
   fieldLabels: string[];
@@ -65,10 +81,12 @@ export type KeyItem = {
 export type RatingKey = {
   setId: string;
   pageId: string;
+  /** Absent on a ranked page (every key before 2026-09-27) */
+  mode?: "pairwise";
   salt: string;
   keyFile: string;
   createdAt: string;
-  /** The arm every other arm is compared with */
+  /** The arm every other arm is compared with (on a pairwise page, the reference) */
   baseline: ArmRef;
   items: Record<string, KeyItem>;
   /** Label -> how often the first arm (baseline) sits there, over the regular items */
@@ -78,6 +96,8 @@ export type RatingKey = {
 
 export const LABELS = ["A", "B", "C", "D"];
 export const FIELD_LABELS = ["Option", "Premise", "Acceptable?", "Yes", "No", "Rank", "Note (optional)", "Previous", "Next", "Export ratings"];
+/** A pairwise page's own fixed text: its question and the answer that picks neither */
+export const PAIRWISE_LABELS = { question: "Which is better?", same: "About the same" };
 export const REPEAT_MIN_DISTANCE = 3;
 
 const TITLES: Record<RatingKind, string> = {
@@ -102,6 +122,48 @@ const INSTRUCTIONS: Record<RatingKind, string[]> = {
     "A note is optional. Your answers save in this browser as you go; export them when you are done.",
   ],
 };
+
+/**
+ * The owner's criteria for the round pages (2026-09-27), printed in a
+ * pairwise page's instructions: setup doc section 4 "Rating format", turn doc
+ * section 4 rounds 1 and 2.
+ */
+export const PAIRWISE_CRITERIA: Record<RatingKind, string[]> = {
+  setup: [
+    "stats that matter in play and keep score sensibly",
+    "a real arc for each player",
+    "shared outcomes only where they fit",
+    "thread types and switch rules that steer",
+  ],
+  turn: [
+    "Does this turn move the chapter's question and follow its plan?",
+    "Does the chapter pursue the direction the player picked?",
+    "Is there a real choice among the options?",
+    "Does the prose sound like this story?",
+  ],
+};
+
+const PAIRWISE_INSTRUCTIONS: Record<RatingKind, string[]> = {
+  setup: [
+    "Each item shows one premise and two story setups written from it, in random order, side by side.",
+    INSTRUCTIONS.setup[1],
+    "Click a section heading to open or fold that section in both columns at once. Some sections start folded; single stats, story elements, outcomes, identities and backgrounds open one by one.",
+    "Acceptable? is the minimum bar, for each of the two: coherent and true to the premise, sensible stats, and distinct playable characters.",
+    `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${PAIRWISE_CRITERIA.setup.join("; ")}.`,
+    INSTRUCTIONS.setup[5],
+  ],
+  turn: [
+    "Each item first shows the background: the chapter this turn belongs to, with its plan and the outcome it advances, every outcome, and what happened just before (the story so far and the story's world start folded). Then come two versions of the next turn, in random order, one column each.",
+    "Click a heading to fold that part in both columns at once.",
+    "Acceptable? is the minimum bar, for each of the two: no continuity error (a wrong name, fact, stat, or outcome of the choice), it shows the chosen action and its result in second person, the three options are meaningfully different, and there is no commentary about the game itself.",
+    `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${PAIRWISE_CRITERIA.turn.join(" ")}`,
+    INSTRUCTIONS.turn[4],
+  ],
+};
+
+export function pairwiseInstructions(kind: RatingKind): string[] {
+  return PAIRWISE_INSTRUCTIONS[kind];
+}
 
 /** An item before labels become final: the case and its options in page order. */
 type Draft = { caseId: string; refs: LabelRef[]; repeat?: boolean; control?: "baseline-vs-baseline" };
@@ -245,13 +307,17 @@ function withControls(
     notes.push("No control items (preview or a single arm).");
     return result;
   }
-  if (result.length >= REPEAT_MIN_DISTANCE) {
-    // The same arms the first item showed, in a fresh order
+  if (spec.repeat === false) {
+    notes.push("No repeated item: switched off.");
+  } else if (result.length >= REPEAT_MIN_DISTANCE) {
+    // The same arms the first item showed, in a fresh order; a pair with its labels swapped
     const first = result[0];
     const isBaseline = (ref: LabelRef) => ref.armKey === spec.arms[0].armKey && ref.promptState === spec.arms[0].promptState;
     const baseline = first.refs.find(isBaseline) as LabelRef;
     const others = first.refs.filter((ref) => !isBaseline(ref));
-    const position = parseInt(sha256(`${salt}|repeat`).slice(0, 8), 16) % first.refs.length;
+    const position = spec.pairwise
+      ? 1 - first.refs.indexOf(baseline)
+      : parseInt(sha256(`${salt}|repeat`).slice(0, 8), 16) % first.refs.length;
     result.push({ caseId: first.caseId, refs: orderRefs(baseline, others, `${salt}|repeat`, position), repeat: true });
   } else {
     notes.push(`No repeated item: fewer than ${REPEAT_MIN_DISTANCE} items.`);
@@ -290,6 +356,9 @@ export function planRatingSet(
   cases: EvalCase[],
   deps: PlanDeps
 ): { set: RatingSet; key: RatingKey } {
+  if (spec.pairwise && spec.arms.length !== 2) {
+    throw new Error(`A pairwise page compares exactly two arms: the reference and the candidate (got ${spec.arms.length}).`);
+  }
   const notes: string[] = [];
   const picked = stratifiedPick(qualifying(spec, records, cases), spec.items, deps.salt);
   if (picked.length < spec.items) {
@@ -321,11 +390,13 @@ export function planRatingSet(
 
   const setId = `text-${spec.kind}`;
   const pageId = sha256(`${deps.salt}|page`).slice(0, 10);
+  const mode: RatingMode = spec.pairwise ? "pairwise" : "ranked";
   return {
-    set: pageSet(spec.kind, setId, pageId, items, spec.preview),
+    set: pageSet(spec.kind, mode, setId, pageId, items, spec.preview),
     key: {
       setId,
       pageId,
+      ...(mode === "pairwise" ? { mode } : {}),
       salt: deps.salt,
       keyFile: `${setId}-${pageId}.json`,
       createdAt: deps.now.toISOString(),
@@ -338,13 +409,24 @@ export function planRatingSet(
 }
 
 /** The page's fixed text, which the blinding word check reads: its own labels, each option card's and a turn's context. */
-export function pageFieldLabels(kind: RatingKind): string[] {
+export function pageFieldLabels(kind: RatingKind, mode: RatingMode = "ranked"): string[] {
   const own = kind === "setup" ? Object.values(SETUP_FIELD_LABELS) : [...Object.values(TURN_FIELD_LABELS), ...Object.values(CONTEXT_LABELS)];
-  return [...FIELD_LABELS, ...own];
+  return [...FIELD_LABELS, ...(mode === "pairwise" ? Object.values(PAIRWISE_LABELS) : []), ...own];
 }
 
-function pageSet(kind: RatingKind, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
-  return { setId, pageId, kind, title: TITLES[kind], instructions: INSTRUCTIONS[kind], fieldLabels: pageFieldLabels(kind), items, preview };
+function pageSet(kind: RatingKind, mode: RatingMode, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
+  const pairwise = mode === "pairwise";
+  return {
+    setId,
+    pageId,
+    kind,
+    ...(pairwise ? { mode } : {}),
+    title: TITLES[kind],
+    instructions: pairwise ? PAIRWISE_INSTRUCTIONS[kind] : INSTRUCTIONS[kind],
+    fieldLabels: pageFieldLabels(kind, mode),
+    items,
+    preview,
+  };
 }
 
 /** One item as the rater sees it: the case's context and each keyed output. */
@@ -385,7 +467,7 @@ export function ratingSetFromKey(
   const kind: RatingKind = key.setId === "text-setup" ? "setup" : "turn";
   const caseById = new Map(cases.map((c) => [c.id, c]));
   const items = Object.entries(key.items).map(([id, keyItem]) => buildItem(kind, id, keyItem, caseById, records, loadOutput));
-  return pageSet(kind, key.setId, key.pageId, items, false);
+  return pageSet(kind, key.mode ?? "ranked", key.setId, key.pageId, items, false);
 }
 
 function optionContent(kind: RatingKind, output: unknown, state: StoryState | undefined): OptionContent {

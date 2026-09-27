@@ -8,20 +8,49 @@ import { STAGES, type Stage } from "./arms.js";
  * setups, and setup inputs are 21-23K tokens with the schema, not the 15K
  * the plan assumed. The owner raised the hard cap to $33 on 2026-09-27, for
  * the setup and turn rounds after the Round 0 play fixes. The stage caps are
- * $8 / $13 / $3 / $4; a stage cap above its default needs a recorded reason,
- * and the global cap can only be lowered. The probe and case building count
- * as Stage 0. The content-filter check (--filter-check, filterCheck.ts) is
- * its own ledger stage, "filter", capped at $0.30: its calls cost fractions
- * of a cent, and it has no --run stage.
+ * $8 / $13 / $3 / $4 for Stages 0 to 4, and $3 / $2 / $1.20 for the setup
+ * rounds, the turn rounds and the migration check (STAGE_CAP_REASONS says
+ * why); a stage cap above its default needs a recorded reason, and the global
+ * cap can only be lowered. The probe and case building count as Stage 0. The
+ * content-filter check (--filter-check, filterCheck.ts) is its own ledger
+ * stage, "filter", capped at $0.30: its calls cost fractions of a cent, and
+ * it has no --run stage.
  */
 
 /** A stage of the spend ledger: the --run stages plus the filter check. */
 export type LedgerStage = Stage | "filter";
 export const LEDGER_STAGES: LedgerStage[] = [...STAGES, "filter"];
 
-export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = { "0": 8, "1-2": 13, "3": 3, "4": 4, filter: 0.3 };
+export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
+  "0": 8,
+  "1-2": 13,
+  "3": 3,
+  "4": 4,
+  "setup-rounds": 3,
+  "turn-rounds": 2,
+  migration: 1.2,
+  filter: 0.3,
+};
 export const HARD_CEILING = 33;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
+
+/** The ledger total when the round stages opened (2026-09-27): $26.39 of the $33 hard cap, $6.61 left. */
+export const LEDGER_WHEN_ROUNDS_OPENED = 26.39;
+
+/** Why each stage's cap is what it is (printed by the dry run beside the spend). */
+export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
+  "0": "probe, case building and both baselines (owner, 2026-09-26)",
+  "1-2": "the model and effort matrix of Round 1 (owner, 2026-09-26)",
+  "3": "the Stage 3 trims; closed with $2.26 spent",
+  "4": "the Stage 4 rewrite; closed, its 4b count fix ran on the owner's one-off $6 raise",
+  "setup-rounds":
+    "coordinator, 2026-09-27: setup rounds 1 to 3 on Luna low, with Sol low in round 1 (about $0.95 for nine premises) and a two-sample Luna noise run per round (about $0.11); the setup doc's three rounds came to $2.63",
+  "turn-rounds":
+    "coordinator, 2026-09-27: turn rounds 1 and 2 on Luna medium turns and Luna low planners, with the judged checks and their calibration (turn doc: about $0.90), plus retries and cold caches",
+  migration:
+    "production's GPT-6 defaults on today's prompts at two samples, and the single-player chains: dry run $0.75, plus AI Iteration (--role iteration, about $0.02) and setup estimates that read about 30% low",
+  filter: "the content filter's fixed test set; its calls cost fractions of a cent",
+};
 
 export type Caps = {
   stageCaps: Record<LedgerStage, number>;
@@ -110,7 +139,7 @@ export type SpendRecord = { stage: LedgerStage; costUsd: number };
 export type Spend = { byStage: Record<LedgerStage, number>; total: number };
 
 export function spentByStage(records: SpendRecord[]): Spend {
-  const byStage: Record<LedgerStage, number> = { "0": 0, "1-2": 0, "3": 0, "4": 0, filter: 0 };
+  const byStage = Object.fromEntries(LEDGER_STAGES.map((stage) => [stage, 0])) as Record<LedgerStage, number>;
   for (const record of records) {
     byStage[record.stage] += record.costUsd;
   }

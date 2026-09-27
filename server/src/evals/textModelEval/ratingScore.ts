@@ -11,6 +11,12 @@ import type { KeyItem, RatingKey } from "./ratingSets.js";
  * On an item with at least one rank, the options left unranked read as
  * worse than every ranked one and tied with each other (the owner ranks the
  * best and leaves the rest); an item with no rank stays unrated.
+ *
+ * A pairwise page (key mode "pairwise") scores with scorePairwise instead: a
+ * win, tie or loss per item for the candidate against the reference, the
+ * sign test over the decided items, the acceptable rate per arm, the repeat
+ * read in arm terms (its labels are swapped), which control sample was
+ * preferred, and the picks by label.
  */
 
 export type OptionRating = { acceptable?: string; rank?: number; note?: string };
@@ -20,6 +26,10 @@ export type ExportedRatings = {
   setId: string;
   exportedAt: string;
   ratings: Record<string, Record<string, OptionRating>>;
+  /** A pairwise page's export */
+  mode?: "pairwise";
+  /** Item -> the label picked as better, or "same" (pairwise pages) */
+  preferences?: Record<string, string>;
 };
 
 export type ArmScore = {
@@ -102,6 +112,11 @@ function readItem(item: KeyItem, ratings: Record<string, OptionRating> | undefin
   return options.map((o) =>
     hasRank(o.rating) ? { ...o, rank: o.rating.rank, readAsWorse: false } : { ...o, rank: worse, readAsWorse: worse !== undefined }
   );
+}
+
+/** An item's options with their ranks as the scorer reads them (unranked beside a rank: one below the worst). */
+export function readRanks(item: KeyItem, ratings: Record<string, OptionRating> | undefined): { label: string; ref: LabelRef; rank?: number }[] {
+  return readItem(item, ratings).map(({ label, ref, rank }) => ({ label, ref, rank }));
 }
 
 /** Arm -> option as scored, for one item. */
@@ -360,6 +375,280 @@ export function renderScores(scores: Scores): string {
     repeatLine(scores),
     controlLine(scores),
     `- Rank-1 picks by label: ${Object.entries(scores.rank1ByLabel).map(([label, n]) => `${label} ${n}`).join(", ") || "none"}.`,
+    "",
+    "## Notes",
+    "",
+    ...(scores.notes.length ? scores.notes.map((n) => `- ${n.item} ${n.label} (${n.arm}): ${n.note}`) : ["None."]),
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+// --- Pairwise pages ---
+
+/** A pairwise item as read for the candidate: it was preferred (win), the reference was (loss), or neither (tie). */
+export type PairwiseResult = "win" | "tie" | "loss";
+
+export type PairwiseItem = {
+  item: string;
+  caseId: string;
+  /** Undefined when the item carries no preference */
+  result?: PairwiseResult;
+  referenceAcceptable?: string;
+  candidateAcceptable?: string;
+};
+
+type AcceptableCount = { marked: number; yes: number; rate: number | null };
+
+export type PairwiseScores = {
+  mode: "pairwise";
+  setId: string;
+  pageId: string;
+  exportedAt: string;
+  reference: string;
+  candidate: string;
+  /** Regular items, in page order */
+  items: PairwiseItem[];
+  wins: number;
+  ties: number;
+  losses: number;
+  /** (wins + half the ties) over the items with a preference; null with none */
+  candidateShare: number | null;
+  /** Two-sided exact sign test of wins against losses (ties left out); null with no decided item */
+  signTestP: number | null;
+  acceptable: {
+    reference: AcceptableCount;
+    candidate: AcceptableCount;
+    /** Items where both carry a verdict and only one side is acceptable */
+    onlyReference: number;
+    onlyCandidate: number;
+  };
+  repeat?: {
+    item: string;
+    of: string;
+    /** Whether both showings give the same result for the candidate; null unless both carry a preference */
+    samePreference: boolean | null;
+    acceptableCompared: number;
+    acceptableAgreement: number | null;
+  };
+  /** The reference against itself: which sample was preferred */
+  control?: { item: string; preferred?: string; samples: { sample: number; acceptable?: string }[] };
+  /** Regular items: how often each label (and "same") was picked */
+  picksByLabel: Record<string, number>;
+  notes: { item: string; label: string; arm: string; note: string }[];
+  completeness: {
+    /** No preference and no verdict on any option (absent from the export included) */
+    unratedItems: string[];
+    /** Rated items without a preference */
+    withoutPreference: string[];
+    /** Rated items with an option lacking a verdict */
+    withoutVerdict: { item: string; options: OptionRef[] }[];
+  };
+};
+
+const SAME = "same";
+
+/** Two-sided exact sign test: the chance of a split at least this uneven among wins + losses decided items, at even odds. */
+export function signTestP(wins: number, losses: number): number | null {
+  const n = wins + losses;
+  if (n === 0) return null;
+  const k = Math.min(wins, losses);
+  let tail = 0;
+  let binomial = 1; // C(n, 0)
+  for (let i = 0; i <= k; i++) {
+    tail += binomial;
+    binomial = (binomial * (n - i)) / (i + 1);
+  }
+  return Math.min(1, (2 * tail) / 2 ** n);
+}
+
+function acceptableCount(verdicts: (string | undefined)[]): AcceptableCount {
+  const marked = verdicts.filter((v) => v === "yes" || v === "no");
+  const yes = marked.filter((v) => v === "yes").length;
+  return { marked: marked.length, yes, rate: marked.length ? yes / marked.length : null };
+}
+
+/** The candidate's result on an item, from the label picked; the reference is the key's baseline arm. */
+function pairwiseResult(item: KeyItem, picked: string | undefined, referenceArm: string): PairwiseResult | undefined {
+  if (picked === SAME) return "tie";
+  const ref = picked ? item.labels[picked] : undefined;
+  if (!ref) return undefined;
+  return armOf(ref) === referenceArm ? "loss" : "win";
+}
+
+function verdictOf(item: KeyItem, ratings: Record<string, OptionRating> | undefined, isReference: boolean, referenceArm: string): string | undefined {
+  const label = Object.keys(item.labels).find((l) => (armOf(item.labels[l]) === referenceArm) === isReference);
+  return label ? ratings?.[label]?.acceptable : undefined;
+}
+
+export function scorePairwise(exported: ExportedRatings, key: RatingKey): PairwiseScores {
+  if (exported.pageId !== key.pageId || exported.setId !== key.setId) {
+    throw new Error(`The export is for ${exported.setId}/${exported.pageId}, the key for ${key.setId}/${key.pageId}.`);
+  }
+  if (key.mode !== "pairwise") throw new Error(`Page ${key.pageId} is not a pairwise page: score it with --score as a ranked page.`);
+  const reference = `${key.baseline.promptState}:${key.baseline.armKey}`;
+  const entries = Object.entries(key.items);
+  const regular = entries.filter(([, item]) => !item.control && !item.repeatOf);
+  const candidateRef = regular.flatMap(([, item]) => Object.values(item.labels)).find((ref) => armOf(ref) !== reference);
+  const preferences = exported.preferences ?? {};
+
+  const items: PairwiseItem[] = regular.map(([itemId, item]) => ({
+    item: itemId,
+    caseId: item.caseId,
+    result: pairwiseResult(item, preferences[itemId], reference),
+    referenceAcceptable: verdictOf(item, exported.ratings[itemId], true, reference),
+    candidateAcceptable: verdictOf(item, exported.ratings[itemId], false, reference),
+  }));
+  const count = (result: PairwiseResult) => items.filter((i) => i.result === result).length;
+  const [wins, ties, losses] = [count("win"), count("tie"), count("loss")];
+  const withPreference = wins + ties + losses;
+  const bothMarked = items.filter((i) => [i.referenceAcceptable, i.candidateAcceptable].every((v) => v === "yes" || v === "no"));
+
+  const picksByLabel: Record<string, number> = {};
+  for (const [itemId] of regular) {
+    const picked = preferences[itemId];
+    if (picked) picksByLabel[picked] = (picksByLabel[picked] ?? 0) + 1;
+  }
+
+  const repeatEntry = entries.find(([, item]) => item.repeatOf);
+  const repeat = repeatEntry
+    ? (() => {
+        const [itemId, item] = repeatEntry;
+        const of = item.repeatOf as string;
+        const again = pairwiseResult(item, preferences[itemId], reference);
+        const first = pairwiseResult(key.items[of], preferences[of], reference);
+        const verdicts = (id: string, entry: KeyItem) =>
+          [true, false].map((isReference) => verdictOf(entry, exported.ratings[id], isReference, reference));
+        const [a, b] = [verdicts(itemId, item), verdicts(of, key.items[of])];
+        const compared = [0, 1].filter((i) => [a[i], b[i]].every((v) => v === "yes" || v === "no"));
+        return {
+          item: itemId,
+          of,
+          samePreference: again && first ? again === first : null,
+          acceptableCompared: compared.length,
+          acceptableAgreement: compared.length ? compared.filter((i) => a[i] === b[i]).length / compared.length : null,
+        };
+      })()
+    : undefined;
+
+  const controlEntry = entries.find(([, item]) => item.control);
+  const control = controlEntry
+    ? (() => {
+        const [itemId, item] = controlEntry;
+        const picked = preferences[itemId];
+        const preferred = picked === SAME ? SAME : picked && item.labels[picked] ? `sample ${item.labels[picked].sample}` : undefined;
+        const samples = Object.entries(item.labels).map(([label, ref]) => ({ sample: ref.sample, acceptable: exported.ratings[itemId]?.[label]?.acceptable }));
+        return { item: itemId, preferred, samples };
+      })()
+    : undefined;
+
+  const notes = entries.flatMap(([itemId, item]) =>
+    Object.entries(exported.ratings[itemId] ?? {})
+      .filter(([, rating]) => rating.note && rating.note.trim())
+      .map(([label, rating]) => ({
+        item: itemId,
+        label,
+        arm: item.labels[label] ? describeRef(item.labels[label]) : "unknown label",
+        note: rating.note as string,
+      }))
+  );
+
+  const completeness: PairwiseScores["completeness"] = { unratedItems: [], withoutPreference: [], withoutVerdict: [] };
+  for (const [itemId, item] of entries) {
+    const ratings = exported.ratings[itemId] ?? {};
+    const labels = Object.entries(item.labels);
+    const verdictLess = labels.filter(([label]) => !hasVerdict(ratings[label])).map(([label, ref]) => ({ label, arm: describeRef(ref) }));
+    if (!preferences[itemId] && verdictLess.length === labels.length) {
+      completeness.unratedItems.push(itemId);
+      continue;
+    }
+    if (!preferences[itemId]) completeness.withoutPreference.push(itemId);
+    if (verdictLess.length) completeness.withoutVerdict.push({ item: itemId, options: verdictLess });
+  }
+
+  return {
+    mode: "pairwise",
+    setId: key.setId,
+    pageId: key.pageId,
+    exportedAt: exported.exportedAt,
+    reference,
+    candidate: candidateRef ? armOf(candidateRef) : "none",
+    items,
+    wins,
+    ties,
+    losses,
+    candidateShare: withPreference ? (wins + ties / 2) / withPreference : null,
+    signTestP: signTestP(wins, losses),
+    acceptable: {
+      reference: acceptableCount(items.map((i) => i.referenceAcceptable)),
+      candidate: acceptableCount(items.map((i) => i.candidateAcceptable)),
+      onlyReference: bothMarked.filter((i) => i.referenceAcceptable === "yes" && i.candidateAcceptable === "no").length,
+      onlyCandidate: bothMarked.filter((i) => i.candidateAcceptable === "yes" && i.referenceAcceptable === "no").length,
+    },
+    repeat,
+    control,
+    picksByLabel,
+    notes,
+    completeness,
+  };
+}
+
+const RESULT_TEXT: Record<PairwiseResult, string> = { win: "candidate better", tie: "about the same", loss: "reference better" };
+
+export function renderPairwiseScores(scores: PairwiseScores): string {
+  const rate = (a: AcceptableCount) => (a.rate === null ? NOT_MARKED : `${a.yes} of ${a.marked} (${pct(a.rate)})`);
+  const r = scores.repeat;
+  const repeatLineText = !r
+    ? "- No repeated item on this page."
+    : r.samePreference === null
+      ? `- Repeated item ${r.item} (of ${r.of}, labels swapped): unavailable, both showings need a preference.`
+      : `- Repeated item ${r.item} (of ${r.of}, labels swapped): ${r.samePreference ? "the same result" : "a different result"} for the candidate${
+          r.acceptableAgreement === null ? "" : `; acceptable verdicts agree on ${pct(r.acceptableAgreement)} of the ${r.acceptableCompared} options marked in both`
+        }.`;
+  const c = scores.control;
+  const controlLineText = !c
+    ? "- No reference-against-reference item on this page."
+    : `- Reference against itself (${c.item}): ${c.preferred === undefined ? "no preference" : c.preferred === SAME ? "about the same" : `${c.preferred} preferred`}; ${c.samples
+        .map((s) => `sample ${s.sample} acceptable ${s.acceptable ?? NOT_MARKED}`)
+        .join(", ")}.`;
+  const done = scores.completeness;
+  const lines = [
+    `# Pairwise scores: ${scores.setId} (${scores.pageId})`,
+    "",
+    `Exported ${scores.exportedAt}.`,
+    "",
+    "| | Arm | Acceptable |",
+    "|---|---|---|",
+    `| Reference | ${scores.reference} | ${rate(scores.acceptable.reference)} |`,
+    `| Candidate | ${scores.candidate} | ${rate(scores.acceptable.candidate)} |`,
+    "",
+    `- Candidate against reference: ${scores.wins} better, ${scores.ties} about the same, ${scores.losses} worse, over ${scores.wins + scores.ties + scores.losses} of ${scores.items.length} regular items.`,
+    `- Candidate share (a tie counts half): ${scores.candidateShare === null ? "unavailable" : pct(scores.candidateShare)}. Sign test over the decided items: ${
+      scores.signTestP === null ? "unavailable (no decided item)" : `p = ${scores.signTestP.toFixed(3)} (two-sided)`
+    }.`,
+    `- Acceptable on one side only: the reference on ${scores.acceptable.onlyReference} items, the candidate on ${scores.acceptable.onlyCandidate}.`,
+    "",
+    "Regular items only; the repeat and the reference-against-reference item are read under Controls.",
+    "",
+    "## Items",
+    "",
+    "| Item | Case | Result | Reference acceptable | Candidate acceptable |",
+    "|---|---|---|---|---|",
+    ...scores.items.map(
+      (i) => `| ${i.item} | ${i.caseId} | ${i.result ? RESULT_TEXT[i.result] : "no preference"} | ${i.referenceAcceptable ?? NOT_MARKED} | ${i.candidateAcceptable ?? NOT_MARKED} |`
+    ),
+    "",
+    "## Completeness",
+    "",
+    ...(done.unratedItems.length ? [`- Not rated at all: ${done.unratedItems.join(", ")}.`] : []),
+    ...(done.withoutPreference.length ? [`- Without a preference: ${done.withoutPreference.join(", ")}.`] : []),
+    ...done.withoutVerdict.map((u) => `- ${u.item}: ${u.options.map((o) => `${o.label} (${o.arm})`).join(", ")} without an Acceptable? verdict.`),
+    ...(!done.unratedItems.length && !done.withoutPreference.length && !done.withoutVerdict.length ? ["- Every item carries a preference and both verdicts."] : []),
+    "",
+    "## Controls",
+    "",
+    repeatLineText,
+    controlLineText,
+    `- Picks by label: ${Object.entries(scores.picksByLabel).map(([label, n]) => `${label === SAME ? "about the same" : label} ${n}`).join(", ") || "none"}.`,
     "",
     "## Notes",
     "",

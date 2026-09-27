@@ -12,12 +12,20 @@ import { ENTRY_STARTS_OPEN, startsOpen } from "../../../../src/evals/textModelEv
 import {
   LABELS,
   pageFieldLabels,
+  pairwiseInstructions,
   planRatingSet,
   ratingSetFromKey,
   type RatingSet,
   type RatingSpec,
 } from "../../../../src/evals/textModelEval/ratingSets.js";
-import { renderScores, scoreRatings, type ExportedRatings } from "../../../../src/evals/textModelEval/ratingScore.js";
+import {
+  renderPairwiseScores,
+  renderScores,
+  scorePairwise,
+  scoreRatings,
+  signTestP,
+  type ExportedRatings,
+} from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
@@ -324,6 +332,224 @@ describe("planRatingSet: rotating candidates (perItem)", () => {
   it("shows every arm on every item when perItem is unset or covers all candidates", () => {
     const { set } = rotated([BASELINE, LUNA, SOL, SOL_MEDIUM], 6, 3);
     expect(set.items.filter((i) => i.options.length === 4)).toHaveLength(set.items.length - 1);
+  });
+});
+
+describe("planRatingSet: pairwise pages", () => {
+  const PAIR = [BASELINE, LUNA].map((a) => ({ promptState: "prefix", armKey: a.key }));
+  function pairwise(items: number, spec: Partial<RatingSpec> = {}, salt = "pairwise", kind: RatingSpec["kind"] = "setup") {
+    const { cases, records, load } = fixture([BASELINE, LUNA], items + 3);
+    return planRatingSet({ kind, arms: PAIR, items, preview: false, pairwise: true, ...spec }, records, cases, { loadOutput: load, salt, now: new Date(0) });
+  }
+  const regular = (key: ReturnType<typeof pairwise>["key"]) => Object.entries(key.items).filter(([, i]) => !i.repeatOf && !i.control);
+  const referenceLabel = (item: { labels: Record<string, { armKey: string; sample: number }> }) =>
+    Object.entries(item.labels).find(([, ref]) => ref.armKey === BASELINE.key)?.[0];
+
+  it("shows exactly two options per item, the reference against the candidate", () => {
+    const { set, key } = pairwise(9);
+    expect(set.items.every((i) => i.options.length === 2)).toBe(true);
+    for (const [, item] of regular(key)) expect(Object.values(item.labels).map((r) => r.armKey).sort()).toEqual([BASELINE.key, LUNA.key].sort());
+    expect(set.mode).toBe("pairwise");
+    expect(key.mode).toBe("pairwise");
+  });
+
+  it("puts the reference first on about half the items, in salted page order", () => {
+    for (const salt of ["one", "two", "three"]) {
+      const { key } = pairwise(9, {}, salt);
+      expect(Math.abs((key.labelDistribution.A ?? 0) - (key.labelDistribution.B ?? 0))).toBeLessThanOrEqual(1);
+    }
+    expect(pairwise(10).key.labelDistribution).toEqual({ A: 5, B: 5 });
+    const orders = ["one", "two", "three", "four"].map((salt) => regular(pairwise(8, {}, salt).key).map(([, i]) => referenceLabel(i)).join(""));
+    expect(new Set(orders).size).toBeGreaterThan(1);
+  });
+
+  it("keeps the control and the repeat, and repeats the pair with its labels swapped", () => {
+    const { key } = pairwise(6);
+    const entries = Object.entries(key.items);
+    const repeat = entries.find(([, i]) => i.repeatOf)?.[1];
+    const control = entries.find(([, i]) => i.control)?.[1];
+    expect(repeat).toBeDefined();
+    expect(referenceLabel(repeat as NonNullable<typeof repeat>)).not.toBe(referenceLabel(key.items[repeat?.repeatOf ?? ""]));
+    expect(Object.values(control?.labels ?? {}).map((l) => [l.armKey, l.sample]).sort()).toEqual([
+      [BASELINE.key, 1],
+      [BASELINE.key, 2],
+    ]);
+  });
+
+  it("leaves the repeat out when it is switched off, on any page, and says so", () => {
+    const off = pairwise(6, { repeat: false });
+    expect(Object.values(off.key.items).some((i) => i.repeatOf)).toBe(false);
+    expect(Object.values(off.key.items).some((i) => i.control)).toBe(true);
+    expect(off.key.notes).toContain("No repeated item: switched off.");
+    expect(Object.values(plan("ranked-off", 6, { repeat: false }).key.items).some((i) => i.repeatOf)).toBe(false);
+  });
+
+  it("refuses anything but two arms", () => {
+    expect(() => pairwise(6, { arms: ARMS })).toThrow(/exactly two arms/);
+    expect(() => pairwise(6, { arms: PAIR.slice(0, 1) })).toThrow(/exactly two arms/);
+  });
+
+  it("prints the owner's criteria in the instructions, which pass the blinding word check", () => {
+    const setup = pairwise(6).set;
+    const text = setup.instructions.join(" ");
+    for (const criterion of [
+      "stats that matter in play and keep score sensibly",
+      "a real arc for each player",
+      "shared outcomes only where they fit",
+      "thread types and switch rules that steer",
+    ]) {
+      expect(text).toContain(criterion);
+    }
+    const turnInstructions = pairwiseInstructions("turn").join(" ");
+    for (const criterion of [
+      "Does this turn move the chapter's question and follow its plan?",
+      "Does the chapter pursue the direction the player picked?",
+      "Is there a real choice among the options?",
+      "Does the prose sound like this story?",
+    ]) {
+      expect(turnInstructions).toContain(criterion);
+    }
+    expect(metadataLeaks(setup)).toEqual([]);
+    expect([...pairwiseInstructions("turn"), ...pageFieldLabels("turn", "pairwise")].filter((s) => LEAK_PATTERN.test(s))).toEqual([]);
+    expect(pageFieldLabels("setup", "pairwise")).toEqual(expect.arrayContaining(["Which is better?", "About the same"]));
+  });
+
+  it("rebuilds a pairwise page from its key", () => {
+    const { cases, records, load } = fixture([BASELINE, LUNA], 9);
+    const planned = planRatingSet({ kind: "setup", arms: PAIR, items: 6, preview: false, pairwise: true }, records, cases, { loadOutput: load, salt: "again", now: new Date(0) });
+    expect(ratingSetFromKey(planned.key, records, cases, load)).toEqual(planned.set);
+  });
+});
+
+describe("renderRatingPage: a pairwise page", () => {
+  const PAIR = [BASELINE, LUNA].map((a) => ({ promptState: "prefix", armKey: a.key }));
+  const { cases, records, load } = fixture([BASELINE, LUNA], 9);
+  const { set, key } = planRatingSet({ kind: "setup", arms: PAIR, items: 6, preview: false, pairwise: true }, records, cases, { loadOutput: load, salt: "page", now: new Date(0) });
+  const html = renderRatingPage(set);
+  const tree = parseHtml(html);
+  const item = select(tree, "section.item")[0];
+  const itemId = item.attrs.id.replace(/^item-/, "");
+
+  it("keeps the aligned, foldable layout: one column per option, the same section keys", () => {
+    expect(select(item, "div.compare")[0].attrs.class).toContain("n2");
+    expect(sectionKeys(item)).toContain("sharedOutcomes");
+    expect(sectionKeys(item)).toContain("premise");
+  });
+
+  it("asks Acceptable? on both options and one Which is better? per item, with no ranks", () => {
+    const inputs = html.match(/<input\b[^>]*>/g) ?? [];
+    expect(inputs.filter((i) => i.includes('data-field="rank"'))).toEqual([]);
+    const own = inputs.filter((i) => i.includes(`data-item="${itemId}"`));
+    expect(own.filter((i) => i.includes('data-field="acceptable"'))).toHaveLength(4);
+    expect(own.filter((i) => i.includes('data-field="note"'))).toHaveLength(2);
+    expect(own.filter((i) => i.includes('data-field="preference"'))).toEqual([
+      `<input type="radio" name="${itemId}-preference" value="A" data-item="${itemId}" data-field="preference">`,
+      `<input type="radio" name="${itemId}-preference" value="B" data-item="${itemId}" data-field="preference">`,
+      `<input type="radio" name="${itemId}-preference" value="same" data-item="${itemId}" data-field="preference">`,
+    ]);
+    expect(textOf(select(item, "fieldset.prefer")[0])).toBe("Which is better? A B About the same");
+  });
+
+  it("tells the script it is pairwise, which exports the preferences beside the verdicts", () => {
+    expect(html).toContain(`"mode":"pairwise"`);
+    const script = select(tree, "script").filter((s) => s.attrs.type === undefined)[0].text.join("");
+    expect(script).toContain(`out.preferences=state.preferences`);
+    expect(html).not.toContain(key.keyFile);
+  });
+
+  it("keeps the harness's leak words out of the stylesheet, the script and every attribute", () => {
+    const code = [...select(tree, "style"), ...select(tree, "script").filter((s) => s.attrs.type === undefined)].map((n) => n.text.join(""));
+    const attributes = all(tree, () => true).flatMap((n) => Object.values(n.attrs));
+    expect([...code, ...attributes].map((s) => s.replace(/\bnone\b/gi, "").match(LEAK_PATTERN)?.[0]).filter(Boolean)).toEqual([]);
+    expect(htmlLeaks(html, key)).toEqual([]);
+  });
+});
+
+describe("scorePairwise", () => {
+  const PAIR = [BASELINE, LUNA].map((a) => ({ promptState: "prefix", armKey: a.key }));
+  const { cases, records, load } = fixture([BASELINE, LUNA], 9);
+  const { key } = planRatingSet({ kind: "setup", arms: PAIR, items: 6, preview: false, pairwise: true }, records, cases, { loadOutput: load, salt: "score", now: new Date(0) });
+  const ids = Object.keys(key.items);
+  const regularIds = ids.filter((id) => !key.items[id].repeatOf && !key.items[id].control);
+  const repeatId = ids.find((id) => key.items[id].repeatOf) ?? "";
+  const controlId = ids.find((id) => key.items[id].control) ?? "";
+  const labelOf = (itemId: string, armKey: string, sample = 1) =>
+    Object.entries(key.items[itemId].labels).find(([, ref]) => ref.armKey === armKey && ref.sample === sample)?.[0] ?? "";
+
+  /** Prefers the candidate on the items given (the reference elsewhere), marks both acceptable except the reference on `refused` */
+  function exported(prefer: (itemId: string) => "candidate" | "reference" | "same" | undefined, refused: string[] = []): ExportedRatings {
+    const ratings: ExportedRatings["ratings"] = {};
+    const preferences: Record<string, string> = {};
+    for (const [itemId, item] of Object.entries(key.items)) {
+      ratings[itemId] = Object.fromEntries(
+        Object.entries(item.labels).map(([label, ref]) => [label, { acceptable: ref.armKey === BASELINE.key && refused.includes(itemId) ? "no" : "yes" }])
+      );
+      const choice = prefer(itemId);
+      if (choice === "same") preferences[itemId] = "same";
+      else if (choice === "candidate") preferences[itemId] = labelOf(itemId, LUNA.key) || labelOf(itemId, BASELINE.key, 2);
+      else if (choice === "reference") preferences[itemId] = labelOf(itemId, BASELINE.key);
+    }
+    return { pageId: key.pageId, setId: key.setId, exportedAt: "2026-09-27T00:00:00Z", mode: "pairwise", ratings, preferences };
+  }
+
+  it("reads a win, tie or loss per item for the candidate, and acceptable rates per arm", () => {
+    const [w1, w2, t1] = regularIds;
+    const scores = scorePairwise(exported((id) => (id === w1 || id === w2 ? "candidate" : id === t1 ? "same" : "reference"), [w1]), key);
+    expect(scores).toMatchObject({ reference: `prefix:${BASELINE.key}`, candidate: `prefix:${LUNA.key}`, wins: 2, ties: 1, losses: regularIds.length - 3 });
+    expect(scores.items.find((i) => i.item === w1)).toMatchObject({ result: "win", referenceAcceptable: "no", candidateAcceptable: "yes" });
+    expect(scores.acceptable.candidate).toEqual({ marked: regularIds.length, yes: regularIds.length, rate: 1 });
+    expect(scores.acceptable.reference.yes).toBe(regularIds.length - 1);
+    expect(scores.acceptable.onlyCandidate).toBe(1);
+    expect(scores.picksByLabel.same).toBe(1);
+  });
+
+  it("gives the sign test's two-sided p over the decided items", () => {
+    const allWins = scorePairwise(exported(() => "candidate"), key);
+    expect(allWins.wins).toBe(regularIds.length);
+    expect(allWins.signTestP).toBeCloseTo(2 / 2 ** regularIds.length);
+    expect(scorePairwise(exported(() => "same"), key).signTestP).toBeNull();
+    expect(signTestP(9, 0)).toBeCloseTo(0.00390625);
+    expect(signTestP(5, 4)).toBe(1);
+  });
+
+  it("reads the repeat in arm terms, so the swapped labels still agree", () => {
+    const same = scorePairwise(exported(() => "candidate"), key);
+    expect(same.repeat).toMatchObject({ item: repeatId, samePreference: true, acceptableAgreement: 1 });
+    const first = key.items[repeatId].repeatOf ?? "";
+    const flipped = scorePairwise(exported((id) => (id === repeatId ? "reference" : id === first ? "candidate" : "same")), key);
+    expect(flipped.repeat?.samePreference).toBe(false);
+  });
+
+  it("reads the control as which sample was preferred", () => {
+    const scores = scorePairwise(exported((id) => (id === controlId ? "candidate" : "same")), key);
+    // The control's "candidate" is its sample 2
+    expect(scores.control).toMatchObject({ item: controlId, preferred: "sample 2" });
+  });
+
+  it("lists items without a preference or a verdict, and scores what is there", () => {
+    const [skipped] = regularIds;
+    const partial = exported((id) => (id === skipped ? undefined : "candidate"));
+    delete partial.ratings[skipped];
+    const scores = scorePairwise(partial, key);
+    expect(scores.completeness.unratedItems).toEqual([skipped]);
+    expect(scores.wins).toBe(regularIds.length - 1);
+    const md = renderPairwiseScores(scores);
+    expect(md).toContain(`Not rated at all: ${skipped}`);
+    expect(md).toMatch(/\| Candidate \| prefix:gpt-6-luna@low\/prod \|/);
+    expect(md).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("refuses an export for another page, and a ranked key", () => {
+    expect(() => scorePairwise({ ...exported(() => "same"), pageId: "other" }, key)).toThrow(/key for/);
+    const ranked = plan("ranked", 3).key;
+    expect(() => scorePairwise({ ...exported(() => "same"), pageId: ranked.pageId }, ranked)).toThrow(/not a pairwise page/);
+  });
+
+  it("lists every note with its arm", () => {
+    const notes = exported(() => "candidate");
+    notes.ratings[regularIds[0]] = { ...notes.ratings[regularIds[0]], [labelOf(regularIds[0], LUNA.key)]: { acceptable: "yes", note: "clearer stats" } };
+    const scores = scorePairwise(notes, key);
+    expect(scores.notes).toEqual([{ item: regularIds[0], label: labelOf(regularIds[0], LUNA.key), arm: `prefix:${LUNA.key} s1`, note: "clearer stats" }]);
   });
 });
 

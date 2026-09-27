@@ -1,5 +1,5 @@
 import { PRODUCTION_MAX_RETRIES } from "shared/llm/chatModel.js";
-import type { Arm, EvalRole, Stage } from "./arms.js";
+import { stageRunsBaseline, type Arm, type EvalRole, type Stage } from "./arms.js";
 import { budgetCheck, spentByStage, type Caps, type SpendRecord } from "./budget.js";
 import { sha256, type CallSpec, type ExecutedCall } from "./executor.js";
 import { costFromUsage, type Estimate } from "./pricing.js";
@@ -432,11 +432,13 @@ export async function runJobs(
 
   const baselineWorked = (group: Job["group"], caseId: string) =>
     allRecords.some((r) => r.baseline && r.group === group && r.caseId === caseId && r.jobFinal && usable(r));
+  // A stage that reads against stored references runs no baseline, so it gates nothing on one
+  const mayRun = (job: Job) => !stageRunsBaseline(job.stage) || baselineWorked(job.group, job.caseId);
 
   for (const group of GROUP_ORDER) {
     const inGroup = jobs.filter((job) => job.group === group);
     await runPhase(inGroup.filter((job) => job.baseline));
-    await runPhase(inGroup.filter((job) => !job.baseline && baselineWorked(group, job.caseId)));
+    await runPhase(inGroup.filter((job) => !job.baseline && mayRun(job)));
     if (stoppedReason) break;
   }
   return { records, stoppedReason };

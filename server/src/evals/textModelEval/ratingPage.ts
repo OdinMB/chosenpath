@@ -2,7 +2,7 @@ import type { OptionContent, SetupCard, TurnContent } from "./ratingContent.js";
 import { MARK_TEXT, type ContextLine } from "./ratingContext.js";
 import { escapeHtml, paragraphs } from "./ratingHtml.js";
 import { setupRows, startsOpen, turnRows, type Row } from "./ratingRows.js";
-import type { RatingItem, RatingSet } from "./ratingSets.js";
+import { PAIRWISE_LABELS, type RatingItem, type RatingSet } from "./ratingSets.js";
 
 /*
  * One self-contained HTML file per rating set: every string escaped and
@@ -16,6 +16,10 @@ import type { RatingItem, RatingSet } from "./ratingSets.js";
  * folds it in every column at once. Below the width where the columns fit
  * (WIDE_FROM) the rows stay and the options stack inside each row, every
  * cell tagged with its option letter.
+ *
+ * A pairwise page keeps the layout and each option's Acceptable? and note,
+ * and asks one "Which is better?" per item (A, B or About the same) instead
+ * of ranks; its export adds the preferences.
  */
 
 const e = escapeHtml;
@@ -78,7 +82,7 @@ function contextHtml(item: RatingItem, kind: RatingSet["kind"]): string {
     : "";
 }
 
-function controlsHtml(item: RatingItem, label: string, count: number): string {
+function controlsHtml(item: RatingItem, label: string, count: number, pairwise: boolean): string {
   const name = `${item.id}-${label}`;
   const ranks = Array.from({ length: count }, (_, i) => i + 1)
     .map((rank) => `<label class="choice"><input type="radio" name="${e(name)}-rank" value="${rank}" data-item="${e(item.id)}" data-label="${e(label)}" data-field="rank"> ${rank}</label>`)
@@ -89,14 +93,20 @@ function controlsHtml(item: RatingItem, label: string, count: number): string {
 <label class="choice"><input type="radio" name="${e(name)}-acceptable" value="yes" data-item="${e(item.id)}" data-label="${e(label)}" data-field="acceptable"> Yes</label>
 <label class="choice"><input type="radio" name="${e(name)}-acceptable" value="no" data-item="${e(item.id)}" data-label="${e(label)}" data-field="acceptable"> No</label>
 </fieldset>
-<fieldset><legend>Rank (1 = best; ties allowed)</legend>${ranks}</fieldset>
-<label class="note">Note (optional) <input type="text" data-item="${e(item.id)}" data-label="${e(label)}" data-field="note"></label>
+${pairwise ? "" : `<fieldset><legend>Rank (1 = best; ties allowed)</legend>${ranks}</fieldset>\n`}<label class="note">Note (optional) <input type="text" data-item="${e(item.id)}" data-label="${e(label)}" data-field="note"></label>
 </div>`;
+}
+
+/** A pairwise item's one question: which option is better, or neither. */
+function preferenceHtml(item: RatingItem, labels: string[]): string {
+  const choice = (value: string, text: string) =>
+    `<label class="choice"><input type="radio" name="${e(item.id)}-preference" value="${e(value)}" data-item="${e(item.id)}" data-field="preference"> ${e(text)}</label>`;
+  return `<fieldset class="prefer"><legend>${e(PAIRWISE_LABELS.question)}</legend>${[...labels.map((label) => choice(label, label)), choice("same", PAIRWISE_LABELS.same)].join("")}</fieldset>`;
 }
 
 const isSetup = (content: OptionContent): content is SetupCard => content.kind === "setup";
 
-function compareHtml(item: RatingItem): string {
+function compareHtml(item: RatingItem, pairwise: boolean): string {
   const labels = item.options.map((o) => o.label);
   const contents = item.options.map((o) => o.content);
   const setups = contents.filter(isSetup);
@@ -109,15 +119,15 @@ function compareHtml(item: RatingItem): string {
   return `<div class="compare n${labels.length}">
 <div class="labels grid">${labelRow}</div>
 ${titleRow}${rows.map((row) => rowHtml(row, labels, 0)).join("")}
-<div class="controls grid">${labels.map((label) => controlsHtml(item, label, labels.length)).join("")}</div>
-</div>`;
+<div class="controls grid">${labels.map((label) => controlsHtml(item, label, labels.length, pairwise)).join("")}</div>
+${pairwise ? preferenceHtml(item, labels) : ""}</div>`;
 }
 
-function itemHtml(item: RatingItem, index: number, total: number, kind: RatingSet["kind"]): string {
+function itemHtml(item: RatingItem, index: number, total: number, set: RatingSet): string {
   return `<section class="item" id="item-${e(item.id)}" data-index="${index}" hidden>
 <h2>Item ${index + 1} of ${total}</h2>
-${contextHtml(item, kind)}
-${compareHtml(item)}
+${contextHtml(item, set.kind)}
+${compareHtml(item, set.mode === "pairwise")}
 </section>`;
 }
 
@@ -205,6 +215,8 @@ code.id{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
 .controls>.cell:last-child{border-bottom-width:1px;border-radius:0 0 8px 8px}
 .ctl-label{font-weight:700;color:var(--accent);margin:.25rem 0 0}
 fieldset{border:1px solid var(--line);border-radius:6px;margin:.75rem 0;padding:.25rem .75rem}
+fieldset.prefer{background:var(--card);border-color:var(--accent);margin-top:1rem}
+fieldset.prefer legend{font-weight:700;color:var(--accent)}
 .choice{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;min-width:44px;margin-right:1rem;cursor:pointer}
 input[type=radio]{width:22px;height:22px}
 .note{display:block;margin:.5rem 0} .note input{width:100%;min-height:44px;font:inherit;padding:.25rem .5rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
@@ -224,24 +236,28 @@ const SCRIPT = `
 (function(){
 var data=JSON.parse(document.getElementById("page-data").textContent);
 var key="chosenpath-rating:"+data.pageId;
-var state={ratings:{},current:0,lastExport:null};
+var pairwise=data.mode==="pairwise";
+var state={ratings:{},preferences:{},current:0,lastExport:null};
 var storage=null;
 try{storage=window.localStorage;var saved=storage.getItem(key);if(saved){state=Object.assign(state,JSON.parse(saved));}}catch(err){storage=null;}
+state.preferences=state.preferences||{};
 if(!storage){document.getElementById("storage-notice").hidden=false;}
 function save(){if(!storage)return;try{storage.setItem(key,JSON.stringify(state));}catch(err){document.getElementById("storage-notice").hidden=false;}}
 var sections=Array.prototype.slice.call(document.querySelectorAll(".item"));
 var bar=document.querySelector(".bar");
 function barHeight(){document.documentElement.style.setProperty("--bar-h",bar.offsetHeight+"px");}
 barHeight();window.addEventListener("resize",barHeight);
-function rated(item){var r=state.ratings[item.id]||{};return item.labels.every(function(l){return r[l]&&r[l].acceptable&&r[l].rank;});}
+function rated(item){var r=state.ratings[item.id]||{};var each=item.labels.every(function(l){return r[l]&&r[l].acceptable&&(pairwise||r[l].rank);});return pairwise?each&&!!state.preferences[item.id]:each;}
 function progress(){var done=data.items.filter(rated).length;document.getElementById("progress").textContent="Item "+(state.current+1)+" of "+data.items.length+" \\u00b7 "+done+" fully rated";
 var jump=document.getElementById("jump");for(var i=0;i<jump.options.length;i++){jump.options[i].textContent=(i+1)+(rated(data.items[i])?" \\u2713":"");}jump.value=String(state.current);
 document.getElementById("last-export").textContent=state.lastExport?"Last export: "+state.lastExport:"Not exported yet";}
 function show(i,scroll){state.current=Math.max(0,Math.min(sections.length-1,i));sections.forEach(function(s,j){s.hidden=j!==state.current;});save();progress();if(scroll){sections[state.current].scrollIntoView({block:"start"});}}
-function restore(){document.querySelectorAll("[data-field]").forEach(function(input){var r=((state.ratings[input.dataset.item]||{})[input.dataset.label])||{};var v=r[input.dataset.field];
+function restore(){document.querySelectorAll("[data-field]").forEach(function(input){if(input.dataset.field==="preference"){input.checked=state.preferences[input.dataset.item]===input.value;return;}
+var r=((state.ratings[input.dataset.item]||{})[input.dataset.label])||{};var v=r[input.dataset.field];
 if(input.type==="radio"){input.checked=v!==undefined&&String(v)===input.value;}else{input.value=v||"";}});}
 document.addEventListener("change",onInput);document.addEventListener("input",function(ev){if(ev.target.type==="text")onInput(ev);});
-function onInput(ev){var t=ev.target;if(!t.dataset||!t.dataset.field)return;var item=state.ratings[t.dataset.item]=state.ratings[t.dataset.item]||{};var opt=item[t.dataset.label]=item[t.dataset.label]||{};
+function onInput(ev){var t=ev.target;if(!t.dataset||!t.dataset.field)return;if(t.dataset.field==="preference"){state.preferences[t.dataset.item]=t.value;save();progress();return;}
+var item=state.ratings[t.dataset.item]=state.ratings[t.dataset.item]||{};var opt=item[t.dataset.label]=item[t.dataset.label]||{};
 opt[t.dataset.field]=t.dataset.field==="rank"?Number(t.value):t.value;save();progress();}
 document.getElementById("prev").addEventListener("click",function(){show(state.current-1,true);});
 document.getElementById("next").addEventListener("click",function(){show(state.current+1,true);});
@@ -249,7 +265,8 @@ document.getElementById("jump").addEventListener("change",function(ev){show(Numb
 document.addEventListener("keydown",function(ev){var tag=(ev.target.tagName||"").toLowerCase();if(tag==="input"&&ev.target.type==="text"||tag==="textarea"||tag==="select")return;
 if(ev.key==="n"){show(state.current+1,true);}else if(ev.key==="p"){show(state.current-1,true);}});
 document.getElementById("export").addEventListener("click",function(){var exportedAt=new Date().toISOString();
-var blob=new Blob([JSON.stringify({pageId:data.pageId,setId:data.setId,exportedAt:exportedAt,ratings:state.ratings},null,2)],{type:"application/json"});
+var out={pageId:data.pageId,setId:data.setId,exportedAt:exportedAt,ratings:state.ratings};if(pairwise){out.mode="pairwise";out.preferences=state.preferences;}
+var blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
 var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ratings-"+data.setId+"-"+data.pageId+".json";document.body.appendChild(a);a.click();
 setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},0);state.lastExport=exportedAt;save();progress();});
 restore();show(state.current||0);
@@ -261,6 +278,7 @@ function pageData(set: RatingSet): string {
   const data = {
     pageId: set.pageId,
     setId: set.setId,
+    ...(set.mode === "pairwise" ? { mode: set.mode } : {}),
     items: set.items.map((item) => ({ id: item.id, labels: item.options.map((o) => o.label) })),
   };
   return JSON.stringify(data).replace(/</g, "\\u003c");
@@ -294,7 +312,7 @@ ${set.instructions.map((line) => `<p>${e(line)}</p>`).join("")}
 </nav>
 </div>
 <main>
-${set.items.map((item, index) => itemHtml(item, index, total, set.kind)).join("\n")}
+${set.items.map((item, index) => itemHtml(item, index, total, set)).join("\n")}
 </main>
 <footer>
 <nav aria-label="Export">

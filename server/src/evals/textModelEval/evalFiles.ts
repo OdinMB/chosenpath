@@ -23,6 +23,7 @@ import type { CallRecord } from "./runner.js";
  *   results.md
  *   filter-check.jsonl     one record per filter-check case and arm (--filter-check)
  *   filter-check.md        its report, rewritten after each run
+ *   check-baselines.md|json  the new checks' baselines over the stored outputs (--check-baselines)
  */
 
 function readJsonl<T>(file: string): T[] {
@@ -77,6 +78,11 @@ export function evalFiles(outDir: string) {
       record.outputFile
         ? replyContent((JSON.parse(fs.readFileSync(at(record.outputFile), "utf-8")) as { rawBody?: string }).rawBody)
         : undefined,
+    /** The text the call was sent (prompts/<promptHash>.txt), when stored */
+    loadPrompt: (record: CallRecord): string | undefined => {
+      const file = record.promptHash ? at("prompts", `${record.promptHash}.txt`) : undefined;
+      return file && fs.existsSync(file) ? fs.readFileSync(file, "utf-8") : undefined;
+    },
     writeRatingPage: (fileName: string, html: string, preview: boolean) => {
       const dir = preview ? at("rating", "preview") : at("rating");
       fs.mkdirSync(dir, { recursive: true });
@@ -96,6 +102,11 @@ export function evalFiles(outDir: string) {
     writeResults: (markdown: string) => {
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(at("results.md"), markdown);
+    },
+    /** The new checks' baselines over the stored outputs (--check-baselines) */
+    writeCheckBaselines: (markdown: string, json: unknown) => {
+      writeJson(at("check-baselines.json"), json);
+      fs.writeFileSync(at("check-baselines.md"), markdown);
     },
     readFilterRecords: (): FilterRecord[] => readJsonl<FilterRecord>(at("filter-check.jsonl")),
     appendFilterRecord: (record: FilterRecord) => {

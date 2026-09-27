@@ -266,7 +266,8 @@ export function withRepairs(result: CheckResult, repairs: Repair[], plan?: { pro
   return merge([result, { checks, counts, unknownIds: [] }]);
 }
 
-function merge(results: CheckResult[]): CheckResult {
+/** Several results as one: a check passes when every result that reports it passes; counts add up. */
+export function merge(results: CheckResult[]): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
   for (const result of results) {

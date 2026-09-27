@@ -1,7 +1,7 @@
 import type { PlayerCount, StoryState, StoryTemplate } from "core/types/index.js";
 import { beatStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import { baselineArm, type EvalRole, type Stage } from "./arms.js";
-import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, type SpendRecord } from "./budget.js";
+import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, STAGE_CAP_REASONS, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type Snapshot } from "./cases.js";
 import { FILTER_CASES } from "./filterCases.js";
@@ -128,6 +128,12 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     ["Stage 3 pipeline chains", "3", plan("3", analysis).filter((j) => !j.baseline)],
     // Likewise every rewrite request on every case in scope; estimates ignore caching
     ["Stage 4 candidates (isolated)", "4", plan("4", { mode: "isolated" }).filter((j) => !j.baseline)],
+    // The rounds and the migration check plan no baseline: they read against stored records
+    ["Setup rounds candidates (isolated)", "setup-rounds", plan("setup-rounds", { mode: "isolated" })],
+    ["Turn rounds candidates (isolated)", "turn-rounds", plan("turn-rounds", { mode: "isolated" })],
+    ["Turn rounds pipeline chains", "turn-rounds", plan("turn-rounds", analysis)],
+    ["Migration check (production defaults, isolated)", "migration", plan("migration", { mode: "isolated" })],
+    ["Migration check pipeline chains", "migration", plan("migration", analysis)],
   ];
   const caps = resolveCaps({}).caps;
   const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0);
@@ -146,7 +152,7 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   log("\nSpend so far vs caps:");
   for (const stage of LEDGER_STAGES) {
     const label = stage === "filter" ? "Filter check" : `Stage ${stage}`;
-    log(`  ${label}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]}`);
+    log(`  ${label}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]} (${STAGE_CAP_REASONS[stage]})`);
   }
   log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $30 by the owner on 2026-09-27; the first target was about $25)`);
   log(

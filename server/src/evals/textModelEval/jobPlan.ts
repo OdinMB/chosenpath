@@ -9,6 +9,7 @@ import {
   chainKey,
   estimateBaseKey,
   pipelinePlan,
+  stageRunsBaseline,
   type Arm,
   type ArmPlan,
   type EvalRole,
@@ -56,7 +57,8 @@ export type PlanOptions = {
 
 const DEFAULT_BASELINE_SAMPLES = 2;
 
-function inputFor(evalCase: EvalCase): RequestInput {
+/** What a case's request is built from: the setup or iteration input, or the case's story (with its fixed analysis for beats). */
+export function requestInputFor(evalCase: EvalCase): RequestInput {
   switch (evalCase.role) {
     case "setup":
       if (!evalCase.setup) throw new Error(`${evalCase.id} has no setup input`);
@@ -177,7 +179,7 @@ function planned(
 
 function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: number, measured: Map<string, number[]>): Job {
   // The estimate has already built the request, so the cache line costs no extra build
-  const first = planned(evalCase.role, arm, evalCase.tags.players, () => requestFor(arm.variant, inputFor(evalCase)), measured);
+  const first = planned(evalCase.role, arm, evalCase.tags.players, () => requestFor(arm.variant, requestInputFor(evalCase)), measured);
   return {
     stage: options.stage,
     promptState: options.promptState,
@@ -285,6 +287,7 @@ function casesFor(
         (!plan.caseIds || plan.caseIds.includes(c.id)) &&
         (!subsetOnly || c.tags.subset15) &&
         !(plan.scope === "single-player" && c.tags.multiplayer) &&
+        !(plan.scope === "multiplayer" && !c.tags.multiplayer) &&
         !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
     )
   );
@@ -298,7 +301,8 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
   const jobs: Job[] = [];
   const regular = options.rareFailure !== "only";
   const baselineSamples = options.samples ?? DEFAULT_BASELINE_SAMPLES;
-  for (const evalCase of regular ? casesFor(cases, role, options) : []) {
+  // The rounds and the migration check read against stored references (stageRunsBaseline)
+  for (const evalCase of regular && stageRunsBaseline(options.stage) ? casesFor(cases, role, options) : []) {
     const arm = baselineArm(role);
     if (!armAllowed(options, arm.key)) continue;
     for (let sample = 1; sample <= baselineSamples; sample++) jobs.push(callJob(options, evalCase, arm, sample, measured));
@@ -323,7 +327,7 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
 function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: PlanOptions, measured: Map<string, number[]>): Job[] {
   const beatCases = cases.filter((c) => c.role === "beat");
   const beatChars = beatCases.length
-    ? [...beatCases.map((c) => requestChars(requestFor("prod", inputFor(c))))].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
+    ? [...beatCases.map((c) => requestChars(requestFor("prod", requestInputFor(c))))].sort((a, b) => a - b)[Math.floor(beatCases.length / 2)]
     : 80_000;
   const jobs: Job[] = [];
   const plan = pipelinePlan(options.stage);
@@ -335,9 +339,11 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
       jobs.push(chainJob(options, evalCase, analysisArm, beatArm, sample, measured, beatChars));
     }
   };
-  // Per case: the baseline chain (every case), then the stage's candidate chains (their scope)
+  // Per case: the baseline chain (every case, in the stages that run it), then the stage's candidate chains (their scope)
   for (const evalCase of casesFor(cases, role, options)) {
-    chains(evalCase, baselineArm(role), baselineArm("beat"), options.samples ?? DEFAULT_BASELINE_SAMPLES);
+    if (stageRunsBaseline(options.stage)) {
+      chains(evalCase, baselineArm(role), baselineArm("beat"), options.samples ?? DEFAULT_BASELINE_SAMPLES);
+    }
     if (!plan || !candidateCases.has(evalCase.id)) continue;
     for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
   }

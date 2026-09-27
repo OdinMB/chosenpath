@@ -223,6 +223,49 @@ describe("planJobs: Stage 4", () => {
   });
 });
 
+describe("planJobs: the round stages and the migration check", () => {
+  const multiplayer = { multiplayer: true, players: 2 };
+  const plan = (stage: PlanOptions["stage"], overrides: Partial<PlanOptions> = {}): Job[] =>
+    planJobs(
+      [
+        evalCase("sp", "beat", { state: threadBeat(1).getState() }),
+        evalCase("mp", "beat", { state: createMockMultiplayerStory(2).getState(), tags: tags(multiplayer) }),
+        evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } }),
+        evalCase("sp-switch", "switch", { state: createMockStoryState() }),
+        evalCase("mp-switch", "switch", { state: createMockMultiplayerStory(2).getState(), tags: tags(multiplayer) }),
+      ],
+      { stage, promptState: "round1", roles: ["setup", "beat", "switch"], mode: "isolated", subset15: false, records: [], ...overrides }
+    );
+  const perArm = (jobs: Job[]) =>
+    jobs.reduce<Record<string, string[]>>((acc, j) => ((acc[j.armKey] = [...(acc[j.armKey] ?? []), `${j.caseId} s${j.sample}`]), acc), {});
+
+  it("plans no baseline job in the round and migration stages: their references are stored records", () => {
+    for (const stage of ["setup-rounds", "turn-rounds", "migration"] as const) {
+      expect(plan(stage).filter((j) => j.baseline)).toEqual([]);
+      expect(plan(stage, { mode: "pipeline", roles: ["switch"] }).filter((j) => j.baseline)).toEqual([]);
+    }
+    // The older stages still plan the baseline on every case
+    expect(plan("3").some((j) => j.baseline)).toBe(true);
+  });
+
+  it("plans nothing in the round stages until their candidates are defined", () => {
+    expect(plan("setup-rounds")).toEqual([]);
+    expect(plan("turn-rounds", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
+  });
+
+  it("runs production's GPT-6 defaults in the migration check, per player count, at two samples", () => {
+    expect(perArm(plan("migration"))).toEqual({
+      "gpt-6-luna@low/prod": ["setup-learn-lemonade s1", "setup-learn-lemonade s2", "mp s1", "mp s2", "mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2"],
+      "gpt-6-luna@medium/prod": ["sp s1", "sp s2"],
+    });
+  });
+
+  it("chains the migration check's single-player analysis into production's single-player beat arm, at one sample", () => {
+    const chains = plan("migration", { mode: "pipeline", roles: ["switch"] });
+    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([["sp-switch", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1]]);
+  });
+});
+
 describe("requestFor: the Stage 4 variants", () => {
   const setupInput = { role: "setup" as const, setup: { premise: "A premise", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 } };
 

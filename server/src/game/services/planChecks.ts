@@ -117,8 +117,8 @@ function isJunkDirection(direction: string): boolean {
   return letters < MIN_DIRECTION_LETTERS || FIELD_NAME_START.test(direction) || QUOTE_THEN_COLON.test(direction);
 }
 
-/** The story's outcome ids a direction names anywhere, and the id-like words in its brackets that the story doesn't hold. */
-function outcomeIdsNamed(direction: string, known: string[]): { known: string[]; unknown: string[] } {
+/** The story's outcome ids a direction names anywhere, and the id-like words in its brackets that the story doesn't hold (also the eval's direction checks). */
+export function outcomeIdsNamed(direction: string, known: string[]): { known: string[]; unknown: string[] } {
   const mentioned = known.filter((id) =>
     new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(id)}(?![A-Za-z0-9_])`).test(direction)
   );
@@ -214,8 +214,8 @@ const RESULT_KEYS: Record<ThreadType, readonly string[]> = {
 
 type Results = Thread["possibleMilestones"];
 
-/** The kind of thread these results belong to: the one kind whose result names they all hold. */
-function resultKind(results: unknown): ThreadType | undefined {
+/** The kind of thread these results belong to: the one kind whose result names they all hold (also the eval's kind check). */
+export function resultKind(results: unknown): ThreadType | undefined {
   if (typeof results !== "object" || results === null) return undefined;
   const kinds = THREAD_TYPE.filter((kind) => RESULT_KEYS[kind].every((key) => key in results));
   return kinds.length === 1 ? kinds[0] : undefined;
