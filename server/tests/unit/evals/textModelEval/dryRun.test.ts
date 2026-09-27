@@ -72,9 +72,11 @@ describe("printDryRun: the prompt state it plans under", () => {
   it("lists the round stages' open jobs per arm, each with its estimate", async () => {
     const setupCase = evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
     const lines = await dryRun([], undefined, [setupCase], ["setup"]);
-    expect(lines.some((line) => /^Setup rounds candidates \(isolated\): 3 jobs \{"setup":3\}, est \$\d+\.\d\d \(stage cap \$3\)/.test(line))).toBe(true);
+    expect(lines.some((line) => /^Setup rounds candidates \(isolated\): 7 jobs \{"setup":7\}, est \$\d+\.\d\d \(stage cap \$3\)/.test(line))).toBe(true);
     expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-luna@low\/setupR1: 2 open jobs, est \$\d+\.\d{3}$/));
     expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-sol@low\/setupR1: 1 open job, est \$\d+\.\d{3}$/));
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-luna@low\/setupR2: 2 open jobs, est \$\d+\.\d{3}$/));
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}gpt-6-luna@low\/setupR2Order: 2 open jobs, est \$\d+\.\d{3}$/));
     // Rows outside the round stages keep their one line
     expect(lines.filter((line) => line.startsWith("  gpt-6-luna@low/prod"))).toEqual([]);
   });

@@ -145,11 +145,13 @@ describe("arm keys and estimates", () => {
   });
 });
 
-describe("the setup rounds' arms (setup doc section 4, round 1)", () => {
-  it("runs round 1 on Luna low at two samples on every premise, and Sol low once on the owner's round-1 page premises", () => {
+describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
+  it("runs round 1 on Luna low at two samples on every premise and Sol low once on the owner's round-1 page premises, then round 2's two arms on Luna low at two samples", () => {
     expect(armsFor("setup-rounds", "setup").map((plan) => [plan.arm.key, plan.samples, plan.scope, plan.caseIds])).toEqual([
       ["gpt-6-luna@low/setupR1", 2, "all", undefined],
       ["gpt-6-sol@low/setupR1", 1, "all", ROUND1_SETUP_PAGE_PREMISES],
+      ["gpt-6-luna@low/setupR2", 2, "all", undefined],
+      ["gpt-6-luna@low/setupR2Order", 2, "all", undefined],
     ]);
     for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("setup-rounds", role)).toEqual([]);
     // gpt-4.x is never a new arm; its stored records are comparisons only
@@ -160,6 +162,12 @@ describe("the setup rounds' arms (setup doc section 4, round 1)", () => {
     expect(referenceKey("gpt-6-luna@low/setupR1")).toBe("gpt-6-luna@low/prod");
     expect(referenceKey("gpt-6-sol@low/setupR1")).toBe("gpt-6-sol@low/prod");
     expect(estimateBaseKey("gpt-6-sol@low/setupR1")).toBe("gpt-6-sol@low/prod");
+  });
+
+  it("reads round 2's arm A against round 1 and arm B against arm A, so the order's effect stays apart", () => {
+    expect(referenceKey("gpt-6-luna@low/setupR2")).toBe("gpt-6-luna@low/setupR1");
+    expect(referenceKey("gpt-6-luna@low/setupR2Order")).toBe("gpt-6-luna@low/setupR2");
+    expect(estimateBaseKey("gpt-6-luna@low/setupR2Order")).toBe("gpt-6-luna@low/setupR2");
   });
 
   it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {

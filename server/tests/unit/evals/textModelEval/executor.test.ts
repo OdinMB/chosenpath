@@ -54,6 +54,29 @@ describe("executeCall", () => {
     expect(files.loadReplyContent(record({ outputFile: undefined }))).toBeUndefined();
   });
 
+  it("stores a reply written in another order as the fields saved today, when its request assembles it", async () => {
+    const assemble = (reply: unknown) => {
+      const { later, ...rest } = reply as { later: { answer: string } };
+      return { ...rest, ...later, assembled: true };
+    };
+    const schema = z.object({ first: z.string(), later: z.object({ answer: z.string() }) });
+    const result = await executeCall(
+      { callId: "call-assembled", role: "setup", arm: LUNA, request: { prompt: "write", schema, assemble } },
+      { outDir, now: () => 0, fetch: replyWith('{"first":"a","later":{"answer":"yes"}}') }
+    );
+    expect(result.check).toMatchObject({ outcome: "valid", parsed: { first: "a", answer: "yes", assembled: true } });
+    // Every reader loads the saved fields; the reply as written stays in the raw body
+    expect(evalFiles(outDir).loadOutput(record({ outputFile: result.outputFile }))).toEqual({ first: "a", answer: "yes", assembled: true });
+    expect(evalFiles(outDir).loadReplyContent(record({ outputFile: result.outputFile }))).toBe('{"first":"a","later":{"answer":"yes"}}');
+    // A reply that does not parse has nothing to assemble
+    const broken = await executeCall(
+      { callId: "call-assembled-broken", role: "setup", arm: LUNA, request: { prompt: "write", schema, assemble } },
+      { outDir, now: () => 0, fetch: replyWith('{"first":"a"}') }
+    );
+    expect(broken.check).toMatchObject({ outcome: "schema-mismatch" });
+    expect(broken.check.parsed).toBeUndefined();
+  });
+
   describe("the request body, by request shape and model family", () => {
     type Body = { messages: { role: string; content: unknown }[] };
     const schema = z.object({ answer: z.string() });

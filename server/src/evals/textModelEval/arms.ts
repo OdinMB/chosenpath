@@ -85,9 +85,11 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
  * The variant each variant builds on: the Stage 3 trims and today's-scaffold
  * rewrite on production's form, the slim rewrite on the slim trim, and the
  * rewrite without examples on the rewrite with them. The count fix (rewrite2*)
- * reads against the same bases as the Stage 4 form it re-runs. A setup round's
- * candidate reads against production's form of the same arm (the stored
- * postfix setups, which today's code rebuilds byte for byte).
+ * reads against the same bases as the Stage 4 form it re-runs. Setup round
+ * 1's candidate reads against production's form of the same arm (the stored
+ * postfix setups, which today's code rebuilds byte for byte); round 2's arm A
+ * against round 1, and its arm B against arm A, so the order's effect is read
+ * on its own.
  */
 const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   prod: undefined,
@@ -100,6 +102,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   rewrite2Slim: "slim",
   rewrite2ZeroShot: "rewrite2",
   setupR1: "prod",
+  setupR2: "setupR1",
+  setupR2Order: "setupR2",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -260,13 +264,17 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
  * samples, so its checks read against the reference's two-sample noise; Sol
  * low runs beside it once on the owner's round-1 page premises, in round 1
  * only, to decide whether template generation moves to Sol. gpt-4.1 is never a
- * new arm. Luna first, so a cap stop cuts Sol.
+ * new arm. Luna first, so a cap stop cuts Sol. Round 2 (setupR2, setupR2Order):
+ * its two arms on Luna low at two samples on all 18 premises, arm A (today's
+ * field order) before arm B (the generation order).
  */
 function setupRoundArms(role: EvalRole): ArmPlan[] {
   if (role !== "setup") return [];
   return [
     { arm: luna("low", "setupR1"), samples: 2, scope: "all" },
     { arm: sol("low", "setupR1"), samples: 1, scope: "all", caseIds: ROUND1_SETUP_PAGE_PREMISES },
+    { arm: luna("low", "setupR2"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR2Order"), samples: 2, scope: "all" },
   ];
 }
 

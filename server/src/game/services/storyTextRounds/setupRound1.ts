@@ -22,12 +22,32 @@ import type { TextRequest } from "../storyTextSteps.js";
  * instances, so the stat, outcome and player instances stay shared across
  * lists and seats. One user message, production's shape. Custom stories,
  * templates and AI Iteration each get the document's text where it says so.
- * The eval's variants.ts is the one caller.
+ * The eval's variants.ts and setupRound2.ts are its callers.
+ *
+ * Later rounds build on the round-1 changes that passed the stop rule
+ * (Round1Parts): proposals 3, 4 and 6 and the blank-items sentence are in
+ * every form; 1, 2 and 5 only where they carry forward. Where one of those is
+ * left out, production's text stands in its place, with the edits the
+ * passing proposals make to that text (the setup document's own fallback for
+ * proposal 5: "at least delete the contradicting example lines").
  */
 
 type Kind = "story" | "template" | "iteration";
 
-type On = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[] };
+/**
+ * Which of round 1's separable proposals a form keeps: 1 (the outcome slate,
+ * with the fixed seat roles, S7 and S8's identities), 2 (the scoreboard, with
+ * the stat-name rule) and 5 (the worked example, with the one-line catalogue
+ * and without the "For each stat" block). The scoreboard needs the slate: its
+ * "Scored by" line and the slates' pointers are printed there.
+ */
+export type Round1Parts = { slate: boolean; scoreboard: boolean; example: boolean };
+/** Setup round 1 as it ran: all six proposals. */
+export const ROUND1_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true };
+/** The round-1 proposals that passed the stop rule (3, 4 and 6), which round 2 builds on. */
+export const PASSING_ROUND1_PARTS: Round1Parts = { slate: false, scoreboard: false, example: false };
+
+type On = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[]; parts: Round1Parts };
 
 const ALL_SECTIONS = Object.keys(templateIterationSections);
 
@@ -121,7 +141,7 @@ function outcomesSection(on: On): string {
         ]
       : []),
     PREMISE_NAMES[multiplayer ? "more" : "one"],
-    ...(contested(on) ? ['- A contested outcome\'s resonance ends with "Scored by <name of its scoreboard stat>."'] : []),
+    ...(contested(on) && on.parts.scoreboard ? ['- A contested outcome\'s resonance ends with "Scored by <name of its scoreboard stat>."'] : []),
   ].join("\n");
 }
 
@@ -150,7 +170,7 @@ function statsThatAct(on: On): string {
 /** A5's one-line catalogue, with A2.3's opposites line (its scoreboard use only where a two-player contest has one). */
 function statTypes(on: On): string {
   const uses =
-    contested(on) && on.players === 2
+    contested(on) && on.players === 2 && on.parts.scoreboard
       ? "a disposition or alignment the player shifts, a tug of war in the world, or the scoreboard of a two-player contest (which moves after threads)"
       : "a disposition or alignment the player shifts, or a tug of war in the world";
   return [
@@ -212,6 +232,162 @@ Not stats: "Personal Safety" (the Hero Guilds' hostility already covers it), and
 In a cooperative version for two activists, the reform question is the shared outcome, and each activist keeps two personal outcomes from their role (player1 the enclave's organizer, player2 the movement's printer). In a competitive version where the two compete to lead the movement, "Who will speak for the goblins at the Queen's council?" is the contested outcome, and "Enclave's Voice|Printers' Voice" (opposites, starts at 50, moves 15 toward the winner of each leadership contest, not in single beats; its tooltip says which role holds which side) is its scoreboard.
 
 Not like this: "+25 points when using a power" (a stat gives at most 15); "Can risk 10 followers for a +20 bonus" (a sacrifice names only its cost, and the cost is certain); "Followers (Player 1)" and "Followers (Player 2)" (one contest has one shared scoreboard, named by role).`;
+
+/*
+ * Without proposal 5, production's catalogue, its "For each stat" block and its
+ * two example stat setups stay, so the passing proposals' edits land on them
+ * instead. Each passage must occur exactly once in the instructions.
+ */
+
+/** Proposal 4 (A4.1) on production's catalogue: numbers are not counters. */
+const CATALOGUE_EDITS: [string, string][] = [["--- Counters (e.g., wins in a tournament, number of people saved)\n", ""]];
+
+/**
+ * Proposals 3 and 4 on production's "For each stat" block: A3.2's pointer in
+ * place of the ±10/±20 effects and their two examples, "(expressed in
+ * points)" dropped; the adjustments that A4.2's field no longer asks for
+ * (player choices, decay and regeneration, choices that shift a balance);
+ * and the flag as round 1's field reads it (a false flag still has its
+ * sacrifice and reward).
+ */
+const FOR_EACH_STAT_EDITS: [string, string][] = [
+  [" for a higher chance of success in certain beats (expressed in points)", " for a higher chance of success in certain beats"],
+  [
+    "Define how the stat changes based on player choices and thread resolutions (often unfavorable/mixed/favorable).",
+    "Define how the stat changes based on thread resolutions (often unfavorable/mixed/favorable).",
+  ],
+  [
+    '- Define decay or regeneration patterns (e.g., "Decreases by 5% per thread for each threat")\n- For opposites stats, define how choices shift the balance (e.g., "Major moral choices shift value by 5-15%")\n',
+    "",
+  ],
+  [
+    "- If false, the stat can only be changed after threads are resolved. Good for stats where a change would be very noticeable and/or have a long-term effect. This should only happen after a relevant thread is resolved.",
+    "- If false, the stat changes when a thread gets resolved and through its own sacrifice and reward options. Good for stats where a change would be very noticeable and/or have a long-term effect.",
+  ],
+];
+
+/**
+ * Proposals 3 and 4 on production's example stat setups (setup doc section 3:
+ * "if 5 slips, at least delete the contradicting example lines"; B3.4 lists
+ * most of them). Effects beyond ±15 are clamped to 15, as the engine clamps
+ * them; formula effects are cut, or made a threshold where the stat would keep
+ * fewer than two effects, and penalties that grow over time are cut;
+ * sacrifices and rewards name only their cost or gain, certain and in the
+ * stat's own units (three rewards gain their amount); a special power's
+ * sacrifice is 'None'; a third change after threads is cut (the field asks
+ * for one or two), and changes are sized 5 to 15; the "Personal Dream"
+ * ladder, the progress meter A4.1 names as weak, is cut whole.
+ */
+const EXAMPLE_EDITS: [string, string][] = [
+  // Seasonal Powers
+  ['"+30 points when using a specific power in a challenge directly related to that power",', '"+15 points when using a specific power in a challenge directly related to that power",'],
+  ['optionsToSacrifice: "Can spend 20% energy to use a power for +30 points in a relevant challenge"', 'optionsToSacrifice: "None"'],
+  [
+    '"Powers may temporarily weaken (-10 points effectiveness) after an unfavorable resolution in a thread where they were heavily relied upon",\n    "Powers can evolve to more potent versions after repeated successful use in critical moments"\n',
+    '"Powers may temporarily weaken (-10 points effectiveness) after an unfavorable resolution in a thread where they were heavily relied upon"\n',
+  ],
+  // Energy
+  [
+    'optionsToSacrifice: "Can spend 20% energy to use a Seasonal Power or 30% energy for a +20 point boost in any spiritual challenge"',
+    'optionsToSacrifice: "Can spend 20% energy to use a Seasonal Power, or 30% energy in any spiritual challenge"',
+  ],
+  ['optionsToGainAsReward: "Can choose to rest and recover energy instead of pursuing immediate goals"', 'optionsToGainAsReward: "Can choose to rest and recover 10% energy instead of pursuing immediate goals"'],
+  ['    "Regenerates 5% after each thread resolution for each special follower in your following",\n', ""],
+  ['"Can be fully restored after a favorable resolution in a thread focused on spiritual renewal"', '"Increases by 15% after a favorable resolution in a thread focused on spiritual renewal"'],
+  // Followers
+  ['    "+1 point for every 10 followers in social influence challenges",\n', ""],
+  ['"+15 points in challenges where followers can directly assist (maximum +30)",', '"+15 points in challenges where followers can directly assist",'],
+  ['"-10 points in stealth challenges for each 20 followers due to increased visibility"', '"-10 points in stealth challenges above 50 followers due to increased visibility"'],
+  ['optionsToSacrifice: "Can risk 10 followers (potentially losing them) for a +20 bonus in critical challenges"', 'optionsToSacrifice: "Can give up 10 followers in a critical challenge"'],
+  // Special followers
+  [
+    'optionsToSacrifice: "Can send a special follower on a dangerous mission for a +30 bonus, risking their permanent loss"',
+    'optionsToSacrifice: "Can send a special follower on a dangerous mission, losing them for good"',
+  ],
+  ['    "Can gain a new special follower at 100 regular followers or through a dedicated recruitment thread",\n', ""],
+  // Threats: penalties that grow over time break the effects' absolute values (A3.2)
+  [
+    '"Multiple threats of the same category (e.g., two Human threats) intensify their narrative impact",\n    "Unaddressed threats escalate over time, changing their description and increasing their penalties"\n',
+    '"Multiple threats of the same category (e.g., two Human threats) intensify their narrative impact"\n',
+  ],
+  [
+    '"Threats can be removed through dedicated challenge threads with favorable resolutions",\n    "Threats may evolve or combine if multiple remain unaddressed for several threads"\n',
+    '"Threats can be removed through dedicated challenge threads with favorable resolutions"\n',
+  ],
+  // Forest health
+  ['"Below 30% applies -20 points to all nature-based challenges due to dying ecosystem",', '"Below 30% applies -15 points to all nature-based challenges due to dying ecosystem",'],
+  [
+    'optionsToSacrifice: "Can channel forest health (reducing it by 10%) for a +25 bonus in critical challenges"',
+    'optionsToSacrifice: "Can channel forest health, reducing it by 10%, in a critical challenge"',
+  ],
+  [
+    'optionsToGainAsReward: "Can focus on forest restoration instead of pursuing immediate goals"',
+    'optionsToGainAsReward: "Can focus on forest restoration instead of pursuing immediate goals, restoring 10% forest health"',
+  ],
+  ['    "Decreases by 5% after each thread for each active forest threat",\n', ""],
+  ['"Increases by 20% after favorable resolutions in threads focused on healing the forest",', '"Increases by 15% after favorable resolutions in threads focused on healing the forest",'],
+  // Stage Presence
+  ['    "Provides (Stage Presence - 50) points to performance challenges (negative at low values, positive at high values)",\n', ""],
+  ['"+20 points in social challenges with fans when above 70%",', '"+15 points in social challenges with fans when above 70%",'],
+  [
+    'optionsToSacrifice: "Can push limits for a temporary +20 boost in a beat for a permanent -5% Stage Presence after the challenge"',
+    'optionsToSacrifice: "Can push limits in a beat for a permanent -5% Stage Presence after the challenge"',
+  ],
+  [
+    'optionsToGainAsReward: "Can choose riskier, more flamboyant performance options that might fail but build presence if successful"',
+    'optionsToGainAsReward: "Can choose a riskier, more flamboyant performance option to gain 5% Stage Presence"',
+  ],
+  [
+    '"Increases by 20% after favorable resolutions in performance threads",\n    "Decreases by 5-10% after public failures or embarrassments"\n',
+    '"Increases by 15% after favorable resolutions in performance threads"\n',
+  ],
+  // Instrument Mastery
+  ['"Provides -20/-10/0/+10/+20 points in performance and recording challenges based on level",', '"Provides -15/-10/0/+10/+15 points in performance and recording challenges based on level",'],
+  // Band Loyalty|Solo Ambition
+  [
+    '"Shifts 5-15% toward Band Loyalty after favorable resolutions in collaborative threads",\n    "Major decisions in critical moments can cause shifts of up to 20%"\n',
+    '"Shifts 5-15% toward Band Loyalty after favorable resolutions in collaborative threads"\n',
+  ],
+  // Gear Quality
+  ['"Broken gear creates -20 points in professional venue challenges due to credibility loss",', '"Broken gear creates -15 points in professional venue challenges due to credibility loss",'],
+  ['optionsToSacrifice: "Can push equipment beyond limits"', 'optionsToSacrifice: "Can push equipment beyond its limits, losing one level of Gear Quality"'],
+  [
+    'optionsToGainAsReward: "Can choose to maintain or upgrade equipment instead of pursuing immediate opportunities"',
+    'optionsToGainAsReward: "Can choose to maintain or upgrade equipment instead of pursuing immediate opportunities, raising Gear Quality one level"',
+  ],
+  [
+    '"Can improve one level after favorable resolutions in threads focused on equipment acquisition or repair",\n    "Extreme performance conditions (dust storms, temperature) may cause unexpected degradation"\n',
+    '"Can improve one level after favorable resolutions in threads focused on equipment acquisition or repair"\n',
+  ],
+  // Fans
+  ['    "+1 point for every 100 fans in performance challenges (maximum +20)",\n', ""],
+  ['optionsToSacrifice: "Can alienate 50-100 fans for bonuses in artistic integrity challenges"', 'optionsToSacrifice: "Can alienate 50-100 fans in an artistic integrity challenge"'],
+  // Group Chemistry
+  ['"Above 70% provides +10 points to collaborative challenges, increasing to +20 above 90%"', '"Above 70% provides +10 points to collaborative challenges, increasing to +15 above 90%"'],
+  [
+    '"Decreases by 5-15% after conflicts or when individual ambitions are prioritized",\n    "Affected by the average Band Loyalty|Solo Ambition balance across all players"\n',
+    '"Decreases by 5-15% after conflicts or when individual ambitions are prioritized"\n',
+  ],
+];
+
+/** The "Personal Dream" ladder (B3.4, A4.1's weak "Dream: Beginning → Fulfillment"), from its heading through its last line. */
+const PERSONAL_DREAM: [string, string] = ['\n\n\n- Personal Dream (string)', 'Initial value: "Beginning" (no variation)'];
+
+/** A6.1's question form on production's multiplayer outcome block: a three-path example asks What / How / Which path. */
+const ALEX_EXAMPLE: [string, string] = [
+  "Example: Does Alex choose loyalty to the family or their own ambitions? 1. Loyalty.",
+  "Example: Which path will Alex choose, loyalty to the family or their own ambitions? 1. Loyalty.",
+];
+
+/**
+ * A6.1's three-player race (three paths, one per player) against production's
+ * rule that a shared competitive outcome has side A, side B and a mixed
+ * result: in a three-player contest call, the rule points to the exception.
+ */
+const THREE_PLAYER_RACE: [string, string] = [
+  "--- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed.",
+  "--- Shared competitive outcomes should include one resolution for side A winning, one for side B winning, and one resolution that is mixed; a three-player race takes three paths instead, one per player, as the outcome description says.",
+];
 
 /** A1.5: the setup's game-mode sentences. */
 const GAME_MODES: Record<Exclude<GameMode, GameModes.SinglePlayer>, string> = {
@@ -350,36 +526,62 @@ function round1Instructions(production: string, on: On): string {
   text = `${text.slice(0, opening)}${ENGINE}\n\n${text.slice(opening)}`;
 
   if (asksOutcomes(on)) {
-    text = replaceThrough(text, "\n- A total of 3 outcomes for each player", "there should be 0 individual outcomes.", INVENTORY_OUTCOMES);
-    text =
-      on.players > 1
-        ? replaceThrough(text, "Outcomes\n- Every player should have 3 outcomes", "become the new spirit leader?'\n\n\n", `${outcomesSection(on)}\n\n`)
-        : replaceThrough(text, "Outcomes\n- The player should have 3 outcomes", "and one mixed.\n\n", `${outcomesSection(on)}\n\n`);
+    if (on.parts.slate) {
+      text = replaceThrough(text, "\n- A total of 3 outcomes for each player", "there should be 0 individual outcomes.", INVENTORY_OUTCOMES);
+      text =
+        on.players > 1
+          ? replaceThrough(text, "Outcomes\n- Every player should have 3 outcomes", "become the new spirit leader?'\n\n\n", `${outcomesSection(on)}\n\n`)
+          : replaceThrough(text, "Outcomes\n- The player should have 3 outcomes", "and one mixed.\n\n", `${outcomesSection(on)}\n\n`);
+    } else if (on.players > 1) {
+      // Production's outcome blocks stay; their three-path example takes A6.1's question form
+      text = replaceOnce(text, ...ALEX_EXAMPLE);
+      // and their two-sided contest line points at A6.1's three-path race, which the slate would have spelled out
+      if (on.players === 3 && contested(on)) text = replaceOnce(text, ...THREE_PLAYER_RACE);
+    }
   }
-  if (asks(on, "stats") && on.players > 1) {
+  if (asks(on, "stats") && on.players > 1 && on.parts.scoreboard) {
     const line = contested(on) ? `\n${SCOREBOARD_LINE[on.players as 2 | 3]}` : "";
     text = replaceOnce(text, "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)", line);
   }
   if (asksStatRules(on)) {
     text = replaceOnce(text, "Detective/Investigation/Contacts (for a mystery story)", "Detective/City/Contacts (for a mystery story)");
-    if (contested(on)) {
+    if (contested(on) && on.parts.scoreboard) {
       const rule = "If only one specific player has a relationship with that NPC, use a character stat.\n";
       text = replaceOnce(text, rule, `${rule}${CONTESTED_FAVOR}\n`);
     }
     text = replaceThrough(text, "- Don't use stats for things that are covered by other mechanics.", "--- Don't track ordinary player decisions (tracked separately)\n", `${statsThatAct(on)}\n`);
-    // The long catalogue, the old engine paragraph (now A3.1) and the "For each stat" block
-    text = replaceThrough(text, "Type of stats and what they are good for:", "interesting part in the story.\n\n", `${statTypes(on)}\n\n`);
+    if (on.parts.example) {
+      // The long catalogue, the old engine paragraph (now A3.1) and the "For each stat" block
+      text = replaceThrough(text, "Type of stats and what they are good for:", "interesting part in the story.\n\n", `${statTypes(on)}\n\n`);
+    } else {
+      for (const [passage, replacement] of CATALOGUE_EDITS) text = replaceOnce(text, passage, replacement);
+      // A3.1 replaces the old engine paragraph
+      text = replaceThrough(text, "Context for additional stat parameters\n", "as it decides which milestone is added to the story state.\n\n", "");
+      text = replaceThrough(text, "Effects on Beat Resolution\n", 'required to perform a risky maneuver")\n', "Effects on beat resolution: see the scale in 'How the game plays your setup'.\n");
+      for (const [passage, replacement] of FOR_EACH_STAT_EDITS) text = replaceOnce(text, passage, replacement);
+    }
   }
-  // A5: the worked example where production's examples sit (production leaves them out of iteration; round 1 keeps its short one)
-  text =
-    on.kind === "iteration"
-      ? insertBeforeFirst(text, ["Character Selection Instructions", "Difficulty Levels\n", SEPARATOR], `${WORKED_EXAMPLE}\n\n`)
-      : replaceThrough(text, "EXAMPLE STAT SETUPS", "Initial value: 70\n\n", `${WORKED_EXAMPLE}\n\n`);
+  if (on.parts.example) {
+    // A5: the worked example where production's examples sit (production leaves them out of iteration; round 1 keeps its short one)
+    text =
+      on.kind === "iteration"
+        ? insertBeforeFirst(text, ["Character Selection Instructions", "Difficulty Levels\n", SEPARATOR], `${WORKED_EXAMPLE}\n\n`)
+        : replaceThrough(text, "EXAMPLE STAT SETUPS", "Initial value: 70\n\n", `${WORKED_EXAMPLE}\n\n`);
+  } else if (on.kind !== "iteration") {
+    for (const [passage, replacement] of EXAMPLE_EDITS) text = replaceOnce(text, passage, replacement);
+    text = replaceThrough(text, ...PERSONAL_DREAM, "");
+  }
   return replaceOnce(text, `${SEPARATOR}\n\n`, `${NO_BLANK_ITEMS}\n\n${SEPARATOR}\n\n`);
 }
 
-/** Round 1's configuration block: A1.5's game-mode sentence, then A1.3's slate; for AI Iteration also A1.6. */
+/**
+ * Round 1's configuration block: A1.5's game-mode sentence, then A1.3's slate;
+ * for AI Iteration also A1.6. All of it is proposal 1's, apart from the
+ * scoreboard's iteration line (KEEP_IDS), so without the slate production's
+ * block stays.
+ */
 function round1Configuration(configuration: string, on: On): string {
+  if (!on.parts.slate) return configuration;
   const at = configuration.indexOf("Game mode: ");
   const lineEnd = configuration.indexOf("\n", at);
   if (at < 0 || lineEnd < 0) throw new Error("Setup round 1: no Game mode line in production's configuration block");
@@ -394,7 +596,7 @@ function round1Configuration(configuration: string, on: On): string {
       const end = text.lastIndexOf(sections) + sections.length;
       text = `${text.slice(0, end)}\n${ONE_OUTCOME_LIST}\n${text.slice(end)}`;
     }
-    if (asksSlate(on)) {
+    if (asksSlate(on) && on.parts.scoreboard) {
       const consistency = "Maintain consistency with the other parts of the template that you are not changing.";
       const end = text.lastIndexOf(consistency) + consistency.length;
       text = `${text.slice(0, end)} ${KEEP_IDS}${text.slice(end)}`;
@@ -436,24 +638,35 @@ function reworded<T extends z.ZodTypeAny>(schema: T, passage: string, replacemen
 
 const appended = <T extends z.ZodTypeAny>(schema: T, addition: string): T => schema.describe(`${schema.description ?? ""} ${addition}`.trim());
 
-/** A6.1, verbatim. */
-const OUTCOME = [
-  "A question the story's ending answers, from the milestones the players earn along the way.",
-  '- Ask about one thing, in the story\'s own names (a person, faction, place or object from the story elements). Don\'t restate the premise, and don\'t join two questions with "and" or "without".',
-  "- The question's form matches its resolutions: 'Will / Does / Can …?' takes favorable, mixed and unfavorable; 'Who / Which player …?' about one prize two players compete for takes the contest resolutions; 'What / How / Which path …?' about a character's choice takes three paths. In a three-player race, 'Who …?' takes three paths, one per player.",
-  "- Each resolution is a concrete end state someone could picture. The favorable one may carry a price; the mixed and unfavorable ones are endings worth playing toward.",
-  '- A player\'s outcomes fit every identity and background that player can choose, so refer to the character by role or as "player2\'s character", never by a name, unless the premise itself names the player characters.',
-  "Examples (a story about goblin activists): 'Will the Hero Guilds reform their anti-goblin policies?' Favorable: the Guilds adopt codes that protect goblins and punish violence against them. Mixed: some reforms pass, but enforcement is weak and many heroes resist. Unfavorable: the Guilds double down, forcing goblins further underground. Contested: 'Who will become the King's Black Hand?' Three paths: 'What will the activist's friendship with Mia look like in the end?'",
-  "Weak: 'Do the players successfully complete their mission?' It restates the premise and names nothing.",
-].join("\n");
+/**
+ * A6.1, verbatim with the seat roles; without them (the slate left out), in
+ * the wording A1.2 gives for decision 2 (b): the character is "player2's
+ * character", never a name.
+ */
+const outcomeDescription = (on: On) =>
+  [
+    "A question the story's ending answers, from the milestones the players earn along the way.",
+    '- Ask about one thing, in the story\'s own names (a person, faction, place or object from the story elements). Don\'t restate the premise, and don\'t join two questions with "and" or "without".',
+    "- The question's form matches its resolutions: 'Will / Does / Can …?' takes favorable, mixed and unfavorable; 'Who / Which player …?' about one prize two players compete for takes the contest resolutions; 'What / How / Which path …?' about a character's choice takes three paths. In a three-player race, 'Who …?' takes three paths, one per player.",
+    "- Each resolution is a concrete end state someone could picture. The favorable one may carry a price; the mixed and unfavorable ones are endings worth playing toward.",
+    `- A player's outcomes fit every identity and background that player can choose, so refer to the character ${on.parts.slate ? "by role or " : ""}as "player2's character", never by a name, unless the premise itself names the player characters.`,
+    "Examples (a story about goblin activists): 'Will the Hero Guilds reform their anti-goblin policies?' Favorable: the Guilds adopt codes that protect goblins and punish violence against them. Mixed: some reforms pass, but enforcement is weak and many heroes resist. Unfavorable: the Guilds double down, forcing goblins further underground. Contested: 'Who will become the King's Black Hand?' Three paths: 'What will the activist's friendship with Mia look like in the end?'",
+    "Weak: 'Do the players successfully complete their mission?' It restates the premise and names nothing.",
+  ].join("\n");
 
-/** A6.2, each kind of outcome only where the call has it (the contested line points to a rule printed in the contest modes only). */
+/**
+ * A6.2, each kind of outcome only where the call has it. The shared line
+ * names roles only where the seats have them (the slate), and the contested
+ * line points to the scoreboard's "Scored by" rule only where it is printed.
+ */
 function resonance(on: On): string {
+  const shared = on.parts.slate ? "what each player, by role, stands to gain or lose" : "what each player stands to gain or lose";
+  const scored = on.parts.scoreboard ? " (and, see the Outcomes section, which stat keeps its score)" : "";
   return [
     "Why the answer matters, in one or two sentences.",
     "- Personal outcome: which need, fear, hope, relationship or secret of this character it tests, in a way that fits all of the player's backgrounds.",
-    ...(on.players > 1 ? ["- Shared outcome: what each player, by role, stands to gain or lose, and why they can't settle it alone."] : []),
-    ...(contested(on) ? ["- Contested outcome: what drives each side and what winning would cost them (and, see the Outcomes section, which stat keeps its score)."] : []),
+    ...(on.players > 1 ? [`- Shared outcome: ${shared}, and why they can't settle it alone.`] : []),
+    ...(contested(on) ? [`- Contested outcome: what drives each side and what winning would cost them${scored}.`] : []),
   ].join("\n");
 }
 
@@ -481,25 +694,34 @@ function round1Outcome(production: z.ZodTypeAny, generation: boolean, on: On): z
         unfavorable: challenge.shape.unfavorable.describe("A concrete ending the story can land on, not just 'they fail'."),
         mixed: challenge.shape.mixed.describe("A real compromise: part of it is won, and something is lost or left open."),
       }),
-      contest.extend({
-        sideAWins: contest.shape.sideAWins.describe("Side A (player1's character in a two-player game) wins."),
-        sideBWins: contest.shape.sideBWins.describe("Side B (player2's character in a two-player game) wins."),
-        mixed: contest.shape.mixed.describe("A draw or a compromise between them."),
-      }),
+      // A2.4's sides, proposal 2's; without it production's
+      on.parts.scoreboard
+        ? contest.extend({
+            sideAWins: contest.shape.sideAWins.describe("Side A (player1's character in a two-player game) wins."),
+            sideBWins: contest.shape.sideBWins.describe("Side B (player2's character in a two-player game) wins."),
+            mixed: contest.shape.mixed.describe("A draw or a compromise between them."),
+          })
+        : contest,
       paths.extend({ resolution1: eachPath(), resolution2: eachPath(), resolution3: eachPath() }).describe(THREE_PATHS),
     ])
     .describe(union.description ?? "");
+  // A1.4's milestone counts are proposal 1's; without it production's number and description
+  const milestones: z.ZodRawShape = on.parts.slate
+    ? {
+        // In the generation field list only (the difficulty precedent); the stored type stays a number, which the editor writes
+        intendedNumberOfMilestones: generation
+          ? z.union([z.literal(1), z.literal(2), z.literal(3)]).describe(MILESTONES)
+          : outcome.shape.intendedNumberOfMilestones.describe(MILESTONES),
+      }
+    : {};
   return outcome
     .extend({
       question: outcome.shape.question.describe("The question, in one sentence, about one thing."),
       possibleResolutions: resolutions,
       resonance: outcome.shape.resonance.describe(resonance(on)),
-      // In the generation field list only (the difficulty precedent); the stored type stays a number, which the editor writes
-      intendedNumberOfMilestones: generation
-        ? z.union([z.literal(1), z.literal(2), z.literal(3)]).describe(MILESTONES)
-        : outcome.shape.intendedNumberOfMilestones.describe(MILESTONES),
+      ...milestones,
     })
-    .describe(OUTCOME);
+    .describe(outcomeDescription(on));
 }
 
 /** A3.2, the scoreboard exception only where a contest has a scoreboard. */
@@ -535,12 +757,17 @@ const TOOLTIP = "One sentence for the player: what the stat is and the value or 
 const NAME_ADDITION =
   "Never a player's seat ('Player 1') or a player character's name: every player sees this name, and players choose their characters' names later. NPC names are fine. When the premise names the player characters, their names are fine too.";
 
-/** A2.4, A3.2 and A4.2: one stat instance for the shared and the player list. */
+/**
+ * A2.4, A3.2 and A4.2: one stat instance for the shared and the player list.
+ * A2.4's name rule leaves with the scoreboard: without the scoreboard's role
+ * names it would forbid the only side names production's own opposites
+ * example offers ("playerA|playerB").
+ */
 function round1Stat(production: z.ZodTypeAny, on: On): z.AnyZodObject {
   const stat = asObject(production, "stat");
   return stat
     .extend({
-      name: appended(stat.shape.name, NAME_ADDITION),
+      name: on.parts.scoreboard ? appended(stat.shape.name, NAME_ADDITION) : stat.shape.name,
       effectOnPoints: asArray(stat.shape.effectOnPoints, "effectOnPoints").max(3).describe(EFFECTS),
       optionsToSacrifice: stat.shape.optionsToSacrifice.describe(sacrifice(on)),
       optionsToGainAsReward: stat.shape.optionsToGainAsReward.describe(REWARD),
@@ -574,9 +801,17 @@ const CONSIDER_A_SCORE =
   " For multiplayer games with a competitive element, consider adding an opposite stat to track who is in the lead (for 2 players) or a string to track which player currently has the most momentum (for 3+ players).";
 const SCOREBOARD_STATS = " In competitive and cooperative-competitive games, one of these is the scoreboard of each contested shared outcome, as the stat rules describe.";
 
-/** One player instance for every seat: the outcome slate's list, and in multiplayer backgrounds that name the seat's role. */
-function round1Player(production: z.ZodTypeAny, outcome: z.AnyZodObject, multiplayer: boolean): z.AnyZodObject {
+/**
+ * One player instance for every seat: the outcome slate's list, and in
+ * multiplayer backgrounds that name the seat's role; without the slate,
+ * production's list and backgrounds, on round 1's outcome instance.
+ */
+function round1Player(production: z.ZodTypeAny, outcome: z.AnyZodObject, multiplayer: boolean, on: On): z.AnyZodObject {
   const player = asObject(production, "player");
+  if (!on.parts.slate) {
+    const outcomes = asArray(player.shape.outcomes, "outcomes");
+    return player.extend({ outcomes: z.array(outcome).describe(outcomes.description ?? "") });
+  }
   const backgrounds = asArray(player.shape.possibleCharacterBackgrounds, "possibleCharacterBackgrounds");
   const background = asObject(backgrounds.element, "character background");
   const fields: z.ZodRawShape = { outcomes: z.array(outcome).max(3).describe(PLAYER_OUTCOMES) };
@@ -594,22 +829,34 @@ function round1Player(production: z.ZodTypeAny, outcome: z.AnyZodObject, multipl
  * the shared list, described by the sections regenerated; milestone counts
  * stay numbers).
  */
-export function round1SetupSchema(playerCount: PlayerCount, gameMode: GameMode, kind: Kind, sections: string[] = ALL_SECTIONS): z.AnyZodObject {
+export function round1SetupSchema(
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  kind: Kind,
+  sections: string[] = ALL_SECTIONS,
+  parts: Round1Parts = ROUND1_PARTS
+): z.AnyZodObject {
   const production = asObject(createStorySetupSchema(playerCount, kind === "iteration" ? "template" : kind), "setup");
-  const on: On = { players: playerCount, mode: gameMode, kind, sections };
+  const on = onFor(playerCount, gameMode, kind, sections, parts);
   const multiplayer = playerCount > 1;
   const shape = production.shape;
   const outcome = round1Outcome(asArray(shape.sharedOutcomes, "sharedOutcomes").element, kind !== "iteration", on);
   const stat = round1Stat(asArray(shape.sharedStats, "sharedStats").element, on);
-  const player = round1Player(shape.player1, outcome, multiplayer);
+  const player = round1Player(shape.player1, outcome, multiplayer, on);
   const plan = asObject(shape.characterSelectionPlan, "characterSelectionPlan");
   const slots = Object.keys(shape).filter((key) => PLAYER_SLOTS.includes(key));
   // Existing keys keep their place in production's order (zod's extend)
+  const sharedStats = parts.scoreboard ? reworded(shape.sharedStats, CONSIDER_A_SCORE, contested(on) ? SCOREBOARD_STATS : "") : shape.sharedStats;
   const fields: z.ZodRawShape = {
-    sharedStats: z.array(stat).describe(reworded(shape.sharedStats, CONSIDER_A_SCORE, contested(on) ? SCOREBOARD_STATS : "").description ?? ""),
+    sharedStats: z.array(stat).describe(sharedStats.description ?? ""),
     playerStats: z.array(stat).describe(shape.playerStats.description ?? ""),
     ...Object.fromEntries(slots.map((slot) => [slot, player])),
   };
+  if (!parts.slate) {
+    // Production's shared list for every player count, on round 1's outcome instance
+    fields.sharedOutcomes = z.array(outcome).describe(shape.sharedOutcomes.description ?? "");
+    return production.extend(fields);
+  }
   if (multiplayer) {
     fields.sharedOutcomes = z.array(outcome).max(2).describe(SHARED_OUTCOMES);
     const coordination = asArray(plan.shape.multiplayerCoordination, "multiplayerCoordination").describe(COORDINATION);
@@ -636,6 +883,47 @@ export function cutToSections(schema: z.AnyZodObject, sections: string[], player
 
 // ---------------------------------------------------------------- requests
 
+function onFor(players: PlayerCount, mode: GameMode, kind: Kind, sections: string[], parts: Round1Parts): On {
+  if (parts.scoreboard && !parts.slate) throw new Error("Setup round 1: the scoreboard's lines are printed in the outcome slate, so it needs the slate");
+  return { players, mode, kind, sections, parts };
+}
+
+/**
+ * A new custom story or template from a premise: production's setupStep.request
+ * with round 1's changes, those in `parts` and proposals 3, 4 and 6.
+ */
+export function setupRequestFromRound1(
+  premise: string,
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  maxTurns: number,
+  kind: "story" | "template",
+  parts: Round1Parts
+): TextRequest {
+  const on = onFor(playerCount, gameMode, kind, ALL_SECTIONS, parts);
+  return {
+    prompt: round1Prompt(StorySetupPromptService.createSetupPrompt(premise, playerCount, gameMode, maxTurns, kind), on),
+    schema: round1SetupSchema(playerCount, gameMode, kind, ALL_SECTIONS, parts),
+  };
+}
+
+/** AI Iteration (production's TemplateService.iterateTemplate request) with round 1's changes, those in `parts` and proposals 3, 4 and 6. */
+export function iterationRequestFromRound1(
+  feedback: string,
+  playerCount: PlayerCount,
+  gameMode: GameMode,
+  maxTurns: number,
+  sections: string[],
+  template: object,
+  parts: Round1Parts
+): TextRequest {
+  const on = onFor(playerCount, gameMode, "iteration", sections, parts);
+  return {
+    prompt: round1Prompt(StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template), on),
+    schema: cutToSections(round1SetupSchema(playerCount, gameMode, "iteration", sections, parts), sections, playerCount),
+  };
+}
+
 /** Round 1's request for a new custom story or template from a premise (production's setupStep.request with A1 to A6). */
 export function setupRound1Request(
   premise: string,
@@ -644,11 +932,7 @@ export function setupRound1Request(
   maxTurns: number,
   kind: "story" | "template"
 ): TextRequest {
-  const on: On = { players: playerCount, mode: gameMode, kind, sections: ALL_SECTIONS };
-  return {
-    prompt: round1Prompt(StorySetupPromptService.createSetupPrompt(premise, playerCount, gameMode, maxTurns, kind), on),
-    schema: round1SetupSchema(playerCount, gameMode, kind),
-  };
+  return setupRequestFromRound1(premise, playerCount, gameMode, maxTurns, kind, ROUND1_PARTS);
 }
 
 /** Round 1's AI Iteration request (production's TemplateService.iterateTemplate request with A1 to A6). */
@@ -660,9 +944,5 @@ export function iterationRound1Request(
   sections: string[],
   template: object
 ): TextRequest {
-  const on: On = { players: playerCount, mode: gameMode, kind: "iteration", sections };
-  return {
-    prompt: round1Prompt(StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template), on),
-    schema: cutToSections(round1SetupSchema(playerCount, gameMode, "iteration", sections), sections, playerCount),
-  };
+  return iterationRequestFromRound1(feedback, playerCount, gameMode, maxTurns, sections, template, ROUND1_PARTS);
 }

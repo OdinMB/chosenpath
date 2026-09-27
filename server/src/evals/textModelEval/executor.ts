@@ -6,7 +6,7 @@ import { createChatModel, modelFamily } from "shared/llm/chatModel.js";
 import { callMetricsFromCompletion, type CallMetrics } from "shared/llm/usageRecorder.js";
 import { armSettings, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { classifyCall, type Capture, type CallCheck } from "./responseCheck.js";
-import { isSplitRequest, requestText, type EvalRequest } from "./variants.js";
+import { assembledReply, isSplitRequest, requestText, type EvalRequest } from "./variants.js";
 
 /*
  * One eval call through the production path: the production factory and
@@ -136,7 +136,9 @@ export async function executeCall(spec: CallSpec, deps: ExecutorDeps): Promise<E
   }
   const latencyMs = deps.now() - startedAt;
 
-  const check = classifyCall(capture, error, spec.request.schema);
+  // A reply written in another field order is kept as the fields saved today; the raw body keeps it as written
+  const classified = classifyCall(capture, error, spec.request.schema);
+  const check = classified.parsed === undefined ? classified : { ...classified, parsed: assembledReply(spec.request, classified.parsed) };
   const metrics = callMetricsFromCompletion(parseBody(capture.body));
   const outputFile = path.join("outputs", `${spec.callId}.json`);
   fs.mkdirSync(path.join(deps.outDir, "outputs"), { recursive: true });

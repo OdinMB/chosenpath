@@ -20,6 +20,7 @@ import { rewriteBeatRequest, type RewriteScaffold } from "../../game/services/st
 import type { RewriteCounts, SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
 import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.js";
 import { iterationRound1Request, setupRound1Request } from "../../game/services/storyTextRounds/setupRound1.js";
+import { iterationRound2Request, setupRound2Request, type Round2Order, type Round2Request } from "../../game/services/storyTextRounds/setupRound2.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -48,6 +49,10 @@ import { iterationRound1Request, setupRound1Request } from "../../game/services/
  * (outcome slates, the scoreboard, the engine facts, stats that act, one
  * worked example, questions that name the stake), for custom-story setup and
  * AI Iteration; its template form is setupRound1Request's "template" kind.
+ * "setupR2" and "setupR2Order" are setup round 2's two arms: steering
+ * (proposal 7) on round 1's passing proposals (3, 4 and 6), in today's field
+ * order and in proposal 9's generation order, whose reply is assembled into
+ * the fields saved today before anything reads it (assembledReply).
  */
 
 export type VariantId =
@@ -60,7 +65,9 @@ export type VariantId =
   | "rewrite2"
   | "rewrite2Slim"
   | "rewrite2ZeroShot"
-  | "setupR1";
+  | "setupR1"
+  | "setupR2"
+  | "setupR2Order";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -72,13 +79,24 @@ export const VARIANTS: VariantId[] = [
   "rewrite2Slim",
   "rewrite2ZeroShot",
   "setupR1",
+  "setupR2",
+  "setupR2Order",
 ];
 
-/** What a variant sends: one user message (production's shape), or fixed rules then a per-call message. */
-export type EvalRequest = TextRequest | SplitTextRequest;
+/**
+ * What a variant sends: one user message (production's shape), or fixed rules
+ * then a per-call message. A one-message request may carry `assemble`: its
+ * reply is written in another field order and reshaped into the saved fields.
+ */
+export type EvalRequest = TextRequest | Round2Request | SplitTextRequest;
 
 export function isSplitRequest(request: EvalRequest): request is SplitTextRequest {
   return "fixed" in request;
+}
+
+/** A parsed reply as the fields saved today: assembled where the request writes another order, else as it came. */
+export function assembledReply(request: EvalRequest, parsed: unknown): unknown {
+  return "assemble" in request && request.assemble ? request.assemble(parsed) : parsed;
 }
 
 export const MESSAGE_SEPARATOR = "\n\n----- per-call message -----\n\n";
@@ -223,6 +241,21 @@ function setupRound1(input: RequestInput): TextRequest {
   throw new Error(`Variant setupR1 does not cover role ${input.role}`);
 }
 
+/** Setup round 2 in one of its two orders; AI Iteration keeps today's order in both (setup doc A9). */
+function setupRound2(variant: VariantId, order: Round2Order) {
+  return (input: RequestInput): Round2Request => {
+    if (input.role === "setup") {
+      const { premise, playerCount, gameMode, maxTurns } = input.setup;
+      return setupRound2Request(premise, playerCount, gameMode, maxTurns, "story", order);
+    }
+    if (input.role === "iteration") {
+      const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
+      return iterationRound2Request(feedback, playerCount, gameMode, maxTurns, sections, template);
+    }
+    throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  };
+}
+
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
@@ -234,6 +267,8 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   rewrite2Slim: rewriteVariant("rewrite2Slim", "worded", { beat: "slim" }),
   rewrite2ZeroShot: rewriteVariant("rewrite2ZeroShot", "worded", { setupWithExamples: false }),
   setupR1: setupRound1,
+  setupR2: setupRound2("setupR2", "fieldOrder"),
+  setupR2Order: setupRound2("setupR2Order", "generationOrder"),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

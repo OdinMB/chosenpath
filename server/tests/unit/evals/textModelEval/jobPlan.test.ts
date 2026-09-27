@@ -7,10 +7,12 @@ import {
   iterationRound1Request,
   setupRound1Request,
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
+import { iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
+  assembledReply,
   isSplitRequest,
   requestFor,
   requestText,
@@ -254,11 +256,13 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("3").some((j) => j.baseline)).toBe(true);
   });
 
-  it("plans setup round 1 in the setup rounds, and nothing yet in the turn rounds", () => {
-    // The lemonade premise is on the owner's round-1 page, so Sol low runs it too
+  it("plans setup rounds 1 and 2 in the setup rounds, and nothing yet in the turn rounds", () => {
+    // The lemonade premise is on the owner's round-1 page, so Sol low runs it too; round 2's two arms run on Luna low only
     expect(perArm(plan("setup-rounds"))).toEqual({
       "gpt-6-luna@low/setupR1": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
       "gpt-6-sol@low/setupR1": ["setup-learn-lemonade s1"],
+      "gpt-6-luna@low/setupR2": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-luna@low/setupR2Order": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
     });
     expect(plan("setup-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
     expect(plan("turn-rounds")).toEqual([]);
@@ -350,6 +354,50 @@ describe("requestFor: setup round 1", () => {
     const block = exampleBlock(requestText(requestFor("setupR1", setup(2, GameModes.Competitive))));
     expect(block?.startsWith(WORKED_EXAMPLE_HEADING)).toBe(true);
     expect(block).toContain("Not like this:");
+    expect(block).not.toContain("Character Selection Instructions");
+  });
+});
+
+describe("requestFor: setup round 2", () => {
+  const MULTIPLAYER_MODES = [GameModes.Cooperative, GameModes.Competitive, GameModes.CooperativeCompetitive];
+  const INPUTS: [1 | 2 | 3, GameMode][] = [[1, GameModes.SinglePlayer], ...([2, 3] as const).flatMap((n) => MULTIPLAYER_MODES.map((m): [2 | 3, GameMode] => [n, m]))];
+  const setup = (playerCount: 1 | 2 | 3, gameMode: GameMode): RequestInput => ({ role: "setup", setup: { premise: "A premise", playerCount, gameMode, maxTurns: 25 } });
+
+  it.each(INPUTS)("%i players, %s: builds arm A (today's field order) and arm B (the generation order) in production's one-message shape", (players, mode) => {
+    const pairs: [VariantId, Round2Order][] = [
+      ["setupR2", "fieldOrder"],
+      ["setupR2Order", "generationOrder"],
+    ];
+    for (const [variant, order] of pairs) {
+      const request = requestFor(variant, setup(players, mode));
+      expect(isSplitRequest(request)).toBe(false);
+      const expected = setupRound2Request("A premise", players, mode, 25, "story", order);
+      expect(requestText(request)).toBe(expected.prompt);
+      expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+      expect("assemble" in request).toBe(order === "generationOrder");
+    }
+  });
+
+  it("builds AI Iteration with arm A's text for both arms (A9 leaves iteration on today's order), and refuses the turn roles", () => {
+    const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["guidelines", "stats"], playerCount: 2 as const, gameMode: GameModes.Competitive, maxTurns: 25 };
+    const expected = iterationRound2Request("More rivalry", 2, GameModes.Competitive, 25, ["guidelines", "stats"], { title: "T" }).prompt;
+    for (const variant of ["setupR2", "setupR2Order"] as VariantId[]) {
+      expect(requestText(requestFor(variant, { role: "iteration", iteration }))).toBe(expected);
+      expect(() => requestFor(variant, { role: "beat", story: firstSwitchBeat(1) })).toThrow(`Variant ${variant} does not cover role beat`);
+    }
+  });
+
+  it("assembles an arm B reply before anything reads it", () => {
+    const request = requestFor("setupR2Order", setup(1, GameModes.SinglePlayer));
+    const reply = { guidelines: { world: "w" }, threadDesign: { typesOfThreads: ["t"] }, playerOutcomes: { player1: [] }, player1: {} };
+    expect(assembledReply(request, reply)).toMatchObject({ guidelines: { world: "w", typesOfThreads: ["t"] }, player1: { outcomes: [] } });
+    expect(assembledReply(requestFor("setupR2", setup(1, GameModes.SinglePlayer)), reply)).toBe(reply);
+  });
+
+  it("gives the example-copy check production's example stat setups, which round 2's base keeps", () => {
+    const block = exampleBlock(requestText(requestFor("setupR2", setup(2, GameModes.Competitive))));
+    expect(block?.startsWith("EXAMPLE STAT SETUPS")).toBe(true);
+    expect(block).not.toContain("Personal Dream");
     expect(block).not.toContain("Character Selection Instructions");
   });
 });
