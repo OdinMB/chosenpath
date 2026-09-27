@@ -1,12 +1,14 @@
 import { z } from "zod";
+import type { Callbacks } from "@langchain/core/callbacks/manager";
+import type { ClientOptions } from "openai";
 import { Logger } from "shared/logger.js";
-import { TEXT_MODEL_CONFIG } from "server/config.js";
+import { productionTextModels } from "server/config.js";
 import {
   createChatModel,
   PRODUCTION_MAX_RETRIES,
-  PRODUCTION_TIMEOUT_MS,
+  productionCallLimits,
 } from "shared/llm/chatModel.js";
-import { settingsFor } from "shared/llm/textModelSettings.js";
+import { settingsFor, type TextModelSettings } from "shared/llm/textModelSettings.js";
 import { llmCallLogger } from "shared/llm/usageRecorder.js";
 import { PROHIBITED_CONTENT_RULES } from "shared/contentSafetyRules.js";
 import dotenv from "dotenv";
@@ -104,10 +106,30 @@ If you have any doubt whether a rule is broken, mark the request as inappropriat
 Request to evaluate: "${request}"`;
 }
 
+/**
+ * The production classifier for these settings: the filter role's retries,
+ * timeout and output cap, with the verdict schema as strict structured
+ * output. The eval's filter check (--filter-check) builds its arms here too.
+ */
+export function contentFilterClassifier(
+  settings: TextModelSettings,
+  options: { callbacks?: Callbacks; configuration?: ClientOptions } = {}
+): ContentClassifier {
+  const structuredModel = createChatModel({
+    role: "contentFilter",
+    settings,
+    maxRetries: PRODUCTION_MAX_RETRIES,
+    ...productionCallLimits("contentFilter", 1),
+    callbacks: options.callbacks,
+    configuration: options.configuration,
+  }).withStructuredOutput(contentFilterSchema);
+  return (filterPrompt) => structuredModel.invoke(filterPrompt);
+}
+
 export class ContentFilterService {
   private classify: ContentClassifier;
 
-  /** Uses the configured OpenAI model unless a classifier is passed in (tests). */
+  /** Uses the configured OpenAI model unless a classifier is passed in (tests, the eval). */
   constructor(classify?: ContentClassifier) {
     if (classify) {
       this.classify = classify;
@@ -116,14 +138,10 @@ export class ContentFilterService {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY environment variable is not set");
     }
-    const structuredModel = createChatModel({
-      role: "contentFilter",
-      settings: settingsFor(TEXT_MODEL_CONFIG, "contentFilter"),
-      maxRetries: PRODUCTION_MAX_RETRIES,
-      timeoutMs: PRODUCTION_TIMEOUT_MS.contentFilter,
-      callbacks: [llmCallLogger],
-    }).withStructuredOutput(contentFilterSchema);
-    this.classify = (filterPrompt) => structuredModel.invoke(filterPrompt);
+    this.classify = contentFilterClassifier(
+      settingsFor(productionTextModels(), "contentFilter"),
+      { callbacks: [llmCallLogger] }
+    );
   }
 
   /**

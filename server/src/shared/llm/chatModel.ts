@@ -12,13 +12,17 @@ import {
 
 /*
  * The one place a text-model ChatOpenAI is built: the exact request shape per
- * model family, the retry policy and retry logging. Only gpt-4.x and gpt-6
- * are accepted; anything else throws, because an unknown family would fail
- * at runtime (and a fail-closed content filter would then block creation).
+ * model family, the retry policy, retry logging, and production's timeout and
+ * output cap per role. The factory accepts gpt-4.x and gpt-6; anything else
+ * throws, because an unknown family would fail at runtime (and a fail-closed
+ * content filter would then block creation). Production text roles take
+ * gpt-6 only (textModelSettings.ts); gpt-4.x stays here for the eval's
+ * comparison arms.
  *
  * LangChain 0.6.7 does not know gpt-6 is a reasoning model, so effort goes
- * through modelKwargs and temperature must never be set. maxTokens is never
- * set either: 0.6.7 would send it as max_tokens.
+ * through modelKwargs and temperature must never be set. For the same reason
+ * a gpt-6 output cap goes through modelKwargs as max_completion_tokens
+ * (which counts reasoning): 0.6.7 would send maxTokens as max_tokens.
  */
 
 export type ModelFamily = "gpt-4.x" | "gpt-6";
@@ -28,6 +32,8 @@ export type ChatModelOptions = {
   settings: TextModelSettings;
   maxRetries: number;
   timeoutMs: number;
+  /** Output cap; on gpt-6 it counts reasoning tokens. Unset: no cap (the eval) */
+  maxCompletionTokens?: number;
   callbacks?: Callbacks;
   /** Passed to the OpenAI client (tests and the eval inject fetch here) */
   configuration?: ClientOptions;
@@ -136,11 +142,16 @@ export function retryHandler(
 
 /** The constructor fields for one role's model: the pinned request shape. */
 export function chatModelFields(options: ChatModelOptions): ChatOpenAIFields {
-  const { settings } = options;
+  const { settings, maxCompletionTokens } = options;
   assertSupportedSettings(settings);
   const shape: ChatOpenAIFields =
     modelFamily(settings.model) === "gpt-4.x"
-      ? { model: settings.model, temperature: settings.temperature }
+      ? {
+          model: settings.model,
+          temperature: settings.temperature,
+          // A non-reasoning model: LangChain sends this as max_tokens, which is right here
+          ...(maxCompletionTokens !== undefined ? { maxTokens: maxCompletionTokens } : {}),
+        }
       : {
           model: settings.model,
           modelKwargs: {
@@ -149,6 +160,7 @@ export function chatModelFields(options: ChatModelOptions): ChatOpenAIFields {
             // default bills a 1.25x cache write on every unique prompt
             prompt_cache_options: { mode: "explicit" },
             ...(settings.verbosity ? { verbosity: settings.verbosity } : {}),
+            ...(maxCompletionTokens !== undefined ? { max_completion_tokens: maxCompletionTokens } : {}),
           },
         };
   return {
@@ -168,16 +180,43 @@ export function chatModelFields(options: ChatModelOptions): ChatOpenAIFields {
 /** Production retries: each is billed, so at most two, and each is logged. */
 export const PRODUCTION_MAX_RETRIES = 2;
 
-/** Well above the slowest expected call (3-player setup, ~100 s); cuts only hung requests. */
-export const PRODUCTION_TIMEOUT_MS: Record<TextRole, number> = {
-  setup: 240_000,
-  templateGeneration: 240_000,
-  templateIteration: 240_000,
-  beat: 180_000,
-  switchAnalysis: 120_000,
-  threadAnalysis: 120_000,
-  contentFilter: 60_000,
-};
+export type CallLimits = { timeoutMs: number; maxCompletionTokens: number };
+
+/**
+ * Production's timeout and output cap per role, for the GPT-6 models of
+ * 2026-09-27. Derived from the eval's valid replies (DOCS/2026-09-26_gpt6-
+ * text-eval/calls.jsonl; the table and margins are in .context/text-model-
+ * eval.md, "Timeouts and output caps"): each timeout is about twice the
+ * slowest normal reply of the chosen arm, and each cap well above the longest
+ * normal reply (reasoning included) but far below the padded runaways, so a
+ * stuck or padding call fails and is retried instead of running to the old
+ * 180-240 s. At the models' output speed each cap is reached at about the
+ * role's timeout, so whichever binds first cuts a runaway. A cut-off call
+ * bills what it wrote, so the cap bounds that too.
+ */
+const TURN_CAP_BY_PLAYERS: Record<1 | 2 | 3, number> = { 1: 12_000, 2: 14_000, 3: 16_000 };
+
+export function productionCallLimits(role: TextRole, players: number): CallLimits {
+  if (players !== 1 && players !== 2 && players !== 3) {
+    throw new Error(`Unsupported player count ${players} for ${role} limits (1 to 3)`);
+  }
+  switch (role) {
+    case "beat":
+      return { timeoutMs: 90_000, maxCompletionTokens: TURN_CAP_BY_PLAYERS[players] };
+    case "setup":
+      return { timeoutMs: 120_000, maxCompletionTokens: 20_000 };
+    case "templateGeneration":
+    case "templateIteration":
+      // No player waits, and Sol (the slower model) may take these over
+      return { timeoutMs: 150_000, maxCompletionTokens: 20_000 };
+    case "switchAnalysis":
+    case "threadAnalysis":
+      return { timeoutMs: 30_000, maxCompletionTokens: 4_000 };
+    case "contentFilter":
+      // The filter check of 2026-09-27: Luna low's slowest verdict 1.9 s, longest 122 tokens
+      return { timeoutMs: 15_000, maxCompletionTokens: 2_000 };
+  }
+}
 
 export function createChatModel(options: ChatModelOptions): ChatOpenAI {
   return new ChatOpenAI(chatModelFields(options));

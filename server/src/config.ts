@@ -1,7 +1,12 @@
 import dotenv from "dotenv";
 import { getApiConfig } from "core/config.js";
 import { IMAGE_QUALITIES } from "core/types/image.js";
-import { resolveTextModelConfig } from "shared/llm/textModelSettings.js";
+import { Logger } from "shared/logger.js";
+import {
+  describeTextModels,
+  resolveTextModelConfig,
+  type TextModelConfig,
+} from "shared/llm/textModelSettings.js";
 
 // Load environment variables
 dotenv.config();
@@ -32,9 +37,20 @@ export const STORAGE_PATHS = {
   },
 };
 
-// Text model settings per role (defaults and env names: shared/llm/textModelSettings.ts).
-// Throws at startup on an unsupported model or a gpt-6 model without an effort.
-export const TEXT_MODEL_CONFIG = resolveTextModelConfig(process.env);
+// Text model settings per role (defaults and env names: shared/llm/textModelSettings.ts),
+// resolved on first use and logged once. The routes build the content filter on import,
+// so a retired (gpt-4.x) or unsupported model stops the server at startup. Lazy so the
+// eval, which imports this file for its storage paths, never depends on production env.
+let textModelConfig: TextModelConfig | undefined;
+
+export function productionTextModels(): TextModelConfig {
+  if (!textModelConfig) {
+    const log = Logger.forService("LLM");
+    textModelConfig = resolveTextModelConfig(process.env, (message) => log.warn(message));
+    log.log(`text models ${JSON.stringify(describeTextModels(textModelConfig))}`);
+  }
+  return textModelConfig;
+}
 
 // Image generation settings (see .context/image-generation.md, "Models and settings").
 // Models and qualities follow the owner's blind rating of 2026-09-24.

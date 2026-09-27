@@ -19,7 +19,7 @@ describe("printDryRun: the prompt state it plans under", () => {
   const beatCase = evalCase("sp", "beat", { state: threadBeat(1).getState() });
   /** Sample 1 of the Stage 0 baseline on the case, finished under the tag */
   const finishedBaseline = (promptState: string): CallRecord => {
-    const armKey = baselineArm("beat", false).key;
+    const armKey = baselineArm("beat").key;
     return record({ jobKey: jobKey("sp", armKey, promptState, 1), promptState, caseId: "sp", armKey, callArmKey: armKey });
   };
 
@@ -31,7 +31,7 @@ describe("printDryRun: the prompt state it plans under", () => {
       extraSpend: [],
       frozenCases: [beatCase],
       sources: { snapshots: [], templates: [], newStory: () => { throw new Error("frozen cases need no new stories"); } },
-      options: (stage, tag, extra): PlanOptions => ({ stage, promptState: tag, roles: ["beat"], mode: "isolated", subset15: false, records, env: {}, ...extra }),
+      options: (stage, tag, extra): PlanOptions => ({ stage, promptState: tag, roles: ["beat"], mode: "isolated", subset15: false, records, ...extra }),
       promptState,
       tpm: 1_000_000,
       maxInFlight: 6,

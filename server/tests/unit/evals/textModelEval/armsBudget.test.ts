@@ -71,14 +71,31 @@ describe("arm keys and estimates", () => {
     expect(referenceKey("pipeline:gpt-6-luna@low/minimal>gpt-6-luna@medium/minimal")).toBeUndefined();
   });
 
-  it("runs Stage 4's gpt-4.1 and gpt-4.1-mini arms on production's default settings", () => {
+  it("runs Stage 4's gpt-4.1 and gpt-4.1-mini arms on the comparison baseline's settings", () => {
     const todays = (role: "setup" | "beat") =>
       armsFor("4", role)
         .map((plan) => plan.arm)
         .filter((arm) => arm.model.startsWith("gpt-4.1"));
     for (const role of ["setup", "beat"] as const) {
       expect(todays(role).length).toBeGreaterThan(0);
-      for (const arm of todays(role)) expect(armSettings(arm)).toEqual(armSettings(baselineArm(role, false, {})));
+      for (const arm of todays(role)) expect(armSettings(arm)).toEqual(armSettings(baselineArm(role)));
+    }
+  });
+
+  it("keeps the baseline on the stored pre-migration keys, whatever production env says", () => {
+    const previous = process.env.TEXT_MODEL_NAME;
+    process.env.TEXT_MODEL_NAME = "gpt-4.1-mini";
+    try {
+      // Production would refuse this env at startup; the eval never reads it
+      expect(baselineArm("setup").key).toBe("gpt-4.1@t0.2/prod");
+      expect(baselineArm("iteration").key).toBe("gpt-4.1@t0.2/prod");
+      expect(baselineArm("beat").key).toBe("gpt-4.1-mini@t0.2/prod");
+      expect(baselineArm("switch").key).toBe("gpt-4.1-mini@t0.2/prod");
+      expect(baselineArm("thread").key).toBe("gpt-4.1-mini@t0.2/prod");
+      expect(baselineArm("beat").baseline).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.TEXT_MODEL_NAME;
+      else process.env.TEXT_MODEL_NAME = previous;
     }
   });
 

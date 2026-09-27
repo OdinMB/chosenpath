@@ -24,11 +24,11 @@ import {
   MOCK_STORIES_IN_DEVELOPMENT,
   MOCK_STORIES_DELAY_MS,
 } from "core/config.js";
-import { TEXT_MODEL_CONFIG } from "server/config.js";
+import { productionTextModels } from "server/config.js";
 import {
   createChatModel,
   PRODUCTION_MAX_RETRIES,
-  PRODUCTION_TIMEOUT_MS,
+  productionCallLimits,
 } from "shared/llm/chatModel.js";
 import { settingsFor, type TextRole } from "shared/llm/textModelSettings.js";
 import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
@@ -67,7 +67,7 @@ function storyTags(
 }
 
 export class AIStoryGenerator {
-  /** One model per role and resolved settings, created on first use */
+  /** One model per role, resolved settings and limits, created on first use */
   private models = new Map<string, ChatOpenAI>();
 
   constructor() {
@@ -76,16 +76,20 @@ export class AIStoryGenerator {
     }
   }
 
-  private modelFor(role: TextRole, multiplayer: boolean = false): ChatOpenAI {
-    const settings = settingsFor(TEXT_MODEL_CONFIG, role, { multiplayer });
-    const key = `${role}|${JSON.stringify(settings)}`;
+  /** The role's model for this many players: multiplayer settings above one, and the output cap by player count. */
+  private modelFor(role: TextRole, players: number): ChatOpenAI {
+    const settings = settingsFor(productionTextModels(), role, {
+      multiplayer: players > 1,
+    });
+    const limits = productionCallLimits(role, players);
+    const key = `${role}|${JSON.stringify(settings)}|${JSON.stringify(limits)}`;
     let model = this.models.get(key);
     if (!model) {
       model = createChatModel({
         role,
         settings,
         maxRetries: PRODUCTION_MAX_RETRIES,
-        timeoutMs: PRODUCTION_TIMEOUT_MS[role],
+        ...limits,
         callbacks: [llmCallLogger],
       });
       this.models.set(key, model);
@@ -200,7 +204,8 @@ export class AIStoryGenerator {
       "template"
     );
     const structuredModel = this.modelFor(
-      "templateGeneration"
+      "templateGeneration",
+      playerCount
     ).withStructuredOutput(request.schema);
 
     try {
@@ -270,9 +275,10 @@ export class AIStoryGenerator {
       maxTurns,
       "story"
     );
-    const structuredModel = this.modelFor("setup").withStructuredOutput(
-      request.schema
-    );
+    const structuredModel = this.modelFor(
+      "setup",
+      playerCount
+    ).withStructuredOutput(request.schema);
 
     try {
       Logger.Story.log(
@@ -317,7 +323,7 @@ export class AIStoryGenerator {
     const request = switchStep.request(story);
     const structuredModel = this.modelFor(
       "switchAnalysis",
-      story.isMultiplayer()
+      story.getNumberOfPlayers()
     ).withStructuredOutput(request.schema);
 
     // Checked before it becomes the story: repaired, or asked for once more
@@ -341,7 +347,7 @@ export class AIStoryGenerator {
     const request = threadStep.request(story);
     const structuredModel = this.modelFor(
       "threadAnalysis",
-      story.isMultiplayer()
+      story.getNumberOfPlayers()
     ).withStructuredOutput(request.schema);
 
     // Checked before it becomes the story: repaired, or asked for once more
@@ -382,7 +388,7 @@ export class AIStoryGenerator {
     const request = beatStep.request(story);
     const structuredModel = this.modelFor(
       "beat",
-      story.isMultiplayer()
+      story.getNumberOfPlayers()
     ).withStructuredOutput(request.schema);
 
     Logger.Story.log(
@@ -423,8 +429,10 @@ export class AIStoryGenerator {
       const partialSchema = partialTemplateSchema(sections, playerCount);
       Logger.Story.log("Fields to keep:", Object.keys(partialSchema.shape));
 
-      const structuredModel =
-        this.modelFor("templateIteration").withStructuredOutput(partialSchema);
+      const structuredModel = this.modelFor(
+        "templateIteration",
+        playerCount
+      ).withStructuredOutput(partialSchema);
       const result = await structuredModel.invoke(prompt, {
         metadata: { players: playerCount },
       });

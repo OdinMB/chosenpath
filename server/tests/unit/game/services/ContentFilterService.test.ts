@@ -1,9 +1,11 @@
 import { jest } from "@jest/globals";
 import {
   CONTENT_FILTER_ATTEMPTS,
+  contentFilterClassifier,
   ContentFilterService,
   ContentFilterUnavailableError,
 } from "../../../../src/game/services/ContentFilterService.js";
+import { productionCallLimits } from "../../../../src/shared/llm/chatModel.js";
 import type {
   ContentClassifier,
   ContentFilterVerdict,
@@ -82,6 +84,38 @@ describe("ContentFilterService.isAppropriatePrompt", () => {
     for (const rule of PROHIBITED_CONTENT_RULES) {
       expect(filterPrompt).toContain(rule);
     }
+  });
+});
+
+describe("contentFilterClassifier", () => {
+  it("sends the filter's request with its role limits and returns the parsed verdict", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetch = async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      const content = JSON.stringify(BLOCKED);
+      const completion = {
+        id: "chatcmpl-test",
+        object: "chat.completion",
+        created: 0,
+        model: "gpt-6-luna",
+        choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content, refusal: null } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      };
+      return new Response(JSON.stringify(completion), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const classify = contentFilterClassifier(
+      { model: "gpt-6-luna", reasoningEffort: "low" },
+      { configuration: { fetch } }
+    );
+
+    await expect(classify("a filter prompt")).resolves.toEqual(BLOCKED);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].reasoning_effort).toBe("low");
+    expect(bodies[0].max_completion_tokens).toBe(
+      productionCallLimits("contentFilter", 1).maxCompletionTokens
+    );
+    const format = bodies[0].response_format as { json_schema: { strict: boolean } };
+    expect(format.json_schema.strict).toBe(true);
   });
 });
 

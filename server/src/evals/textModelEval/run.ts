@@ -377,7 +377,7 @@ async function buildCasesMode(args: Args, files: EvalFiles, dirs: ReturnType<typ
   const { cases, report } = await buildCases({
     ...localSources(dirs),
     callBaseline: async (role, caseId, request, players) => {
-      const job = requestJob({ stage: "0", promptState: PRE_FIX_PROMPT_STATE, caseId, role, arm: baselineArm(role, players > 1), players, request, records });
+      const job = requestJob({ stage: "0", promptState: PRE_FIX_PROMPT_STATE, caseId, role, arm: baselineArm(role), players, request, records });
       const remaining: Caps = { ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - buildSpent };
       const result = await runJobs([job], deps, { caps: remaining, previous: records, extraSpend: extraSpend(files), tokensPerMinute: args.tpm });
       buildSpent += result.records.reduce((sum, r) => sum + r.costUsd, 0);

@@ -1,6 +1,5 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
-import type { Env } from "shared/llm/textModelSettings.js";
 import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
 import { switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
@@ -53,7 +52,6 @@ export type PlanOptions = {
   rareFailure?: "skip" | "only";
   /** Earlier records, for measured output sizes */
   records: CallRecord[];
-  env?: Env;
 };
 
 const DEFAULT_BASELINE_SAMPLES = 2;
@@ -301,7 +299,7 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
   const regular = options.rareFailure !== "only";
   const baselineSamples = options.samples ?? DEFAULT_BASELINE_SAMPLES;
   for (const evalCase of regular ? casesFor(cases, role, options) : []) {
-    const arm = baselineArm(role, evalCase.tags.multiplayer, options.env);
+    const arm = baselineArm(role);
     if (!armAllowed(options, arm.key)) continue;
     for (let sample = 1; sample <= baselineSamples; sample++) jobs.push(callJob(options, evalCase, arm, sample, measured));
   }
@@ -339,8 +337,7 @@ function pipelineJobs(cases: EvalCase[], role: "switch" | "thread", options: Pla
   };
   // Per case: the baseline chain (every case), then the stage's candidate chains (their scope)
   for (const evalCase of casesFor(cases, role, options)) {
-    const multiplayer = evalCase.tags.multiplayer;
-    chains(evalCase, baselineArm(role, multiplayer, options.env), baselineArm("beat", multiplayer, options.env), options.samples ?? DEFAULT_BASELINE_SAMPLES);
+    chains(evalCase, baselineArm(role), baselineArm("beat"), options.samples ?? DEFAULT_BASELINE_SAMPLES);
     if (!plan || !candidateCases.has(evalCase.id)) continue;
     for (const beatArm of plan.beats) chains(evalCase, plan.analysis, beatArm, options.samples ?? plan.samples);
   }

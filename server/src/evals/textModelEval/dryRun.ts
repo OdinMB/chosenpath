@@ -52,7 +52,7 @@ export function buildEstimate(local: LocalCases): number {
   const medianBeatChars = beatChars[Math.floor(beatChars.length / 2)] ?? 80_000;
   return local.requests.reduce((sum, r) => {
     const est = (role: EvalRole, promptChars: number) =>
-      estimateCall({ role, arm: baselineArm(role, r.players > 1), players: r.players, promptChars }).costUsd;
+      estimateCall({ role, arm: baselineArm(role), players: r.players, promptChars }).costUsd;
     const known = est(r.role, requestChars(r.request));
     if (!r.caseId.startsWith("switch-tpl-")) return sum + known;
     // Each extra player adds prompt and schema (probe: the beat schema is about 4.5K tokens at 1p, 15K at 3p)
@@ -145,6 +145,6 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
   }
   log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $30 by the owner on 2026-09-27; the first target was about $25)`);
   log(
-    `Baseline arms from production config: setup ${baselineArm("setup", false).key}, beat ${baselineArm("beat", false).key}, analysis ${baselineArm("switch", false).key}`
+    `Baseline arms (the pre-migration comparison, fixed in arms.ts): setup ${baselineArm("setup").key}, beat ${baselineArm("beat").key}, analysis ${baselineArm("switch").key}`
   );
 }

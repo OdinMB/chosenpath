@@ -52,7 +52,6 @@ describe("planJobs: --no-mp-continuations", () => {
     subset15: false,
     skipMultiplayerContinuations: skip,
     records: [],
-    env: {},
   });
 
   it("drops multiplayer continuation beats and keeps first beats, endings and single-player beats", () => {
@@ -73,7 +72,6 @@ describe("planJobs: execution order and cache lines", () => {
     samples: 1,
     subset15: false,
     records: [],
-    env: {},
   });
 
   it("runs beat cases in story order, then turn order, whatever their ids", () => {
@@ -108,7 +106,6 @@ describe("planJobs: Stage 4", () => {
     mode: "isolated",
     subset15: false,
     records: [],
-    env: {},
     ...overrides,
   });
   const candidates = (jobs: Job[]) => jobs.filter((j) => !j.baseline);
@@ -283,7 +280,6 @@ describe("storyAfterAnalysis: chains go on with the plan the game keeps", () => 
       samples: 1,
       subset15: false,
       records: [],
-      env: {},
     });
     const beat = job.then?.build(shortPlan());
     const text = beat ? requestText(beat.request()) : "";
@@ -313,7 +309,6 @@ describe("planJobs: --rare-failure", () => {
     subset15: false,
     rareFailure,
     records: [],
-    env: {},
   });
 
   it("plans the regular samples and the batch without the flag", () => {
@@ -347,7 +342,6 @@ describe("planJobs: Stage 3 scopes, estimates and chains", () => {
     mode: "isolated",
     subset15: false,
     records: [],
-    env: {},
     ...overrides,
   });
   const candidates = (jobs: Job[]) => jobs.filter((j) => !j.baseline);

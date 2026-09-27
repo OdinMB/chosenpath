@@ -2,7 +2,7 @@ import http from "http";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { API_CONFIG, isDevelopment } from "server/config.js";
+import { API_CONFIG, isDevelopment, productionTextModels } from "server/config.js";
 import { router } from "./routes.js";
 import { GameWebSocketServer } from "./game/websocket.js";
 import { GameHandler } from "game/GameHandler.js";
@@ -33,6 +33,9 @@ async function startServer() {
       isDevelopment ? "development" : "production"
     );
     console.log("[Server] CORS origins:", API_CONFIG.DEFAULT_CORS_ORIGIN);
+
+    // Stops here, before anything listens, on a retired (gpt-4.x) or unsupported text model
+    productionTextModels();
 
     // Initialize database
     await initializeDatabase();

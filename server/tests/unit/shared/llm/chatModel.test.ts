@@ -1,7 +1,11 @@
 import { jest } from "@jest/globals";
 import { z } from "zod";
-import { createChatModel, modelFamily } from "../../../../src/shared/llm/chatModel.js";
-import type { TextModelSettings } from "../../../../src/shared/llm/textModelSettings.js";
+import {
+  createChatModel,
+  modelFamily,
+  productionCallLimits,
+} from "../../../../src/shared/llm/chatModel.js";
+import type { TextModelSettings, TextRole } from "../../../../src/shared/llm/textModelSettings.js";
 
 type FetchFn = (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -45,13 +49,14 @@ function fakeFetch(statuses: number[]) {
 
 const schema = z.object({ answer: z.string() });
 
-async function sendOnce(settings: TextModelSettings) {
+async function sendOnce(settings: TextModelSettings, maxCompletionTokens?: number) {
   const { fetch, bodies } = fakeFetch([200]);
   const model = createChatModel({
     role: "beat",
     settings,
     maxRetries: 0,
     timeoutMs: 5_000,
+    maxCompletionTokens,
     configuration: { fetch },
   });
   const result = await model.withStructuredOutput(schema).invoke("x");
@@ -92,6 +97,19 @@ describe("createChatModel wire shape", () => {
     expect(body.verbosity).toBe("low");
   });
 
+  it("sends a gpt-6 output cap as max_completion_tokens, never as max_tokens", async () => {
+    const body = await sendOnce({ model: "gpt-6-luna", reasoningEffort: "medium" }, 12_000);
+    expect(body.max_completion_tokens).toBe(12_000);
+    expect(body).not.toHaveProperty("max_tokens");
+    expect(body.reasoning_effort).toBe("medium");
+  });
+
+  it("sends a gpt-4.x output cap as max_tokens (the eval's comparison arms)", async () => {
+    const body = await sendOnce({ model: "gpt-4.1-mini", temperature: 0.2 }, 3_000);
+    expect(body.max_tokens).toBe(3_000);
+    expect(body).not.toHaveProperty("max_completion_tokens");
+  });
+
   it("refuses settings outside the pinned families", () => {
     expect(() => modelFamily("o4-mini")).toThrow(/Unsupported text model/);
     expect(() =>
@@ -102,6 +120,40 @@ describe("createChatModel wire shape", () => {
         timeoutMs: 1_000,
       })
     ).toThrow(/takes no temperature/);
+  });
+});
+
+describe("productionCallLimits", () => {
+  const ALL_ROLES: TextRole[] = [
+    "setup",
+    "templateGeneration",
+    "templateIteration",
+    "beat",
+    "switchAnalysis",
+    "threadAnalysis",
+    "contentFilter",
+  ];
+
+  it("cuts a stuck turn at 90 s and caps it by player count", () => {
+    expect(productionCallLimits("beat", 1)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(productionCallLimits("beat", 2)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 14_000 });
+    expect(productionCallLimits("beat", 3)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 16_000 });
+  });
+
+  it("gives setup and the template editor room above their slowest replies, and analysis and the filter short limits", () => {
+    expect(productionCallLimits("setup", 3)).toEqual({ timeoutMs: 120_000, maxCompletionTokens: 20_000 });
+    expect(productionCallLimits("templateGeneration", 1)).toEqual({ timeoutMs: 150_000, maxCompletionTokens: 20_000 });
+    expect(productionCallLimits("templateIteration", 2)).toEqual({ timeoutMs: 150_000, maxCompletionTokens: 20_000 });
+    expect(productionCallLimits("switchAnalysis", 2)).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
+    expect(productionCallLimits("threadAnalysis", 1)).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
+    expect(productionCallLimits("contentFilter", 1)).toEqual({ timeoutMs: 15_000, maxCompletionTokens: 2_000 });
+  });
+
+  it("rejects a player count outside 1 to 3, for every role", () => {
+    for (const role of ALL_ROLES) {
+      expect(() => productionCallLimits(role, 0)).toThrow(/player count/);
+      expect(() => productionCallLimits(role, 4)).toThrow(/player count/);
+    }
   });
 });
 

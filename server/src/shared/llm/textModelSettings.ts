@@ -1,16 +1,22 @@
 import { assertSupportedSettings, modelFamily } from "./chatModel.js";
 
 /*
- * Which model, reasoning effort and temperature each text role uses, read from
- * env with today's defaults. Background: .context/text-model-eval.md.
+ * Which model and reasoning effort each production text role uses, read from
+ * env with the GPT-6 defaults the owner and coordinator settled on
+ * 2026-09-27. Background: .context/text-model-eval.md.
  *
- * Five setting groups. Existing env names keep their meaning:
- *   setup            SETUP_MODEL_*, or GENERATION_MODEL_* when SETUP_MODEL_NAME is unset
- *   template editor  GENERATION_MODEL_*
- *   beats            TEXT_MODEL_*            (+ MULTIPLAYER_TEXT_MODEL_*)
- *   analysis         SWITCH_THREAD_MODEL_*   (+ MULTIPLAYER_SWITCH_THREAD_MODEL_*)
- *   content filter   CONTENT_FILTER_MODEL_*
- * Each group reads _NAME, _TEMPERATURE and _REASONING_EFFORT.
+ * Seven setting groups, each read from its own prefix and nothing else:
+ *   setup                 SETUP_MODEL_*                       gpt-6-luna low
+ *   template editor       GENERATION_MODEL_*                  gpt-6-luna low
+ *   beats                 TEXT_MODEL_*                        gpt-6-luna medium
+ *   multiplayer beats     MULTIPLAYER_TEXT_MODEL_*            gpt-6-luna low
+ *   analysis              SWITCH_THREAD_MODEL_*               gpt-6-luna low
+ *   multiplayer analysis  MULTIPLAYER_SWITCH_THREAD_MODEL_*   gpt-6-luna low
+ *   content filter        CONTENT_FILTER_MODEL_*              gpt-6-luna low
+ * Each group reads _NAME and _REASONING_EFFORT; _TEMPERATURE is ignored with
+ * a warning. Production text calls run only on gpt-6 models: a gpt-4.x name
+ * stops the server at startup with the variable and its replacement. The
+ * eval's comparison arms still run gpt-4.x through the factory directly.
  */
 
 export type TextRole =
@@ -38,7 +44,7 @@ export type UncheckedTextModelSettings = {
 
 export type TextModelSettings = {
   model: string;
-  /** gpt-4.x only */
+  /** gpt-4.x only (the eval's comparison arms) */
   temperature?: number;
   /** gpt-6 only; always set there */
   reasoningEffort?: ReasoningEffort;
@@ -50,19 +56,37 @@ export type TextModelConfig = {
   setup: TextModelSettings;
   templateEditor: TextModelSettings;
   beat: TextModelSettings;
+  multiplayerBeat: TextModelSettings;
   analysis: TextModelSettings;
+  multiplayerAnalysis: TextModelSettings;
   contentFilter: TextModelSettings;
-  /** Only when MULTIPLAYER_TEXT_MODEL_NAME is set */
-  multiplayerBeat?: TextModelSettings;
-  /** Only when MULTIPLAYER_SWITCH_THREAD_MODEL_NAME is set */
-  multiplayerAnalysis?: TextModelSettings;
 };
+
+export type TextModelGroup = keyof TextModelConfig;
 
 export type Env = Record<string, string | undefined>;
 
-const DEFAULT_TEMPERATURE = 0.2;
-const LARGE_DEFAULT_MODEL = "gpt-4.1";
-const SMALL_DEFAULT_MODEL = "gpt-4.1-mini";
+type GroupDefault = { prefix: string; model: string; reasoningEffort: ReasoningEffort };
+
+/**
+ * The settled defaults (2026-09-27): single-player turns on Luna medium,
+ * multiplayer turns on Luna low (medium's 3-player p95 was 62 s, over the
+ * 60 s cap), everything else on Luna low. Setup is the only GPT-6 arm inside
+ * the setup wait cap; templates may move to Sol after setup round 1.
+ */
+export const TEXT_MODEL_GROUPS: Record<TextModelGroup, GroupDefault> = {
+  setup: { prefix: "SETUP_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+  templateEditor: { prefix: "GENERATION_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+  beat: { prefix: "TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "medium" },
+  multiplayerBeat: { prefix: "MULTIPLAYER_TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+  analysis: { prefix: "SWITCH_THREAD_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+  multiplayerAnalysis: {
+    prefix: "MULTIPLAYER_SWITCH_THREAD_MODEL",
+    model: "gpt-6-luna",
+    reasoningEffort: "low",
+  },
+  contentFilter: { prefix: "CONTENT_FILTER_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+};
 
 /** An empty string counts as unset, as `||` treated it before. */
 function read(env: Env, name: string): string | undefined {
@@ -70,75 +94,71 @@ function read(env: Env, name: string): string | undefined {
   return value ? value : undefined;
 }
 
-function parseTemperature(name: string, raw: string): number {
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0 || value > 2) {
-    throw new Error(`${name} must be a number between 0 and 2`);
-  }
-  return value;
+function isEffort(value: string): value is ReasoningEffort {
+  return (REASONING_EFFORTS as readonly string[]).includes(value);
 }
 
-function readGroup(
-  env: Env,
-  prefix: string,
-  defaultModel: string,
-  warn: (message: string) => void
-): TextModelSettings {
-  const model = read(env, `${prefix}_NAME`) ?? defaultModel;
-  const rawTemperature = read(env, `${prefix}_TEMPERATURE`);
-  const rawEffort = read(env, `${prefix}_REASONING_EFFORT`);
+function replacement(group: GroupDefault): string {
+  return `Set ${group.prefix}_NAME=${group.model} and ${group.prefix}_REASONING_EFFORT=${group.reasoningEffort}, or remove ${group.prefix}_NAME to use that default.`;
+}
 
-  let settings: UncheckedTextModelSettings;
-  if (modelFamily(model) === "gpt-4.x") {
-    // Effort is ignored here: today's configured "minimal" must keep working
-    settings = {
-      model,
-      temperature:
-        rawTemperature === undefined
-          ? DEFAULT_TEMPERATURE
-          : parseTemperature(`${prefix}_TEMPERATURE`, rawTemperature),
-    };
-  } else {
-    if (rawTemperature !== undefined) {
-      warn(`${prefix}_TEMPERATURE is ignored for ${model} (GPT-6 takes no temperature)`);
-    }
-    if (rawEffort === undefined) {
-      throw new Error(
-        `${prefix}_REASONING_EFFORT must be set for ${model} (none, low, medium or high)`
-      );
-    }
-    settings = { model, reasoningEffort: rawEffort };
+function readGroup(env: Env, group: GroupDefault, warn: (message: string) => void): TextModelSettings {
+  const { prefix } = group;
+  const name = read(env, `${prefix}_NAME`);
+  const model = name ?? group.model;
+
+  let family: ReturnType<typeof modelFamily>;
+  try {
+    family = modelFamily(model);
+  } catch {
+    throw new Error(
+      `${prefix}_NAME=${model} is not a supported text model: production text calls take gpt-6-* models. ${replacement(group)}`
+    );
   }
+  if (family === "gpt-4.x") {
+    throw new Error(
+      `${prefix}_NAME=${model}: gpt-4.x models no longer run production text calls (GPT-6 migration, 2026-09-27). ${replacement(group)}`
+    );
+  }
+
+  if (read(env, `${prefix}_TEMPERATURE`) !== undefined) {
+    warn(`${prefix}_TEMPERATURE is ignored for ${model} (GPT-6 takes no temperature); remove it`);
+  }
+
+  // The default model brings its default effort; an explicit name needs its own
+  const effort = read(env, `${prefix}_REASONING_EFFORT`) ?? (name ? undefined : group.reasoningEffort);
+  if (effort === undefined) {
+    throw new Error(`${prefix}_REASONING_EFFORT must be set for ${model} (none, low, medium or high)`);
+  }
+  if (!isEffort(effort)) {
+    const legacy = effort === "minimal" ? `; minimal was a gpt-4-era value: set ${group.reasoningEffort} or remove it` : "";
+    throw new Error(
+      `${prefix}_REASONING_EFFORT=${effort} is not a GPT-6 reasoning effort (none, low, medium or high)${legacy}`
+    );
+  }
+
+  const settings: UncheckedTextModelSettings = { model, reasoningEffort: effort };
   assertSupportedSettings(settings);
   return settings;
 }
 
-/** Reads every text role's settings; throws on an unsupported configuration. */
+/** Reads every text group's settings; throws on a retired or unsupported configuration. */
 export function resolveTextModelConfig(
   env: Env,
   warn: (message: string) => void = console.warn
 ): TextModelConfig {
-  const setupPrefix = read(env, "SETUP_MODEL_NAME") ? "SETUP_MODEL" : "GENERATION_MODEL";
-  const config: TextModelConfig = {
-    setup: readGroup(env, setupPrefix, LARGE_DEFAULT_MODEL, warn),
-    templateEditor: readGroup(env, "GENERATION_MODEL", LARGE_DEFAULT_MODEL, warn),
-    beat: readGroup(env, "TEXT_MODEL", SMALL_DEFAULT_MODEL, warn),
-    analysis: readGroup(env, "SWITCH_THREAD_MODEL", SMALL_DEFAULT_MODEL, warn),
-    contentFilter: readGroup(env, "CONTENT_FILTER_MODEL", SMALL_DEFAULT_MODEL, warn),
-  };
-  // A multiplayer override applies only when its _NAME is set, and then fully
-  if (read(env, "MULTIPLAYER_TEXT_MODEL_NAME")) {
-    config.multiplayerBeat = readGroup(env, "MULTIPLAYER_TEXT_MODEL", SMALL_DEFAULT_MODEL, warn);
-  }
-  if (read(env, "MULTIPLAYER_SWITCH_THREAD_MODEL_NAME")) {
-    config.multiplayerAnalysis = readGroup(
-      env,
-      "MULTIPLAYER_SWITCH_THREAD_MODEL",
-      SMALL_DEFAULT_MODEL,
-      warn
-    );
-  }
-  return config;
+  const groups = Object.entries(TEXT_MODEL_GROUPS) as [TextModelGroup, GroupDefault][];
+  return Object.fromEntries(
+    groups.map(([key, group]) => [key, readGroup(env, group, warn)])
+  ) as TextModelConfig;
+}
+
+/** Each group as model@effort, for the startup log line. */
+export function describeTextModels(config: TextModelConfig): Record<TextModelGroup, string> {
+  const entries = Object.entries(config) as [TextModelGroup, TextModelSettings][];
+  return Object.fromEntries(
+    entries.map(([key, settings]) => [key, `${settings.model}@${settings.reasoningEffort}`])
+  ) as Record<TextModelGroup, string>;
 }
 
 /** The settings one call uses. */
@@ -154,10 +174,10 @@ export function settingsFor(
     case "templateIteration":
       return config.templateEditor;
     case "beat":
-      return (options.multiplayer && config.multiplayerBeat) || config.beat;
+      return options.multiplayer ? config.multiplayerBeat : config.beat;
     case "switchAnalysis":
     case "threadAnalysis":
-      return (options.multiplayer && config.multiplayerAnalysis) || config.analysis;
+      return options.multiplayer ? config.multiplayerAnalysis : config.analysis;
     case "contentFilter":
       return config.contentFilter;
   }

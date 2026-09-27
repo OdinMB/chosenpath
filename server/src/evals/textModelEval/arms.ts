@@ -1,19 +1,18 @@
-import {
-  resolveTextModelConfig,
-  settingsFor,
-  type Env,
-  type ReasoningEffort,
-  type TextModelSettings,
-  type TextRole,
-  type Verbosity,
+import type {
+  ReasoningEffort,
+  TextModelSettings,
+  TextRole,
+  Verbosity,
 } from "shared/llm/textModelSettings.js";
 import type { VariantId } from "./variants.js";
 
 /*
  * The arm matrix per stage and role, the arm and chain key formats, each
  * variant arm's reference arm, and the pipeline plans. Arms are hard-coded
- * here; the baseline follows production config (resolveTextModelConfig), so
- * "as in production" is literal. Prices and estimates live in pricing.ts.
+ * here, the baseline included: it is production's pre-migration settings
+ * (gpt-4.1, gpt-4.1-mini), which every stored baseline record carries.
+ * Production no longer runs them, so the baseline no longer follows
+ * production config. Prices and estimates live in pricing.ts.
  */
 
 export type EvalRole = "setup" | "beat" | "switch" | "thread" | "iteration";
@@ -142,17 +141,30 @@ export function armSettings(arm: Arm): TextModelSettings {
   return { model, temperature, reasoningEffort, verbosity };
 }
 
-/** Today's production settings for this role. */
-export function baselineArm(role: EvalRole, multiplayer: boolean, env: Env = process.env): Arm {
-  const config = resolveTextModelConfig(env, () => undefined);
-  return makeArm(settingsFor(config, productionRole(role), { multiplayer }), "prod", true);
+/**
+ * The comparison baseline: production's settings before the GPT-6 migration
+ * of 2026-09-27 (gpt-4.1 for setup and the template editor, gpt-4.1-mini for
+ * turns and analysis, temperature 0.2, single- and multiplayer alike). Every
+ * stored baseline record carries these keys, so the eval keeps reading
+ * against them; production refuses gpt-4.x (textModelSettings.ts).
+ */
+const COMPARISON_BASELINE: Record<EvalRole, TextModelSettings> = {
+  setup: { model: "gpt-4.1", temperature: 0.2 },
+  iteration: { model: "gpt-4.1", temperature: 0.2 },
+  beat: { model: "gpt-4.1-mini", temperature: 0.2 },
+  switch: { model: "gpt-4.1-mini", temperature: 0.2 },
+  thread: { model: "gpt-4.1-mini", temperature: 0.2 },
+};
+
+export function baselineArm(role: EvalRole): Arm {
+  return makeArm(COMPARISON_BASELINE[role], "prod", true);
 }
 
 const luna = (effort: ReasoningEffort, variant: VariantId = "prod", verbosity?: Verbosity) =>
   makeArm({ model: "gpt-6-luna", reasoningEffort: effort, ...(verbosity ? { verbosity } : {}) }, variant);
 const sol = (effort: ReasoningEffort, variant: VariantId = "prod", verbosity?: Verbosity) =>
   makeArm({ model: "gpt-6-sol", reasoningEffort: effort, ...(verbosity ? { verbosity } : {}) }, variant);
-/** Today's model at production's default settings, on another variant. */
+/** The comparison model at its pre-migration production settings, on another variant. */
 const todays = (model: string, variant: VariantId) => makeArm({ model, temperature: 0.2 }, variant);
 
 export const RARE_FAILURE_CALLS_PER_ARM = 50;
