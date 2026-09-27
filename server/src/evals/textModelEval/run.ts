@@ -31,6 +31,7 @@ import {
 } from "./filterCheck.js";
 import { jobEstimateUsd, planJobs, requestInputFor, requestJob, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
+import { prepSpend } from "./prepCalls.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
 import { runProbe } from "./probe.js";
 import { renderRatingPage } from "./ratingPage.js";
@@ -39,6 +40,15 @@ import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type E
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { statReadouts } from "./turnDesignChecks.js";
+import {
+  DEFAULT_JUDGE_SAMPLES,
+  backfillChaptersMode,
+  buildRoundCasesMode,
+  judgeCalibrationMode,
+  printPrepPlan,
+  spendBeside,
+  type PrepContext,
+} from "./turnPrep.js";
 import { PRE_FIX_PROMPT_STATE, requestFor, requestText, retiredPromptStateProblem } from "./variants.js";
 
 /*
@@ -60,6 +70,12 @@ import { PRE_FIX_PROMPT_STATE, requestFor, requestText, retiredPromptStateProble
  *   --filter-check [--arms k1,k2] [--fresh] [--max-spend 0.30]  the content filter's fixed test set through
  *     the production filter path (default arms: gpt-4.1-mini and Luna low); its own ledger stage, capped at
  *     $0.30. Answered pairs are skipped unless --fresh.
+ *   The turn rounds' preparation (turnPrep.ts), in the turn-rounds stage:
+ *   --build-round-cases [--rebuild-cases] [--max-spend 0.10]  the cases play never produced (roundCases.ts),
+ *     frozen beside the others; the few missing turns and plans come from production's GPT-6 defaults
+ *   --backfill-chapters [--max-spend 0.10]  a chapter question and plan per stored chapter (chapterFrames.ts)
+ *   --judge-calibration [--arms gpt-6-luna@low] [--samples 2] [--max-spend 0.10]  the judged checks on the
+ *     hand-read turns (judgedChecks.ts)
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -70,7 +86,19 @@ import { PRE_FIX_PROMPT_STATE, requestFor, requestText, retiredPromptStateProble
  * Reads only local files under data/ and the frozen cases; never touches a database.
  */
 
-type Mode = "dry-run" | "probe" | "build-cases" | "run" | "rating-page" | "rerender-page" | "score" | "filter-check" | "check-baselines";
+type Mode =
+  | "dry-run"
+  | "probe"
+  | "build-cases"
+  | "run"
+  | "rating-page"
+  | "rerender-page"
+  | "score"
+  | "filter-check"
+  | "check-baselines"
+  | "build-round-cases"
+  | "backfill-chapters"
+  | "judge-calibration";
 
 type Args = {
   mode: Mode;
@@ -161,6 +189,9 @@ function parseArgs(argv: string[]): Args {
       case "--run":
       case "--filter-check":
       case "--check-baselines":
+      case "--build-round-cases":
+      case "--backfill-chapters":
+      case "--judge-calibration":
         args.mode = arg.slice(2) as Mode;
         break;
       case "--ratings":
@@ -307,11 +338,13 @@ function newStory(template: StoryTemplate, playerCount: PlayerCount, caseId: str
   return createStoryStateFromTemplate(caseId, template, playerCount, maxTurns, template.containsImages, true, difficulty, codes);
 }
 
-/** Probe spend lives in probe.json and counts against Stage 0; the filter check's in filter-check.jsonl. */
+/**
+ * Spend outside calls.jsonl: the probe's (probe.json, Stage 0), the filter
+ * check's (filter-check.jsonl) and the turn rounds' preparation calls
+ * (prep-calls.jsonl, their own stage).
+ */
 function extraSpend(files: EvalFiles): SpendRecord[] {
-  const probe = files.readProbe();
-  const probeSpend: SpendRecord[] = probe ? [{ stage: "0", costUsd: probe.totalCostUsd + (probe.priorSpendUsd ?? 0) }] : [];
-  return [...probeSpend, { stage: "filter", costUsd: filterSpendUsd(files.readFilterRecords()) }];
+  return spendBeside(files, "calls");
 }
 
 function capsFor(args: Args, files: EvalFiles, stage: LedgerStage, defaultMaxSpend?: number): Caps {
@@ -356,9 +389,9 @@ function localSources(dirs: ReturnType<typeof guardEnvironment>): LocalCaseSourc
   };
 }
 
-function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvironment>) {
+async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvironment>) {
   const records = files.readRecords();
-  return printDryRun({
+  await printDryRun({
     outDir: files.outDir,
     records,
     extraSpend: extraSpend(files),
@@ -371,6 +404,24 @@ function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvir
     maxInFlight: MAX_IN_FLIGHT,
     log: (line) => console.log(line),
   });
+  printPrepPlan(files, (line) => console.log(line));
+}
+
+const DEFAULT_PREP_MAX_SPEND = 0.1;
+
+/** The turn rounds' preparation modes (turnPrep.ts), each capped by the turn-rounds stage and --max-spend. */
+function prepContext(args: Args, files: EvalFiles): PrepContext {
+  requireApiKey();
+  const caps = capsFor(args, files, "turn-rounds", DEFAULT_PREP_MAX_SPEND);
+  return {
+    files,
+    caps,
+    deps: (ledger) => runnerDeps(files, ledger),
+    refuse: (stage, estimate) => refuseIfOverCaps(caps, files, stage, estimate),
+    tpm: args.tpm,
+    maxInFlight: MAX_IN_FLIGHT,
+    log: (line) => console.log(line),
+  };
 }
 
 function refuseIfOverCaps(caps: Caps, files: EvalFiles, stage: LedgerStage, estimate: number) {
@@ -385,11 +436,13 @@ function refuseIfOverCaps(caps: Caps, files: EvalFiles, stage: LedgerStage, esti
   }
 }
 
-function runnerDeps(files: EvalFiles) {
+/** Runner deps that append each attempt to calls.jsonl, or to prep-calls.jsonl for the rounds' own calls. */
+function runnerDeps(files: EvalFiles, ledger: "calls" | "prep" = "calls") {
   return {
     execute: (spec: Parameters<typeof executeCall>[0]) => executeCall(spec, { outDir: files.outDir, now: Date.now }),
     record: (record: Parameters<EvalFiles["appendRecord"]>[0]) => {
-      files.appendRecord(record);
+      if (ledger === "prep") files.appendPrepRecord(record);
+      else files.appendRecord(record);
       console.log(
         `${record.caseId} ${record.callArmKey} s${record.sample} step ${record.step} attempt ${record.attempt}: ${record.outcome}${record.status && record.status >= 400 ? ` ${record.status}` : ""} (${(record.latencyMs / 1000).toFixed(1)} s, $${record.costUsd.toFixed(4)})`
       );
@@ -483,6 +536,7 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       caps,
       probe: files.readProbe(),
       filterCheckUsd: filterSpendUsd(files.readFilterRecords()),
+      sideSpend: prepSpend(files.readPrepRecords()),
       prose,
       generatedAt: new Date(),
     })
@@ -689,6 +743,12 @@ async function main() {
       return filterCheck(args, files);
     case "check-baselines":
       return checkBaselinesMode(args, files);
+    case "build-round-cases":
+      return buildRoundCasesMode(prepContext(args, files), args.rebuildCases);
+    case "backfill-chapters":
+      return backfillChaptersMode(prepContext(args, files));
+    case "judge-calibration":
+      return judgeCalibrationMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_JUDGE_SAMPLES);
     default:
       return dryRun(args, files, dirs);
   }

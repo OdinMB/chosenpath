@@ -3,6 +3,8 @@ import path from "path";
 import type { BudgetOverride } from "./budget.js";
 import type { BuildReport } from "./caseBuilder.js";
 import type { EvalCase } from "./cases.js";
+import { withChapterFrames, type ChapterFramesFile } from "./chapterFrames.js";
+import type { RoundBuildReport } from "./roundCases.js";
 import type { FilterRecord } from "./filterCheck.js";
 import type { ProbeReport } from "./probe.js";
 import type { RatingKey } from "./ratingSets.js";
@@ -24,6 +26,10 @@ import type { CallRecord } from "./runner.js";
  *   filter-check.jsonl     one record per filter-check case and arm (--filter-check)
  *   filter-check.md        its report, rewritten after each run
  *   check-baselines.md|json  the new checks' baselines over the stored outputs (--check-baselines)
+ *   cases/round-build-report.json  what --build-round-cases built and any problem
+ *   prep-calls.jsonl       the rounds' own calls: chapter backfill and judged checks (prepCalls.ts)
+ *   chapter-frames.json    the backfilled chapter questions and plans (--backfill-chapters)
+ *   judge-calibration.md|json  the judged checks against the hand verdicts (--judge-calibration)
  */
 
 function readJsonl<T>(file: string): T[] {
@@ -55,9 +61,12 @@ export function evalFiles(outDir: string) {
       fs.appendFileSync(at("budget-overrides.jsonl"), `${JSON.stringify(override)}\n`);
     },
     casesExist: () => fs.existsSync(at("cases", "cases.json")),
+    /** The frozen cases, each carrying its chapter's backfilled frame once chapter-frames.json exists */
     readCases: (): EvalCase[] => {
       const index = JSON.parse(fs.readFileSync(at("cases", "cases.json"), "utf-8")) as { id: string }[];
-      return index.map((entry) => JSON.parse(fs.readFileSync(at("cases", `${entry.id}.json`), "utf-8")) as EvalCase);
+      const cases = index.map((entry) => JSON.parse(fs.readFileSync(at("cases", `${entry.id}.json`), "utf-8")) as EvalCase);
+      const frames = at("chapter-frames.json");
+      return fs.existsSync(frames) ? withChapterFrames(cases, JSON.parse(fs.readFileSync(frames, "utf-8")) as ChapterFramesFile) : cases;
     },
     writeCases: (cases: EvalCase[], report: BuildReport) => {
       for (const evalCase of cases) writeJson(at("cases", `${evalCase.id}.json`), evalCase);
@@ -66,6 +75,30 @@ export function evalFiles(outDir: string) {
         cases.map((c) => ({ id: c.id, role: c.role, tags: c.tags }))
       );
       writeJson(at("cases", "build-report.json"), report);
+    },
+    /**
+     * Freezes the round cases beside the others: their files, their index
+     * entries after the existing ones (which stay as they are), and the round
+     * build report. An id already frozen is replaced only when `replace` is set.
+     */
+    addCases: (cases: EvalCase[], report: RoundBuildReport, replace: boolean) => {
+      const index = JSON.parse(fs.readFileSync(at("cases", "cases.json"), "utf-8")) as { id: string; role: string; tags: unknown }[];
+      const ids = new Set(cases.map((c) => c.id));
+      const clash = index.filter((entry) => ids.has(entry.id)).map((entry) => entry.id);
+      if (clash.length && !replace) throw new Error(`Already frozen: ${clash.join(", ")}`);
+      for (const evalCase of cases) writeJson(at("cases", `${evalCase.id}.json`), evalCase);
+      writeJson(at("cases", "cases.json"), [...index.filter((entry) => !ids.has(entry.id)), ...cases.map((c) => ({ id: c.id, role: c.role, tags: c.tags }))]);
+      writeJson(at("cases", "round-build-report.json"), report);
+    },
+    readPrepRecords: (): CallRecord[] => readJsonl<CallRecord>(at("prep-calls.jsonl")),
+    appendPrepRecord: (record: CallRecord) => {
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.appendFileSync(at("prep-calls.jsonl"), `${JSON.stringify(record)}\n`);
+    },
+    writeChapterFrames: (file: ChapterFramesFile) => writeJson(at("chapter-frames.json"), file),
+    writeJudgeCalibration: (markdown: string, json: unknown) => {
+      writeJson(at("judge-calibration.json"), json);
+      fs.writeFileSync(at("judge-calibration.md"), markdown);
     },
     readProbe: (): ProbeReport | undefined =>
       fs.existsSync(at("probe.json")) ? (JSON.parse(fs.readFileSync(at("probe.json"), "utf-8")) as ProbeReport) : undefined,

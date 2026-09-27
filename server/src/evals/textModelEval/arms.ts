@@ -237,6 +237,26 @@ function productionDefault(group: TextModelGroup): Arm {
   return makeArm({ model, reasoningEffort });
 }
 
+/**
+ * Production's GPT-6 default for a role at a player count, on production's
+ * form: what writes a round case's missing history (roundCases.ts), since the
+ * owner keeps gpt-4.x out of new runs.
+ */
+export function productionArm(role: EvalRole, players: number): Arm {
+  const multiplayer = players > 1;
+  switch (role) {
+    case "setup":
+      return productionDefault("setup");
+    case "iteration":
+      return productionDefault("templateEditor");
+    case "beat":
+      return productionDefault(multiplayer ? "multiplayerBeat" : "beat");
+    case "switch":
+    case "thread":
+      return productionDefault(multiplayer ? "multiplayerAnalysis" : "analysis");
+  }
+}
+
 /** One plan per player-count group, or one on every case when both groups run the same arm. */
 function perPlayerCount(single: Arm, multi: Arm, samples: number): ArmPlan[] {
   return single.key === multi.key

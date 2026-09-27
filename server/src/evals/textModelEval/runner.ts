@@ -40,8 +40,8 @@ export type Job = {
   armKey: string;
   sample: number;
   baseline: boolean;
-  /** Ordering group: the role, or "pipeline" for chains */
-  group: EvalRole | "pipeline";
+  /** Ordering group: the role, "pipeline" for chains, or "prep" for the rounds' own calls (prepCalls.ts, never in calls.jsonl) */
+  group: EvalRole | "pipeline" | "prep";
   first: PlannedCall;
   /** Pipeline chains: the beat call, built from the analysis output */
   then?: { estimate: Estimate; arm: Arm; players: number; build: (analysis: unknown) => PlannedCall };
@@ -123,7 +123,7 @@ export type RunnerResult = { records: CallRecord[]; stoppedReason?: string };
 export const DEFAULT_TOKENS_PER_MINUTE = 400_000;
 const WINDOW_MS = 60_000;
 
-export const GROUP_ORDER: Job["group"][] = ["setup", "beat", "switch", "thread", "pipeline", "iteration"];
+export const GROUP_ORDER: Job["group"][] = ["setup", "beat", "switch", "thread", "pipeline", "iteration", "prep"];
 
 export function jobKey(caseId: string, armKey: string, promptState: string, sample: number): string {
   return `${caseId}|${armKey}|${promptState}|s${sample}`;

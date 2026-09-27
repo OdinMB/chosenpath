@@ -81,6 +81,19 @@ describe("runJobs", () => {
     expect(calls.map((c) => c.arm.key)).toEqual([BASELINE.key, BASELINE.key, BASELINE.key, BASELINE.key, LUNA.key]);
   });
 
+  it("runs the rounds' own prep calls after every story-role call, and counts spend recorded elsewhere against the caps", async () => {
+    const { d, calls, records } = deps(() => executed("valid"));
+    const prep = job("frame-abc", "thread", LUNA, { stage: "turn-rounds", group: "prep", armKey: `backfill>${LUNA.key}` });
+    await runJobs([prep, job("b", "beat", LUNA, { stage: "turn-rounds" })], d, { caps, previous: [], maxInFlight: 1 });
+    expect(calls.map((c) => c.role)).toEqual(["beat", "thread"]);
+    expect(records[1]).toMatchObject({ group: "prep", jobKey: `frame-abc|backfill>${LUNA.key}|prefix|s1`, stage: "turn-rounds" });
+    // The stage's spend in calls.jsonl, passed as spend recorded elsewhere, stops a prep call at the cap
+    const full = deps(() => executed("valid"));
+    const result = await runJobs([prep], full.d, { caps, previous: [], extraSpend: [{ stage: "turn-rounds", costUsd: 2 }], maxInFlight: 1 });
+    expect(full.calls).toEqual([]);
+    expect(result.stoppedReason).toMatch(/turn-rounds/);
+  });
+
   it("runs a round stage's candidates without a baseline record: its references are stored", async () => {
     const { d, calls } = deps(() => executed("valid"));
     await runJobs([job("new-case", "beat", LUNA, { stage: "turn-rounds" })], d, { caps, previous: [], maxInFlight: 1 });

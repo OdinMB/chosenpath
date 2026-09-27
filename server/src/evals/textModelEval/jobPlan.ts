@@ -270,7 +270,9 @@ function isMultiplayerContinuation(c: EvalCase): boolean {
 
 /**
  * The role's cases after the filters and the arm's scope and case list, in
- * turn order; the 15-case subset narrows beats only.
+ * turn order; the 15-case subset narrows beats only. The cases built for the
+ * rounds (source "round") stay out of the closed Stages 0 to 4, the stages
+ * that run the baseline, so their dry-run rows and records stay as they ran.
  */
 function casesFor(
   cases: EvalCase[],
@@ -279,10 +281,12 @@ function casesFor(
   plan: Pick<ArmPlan, "scope" | "caseIds"> = { scope: "all" }
 ): EvalCase[] {
   const subsetOnly = role === "beat" && (options.subset15 || plan.scope === "subset15");
+  const roundCasesOut = stageRunsBaseline(options.stage);
   return inTurnOrder(
     cases.filter(
       (c) =>
         c.role === role &&
+        !(roundCasesOut && c.tags.source === "round") &&
         (!options.caseIds || options.caseIds.includes(c.id)) &&
         (!plan.caseIds || plan.caseIds.includes(c.id)) &&
         (!subsetOnly || c.tags.subset15) &&

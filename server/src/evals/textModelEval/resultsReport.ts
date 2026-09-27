@@ -1,6 +1,6 @@
 import { chainSides } from "./arms.js";
 import { COST_BASES, computeArmStats, percentile, type ArmStats, type CostBasis } from "./armStats.js";
-import type { Caps } from "./budget.js";
+import type { Caps, SpendRecord } from "./budget.js";
 import { LEDGER_STAGES, spentByStage } from "./budget.js";
 import type { CaseTags } from "./cases.js";
 import {
@@ -42,6 +42,8 @@ export type ResultsInput = {
   probe?: ProbeReport;
   /** The filter check's spend (filter-check.jsonl), its own ledger stage */
   filterCheckUsd?: number;
+  /** Other spend beside calls.jsonl: the turn rounds' preparation calls (prep-calls.jsonl), under their stage */
+  sideSpend?: SpendRecord[];
   prose?: Record<string, { distinctOpenings: number; youOpenings: number; beats: number; stockPhrasesPer1000Words: number }>;
   generatedAt: Date;
 };
@@ -372,6 +374,7 @@ export function renderResults(input: ResultsInput): string {
     ...input.records,
     { stage: "0", costUsd: probeSpend },
     { stage: "filter", costUsd: input.filterCheckUsd ?? 0 },
+    ...(input.sideSpend ?? []),
   ]);
   const lines: string[] = [
     "# Text-model eval: results",

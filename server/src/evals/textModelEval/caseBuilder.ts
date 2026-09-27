@@ -97,7 +97,8 @@ function selectCharacters(story: Story, caseId: string): Story {
   return updated.completeCharacterSelection();
 }
 
-function chooseAndResolve(story: Story, caseId: string): Story {
+/** Each player's option picked by hash of the case id and slot, then resolved (a challenge option rolls the dice). */
+export function chooseAndResolve(story: Story, caseId: string): Story {
   let updated = story;
   const difficulty = story.getState().difficultyLevel || { title: "Balanced", modifier: -10 };
   for (const slot of story.getPlayerSlots() as PlayerSlot[]) {

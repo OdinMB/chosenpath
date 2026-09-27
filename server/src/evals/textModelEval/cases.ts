@@ -40,9 +40,22 @@ export type CaseTags = {
   ending: boolean;
   /** A switch or thread analysis runs before this beat */
   analysisTurn: boolean;
-  source: "stored" | "synthetic" | "built" | "premise" | "template";
+  /**
+   * "round": built for the rounds after the Round 0 play fixes by editing
+   * stored states (roundCases.ts); the closed Stages 0 to 4 never plan them
+   */
+  source: "stored" | "synthetic" | "built" | "premise" | "template" | "round";
   category?: string;
+  /**
+   * A case that reads a chapter: whether that chapter has a backfilled
+   * question and plan (chapterFrames.ts), or reads in the fallback form.
+   * Set when the cases are read, from chapter-frames.json.
+   */
+  chapterFrame?: "backfilled" | "fallback";
 };
+
+/** A chapter's question and plan (turn doc A3), backfilled for a stored chapter plan (chapterFrames.ts). */
+export type ChapterFrame = { question: string; plan: string; chapterKey: string };
 
 export type FixedAnalysis =
   | { kind: "switch"; phase: SwitchAnalysis }
@@ -61,6 +74,12 @@ export type EvalCase = {
   /** The stored output for the same input (the model in use during play) */
   storedOutput?: unknown;
   note?: string;
+  /**
+   * The backfilled question and plan of the chapter this case reads, per
+   * thread id; attached when the cases are read (chapterFrames.ts). No
+   * production request reads it.
+   */
+  chapterFrames?: Record<string, ChapterFrame>;
 };
 
 export type Snapshot = {

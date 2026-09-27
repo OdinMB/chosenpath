@@ -5,6 +5,7 @@ import {
   baselineArm,
   estimateBaseKey,
   makeArm,
+  productionArm,
   referenceKey,
   STAGES,
   stageRunsBaseline,
@@ -86,6 +87,22 @@ describe("arm keys and estimates", () => {
     for (const role of ["setup", "beat"] as const) {
       expect(todays(role).length).toBeGreaterThan(0);
       for (const arm of todays(role)) expect(armSettings(arm)).toEqual(armSettings(baselineArm(role)));
+    }
+  });
+
+  it("gives production's GPT-6 default per role and player count, on production's form, whatever env says", () => {
+    const previous = process.env.MULTIPLAYER_TEXT_MODEL_NAME;
+    process.env.MULTIPLAYER_TEXT_MODEL_NAME = "gpt-6-sol";
+    try {
+      expect(productionArm("beat", 1).key).toBe("gpt-6-luna@medium/prod");
+      expect(productionArm("beat", 3).key).toBe("gpt-6-luna@low/prod");
+      expect(productionArm("switch", 1).key).toBe("gpt-6-luna@low/prod");
+      expect(productionArm("thread", 2).key).toBe("gpt-6-luna@low/prod");
+      expect(productionArm("setup", 1).key).toBe("gpt-6-luna@low/prod");
+      expect(productionArm("beat", 1).baseline).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.MULTIPLAYER_TEXT_MODEL_NAME;
+      else process.env.MULTIPLAYER_TEXT_MODEL_NAME = previous;
     }
   });
 

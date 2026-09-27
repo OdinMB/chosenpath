@@ -80,6 +80,19 @@ describe("renderResults", () => {
     });
     expect(text).toContain("| 0 | $1.00 | $8.00 |");
   });
+
+  it("counts the turn rounds' preparation calls, kept beside calls.jsonl, under their stage and in the total", () => {
+    const text = renderResults({
+      records: [record({ costUsd: 0.25 })],
+      checks: new Map(),
+      tags: new Map(),
+      caps: resolveCaps({}).caps,
+      sideSpend: [{ stage: "turn-rounds", costUsd: 0.5 }],
+      generatedAt: new Date(0),
+    });
+    expect(text).toContain("| turn-rounds | $0.50 | $2.00 |");
+    expect(text).toContain("| total | $0.75 | $33.00 |");
+  });
 });
 
 describe("renderResults: the variant section", () => {

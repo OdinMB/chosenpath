@@ -264,6 +264,21 @@ describe("planJobs: the round stages and the migration check", () => {
     const chains = plan("migration", { mode: "pipeline", roles: ["switch"] });
     expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([["sp-switch", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1]]);
   });
+
+  it("keeps the round cases out of the closed Stages 0 to 4, isolated and chained, and plans them in the migration check", () => {
+    const cases = [
+      evalCase("sp-switch", "switch", { state: createMockStoryState() }),
+      evalCase("round-switch-late", "switch", { state: createMockStoryState(), tags: tags({ source: "round" }) }),
+    ];
+    const caseIds = (stage: PlanOptions["stage"], mode: PlanOptions["mode"]) =>
+      [...new Set(planJobs(cases, { stage, promptState: "round1", roles: ["switch"], mode, subset15: false, records: [] }).map((j) => j.caseId))].sort();
+    for (const stage of ["0", "1-2", "3", "4"] as const) {
+      expect(caseIds(stage, "isolated")).toEqual(["sp-switch"]);
+      expect(caseIds(stage, "pipeline")).toEqual(["sp-switch"]);
+    }
+    expect(caseIds("migration", "isolated")).toEqual(["round-switch-late", "sp-switch"]);
+    expect(caseIds("migration", "pipeline")).toEqual(["round-switch-late", "sp-switch"]);
+  });
 });
 
 describe("requestFor: the Stage 4 variants", () => {
