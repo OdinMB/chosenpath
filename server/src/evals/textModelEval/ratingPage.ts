@@ -19,7 +19,12 @@ import type { RatingItem, RatingSet } from "./ratingSets.js";
 
 const e = escapeHtml;
 
-/** The viewport width from which N options sit side by side: about 340 px a column at the page's 18 px text. */
+/**
+ * The viewport width from which N options sit side by side: about 340 px a
+ * column. At 1100 px three columns hold some 305 px of text (35 characters a
+ * line at 18 px), 40 at a 1280 px window; raising 3 would stack the options
+ * in a 1280 px window (a 1920 px laptop at 150 %) and lose the alignment.
+ */
 export const WIDE_FROM: Record<number, number> = { 1: 0, 2: 760, 3: 1100, 4: 1440 };
 
 /** Marks an option that lacks a section the others have. */
@@ -141,7 +146,7 @@ details.ctx+details.ctx{border-top:1px solid var(--line)}
 .tag{display:inline-block;min-width:1.7rem;margin:.1rem .5rem .1rem 0;padding:0 .35rem;border-radius:4px;background:var(--accent);color:var(--bg);font-size:.85rem;font-weight:700;line-height:1.5;text-align:center}
 details.sec>summary{display:block;list-style:none;cursor:pointer}
 details.sec>summary::-webkit-details-marker{display:none}
-.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem .75rem;background:var(--card);border:solid var(--line);border-width:1px 1px 0;padding:.55rem .9rem;min-height:44px}
+.head{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.2rem .75rem;background:var(--card);border:solid var(--line);border-width:1px 1px 0;padding:.55rem .9rem;min-height:44px}
 .head>.cell{background:none;border:0;padding:0}
 .head>.cell:not(.has-gist),.head>.cell .title{display:none}
 details.sec>summary:hover>.head{background:var(--hover)}
@@ -152,6 +157,8 @@ details.sec[data-depth="1"]>summary .row-title,details.sec[data-depth="1"]>summa
 details.sec[data-depth="1"]>summary>.head{padding-left:1.6rem}
 details.sec[data-depth="1"]>.body>.cell{padding-left:1.6rem}
 .gist{color:var(--muted);font-size:.85rem}
+.gist .part{white-space:nowrap}
+.gist .part+.part::before{content:"\\00B7";margin:0 .4rem}
 .count{display:inline-block;min-width:1.6rem;padding:0 .4rem;border:1px solid var(--line);border-radius:999px;text-align:center;line-height:1.4}
 .body>.cell{padding-bottom:.6rem}
 .body>.cell+.cell{border-top:1px dashed var(--line)}

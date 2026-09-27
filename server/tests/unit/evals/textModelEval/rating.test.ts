@@ -692,6 +692,17 @@ describe("renderRatingPage: setups side by side, every section aligned and folda
     expect(gists(sectionAt(item, "stats.sharedStats"))).toEqual(["1", "2", "1"]);
     expect(gists(sectionAt(item, "storyElements"))).toEqual(["1", "2", ""]);
     expect(gists(sectionAt(item, "player1.backgrounds"))).toEqual(["1", "1", "1"]);
+    // A group says how many fields each option filled, or what its lists hold
+    expect(gists(sectionAt(item, "guidelines"))).toEqual(["6", "6", "6"]);
+    expect(gists(sectionAt(item, "imageInstructions"))).toEqual(["7", "7", "7"]);
+    expect(gists(sectionAt(item, "stats"))).toEqual([
+      "Stat groups 2 Shared stats 1 Player stats 1",
+      "Stat groups 2 Shared stats 2 Player stats 1",
+      "Shared stats 1 Player stats 1",
+    ]);
+    expect(gists(sectionAt(item, "player1"))).toEqual(options.map(() => "Outcomes 1 Identities 1 Backgrounds 1"));
+    const sparse = parseHtml(renderRatingPage(comparisonSet([setupOutput("Tides"), { ...setupOutput("Bare"), guidelines: { world: "An island.", tone: [] } }])));
+    expect(gists(sectionAt(sparse, "guidelines"))).toEqual(["6", "1"]);
     const summaries = (root: HtmlNode, kind: string) =>
       select(root, "details.entry")
         .filter((d) => d.attrs["data-entry"] === kind)
@@ -746,6 +757,13 @@ describe("renderRatingPage: setups side by side, every section aligned and folda
     expect(widths.map(([, n, unit]) => Number(n) * (unit === "rem" ? 18 : 1)).filter((px) => px > 44)).toEqual([]);
   });
 
+  it("keeps the harness's leak words out of the stylesheet, the script and every attribute (CSS's own none aside)", () => {
+    const code = [...select(tree, "style"), ...select(tree, "script").filter((s) => s.attrs.type === undefined)].map((n) => n.text.join(""));
+    const attributes = all(tree, () => true).flatMap((n) => Object.values(n.attrs));
+    const hits = [...code, ...attributes].map((s) => s.replace(/\bnone\b/gi, "").match(LEAK_PATTERN)?.[0]).filter(Boolean);
+    expect(hits).toEqual([]);
+  });
+
   it("keeps n and p for the items, but not while typing a note", () => {
     const script = select(tree, "script").filter((s) => s.attrs.type === undefined)[0].text.join("");
     expect(script).toContain(`if(tag==="input"&&ev.target.type==="text"||tag==="textarea"||tag==="select")return;`);
@@ -764,6 +782,7 @@ describe("renderRatingPage: setups side by side, every section aligned and folda
     const duo = { ...setupOutput("Duo"), player2: setupOutput("x").player1 };
     const page = parseHtml(renderRatingPage(comparisonSet([setupOutput("Solo"), duo])));
     expect(optionsOf(headCells(sectionAt(page, "player2")))).toEqual(["A", "B"]);
+    expect(gists(sectionAt(page, "player2"))).toEqual(["", "Outcomes 1 Identities 1 Backgrounds 1"]);
     expect(textOf(bodyCells(sectionAt(page, "player2.outcomes"))[0])).toBe("A —");
   });
 });

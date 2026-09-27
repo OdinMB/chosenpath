@@ -58,7 +58,23 @@ const e = escapeHtml;
 const L = SETUP_FIELD_LABELS;
 const EMPTY = `<p class="muted">${e(L.empty)}</p>`;
 
-const countGist = (list: unknown[] | undefined) => (list === undefined ? "" : `<span class="count">${list.length}</span>`);
+const count = (n: number) => `<span class="count">${n}</span>`;
+const countGist = (list: unknown[] | undefined) => (list === undefined ? "" : count(list.length));
+
+/** A group of fields (guidelines, image instructions): how many the option filled, nothing for none. */
+const filledGist = (values: (string | unknown[] | undefined)[]) => {
+  const filled = values.filter((v) => v !== undefined && v.length > 0).length;
+  return filled ? count(filled) : "";
+};
+
+/** A group of lists (stats, a player): each list the option has, with its count. */
+const listsGist = (lists: (Row | undefined)[], options: number) =>
+  Array.from({ length: options }, (_, i) =>
+    lists
+      .filter((r): r is Row => r !== undefined && r.gists[i] !== "")
+      .map((r) => `<span class="part">${e(r.title)} ${r.gists[i]}</span>`)
+      .join("")
+  );
 
 function leaf(kind: RatingKind, key: string, title: string, cells: (string | undefined)[], gists?: string[]): Row | undefined {
   if (cells.every((cell) => cell === undefined)) return undefined;
@@ -208,8 +224,8 @@ export function setupRows(cards: SetupCard[]): Row[] {
       title,
       cards.map((c) => (pick(c) ? paragraphs([pick(c)]) : undefined))
     );
-  const noGists = cards.map(() => "");
   const player = (c: SetupCard, slot: string) => c.players.find((p) => p.slot === slot);
+  const lists = (key: string, title: string, rows: (Row | undefined)[]) => parent(K, key, title, rows, listsGist(rows, cards.length));
 
   const rows = [
     text("difficulty", L.difficulty, (c) =>
@@ -240,46 +256,34 @@ export function setupRows(cards: SetupCard[]): Row[] {
         list("guidelines.typesOfThreads", L.typesOfThreads, (c) => c.guidelines.typesOfThreads),
         list("guidelines.switchAndThreadInstructions", L.switchAndThreadInstructions, (c) => c.guidelines.switchAndThreadInstructions),
       ],
-      noGists
+      cards.map((c) => filledGist(Object.values(c.guidelines)))
     ),
     entries("sharedOutcomes", L.sharedOutcomes, (c) => c.sharedOutcomes, outcomeEntry),
-    parent(
-      K,
-      "stats",
-      L.stats,
-      [
-        leaf(
-          K,
-          "stats.statGroups",
-          L.statGroups,
-          cards.map((c) => (c.statGroups === undefined ? undefined : `<p>${e(valueText(c.statGroups))}</p>`)),
-          cards.map((c) => countGist(c.statGroups))
-        ),
-        entries("stats.sharedStats", L.sharedStats, (c) => c.sharedStats, statEntry),
-        entries("stats.playerStats", L.playerStats, (c) => c.playerStats, statEntry),
-      ],
-      noGists
-    ),
+    lists("stats", L.stats, [
+      leaf(
+        K,
+        "stats.statGroups",
+        L.statGroups,
+        cards.map((c) => (c.statGroups === undefined ? undefined : `<p>${e(valueText(c.statGroups))}</p>`)),
+        cards.map((c) => countGist(c.statGroups))
+      ),
+      entries("stats.sharedStats", L.sharedStats, (c) => c.sharedStats, statEntry),
+      entries("stats.playerStats", L.playerStats, (c) => c.playerStats, statEntry),
+    ]),
     entries("storyElements", L.storyElements, (c) => c.storyElements, elementEntry),
     ...slots(cards).map((slot) =>
-      parent(
-        K,
-        slot,
-        `${L.player} ${slot.replace(/^player/, "")}`,
-        [
-          entries(`${slot}.outcomes`, L.outcomes, (c) => player(c, slot)?.outcomes, outcomeEntry),
-          entries(`${slot}.identities`, L.identities, (c) => player(c, slot)?.identities, identityEntry),
-          entries(`${slot}.backgrounds`, L.backgrounds, (c) => player(c, slot)?.backgrounds, backgroundEntry),
-        ],
-        noGists
-      )
+      lists(slot, `${L.player} ${slot.replace(/^player/, "")}`, [
+        entries(`${slot}.outcomes`, L.outcomes, (c) => player(c, slot)?.outcomes, outcomeEntry),
+        entries(`${slot}.identities`, L.identities, (c) => player(c, slot)?.identities, identityEntry),
+        entries(`${slot}.backgrounds`, L.backgrounds, (c) => player(c, slot)?.backgrounds, backgroundEntry),
+      ])
     ),
     parent(
       K,
       "imageInstructions",
       L.imageInstructions,
       IMAGE_KEYS.map((key) => text(`imageInstructions.${key}`, L[key], (c) => c.imageInstructions.find((i) => i.key === key)?.text ?? "")),
-      cards.map((c) => (c.imageInstructions.length ? countGist(c.imageInstructions) : ""))
+      cards.map((c) => filledGist(c.imageInstructions.map((i) => i.text)))
     ),
   ];
   return rows.filter((r): r is Row => r !== undefined);
