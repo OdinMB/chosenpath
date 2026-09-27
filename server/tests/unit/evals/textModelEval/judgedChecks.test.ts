@@ -144,16 +144,37 @@ describe("scoreCalibration", () => {
     expect(progress).toMatchObject({ decided: 0, partial: { yes: 1, no: 0 }, pairs: 1, pairsAgree: 0, reliable: false });
   });
 
-  it("calls a check reliable at 85% agreement with the hand and 90% between samples", () => {
-    expect(isReliable({ decided: 20, agree: 17, pairs: 20, pairsAgree: 18 })).toBe(true);
-    expect(isReliable({ decided: 20, agree: 16, pairs: 20, pairsAgree: 20 })).toBe(false);
-    expect(isReliable({ decided: 20, agree: 20, pairs: 20, pairsAgree: 17 })).toBe(false);
-    expect(isReliable({ decided: 0, agree: 0, pairs: 0, pairsAgree: 0 })).toBe(false);
+  it("calls a check reliable at 85% agreement on the hand yes and on the hand no, at least 3 of each, and 90% between samples", () => {
+    const allRight = { handPasses: 19, handFails: 3, falseFails: 0, falsePasses: 0, pairs: 22, pairsAgree: 22 };
+    expect(isReliable(allRight)).toBe(true);
+    // Always yes: 19 of 22 agree (86%) and the samples always agree, but no hand no is caught
+    expect(isReliable({ ...allRight, falsePasses: 3 })).toBe(false);
+    expect(isReliable({ ...allRight, falsePasses: 1 })).toBe(false);
+    // Always no
+    expect(isReliable({ ...allRight, falseFails: 19 })).toBe(false);
+    // 9 of 10 yes and 6 of 7 no pass; 5 of 7 no does not
+    expect(isReliable({ handPasses: 10, handFails: 7, falseFails: 1, falsePasses: 1, pairs: 17, pairsAgree: 17 })).toBe(true);
+    expect(isReliable({ handPasses: 10, handFails: 7, falseFails: 1, falsePasses: 2, pairs: 17, pairsAgree: 17 })).toBe(false);
+    // One hand no cannot show whether the judge fails a turn it should
+    expect(isReliable({ handPasses: 9, handFails: 1, falseFails: 0, falsePasses: 0, pairs: 10, pairsAgree: 10 })).toBe(false);
+    expect(isReliable({ ...allRight, pairsAgree: 19 })).toBe(false);
+    expect(isReliable({ handPasses: 0, handFails: 0, falseFails: 0, falsePasses: 0, pairs: 0, pairsAgree: 0 })).toBe(false);
   });
 
-  it("renders a row per judge and check, and every item with its hand and judged answers", () => {
+  it("calls an always-yes judge reliable on no check of the hand-read set", () => {
+    const allYes: JudgedItem[] = JUDGE_CALIBRATION.map((c) => ({
+      itemId: c.id,
+      armKey: "yes",
+      samples: [1, 2].map(() => Object.fromEntries(JUDGED_CHECKS.map((check) => [check, true]))),
+    }));
+    expect(scoreCalibration(JUDGE_CALIBRATION, allYes, "yes").map((a) => a.reliable)).toEqual([false, false, false]);
+  });
+
+  it("renders a row per judge and check, the hand-no items per check, and every item with its hand and judged answers", () => {
     const md = renderCalibration({ items, judged, armKeys: ["j"], spentUsd: 0.01, generatedAt: new Date("2026-09-27T00:00:00Z"), problems: ["x: missing"] });
-    expect(md).toContain("| j | stepLeftOpen | 1 of 3 (33%) | 2 / 1 | 1 | 1 | 2 of 2 | 0 / 0 | not reliable |");
+    expect(md).toContain("| j | stepLeftOpen | 1 of 3 (33%) | 2 / 1 | 1 | 1 | 2 of 2 | 0 / 0 | not reliable (too few hand yes and no) |");
+    expect(md).toContain("- stepLeftOpen: 1 (b)");
+    expect(md).toContain("- concreteProgress: none");
     expect(md).toContain("hand yes, judged yes/yes");
     expect(md).toContain("hand partial, judged yes/no");
     expect(md).toContain("- x: missing");

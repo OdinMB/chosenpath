@@ -25,8 +25,10 @@ import type { Job } from "./runner.js";
  *
  * Before a round uses them, the checks are calibrated on the turns the
  * research notes read by hand (JUDGE_CALIBRATION): Luna low judges unless it
- * disagrees with the hand verdicts or with itself too often
- * (isReliable), and then Luna medium is tried.
+ * disagrees with the hand verdicts on either side (yes or no) or with itself
+ * too often (isReliable), and then Luna medium is tried. Every hand no in
+ * the set is a gpt-4.1-mini turn, so how often a judge passes a Luna turn it
+ * should fail is not measured here.
  */
 
 export const JUDGED_CHECKS = ["stepLeftOpen", "concreteProgress", "firstParagraphNarratesChoice"] as const;
@@ -321,14 +323,33 @@ export type CheckAgreement = {
   reliable: boolean;
 };
 
-/** A check is judged reliably when sample 1 agrees with the hand verdicts on at least 85% of the decided items and the two samples agree on at least 90%. */
+/**
+ * A check is judged reliably when sample 1 agrees with the hand verdicts on
+ * at least 85% of the hand-yes items and at least 85% of the hand-no items,
+ * each side holding at least 3, and the two samples agree on at least 90%.
+ * Each side on its own, because the set is mostly yes: on 19 yes and 3 no an
+ * always-yes judge agrees on 86% overall, and only the hand-no items show
+ * whether a judge fails a turn it should.
+ */
 export const RELIABLE_AGREEMENT = 0.85;
 export const RELIABLE_SELF_AGREEMENT = 0.9;
+export const RELIABLE_MIN_PER_SIDE = 3;
 
-export function isReliable(a: Pick<CheckAgreement, "decided" | "agree" | "pairs" | "pairsAgree">): boolean {
-  if (a.decided === 0) return false;
+type ReliabilityInput = Pick<CheckAgreement, "handPasses" | "handFails" | "falseFails" | "falsePasses" | "pairs" | "pairsAgree">;
+
+export function isReliable(a: ReliabilityInput): boolean {
+  if (a.handPasses < RELIABLE_MIN_PER_SIDE || a.handFails < RELIABLE_MIN_PER_SIDE) return false;
+  const yesOk = (a.handPasses - a.falseFails) / a.handPasses >= RELIABLE_AGREEMENT;
+  const noOk = (a.handFails - a.falsePasses) / a.handFails >= RELIABLE_AGREEMENT;
   const selfOk = a.pairs === 0 || a.pairsAgree / a.pairs >= RELIABLE_SELF_AGREEMENT;
-  return a.agree / a.decided >= RELIABLE_AGREEMENT && selfOk;
+  return yesOk && noOk && selfOk;
+}
+
+/** The report's reading: reliable, not reliable, or too few items on a side to tell. */
+function readingOf(a: CheckAgreement): string {
+  if (a.reliable) return "reliable";
+  const few = [a.handPasses < RELIABLE_MIN_PER_SIDE ? "yes" : "", a.handFails < RELIABLE_MIN_PER_SIDE ? "no" : ""].filter(Boolean);
+  return few.length ? `not reliable (too few hand ${few.join(" and ")})` : "not reliable";
 }
 
 /** Agreement with the hand verdicts, per check, for one judge arm. */
@@ -376,7 +397,7 @@ export function renderCalibration(input: {
   const lines = [
     "# Judged checks: calibration",
     "",
-    `Generated ${input.generatedAt.toISOString()} from prep-calls.jsonl. ${input.items.length} hand-read turns (turn doc E6; the research notes' S1-S14 and M1-M4, gpt-4.1-mini and Luna medium, sample 1), judged through the eval (judgedChecks.ts). A check is judged reliably when sample 1 agrees with the hand verdicts on at least ${RELIABLE_AGREEMENT * 100}% of the decided items and the judge's two samples agree on at least ${RELIABLE_SELF_AGREEMENT * 100}%. Partial hand verdicts are left out of agreement and shown on their own. Spent: $${input.spentUsd.toFixed(4)}.`,
+    `Generated ${input.generatedAt.toISOString()} from prep-calls.jsonl. ${input.items.length} hand-read turns (turn doc E6; the research notes' S1-S14 and M1-M4, gpt-4.1-mini and Luna medium, sample 1), judged through the eval (judgedChecks.ts). A check is judged reliably when sample 1 agrees with the hand verdicts on at least ${RELIABLE_AGREEMENT * 100}% of the hand-yes items and at least ${RELIABLE_AGREEMENT * 100}% of the hand-no items, each side holding at least ${RELIABLE_MIN_PER_SIDE}, and the judge's two samples agree on at least ${RELIABLE_SELF_AGREEMENT * 100}%. Partial hand verdicts are left out of agreement and shown on their own. Spent: $${input.spentUsd.toFixed(4)}.`,
     "",
     "| Judge | Check | Agree (sample 1) | Hand yes / no | Judged no where the hand says yes | Judged yes where the hand says no | Samples agree | On partial items (yes / no) | Reading |",
     "|---|---|---|---|---|---|---|---|---|",
@@ -384,9 +405,15 @@ export function renderCalibration(input: {
   for (const armKey of input.armKeys) {
     for (const a of scoreCalibration(input.items, input.judged, armKey)) {
       lines.push(
-        `| ${armKey} | ${a.check} | ${a.agree} of ${a.decided} (${pct(a.agree, a.decided)}) | ${a.handPasses} / ${a.handFails} | ${a.falseFails} | ${a.falsePasses} | ${a.pairs ? `${a.pairsAgree} of ${a.pairs}` : "–"} | ${a.partial.yes} / ${a.partial.no} | ${a.reliable ? "reliable" : "not reliable"} |`
+        `| ${armKey} | ${a.check} | ${a.agree} of ${a.decided} (${pct(a.agree, a.decided)}) | ${a.handPasses} / ${a.handFails} | ${a.falseFails} | ${a.falsePasses} | ${a.pairs ? `${a.pairsAgree} of ${a.pairs}` : "–"} | ${a.partial.yes} / ${a.partial.no} | ${readingOf(a)} |`
       );
     }
+  }
+  // The only items that show whether a judge fails a turn it should: which turns, and so which model, they come from
+  lines.push("", "Hand-no items per check (a judge's false passes are measured on these alone):", "");
+  for (const check of JUDGED_CHECKS) {
+    const noItems = input.items.filter((c) => c.hand[check] === false).map((c) => c.id);
+    lines.push(`- ${check}: ${noItems.length ? `${noItems.length} (${noItems.join(", ")})` : "none"}`);
   }
   lines.push("", "## Items", "", `| Item | Turn | ${input.armKeys.flatMap((k) => JUDGED_CHECKS.map((c) => `${c} (${k})`)).join(" | ")} | Source |`);
   lines.push(`|---|---|${input.armKeys.flatMap(() => JUDGED_CHECKS.map(() => "---|")).join("")}---|`);

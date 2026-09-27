@@ -58,6 +58,9 @@ export type PrepContext = {
 const STAGE: LedgerStage = "turn-rounds";
 const sumCost = (records: { costUsd: number }[]) => records.reduce((sum, r) => sum + r.costUsd, 0);
 
+/** The caps for a mode's next runner pass: --max-spend covers the whole invocation, so what earlier passes spent comes off it. */
+const capsAfter = (caps: Caps, spent: number): Caps => ({ ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - spent });
+
 /** Ledger spend beside the file a mode appends to: the probe, the filter check, and the other call ledger. */
 export function spendBeside(files: EvalFiles, writing: "calls" | "prep"): SpendRecord[] {
   const probe = files.readProbe();
@@ -86,8 +89,7 @@ export async function buildRoundCasesMode(ctx: PrepContext, replace: boolean): P
     if (earlier?.promptHash && earlier.promptHash !== sha256(requestText(request))) {
       throw new Error(`${caseId}: a call under this id was made on a different state; remove its records from calls.jsonl or rebuild under new ids.`);
     }
-    const remaining: Caps = { ...ctx.caps, maxSpend: ctx.caps.maxSpend === undefined ? undefined : ctx.caps.maxSpend - spent };
-    const result = await runJobs([job], ctx.deps("calls"), { caps: remaining, previous: records, extraSpend: spendBeside(files, "calls"), tokensPerMinute: ctx.tpm });
+    const result = await runJobs([job], ctx.deps("calls"), { caps: capsAfter(ctx.caps, spent), previous: records, extraSpend: spendBeside(files, "calls"), tokensPerMinute: ctx.tpm });
     spent += sumCost(result.records);
     records.push(...result.records);
     if (result.stoppedReason) log(`Stopped: ${result.stoppedReason}`);
@@ -174,21 +176,25 @@ export async function judgeCalibrationMode(ctx: PrepContext, armKeys: string[] |
     return arm;
   });
   const { turns, problems } = calibrationTurns(files);
-  for (const arm of arms) {
+  const done = finishedJobKeys(files.readPrepRecords());
+  const planned = arms.map((arm) => {
     const jobs = judgeJobs(turns, arm, samples, CURRENT_PROMPT_STATE);
-    const previous = files.readPrepRecords();
-    const done = finishedJobKeys(previous);
     const open = jobs.filter((j) => !done.has(keyOf(j)));
-    const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
-    ctx.refuse(STAGE, estimate);
-    log(`${arm.key}: ${turns.length} turns × ${samples} samples, ${open.length} open, est $${estimate.toFixed(3)}`);
+    return { arm, jobs, open: open.length, estimate: open.reduce((sum, j) => sum + jobEstimateUsd(j), 0) };
+  });
+  // One refusal for the whole invocation, before anything is sent; each judge then runs on what the earlier ones left
+  ctx.refuse(STAGE, planned.reduce((sum, p) => sum + p.estimate, 0));
+  let spent = 0;
+  for (const { arm, jobs, open, estimate } of planned) {
+    log(`${arm.key}: ${turns.length} turns × ${samples} samples, ${open} open, est $${estimate.toFixed(3)}`);
     const result = await runJobs(jobs, ctx.deps("prep"), {
-      caps: ctx.caps,
-      previous,
+      caps: capsAfter(ctx.caps, spent),
+      previous: files.readPrepRecords(),
       extraSpend: spendBeside(files, "prep"),
       tokensPerMinute: ctx.tpm,
       maxInFlight: ctx.maxInFlight,
     });
+    spent += sumCost(result.records);
     if (result.stoppedReason) log(`Stopped: ${result.stoppedReason}`);
   }
   writeCalibration(files, turns, problems, log);

@@ -181,6 +181,38 @@ describe("createChatModel retries", () => {
     }
   }, 20_000);
 
+  it("names a reply cut off at its output cap on the retry line", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // openai's parse throws LengthFinishReasonError, which sets no name, status or code of its own
+      const finishReasons = ["length", "stop"];
+      const fetch: FetchFn = async () => {
+        const body = completion('{"answer":"yes"}');
+        body.choices[0].finish_reason = finishReasons.shift() ?? "stop";
+        return jsonResponse(200, body);
+      };
+      const model = createChatModel({
+        role: "beat",
+        settings: { model: "gpt-6-luna", reasoningEffort: "medium" },
+        maxRetries: 1,
+        timeoutMs: 5_000,
+        maxCompletionTokens: 12_000,
+        configuration: { fetch },
+      });
+      await expect(model.withStructuredOutput(schema).invoke("x")).resolves.toEqual({
+        answer: "yes",
+      });
+      const retryLines = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((line) => line.includes("retry"));
+      expect(retryLines).toHaveLength(1);
+      expect(retryLines[0]).toContain('"finishReason":"length"');
+      expect(retryLines[0]).toContain('"name":"LengthFinishReasonError"');
+    } finally {
+      warn.mockRestore();
+    }
+  }, 20_000);
+
   it("does not retry a 400", async () => {
     const { fetch, bodies } = fakeFetch([400, 200]);
     const model = createChatModel({

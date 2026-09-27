@@ -232,6 +232,25 @@ describe("checkSetupDesign: stats (proposals 3 and 4)", () => {
     expect(checkSetupDesign(bonus, solo)).toMatchObject({ checks: { sacrificeNoBonus: false }, counts: { sacrificeTextsWithBonus: 1 } });
     const maybe = soloSetup({ playerStats: [stat("Courage", { optionsToGainAsReward: "Might regain courage by resting." })] });
     expect(checkSetupDesign(maybe, solo).checks.sacrificeNoBonus).toBe(false);
+    for (const hedged of ["Risk losing one contact.", "A chance to regain 10% energy.", "Potentially regain one ally.", "Gain +5 courage."]) {
+      const setup = soloSetup({ playerStats: [stat("Courage", { optionsToSacrifice: hedged })] });
+      expect(checkSetupDesign(setup, solo).checks.sacrificeNoBonus).toBe(false);
+    }
+  });
+
+  it("passes a certain cost in the stat's own units, whatever words describe what is spent", () => {
+    const certain = [
+      // Setup doc A5's worked example: "risky" describes the favor, the loss is certain
+      "Ask one friend for a risky favor; they leave the list until an old-friends thread.",
+      // A stat counted in points spends its own unit
+      "Spend 10 Influence Points to call in a debt.",
+      // A permissive "may" is no maybe
+      "An applicant may take a beat to offer quiet attention.",
+    ];
+    for (const text of certain) {
+      const setup = soloSetup({ playerStats: [stat("Friends", { optionsToSacrifice: text, optionsToGainAsReward: text })] });
+      expect(checkSetupDesign(setup, solo).checks.sacrificeNoBonus).toBe(true);
+    }
   });
 
   it("counts the visible player stats that can be spent or earned", () => {

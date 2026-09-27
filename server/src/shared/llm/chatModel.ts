@@ -9,6 +9,7 @@ import {
   type TextRole,
   type UncheckedTextModelSettings,
 } from "./textModelSettings.js";
+import { errorFinishReason, errorName } from "./usageRecorder.js";
 
 /*
  * The one place a text-model ChatOpenAI is built: the exact request shape per
@@ -115,7 +116,11 @@ function rethrowIfNotRetryable(error: unknown): void {
   }
 }
 
-/** Logs each retry LangChain is about to make; non-retryable errors are rethrown. */
+/**
+ * Logs each retry LangChain is about to make; non-retryable errors are
+ * rethrown. A reply cut off at its output cap reads `finishReason` "length"
+ * here and nowhere else, since the attempt that follows is the one logged.
+ */
 export function retryHandler(
   role: TextRole,
   log: (line: string) => void = (line) => Logger.forService("LLM").warn(line)
@@ -133,7 +138,8 @@ export function retryHandler(
           retriesLeft,
           status: typeof status === "number" ? status : undefined,
           code: typeof code === "string" ? code : undefined,
-          name: readField(error, "name"),
+          name: errorName(error),
+          finishReason: errorFinishReason(error),
         })}`
       );
     }

@@ -22,7 +22,7 @@ The tests loop over the live list and check that every rule reaches every filter
 
 The classifier is `gpt-6-luna` at low reasoning effort (`CONTENT_FILTER_MODEL_*`, since 2026-09-27; it was gpt-4.1-mini), chosen after the filter check below.
 
-The filter fails closed. The classifier gets one retry. Each attempt is one LangChain call that itself retries at most twice (logged as `[LLM] retry`), times out after 15 s and stops at 2,000 output tokens, reasoning included (`productionCallLimits` in `server/src/shared/llm/chatModel.ts`). So the worst case is 2 attempts × 3 calls, about 90 s. A reply cut at the cap cannot parse, so it counts as a failed call. If both attempts fail, `ContentFilterUnavailableError` is thrown and nothing goes through:
+The filter fails closed. The classifier gets one retry. Each attempt is one LangChain call that itself retries at most twice (logged as `[LLM] retry`), times out after 15 s and stops at 2,000 output tokens, reasoning included (`productionCallLimits` in `server/src/shared/llm/chatModel.ts`). So the worst case is 2 attempts × 3 calls, about 90 s. A reply cut at the cap cannot parse, so it counts as a failed call; its retry line reads `"finishReason":"length"`. If both attempts fail, `ContentFilterUnavailableError` is thrown and nothing goes through:
 
 - The story and AI Draft/Iteration routes refuse with their existing generic 500 message.
 - The image routes refuse with the existing `TECHNICAL` image error.

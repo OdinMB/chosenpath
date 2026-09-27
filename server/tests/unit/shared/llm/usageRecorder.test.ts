@@ -137,4 +137,30 @@ describe("LlmCallLogger", () => {
       error: { status: 400, code: "unsupported_parameter", param: "temperature" },
     });
   });
+
+  it("records a reply cut off at its output cap as finishReason length", async () => {
+    const records: LlmCallRecord[] = [];
+    const cutOff = {
+      ...fullCompletion,
+      choices: [{ ...fullCompletion.choices[0], finish_reason: "length" }],
+    };
+    const model = createChatModel({
+      role: "beat",
+      settings: { model: "gpt-6-luna", reasoningEffort: "medium" },
+      maxRetries: 0,
+      timeoutMs: 5_000,
+      maxCompletionTokens: 12_000,
+      callbacks: [new LlmCallLogger((r) => records.push(r), clock())],
+      configuration: { fetch: respondWith(200, cutOff) },
+    });
+    await expect(
+      model.withStructuredOutput(z.object({ answer: z.string() })).invoke("x")
+    ).rejects.toBeDefined();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      role: "beat",
+      ok: false,
+      error: { name: "LengthFinishReasonError", finishReason: "length" },
+    });
+  });
 });

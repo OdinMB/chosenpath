@@ -160,7 +160,12 @@ function signedNumbers(text: string): number[] {
 
 const NONE = /^\s*(none|n\/a|no|-)?\s*\.?\s*$/i;
 const isNone = (text: string) => NONE.test(text);
-const BONUS_OR_RISK = /\b(bonus(es)?|points?|risk(s|ed|ing|y)?|might|may|potentially|possibly|chance)\b|[+±]\s?\d+/i;
+/**
+ * B13's "a bonus, a risk, or 'might'", and the hedges that say the same. Not
+ * "points" (a stat's own unit), "risky" (it describes what is spent: A5's
+ * "a risky favor") or "may" (mostly permissive: "may take a beat to…").
+ */
+const BONUS_OR_RISK = /\b(bonus(es)?|risk(s|ed|ing)?|might|potentially|possibly|chances?)\b|[+±]\s?\d+/i;
 const FORMULA = /\b(per|for (every|each)|times|multiplied|divided)\b|[×÷*]|\beach \d+|\(\s*[\p{L} ]+\s[-+]\s\d+\s*\)/iu;
 const ENGINE_FACTS = [
   /\b2\s*(?:-|–|to)\s*4 beats?\b/i,

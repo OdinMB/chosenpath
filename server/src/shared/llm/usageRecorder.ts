@@ -8,7 +8,10 @@ import { Logger } from "shared/logger.js";
  * Turns one finished chat call into a metrics record and logs it: role,
  * model, effort, tokens by type, milliseconds, finish reason, refusal, and the
  * story tags the caller passed as invoke metadata. Never logs prompt or
- * output text, and never a user id. Background: .context/text-model-eval.md.
+ * output text (so no error message), and never a user id. A reply cut off
+ * at its output cap fails inside openai's parse, so it shows only as a
+ * failed attempt: `finishReason` "length" on the retry line (chatModel.ts)
+ * or on this record's error. Background: .context/text-model-eval.md.
  */
 
 export type CallMetrics = {
@@ -43,13 +46,39 @@ export type LlmCallRecord = CallTags & {
   ms: number;
   ok: boolean;
   metrics?: CallMetrics;
-  error?: { name?: string; status?: number; code?: string; param?: string };
+  error?: { name?: string; status?: number; code?: string; param?: string; finishReason?: string };
 };
 
 function field(value: unknown, key: string): unknown {
   return value && typeof value === "object" && key in value
     ? (value as Record<string, unknown>)[key]
     : undefined;
+}
+
+/**
+ * An error's name, or its class where the name is the generic "Error":
+ * openai's own errors (LengthFinishReasonError, InternalServerError,
+ * APIConnectionError, …) set none, so without the class every one of them
+ * would log as "Error".
+ */
+export function errorName(error: unknown): string | undefined {
+  const name = stringAt(error, "name");
+  if (name && name !== "Error") return name;
+  const className = error && typeof error === "object" ? error.constructor?.name : undefined;
+  return className && className !== "Object" ? className : name;
+}
+
+// openai's parse throws these before LangChain sees the reply, so a cut-off
+// or filtered reply never reaches handleLLMEnd's finish reason
+const FINISH_REASON_ERRORS: Record<string, string> = {
+  LengthFinishReasonError: "length",
+  ContentFilterFinishReasonError: "content_filter",
+};
+
+/** "length" for a reply cut off at its output cap, "content_filter" for a filtered one; otherwise undefined. */
+export function errorFinishReason(error: unknown): string | undefined {
+  const name = errorName(error);
+  return name ? FINISH_REASON_ERRORS[name] : undefined;
 }
 
 function numberAt(value: unknown, ...path: string[]): number {
@@ -145,10 +174,11 @@ export class LlmCallLogger extends BaseCallbackHandler {
       ...call,
       ok: false,
       error: {
-        name: stringAt(error, "name"),
+        name: errorName(error),
         status: typeof status === "number" ? status : undefined,
         code: stringAt(error, "code"),
         param: stringAt(error, "param"),
+        finishReason: errorFinishReason(error),
       },
     });
   }
