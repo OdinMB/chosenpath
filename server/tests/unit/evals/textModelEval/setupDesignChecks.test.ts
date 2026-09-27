@@ -310,6 +310,32 @@ describe("checkSetupDesign: steering (proposal 7)", () => {
     const vague = soloSetup({ sharedStats: [stat("Supplies", { narrativeImplications: ["Low supplies make the crew grumpy."] })], playerStats: [] });
     expect(checkSetupDesign(vague, solo).checks.triggerImplications).toBe(false);
   });
+
+  it("counts the rules that name one of the setup's own stats (proposal 9's problem: 7 of 56 setups have one)", () => {
+    // "When Supplies falls below 30%…" names a stat; the opening rule and the turn-13 rule name none
+    const { checks, counts } = checkSetupDesign(soloSetup(), solo);
+    expect(counts.rulesNamingStat).toBe(1);
+    expect(checks.ruleNamesStat).toBe(true);
+    // An opposites stat is named by either side
+    const sides = soloSetup({
+      sharedStats: [stat("Harbour Master's Voice|Guild's Voice", { type: "opposites" })],
+      guidelines: { ...(soloSetup().guidelines as Loose), switchAndThreadInstructions: ["When the guild's voice leads by 20, the next thread is a contest."] },
+    });
+    expect(checkSetupDesign(sides, solo).counts.rulesNamingStat).toBe(1);
+    const none = checkSetupDesign(withInstructions(["The first thread is about the missing ferry."]), solo);
+    expect(none.checks.ruleNamesStat).toBe(false);
+    expect(none.counts.rulesNamingStat).toBe(0);
+  });
+
+  it("counts the implications that steer (a value, a thread and a force or offer) among all, for a pooled share", () => {
+    // One steering implication on each of the two stats
+    expect(checkSetupDesign(soloSetup(), solo).counts).toMatchObject({ implications: 2, steeringImplications: 2 });
+    const mixed = soloSetup({
+      sharedStats: [stat("Supplies", { narrativeImplications: ["Low supplies make the crew grumpy.", "Below 20%: the next switch forces a thread about food."] })],
+      playerStats: [stat("Courage", { id: "player_courage", narrativeImplications: [] })],
+    });
+    expect(checkSetupDesign(mixed, solo).counts).toMatchObject({ implications: 2, steeringImplications: 1 });
+  });
 });
 
 describe("checkSetupDesign: facts (proposal 11) and example copies (proposal 5)", () => {

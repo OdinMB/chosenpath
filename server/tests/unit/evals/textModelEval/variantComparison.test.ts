@@ -98,33 +98,67 @@ describe("variantComparisons", () => {
     expect(comparison.arm.turnLatencies).toEqual([30]);
   });
 
-  it("flags a check beyond the reference's noise floor, and not one inside it", () => {
-    const trimmed = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call(MEDIUM_MINIMAL, c, sample)));
-    const full = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call(MEDIUM_PROD, c, sample)));
-    const [t1a, t1b, t2a, t2b] = trimmed;
-    const [f1a, f1b, f2a, f2b] = full;
+  describe("the stop rule's moved reading (owner, 2026-09-27)", () => {
+    // 20 cases at two samples on each side: 40 matched pairs
+    const cases = Array.from({ length: 20 }, (_, i) => `c${i}`);
+    const trimmed = [1, 2].flatMap((sample) => cases.map((c) => call(MEDIUM_MINIMAL, c, sample)));
+    const full = [1, 2].flatMap((sample) => cases.map((c) => call(MEDIUM_PROD, c, sample)));
+    const index = (r: CallRecord) => Number(r.caseId.slice(1));
     const checks = checked([
-      // knownIds: full 100% on both samples (noise 0); trimmed 75% -> lower
-      // sentences: full 100% / 50% (75% ± 50%); trimmed 50% -> inside the floor
-      // paragraphs: full 50% on both samples (noise 0); trimmed 100% -> higher
-      [f1a, { knownIds: true, sentences: true, paragraphs: true }, { facts: 2 }],
-      [f1b, { knownIds: true, sentences: true, paragraphs: false }, { facts: 2 }],
-      [f2a, { knownIds: true, sentences: true, paragraphs: true }, { facts: 4 }],
-      [f2b, { knownIds: true, sentences: false, paragraphs: false }, { facts: 4 }],
-      [t1a, { knownIds: true, sentences: true, paragraphs: true }, { facts: 1 }],
-      [t1b, { knownIds: true, sentences: false, paragraphs: true }, { facts: 1 }],
-      [t2a, { knownIds: true, sentences: true, paragraphs: true }, { facts: 1 }],
-      [t2b, { knownIds: false, sentences: false, paragraphs: true }, { facts: 1 }],
+      ...full.map((r): [CallRecord, Record<string, boolean>, Record<string, number>] => [
+        r,
+        // knownIds and sentences 100% on both samples (noise 0); paragraphs 50% on both (noise 0); spread 100% / 50% (noise 50%)
+        { knownIds: true, sentences: true, paragraphs: index(r) % 2 === 0, spread: r.sample === 1 || index(r) % 2 === 0 },
+        // facts 2 or 4 (mean 3, the same on both samples); words 100 or 300 (mean 200)
+        { facts: index(r) % 2 === 0 ? 2 : 4, words: index(r) % 2 === 0 ? 100 : 300 },
+      ]),
+      ...trimmed.map((r): [CallRecord, Record<string, boolean>, Record<string, number>] => [
+        r,
+        // knownIds fails on 8 of 40; sentences on 1 of 40; paragraphs passes all; spread 50%
+        { knownIds: index(r) >= 4, sentences: !(index(r) === 0 && r.sample === 1), paragraphs: true, spread: index(r) % 2 === 0 },
+        // facts 1 everywhere; words 110 or 310 (mean 210)
+        { facts: 1, words: index(r) % 2 === 0 ? 110 : 310 },
+      ]),
     ]);
-    const [comparison] = variantComparisons([...trimmed, ...full], checks, caseTags("a", "b"), "postfix");
-    const flag = (name: string) => comparison.checks.find((c) => c.name === name)?.flag;
-    expect(flag("knownIds")).toBe("lower");
-    expect(flag("sentences")).toBeUndefined();
-    expect(flag("paragraphs")).toBe("higher");
-    expect(comparison.counts).toEqual([{ name: "facts", reference: 3, arm: 1, noise: 2 }]);
+    const [comparison] = variantComparisons([...trimmed, ...full], checks, caseTags(...cases), "postfix");
+    const check = (name: string) => comparison.checks.find((c) => c.name === name);
+
+    it("moves a check beyond the reference's noise at a one-sided Fisher p < 0.10, in either direction", () => {
+      // 8 failures in 40 against none: P = C(40,8)/C(80,8)
+      expect(check("knownIds")).toMatchObject({ reference: 1, arm: 0.8, beyondNoise: "lower", moved: "lower" });
+      expect(check("knownIds")?.p).toBeLessThan(0.01);
+      expect(check("paragraphs")).toMatchObject({ reference: 0.5, arm: 1, beyondNoise: "higher", moved: "higher" });
+    });
+
+    it("reads a check beyond the noise at p ≥ 0.10 as not moved, with its p", () => {
+      // 1 failure in 40 against none: p = 0.5
+      expect(check("sentences")).toEqual({ name: "sentences", reference: 1, arm: 0.975, beyondNoise: "lower", p: expect.closeTo(0.5, 10) });
+    });
+
+    it("leaves a check inside the noise unread", () => {
+      expect(check("spread")).toEqual({ name: "spread", reference: 0.75, arm: 0.5 });
+    });
+
+    it("moves a mean beyond the noise at 2 standard errors of the difference, and not one under them", () => {
+      // facts: reference variance 40/39 (2s and 4s), arm none: SE = sqrt((40/39)/40)
+      expect(comparison.counts.find((c) => c.name === "facts")).toEqual({
+        name: "facts",
+        reference: 3,
+        arm: 1,
+        noise: 0,
+        beyondNoise: "lower",
+        standardErrors: expect.closeTo(2 / Math.sqrt(40 / 39 / 40), 6),
+        moved: "lower",
+      });
+      // words: +10 against a spread of ±100 on both sides, beyond a zero noise but about 0.4 SE
+      const words = comparison.counts.find((c) => c.name === "words");
+      expect(words).toMatchObject({ reference: 200, arm: 210, noise: 0, beyondNoise: "higher" });
+      expect(words?.standardErrors).toBeCloseTo(10 / Math.sqrt((2 * (40 * 10_000)) / 39 / 40), 6);
+      expect(words?.moved).toBeUndefined();
+    });
   });
 
-  it("gives a one-sample arm the noise of the reference's two samples on the matched cases, and flags beyond it", () => {
+  it("gives a one-sample arm the noise of the reference's two samples on the matched cases, and reads beyond it", () => {
     const setup = { group: "setup" as const };
     const arm = [call("gpt-6-sol@low/rewrite", "a", 1, setup), call("gpt-6-sol@low/rewrite", "b", 1, setup)];
     const reference = [1, 2].flatMap((sample) => ["a", "b"].map((c) => call("gpt-6-sol@low/prod", c, sample, setup)));
@@ -144,10 +178,13 @@ describe("variantComparisons", () => {
     const [comparison] = variantComparisons([...arm, ...reference, unmatched], checks, caseTags("a", "b", "c"), "postfix");
     expect(comparison.pairs).toBe(2);
     expect(comparison.hasNoise).toBe(true);
-    expect(comparison.checks.find((c) => c.name === "playerStats")).toEqual({ name: "playerStats", reference: 1, arm: 0.5, flag: "lower" });
-    expect(comparison.checks.find((c) => c.name === "sharedStats")?.flag).toBeUndefined();
-    // The reference itself is read on the matched pairs (sample 1); the noise on both samples
-    expect(comparison.counts).toEqual([{ name: "storyElements", reference: 8, arm: 5, noise: 1 }]);
+    // Beyond the noise, but one failure in two against none is no Fisher move (p = 0.5)
+    expect(comparison.checks.find((c) => c.name === "playerStats")).toEqual({ name: "playerStats", reference: 1, arm: 0.5, beyondNoise: "lower", p: expect.closeTo(0.5, 10) });
+    expect(comparison.checks.find((c) => c.name === "sharedStats")?.beyondNoise).toBeUndefined();
+    // The reference itself is read on the matched pairs (sample 1); the noise on both samples. No spread on either side: moved.
+    expect(comparison.counts).toEqual([
+      { name: "storyElements", reference: 8, arm: 5, noise: 1, beyondNoise: "lower", standardErrors: Infinity, moved: "lower" },
+    ]);
   });
 
   it("lists no flags when the reference has only one sample on the matched cases", () => {
@@ -284,7 +321,7 @@ describe("variantComparisons: stored references from another prompt state", () =
     expect(variantComparisons([...candidate, ...stored], new Map(), caseTags("a", "b"), "round0")).toEqual([]);
   });
 
-  it("reads the design checks' pooled shares beside the checks, flagged beyond the reference's noise", () => {
+  it("reads the design checks' pooled shares beside the checks, moved beyond the reference's noise at a Fisher p < 0.10 on the pooled counts", () => {
     const counts = (spendable: number, visible = 4) => ({ spendablePlayerStats: spendable, visiblePlayerStats: visible });
     const [c1a, c1b, c2a, c2b] = candidate;
     const [s1a, s1b, s2a, s2b] = stored;
@@ -300,6 +337,29 @@ describe("variantComparisons: stored references from another prompt state", () =
       [c2b, {}, counts(4)],
     ]);
     const [comparison] = variantComparisons([...candidate, ...stored], checks, caseTags("a", "b"), "round0", rebuilt);
-    expect(comparison.shares).toEqual([{ name: "spendableShare", reference: 0.5, arm: 1, noise: 0, flag: "higher" }]);
+    // 16 of 16 stats against 8 of 16: P = C(24,16)/C(32,16)
+    expect(comparison.shares).toEqual([
+      { name: "spendableShare", reference: 0.5, arm: 1, noise: 0, beyondNoise: "higher", p: expect.closeTo(735_471 / 601_080_390, 10), moved: "higher" },
+    ]);
+  });
+
+  it("reads setup round 2's arm A against production's form beside round 1, and Sol's round 1 against Luna's", () => {
+    const ROUND2 = "gpt-6-luna@low/setupR2";
+    const SOL_ROUND1 = "gpt-6-sol@low/setupR1";
+    const round2 = [1, 2].flatMap((sample) => ["a", "b"].map((c) => inState("round0", ROUND2, c, sample)));
+    const sol = inState("round0", SOL_ROUND1, "a", 1);
+    const comparisons = variantComparisons([...candidate, ...stored, ...round2, sol], new Map(), caseTags("a", "b"), "round0", rebuilt);
+    const read = comparisons.map((c) => [c.armKey, c.referenceKey, c.referenceState, c.secondReference === true, c.pairs]).sort();
+    expect(read).toEqual(
+      [
+        [ROUND1, LUNA_PROD, "postfix", false, 4],
+        [ROUND2, ROUND1, undefined, false, 4],
+        [ROUND2, LUNA_PROD, "postfix", true, 4],
+        // Sol's own reference (its production form) has no records here; Luna's round 1 is read on Sol's one pair
+        [SOL_ROUND1, ROUND1, undefined, true, 1],
+      ].sort()
+    );
+    // With Luna's two samples on the matched case as its noise
+    expect(comparisons.find((c) => c.armKey === SOL_ROUND1)?.hasNoise).toBe(true);
   });
 });

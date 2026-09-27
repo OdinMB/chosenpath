@@ -84,6 +84,7 @@ export const RATIOS: { name: string; numerator: string; denominator: string }[] 
   { name: "spendableShare", numerator: "spendablePlayerStats", denominator: "visiblePlayerStats" },
   { name: "effectNumbersInRangeShare", numerator: "effectNumbersInRange", denominator: "effectNumbers" },
   { name: "threadTypeShapeShare", numerator: "threadTypesShaped", denominator: "threadTypes" },
+  { name: "steeringImplicationShare", numerator: "steeringImplications", denominator: "implications" },
   { name: "youParagraphShare", numerator: "youParagraphs", denominator: "proseParagraphs" },
   { name: "waitingCloseShare", numerator: "waitingClose", denominator: "beatTexts" },
   { name: "pointingAtChoiceShare", numerator: "pointingAtChoice", denominator: "beatTexts" },

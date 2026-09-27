@@ -8,6 +8,7 @@ import {
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
+  secondReferenceKeys,
   STAGES,
   stageRunsBaseline,
 } from "../../../../src/evals/textModelEval/arms.js";
@@ -168,6 +169,14 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
     expect(referenceKey("gpt-6-luna@low/setupR2")).toBe("gpt-6-luna@low/setupR1");
     expect(referenceKey("gpt-6-luna@low/setupR2Order")).toBe("gpt-6-luna@low/setupR2");
     expect(estimateBaseKey("gpt-6-luna@low/setupR2Order")).toBe("gpt-6-luna@low/setupR2");
+  });
+
+  it("reads round 2's arms against production's form too (their base never ran alone), and Sol's round 1 against Luna's", () => {
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR2")).toEqual(["gpt-6-luna@low/prod"]);
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR2Order")).toEqual(["gpt-6-luna@low/prod"]);
+    expect(secondReferenceKeys("gpt-6-sol@low/setupR1")).toEqual(["gpt-6-luna@low/setupR1"]);
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR1")).toEqual([]);
+    expect(secondReferenceKeys("gpt-6-luna@low/prod")).toEqual([]);
   });
 
   it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {

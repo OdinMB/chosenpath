@@ -1,8 +1,9 @@
 import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
-import { chainKey, chainSides, referenceKey } from "./arms.js";
+import { chainKey, chainSides, referenceKey, secondReferenceKeys } from "./arms.js";
 import type { CaseTags } from "./cases.js";
 import { RATIOS } from "./checkBaselines.js";
 import { finishesJob, type CallRecord } from "./runner.js";
+import { meanMove, rateMove, type MeanMove, type RateMove, type Tally } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
 
 /*
@@ -10,24 +11,28 @@ import type { CheckResult } from "./textChecks.js";
  * against its reference arm (referenceKey: a Stage 3 trim against its full
  * form, a Stage 4 rewrite against the form it rewrites, a verbosity arm
  * against the same arm without it, a round's candidate against production's
- * form), on the (case, sample) pairs both finished. The baseline's records
- * can be a reference; the baseline is never a candidate. Tokens, waits, cost,
- * caching, validity, state counts, the design checks' pooled shares, and the
- * rule checks that read lower or higher than the reference beyond its own
- * noise floor: the reference's sample 1 against its sample 2 on the matched
- * cases, so a one-sample arm is read against a two-sample reference's noise.
- * A reference is read in the arm's own prompt state, unless stored records of
- * another state, whose request today's code rebuilds byte for byte, cover
- * more of the arm's pairs (the setup rounds read the stored postfix setups
- * until a full same-state run exists). Readings only, rendered by
- * resultsReport.ts; nothing is dropped or picked.
+ * form), and against any second reference its round reads (arms.ts,
+ * secondReferenceKeys), on the (case, sample) pairs both finished. The
+ * baseline's records can be a reference; the baseline is never a candidate.
+ * Tokens, waits, cost, caching, validity, state counts, the design checks'
+ * pooled shares, and the rule checks, each read against the reference under
+ * the stop rule (stopRule.ts): beyond its own noise floor (the reference's
+ * sample 1 against its sample 2 on the matched cases, so a one-sample arm is
+ * read against a two-sample reference's noise), and moved only at a Fisher
+ * p < 0.10 (checks, shares) or 2 standard errors (counts). A reference is
+ * read in the arm's own prompt state, unless stored records of another
+ * state, whose request today's code rebuilds byte for byte, cover more of the
+ * arm's pairs (the setup rounds read the stored postfix setups until a full
+ * same-state run exists). Readings only, rendered by resultsReport.ts;
+ * nothing is dropped or picked.
  */
 
-export type CheckReading = { name: string; reference: number; arm: number; flag?: "lower" | "higher" };
-/** noise: the reference's |mean(sample 1) − mean(sample 2)| on the matched cases, when it has both samples there */
-export type CountReading = { name: string; reference: number; arm: number; noise?: number };
-/** A pooled share (checkBaselines' RATIOS), with the reference's two-sample noise and a flag beyond it */
-export type ShareReading = CountReading & { flag?: "lower" | "higher" };
+/** A rule check's pass rate: beyondNoise past the reference's two-sample noise, with p; moved when p < 0.10 too */
+export type CheckReading = { name: string; reference: number; arm: number } & RateMove;
+/** noise: the reference's |mean(sample 1) − mean(sample 2)| on the matched cases, when it has both samples there; moved at 2 standard errors too */
+export type CountReading = { name: string; reference: number; arm: number; noise?: number } & MeanMove;
+/** A pooled share (checkBaselines' RATIOS), with the reference's two-sample noise; moved at a Fisher p < 0.10 on the pooled counts too */
+export type ShareReading = { name: string; reference: number; arm: number; noise?: number } & RateMove;
 
 /**
  * Whether a stored record of another prompt state may stand in as a
@@ -42,6 +47,8 @@ export type VariantComparison = {
   referenceKey: string;
   /** The reference's prompt state when it is a stored reference from another state */
   referenceState?: string;
+  /** A second reference the round reads beside the arm's own (secondReferenceKeys) */
+  secondReference?: true;
   /** (case, sample) pairs both arms finished; both sides are read on these only */
   pairs: number;
   arm: ArmStats;
@@ -52,8 +59,6 @@ export type VariantComparison = {
   checks: CheckReading[];
   shares: ShareReading[];
 };
-
-const EPSILON = 1e-9;
 
 /** The reference's key: the arm's reference, or for a chain the reference of each side. */
 function referenceKeyOf(armKey: string): string | undefined {
@@ -82,6 +87,7 @@ function noiseSamples(noiseRecords: CallRecord[], inputs: Inputs): { s1: ArmStat
   return s1 && s2 ? { s1, s2 } : undefined;
 }
 
+/** A count's noise floor: |mean(sample 1) − mean(sample 2)| of the reference on the matched cases; the stop rule's 2 SE on top. */
 function countReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats; s2: ArmStats } | undefined): CountReading[] {
   return Object.keys(reference.meanCounts)
     .filter((name) => name in arm.meanCounts)
@@ -89,11 +95,13 @@ function countReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats
     .map((name) => {
       const reading: CountReading = { name, reference: reference.meanCounts[name], arm: arm.meanCounts[name] };
       const [a, b] = [noise?.s1.meanCounts[name], noise?.s2.meanCounts[name]];
-      return a !== undefined && b !== undefined ? { ...reading, noise: Math.abs(a - b) } : reading;
+      if (a === undefined || b === undefined) return reading;
+      const floor = Math.abs(a - b);
+      return { ...reading, noise: floor, ...meanMove(reference.countMoments[name], arm.countMoments[name], floor) };
     });
 }
 
-/** A rule rate's noise floor: |rate(sample 1) − rate(sample 2)| of the reference on the matched cases. */
+/** A rule rate's noise floor: |rate(sample 1) − rate(sample 2)| of the reference on the matched cases; the stop rule's Fisher test on top. */
 function checkReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats; s2: ArmStats } | undefined): CheckReading[] {
   return Object.keys(reference.ruleRates)
     .filter((name) => name in arm.ruleRates)
@@ -102,18 +110,22 @@ function checkReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats
       const reading: CheckReading = { name, reference: reference.ruleRates[name], arm: arm.ruleRates[name] };
       const [a, b] = [noise?.s1.ruleRates[name], noise?.s2.ruleRates[name]];
       if (a === undefined || b === undefined) return reading;
-      const flag = beyond(reading, Math.abs(a - b));
-      return flag ? { ...reading, flag } : reading;
+      return { ...reading, ...rateMove(reference.ruleTallies[name], arm.ruleTallies[name], Math.abs(a - b)) };
     });
 }
-
-const beyond = (reading: { reference: number; arm: number }, floor: number): "lower" | "higher" | undefined =>
-  reading.arm < reading.reference - floor - EPSILON ? "lower" : reading.arm > reading.reference + floor + EPSILON ? "higher" : undefined;
 
 /** A pooled share from the mean counts (each design count is reported on every reply of its role, so the means pool). */
 function shareOf(stats: ArmStats, numerator: string, denominator: string): number | undefined {
   const [num, den] = [stats.meanCounts[numerator], stats.meanCounts[denominator]];
   return num !== undefined && den !== undefined && den > 0 ? num / den : undefined;
+}
+
+/** A pooled share's items: the numerator's total among the denominator's (whole counts, so the totals are whole). */
+function shareTally(stats: ArmStats, numerator: string, denominator: string): Tally | undefined {
+  const [num, den] = [stats.countMoments[numerator], stats.countMoments[denominator]];
+  if (!num || !den) return undefined;
+  const [hits, n] = [Math.round(num.mean * num.n), Math.round(den.mean * den.n)];
+  return hits <= n ? { hits, n } : undefined;
 }
 
 function shareReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats; s2: ArmStats } | undefined): ShareReading[] {
@@ -124,8 +136,8 @@ function shareReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats
     const [a, b] = [noise && shareOf(noise.s1, numerator, denominator), noise && shareOf(noise.s2, numerator, denominator)];
     if (a === undefined || b === undefined) return [reading];
     const floor = Math.abs(a - b);
-    const flag = beyond(reading, floor);
-    return [{ ...reading, noise: floor, ...(flag ? { flag } : {}) }];
+    const [refTally, armTally] = [shareTally(reference, numerator, denominator), shareTally(arm, numerator, denominator)];
+    return [{ ...reading, noise: floor, ...(refTally && armTally ? rateMove(refTally, armTally, floor) : {}) }];
   });
 }
 
@@ -189,7 +201,8 @@ function storedReferenceRecords(
  * stored ones that today's code rebuilds, whichever covers more of the arm's
  * pairs; the own state on a tie. So a partial run of the reference in the
  * arm's state (a narrowed or capped migration run) never silently replaces a
- * fuller stored one.
+ * fuller stored one. Each second reference the arm has is read the same way,
+ * after its own, marked `secondReference`.
  */
 export function variantComparisons(
   records: CallRecord[],
@@ -208,14 +221,21 @@ export function variantComparisons(
   for (const armRecords of byArm.values()) {
     const { group, armKey, baseline } = armRecords[0];
     if (baseline) continue;
-    const key = referenceKeyOf(armKey);
-    if (!key) continue;
-    const own = byArm.get(`${group}|${key}`);
-    const candidate = storedReference ? storedReferenceRecords(records, tags, armRecords, key, storedReference) : undefined;
-    const stored = candidate && (!own || coverage(armRecords, candidate) > coverage(armRecords, own)) ? candidate : undefined;
-    const referenceRecords = stored ?? own;
-    const comparison = referenceRecords ? compare(armRecords, referenceRecords, key, { checks, tags }) : undefined;
-    if (comparison) comparisons.push(stored ? { ...comparison, referenceState: stored[0].promptState } : comparison);
+    const own = referenceKeyOf(armKey);
+    const keys = [...(own ? [{ key: own, second: false }] : []), ...secondReferenceKeys(armKey).map((key) => ({ key, second: true }))];
+    for (const { key, second } of keys) {
+      const sameState = byArm.get(`${group}|${key}`);
+      const candidate = storedReference ? storedReferenceRecords(records, tags, armRecords, key, storedReference) : undefined;
+      const stored = candidate && (!sameState || coverage(armRecords, candidate) > coverage(armRecords, sameState)) ? candidate : undefined;
+      const referenceRecords = stored ?? sameState;
+      const comparison = referenceRecords ? compare(armRecords, referenceRecords, key, { checks, tags }) : undefined;
+      if (!comparison) continue;
+      comparisons.push({
+        ...comparison,
+        ...(stored ? { referenceState: stored[0].promptState } : {}),
+        ...(second ? { secondReference: true as const } : {}),
+      });
+    }
   }
   return comparisons;
 }

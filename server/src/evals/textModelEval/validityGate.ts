@@ -73,8 +73,12 @@ export function validityReading(records: CallRecord[]): ValidityReading {
   };
 }
 
-/** P(X >= failuresA) for X ~ Hypergeometric: the one-sided Fisher exact test that group A fails more often than group B. */
-function fisherGreaterP(failuresA: number, callsA: number, failuresB: number, callsB: number): number {
+/**
+ * P(X >= failuresA) for X ~ Hypergeometric: the one-sided Fisher exact test
+ * that group A fails more often than group B. The stop rule (stopRule.ts)
+ * reads it with "failures" as whichever outcome the direction counts.
+ */
+export function fisherGreaterP(failuresA: number, callsA: number, failuresB: number, callsB: number): number {
   const total = callsA + callsB;
   const failures = failuresA + failuresB;
   const logFactorial = [0];

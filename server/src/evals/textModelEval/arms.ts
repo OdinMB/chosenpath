@@ -137,6 +137,26 @@ export function referenceKey(key: string): string | undefined {
 }
 
 /**
+ * The arms a round's report reads a candidate against beside its own
+ * reference. Setup round 2's arms A and B against production's form too:
+ * their base (round 1 without its three failed proposals) never ran alone,
+ * so an existing check counts against steering only when it is worse than
+ * both references, and a form carried forward must be no worse than today's
+ * prompt on a check the round targets. Sol low's round 1 against Luna low's
+ * (the templates question: is Sol clearly better on the same prompt?).
+ */
+const LUNA_LOW = { model: "gpt-6-luna", reasoningEffort: "low" } as const;
+const SECOND_REFERENCES: Record<string, string[]> = {
+  [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
+  [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
+  [armKey({ model: "gpt-6-sol", reasoningEffort: "low" }, "setupR1")]: [armKey(LUNA_LOW, "setupR1")],
+};
+
+export function secondReferenceKeys(key: string): string[] {
+  return SECOND_REFERENCES[key] ?? [];
+}
+
+/**
  * The next arm whose measured outputs an estimate may borrow: a count-fix
  * arm's Stage 4 form (same model and setting, EARLIER_FORM), else the arm's
  * reference.

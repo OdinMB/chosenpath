@@ -1,5 +1,6 @@
 import type { CaseTags } from "./cases.js";
 import { costFromUsage } from "./pricing.js";
+import { momentsOf, type Moments, type Tally } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
 import { usable, type CallRecord } from "./runner.js";
 import { modelAttemptsByStep, validityReading, type ValidityReading } from "./validityGate.js";
@@ -45,6 +46,8 @@ export type ArmStats = {
   };
   /** check name -> pass rate over usable outputs */
   ruleRates: Record<string, number>;
+  /** check name -> passes (hits) over the usable outputs it applies to: the counts behind ruleRates, for the stop rule's Fisher test */
+  ruleTallies: Record<string, Tally>;
   /** check name -> |rate(sample 1) − rate(sample 2)|, the noise floor (baseline) */
   noiseFloor: Record<string, number>;
   /** Seconds, usable final calls */
@@ -58,6 +61,8 @@ export type ArmStats = {
   medianTokens: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; visible: number };
   /** check count name -> mean over usable final calls whose check reports it (facts, newElements, switches, …) */
   meanCounts: Record<string, number>;
+  /** count name -> replies, mean and sample variance behind meanCounts, for the stop rule's standard errors */
+  countMoments: Record<string, Moments>;
   /** Rejected requests (planned again, never billed) are not calls here, as in `calls` */
   cost: Record<CostBasis, CostReading>;
   /**
@@ -100,30 +105,31 @@ export function weightedQuantile(samples: { value: number; weight: number }[], q
 
 const rate = (hits: number, n: number) => (n === 0 ? 0 : hits / n);
 
-function ruleRatesOf(records: CallRecord[], checks: Map<string, CheckResult>): Record<string, number> {
-  const passes: Record<string, { ok: number; n: number }> = {};
+function ruleTalliesOf(records: CallRecord[], checks: Map<string, CheckResult>): Record<string, Tally> {
+  const tallies: Record<string, Tally> = {};
   for (const record of records) {
     const result = record.outputFile ? checks.get(record.outputFile) : undefined;
     for (const [name, ok] of Object.entries(result?.checks ?? {})) {
-      passes[name] ??= { ok: 0, n: 0 };
-      passes[name].n++;
-      if (ok) passes[name].ok++;
+      tallies[name] ??= { hits: 0, n: 0 };
+      tallies[name].n++;
+      if (ok) tallies[name].hits++;
     }
   }
-  return Object.fromEntries(Object.entries(passes).map(([name, p]) => [name, rate(p.ok, p.n)]));
+  return tallies;
 }
 
-function meanCountsOf(records: CallRecord[], checks: Map<string, CheckResult>): Record<string, number> {
-  const sums: Record<string, { total: number; n: number }> = {};
+const ratesOf = (tallies: Record<string, Tally>): Record<string, number> =>
+  Object.fromEntries(Object.entries(tallies).map(([name, t]) => [name, rate(t.hits, t.n)]));
+
+const ruleRatesOf = (records: CallRecord[], checks: Map<string, CheckResult>) => ratesOf(ruleTalliesOf(records, checks));
+
+function countMomentsOf(records: CallRecord[], checks: Map<string, CheckResult>): Record<string, Moments> {
+  const values: Record<string, number[]> = {};
   for (const record of records) {
     const result = record.outputFile ? checks.get(record.outputFile) : undefined;
-    for (const [name, value] of Object.entries(result?.counts ?? {})) {
-      sums[name] ??= { total: 0, n: 0 };
-      sums[name].total += value;
-      sums[name].n++;
-    }
+    for (const [name, value] of Object.entries(result?.counts ?? {})) (values[name] ??= []).push(value);
   }
-  return Object.fromEntries(Object.entries(sums).map(([name, s]) => [name, s.total / s.n]));
+  return Object.fromEntries(Object.entries(values).map(([name, list]) => [name, momentsOf(list)]));
 }
 
 /** Caching off: cache reads and writes both priced as plain input. */
@@ -203,6 +209,8 @@ export function armStatsOf(
   const s2 = bySample(2);
   const latencyByPlayers: Record<number, number[]> = {};
   for (const r of good) (latencyByPlayers[r.players] ??= []).push(seconds(r));
+  const tallies = ruleTalliesOf(good, checks);
+  const moments = countMomentsOf(good, checks);
   return {
     promptState: first.promptState,
     group: first.group,
@@ -220,7 +228,8 @@ export function armStatsOf(
       textAfterJson: firstRate((r) => r.textAfterJson === true),
       junk: firstRate((r) => r.junkChars > 0),
     },
-    ruleRates: ruleRatesOf(good, checks),
+    ruleRates: ratesOf(tallies),
+    ruleTallies: tallies,
     noiseFloor: Object.fromEntries(
       Object.keys(s1)
         .filter((name) => name in s2)
@@ -240,7 +249,8 @@ export function armStatsOf(
       reasoning: median(good.map((r) => r.reasoningTokens)),
       visible: median(good.map((r) => r.outputTokens - r.reasoningTokens)),
     },
-    meanCounts: meanCountsOf(good, checks),
+    meanCounts: Object.fromEntries(Object.entries(moments).map(([name, m]) => [name, m.mean])),
+    countMoments: moments,
     cost: { billed: costReading(priced, PRICE.billed), uncached: costReading(priced, PRICE.uncached) },
     cache: cacheReading(priced),
     inputCost: {

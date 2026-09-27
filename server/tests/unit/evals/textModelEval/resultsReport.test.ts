@@ -30,6 +30,7 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
     validity: { calls: 10, firstAttemptValid: 10, invalidFirstAttempts: 0, validWithinRetries: 10, transportOnly: 0 },
     rates: { repaired: 0, refusal: 0, length: 0, rejectedParam: 0, textAfterJson: 0, junk: 0 },
     ruleRates: {},
+    ruleTallies: {},
     noiseFloor: {},
     latency: { n: 10, p50: 10, p95: 20 },
     beatOnlyLatencies: [10, 12, 20],
@@ -37,6 +38,7 @@ function arm(overrides: Partial<ArmStats> = {}): ArmStats {
     latencyByPlayers: {},
     medianTokens: { input: 0, cached: 0, cacheWrite: 0, output: 0, reasoning: 0, visible: 0 },
     meanCounts: {},
+    countMoments: {},
     cache: { readShare: 0, writeShare: 0, writingCalls: 0, lines: 0 },
     inputCost: { billed: 0, uncached: 0 },
     ...priced(0.01),
@@ -166,6 +168,56 @@ describe("renderResults: the variant section", () => {
     });
     expect(text).toContain(`| setup | ${ROUND1} | postfix:${LUNA_PROD} (stored) | 2 |`);
     expect(text).toContain("spendableShare 50.0% → 100.0%");
+  });
+
+  it("lists what moved under the stop rule apart from what is only beyond the noise, with its p or standard errors", () => {
+    const ROUND1 = "gpt-6-luna@low/setupR1";
+    const LUNA_PROD = "gpt-6-luna@low/prod";
+    const cases = Array.from({ length: 20 }, (_, i) => `c${i}`);
+    const setupCall = (promptState: string, armKey: string, caseId: string, sample: number) =>
+      record({
+        jobKey: `${caseId}|${armKey}|${promptState}|s${sample}`,
+        promptState,
+        role: "setup",
+        group: "setup",
+        armKey,
+        callArmKey: armKey,
+        model: "gpt-6-luna",
+        baseline: false,
+        caseId,
+        sample,
+        promptHash: "today",
+        outputFile: `${promptState}|${armKey}|${caseId}|${sample}`,
+      });
+    const records = [1, 2].flatMap((sample) => cases.flatMap((c) => [setupCall("round0", ROUND1, c, sample), setupCall("postfix", LUNA_PROD, c, sample)]));
+    const even = (r: CallRecord) => Number(r.caseId.slice(1)) % 2 === 0;
+    const checks = new Map<string, CheckResult>(
+      records.map((r) => {
+        const round1 = r.armKey === ROUND1;
+        return [
+          r.outputFile as string,
+          {
+            // modeSlate 50% -> 100%; playerStats 100% -> 39 of 40
+            checks: { modeSlate: round1 || even(r), playerStats: !(round1 && r.caseId === "c0" && r.sample === 1) },
+            // 1s and 3s -> 0s
+            counts: { compoundQuestions: round1 ? 0 : even(r) ? 1 : 3 },
+            unknownIds: [],
+          },
+        ];
+      })
+    );
+    const text = renderResults({
+      records,
+      checks,
+      tags: new Map(cases.map((c) => [c, tags()])),
+      caps: resolveCaps({}).caps,
+      storedReference: (r) => r.promptHash === "today",
+      generatedAt: new Date(0),
+    });
+    expect(text).toContain("| Role | Arm | Reference | State counts per call, reference (±noise) → arm | Moved lower | Moved higher | Beyond noise, not moved |");
+    expect(text).toContain(
+      `| setup | ${ROUND1} | postfix:${LUNA_PROD} (stored) | compoundQuestions 2.00 (±0.00) → 0.00 | compoundQuestions 2.00 → 0.00 (12.5 SE) | modeSlate 50.0% → 100.0% (p < 0.001) | playerStats 100.0% → 97.5% (p 0.500) |`
+    );
   });
 });
 
@@ -335,5 +387,24 @@ describe("computeArmStats", () => {
     const [stats] = computeArmStats(records, checks, new Map([["a", tags()]]));
     expect(stats.meanCounts).toEqual({ facts: 3, threads: 1 });
     expect(stats.medianTokens.visible).toBe(1_000);
+  });
+
+  it("keeps the passes behind each rate and the moments behind each mean, over usable final calls, for the stop rule", () => {
+    const checks = new Map<string, CheckResult>([
+      ["o1", { checks: { paragraphs: true }, counts: { facts: 2 }, unknownIds: [] }],
+      ["o2", { checks: { paragraphs: false }, counts: { facts: 4 }, unknownIds: [] }],
+      ["o3", { checks: { paragraphs: true }, counts: { facts: 6 }, unknownIds: [] }],
+      ["o4", { checks: { paragraphs: false }, counts: { facts: 90 }, unknownIds: [] }],
+    ]);
+    const records = [
+      record({ jobKey: "a", caseId: "a", outputFile: "o1" }),
+      record({ jobKey: "b", caseId: "a", outputFile: "o2" }),
+      record({ jobKey: "c", caseId: "a", outputFile: "o3" }),
+      // An unusable final call does not count
+      record({ jobKey: "d", caseId: "a", outputFile: "o4", outcome: "invalid-json" }),
+    ];
+    const [stats] = computeArmStats(records, checks, new Map([["a", tags()]]));
+    expect(stats.ruleTallies).toEqual({ paragraphs: { hits: 2, n: 3 } });
+    expect(stats.countMoments).toEqual({ facts: { n: 3, mean: 4, variance: 4 } });
   });
 });

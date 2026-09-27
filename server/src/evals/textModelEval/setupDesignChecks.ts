@@ -15,7 +15,8 @@ import type { SetupInput } from "./variants.js";
  * it, so a rate reads over the setups it applies to. Counts that make a
  * pooled share come in pairs (outcomesNamingElement of outcomes,
  * spendablePlayerStats of visiblePlayerStats, effectNumbersInRange of
- * effectNumbers, threadTypesShaped of threadTypes).
+ * effectNumbers, threadTypesShaped of threadTypes, steeringImplications of
+ * implications).
  */
 
 type Loose = Record<string, unknown>;
@@ -376,6 +377,9 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   const triggers = instructions.filter((rule) => namesStat(rule) || namesOutcome(rule) || OPENING.test(rule) || FINALE.test(rule) || TIMING.test(rule)).length;
   counts.triggerInstructions = triggers;
   checks.triggerRules = triggers >= 2;
+  // Proposal 9's problem: "only 7 of 56 setups have an instruction that names one of their own stats"
+  counts.rulesNamingStat = instructions.filter(namesStat).length;
+  checks.ruleNamesStat = counts.rulesNamingStat > 0;
   const thresholds = instructions.flatMap((rule) => [...rule.matchAll(THRESHOLD_PHRASE)].map((m) => m[1].toLowerCase()));
   if (thresholds.length > 0) {
     checks.triggerStatsExist = thresholds.every((phrase) => stats.some((s) => statNames(s).some((n) => phrase.includes(n) || n.includes(phrase))));
@@ -386,9 +390,10 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
     .every((rule) => typeNames.some((name) => rule.toLowerCase().includes(name)));
   counts.threadTypes = threadTypes.length;
   counts.threadTypesShaped = threadTypes.filter((type) => THREAD_TYPE_SHAPE.test(type)).length;
-  checks.triggerImplications = stats.some((s) =>
-    s.implications.some((text) => IMPLICATION_VALUE.test(text) && IMPLICATION_THREAD.test(text) && IMPLICATION_STEER.test(text))
-  );
+  const steers = (text: string) => IMPLICATION_VALUE.test(text) && IMPLICATION_THREAD.test(text) && IMPLICATION_STEER.test(text);
+  checks.triggerImplications = stats.some((s) => s.implications.some(steers));
+  counts.implications = stats.reduce((n, s) => n + s.implications.length, 0);
+  counts.steeringImplications = stats.reduce((n, s) => n + s.implications.filter(steers).length, 0);
 
   // --- Facts (proposal 11) and example copies (proposal 5) ---
   counts.hookFacts = facts.filter((fact) => HOOK.test(fact)).length;

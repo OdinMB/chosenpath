@@ -64,6 +64,7 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  *     --no-repeat: leaves the repeated item out)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
+ *   --results                     rewrites results.md from the stored records (after a reading changed); no API calls
  *   --check-baselines [--ratings <export.json>,…]  the improvement documents' new checks over every stored
  *     output, per arm with the two-sample noise, what separates the rated pages' rank-1 picks, waits per
  *     turn kind and the stored references' currency; writes check-baselines.md and .json. No API calls.
@@ -96,6 +97,7 @@ type Mode =
   | "score"
   | "filter-check"
   | "check-baselines"
+  | "results"
   | "build-round-cases"
   | "backfill-chapters"
   | "judge-calibration";
@@ -189,6 +191,7 @@ function parseArgs(argv: string[]): Args {
       case "--run":
       case "--filter-check":
       case "--check-baselines":
+      case "--results":
       case "--build-round-cases":
       case "--backfill-chapters":
       case "--judge-calibration":
@@ -525,6 +528,13 @@ async function run(args: Args, files: EvalFiles) {
   console.log(`${result.stoppedReason ? `Stopped: ${result.stoppedReason}` : "Run complete"}. Wrote results.md.`);
 }
 
+/** results.md afresh from the stored records and outputs, after a reading changed (the stop rule of 2026-09-27); no API calls. */
+function resultsMode(args: Args, files: EvalFiles) {
+  if (!files.casesExist()) throw new UsageError("No frozen cases. Run --build-cases first.");
+  writeResults(files, resolveCaps({ globalCap: args.globalCap }).caps, files.readCases());
+  console.log(`Wrote results.md in ${files.outDir}`);
+}
+
 function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
   const records = files.readRecords();
   const { checks, prose } = checksForRecords(records, cases, files.loadOutput, files.loadReplyContent, files.loadPrompt);
@@ -737,6 +747,8 @@ async function main() {
       return filterCheck(args, files);
     case "check-baselines":
       return checkBaselinesMode(args, files);
+    case "results":
+      return resultsMode(args, files);
     case "build-round-cases":
       return buildRoundCasesMode(prepContext(args, files), args.rebuildCases);
     case "backfill-chapters":
