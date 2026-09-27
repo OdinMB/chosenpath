@@ -125,8 +125,9 @@ export class ThreadManager {
       return 0;
     }
 
-    // All threads in the same ThreadAnalysis have the same number of completed steps
-    // So we can just look at the first thread
+    // Between beats, all threads in the same ThreadAnalysis have the same number of
+    // completed steps, so we can just look at the first thread (not while
+    // updateThreadResolution is resolving them one by one)
     const firstThread = threadAnalysis.threads[0];
     return firstThread.progression.filter((step) => step.resolution !== null)
       .length;
@@ -235,8 +236,14 @@ export class ThreadManager {
       return state;
     }
 
-    // Get the current step index that needs to be updated
-    const currentStepIndex = this.getCurrentThreadBeatsCompleted(state);
+    // The step to update is this thread's first unresolved one. Counted per thread, not
+    // from threads[0]: parallel threads are resolved one after another, so by the time a
+    // later thread is updated, threads[0] already holds this beat's step
+    const current =
+      threadAnalysis.threads.find((t) => t.id === thread.id) ?? thread;
+    const currentStepIndex = current.progression.filter(
+      (step) => step.resolution !== null
+    ).length;
 
     console.log(
       `[ThreadManager] Updating thread ${thread.id} resolution at step ${

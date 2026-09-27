@@ -60,7 +60,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 
 **Commands** (`npm run eval:text -- …`):
 
-- *(no flags)*: the dry run. It prints the cases, the jobs, and the estimated $ and minutes per stage against the caps. No API calls.
+- *(no flags)*: the dry run. It prints the cases, the jobs, and the estimated $ and minutes per stage against the caps. No API calls. It plans every row under `--prompt-state <tag>`, by default `round0` (`CURRENT_PROMPT_STATE` in `variants.ts`), so its jobs are the ones a `--run` under that tag would still send; records under other tags don't count as done. It refuses a retired tag, as `--run` does.
 - `--probe [--max-spend 1]`: what Sol and Luna accept.
   - Raw SDK checks: a small strict schema at none, low, medium and high; temperature with effort, `minimal`, verbosity, explicit and implicit caching, and a cache breakpoint. Each cache check has its own prefix, so one check's cache write cannot show up as another's read.
   - Every production schema, capped at 64 output tokens: at all four efforts on Luna, at low on Sol (schema validation does not depend on effort).
@@ -70,7 +70,7 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
 - `--build-cases [--rebuild-cases] [--max-spend 0.75]`: plays templates forward with the baseline and freezes every case. It refuses to overwrite frozen cases without `--rebuild-cases`, because rebuilding changes the inputs.
 - `--run --stage 0|1-2|3|4 --prompt-state <tag>`: the replay. It refuses to start when the estimate exceeds a cap, stops scheduling when the next call would, and resumes from `calls.jsonl`. It rewrites `results.md` at the end.
   - Filters: `--role setup,beat,switch,thread,iteration` (`analysis` means switch plus thread), `--mode isolated|pipeline`, `--arms`, `--cases`, `--samples N`, `--subset15`, `--no-mp-continuations` (leaves out multiplayer beats other than first beats and endings), and `--rare-failure skip|only` (leaves out the rare-failure batch, or plans only it, so it can run after the analysis and the chains). The dry run takes the same filters.
-  - Prompt states: `prefix` is before the prompt-bug fixes (Run A), `postfix` after them, through Stage 4b. `--run` refuses both (`retiredPromptStateProblem` in `variants.ts`): the pre-fix prompts exist only in Run A's records, and the Round 0 play fixes (2026-09-27) changed the production prompts after the `postfix` records (the state text and the multiplayer first-thread rule), so a resumed run under either tag would mix two prompt versions. New runs take a new tag, such as `round0`. Reading the old tags (pages, scores, reports) is unchanged.
+  - Prompt states: `prefix` is before the prompt-bug fixes (Run A), `postfix` after them, through Stage 4b. `--run` refuses both (`retiredPromptStateProblem` in `variants.ts`): the pre-fix prompts exist only in Run A's records, and the Round 0 play fixes (2026-09-27) changed the production prompts after the `postfix` records (the state text and the multiplayer first-thread rule), so a resumed run under either tag would mix two prompt versions. New runs take a new tag: `round0` for today's prompts (`CURRENT_PROMPT_STATE`; a prompt change retires it and sets the next). Reading the old tags (pages, scores, reports) is unchanged.
   - The post-fix prompts (Milestone 2, test plan A7) fix these on today's models:
     - thread beats see their own thread's beat texts;
     - the ending sees the thread it wraps up, the outcomes, and the stats' "Adjustments after threads";
@@ -149,13 +149,13 @@ Run everything from `server/`. The harness finds `data/` and `server/.env` relat
   - Analysis: Luna none, low and medium ×2.
   - Pipeline: Luna low analysis, then each Luna beat arm.
   - Rare-failure batch: 50 extra single-sample Luna beat calls per effort.
-- Stage 3 (Milestone 3). This is the coordinator's carry-forward, chosen before the owner rated Round 1. The full forms are the Stage 1–2 `prod` records and are not re-run. So run Stage 3 with `--prompt-state postfix`: the comparison pairs arms only within one prompt state.
+- Stage 3 (Milestone 3). This is the coordinator's carry-forward, chosen before the owner rated Round 1. The full forms are the Stage 1–2 `prod` records and are not re-run. So Stage 3 ran with `--prompt-state postfix`: the comparison pairs arms only within one prompt state. A Stage 3 run under a new tag therefore needs its full forms (the Stage 1–2 `prod` arms) recorded under that tag too.
   - Setup: Sol low minimal on 9 premises (`STAGE3_SETUP_PREMISES`: 3 per player count, every game mode, a Kids premise and three dark ones) ×1. Luna low minimal on all 18 ×2.
   - Beats: Luna medium and Luna low, each slim and minimal, and a Luna none minimal control, on single-player cases ×2. The control comes last, so a cap stop cuts it first.
   - Analysis: Luna low minimal ×2.
   - Pipeline: Luna low minimal analysis, then Luna medium minimal and Luna low minimal beats, on single-player analysis cases ×1 (`pipelinePlan`). The baseline chain stays on every case.
   - Dry run of 2026-09-26: $2.38 isolated plus $0.18 for chains, against the $3 cap.
-- Stage 4 (Milestone 3, the coordinator's carry-forward): the GPT-6-style rewrite. No analysis arms and no chains. Run it with `--prompt-state postfix`.
+- Stage 4 (Milestone 3, the coordinator's carry-forward): the GPT-6-style rewrite. No analysis arms and no chains. It ran with `--prompt-state postfix`; a new run takes the current tag.
   - Setup on the 9 `STAGE3_SETUP_PREMISES` ×1: Sol low and gpt-4.1 (production's default settings), each `rewrite` and `rewriteZeroShot`.
   - Beats on single-player cases, in this order: Luna medium `rewriteSlim` ×2 (the lead), gpt-4.1-mini `rewrite` ×1 (does the cleanup help today's model?), Luna medium verbosity low `rewriteSlim` ×1, and Luna medium `rewrite` ×1 (the full-scaffold hedge).
   - Dry run of 2026-09-26: 256 jobs (setup 36, beat 220), $3.62 uncached against the $4 cap. Setup estimates read low (see Estimates), so about $4.1 uncached is the realistic figure, over the cap as the plan expected.

@@ -91,18 +91,25 @@ export function requestText(request: EvalRequest): string {
  */
 export const PRE_FIX_PROMPT_STATE = "prefix";
 
+/**
+ * The tag for today's production prompts, after the Round 0 play fixes. The
+ * dry run plans under it when no --prompt-state is given. A change to the
+ * production prompts retires it: add it to RETIRED_PROMPT_STATES and set a new one.
+ */
+export const CURRENT_PROMPT_STATE = "round0";
+
 const RETIRED_PROMPT_STATES = new Map<string, string>([
   [
     PRE_FIX_PROMPT_STATE,
-    'The pre-fix prompts no longer exist in the code (Run A recorded them), so --prompt-state prefix would mix post-fix prompts into pre-fix results. Use a new tag such as "round0".',
+    `The pre-fix prompts no longer exist in the code (Run A recorded them), so --prompt-state prefix would mix post-fix prompts into pre-fix results. Use a new tag such as "${CURRENT_PROMPT_STATE}".`,
   ],
   [
     "postfix",
-    'The production prompts changed after the postfix records (the Round 0 play fixes of 2026-09-27), so --prompt-state postfix would mix two prompt versions. Use a new tag such as "round0".',
+    `The production prompts changed after the postfix records (the Round 0 play fixes of 2026-09-27), so --prompt-state postfix would mix two prompt versions. Use a new tag such as "${CURRENT_PROMPT_STATE}".`,
   ],
 ]);
 
-/** Why --run refuses this prompt state, or undefined when it may record under it. */
+/** Why --run (and the dry run) refuses this prompt state, or undefined when it may record under it. */
 export function retiredPromptStateProblem(promptState: string): string | undefined {
   return RETIRED_PROMPT_STATES.get(promptState);
 }

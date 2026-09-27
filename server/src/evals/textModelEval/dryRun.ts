@@ -8,11 +8,13 @@ import { jobEstimateUsd, planJobs, requestChars, type PlanOptions } from "./jobP
 import { estimateCall, outputTokensPerSecond } from "./pricing.js";
 import { estimateCheckCost, probeChecks } from "./probe.js";
 import { finishedJobKeys, keyOf, type CallRecord, type Job } from "./runner.js";
+import { CURRENT_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * The no-API planning report (--dry-run): the cases that exist without any
  * call, what case building would cost, and per stage the jobs, estimated
- * dollars and duration against the owner's caps, plus spend so far.
+ * dollars and duration against the owner's caps, plus spend so far. The jobs
+ * are those a --run under the same --prompt-state would still send.
  */
 
 export type LocalCaseSources = {
@@ -83,6 +85,8 @@ export type DryRunInput = {
   sources: LocalCaseSources;
   /** The CLI's filters and sample override, applied to every row */
   options: (stage: Stage, promptState: string, extra: Partial<PlanOptions>) => PlanOptions;
+  /** --prompt-state: the tag the rows are planned under, as --run would record them; defaults to CURRENT_PROMPT_STATE */
+  promptState?: string;
   samples?: number;
   tpm: number;
   maxInFlight: number;
@@ -91,6 +95,9 @@ export type DryRunInput = {
 
 export async function printDryRun(input: DryRunInput): Promise<void> {
   const { log, records } = input;
+  const promptState = input.promptState ?? CURRENT_PROMPT_STATE;
+  const retired = retiredPromptStateProblem(promptState);
+  if (retired) throw new Error(retired);
   const finished = finishedJobKeys(records);
   log(`Output folder: ${input.outDir}`);
   let cases = input.frozenCases;
@@ -105,22 +112,20 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     log("The stage estimates below leave out the cases --build-cases adds (first beats, multiplayer, template analysis).");
   }
 
-  const plan = (stage: Stage, promptState: string, extra: Partial<PlanOptions>) =>
-    planJobs(cases ?? [], input.options(stage, promptState, extra));
+  const plan = (stage: Stage, extra: Partial<PlanOptions>) => planJobs(cases ?? [], input.options(stage, promptState, extra));
   const analysis: Partial<PlanOptions> = { mode: "pipeline", roles: ["switch", "thread"] };
-  // The pre-fix baseline finished in Run A, and --run now refuses "prefix". The rows read
-  // the "postfix" records, which --run refuses too since the Round 0 play fixes; the
-  // stages of the next rounds get rows under their own tag
+  // Rows are planned under the tag --run would record, so only records under it count as done
+  log(`\nJobs planned under --prompt-state ${promptState}; records under other tags do not count as done.`);
   const rows: [string, Stage, Job[]][] = [
-    ["Stage 0 post-fix baseline (2 samples, isolated)", "0", plan("0", "postfix", { samples: input.samples ?? 2, mode: "isolated" })],
-    ["Stage 0 post-fix baseline pipeline chains", "0", plan("0", "postfix", analysis).filter((j) => j.group === "pipeline")],
-    ["Stages 1-2 candidates (isolated)", "1-2", plan("1-2", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
-    ["Stages 1-2 pipeline chains", "1-2", plan("1-2", "postfix", analysis).filter((j) => !j.baseline)],
+    ["Stage 0 baseline (2 samples, isolated)", "0", plan("0", { samples: input.samples ?? 2, mode: "isolated" })],
+    ["Stage 0 baseline pipeline chains", "0", plan("0", analysis).filter((j) => j.group === "pipeline")],
+    ["Stages 1-2 candidates (isolated)", "1-2", plan("1-2", { mode: "isolated" }).filter((j) => !j.baseline)],
+    ["Stages 1-2 pipeline chains", "1-2", plan("1-2", analysis).filter((j) => !j.baseline)],
     // Planning builds every trimmed request, so these rows also show that each trim applies to every frozen case
-    ["Stage 3 candidates (isolated)", "3", plan("3", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
-    ["Stage 3 pipeline chains", "3", plan("3", "postfix", analysis).filter((j) => !j.baseline)],
+    ["Stage 3 candidates (isolated)", "3", plan("3", { mode: "isolated" }).filter((j) => !j.baseline)],
+    ["Stage 3 pipeline chains", "3", plan("3", analysis).filter((j) => !j.baseline)],
     // Likewise every rewrite request on every case in scope; estimates ignore caching
-    ["Stage 4 candidates (isolated)", "4", plan("4", "postfix", { mode: "isolated" }).filter((j) => !j.baseline)],
+    ["Stage 4 candidates (isolated)", "4", plan("4", { mode: "isolated" }).filter((j) => !j.baseline)],
   ];
   const caps = resolveCaps({}).caps;
   const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0);

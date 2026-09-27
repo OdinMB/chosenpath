@@ -28,7 +28,7 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
- *   --dry-run (default)           cases, calls, estimated $ and duration per stage; no API calls
+ *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
  *   --run --stage 0|1-2|3|4 --prompt-state <tag> [filters]  (refuses the retired "prefix" and "postfix")
@@ -312,6 +312,7 @@ function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guardEnvir
     frozenCases: files.casesExist() ? files.readCases() : undefined,
     sources: localSources(dirs),
     options: (stage, promptState, extra) => planOptions(args, stage, promptState, records, extra),
+    promptState: args.promptState,
     samples: args.samples,
     tpm: args.tpm,
     maxInFlight: MAX_IN_FLIGHT,
