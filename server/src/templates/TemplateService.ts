@@ -755,7 +755,10 @@ export class TemplateService {
     userPermissions: string[] = []
   ): Promise<StoryTemplate> {
     try {
-      this.logger.log(`Generating template with prompt: ${prompt}`);
+      // Length only: the prompt is user-written and stays out of the logs
+      this.logger.log(
+        `Generating template from a prompt of ${prompt.length} characters`
+      );
 
       // Create an ID for the new template
       const id = uuidv4();

@@ -52,12 +52,27 @@ const fitsAll: StatValueEntry[] = [
   { statId: 'player_items', value: ['rope'] },
 ];
 
+const VALUE_WARNING = 'stat values that don\'t fit their stats';
+
 const typeIssues = (t: StoryTemplate) =>
-  validateTemplateIntegrity(t).issues.filter((issue) => issue.message.includes('of the wrong type'));
+  validateTemplateIntegrity(t).issues.filter((issue) => issue.message.includes(VALUE_WARNING));
 
 describe('Template background value validation', () => {
   it('reports nothing when every background value fits its stat', () => {
     expect(typeIssues(template(fitsAll))).toEqual([]);
+  });
+
+  it('warns about a percentage outside 0 to 100, saying it is clamped to the range', () => {
+    const issues = typeIssues(
+      template([
+        { statId: 'player_nerve', value: 120 },
+        { statId: 'player_rank', value: 'Master' },
+      ])
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toContain('player_nerve (120 becomes 100)');
+    expect(issues[0].message).not.toContain('initial value');
   });
 
   it('warns about values of the wrong type in the backgrounds category, saying what stories make of them', () => {
@@ -85,13 +100,13 @@ describe('Template background value validation', () => {
     ).issues;
 
     expect(issues.some((issue) => issue.message.includes('references non-existent stat: player_ghost'))).toBe(true);
-    expect(issues.some((issue) => issue.message.includes('of the wrong type'))).toBe(false);
+    expect(issues.some((issue) => issue.message.includes(VALUE_WARNING))).toBe(false);
   });
 
   it('does not type-check a shared stat held in a background (the orphaned-stat warning covers it)', () => {
     const issues = validateTemplateIntegrity(template([...fitsAll, { statId: 'shared_weather', value: 4 }])).issues;
 
     expect(issues.some((issue) => issue.message.includes('orphaned stats: shared_weather'))).toBe(true);
-    expect(issues.some((issue) => issue.message.includes('of the wrong type'))).toBe(false);
+    expect(issues.some((issue) => issue.message.includes(VALUE_WARNING))).toBe(false);
   });
 });

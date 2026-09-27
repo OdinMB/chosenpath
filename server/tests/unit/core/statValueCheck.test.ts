@@ -59,9 +59,28 @@ describe("checkStatValue", () => {
   });
 
   it.each([
-    [percentage, "150", 40],
-    [percentage, 120, 40],
-    [percentage, -5, 40],
+    [percentage, 120, 100],
+    [percentage, -5, 0],
+    [percentage, "150", 100],
+    [percentage, " 140% ", 100],
+    [percentage, "-10", 0],
+    [opposites, 130, 100],
+    [opposites, "-20%", 0],
+  ])("clamps a percentage or opposites value outside 0 to 100 to the range (%#)", (definition, value, clamped) => {
+    expect(checkStatValue(definition, value)).toEqual({
+      value: clamped,
+      kind: "clamped",
+    });
+  });
+
+  it("leaves a number stat unbounded", () => {
+    expect(checkStatValue(count, 5000)).toEqual({ value: 5000 });
+    expect(checkStatValue(count, "-250")).toEqual({ value: -250, kind: "converted" });
+  });
+
+  it.each([
+    [percentage, Number.NaN, 40],
+    [percentage, Number.POSITIVE_INFINITY, 40],
     [percentage, "high", 40],
     [percentage, ["5"], 40],
     [opposites, "60|30", 50],
@@ -95,12 +114,21 @@ describe("checkStatValue", () => {
       kind: "replaced",
     });
   });
+
+  it("uses a clamped initial value as the replacement", () => {
+    expect(checkStatValue({ ...percentage, initialValue: 130 }, "none")).toEqual({
+      value: 100,
+      kind: "replaced",
+    });
+  });
 });
 
 describe("statValueFit", () => {
-  it("tells a value that fits, one that converts and one of the wrong type apart", () => {
+  it("tells a value that fits, one that converts, one out of range and one of the wrong type apart", () => {
     expect(statValueFit(percentage, 5)).toBe("fits");
     expect(statValueFit(percentage, "5")).toBe("converts");
+    expect(statValueFit(percentage, 120)).toBe("clamps");
+    expect(statValueFit(percentage, "150%")).toBe("clamps");
     expect(statValueFit(percentage, "high")).toBe("wrongType");
     expect(statValueFit(items, "sword")).toBe("converts");
     expect(statValueFit(rank, 3)).toBe("wrongType");
@@ -145,14 +173,22 @@ describe("checkBackgroundStatValues", () => {
     expect(checkBackgroundStatValues(playerStats, undefined)).toEqual({ values: [], fixes: [] });
   });
 
+  it("clamps an out-of-range starting value instead of replacing it", () => {
+    const result = checkBackgroundStatValues(playerStats, [{ statId: "player_nerve", value: 120 }]);
+
+    expect(result.values).toEqual([{ statId: "player_nerve", value: 100 }]);
+    expect(result.fixes).toEqual([{ statId: "player_nerve", kind: "clamped" }]);
+  });
+
   it("counts the fixes by kind, without stat ids", () => {
-    const { fixes } = checkBackgroundStatValues(playerStats, [
+    const { fixes } = checkBackgroundStatValues([...playerStats, opposites], [
       { statId: "player_nerve", value: "70" },
+      { statId: "player_order", value: -5 },
       { statId: "player_rank", value: "5" },
       { statId: "player_items", value: 5 },
       { statId: "player_ghost", value: 10 },
     ]);
-    expect(countStatValueFixes(fixes)).toBe("1 converted, 1 replaced, 1 dropped");
+    expect(countStatValueFixes(fixes)).toBe("1 converted, 1 clamped, 1 replaced, 1 dropped");
   });
 });
 

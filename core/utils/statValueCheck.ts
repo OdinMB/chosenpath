@@ -10,13 +10,15 @@ import type { StoryState } from "../types/story.js";
  *
  * The rule: a value of the right type is kept. A value of the wrong type is
  * converted when the reading is unambiguous: a numeric string for a number,
- * percentage or opposites stat (percentages and opposites also as "75%",
- * within 0 to 100), "a|b" for opposites when a + b = 100 (the stored value is
- * the first side), a single string for a string[] stat ("" is the empty list),
- * a one-item list for a string stat. Anything else, including a number or
- * percentage outside 0 to 100, is replaced by the stat's own initial value (read
- * the same way), or the template editor's default for its type when that
- * doesn't fit either. A value for a stat id that isn't a player stat is dropped.
+ * percentage or opposites stat (percentages and opposites also as "75%"),
+ * "a|b" for opposites when a + b = 100 (the stored value is the first side), a
+ * single string for a string[] stat ("" is the empty list), a one-item list
+ * for a string stat. A percentage or opposites value outside 0 to 100, read
+ * either way, is clamped to the range (120 becomes 100, -5 becomes 0); number
+ * stats have no range. Anything else is replaced by the stat's own initial
+ * value (read the same way), or the template editor's default for its type
+ * when that doesn't fit either. A value for a stat id that isn't a player stat
+ * is dropped.
  *
  * Applied where a background's values enter a story or a template: character
  * selection (PlayerManager), story start from a template (StoryStateFactory),
@@ -24,12 +26,12 @@ import type { StoryState } from "../types/story.js";
  * The template editor shows the same reading as a validation warning.
  */
 
-export type StatValueFixKind = "converted" | "replaced" | "dropped";
+export type StatValueFixKind = "converted" | "clamped" | "replaced" | "dropped";
 
 export type StatValueFix = { statId: string; kind: StatValueFixKind };
 
 /** How a value fits its stat. */
-export type StatValueFit = "fits" | "converts" | "wrongType";
+export type StatValueFit = "fits" | "converts" | "clamps" | "wrongType";
 
 /** Every fix made to one background's values, by seat and background index. */
 export type BackgroundValueFixes = {
@@ -42,9 +44,6 @@ const NUMERIC = /^[+-]?\d+(?:\.\d+)?$/;
 const PERCENT = /^[+-]?\d+(?:\.\d+)?%?$/;
 const OPPOSITES = /^(\d+(?:\.\d+)?)%?\s*\|\s*(\d+(?:\.\d+)?)%?$/;
 
-const inPercentRange = (value: number): boolean =>
-  Number.isFinite(value) && value >= 0 && value <= 100;
-
 /** The template editor's default for a stat of this type: "", [] or 50. */
 export function defaultStatValue(type: Stat["type"]): StatValue {
   if (type === "string") return "";
@@ -52,27 +51,32 @@ export function defaultStatValue(type: Stat["type"]): StatValue {
   return 50;
 }
 
-type Reading = { value: StatValue; converted: boolean } | null;
+/** A value read by type, and how it was changed to fit, if it was. */
+type Reading = { value: StatValue; change?: "converted" | "clamped" } | null;
 
-const kept = (value: StatValue): Reading => ({ value, converted: false });
-const converted = (value: StatValue): Reading => ({ value, converted: true });
+const kept = (value: StatValue): Reading => ({ value });
+const converted = (value: StatValue): Reading => ({ value, change: "converted" });
+
+/** A percentage read from a number or a string: clamped to 0 to 100; not finite reads as nothing. */
+function withinPercentRange(number: number, fromString: boolean): Reading {
+  if (!Number.isFinite(number)) return null;
+  if (number < 0 || number > 100) {
+    return { value: Math.min(100, Math.max(0, number)), change: "clamped" };
+  }
+  return fromString ? converted(number) : kept(number);
+}
 
 function readPercentage(value: unknown, opposites: boolean): Reading {
-  if (typeof value === "number") {
-    return inPercentRange(value) ? kept(value) : null;
-  }
+  if (typeof value === "number") return withinPercentRange(value, false);
   if (typeof value !== "string") return null;
   const text = value.trim();
-  if (PERCENT.test(text)) {
-    const number = parseFloat(text);
-    return inPercentRange(number) ? converted(number) : null;
-  }
+  if (PERCENT.test(text)) return withinPercentRange(parseFloat(text), true);
   const sides = opposites ? text.match(OPPOSITES) : null;
   if (sides) {
     const first = parseFloat(sides[1] ?? "");
     const second = parseFloat(sides[2] ?? "");
-    return inPercentRange(first) && Math.abs(first + second - 100) < 1e-9
-      ? converted(first)
+    return Math.abs(first + second - 100) < 1e-9
+      ? withinPercentRange(first, true)
       : null;
   }
   return null;
@@ -131,14 +135,15 @@ function readStatValue(stat: Pick<Stat, "type">, value: unknown): Reading {
   }
 }
 
-/** Whether a value fits its stat, converts unambiguously, or is of the wrong type. */
+/** Whether a value fits its stat, converts unambiguously, is clamped to the stat's range, or is of the wrong type. */
 export function statValueFit(
   stat: Pick<Stat, "type">,
   value: unknown
 ): StatValueFit {
   const reading = readStatValue(stat, value);
   if (!reading) return "wrongType";
-  return reading.converted ? "converts" : "fits";
+  if (reading.change === "clamped") return "clamps";
+  return reading.change === "converted" ? "converts" : "fits";
 }
 
 /** The value to use when a value doesn't fit: the stat's initial value read by type, else the editor's default. */
@@ -148,15 +153,15 @@ export function fallbackStatValue(
   return readStatValue(stat, stat.initialValue)?.value ?? defaultStatValue(stat.type);
 }
 
-/** A value checked against its stat: kept, converted, or replaced (see the rule above). */
+/** A value checked against its stat: kept, converted, clamped, or replaced (see the rule above). */
 export function checkStatValue(
   stat: Pick<Stat, "type" | "initialValue">,
   value: unknown
-): { value: StatValue; kind?: "converted" | "replaced" } {
+): { value: StatValue; kind?: "converted" | "clamped" | "replaced" } {
   const reading = readStatValue(stat, value);
   if (!reading) return { value: fallbackStatValue(stat), kind: "replaced" };
-  return reading.converted
-    ? { value: reading.value, kind: "converted" }
+  return reading.change
+    ? { value: reading.value, kind: reading.change }
     : { value: reading.value };
 }
 
@@ -187,7 +192,7 @@ export function checkBackgroundStatValues(
 
 /** "1 converted, 1 dropped": the fixes counted by kind, for logs (no stat ids, which carry story words). */
 export function countStatValueFixes(fixes: readonly StatValueFix[]): string {
-  const kinds: StatValueFixKind[] = ["converted", "replaced", "dropped"];
+  const kinds: StatValueFixKind[] = ["converted", "clamped", "replaced", "dropped"];
   return kinds
     .map((kind) => [kind, fixes.filter((fix) => fix.kind === kind).length] as const)
     .filter(([, count]) => count > 0)

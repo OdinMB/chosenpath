@@ -346,12 +346,13 @@ const validateStatReferences = (template: StoryTemplate): ValidationIssue[] => {
 };
 
 /**
- * Validates that each background value fits its player stat's type, with
- * the rule stories and the server apply (core/utils/statValueCheck.ts): a
- * value that converts unambiguously becomes that value, anything else the
- * stat's initial value. One warning per background. Unknown stat ids are left
- * to validateStatReferences, and values for stats that aren't background
- * stats to the orphaned-stat warning.
+ * Validates that each background value fits its player stat, with the rule
+ * stories and the server apply (core/utils/statValueCheck.ts): a value that
+ * converts unambiguously becomes that value, a percentage or opposites value
+ * outside 0 to 100 is clamped to the range, anything else becomes the stat's
+ * initial value. One warning per background. Unknown stat ids are left to
+ * validateStatReferences, and values for stats that aren't background stats
+ * to the orphaned-stat warning.
  */
 const validateBackgroundValueTypes = (
   template: StoryTemplate
@@ -380,9 +381,9 @@ const validateBackgroundValueTypes = (
         if (!stat || statValueFit(stat, sv.value) === "fits") return [];
         const result = checkStatValue(stat, sv.value);
         return [
-          result.kind === "converted"
-            ? `${sv.statId} (${shown(sv.value)} becomes ${shown(result.value)})`
-            : `${sv.statId} (${shown(sv.value)} becomes the stat's initial value)`,
+          result.kind === "replaced"
+            ? `${sv.statId} (${shown(sv.value)} becomes the stat's initial value)`
+            : `${sv.statId} (${shown(sv.value)} becomes ${shown(result.value)})`,
         ];
       });
       if (wrong.length > 0) {
@@ -391,7 +392,7 @@ const validateBackgroundValueTypes = (
           category: "backgrounds",
           message: `Background "${
             background.title
-          }" in ${key} has stat values of the wrong type: ${wrong.join(
+          }" in ${key} has stat values that don't fit their stats: ${wrong.join(
             ", "
           )}. They are corrected when the World is saved.`,
           affectedItems: [background.title],

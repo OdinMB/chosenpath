@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { CharacterBackground, StoryTemplate } from "core/types/index.js";
+import { GameModes } from "core/types/index.js";
 import { stat } from "../../helpers/textFixtures.js";
 
 // The service writes template.json and a DB row; both are stubbed here
 const writeFile = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
 const readFile = jest.fn<(...args: unknown[]) => Promise<string>>(async () => "");
+// No model call: an AI Draft stops at the setup call
+const generateTemplateSetup = jest.fn<(...args: unknown[]) => Promise<never>>(async () => {
+  throw new Error("no model in tests");
+});
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockModule = (jest as any).unstable_mockModule;
 await mockModule("fs/promises", () => ({
@@ -30,7 +35,9 @@ await mockModule("../../../src/templates/TemplateDbService.js", () => ({
 }));
 await mockModule("../../../src/game/services/AIStoryGenerator.js", () => ({
   __esModule: true,
-  AIStoryGenerator: class {},
+  AIStoryGenerator: class {
+    generateTemplateSetup = generateTemplateSetup;
+  },
 }));
 await mockModule("../../../src/game/services/prompts/StorySetupPromptService.js", () => ({
   __esModule: true,
@@ -119,5 +126,19 @@ describe("TemplateService background values on save", () => {
       { statId: "player_nerve", value: 70 },
     ]);
     expect(checkLines()).toEqual([]);
+  });
+});
+
+describe("TemplateService AI Draft logs", () => {
+  it("logs the prompt's length, never its text", async () => {
+    const prompt = "A lighthouse keeper named Ottoline Brandvik hides a letter";
+
+    await expect(
+      new TemplateService().generateTemplate(prompt, false, 1, 10, GameModes.Cooperative)
+    ).rejects.toThrow("Failed to generate story template");
+
+    const lines = log.mock.calls.map((call) => call.join(" "));
+    expect(lines.some((line) => line.includes(`prompt of ${prompt.length} characters`))).toBe(true);
+    expect(lines.some((line) => line.includes("Ottoline") || line.includes("lighthouse"))).toBe(false);
   });
 });

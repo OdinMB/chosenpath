@@ -30,10 +30,15 @@ function classifierAnswering(...answers: Array<ContentFilterVerdict | Error>) {
   return classify;
 }
 
+let logs: string[];
 beforeEach(() => {
-  // The filter logs every prompt and every failure; keep test output readable
-  jest.spyOn(console, "log").mockImplementation(() => undefined);
-  jest.spyOn(console, "error").mockImplementation(() => undefined);
+  // The filter logs every check and every failure; keep test output readable
+  logs = [];
+  const capture = (...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  };
+  jest.spyOn(console, "log").mockImplementation(capture);
+  jest.spyOn(console, "error").mockImplementation(capture);
 });
 
 afterEach(() => {
@@ -84,6 +89,16 @@ describe("ContentFilterService.isAppropriatePrompt", () => {
     for (const rule of PROHIBITED_CONTENT_RULES) {
       expect(filterPrompt).toContain(rule);
     }
+  });
+
+  it("logs the premise's length, never its text", async () => {
+    const premise = "A lighthouse keeper named Ottoline Brandvik hides a letter";
+    const filter = new ContentFilterService(classifierAnswering(ALLOWED));
+
+    await filter.isAppropriatePrompt(premise);
+
+    expect(logs.some((line) => line.includes(`prompt of ${premise.length} characters`))).toBe(true);
+    expect(logs.some((line) => line.includes("Ottoline") || line.includes("lighthouse"))).toBe(false);
   });
 });
 
@@ -144,6 +159,18 @@ describe("ContentFilterService.isAppropriateImageRequest", () => {
       (call) => call[0]
     );
     expect(withReferences).not.toEqual(withoutReferences);
+  });
+
+  it("logs the request's length and reference count, never its text", async () => {
+    const request = "a portrait of the innkeeper Ottoline Brandvik";
+    const filter = new ContentFilterService(classifierAnswering(ALLOWED));
+
+    await filter.isAppropriateImageRequest(request, 2);
+
+    expect(
+      logs.some((line) => line.includes(`request of ${request.length} characters with 2 reference image(s)`))
+    ).toBe(true);
+    expect(logs.some((line) => line.includes("Ottoline") || line.includes("innkeeper"))).toBe(false);
   });
 
   it("fails closed when every attempt fails", async () => {

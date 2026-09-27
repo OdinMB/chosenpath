@@ -20,6 +20,8 @@ The tests loop over the live list and check that every rule reaches every filter
 - AI Draft prompts (`POST /templates/generate`) and AI Iteration feedback (`POST /templates/:id/iterate`). These use the premise prompt: the rules, plus the older general-audience and copyright rules;
 - template-editor image requests (element image, identity portrait, cover), via `server/src/images/imageRequestScreening.ts`. These use the rules only, applied to the description plus the image-instruction text. The filter is told how many reference images come with the request; it cannot see them.
 
+The filter's log lines give the text's length (and an image request's reference count) and the verdict with the classifier's reason, never the text itself; the story request's own start line logs the story id and the premise's length.
+
 The classifier is `gpt-6-luna` at low reasoning effort (`CONTENT_FILTER_MODEL_*`, since 2026-09-27; it was gpt-4.1-mini), chosen after the filter check below.
 
 The filter fails closed. The classifier gets one retry. Each attempt is one LangChain call that itself retries at most twice (logged as `[LLM] retry`), times out after 15 s and stops at 2,000 output tokens, reasoning included (`productionCallLimits` in `server/src/shared/llm/chatModel.ts`). So the worst case is 2 attempts × 3 calls, about 90 s. A reply cut at the cap cannot parse, so it counts as a failed call; its retry line reads `"finishReason":"length"`. If both attempts fail, `ContentFilterUnavailableError` is thrown and nothing goes through:

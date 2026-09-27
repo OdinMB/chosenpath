@@ -147,12 +147,32 @@ describe("StoryCreationService setup status", () => {
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
 
-    // The request's own start line already quoted the premise before this fix; every
-    // line after it (the setup and its failure) stays free of it
-    const setupLines = logs.slice(from).filter((line) => !line.includes("Creating new story with prompt"));
+    const setupLines = logs.slice(from);
     const failureLines = setupLines.filter((line) => /fail/i.test(line));
     expect(failureLines.length).toBeGreaterThan(0);
     expect(setupLines.some((line) => line.includes("Ottoline") || line.includes("model gave up"))).toBe(false);
+  });
+
+  it("logs the request with the story id and the premise's length, never its text", async () => {
+    createInitialState.mockResolvedValue(startableState());
+    const service = new StoryCreationService();
+
+    const { storyId } = await create(service);
+
+    const startLines = logs.filter((line) => line.includes(`premise of ${PREMISE.length} characters`));
+    expect(startLines).toHaveLength(1);
+    expect(startLines[0]).toContain(storyId);
+    expect(logs.some((line) => line.includes("Ottoline") || line.includes("lighthouse"))).toBe(false);
+  });
+
+  it("logs a refused premise without its text", async () => {
+    isAppropriatePrompt.mockResolvedValue({ isAppropriate: false, reason: "Violence" });
+    const service = new StoryCreationService();
+
+    await create(service);
+
+    expect(logs.some((line) => line.includes(`premise of ${PREMISE.length} characters`))).toBe(true);
+    expect(logs.some((line) => line.includes("Ottoline") || line.includes("lighthouse"))).toBe(false);
   });
 
   it("keeps a story that is still being set up queued", async () => {

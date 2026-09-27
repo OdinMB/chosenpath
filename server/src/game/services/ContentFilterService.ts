@@ -149,7 +149,8 @@ export class ContentFilterService {
    * @throws ContentFilterUnavailableError when no verdict could be obtained
    */
   async isAppropriatePrompt(prompt: string): Promise<ContentCheck> {
-    Logger.Story.log("Checking if prompt is appropriate:", prompt);
+    // Lengths only: user-written text stays out of the logs
+    Logger.Story.log(`Checking a prompt of ${prompt.length} characters`);
     return this.classifyWithRetry(premiseFilterPrompt(prompt));
   }
 
@@ -162,7 +163,9 @@ export class ContentFilterService {
     request: string,
     referenceImageCount: number
   ): Promise<ContentCheck> {
-    Logger.Story.log("Checking if image request is appropriate:", request);
+    Logger.Story.log(
+      `Checking an image request of ${request.length} characters with ${referenceImageCount} reference image(s)`
+    );
     return this.classifyWithRetry(
       imageRequestFilterPrompt(request, referenceImageCount)
     );

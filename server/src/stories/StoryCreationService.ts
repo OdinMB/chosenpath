@@ -128,8 +128,10 @@ export class StoryCreationService {
     creatorId?: string,
     category?: StoryCategory
   ): Promise<void> {
+    // Logged by story id and length only: premise text stays out of the logs
+    const storyId = randomUUID();
     Logger.Route.log(
-      `Creating new story with prompt: "${prompt.substring(0, 50)}..."`
+      `Creating story ${storyId} from a premise of ${prompt.length} characters`
     );
 
     // Check if the prompt contains inappropriate content. The filter fails
@@ -145,7 +147,6 @@ export class StoryCreationService {
       return;
     }
 
-    const storyId = randomUUID();
     const playerCodes = this.generatePlayerCodes(playerCount);
     Logger.Route.log(
       `Generated story ID: ${storyId} with ${playerCount} player codes`
