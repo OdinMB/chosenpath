@@ -19,9 +19,15 @@ import {
   storyStateStartProblem,
   templateStartProblem,
 } from "core/utils/outcomeReadiness.js";
+import {
+  checkStoryStateBackgrounds,
+  describeBackgroundFixes,
+} from "core/utils/statValueCheck.js";
+import type { StoryStatusInfo } from "core/types/api.js";
 import { createStoryStateFromTemplate } from "../game/services/StoryStateFactory.js";
 import { withOneRetry } from "../game/services/retryOnce.js";
 import { storyRepository } from "./StoryRepository.js";
+import { setupStatusTracker } from "./setupStatus.js";
 import {
   sendSuccess,
   sendModerationBlocked,
@@ -171,7 +177,10 @@ export class StoryCreationService {
     });
     Logger.Route.log(`Registered game session and codes for story: ${storyId}`);
 
-    // Start story generation asynchronously
+    // Start story generation asynchronously; the client polls its status.
+    // generateStoryState records a failure itself; this catch is a guard,
+    // logging the story id only (errors can quote the premise).
+    setupStatusTracker.start(storyId);
     this.generateStoryState(
       storyId,
       prompt,
@@ -184,11 +193,9 @@ export class StoryCreationService {
       playerCodes,
       category
       // creatorId - currently unused
-    ).catch((error) => {
-      Logger.Route.error(
-        `Failed to generate story state for ${storyId}:`,
-        error
-      );
+    ).catch(() => {
+      setupStatusTracker.fail(storyId, "setup_failed");
+      Logger.Route.error(`Setup of story ${storyId} failed unexpectedly`);
     });
 
     Logger.Route.log(`Returning codes immediately for story: ${storyId}`);
@@ -219,7 +226,7 @@ export class StoryCreationService {
       // Create initial state. A setup the story can't start from (no
       // outcomes, or multiplayer without a shared one) is generated once more,
       // a fresh sample of the same request.
-      const storyState = await withOneRetry(
+      const generatedState = await withOneRetry(
         () =>
           this.aiStoryGenerator.createInitialState(
             storyId,
@@ -242,6 +249,17 @@ export class StoryCreationService {
         "story setup"
       );
       Logger.Route.log(`Generated initial state for story: ${storyId}`);
+
+      // The backgrounds' starting values, read by their stats' types before the setup is stored
+      const { state: storyState, fixed } =
+        checkStoryStateBackgrounds(generatedState);
+      if (fixed.length > 0) {
+        Logger.Route.log(
+          `Checked background values of story ${storyId}'s setup: ${describeBackgroundFixes(
+            fixed
+          )}`
+        );
+      }
 
       // --- DB Integration: Update title and AI-defined difficulty level ---
       // Ensure storyState.difficultyLevel is defined by AIStoryGenerator
@@ -312,8 +330,13 @@ export class StoryCreationService {
           );
         }
       }
-    } catch (error) {
-      Logger.Route.error(`Error generating story state for ${storyId}:`, error);
+      setupStatusTracker.finish(storyId);
+    } catch {
+      // Failed for good (the model call's own retries and the start-rule
+      // retry are behind this). The client's status poll now reports it.
+      // Logged with the story id only: the error can quote the premise.
+      setupStatusTracker.fail(storyId, "setup_failed");
+      Logger.Route.error(`Setup of story ${storyId} failed for good`);
       Logger.Route.log(`Cleaning up DB entries for failed story ${storyId}`);
       try {
         await storyDbService.deleteStoryWithPlayers(storyId);
@@ -327,7 +350,6 @@ export class StoryCreationService {
         );
       }
       // TODO: Consider deleting the story directory: await deleteStoryDirectory(storyId);
-      throw error; // Re-throw the original error
     }
   }
 
@@ -462,11 +484,16 @@ export class StoryCreationService {
     }
   }
 
-  async checkStoryStatus(storyId: string): Promise<"queued" | "ready"> {
+  /** A story's setup status for the client's polling (see setupStatus.ts). */
+  async checkStoryStatus(storyId: string): Promise<StoryStatusInfo> {
     const story = await storyRepository.getStory(storyId);
-    const status = story ? "ready" : "queued";
-    Logger.Route.log(`Story ${storyId} status: ${status}`);
-    return status;
+    const info = setupStatusTracker.statusOf(storyId, story !== null);
+    Logger.Route.log(
+      `Story ${storyId} status: ${info.status}${
+        info.reason ? ` (${info.reason})` : ""
+      }`
+    );
+    return info;
   }
 }
 

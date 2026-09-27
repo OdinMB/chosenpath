@@ -109,6 +109,22 @@ export interface CreateStoryInfo {
 }
 export interface CreateStoryResponse extends SuccessResponse<CreateStoryInfo> {}
 
+/** A story's setup: queued while it is generated, ready once stored, failed for good. */
+export type StoryCreationStatus = "queued" | "ready" | "failed";
+/**
+ * Why a setup failed for good: its generation failed after the retries
+ * ("setup_failed"), or this server is neither setting it up nor holds it,
+ * e.g. it restarted mid-setup ("setup_lost").
+ */
+export type StorySetupFailureReason = "setup_failed" | "setup_lost";
+export interface StoryStatusInfo {
+  status: StoryCreationStatus;
+  /** Set when the status is "failed". */
+  reason?: StorySetupFailureReason;
+}
+export interface CheckStoryStatusResponse
+  extends SuccessResponse<StoryStatusInfo> {}
+
 /**
  * User basics
  */

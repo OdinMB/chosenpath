@@ -435,11 +435,11 @@ Create a new story from a prompt.
 }
 ```
 
-Story is generated asynchronously. Client should poll `/stories/:id/status` to check when ready.
+Story is generated asynchronously. Client should poll `/stories/:id/status` until it is `ready` or `failed` (a setup that fails for good is reported there, not here).
 
 **Error Cases:**
 
-- `400`: The premise was blocked by content moderation
+- `400`: The premise was blocked by content moderation (checked before anything is queued, so a refusal never shows up as a failed setup)
 - `429`: Rate limit exceeded
 - `500`: Story creation failed, including when the content filter was unavailable (it fails closed)
 
@@ -500,7 +500,7 @@ Template-based stories are created synchronously and are ready immediately (no p
 
 **GET** `/stories/:id/status`
 
-Check the initialization status of a story.
+Check the setup status of a story (`StoryStatusInfo`, `core/types/api.ts`).
 
 **Path Params:**
 
@@ -516,11 +516,19 @@ Check the initialization status of a story.
 {
   success: true,
   data: {
-    status: "initializing" | "ready" | "error"
+    status: "queued" | "ready" | "failed",
+    reason?: "setup_failed" | "setup_lost"  // only with "failed"
   },
   requestId: string
 }
 ```
+
+- `ready`: the story's state is stored (template stories always are).
+- `queued`: this server is still generating the setup.
+- `failed` / `setup_failed`: the setup failed for good after the retries (the model call's own, and one more sample when the setup can't start); its DB entries are deleted.
+- `failed` / `setup_lost`: neither stored nor being set up here, e.g. the server restarted mid-setup. Setups live in the server process (`server/src/stories/setupStatus.ts`; failures kept for the latest 5,000 ids, older ones read as lost).
+
+The client (`useStoryCreation`, `page/hooks/storyStatusPolling.ts`) stops polling on `ready` or `failed`, and after three failed requests in a row; on a failure it shows "We couldn't create this story. Please try again." with Try again (the same request) and Back (the form).
 
 ---
 

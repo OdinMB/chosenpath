@@ -6,6 +6,7 @@ import {
 } from "core/types";
 import { TemplateImageManifest } from "core/types/api";
 import { templateStartProblem } from "core/utils/outcomeReadiness";
+import { checkStatValue, statValueFit } from "core/utils/statValueCheck";
 import { getPlayerSlots } from "core/utils/playerUtils";
 import { checkPlayerBackgroundConsistency } from "../hooks/useTemplateWarnings";
 
@@ -51,6 +52,9 @@ export const validateTemplateIntegrity = (
 
   // Validate player background consistency
   issues.push(...validatePlayerBackgroundConsistency(template));
+
+  // Validate that background values fit their stats' types
+  issues.push(...validateBackgroundValueTypes(template));
 
   // Validate that stories from this template can start
   issues.push(...validateOutcomeReadiness(template));
@@ -336,6 +340,65 @@ const validateStatReferences = (template: StoryTemplate): ValidationIssue[] => {
         });
       });
     }
+  });
+
+  return issues;
+};
+
+/**
+ * Validates that each background value fits its player stat's type, with
+ * the rule stories and the server apply (core/utils/statValueCheck.ts): a
+ * value that converts unambiguously becomes that value, anything else the
+ * stat's initial value. One warning per background. Unknown stat ids are left
+ * to validateStatReferences, and values for stats that aren't background
+ * stats to the orphaned-stat warning.
+ */
+const validateBackgroundValueTypes = (
+  template: StoryTemplate
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  const playerStatsById = new Map(
+    (template.playerStats ?? []).map((stat) => [stat.id, stat])
+  );
+  const shown = (value: unknown) => JSON.stringify(value) ?? String(value);
+
+  Object.entries(template).forEach(([key, playerOptions]) => {
+    if (
+      !key.startsWith("player") ||
+      typeof playerOptions !== "object" ||
+      playerOptions === null ||
+      !("possibleCharacterBackgrounds" in playerOptions)
+    ) {
+      return;
+    }
+    const { possibleCharacterBackgrounds } = playerOptions as {
+      possibleCharacterBackgrounds: CharacterBackground[];
+    };
+    (possibleCharacterBackgrounds ?? []).forEach((background) => {
+      const wrong = (background.initialPlayerStatValues ?? []).flatMap((sv) => {
+        const stat = playerStatsById.get(sv.statId);
+        if (!stat || statValueFit(stat, sv.value) === "fits") return [];
+        const result = checkStatValue(stat, sv.value);
+        return [
+          result.kind === "converted"
+            ? `${sv.statId} (${shown(sv.value)} becomes ${shown(result.value)})`
+            : `${sv.statId} (${shown(sv.value)} becomes the stat's initial value)`,
+        ];
+      });
+      if (wrong.length > 0) {
+        issues.push({
+          type: "warning",
+          category: "backgrounds",
+          message: `Background "${
+            background.title
+          }" in ${key} has stat values of the wrong type: ${wrong.join(
+            ", "
+          )}. They are corrected when the World is saved.`,
+          affectedItems: [background.title],
+          autoFixable: false,
+        });
+      }
+    });
   });
 
   return issues;

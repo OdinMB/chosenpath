@@ -8,6 +8,7 @@ import { ShareLink } from "shared/components/ShareLink";
 import { SetupAiNotice } from "shared/components/AiNotice";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
+import { StorySetupFailed } from "./StorySetupFailed";
 import { useStoryCreation } from "page/hooks/useStoryCreation";
 import { RateLimitNotification } from "client/shared/notifications/RateLimitNotification";
 import { RateLimitedResponse } from "core/types/api";
@@ -49,7 +50,10 @@ export function TemplateConfigurator() {
     storyId,
     playerCodes,
     storyReady,
+    setupFailed,
     createStoryFromTemplate,
+    retryStoryCreation,
+    resetStoryCreation,
     handleCodeSubmit,
   } = useStoryCreation();
 
@@ -161,6 +165,17 @@ export function TemplateConfigurator() {
   const handleBack = () => {
     navigate("/library");
   };
+
+  // Template stories are ready on creation; a setup that still fails later
+  // gets the same screen as a custom story
+  if (setupFailed) {
+    return (
+      <StorySetupFailed
+        onRetry={() => void retryStoryCreation()}
+        onBack={resetStoryCreation}
+      />
+    );
+  }
 
   if (storyId && playerCodes) {
     // PlayerCodes only needs basic template fields

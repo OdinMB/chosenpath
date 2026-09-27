@@ -7,7 +7,12 @@ import {
   Outcome,
   categoryFromTemplateTags,
 } from "core/types/index.js";
+import {
+  checkStoryStateBackgrounds,
+  describeBackgroundFixes,
+} from "core/utils/statValueCheck.js";
 import { loadTemplateImages } from "shared/storageUtils.js";
+import { Logger } from "shared/logger.js";
 
 /**
  * Creates a story state from a template with the given parameters
@@ -103,7 +108,19 @@ export function createStoryStateFromTemplate(
     );
   }
 
-  return storyState;
+  // Templates saved before the check (or imported as files) can hold
+  // background values of the wrong type; the story starts with them read by type
+  const { state: checkedState, fixed } =
+    checkStoryStateBackgrounds(storyState);
+  if (fixed.length > 0) {
+    Logger.Story.log(
+      `Checked background values of story ${gameId} from template ${
+        template.id
+      }: ${describeBackgroundFixes(fixed)}`
+    );
+  }
+
+  return checkedState;
 }
 
 /**

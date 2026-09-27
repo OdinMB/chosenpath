@@ -66,6 +66,57 @@ describe("PlayerManager.setCharacterSelection stat values", () => {
     expect(lines.some((line) => line.includes("player_cash"))).toBe(false);
   });
 
+  it("checks the background's values against their stats' types and drops unknown stat ids", () => {
+    const stats = [
+      stat("player_nerve", { partOfPlayerBackgrounds: true, initialValue: 40 }),
+      stat("player_rank", { type: "string", partOfPlayerBackgrounds: true, initialValue: "Novice" }),
+      stat("player_items", { type: "string[]", partOfPlayerBackgrounds: true, initialValue: [] }),
+    ];
+    expect(
+      selected(stats, [
+        { statId: "player_nerve", value: "70" },
+        { statId: "player_rank", value: 3 },
+        { statId: "player_items", value: "rope" },
+        { statId: "player_ghost", value: 5 },
+      ])
+    ).toEqual([
+      { statId: "player_nerve", value: 70 },
+      { statId: "player_rank", value: "Novice" },
+      { statId: "player_items", value: ["rope"] },
+    ]);
+  });
+
+  it("fills a background stat from its initial value read by type", () => {
+    const stats = [stat("player_nerve", { partOfPlayerBackgrounds: true, initialValue: "30" })];
+    expect(selected(stats, [])).toEqual([{ statId: "player_nerve", value: 30 }]);
+  });
+
+  it("logs the checked values once per selection with the story id, seat and counts, without stat ids", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    selected(
+      [stat("player_nerve", { partOfPlayerBackgrounds: true, initialValue: 40 })],
+      [
+        { statId: "player_nerve", value: "70" },
+        { statId: "player_ghost", value: 5 },
+      ]
+    );
+    const lines = log.mock.calls.map((call) => call.join(" ")).filter((line) => line.includes("converted"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("player1");
+    expect(lines[0]).toContain("1 converted, 1 dropped");
+    expect(lines[0]).not.toContain("player_nerve");
+    expect(lines[0]).not.toContain("player_ghost");
+  });
+
+  it("logs nothing about checks when every value fits", () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    selected([stat("player_nerve", { partOfPlayerBackgrounds: true, initialValue: 40 })], [
+      { statId: "player_nerve", value: 70 },
+    ]);
+    const lines = log.mock.calls.map((call) => call.join(" "));
+    expect(lines.some((line) => /converted|replaced|dropped/.test(line))).toBe(false);
+  });
+
   it("keeps the background's values and the universal stats as before", () => {
     const stats = [
       stat("player_nerve", { partOfPlayerBackgrounds: true, initialValue: 40 }),

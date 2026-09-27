@@ -146,8 +146,9 @@ router.get("/stories/:id/status", async (req, res) => {
   try {
     const storyId = req.params.id;
     Logger.Route.log(`Checking story status: ${storyId}`);
-    const status = await storyCreationService.checkStoryStatus(storyId);
-    sendSuccess(res, { status }, requestId);
+    // { status: "queued" | "ready" | "failed", reason? }
+    const statusInfo = await storyCreationService.checkStoryStatus(storyId);
+    sendSuccess(res, statusInfo, requestId);
   } catch (error) {
     Logger.Route.error(`Failed to check story status: ${req.params.id}`, error);
     sendError(res, "Failed to check story status", 500, requestId, error);

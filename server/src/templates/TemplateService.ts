@@ -13,6 +13,10 @@ import {
   Stat,
   TemplateIterationSections,
 } from "core/types/index.js";
+import {
+  checkTemplateBackgrounds,
+  describeBackgroundFixes,
+} from "core/utils/statValueCheck.js";
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
@@ -65,6 +69,23 @@ export class TemplateService {
         uuid: existing?.uuid || uuidv4() // Preserve existing UUID or generate new one
       };
     });
+  }
+
+  /**
+   * The template with each background value read by its stat's type (see
+   * core/utils/statValueCheck.ts), logged once with the template id and the
+   * counts per seat and background.
+   */
+  private withCheckedBackgroundValues(template: StoryTemplate): StoryTemplate {
+    const { template: checked, fixed } = checkTemplateBackgrounds(template);
+    if (fixed.length > 0) {
+      this.logger.log(
+        `Checked background values of template ${
+          template.id
+        }: ${describeBackgroundFixes(fixed)}`
+      );
+    }
+    return checked;
   }
 
   constructor() {
@@ -146,7 +167,7 @@ export class TemplateService {
 
     // Add player properties
     PLAYER_SLOTS.slice(0, MAX_PLAYERS).forEach((slot) => {
-      filledTemplate[slot as keyof StoryTemplate] = (baseTemplate[
+      (filledTemplate as Record<string, unknown>)[slot] = (baseTemplate[
         slot as keyof StoryTemplate
       ] as unknown as PlayerOptionsGeneration) || {
         outcomes: [],
@@ -364,9 +385,8 @@ export class TemplateService {
         template.id = uuidv4();
       }
 
-      const fullTemplate: StoryTemplate = this.createFullTemplateObject(
-        template,
-        userPermissions
+      const fullTemplate: StoryTemplate = this.withCheckedBackgroundValues(
+        this.createFullTemplateObject(template, userPermissions)
       );
 
       // Set creator information on creation
@@ -471,9 +491,8 @@ export class TemplateService {
         // Template doesn't exist, create it (inline to avoid circular dependency)
         this.logger.log(`Template ${template.id} doesn't exist, creating new`);
 
-        const fullTemplate: StoryTemplate = this.createFullTemplateObject(
-          template,
-          userPermissions
+        const fullTemplate: StoryTemplate = this.withCheckedBackgroundValues(
+          this.createFullTemplateObject(template, userPermissions)
         );
 
         // Set creator information on creation
@@ -562,12 +581,13 @@ export class TemplateService {
         throw new Error(`Template with ID ${id} not found`);
       }
 
-      // Merge existing data with the updates
-      const mergedTemplate: StoryTemplate = {
+      // Merge existing data with the updates, then check the backgrounds
+      // against the stats the template holds after the update
+      const mergedTemplate: StoryTemplate = this.withCheckedBackgroundValues({
         ...existingTemplate,
         ...template,
         updatedAt: new Date().toISOString(),
-      };
+      });
 
       // Handle creator information on update
       if (currentUserId) {

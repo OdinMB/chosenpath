@@ -12,6 +12,12 @@ import {
   removeCodeSetFromStorage,
 } from "../../shared/utils/codeSetUtils";
 import { useSession } from "../../shared/session/useSession";
+import { pollStoryStatus } from "./storyStatusPolling";
+
+/** The last creation request, so a failed setup can be tried again as sent. */
+type CreationRequest =
+  | { kind: "prompt"; data: CreateStoryRequest }
+  | { kind: "template"; data: CreateStoryFromTemplateRequest };
 
 export function useStoryCreation() {
   const navigate = useNavigate();
@@ -22,7 +28,13 @@ export function useStoryCreation() {
     null
   );
   const [storyReady, setStoryReady] = useState(false);
+  // The setup failed for good: the screen shows the failure, not the codes
+  const [setupFailed, setSetupFailed] = useState(false);
   const pollingStartTimeRef = useRef<number | null>(null);
+  // Each attempt polls under its own number; a newer attempt (or leaving the
+  // page) cancels the older poll
+  const pollAttemptRef = useRef(0);
+  const lastRequestRef = useRef<CreationRequest | null>(null);
 
   // Clear polling start time when component unmounts or when story becomes ready
   useEffect(() => {
@@ -30,6 +42,13 @@ export function useStoryCreation() {
       pollingStartTimeRef.current = null;
     }
   }, [storyReady]);
+
+  // Stop polling when the component unmounts
+  useEffect(() => {
+    return () => {
+      pollAttemptRef.current += 1;
+    };
+  }, []);
 
   const getPollingInterval = () => {
     if (pollingStartTimeRef.current === null) {
@@ -67,6 +86,58 @@ export function useStoryCreation() {
     // Logger.App.log("Redirected to / after story creation failure.");
   };
 
+  /** Clears the last attempt (and stops its poll), back to the form. */
+  const resetStoryCreation = () => {
+    pollAttemptRef.current += 1;
+    pollingStartTimeRef.current = null;
+    setStoryId(null);
+    setPlayerCodes(null);
+    setStoryReady(false);
+    setSetupFailed(false);
+    setIsLoading(false);
+  };
+
+  /** Polls a queued story until it is ready or its setup failed for good. */
+  const pollUntilReady = (storyData: CreateStoryInfo) => {
+    const attempt = ++pollAttemptRef.current;
+    const codes = Object.values(storyData.codes);
+    Logger.App.log(
+      `Story ${storyData.storyId} status is ${storyData.status}. Polling...`
+    );
+    void pollStoryStatus({
+      check: () => storyApi.checkStoryStatus(storyData.storyId),
+      schedule: (next, delayMs) => {
+        Logger.App.log(
+          `Story ${storyData.storyId} is not ready yet, will check again in ${
+            delayMs / 1000
+          }s`
+        );
+        setTimeout(next, delayMs);
+      },
+      delayFor: getPollingInterval,
+      isCancelled: () => attempt !== pollAttemptRef.current,
+      onReady: () => {
+        Logger.App.log(`Story ${storyData.storyId} is ready`);
+        setStoryReady(true);
+        setIsLoading(false);
+        pollingStartTimeRef.current = null;
+      },
+      onFailed: (reason) => {
+        Logger.App.warn(
+          `Setup of story ${storyData.storyId} failed (${reason})`
+        );
+        setSetupFailed(true);
+        setIsLoading(false);
+        pollingStartTimeRef.current = null;
+        // The story never came to be, so its codes lead nowhere
+        if (codes.length > 0) {
+          removeCodeSetFromStorage(codes);
+          refreshStoredCodeSets();
+        }
+      },
+    });
+  };
+
   // This is the common success handler used by createStory (prompt-based)
   // createStoryFromTemplate now has its own explicit logic as per user revert.
   const handleStoryDataResponse = (storyData: CreateStoryInfo) => {
@@ -90,49 +161,14 @@ export function useStoryCreation() {
       setIsLoading(false);
       pollingStartTimeRef.current = null;
     } else {
-      Logger.App.log(
-        `Story ${storyData.storyId} status is ${storyData.status}. Polling...`
-      );
-      const checkStatus = async () => {
-        try {
-          Logger.App.log(`Polling status for story: ${storyData.storyId}`);
-          const statusResult = await storyApi.checkStoryStatus(
-            storyData.storyId
-          );
-          if (statusResult.status === "ready") {
-            Logger.App.log(`Story ${storyData.storyId} is ready`);
-            setStoryReady(true);
-            setIsLoading(false);
-            pollingStartTimeRef.current = null;
-          } else {
-            const interval = getPollingInterval();
-            Logger.App.log(
-              `Story ${storyData.storyId} is still ${
-                statusResult.status
-              }, will check again in ${interval / 1000}s`
-            );
-            if (!storyReady) {
-              setTimeout(checkStatus, interval);
-            }
-          }
-        } catch (pollError) {
-          Logger.App.error(
-            `Failed to poll story status for ${storyData.storyId}:`,
-            pollError
-          );
-          setIsLoading(false);
-          pollingStartTimeRef.current = null;
-        }
-      };
-      if (!storyReady) {
-        checkStatus();
-      }
+      pollUntilReady(storyData);
     }
   };
 
   const createStory = async (
     data: CreateStoryRequest
   ): Promise<CreateStoryInfo | undefined> => {
+    lastRequestRef.current = { kind: "prompt", data };
     setIsLoading(true);
     pollingStartTimeRef.current = null;
     Logger.App.log("Starting story creation process (prompt-based)");
@@ -154,6 +190,7 @@ export function useStoryCreation() {
   const createStoryFromTemplate = async (
     data: CreateStoryFromTemplateRequest
   ): Promise<CreateStoryInfo | undefined> => {
+    lastRequestRef.current = { kind: "template", data };
     setIsLoading(true);
     pollingStartTimeRef.current = null;
     Logger.App.log("Starting template story creation process (template-based)");
@@ -194,53 +231,29 @@ export function useStoryCreation() {
         setIsLoading(false); // Stop loading if ready
         pollingStartTimeRef.current = null;
       } else {
-        Logger.App.warn(
-          `Template story ${responseData.storyId} has status ${responseData.status}. Polling...`
-        );
-        const checkStatus = async () => {
-          try {
-            Logger.App.log(
-              `Polling status for template story: ${responseData.storyId}`
-            );
-            const statusResult = await storyApi.checkStoryStatus(
-              responseData.storyId
-            );
-            if (statusResult.status === "ready") {
-              Logger.App.log(`Template story ${responseData.storyId} is ready`);
-              setStoryReady(true);
-              setIsLoading(false); // Stop loading once polling confirms ready
-              pollingStartTimeRef.current = null;
-            } else {
-              const interval = getPollingInterval();
-              Logger.App.log(
-                `Template story ${responseData.storyId} is still ${
-                  statusResult.status
-                }, will check again in ${interval / 1000}s`
-              );
-              if (!storyReady) {
-                // Continue polling only if not ready
-                setTimeout(checkStatus, interval);
-              }
-            }
-          } catch (pollError) {
-            Logger.App.error(
-              "Failed to poll story status for template during polling:",
-              pollError
-            );
-            setIsLoading(false); // Stop loading on polling error
-            pollingStartTimeRef.current = null;
-          }
-        };
-        if (!storyReady) {
-          // Start polling if not immediately ready
-          checkStatus();
-        }
+        // Template stories are created before the response; poll just in case
+        pollUntilReady(responseData);
       }
       return responseData;
     } catch (error) {
       handleError(error, tempCodesForCleanup); // Pass the string[] for cleanup
       return undefined;
     }
+  };
+
+  /**
+   * Sends the last request again (same premise or template, same settings).
+   * It goes through the same checks as the first: a moderation refusal or a
+   * rate limit shows its own notification and leaves the player on the form.
+   */
+  const retryStoryCreation = async (): Promise<CreateStoryInfo | undefined> => {
+    const last = lastRequestRef.current;
+    resetStoryCreation();
+    if (!last) return undefined;
+    Logger.App.log("Trying the story setup again");
+    return last.kind === "prompt"
+      ? createStory(last.data)
+      : createStoryFromTemplate(last.data);
   };
 
   const handleCodeSubmit = (code: string) => {
@@ -253,8 +266,11 @@ export function useStoryCreation() {
     storyId,
     playerCodes,
     storyReady,
+    setupFailed,
     createStory,
     createStoryFromTemplate,
+    retryStoryCreation,
+    resetStoryCreation,
     handleCodeSubmit,
   };
 }

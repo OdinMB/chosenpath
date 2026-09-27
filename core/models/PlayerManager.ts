@@ -11,6 +11,11 @@ import {
   CharacterIdentity,
 } from "../types/index.js";
 import { replacePronounPlaceholders } from "../utils/playerUtils.js";
+import {
+  checkBackgroundStatValues,
+  countStatValueFixes,
+  fallbackStatValue,
+} from "../utils/statValueCheck.js";
 
 /**
  * Manages all player-related operations for Story class
@@ -286,15 +291,23 @@ export class PlayerManager {
       return state;
     }
 
-    // Initial player stats: background stats + player stats that are not part of backgrounds
-    // Create a copy to avoid mutating the original background object
+    // Initial player stats: background stats + player stats that are not part of backgrounds.
+    // The background's values are checked against their stats' types first
+    // (a copy, so the background object is not mutated).
+    const checked = checkBackgroundStatValues(
+      state.playerStats,
+      background.initialPlayerStatValues
+    );
+    if (checked.fixes.length > 0) {
+      console.log(
+        `[PlayerManager] Checked ${playerSlot}'s background values in story ${
+          state.id
+        } against their stats: ${countStatValueFixes(checked.fixes)}`
+      );
+    }
     const backgroundStatValues: StatValueEntry[] = [
-      ...background.initialPlayerStatValues,
-      ...this.missingBackgroundStatValues(
-        state,
-        playerSlot,
-        background.initialPlayerStatValues
-      ),
+      ...checked.values,
+      ...this.missingBackgroundStatValues(state, playerSlot, checked.values),
     ];
     const universalStatValues = state.playerStats
       .filter((stat) => stat.partOfPlayerBackgrounds === false)
@@ -401,8 +414,8 @@ export class PlayerManager {
 
   /**
    * Values for the background stats a background leaves out, so every player
-   * stat has a value: the stat's initialValue, or the template editor's
-   * default for its type when that is missing too.
+   * stat has a value: the stat's initialValue read by its type, or the
+   * template editor's default for its type when that is missing or doesn't fit.
    */
   private missingBackgroundStatValues(
     state: StoryState,
@@ -418,14 +431,7 @@ export class PlayerManager {
       .map(
         (stat): StatValueEntry => ({
           statId: stat.id,
-          value:
-            stat.initialValue !== undefined && stat.initialValue !== null
-              ? stat.initialValue
-              : stat.type === "string"
-              ? ""
-              : stat.type === "string[]"
-              ? []
-              : 50,
+          value: fallbackStatValue(stat),
         })
       );
     if (missing.length > 0) {

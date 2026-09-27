@@ -1,5 +1,5 @@
 import { StoryInitializer } from "../../../src/page/components/StoryInitializer";
-import { notesIn, renderMarkup } from "../../helpers/staticMarkup";
+import { accessibleText, notesIn, renderMarkup } from "../../helpers/staticMarkup";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../src/config", () =>
@@ -18,15 +18,20 @@ jest.mock("react-router-dom", () => ({
   useNavigate: () => jest.fn(),
   useSearchParams: () => [new URLSearchParams(mockSearch), jest.fn()],
 }));
+const IDLE_CREATION = {
+  isLoading: false,
+  storyId: null as string | null,
+  playerCodes: null as Record<string, string> | null,
+  storyReady: false,
+  setupFailed: false,
+  createStory: jest.fn(),
+  retryStoryCreation: jest.fn(),
+  resetStoryCreation: jest.fn(),
+  handleCodeSubmit: jest.fn(),
+};
+let mockCreation = IDLE_CREATION;
 jest.mock("../../../src/page/hooks/useStoryCreation", () => ({
-  useStoryCreation: () => ({
-    isLoading: false,
-    storyId: null,
-    playerCodes: null,
-    storyReady: false,
-    createStory: jest.fn(),
-    handleCodeSubmit: jest.fn(),
-  }),
+  useStoryCreation: () => mockCreation,
 }));
 jest.mock("../../../src/shared/auth/useAuth", () => ({
   useAuth: () => ({ user: null }),
@@ -75,5 +80,40 @@ describe("StoryInitializer AI notice", () => {
 
   it("leaves template mode to the labelled AI Worldbuilding Assistant", () => {
     expect(notesIn(renderSetupStep3(true))).toEqual([]);
+  });
+});
+
+describe("StoryInitializer after a setup", () => {
+  afterEach(() => {
+    mockCreation = IDLE_CREATION;
+  });
+
+  const CODES = { player1: "ABC123", player2: "DEF456" };
+
+  it("replaces the waiting screen with the failure message when the setup failed", () => {
+    mockCreation = { ...IDLE_CREATION, storyId: "story-1", playerCodes: CODES, setupFailed: true };
+
+    const text = accessibleText(renderSetupStep3(false));
+
+    expect(text).toContain("We couldn't create this story. Please try again.");
+    expect(text).toContain("Try again");
+    expect(text).not.toContain("ABC123");
+    expect(text).not.toContain("Waiting");
+  });
+
+  it("still shows the codes while the story is being created", () => {
+    mockCreation = { ...IDLE_CREATION, storyId: "story-1", playerCodes: CODES };
+
+    const text = accessibleText(renderSetupStep3(false));
+
+    expect(text).toContain("ABC123");
+    expect(text).not.toContain("We couldn't create this story");
+  });
+
+  it("shows the setup form, not the failure message, when the request itself was refused (e.g. by moderation)", () => {
+    const text = accessibleText(renderSetupStep3(false));
+
+    expect(text).toContain("Create Story");
+    expect(text).not.toContain("We couldn't create this story");
   });
 });

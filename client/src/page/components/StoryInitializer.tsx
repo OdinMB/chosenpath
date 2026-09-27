@@ -10,6 +10,7 @@ import {
 } from "components/ui";
 import { Logger } from "shared/logger";
 import { PlayerCodes } from "./PlayerCodes";
+import { StorySetupFailed } from "./StorySetupFailed";
 import {
   MIN_PLAYERS,
   MAX_PLAYERS,
@@ -327,7 +328,10 @@ export const StoryInitializer = ({
     storyId,
     playerCodes,
     storyReady,
+    setupFailed,
     createStory,
+    retryStoryCreation,
+    resetStoryCreation,
     handleCodeSubmit,
   } = useStoryCreation();
 
@@ -701,6 +705,17 @@ export const StoryInitializer = ({
   // Don't show GenerationProgress in renderStep3 if we already have codes (PlayerCodes will handle it)
   const showGenerationProgress =
     (currentIsLoading || debugShowProgress) && !(storyId && playerCodes);
+
+  // The setup failed for good: try the same premise and settings again, or go
+  // back to the form (which still holds them)
+  if (setupFailed) {
+    return (
+      <StorySetupFailed
+        onRetry={() => void retryStoryCreation()}
+        onBack={resetStoryCreation}
+      />
+    );
+  }
 
   if (storyId && playerCodes) {
     return (

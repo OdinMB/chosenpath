@@ -18,6 +18,8 @@ import {
   UpdateStoryStatusRequest,
   UpdateStoryStatusResponse,
   LinkStoryToUserResponse,
+  CheckStoryStatusResponse,
+  StoryStatusInfo,
 } from "core/types/api";
 import { Logger } from "./logger";
 import {
@@ -395,12 +397,10 @@ export const storyApi = {
   },
 
   /**
-   * Check story status
+   * Check a story's setup status: queued, ready, or failed for good (with a reason)
    */
-  checkStoryStatus: async (
-    storyId: string
-  ): Promise<{ status: "queued" | "ready" }> => {
-    return apiClient.get<{ status: "queued" | "ready" }>(
+  checkStoryStatus: async (storyId: string): Promise<StoryStatusInfo> => {
+    return apiClient.get<CheckStoryStatusResponse["data"]>(
       `/stories/${storyId}/status`
     );
   },

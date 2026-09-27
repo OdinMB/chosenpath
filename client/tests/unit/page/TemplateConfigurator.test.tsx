@@ -1,7 +1,7 @@
 import { GameModes, PublicationStatus } from "core/types";
 import type { TemplateMetadata } from "core/types";
 import { TemplateConfigurator } from "../../../src/page/components/TemplateConfigurator";
-import { notesIn, renderMarkup } from "../../helpers/staticMarkup";
+import { accessibleText, notesIn, renderMarkup } from "../../helpers/staticMarkup";
 
 // The real config reads import.meta.env, which Jest cannot parse
 jest.mock("../../../src/config", () =>
@@ -37,15 +37,20 @@ jest.mock("react-router-dom", () => ({
   useNavigate: () => jest.fn(),
   useLoaderData: () => ({ template: TEMPLATE }),
 }));
+const IDLE_CREATION = {
+  isLoading: false,
+  storyId: null as string | null,
+  playerCodes: null as Record<string, string> | null,
+  storyReady: false,
+  setupFailed: false,
+  createStoryFromTemplate: jest.fn(),
+  retryStoryCreation: jest.fn(),
+  resetStoryCreation: jest.fn(),
+  handleCodeSubmit: jest.fn(),
+};
+let mockCreation = IDLE_CREATION;
 jest.mock("../../../src/page/hooks/useStoryCreation", () => ({
-  useStoryCreation: () => ({
-    isLoading: false,
-    storyId: null,
-    playerCodes: null,
-    storyReady: false,
-    createStoryFromTemplate: jest.fn(),
-    handleCodeSubmit: jest.fn(),
-  }),
+  useStoryCreation: () => mockCreation,
 }));
 
 describe("TemplateConfigurator AI notice", () => {
@@ -67,5 +72,20 @@ describe("TemplateConfigurator AI notice", () => {
       .replace(/<p[\s\S]*?<\/p>/, "");
     expect(afterNote).toMatch(/^<div[^>]*><button[^>]*>[\s\S]*?Back/);
     expect(afterNote).toContain("Start Story");
+  });
+});
+
+describe("TemplateConfigurator after a setup", () => {
+  afterEach(() => {
+    mockCreation = IDLE_CREATION;
+  });
+
+  it("shows the failure message instead of the codes when the story couldn't be set up", () => {
+    mockCreation = { ...IDLE_CREATION, storyId: "story-1", playerCodes: { player1: "ABC123" }, setupFailed: true };
+
+    const text = accessibleText(renderMarkup(<TemplateConfigurator />));
+
+    expect(text).toContain("We couldn't create this story. Please try again.");
+    expect(text).not.toContain("ABC123");
   });
 });
