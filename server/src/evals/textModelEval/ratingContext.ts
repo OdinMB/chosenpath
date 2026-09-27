@@ -6,8 +6,10 @@ import { field, list, strings, text } from "./ratingContent.js";
  * The background shown above a turn's options, the same for every option of
  * an item: the chapter the turn belongs to (the owner's word for the thread
  * or switch), with the outcome it advances, its plan and the current step
- * marked; every outcome with its milestones; what happened just before; the
- * story so far, chapter by chapter; and the story's world.
+ * marked, and a chapter that just ended with every step's result; every
+ * outcome with its milestones, marked where this turn adds a milestone or
+ * the chapter works toward it; what happened just before; the story so far,
+ * chapter by chapter; and the story's world and rules for chapters.
  *
  * It reads the state the beat call saw: the frozen case state with the
  * case's fixed analysis appended, as caseStory does. The pages show isolated
@@ -51,7 +53,7 @@ export const CONTEXT_LABELS = {
   question: "Question",
   directions: "Directions offered",
   mustResolve: "Must resolve",
-  milestone: "Milestone",
+  plannedMilestone: "Planned milestone",
   character: "Character",
   sharedOutcomes: "Shared outcomes",
   previousBeat: "Previous beat",
@@ -62,6 +64,10 @@ export const CONTEXT_LABELS = {
   rules: "World rules",
   tone: "Tone",
   conflicts: "Conflicts",
+  chapterRules: "Chapter rules",
+  noOutcomes: "The story holds no outcomes.",
+  noIntroduction: "The story has no introduction.",
+  noName: "no name in the story",
   of: "of",
   turns: "turns",
   switch: "switch",
@@ -82,6 +88,7 @@ export const CONTEXT_LABELS = {
   samePlan: "Planned for this turn; every version below was written from the same plan.",
   markCurrent: "current step",
   markAdvances: "this chapter advances it",
+  markDue: "gets a milestone this turn",
   favorable: "Favorable",
   mixed: "Mixed",
   unfavorable: "Unfavorable",
@@ -99,10 +106,14 @@ export const CONTEXT_LABELS = {
 
 const L = CONTEXT_LABELS;
 
-/** A line to mark: the plan's current step, or an outcome the current chapter advances. */
-export type ContextMark = "current" | "advances";
+/**
+ * A line to mark: the plan's current step, an outcome that gets a milestone
+ * this turn (from the chapter that just ended), or an outcome the current
+ * chapter advances.
+ */
+export type ContextMark = "current" | "due" | "advances";
 
-export const MARK_TEXT: Record<ContextMark, string> = { current: L.markCurrent, advances: L.markAdvances };
+export const MARK_TEXT: Record<ContextMark, string> = { current: L.markCurrent, due: L.markDue, advances: L.markAdvances };
 
 export type ContextLine = {
   /** Fixed text (from CONTEXT_LABELS, perhaps with a number) */
@@ -110,7 +121,8 @@ export type ContextLine = {
   text?: string;
   /** An outcome's id, shown small so a direction's "(id)" can be matched */
   id?: string;
-  mark?: ContextMark;
+  /** One badge each, in order */
+  marks?: ContextMark[];
   sub?: ContextLine[];
 };
 
@@ -138,8 +150,10 @@ type View = {
   beatType: BeatType;
   players: [string, unknown][];
   multiplayer: boolean;
-  /** Shared first, then each player's, as the game looks them up (getOutcomeById) */
+  /** Shared first, then each player's, as the game looks them up (getOutcomeById); a repeated id only once */
   outcomes: OutcomeRef[];
+  /** The state has outcome lists at all, even empty ones */
+  holdsOutcomes: boolean;
   /** An analysis ran for this turn: the case's fixed analysis */
   planned: boolean;
 };
@@ -181,10 +195,19 @@ function viewOf(state: StoryState, fixed?: FixedAnalysis): View {
     owner,
     slot,
   });
+  // A shared outcome may be copied into every player's list; milestones land on the shared one (ChangeService)
+  const seen = new Set<string>();
   const outcomes = [
     ...list(field(state, "sharedOutcomes")).map((o) => ref(o, L.allPlayers)),
     ...players.flatMap(([slot, player]) => list(field(player, "outcomes")).map((o) => ref(o, nameOf(player, slot), slot))),
-  ].filter((r) => r.id || r.question);
+  ]
+    .filter((r) => r.id || r.question)
+    .filter((r) => {
+      if (!r.id) return true;
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
   return {
     state,
     phases,
@@ -194,6 +217,7 @@ function viewOf(state: StoryState, fixed?: FixedAnalysis): View {
     players,
     multiplayer: players.length > 1,
     outcomes,
+    holdsOutcomes: Array.isArray(field(state, "sharedOutcomes")) || players.some(([, player]) => Array.isArray(field(player, "outcomes"))),
     planned: fixed !== undefined,
   };
 }
@@ -261,10 +285,16 @@ function outcomeDetail(view: View, ref: OutcomeRef, show: { milestones: boolean;
   ]);
 }
 
+/** An outcome named by id under a label: its question, or the id and a note when the story does not hold it. */
+function outcomeRefLine(view: View, label: string, id: string): ContextLine {
+  const ref = view.outcomes.find((r) => r.id === id);
+  return ref ? { label, ...outcomeName(ref) } : { label, text: id, sub: [{ text: L.notAnOutcome }] };
+}
+
 function advancesLine(view: View, id: string, milestones: boolean): ContextLine | undefined {
   if (!id) return undefined;
   const ref = view.outcomes.find((r) => r.id === id);
-  if (!ref) return { label: L.advances, text: id, sub: [{ text: L.notAnOutcome }] };
+  if (!ref) return outcomeRefLine(view, L.advances, id);
   return { label: L.advances, ...outcomeName(ref), sub: outcomeDetail(view, ref, { milestones }) };
 }
 
@@ -291,7 +321,7 @@ function stepLine(step: unknown, index: number, current: number | undefined): Co
   if (resolution) {
     return { ...base, sub: [{ label: L.result, text: present([resultWord(resolution), text(field(resolutions, resolution))]).join(" — ") }] };
   }
-  return index === current ? { ...base, mark: "current", sub: resultLines(resolutions) } : base;
+  return index === current ? { ...base, marks: ["current"], sub: resultLines(resolutions) } : base;
 }
 
 function threadChapter(view: View, thread: unknown, duration: number | undefined): ContextLine {
@@ -318,9 +348,19 @@ function threadChapter(view: View, thread: unknown, duration: number | undefined
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Outcomes a topic direction names by id, e.g. "… (player1_expose_waste_ring)". */
-const named = (view: View, choice: string) =>
-  view.outcomes.filter((r) => r.id && new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(r.id)}(?![A-Za-z0-9_])`).test(choice));
+/** An id-like word, e.g. player1_expose_waste_ring: it holds an underscore, so "(optional)" is not one. */
+const ID_WORD = /^[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+$/;
+
+/**
+ * Outcome ids a topic direction names, e.g. "… (player1_expose_waste_ring)":
+ * the story's outcomes it mentions, then any other id-like word in
+ * parentheses, which the story does not hold.
+ */
+function named(view: View, choice: string): string[] {
+  const known = view.outcomes.filter((r) => r.id && new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(r.id)}(?![A-Za-z0-9_])`).test(choice)).map((r) => r.id);
+  const bracketed = [...choice.matchAll(/\(([^()]*)\)/g)].flatMap((m) => m[1].split(/[\s,;]+/)).filter((word) => ID_WORD.test(word));
+  return [...new Set([...known, ...bracketed])];
+}
 
 function switchChapter(view: View, sw: unknown): ContextLine {
   const type = text(field(sw, "type"));
@@ -336,7 +376,7 @@ function switchChapter(view: View, sw: unknown): ContextLine {
       choices.length
         ? {
             label: L.directions,
-            sub: choices.map((choice) => ({ text: choice, sub: present(named(view, choice).map((ref) => advancesLine(view, ref.id, false))) })),
+            sub: choices.map((choice) => ({ text: choice, sub: present(named(view, choice).map((id) => advancesLine(view, id, false))) })),
           }
         : undefined,
     ]),
@@ -353,17 +393,28 @@ function endedThreads(view: View): unknown[] {
   return isThreadPhase(before) ? threadsOf(before) : [];
 }
 
+/** Outcomes that get a milestone this turn: those of the threads that just ended. */
+const dueOutcomes = (view: View) => new Set(endedThreads(view).map((t) => text(field(t, "outcomeId"))).filter(Boolean));
+
+/**
+ * The thread that just ended, as the beat prompt shows it (PREVIOUS THREAD
+ * CONFIGURATION): its result, the milestone due and its outcome, then every
+ * step with its result, the last of which this beat narrates.
+ */
 function endedLine(view: View, thread: unknown): ContextLine {
   const outcomeId = text(field(thread, "outcomeId"));
-  const ref = view.outcomes.find((r) => r.id === outcomeId);
+  const known = view.outcomes.some((r) => r.id === outcomeId);
   const resolution = text(field(thread, "resolution"));
+  const steps = list(field(thread, "progression"));
   return {
     label: L.justEnded,
     text: text(field(thread, "title")),
     sub: present([
       resolution ? { label: L.result, text: resultWord(resolution) } : undefined,
       line(L.milestoneDue, field(thread, "milestone")),
-      outcomeId ? { label: L.forOutcome, ...(ref ? outcomeName(ref) : { text: outcomeId }) } : undefined,
+      outcomeId ? { ...outcomeRefLine(view, L.forOutcome, outcomeId), ...(known ? { marks: ["due" as const] } : {}) } : undefined,
+      line(L.type, threadType(thread)),
+      steps.length ? { label: L.plan, sub: steps.map((step, i) => stepLine(step, i, undefined)) } : undefined,
     ]),
   };
 }
@@ -415,17 +466,18 @@ function advancing(view: View): Set<string> {
 }
 
 function outcomesSection(view: View): ContextSection {
-  const marked = advancing(view);
-  const outcomeLine = (ref: OutcomeRef): ContextLine => ({
-    ...outcomeName(ref),
-    mark: marked.has(ref.id) ? "advances" : undefined,
-    sub: present([milestonesLine(ref.outcome)]),
-  });
+  const due = dueOutcomes(view);
+  const advanced = advancing(view);
+  const outcomeLine = (ref: OutcomeRef): ContextLine => {
+    const marks = present<ContextMark>([due.has(ref.id) && "due", advanced.has(ref.id) && "advances"]);
+    return { ...outcomeName(ref), ...(marks.length ? { marks } : {}), sub: present([milestonesLine(ref.outcome)]) };
+  };
   const shared = view.outcomes.filter((r) => r.slot === undefined);
   return {
     key: "outcomes",
     heading: L.outcomes,
-    lines: [],
+    // Lists that are there but empty are worth saying: the rater then knows no outcome can progress
+    lines: view.holdsOutcomes && view.outcomes.length === 0 ? [L.noOutcomes] : [],
     entries: present([
       shared.length ? { label: L.sharedOutcomes, sub: shared.map(outcomeLine) } : undefined,
       ...view.players.map(([slot, player]) => {
@@ -451,12 +503,17 @@ function statLines(state: StoryState, player: unknown): string[] {
   return [...shared, ...own].filter((l) => !l.endsWith(": ") && !l.startsWith(": "));
 }
 
+/** The text of the option a beat's player chose, "" when none was. */
+function chosenText(beat: unknown): string {
+  const choice = field(beat, "choice");
+  return typeof choice === "number" && choice >= 0 ? text(field(list(field(beat, "options"))[choice], "text")) : "";
+}
+
 /** What happened just before, per player: the previous beat, the chosen option and its result, the relevant stats. */
 function beforeSections(view: View): ContextSection[] {
   return view.players.map(([slot, player], index) => {
     const beat = list(field(player, "beatHistory"))[view.turn - 1];
-    const choice = field(beat, "choice");
-    const chosen = typeof choice === "number" && choice >= 0 ? text(field(list(field(beat, "options"))[choice], "text")) : "";
+    const chosen = chosenText(beat);
     const result = OUTCOME_WORDS.get(text(field(beat, "resolution")));
     return {
       key: view.multiplayer ? `before.${slot}` : "before",
@@ -473,14 +530,17 @@ function beforeSections(view: View): ContextSection[] {
   });
 }
 
+/** The introduction and chosen characters, as before; an introduction or name the state holds empty is said to be missing. */
 function firstTurnSections(view: View): ContextSection[] {
   const intro = field(view.state, "characterSelectionIntroduction");
+  const introLines = present([text(field(intro, "title")), text(field(intro, "text"))]);
+  const held = Boolean(intro) && typeof intro === "object";
   return [
-    { key: "introduction", heading: L.introduction, lines: present([text(field(intro, "title")), text(field(intro, "text"))]) },
+    { key: "introduction", heading: L.introduction, lines: introLines.length || !held ? introLines : [L.noIntroduction] },
     {
       key: "characters",
       heading: L.chosenCharacters,
-      lines: view.players.map(([slot, p]) => `${slot}: ${text(field(p, "name"))}${text(field(p, "fluff")) ? `, ${text(field(p, "fluff"))}` : ""}`),
+      lines: view.players.map(([slot, p]) => `${slot}: ${text(field(p, "name")) || L.noName}${text(field(p, "fluff")) ? `, ${text(field(p, "fluff"))}` : ""}`),
     },
   ];
 }
@@ -490,38 +550,61 @@ function chapterTitle(phase: unknown): string {
   return strings(parts.map((part) => field(part, "title"))).join(" / ");
 }
 
-function threadFacts(thread: unknown): ContextLine[] {
+/**
+ * A past thread's type, outcome, result and milestone. The milestone is the
+ * plan's wording for the result; the beat after it wrote the outcome's own,
+ * more specific milestone, which the Outcomes fold lists.
+ */
+function threadFacts(view: View, thread: unknown): ContextLine[] {
   const resolution = text(field(thread, "resolution"));
+  const outcomeId = text(field(thread, "outcomeId"));
   return present([
     line(L.type, threadType(thread)),
+    outcomeId ? outcomeRefLine(view, L.forOutcome, outcomeId) : undefined,
     { label: L.result, text: resolution ? resultWord(resolution) : L.inProgress },
-    line(L.milestone, field(thread, "milestone")),
+    line(L.plannedMilestone, field(thread, "milestone")),
   ]);
 }
 
-/** A past chapter's kind and results: a switch's type; each thread's type, result and milestone. */
-function chapterFacts(phase: unknown): ContextLine[] {
+/** A past switch's set question and outcome (a flavor switch); a topic switch has neither. */
+function switchFacts(view: View, sw: unknown): ContextLine[] {
+  const outcomeId = text(field(sw, "outcomeId"));
+  return present([line(L.question, field(sw, "question")), outcomeId ? outcomeRefLine(view, L.forOutcome, outcomeId) : undefined]);
+}
+
+/** A past chapter's kind and results: a switch's type, question and outcome; each thread's type, outcome, result and milestone. */
+function chapterFacts(view: View, phase: unknown): ContextLine[] {
   if (isSwitchPhase(phase)) {
-    const types = [...new Set(strings(switchesOf(phase).map((sw) => field(sw, "type"))))].map((t) => (t === "topic" ? L.topic : t === "flavor" ? L.flavor : t));
-    return [{ label: L.type, text: [L.switch, ...types].join(" · ") }];
+    const switches = switchesOf(phase);
+    const types = [...new Set(strings(switches.map((sw) => field(sw, "type"))))].map((t) => (t === "topic" ? L.topic : t === "flavor" ? L.flavor : t));
+    const kind: ContextLine = { label: L.type, text: [L.switch, ...types].join(" · ") };
+    if (switches.length === 1) return [kind, ...switchFacts(view, switches[0])];
+    return [kind, ...switches.map((sw) => ({ text: text(field(sw, "title")), sub: switchFacts(view, sw) })).filter((l) => l.sub.length > 0)];
   }
   if (!isThreadPhase(phase)) return [];
   const threads = threadsOf(phase);
-  return threads.length === 1 ? threadFacts(threads[0]) : threads.map((t) => ({ text: text(field(t, "title")), sub: threadFacts(t) }));
+  return threads.length === 1 ? threadFacts(view, threads[0]) : threads.map((t) => ({ text: text(field(t, "title")), sub: threadFacts(view, t) }));
 }
 
-/** The chapters before this turn in order, each with its results and its beats' titles and summaries. */
+/**
+ * The chapters before this turn in order, each with its results and its
+ * beats' titles and summaries; a switch's beats also with the option chosen,
+ * which is the direction or approach the switch settled.
+ */
 function storySoFarSection(view: View): ContextSection {
   const placed = view.phases
     .map((phase) => ({ phase, start: num(field(phase, "firstBeatIndex")) }))
     .filter((p): p is { phase: unknown; start: number } => p.start !== undefined && p.start < view.turn);
   const ownerOf = (index: number) => placed.filter((p) => p.start <= index).pop();
-  const beatLines = (index: number): ContextLine[] =>
+  const beatLines = (index: number, withChoice: boolean): ContextLine[] =>
     present(
       view.players.map(([slot, player]) => {
         const beat = list(field(player, "beatHistory"))[index];
         const body = present([text(field(beat, "title")), text(field(beat, "summary"))]).join(" — ");
-        return body ? { label: `${L.turn} ${index + 1}`, text: view.multiplayer ? `${nameOf(player, slot)} · ${body}` : body } : undefined;
+        const chosen = withChoice ? chosenText(beat) : "";
+        return body
+          ? { label: `${L.turn} ${index + 1}`, text: view.multiplayer ? `${nameOf(player, slot)} · ${body}` : body, ...(chosen ? { sub: [{ label: L.chosen, text: chosen }] } : {}) }
+          : undefined;
       })
     );
   const indices = Array.from({ length: view.turn }, (_, i) => i);
@@ -530,16 +613,17 @@ function storySoFarSection(view: View): ContextSection {
     heading: L.storySoFar,
     lines: [],
     entries: [
-      ...indices.filter((i) => ownerOf(i) === undefined).flatMap(beatLines),
+      ...indices.filter((i) => ownerOf(i) === undefined).flatMap((i) => beatLines(i, false)),
       ...placed.map((p, n) => ({
         label: `${L.chapterLine} ${n + 1}`,
         text: chapterTitle(p.phase),
-        sub: [...chapterFacts(p.phase), ...indices.filter((i) => ownerOf(i) === p).flatMap(beatLines)],
+        sub: [...chapterFacts(view, p.phase), ...indices.filter((i) => ownerOf(i) === p).flatMap((i) => beatLines(i, isSwitchPhase(p.phase)))],
       })),
     ],
   };
 }
 
+/** The story's title and world, and its own rules for chapters (switchAndThreadInstructions), which the switch prompt carries. */
 function storySection(view: View): ContextSection {
   const guidelines = field(view.state, "guidelines");
   return {
@@ -552,6 +636,7 @@ function storySection(view: View): ContextSection {
       listLine(L.rules, field(guidelines, "rules")),
       listLine(L.tone, field(guidelines, "tone")),
       listLine(L.conflicts, field(guidelines, "conflicts")),
+      listLine(L.chapterRules, field(guidelines, "switchAndThreadInstructions")),
     ]),
   };
 }

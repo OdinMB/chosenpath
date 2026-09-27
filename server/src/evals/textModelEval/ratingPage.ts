@@ -46,18 +46,19 @@ function rowHtml(row: Row, labels: string[], depth: number): string {
   return `<details class="sec" data-sec="${e(row.key)}" data-depth="${depth}"${row.open ? " open" : ""}><summary><span class="head"><span class="row-title">${e(row.title)}</span>${head}</span></summary>${body}</details>`;
 }
 
-/** Structured context lines as nested lists: a bold label, the text, an outcome id small, and a badge on a marked line. */
+/** Structured context lines as nested lists: a bold label, the text, an outcome id small, and a badge per mark on a marked line. */
 function contextLinesHtml(lines: ContextLine[] = []): string {
   if (!lines.length) return "";
   const item = (line: ContextLine) => {
+    const marks = line.marks ?? [];
     const label = line.label ? `<span class="k">${e(line.label)}${line.text ? ":" : ""}</span>` : "";
     const parts = [
       label,
       line.text ? `<span class="t">${e(line.text)}</span>` : "",
       line.id ? `<code class="id">${e(line.id)}</code>` : "",
-      line.mark ? `<span class="badge">${e(MARK_TEXT[line.mark])}</span>` : "",
+      ...marks.map((mark) => `<span class="badge">${e(MARK_TEXT[mark])}</span>`),
     ].filter(Boolean);
-    return `<li${line.mark ? ` class="${line.mark}"` : ""}>${parts.join(" ")}${contextLinesHtml(line.sub)}</li>`;
+    return `<li${marks.length ? ` class="${marks.join(" ")}"` : ""}>${parts.join(" ")}${contextLinesHtml(line.sub)}</li>`;
   };
   return `<ul class="ctx-lines">${lines.map(item).join("")}</ul>`;
 }
@@ -150,14 +151,14 @@ h1{font-size:1.5rem;margin:.5rem 0} h2{font-size:1.25rem} h3{font-size:1.1rem;ma
 .banner{background:#8a5a00;color:#fff;padding:.75rem 1.25rem;font-weight:600}
 .notice{border:1px solid var(--line);background:var(--card);padding:.75rem;border-radius:8px}
 .muted,.picture{color:var(--muted)} .picture{font-style:italic}
-.context{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem 1rem;margin-bottom:1rem}
+.context{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.25rem 1rem;margin-bottom:1rem;overflow-wrap:anywhere}
 details.ctx>summary{cursor:pointer;min-height:44px;padding:.4rem 0}
 details.ctx>summary>h3{display:inline;margin:0}
 details.ctx+details.ctx{border-top:1px solid var(--line)}
 .ctx-lines{list-style:none;margin:.2rem 0 .6rem;padding:0;font-size:.95rem;line-height:1.5}
 .ctx-lines .ctx-lines{margin:.1rem 0 .2rem;padding-left:.9rem;border-left:2px solid var(--line);font-size:1em}
 .ctx-lines li{margin:.15rem 0}
-.ctx-lines li.current,.ctx-lines li.advances{background:var(--mark);border-radius:4px;padding:.1rem .4rem}
+.ctx-lines li.current,.ctx-lines li.due,.ctx-lines li.advances{background:var(--mark);border-radius:4px;padding:.1rem .4rem}
 .ctx-lines li.current{border-left:4px solid var(--accent)}
 .badge{display:inline-block;padding:0 .4rem;border-radius:4px;background:var(--accent);color:var(--bg);font-size:.8rem;font-weight:700;line-height:1.5;white-space:nowrap}
 .compare{margin:.5rem 0 1.5rem}
