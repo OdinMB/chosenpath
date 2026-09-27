@@ -7,11 +7,15 @@ import { NO_EMPTY_ITEMS } from "../../../../../src/game/services/storyTextRewrit
 import {
   ENGINE_HEADING,
   NO_BLANK_ITEMS,
+  ROUND1B_PARTS,
+  ROUND1C_PARTS,
   THIS_SETUP_HEADING,
   WORKED_EXAMPLE_HEADING,
   cutToSections,
+  iterationRequestFromRound1,
   iterationRound1Request,
   round1SetupSchema,
+  setupRequestFromRound1,
   setupRound1Request,
 } from "../../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { slotsOf } from "../../../../helpers/promptStories.js";
@@ -32,6 +36,9 @@ const TEMPLATE = { title: "The Oven", gameMode: "competitive", creatorId: "u1", 
 const FEEDBACK = "Make the rivalry sharper";
 
 const round1 = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") => setupRound1Request(PREMISE, players, mode, 25, kind);
+/** Round 1b: round 1 with the round-1 report's one-sentence fixes (setupR1b) */
+const round1b = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") =>
+  setupRequestFromRound1(PREMISE, players, mode, 25, kind, ROUND1B_PARTS);
 const production = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") => setupStep.request(PREMISE, players, mode, 25, kind);
 const iteration = (players: PlayerCount, mode: GameMode, sections: string[]) =>
   iterationRound1Request(FEEDBACK, players, mode, 25, sections, TEMPLATE);
@@ -449,8 +456,10 @@ describe("the worked example", () => {
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
 
-  describe("follows the rules it sits beside", () => {
-    const request = round1(1, GameModes.SinglePlayer);
+  describe.each([
+    ["round 1", round1(1, GameModes.SinglePlayer)],
+    ["round 1b", round1b(1, GameModes.SinglePlayer)],
+  ])("%s: follows the rules it sits beside", (_, request) => {
     const example = request.prompt.slice(request.prompt.indexOf(WORKED_EXAMPLE_HEADING), request.prompt.indexOf("Character Selection Instructions"));
     const between = (text: string, from: string, to: string) => {
       const start = text.indexOf(from) + from.length;
@@ -497,11 +506,141 @@ describe("the worked example", () => {
   });
 
   it("is about 1,100 tokens, and the prompt loses about 3,700 against production's", () => {
+    // Round 1b's renamed stat leaves the size as it was
+    expect(Math.abs(round1b(1, GameModes.SinglePlayer).prompt.length - round1(1, GameModes.SinglePlayer).prompt.length)).toBeLessThan(80);
     // Setup doc A5 and proposal 5: at the prompt's measured 4.65 characters per token
     const [ours, theirs] = [round1(1, GameModes.SinglePlayer).prompt, production(1, GameModes.SinglePlayer).prompt];
     const example = ours.slice(ours.indexOf(WORKED_EXAMPLE_HEADING), ours.indexOf("Character Selection Instructions"));
     expect(example.length / 4.65).toBeGreaterThan(900);
     expect(example.length / 4.65).toBeLessThan(1_300);
     expect((theirs.length - ours.length) / 4.65).toBeGreaterThan(2_500);
+  });
+});
+
+/*
+ * Round 1b (setupR1b): round 1 with the one-sentence fixes of the round-1
+ * report (section 2) for the changes the stop rule still fails or that clash:
+ * the scoreboard names roles only, a two-player scoreboard has one or two
+ * effects, and the worked example's "Energy" is renamed. Round 1's own
+ * requests stay as they ran.
+ */
+describe("round 1b: round 1 with the round-1 report's one-sentence fixes", () => {
+  /** Each fix: round 1's passage, round 1b's, and where it prints */
+  const FIXES: { id: string; part: Part; round1: string; round1b: string; applies: (on: On) => boolean }[] = [
+    {
+      id: "two-player scoreboard: no seat in the tooltip",
+      part: "prompt",
+      round1: "Its tooltip says it is the score of that contest and which role holds which side.",
+      round1b: 'Its tooltip says it is the score of that contest and which role holds which side, without naming a seat ("player1"): each seat\'s backgrounds already carry its role.',
+      applies: (on) => contest(on) && on.players === 2 && has(on, "stats"),
+    },
+    {
+      id: "three-player scoreboard: no seat in the values or the tooltip",
+      part: "prompt",
+      round1: "List these values in its narrative implications and its tooltip, and say there which role belongs to which player.",
+      round1b: 'List these values in its narrative implications and its tooltip, without naming a seat ("player1") in either: each seat\'s backgrounds already carry its role.',
+      applies: (on) => contest(on) && on.players === 3 && has(on, "stats"),
+    },
+    {
+      // The review read before round 1b's run: the stat guidelines' first bullet already says it, with its exceptions
+      id: "the catalogue's repeat of 'favor string and string[]'",
+      part: "prompt",
+      round1: "and not for counting progress.\nIn general, favor string and string[] over numbers and percentages.",
+      round1b: "and not for counting progress.",
+      applies: statsAsked,
+    },
+    {
+      id: "a two-player scoreboard's one or two effects",
+      part: "schema",
+      round1: "Two or three effects, each a situation or threshold",
+      round1b: "Two or three effects (one or two for a contest's scoreboard, its catch-up among them), each a situation or threshold",
+      applies: (on) => contest(on) && on.players === 2 && statsListed(on),
+    },
+  ];
+  /** The worked example's renamed stat: round 1's passages and round 1b's */
+  const RENAMED: [string, string][] = [
+    ["- Energy (player, percentage, adjustable anytime): activist burnout.", "- Fervor (player, percentage, adjustable anytime): the activist's drive, which burnout drains."],
+    ['"Spend 15% Energy to push through exhaustion."', '"Spend 15% Fervor to push through exhaustion."'],
+    ['"Regain 10% Energy by resting instead of acting."', '"Regain 10% Fervor by resting instead of acting."'],
+  ];
+  const undo = (text: string, pairs: [string, string][]) => pairs.reduce((out, [before, after]) => out.split(after).join(before), text);
+  const schemaJson = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJsonSchema(schema));
+
+  function expectFixes(ours: { prompt: string; schema: Parameters<typeof toJsonSchema>[0] }, theirs: typeof ours, on: On) {
+    const texts: Record<Part, string> = { prompt: ours.prompt, schema: descriptions(ours.schema) };
+    for (const fix of FIXES) {
+      // Where a fix applies, round 1's passage is gone; elsewhere round 1's text stands
+      const found = { round1b: occurrences(texts[fix.part], fix.round1b), ...(fix.applies(on) ? { round1: occurrences(texts[fix.part], fix.round1) } : {}) };
+      expect({ fix: fix.id, found }).toEqual({ fix: fix.id, found: fix.applies(on) ? { round1b: 1, round1: 0 } : { round1b: 0 } });
+    }
+    // With the fixes undone, round 1b is round 1 byte for byte
+    const promptPairs: [string, string][] = [...FIXES.filter((f) => f.part === "prompt").map((f): [string, string] => [f.round1, f.round1b]), ...RENAMED];
+    const schemaPairs = FIXES.filter((f) => f.part === "schema").map((f): [string, string] => [f.round1, f.round1b]);
+    expect(undo(ours.prompt, promptPairs)).toBe(theirs.prompt);
+    expect(undo(schemaJson(ours.schema), schemaPairs)).toBe(schemaJson(theirs.schema));
+  }
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: each fix once where the call prints what it fixes, and nothing else changed", (kind, players, mode) => {
+    expectFixes(round1b(players, mode, kind), round1(players, mode, kind), { players, mode, kind, sections: ALL_SECTIONS });
+  });
+
+  it.each(INPUTS)("iteration, %i players, %s, every section set", (players, mode) => {
+    for (const sections of SECTION_SETS) {
+      const ours = iterationRequestFromRound1(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND1B_PARTS);
+      expectFixes(ours, iteration(players, mode, sections), { players, mode, kind: "iteration", sections });
+    }
+  });
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: every round-1 rule stays once where it applies", (kind, players, mode) => {
+    const request = round1b(players, mode, kind);
+    expectRules(request.prompt, descriptions(request.schema), { players, mode, kind, sections: ALL_SECTIONS });
+  });
+
+  it("renames the worked example's player stat, which 10 of round 1's 36 setups copied, and nowhere names it Energy", () => {
+    const example = (prompt: string) => prompt.slice(prompt.indexOf(WORKED_EXAMPLE_HEADING), prompt.indexOf("Character Selection Instructions"));
+    for (const [players, mode] of INPUTS) {
+      const [ours, theirs] = [example(round1b(players, mode).prompt), example(round1(players, mode).prompt)];
+      expect(ours).not.toMatch(/\bEnergy\b/);
+      expect(occurrences(ours, "Fervor")).toBe(3);
+      // Round 1 as it ran
+      expect(occurrences(theirs, "Energy")).toBe(3);
+    }
+  });
+
+  describe("round 1c: round 1b with proposal 1's one fix-and-retest", () => {
+    // Round 1b's five setups outside 3-4 visible player stats each wrote one set of player stats per seat
+    const EVERY_PLAYER_STAT = " Every player gets every player stat, so none is written for one role or named after one player.";
+    const round1c = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") =>
+      setupRequestFromRound1(PREMISE, players, mode, 25, kind, ROUND1C_PARTS);
+
+    it.each(KIND_INPUTS)("%s, %i players, %s: round 1b plus one sentence where the seats have roles, and nothing else", (kind, players, mode) => {
+      const [ours, theirs] = [round1c(players, mode, kind), round1b(players, mode, kind)];
+      expect(occurrences(ours.prompt, EVERY_PLAYER_STAT)).toBe(players > 1 ? 1 : 0);
+      expect(ours.prompt.split(EVERY_PLAYER_STAT).join("")).toBe(theirs.prompt);
+      expect(JSON.stringify(toJsonSchema(ours.schema))).toBe(JSON.stringify(toJsonSchema(theirs.schema)));
+    });
+
+    it.each(INPUTS)("iteration, %i players, %s: where the stat rules print, every section set", (players, mode) => {
+      for (const sections of SECTION_SETS) {
+        const ours = iterationRequestFromRound1(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND1C_PARTS);
+        const theirs = iterationRequestFromRound1(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND1B_PARTS);
+        expect(occurrences(ours.prompt, EVERY_PLAYER_STAT)).toBe(players > 1 && statsAsked({ players, mode, kind: "iteration", sections }) ? 1 : 0);
+        expect(ours.prompt.split(EVERY_PLAYER_STAT).join("")).toBe(theirs.prompt);
+      }
+    });
+
+    it("sits in the stat guidelines' bullet about player stats, after the one about the players' relationship", () => {
+      const prompt = round1c(2, GameModes.Cooperative).prompt;
+      expect(prompt).toContain(`A relationship between the player characters themselves is one shared stat, not a copy for each player.${EVERY_PLAYER_STAT}\n`);
+    });
+  });
+
+  it("asks nothing of a scoreboard's tooltip or values that names a seat", () => {
+    for (const [players, mode] of INPUTS.filter(([p, m]) => p > 1 && isContestMode(m))) {
+      const prompt = round1b(players, mode).prompt;
+      expect(prompt).not.toContain("which role belongs to which player");
+      // The slate still says which seat is side A, which the contest's resolutions read
+      if (players === 2) expect(occurrences(prompt, "Side A is player1's character, side B is player2's.")).toBe(1);
+    }
   });
 });

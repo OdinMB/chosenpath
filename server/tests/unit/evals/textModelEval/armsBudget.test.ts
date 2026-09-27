@@ -153,6 +153,12 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
       ["gpt-6-sol@low/setupR1", 1, "all", ROUND1_SETUP_PAGE_PREMISES],
       ["gpt-6-luna@low/setupR2", 2, "all", undefined],
       ["gpt-6-luna@low/setupR2Order", 2, "all", undefined],
+      // Round 1b: round 1 with the round-1 report's one-sentence fixes; then round 2's two arms on its passing changes
+      ["gpt-6-luna@low/setupR1b", 2, "all", undefined],
+      // Round 1c: round 1b with proposal 1's one fix-and-retest
+      ["gpt-6-luna@low/setupR1c", 2, "all", undefined],
+      ["gpt-6-luna@low/setupR2b", 2, "all", undefined],
+      ["gpt-6-luna@low/setupR2bOrder", 2, "all", undefined],
     ]);
     for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("setup-rounds", role)).toEqual([]);
     // gpt-4.x is never a new arm; its stored records are comparisons only
@@ -177,6 +183,25 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
     expect(secondReferenceKeys("gpt-6-sol@low/setupR1")).toEqual(["gpt-6-luna@low/setupR1"]);
     expect(secondReferenceKeys("gpt-6-luna@low/setupR1")).toEqual([]);
     expect(secondReferenceKeys("gpt-6-luna@low/prod")).toEqual([]);
+  });
+
+  it("reads round 1b against today's prompt, as round 1 was read, and against round 1 as it ran", () => {
+    expect(referenceKey("gpt-6-luna@low/setupR1b")).toBe("gpt-6-luna@low/prod");
+    expect(estimateBaseKey("gpt-6-luna@low/setupR1b")).toBe("gpt-6-luna@low/prod");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR1b")).toEqual(["gpt-6-luna@low/setupR1"]);
+  });
+
+  it("reads round 1c against today's prompt, and against round 1b, whose one change it retests", () => {
+    expect(referenceKey("gpt-6-luna@low/setupR1c")).toBe("gpt-6-luna@low/prod");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR1c")).toEqual(["gpt-6-luna@low/setupR1b"]);
+  });
+
+  it("reads both of round 2b's arms against the fixed round 1, arm B against arm A too, and both against today's prompt (the carry-forward guard)", () => {
+    // The fixed round 1 is round 1c: round 1b with proposal 1's fix-and-retest
+    expect(referenceKey("gpt-6-luna@low/setupR2b")).toBe("gpt-6-luna@low/setupR1c");
+    expect(referenceKey("gpt-6-luna@low/setupR2bOrder")).toBe("gpt-6-luna@low/setupR1c");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR2b")).toEqual(["gpt-6-luna@low/prod"]);
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR2bOrder")).toEqual(["gpt-6-luna@low/setupR2b", "gpt-6-luna@low/prod"]);
   });
 
   it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {

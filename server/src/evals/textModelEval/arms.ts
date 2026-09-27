@@ -104,6 +104,10 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   setupR1: "prod",
   setupR2: "setupR1",
   setupR2Order: "setupR2",
+  setupR1b: "prod",
+  setupR1c: "prod",
+  setupR2b: "setupR1c",
+  setupR2bOrder: "setupR1c",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -143,13 +147,21 @@ export function referenceKey(key: string): string | undefined {
  * so an existing check counts against steering only when it is worse than
  * both references, and a form carried forward must be no worse than today's
  * prompt on a check the round targets. Sol low's round 1 against Luna low's
- * (the templates question: is Sol clearly better on the same prompt?).
+ * (the templates question: is Sol clearly better on the same prompt?). Round
+ * 1b against round 1 as it ran, so each fix reads against the text it fixes.
+ * Round 2b's arms read against round 1c, their base (their own reference), arm B against
+ * arm A too (the order alone), and both against today's prompt (the
+ * carry-forward guard).
  */
 const LUNA_LOW = { model: "gpt-6-luna", reasoningEffort: "low" } as const;
 const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
   [armKey({ model: "gpt-6-sol", reasoningEffort: "low" }, "setupR1")]: [armKey(LUNA_LOW, "setupR1")],
+  [armKey(LUNA_LOW, "setupR1b")]: [armKey(LUNA_LOW, "setupR1")],
+  [armKey(LUNA_LOW, "setupR1c")]: [armKey(LUNA_LOW, "setupR1b")],
+  [armKey(LUNA_LOW, "setupR2b")]: [armKey(LUNA_LOW, "prod")],
+  [armKey(LUNA_LOW, "setupR2bOrder")]: [armKey(LUNA_LOW, "setupR2b"), armKey(LUNA_LOW, "prod")],
 };
 
 export function secondReferenceKeys(key: string): string[] {
@@ -286,7 +298,11 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
  * only, to decide whether template generation moves to Sol. gpt-4.1 is never a
  * new arm. Luna first, so a cap stop cuts Sol. Round 2 (setupR2, setupR2Order):
  * its two arms on Luna low at two samples on all 18 premises, arm A (today's
- * field order) before arm B (the generation order).
+ * field order) before arm B (the generation order). Round 1b (setupR1b, the
+ * round-1 report's fixes) on Luna low at two samples on all 18 premises, then
+ * round 1c (setupR1c, proposal 1's fix-and-retest) and round 2b (setupR2b,
+ * setupR2bOrder: round 2's arms on the passing changes) the same way, arm A
+ * first.
  */
 function setupRoundArms(role: EvalRole): ArmPlan[] {
   if (role !== "setup") return [];
@@ -295,6 +311,10 @@ function setupRoundArms(role: EvalRole): ArmPlan[] {
     { arm: sol("low", "setupR1"), samples: 1, scope: "all", caseIds: ROUND1_SETUP_PAGE_PREMISES },
     { arm: luna("low", "setupR2"), samples: 2, scope: "all" },
     { arm: luna("low", "setupR2Order"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR1b"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR1c"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR2b"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR2bOrder"), samples: 2, scope: "all" },
   ];
 }
 

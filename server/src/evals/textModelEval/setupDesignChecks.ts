@@ -234,6 +234,8 @@ const EXAMPLE_NAMES: { pattern: RegExp; where: "statNames" | "anywhere" }[] = [
   { pattern: /\bpublic support\b/i, where: "statNames" },
   { pattern: /\bcommunity standing\b/i, where: "statNames" },
   { pattern: /\benergy\b/i, where: "statNames" },
+  // Round 1b's name for the example's player stat, which round 1 called Energy
+  { pattern: /\bfervou?r\b/i, where: "statNames" },
   { pattern: /\b(enclave|printers)['’]s? voice\b/i, where: "statNames" },
   { pattern: /\bgoblins?\b/i, where: "anywhere" },
   { pattern: /\bgruk\b/i, where: "anywhere" },
@@ -346,11 +348,15 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   checks.noSlotNames = stats.every((s) => [s.name, s.possibleValues, s.tooltip].every((text) => !SEAT.test(text) && !mentionsIdentity(text, names)));
 
   // --- Stats (proposals 3 and 4) ---
+  // The scoreboard of a contested outcome is the one stat that may track progress
+  const scoreboard = (s: Stat) => contestMode && multiplayer && s.shared && (s.type === "opposites" || SCORE.test(s.name) || SCORE.test(s.tooltip));
   const numbers = stats.flatMap((s) => s.effects.flatMap(signedNumbers));
   counts.effectNumbers = numbers.length;
   counts.effectNumbersInRange = numbers.filter((n) => n <= 15).length;
   if (numbers.length > 0) checks.effectsInRange = counts.effectNumbersInRange === numbers.length;
-  checks.effectsTwoOrThree = stats.every((s) => s.effects.length >= 2 && s.effects.length <= 3);
+  // A two-player contest's scoreboard may carry its catch-up alone (A2.1's "one way to catch up"; round 1b's one or two)
+  const fewestEffects = (s: Stat) => (input.playerCount === 2 && scoreboard(s) ? 1 : 2);
+  checks.effectsTwoOrThree = stats.every((s) => s.effects.length >= fewestEffects(s) && s.effects.length <= 3);
   checks.noFormula = stats.every((s) => s.effects.every((effect) => !FORMULA.test(effect)));
   const withBonus = stats.filter((s) => [s.sacrifice, s.reward].some((text) => !isNone(text) && BONUS_OR_RISK.test(text))).length;
   checks.sacrificeNoBonus = withBonus === 0;
@@ -358,8 +364,6 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   const visiblePlayer = stats.filter((s) => !s.shared && s.visible);
   counts.visiblePlayerStats = visiblePlayer.length;
   counts.spendablePlayerStats = visiblePlayer.filter((s) => !isNone(s.sacrifice) || !isNone(s.reward)).length;
-  // The scoreboard of a contested outcome is the one stat that may track progress
-  const scoreboard = (s: Stat) => contestMode && multiplayer && s.shared && (s.type === "opposites" || SCORE.test(s.name) || SCORE.test(s.tooltip));
   const progressLike = stats.filter((s) => !scoreboard(s) && [s.name, s.tooltip, ...s.implications].some((text) => PROGRESS.test(text))).length;
   checks.noProgressMeter = progressLike === 0;
   counts.progressLikeStats = progressLike;

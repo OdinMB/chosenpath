@@ -29,7 +29,8 @@ import type { TextRequest } from "../storyTextSteps.js";
  * every form; 1, 2 and 5 only where they carry forward. Where one of those is
  * left out, production's text stands in its place, with the edits the
  * passing proposals make to that text (the setup document's own fallback for
- * proposal 5: "at least delete the contradicting example lines").
+ * proposal 5: "at least delete the contradicting example lines"). Round 1b
+ * (ROUND1B_PARTS) is round 1 with the round-1 report's one-sentence fixes.
  */
 
 type Kind = "story" | "template" | "iteration";
@@ -39,13 +40,32 @@ type Kind = "story" | "template" | "iteration";
  * with the fixed seat roles, S7 and S8's identities), 2 (the scoreboard, with
  * the stat-name rule) and 5 (the worked example, with the one-line catalogue
  * and without the "For each stat" block). The scoreboard needs the slate: its
- * "Scored by" line and the slates' pointers are printed there.
+ * "Scored by" line and the slates' pointers are printed there. `fixes` adds
+ * the round-1 report's one-sentence fixes (round 1b) to the parts they fix:
+ * the scoreboard names no seat and, for two players, has one or two effects;
+ * the worked example's "Energy" is renamed. `everyPlayerStat` is proposal
+ * 1's one fix-and-retest after round 1b (round 1c): with the seat roles,
+ * every player gets every player stat.
  */
-export type Round1Parts = { slate: boolean; scoreboard: boolean; example: boolean };
+export type Round1Parts = { slate: boolean; scoreboard: boolean; example: boolean; fixes: boolean; everyPlayerStat: boolean };
 /** Setup round 1 as it ran: all six proposals. */
-export const ROUND1_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true };
-/** The round-1 proposals that passed the stop rule (3, 4 and 6), which round 2 builds on. */
-export const PASSING_ROUND1_PARTS: Round1Parts = { slate: false, scoreboard: false, example: false };
+export const ROUND1_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true, fixes: false, everyPlayerStat: false };
+/**
+ * The round-1 proposals that passed the stop rule as it was first read (3, 4
+ * and 6), which round 2 built on. Under the moved reading of 2026-09-27
+ * proposal 1 passes too (.plans/2026-09-26_build-followup.md, "Setup rounds,
+ * stop rule").
+ */
+export const PASSING_ROUND1_PARTS: Round1Parts = { slate: false, scoreboard: false, example: false, fixes: false, everyPlayerStat: false };
+/** Round 1b: all six proposals with the round-1 report's one-sentence fixes (setup round 1's fix run). */
+export const ROUND1B_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true, fixes: true, everyPlayerStat: false };
+/**
+ * Round 1c: round 1b with proposal 1's one fix-and-retest. In round 1b the
+ * 3-4 visible player stats rule moved lower (36 to 31 of 36, p 0.027): each
+ * of the five misses wrote one set of player stats per seat, by role or by
+ * the premise's player names, which the seat roles and S8 invite.
+ */
+export const ROUND1C_PARTS: Round1Parts = { ...ROUND1B_PARTS, everyPlayerStat: true };
 
 type On = { players: PlayerCount; mode: GameMode; kind: Kind; sections: string[]; parts: Round1Parts };
 
@@ -110,6 +130,31 @@ const SCOREBOARD_LINE: Record<2 | 3, string> = {
   3: '--- A scoreboard for each contested shared outcome: one shared string stat whose values name who currently leads, by role or by the names the premise gives the player characters, plus "Nobody yet" (for example "Nobody yet, The Archivist, The Performer, The Neighbor"). List these values in its narrative implications and its tooltip, and say there which role belongs to which player. It changes only after threads about that contest, so it is not adjustable anytime and has no sacrifice or reward.',
 };
 
+/**
+ * Round 1b's fix for the scoreboard (round-1 report, section 2): 10 of round
+ * 1's 12 contest setups named seats in the tooltip ("player1's bounty
+ * hunter") or the leader's values ("Player1's Founder"), as "which role holds
+ * which side" and "which role belongs to which player" invited. The tooltip
+ * and values name no seat; each seat's backgrounds carry its role. (Worded as
+ * "no seat" rather than "roles only", since S8 lets the premise's own names
+ * name the sides.)
+ */
+const ROLES_ONLY: Record<2 | 3, [string, string]> = {
+  2: [
+    "Its tooltip says it is the score of that contest and which role holds which side.",
+    'Its tooltip says it is the score of that contest and which role holds which side, without naming a seat ("player1"): each seat\'s backgrounds already carry its role.',
+  ],
+  3: [
+    "List these values in its narrative implications and its tooltip, and say there which role belongs to which player.",
+    'List these values in its narrative implications and its tooltip, without naming a seat ("player1") in either: each seat\'s backgrounds already carry its role.',
+  ],
+};
+
+function scoreboardLine(on: On): string {
+  const players = on.players as 2 | 3;
+  return on.parts.fixes ? replaceOnce(SCOREBOARD_LINE[players], ...ROLES_ONLY[players]) : SCOREBOARD_LINE[players];
+}
+
 /** S8 for every player count: a named protagonist keeps the name in every identity. */
 const PREMISE_NAMES: Record<"one" | "more", string> = {
   one: "- When the premise names the player character, use that name in outcomes and stats, and give the player three identities that keep the name and vary in appearance and details.",
@@ -149,6 +194,14 @@ function outcomesSection(on: On): string {
 const CONTESTED_FAVOR = "--- If the players compete for one NPC's favor, that favor is a contest: one shared scoreboard stat, not a relationship stat for each player.";
 
 /**
+ * Round 1c's fix for proposal 1 (the round-1 report's suggestion, section 2):
+ * with a role per seat, and the premise's player names allowed in stats (S8),
+ * models wrote one set of player stats per seat, though every player gets
+ * every player stat. Printed where the seats have roles.
+ */
+const EVERY_PLAYER_STAT = " Every player gets every player stat, so none is written for one role or named after one player.";
+
+/**
  * A4.1, in place of the "Don't use stats for things that are covered by
  * other mechanics" lines. The scoreboard exception is stated once, and only
  * where a contest has a scoreboard; the relationship between the player
@@ -160,7 +213,7 @@ function statsThatAct(on: On): string {
     "- Every stat earns its place in play in at least two ways: it shifts chances in challenge scenes the thread types create (effects), it can be spent or earned in a scene (sacrifice or reward), or its thresholds change which threads and scenes happen (narrative implications).",
     "- Name the stats after what the premise says the characters care about or have to manage or balance: its resources, relationships and pressures (for example the Queen's opinion in a court intrigue, fuel on a long voyage, burnout for an activist).",
     "- Most player stats can be spent or earned in a scene: resources, reserves, contacts, items, moods. Only special powers, standings earned over the whole story (a rank, a faction's stance on a four-step scale) and trust that must be earned in a thread are 'None'.",
-    `- Player stats are about the person: their values, their approach, their resilience, the people who support them.${on.players > 1 ? " A relationship between the player characters themselves is one shared stat, not a copy for each player." : ""}`,
+    `- Player stats are about the person: their values, their approach, their resilience, the people who support them.${on.players > 1 ? " A relationship between the player characters themselves is one shared stat, not a copy for each player." : ""}${on.players > 1 && on.parts.slate && on.parts.everyPlayerStat ? EVERY_PLAYER_STAT : ""}`,
     `${progressMeters} Milestones already track how close an outcome is to its resolution, and nothing in the game reads a stat to decide an outcome or to end the story. Weak: 'Reform Progress (0-100%)', 'Fragments collected', 'Dream: Beginning → Fulfillment'. A list of concrete clues, allies or items is fine when each item opens options on its own.`,
     "- No two stats track the same thing. A stat may bear on an outcome as a lever the player spends or protects (a standing with the court, next to an outcome about the court's verdict).",
     "- Don't track the remaining turns or the players' ordinary decisions; the game tracks both.",
@@ -180,7 +233,8 @@ function statTypes(on: On): string {
     "- percentage: a capacity that is managed often and in small steps (health, energy, fuel; one relationship only if managing it is central).",
     `- opposites: two percentages in one; the second is 100 minus the first. Use it for a balance that moves both ways: ${uses}. Not for a pair where one side is simply better for the players, unless it is a tug of war the story is about.`,
     "- number: a countable quantity whose management is central (money, ammunition). Not for skills, influence, goals or friends, and not for counting progress.",
-    "In general, favor string and string[] over numbers and percentages.",
+    // Round 1b's review read: the stat guidelines' first bullet already says this, with its exceptions
+    ...(on.parts.fixes ? [] : ["In general, favor string and string[] over numbers and percentages."]),
   ].join("\n");
 }
 
@@ -232,6 +286,19 @@ Not stats: "Personal Safety" (the Hero Guilds' hostility already covers it), and
 In a cooperative version for two activists, the reform question is the shared outcome, and each activist keeps two personal outcomes from their role (player1 the enclave's organizer, player2 the movement's printer). In a competitive version where the two compete to lead the movement, "Who will speak for the goblins at the Queen's council?" is the contested outcome, and "Enclave's Voice|Printers' Voice" (opposites, starts at 50, moves 15 toward the winner of each leadership contest, not in single beats; its tooltip says which role holds which side) is its scoreboard.
 
 Not like this: "+25 points when using a power" (a stat gives at most 15); "Can risk 10 followers for a +20 bonus" (a sacrifice names only its cost, and the cost is certain); "Followers (Player 1)" and "Followers (Player 2)" (one contest has one shared scoreboard, named by role).`;
+
+/**
+ * Round 1b's fix for the worked example (round-1 report, section 2): 10 of
+ * round 1's 36 setups named a stat "... Energy", the example's player stat,
+ * against 4 of 36 on today's prompt. The stat gets a less common name.
+ */
+const RENAMED_STAT: [string, string][] = [
+  ["- Energy (player, percentage, adjustable anytime): activist burnout.", "- Fervor (player, percentage, adjustable anytime): the activist's drive, which burnout drains."],
+  ['"Spend 15% Energy to push through exhaustion."', '"Spend 15% Fervor to push through exhaustion."'],
+  ['"Regain 10% Energy by resting instead of acting."', '"Regain 10% Fervor by resting instead of acting."'],
+];
+
+const workedExample = (on: On) => (on.parts.fixes ? RENAMED_STAT.reduce((text, [passage, renamed]) => replaceOnce(text, passage, renamed), WORKED_EXAMPLE) : WORKED_EXAMPLE);
 
 /*
  * Without proposal 5, production's catalogue, its "For each stat" block and its
@@ -540,7 +607,7 @@ function round1Instructions(production: string, on: On): string {
     }
   }
   if (asks(on, "stats") && on.players > 1 && on.parts.scoreboard) {
-    const line = contested(on) ? `\n${SCOREBOARD_LINE[on.players as 2 | 3]}` : "";
+    const line = contested(on) ? `\n${scoreboardLine(on)}` : "";
     text = replaceOnce(text, "\n--- Stats to track the score about things that players compete over (e.g. territory control, which side the council/an npc leans towards, etc.)", line);
   }
   if (asksStatRules(on)) {
@@ -565,8 +632,8 @@ function round1Instructions(production: string, on: On): string {
     // A5: the worked example where production's examples sit (production leaves them out of iteration; round 1 keeps its short one)
     text =
       on.kind === "iteration"
-        ? insertBeforeFirst(text, ["Character Selection Instructions", "Difficulty Levels\n", SEPARATOR], `${WORKED_EXAMPLE}\n\n`)
-        : replaceThrough(text, "EXAMPLE STAT SETUPS", "Initial value: 70\n\n", `${WORKED_EXAMPLE}\n\n`);
+        ? insertBeforeFirst(text, ["Character Selection Instructions", "Difficulty Levels\n", SEPARATOR], `${workedExample(on)}\n\n`)
+        : replaceThrough(text, "EXAMPLE STAT SETUPS", "Initial value: 70\n\n", `${workedExample(on)}\n\n`);
   } else if (on.kind !== "iteration") {
     for (const [passage, replacement] of EXAMPLE_EDITS) text = replaceOnce(text, passage, replacement);
     text = replaceThrough(text, ...PERSONAL_DREAM, "");
@@ -730,6 +797,13 @@ const statDescription = (on: On) =>
 const EFFECTS =
   "How this stat shifts the chance of success in challenge and contest scenes. Two or three effects, each a situation or threshold and a value in absolute terms: +5 slight, +10 clear, +15 decisive (and the same below zero), never beyond 15 either way and never a formula. At most two stats count for any one choice, so write effects for the situations in which this stat is the one that matters, in scenes this story's thread types create. Examples: 'Above 70%: +10 in social challenges'; '-15 when the ship is Damaged and a risky maneuver is needed'.";
 /**
+ * Round 1b's fix for the clash between the two-player scoreboard's "one way
+ * to catch up" (A2.1) and "Two or three effects" (A3.2): both of round 1's
+ * one-effect stats were such scoreboards. Other stats keep two or three.
+ */
+const SCOREBOARD_EFFECTS: [string, string] = ["Two or three effects, each", "Two or three effects (one or two for a contest's scoreboard, its catch-up among them), each"];
+const effects = (on: On) => (on.parts.fixes && on.parts.scoreboard && contested(on) && on.players === 2 ? replaceOnce(EFFECTS, ...SCOREBOARD_EFFECTS) : EFFECTS);
+/**
  * A4.2, with the flag apart: A4.2's "'None' only for a stat that must not
  * change within one scene" matches production's reading of a false flag
  * ("can only be changed after threads are resolved"), and GPT-6 already
@@ -768,7 +842,7 @@ function round1Stat(production: z.ZodTypeAny, on: On): z.AnyZodObject {
   return stat
     .extend({
       name: on.parts.scoreboard ? appended(stat.shape.name, NAME_ADDITION) : stat.shape.name,
-      effectOnPoints: asArray(stat.shape.effectOnPoints, "effectOnPoints").max(3).describe(EFFECTS),
+      effectOnPoints: asArray(stat.shape.effectOnPoints, "effectOnPoints").max(3).describe(effects(on)),
       optionsToSacrifice: stat.shape.optionsToSacrifice.describe(sacrifice(on)),
       optionsToGainAsReward: stat.shape.optionsToGainAsReward.describe(REWARD),
       canBeChangedInBeatResolutions: stat.shape.canBeChangedInBeatResolutions.describe(CHANGEABLE_IN_BEATS),

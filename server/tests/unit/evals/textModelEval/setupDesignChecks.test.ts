@@ -227,6 +227,24 @@ describe("checkSetupDesign: stats (proposals 3 and 4)", () => {
     expect(counts).toMatchObject({ effectNumbers: 6, effectNumbersInRange: 4 });
   });
 
+  it("lets a two-player contest's scoreboard carry one effect, its catch-up (round 1b's fix), and holds every other stat to two or three", () => {
+    const catchUp = ["When the side behind takes a bold risk in a regatta thread: +10 to its choice."];
+    const board = (effectOnPoints: string[]) =>
+      duelSetup({
+        sharedStats: [stat("Supplies"), stat("Harbour Master's Voice|Guild's Voice", { type: "opposites", effectOnPoints, tooltip: "The score of the regatta: the harbour master holds the first side." })],
+      });
+    expect(checkSetupDesign(board(catchUp), multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(true);
+    expect(checkSetupDesign(board(catchUp), multi(2, GameModes.CooperativeCompetitive)).checks.effectsTwoOrThree).toBe(true);
+    expect(checkSetupDesign(board([]), multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
+    expect(checkSetupDesign(board([...catchUp, "+5 in a", "+5 in b", "+5 in c"]), multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
+    // No scoreboard in a cooperative game, and no rule gives a three-player lead string one effect
+    expect(checkSetupDesign(board(catchUp), multi(2, GameModes.Cooperative)).checks.effectsTwoOrThree).toBe(false);
+    expect(checkSetupDesign(board(catchUp), multi(3, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
+    // Any other stat keeps two or three
+    const thin = duelSetup({ sharedStats: [stat("Supplies", { effectOnPoints: ["+10 when rested"] })] });
+    expect(checkSetupDesign(thin, multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
+  });
+
   it("finds a sacrifice or reward that names a bonus, a risk or a maybe", () => {
     const bonus = soloSetup({ sharedStats: [stat("Followers", { optionsToSacrifice: "Can risk 10 followers for a +20 bonus." })] });
     expect(checkSetupDesign(bonus, solo)).toMatchObject({ checks: { sacrificeNoBonus: false }, counts: { sacrificeTextsWithBonus: 1 } });
@@ -367,6 +385,12 @@ describe("checkSetupDesign: facts (proposal 11) and example copies (proposal 5)"
     expect(checkSetupDesign(leaky, { ...solo, premise }).counts.exampleNameLeaks).toBe(0);
     // Reported on every setup, with or without the prompt's example, so a production reference has its own rate
     expect(checkSetupDesign(soloSetup(), solo)).toMatchObject({ checks: { noExampleNameLeak: true }, counts: { exampleNameLeaks: 0 } });
+  });
+
+  it("counts round 1b's renamed example stat (Fervor, for round 1's Energy) as a leak too", () => {
+    const renamed = soloSetup({ playerStats: [stat("Fervor", { id: "player_fervor" })] });
+    expect(checkSetupDesign(renamed, solo).counts.exampleNameLeaks).toBe(1);
+    expect(checkSetupDesign(renamed, { ...solo, premise: "An activist whose fervor burns out." }).counts.exampleNameLeaks).toBe(0);
   });
 
   it("counts an example stat name only as a stat's name, and a name word only as a whole word", () => {

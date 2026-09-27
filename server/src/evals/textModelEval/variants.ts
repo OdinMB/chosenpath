@@ -19,8 +19,23 @@ import {
 import { rewriteBeatRequest, type RewriteScaffold } from "../../game/services/storyTextRewrite/beat.js";
 import type { RewriteCounts, SplitTextRequest } from "../../game/services/storyTextRewrite/common.js";
 import { rewriteSetupRequest } from "../../game/services/storyTextRewrite/setup.js";
-import { iterationRound1Request, setupRound1Request } from "../../game/services/storyTextRounds/setupRound1.js";
-import { iterationRound2Request, setupRound2Request, type Round2Order, type Round2Request } from "../../game/services/storyTextRounds/setupRound2.js";
+import {
+  PASSING_ROUND1_PARTS,
+  ROUND1B_PARTS,
+  ROUND1C_PARTS,
+  iterationRequestFromRound1,
+  iterationRound1Request,
+  setupRequestFromRound1,
+  setupRound1Request,
+  type Round1Parts,
+} from "../../game/services/storyTextRounds/setupRound1.js";
+import {
+  ROUND2B_BASE_PARTS,
+  iterationRound2Request,
+  setupRound2Request,
+  type Round2Order,
+  type Round2Request,
+} from "../../game/services/storyTextRounds/setupRound2.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -53,6 +68,12 @@ import { iterationRound2Request, setupRound2Request, type Round2Order, type Roun
  * (proposal 7) on round 1's passing proposals (3, 4 and 6), in today's field
  * order and in proposal 9's generation order, whose reply is assembled into
  * the fields saved today before anything reads it (assembledReply).
+ * "setupR1b" is round 1 with the round-1 report's one-sentence fixes (the
+ * scoreboard names roles only and has one or two effects for two players;
+ * the worked example's "Energy" renamed), so round 1's records stay as they ran.
+ * "setupR1c" is round 1b with proposal 1's one fix-and-retest (every player
+ * gets every player stat). "setupR2b" and "setupR2bOrder" are round 2's two arms again, on round 1b's
+ * passing changes (ROUND2B_BASE_PARTS).
  */
 
 export type VariantId =
@@ -67,7 +88,11 @@ export type VariantId =
   | "rewrite2ZeroShot"
   | "setupR1"
   | "setupR2"
-  | "setupR2Order";
+  | "setupR2Order"
+  | "setupR1b"
+  | "setupR1c"
+  | "setupR2b"
+  | "setupR2bOrder";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -81,6 +106,10 @@ export const VARIANTS: VariantId[] = [
   "setupR1",
   "setupR2",
   "setupR2Order",
+  "setupR1b",
+  "setupR1c",
+  "setupR2b",
+  "setupR2bOrder",
 ];
 
 /**
@@ -241,16 +270,37 @@ function setupRound1(input: RequestInput): TextRequest {
   throw new Error(`Variant setupR1 does not cover role ${input.role}`);
 }
 
-/** Setup round 2 in one of its two orders; AI Iteration keeps today's order in both (setup doc A9). */
-function setupRound2(variant: VariantId, order: Round2Order) {
-  return (input: RequestInput): Round2Request => {
+/**
+ * Round 1b (round 1 with the round-1 report's one-sentence fixes) and round
+ * 1c (round 1b with proposal 1's fix-and-retest): round 1's shape and roles.
+ */
+function setupRound1With(variant: VariantId, parts: Round1Parts) {
+  return (input: RequestInput): TextRequest => {
     if (input.role === "setup") {
       const { premise, playerCount, gameMode, maxTurns } = input.setup;
-      return setupRound2Request(premise, playerCount, gameMode, maxTurns, "story", order);
+      return setupRequestFromRound1(premise, playerCount, gameMode, maxTurns, "story", parts);
     }
     if (input.role === "iteration") {
       const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
-      return iterationRound2Request(feedback, playerCount, gameMode, maxTurns, sections, template);
+      return iterationRequestFromRound1(feedback, playerCount, gameMode, maxTurns, sections, template, parts);
+    }
+    throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  };
+}
+
+/**
+ * Setup round 2 in one of its two orders, on round 2's base or (round 2b)
+ * round 1b's passing changes; AI Iteration keeps today's order in both (setup doc A9).
+ */
+function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts = PASSING_ROUND1_PARTS) {
+  return (input: RequestInput): Round2Request => {
+    if (input.role === "setup") {
+      const { premise, playerCount, gameMode, maxTurns } = input.setup;
+      return setupRound2Request(premise, playerCount, gameMode, maxTurns, "story", order, parts);
+    }
+    if (input.role === "iteration") {
+      const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
+      return iterationRound2Request(feedback, playerCount, gameMode, maxTurns, sections, template, parts);
     }
     throw new Error(`Variant ${variant} does not cover role ${input.role}`);
   };
@@ -269,6 +319,10 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   setupR1: setupRound1,
   setupR2: setupRound2("setupR2", "fieldOrder"),
   setupR2Order: setupRound2("setupR2Order", "generationOrder"),
+  setupR1b: setupRound1With("setupR1b", ROUND1B_PARTS),
+  setupR1c: setupRound1With("setupR1c", ROUND1C_PARTS),
+  setupR2b: setupRound2("setupR2b", "fieldOrder", ROUND2B_BASE_PARTS),
+  setupR2bOrder: setupRound2("setupR2bOrder", "generationOrder", ROUND2B_BASE_PARTS),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

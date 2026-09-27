@@ -3,11 +3,15 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes, type GameMode } from "core/types/index.js";
 import { exampleBlock } from "../../../../src/evals/textModelEval/setupDesignChecks.js";
 import {
+  ROUND1B_PARTS,
+  ROUND1C_PARTS,
   WORKED_EXAMPLE_HEADING,
+  iterationRequestFromRound1,
   iterationRound1Request,
+  setupRequestFromRound1,
   setupRound1Request,
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
-import { iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
+import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
@@ -263,6 +267,10 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-sol@low/setupR1": ["setup-learn-lemonade s1"],
       "gpt-6-luna@low/setupR2": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
       "gpt-6-luna@low/setupR2Order": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-luna@low/setupR1b": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-luna@low/setupR1c": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-luna@low/setupR2b": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      "gpt-6-luna@low/setupR2bOrder": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
     });
     expect(plan("setup-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
     expect(plan("turn-rounds")).toEqual([]);
@@ -344,6 +352,32 @@ describe("requestFor: setup round 1", () => {
     expect(() => requestFor("setupR1", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant setupR1 does not cover role beat");
   });
 
+  it.each(INPUTS)("%i players, %s: builds round 1b (round 1 with the report's fixes) for custom stories and AI Iteration", (players, mode) => {
+    const request = requestFor("setupR1b", setup(players, mode));
+    const expected = setupRequestFromRound1("A premise", players, mode, 25, "story", ROUND1B_PARTS);
+    expect(isSplitRequest(request)).toBe(false);
+    expect(requestText(request)).toBe(expected.prompt);
+    expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+    expect(requestText(request)).not.toBe(requestText(requestFor("setupR1", setup(players, mode))));
+    const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: players, gameMode: mode, maxTurns: 25 };
+    expect(requestText(requestFor("setupR1b", { role: "iteration", iteration }))).toBe(
+      iterationRequestFromRound1("More rivalry", players, mode, 25, ["stats"], { title: "T" }, ROUND1B_PARTS).prompt
+    );
+    expect(() => requestFor("setupR1b", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant setupR1b does not cover role beat");
+  });
+
+  it.each(INPUTS)("%i players, %s: builds round 1c (round 1b with proposal 1's fix-and-retest) for custom stories and AI Iteration", (players, mode) => {
+    const request = requestFor("setupR1c", setup(players, mode));
+    const expected = setupRequestFromRound1("A premise", players, mode, 25, "story", ROUND1C_PARTS);
+    expect(requestText(request)).toBe(expected.prompt);
+    expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+    const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: players, gameMode: mode, maxTurns: 25 };
+    expect(requestText(requestFor("setupR1c", { role: "iteration", iteration }))).toBe(
+      iterationRequestFromRound1("More rivalry", players, mode, 25, ["stats"], { title: "T" }, ROUND1C_PARTS).prompt
+    );
+    expect(() => requestFor("setupR1c", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant setupR1c does not cover role beat");
+  });
+
   it.each(INPUTS)("%i players, %s: the Stage 3 and Stage 4 setup variants still build on production's anchors", (players, mode) => {
     for (const variant of ["minimal", "rewrite", "rewriteZeroShot", "rewrite2", "rewrite2ZeroShot"] as VariantId[]) {
       expect(() => requestFor(variant, setup(players, mode))).not.toThrow();
@@ -383,6 +417,25 @@ describe("requestFor: setup round 2", () => {
     const expected = iterationRound2Request("More rivalry", 2, GameModes.Competitive, 25, ["guidelines", "stats"], { title: "T" }).prompt;
     for (const variant of ["setupR2", "setupR2Order"] as VariantId[]) {
       expect(requestText(requestFor(variant, { role: "iteration", iteration }))).toBe(expected);
+      expect(() => requestFor(variant, { role: "beat", story: firstSwitchBeat(1) })).toThrow(`Variant ${variant} does not cover role beat`);
+    }
+  });
+
+  it.each(INPUTS)("%i players, %s: builds round 2b's two arms on round 1b's passing changes, custom stories and AI Iteration", (players, mode) => {
+    const pairs: [VariantId, Round2Order][] = [
+      ["setupR2b", "fieldOrder"],
+      ["setupR2bOrder", "generationOrder"],
+    ];
+    for (const [variant, order] of pairs) {
+      const request = requestFor(variant, setup(players, mode));
+      const expected = setupRound2Request("A premise", players, mode, 25, "story", order, ROUND2B_BASE_PARTS);
+      expect(requestText(request)).toBe(expected.prompt);
+      expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+      expect("assemble" in request).toBe(order === "generationOrder");
+      const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["guidelines", "stats"], playerCount: players, gameMode: mode, maxTurns: 25 };
+      expect(requestText(requestFor(variant, { role: "iteration", iteration }))).toBe(
+        iterationRound2Request("More rivalry", players, mode, 25, ["guidelines", "stats"], { title: "T" }, ROUND2B_BASE_PARTS).prompt
+      );
       expect(() => requestFor(variant, { role: "beat", story: firstSwitchBeat(1) })).toThrow(`Variant ${variant} does not cover role beat`);
     }
   });

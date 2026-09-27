@@ -1,4 +1,5 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
+import type { z } from "zod";
 import { createStorySetupSchema, GameModes, type GameMode, type PlayerCount } from "core/types/index.js";
 import { setupStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { StorySetupPromptService } from "../../../../../src/game/services/prompts/StorySetupPromptService.js";
@@ -6,6 +7,8 @@ import {
   ENGINE_HEADING,
   NO_BLANK_ITEMS,
   PASSING_ROUND1_PARTS,
+  ROUND1B_PARTS,
+  ROUND1C_PARTS,
   THIS_SETUP_HEADING,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
@@ -14,6 +17,7 @@ import {
 import {
   INSTRUCTIONS_FALLBACK,
   NARRATIVE_PROMPT_LINE,
+  ROUND2B_BASE_PARTS,
   assembleGenerationOrder,
   iterationRound2Request,
   setupRound2Request,
@@ -68,7 +72,7 @@ describe("round 2's base: round 1 without the proposals that failed the stop rul
   });
 
   it("refuses a scoreboard without the slate that prints its lines", () => {
-    expect(() => setupRequestFromRound1(PREMISE, 2, GameModes.Competitive, 25, "story", { slate: false, scoreboard: true, example: false })).toThrow(
+    expect(() => setupRequestFromRound1(PREMISE, 2, GameModes.Competitive, 25, "story", { slate: false, scoreboard: true, example: false, fixes: false, everyPlayerStat: false })).toThrow(
       /needs the slate/
     );
   });
@@ -474,5 +478,159 @@ describe("AI Iteration on round 2 (arm A's text: A9 keeps iteration on today's f
     const prompt = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, ALL_SECTIONS, TEMPLATE).prompt;
     expect(prompt).not.toContain("EXAMPLE STAT SETUPS");
     expect(StorySetupPromptService.createIterationPrompt(FEEDBACK, 2, GameModes.Competitive, 25, ALL_SECTIONS, TEMPLATE)).not.toContain("EXAMPLE STAT SETUPS");
+  });
+});
+
+/*
+ * Round 2b: round 2's two arms on round 1b's base (round 1 with the report's
+ * fixes, every proposal kept), after the moved reading of the stop rule
+ * passed proposal 1: the outcome slate and the seat roles are back, and with
+ * them the worked example in place of production's example stat setups.
+ */
+describe("round 2b: steering on round 1b's base", () => {
+  const base1b = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") =>
+    setupRequestFromRound1(PREMISE, players, mode, 25, kind, ROUND1B_PARTS);
+  const round2b = (order: Round2Order, players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story") =>
+    setupRound2Request(PREMISE, players, mode, 25, kind, order, ROUND1B_PARTS);
+  const A71 = "Two to four rules that the story's planners apply between threads";
+  const A72 = "Write each as 'Name (kind, beats): what the players do and what is at stake'.";
+  const A73 = "One to three thresholds, each with what the story must do when the stat reaches it.";
+
+  it.each(ARM_INPUTS)("%s, %s, %i players, %s: builds with caps only, and A7's three fields once each", (order, kind, players, mode) => {
+    const request = round2b(order, players, mode, kind);
+    const schema = json(request.schema);
+    expect(countKeywords(schema).filter((keyword) => keyword.startsWith("minItems"))).toEqual([]);
+    const text = descriptions(request.schema);
+    expect([occurrences(text, A71), occurrences(text, A72), occurrences(text, A73)]).toEqual([1, 1, 1]);
+    expect(occurrences(text, INSTRUCTIONS_FALLBACK)).toBe(order === "fieldOrder" ? 1 : 0);
+    // Production's field texts are replaced whole
+    expect(text).not.toContain("Generate 0-3 instructions.");
+    expect(text).not.toContain("Specific thresholds and their story implications. Be creative.");
+  });
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: both arms send round 1b's prompt as it is: no narrative-thresholds block to replace, no production examples to cut", (kind, players, mode) => {
+    const prompt = round2b("fieldOrder", players, mode, kind).prompt;
+    expect(round2b("generationOrder", players, mode, kind).prompt).toBe(prompt);
+    expect(prompt).toBe(base1b(players, mode, kind).prompt);
+    // A7.3's field says what the prompt line would; the worked example shows it
+    expect(prompt).not.toContain(NARRATIVE_PROMPT_LINE);
+    expect(occurrences(prompt, WORKED_EXAMPLE_HEADING)).toBe(1);
+    expect(prompt).not.toContain("EXAMPLE STAT SETUPS");
+  });
+
+  it("builds round 2b's variants on round 1c, round 1b with proposal 1's fix-and-retest", () => {
+    expect(ROUND2B_BASE_PARTS).toEqual(ROUND1C_PARTS);
+  });
+
+  it("keeps round 2 as it ran: the default base is round 2's", () => {
+    for (const order of ORDERS) {
+      const [asRan, explicit] = [round2(order, 2, GameModes.Competitive), setupRound2Request(PREMISE, 2, GameModes.Competitive, 25, "story", order, PASSING_ROUND1_PARTS)];
+      expect(asRan.prompt).toBe(explicit.prompt);
+      expect(JSON.stringify(json(asRan.schema))).toBe(JSON.stringify(json(explicit.schema)));
+    }
+  });
+
+  describe("arm B: proposal 9's order with the seat roles first (A9's playerRoles)", () => {
+    const properties = (schema: Parameters<typeof toJsonSchema>[0], path: string[] = []) => Object.keys(find(json(schema), [...path, "properties"]) as object);
+
+    it.each(KIND_INPUTS)("%s, %i players, %s: roles, then what depends on them; no shared list for one player", (kind, players, mode) => {
+      const schema = round2b("generationOrder", players, mode, kind).schema;
+      const slots = slotsOf(players);
+      expect(properties(schema)).toEqual([
+        "guidelines",
+        ...(kind === "story" ? ["difficultyLevel"] : ["difficultyLevels", "teaser"]),
+        ...(players > 1 ? ["playerRoles"] : []),
+        "storyElements",
+        ...(players > 1 ? ["sharedOutcomes"] : []),
+        "playerOutcomes",
+        "sharedStats",
+        "playerStats",
+        "characterSelectionPlan",
+        ...slots,
+        "threadDesign",
+        "title",
+        "characterSelectionIntroduction",
+        "imageInstructions",
+      ]);
+      // The seat roles leave the plan for their own field (A9: "replaces multiplayerCoordination")
+      expect(properties(schema, ["properties", "characterSelectionPlan"])).toEqual(["playerStatConversionRates", "backgroundArchetypes"]);
+      expect(properties(schema, ["properties", "playerOutcomes"])).toEqual(slots);
+    });
+
+    it.each(INPUTS.filter(([players]) => players > 1))("%i players, %s: one line per seat, capped at the player count", (players, mode) => {
+      const schema = json(round2b("generationOrder", players, mode).schema);
+      const roles = find(schema, ["properties", "playerRoles"]) as { description: string; maxItems: number };
+      expect(roles.maxItems).toBe(players);
+      expect(roles.description).toContain("One line per player seat, in seat order");
+      expect(occurrences(descriptions(round2b("generationOrder", players, mode).schema), "give each player seat its own role")).toBe(0);
+      expect(countKeywords(schema).filter((keyword) => keyword.startsWith("maxItems")).length).toBe(countKeywords(json(round2b("fieldOrder", players, mode).schema)).filter((k) => k.startsWith("maxItems")).length + 1);
+    });
+
+    const outcome = (id: string, milestones: 1 | 2 | 3) => ({
+      id,
+      question: `Will ${id} happen?`,
+      possibleResolutions: { favorable: "yes", unfavorable: "no", mixed: "partly" },
+      resonance: "It matters.",
+      intendedNumberOfMilestones: milestones,
+    });
+    const stat = (id: string) => ({
+      type: "percentage",
+      name: id,
+      id,
+      possibleValues: "",
+      effectOnPoints: ["Above 70%: +10 in social challenges", "Below 30%: -10 in social challenges"],
+      optionsToSacrifice: "Spend 10%",
+      optionsToGainAsReward: "Regain 10%",
+      canBeChangedInBeatResolutions: true,
+      narrativeImplications: ["At 20% or below: the next switch forces a thread about rest."],
+      adjustmentsAfterThreads: ["+10% after a favorable challenge thread"],
+      isVisible: true,
+      partOfPlayerBackgrounds: true,
+      initialValue: 50,
+      tooltip: "How rested you are.",
+      group: "Baker",
+    });
+    const seat = (slot: string) => ({
+      possibleCharacterIdentities: [1, 2, 3].map((i) => ({ name: `${slot} ${i}`, pronouns: { personal: "they", object: "them", possessive: "their", reflexive: "themselves" }, appearance: "tall" })),
+      possibleCharacterBackgrounds: [1, 2, 3].map((i) => ({ title: `B${i}`, fluffTemplate: "{name} bakes as the oven's keeper.", initialPlayerStatValues: [{ statId: "player_energy", value: 50 }] })),
+    });
+    const reply = (players: PlayerCount, kind: "story" | "template") => ({
+      guidelines: { world: "A market.", rules: ["One oven."], tone: ["Warm."], conflicts: ["Share or win."], decisions: ["Who bakes first."] },
+      ...(kind === "story" ? { difficultyLevel: { modifier: 0, title: "Even" } } : { difficultyLevels: [{ modifier: 0, title: "Even" }], teaser: "Bread." }),
+      ...(players > 1 ? { playerRoles: slotsOf(players).map((slot) => `${slot}: the oven's keeper`) } : {}),
+      storyElements: [{ id: "oven", name: "The Oven", role: "Prize", instructions: "Hot.", appearance: "Iron.", facts: ["Old.", "Big.", "Cracked."] }],
+      ...(players > 1 ? { sharedOutcomes: [outcome("shared_oven", 2)] } : {}),
+      playerOutcomes: Object.fromEntries(slotsOf(players).map((slot) => [slot, [outcome(`${slot}_loaf`, 2), outcome(`${slot}_friend`, 1)]])),
+      sharedStats: [stat("shared_heat")],
+      playerStats: [stat("player_energy")],
+      characterSelectionPlan: { playerStatConversionRates: ["10 energy is 1 flour"], backgroundArchetypes: ["a", "b", "c"] },
+      ...Object.fromEntries(slotsOf(players).map((slot) => [slot, seat(slot)])),
+      threadDesign: { typesOfThreads: ["Bake-off (challenge, 3): win the crowd"], switchAndThreadInstructions: ["The first thread is about the oven."] },
+      title: "The Oven",
+      characterSelectionIntroduction: { title: "Who bakes?", text: "You are..." },
+      imageInstructions: { visualStyle: "warm", atmosphere: "busy", colorPalette: "golden", settingDetails: "stalls", characterStyle: "round", artInfluences: "soft", coverPrompt: "A market oven" },
+    });
+
+    it.each(KIND_INPUTS)("%s, %i players, %s: assembles into round 1b's own fields and key order, which its schema parses", (kind, players, mode) => {
+      const request = round2b("generationOrder", players, mode, kind);
+      const assembled = request.assemble?.(reply(players, kind)) as Record<string, unknown>;
+      const arm = round2b("fieldOrder", players, mode, kind).schema as z.AnyZodObject;
+      expect(Object.keys(assembled)).toEqual(Object.keys(arm.shape));
+      expect(arm.safeParse(assembled).success).toBe(true);
+      expect(assembled).not.toHaveProperty("playerRoles");
+      // The seat roles are saved where arm A keeps them, in the plan
+      const plan = assembled.characterSelectionPlan as { multiplayerCoordination: string[] };
+      expect(plan.multiplayerCoordination).toEqual(players > 1 ? slotsOf(players).map((slot) => `${slot}: the oven's keeper`) : []);
+    });
+  });
+
+  it.each(INPUTS)("iteration, %i players, %s: every section set builds on round 1b's base, cut as production cuts it", (players, mode) => {
+    for (const sections of SECTION_SETS) {
+      const request = iterationRound2Request(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND1B_PARTS);
+      const base1 = iterationRequestFromRound1(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND1B_PARTS);
+      expect(Object.keys(find(json(request.schema), ["properties"]) as object)).toEqual(Object.keys(find(json(base1.schema), ["properties"]) as object));
+      expect(request.prompt).toBe(base1.prompt.replace(/Narrative Thresholds and Implications\.\n[\s\S]*?\(e\.g\., "1000\+ gold represents upper class status"\)\n/, `${NARRATIVE_PROMPT_LINE}\n`));
+      expect(occurrences(descriptions(request.schema), "Two to four rules that the story's planners apply between threads")).toBe(sections.includes("guidelines") ? 1 : 0);
+    }
   });
 });
