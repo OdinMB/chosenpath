@@ -1,5 +1,6 @@
 import type { BeatGeneration, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { Logger } from "shared/logger.js";
+import { errorClass } from "./retryOnce.js";
 import { isPlayerBeat } from "./storyTextSteps.js";
 
 /*
@@ -48,7 +49,12 @@ export function withBeatProblem(prompt: string, problem: string): string {
   return `${prompt}\n\nYour previous reply could not be used: ${problem}. Write the beats again.`;
 }
 
-/** A beat call, checked for texts of one paragraph: one more call told the problem, and the second reply is used either way. */
+/**
+ * A beat call, checked for texts of one paragraph: one more call told the
+ * problem, and the second reply is used either way. The first reply is usable,
+ * so when the second call fails (after the chat model's own re-sends), the
+ * first is used rather than failing the turn.
+ */
 export async function checkedBeatReply(
   prompt: string,
   invoke: (prompt: string) => Promise<SetOfBeatGenerationSchema>,
@@ -59,7 +65,14 @@ export async function checkedBeatReply(
   if (!problem) return first;
   // Counts only: the problem names slots, never text
   log("A beat came back as a single short paragraph; asking once more");
-  const second = await invoke(withBeatProblem(prompt, problem));
+  let second: SetOfBeatGenerationSchema;
+  try {
+    second = await invoke(withBeatProblem(prompt, problem));
+  } catch (error) {
+    // The error's class only: its message can quote the reply
+    log(`A beat's retry failed (${errorClass(error)}); using the first reply`);
+    return first;
+  }
   if (shortTextProblem(second)) log("A beat came back as a single short paragraph again; using it");
   return second;
 }

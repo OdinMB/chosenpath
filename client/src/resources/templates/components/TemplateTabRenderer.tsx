@@ -24,6 +24,7 @@ import {
   GameMode,
 } from "core/types";
 import { TabType } from "../hooks/useTemplateForm";
+import { worldPlaysContests } from "../utils/outcomeResolutions";
 
 interface TabRendererProps {
   activeTab: TabType;
@@ -332,6 +333,7 @@ export const TemplateTabRenderer: React.FC<TabRendererProps> = (props) => {
           playerOptions={getPlayerOptionsFromStoryTemplate(formData)}
           onPlayerOptionsChange={handlePlayerChange}
           playerStats={formData.playerStats || []}
+          contests={worldPlaysContests(formData.gameMode, formData.playerCountMax)}
           showContextCards={true}
           isAiIterating={isAiIterating}
           isSparse={isSparse}

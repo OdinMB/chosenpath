@@ -204,6 +204,82 @@ describe("pickedOutcome (turn doc A2: the player's pick sets the chapter's outco
     const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 0, playerOutcomes: { player1: [outcome(GUILD), outcome(ENCLAVE)] }, phases: [structured] });
     expect(pickedOutcome(story, "player1")?.outcomeId).toBe(ENCLAVE);
   });
+
+  describe("a single player's pick that names no outcome the story knows: a fallback, so the chapter still has one", () => {
+    // GUILD needs 1 more, ENCLAVE 3, MIA 2
+    const OUTCOMES = {
+      player1: [
+        outcome(GUILD, { intendedNumberOfMilestones: 2, milestones: ["The Guild listens"] }),
+        outcome(ENCLAVE, { intendedNumberOfMilestones: 3 }),
+        outcome(MIA, { intendedNumberOfMilestones: 2 }),
+      ],
+    };
+    const withDirections = (plan: ReturnType<typeof topicSwitch>, directions: { direction: string; outcomeId: string }[]) => ({
+      ...plan,
+      switches: plan.switches.map((sw) => ({ ...sw, topicDirections: directions })),
+    });
+
+    it("takes the outcome that still needs the most milestones when the player picks a third option beside two directions", () => {
+      const plan = topicSwitch([["Meet Sir Bram", GUILD], ["Find Mia", MIA]], 4);
+      const twoDirections = withDirections(plan, [
+        { direction: "Meet Sir Bram", outcomeId: GUILD },
+        { direction: "Find Mia", outcomeId: MIA },
+      ]);
+      const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 2, playerOutcomes: OUTCOMES, phases: [twoDirections] });
+
+      expect(pickedOutcome(story, "player1")).toMatchObject({ kind: "topic", choice: 2, directions: 2, outcomeId: ENCLAVE, fallback: true });
+    });
+
+    it("does the same for a switch planned before planner v2 whose chosen direction names no id", () => {
+      const plan = topicSwitch([["Meet Sir Bram", GUILD], ["Find Mia", MIA]], 4);
+      const legacy = { ...plan, switches: plan.switches.map((sw) => ({ ...sw, topicChoices: [sw.topicChoices[0], "Wander the docks at night and listen", sw.topicChoices[1]] })) };
+      const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 1, playerOutcomes: OUTCOMES, phases: [legacy] });
+
+      expect(pickedOutcome(story, "player1")).toMatchObject({ kind: "topic", choice: 1, directions: 3, outcomeId: ENCLAVE, fallback: true });
+    });
+
+    it("prefers the main outcome on a tie, whatever the list's order", () => {
+      // ENCLAVE and GUILD both still need 2; GUILD, with the most intended milestones, is the main outcome
+      const tied = { player1: [outcome(ENCLAVE, { intendedNumberOfMilestones: 2 }), outcome(GUILD, { intendedNumberOfMilestones: 3, milestones: ["a"] })] };
+      const plan = withDirections(topicSwitch([["Meet Sir Bram", GUILD]], 4), [{ direction: "Meet Sir Bram", outcomeId: GUILD }]);
+      const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 1, playerOutcomes: tied, phases: [plan] });
+
+      expect(pickedOutcome(story, "player1")?.outcomeId).toBe(GUILD);
+    });
+
+    it("keeps a pick that names a known outcome as it is, unmarked", () => {
+      const plan = topicSwitch([["Meet Sir Bram", GUILD], ["Find Mia", MIA]], 4);
+      const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 1, playerOutcomes: OUTCOMES, phases: [plan] });
+
+      const pick = pickedOutcome(story, "player1");
+      expect(pick?.outcomeId).toBe(MIA);
+      expect(pick?.fallback).toBeUndefined();
+    });
+
+    it("gives a group no fallback: a group's plan names its own outcome", () => {
+      const slots = ["player1", "player2"];
+      const plan = topicSwitch([["Meet Sir Bram", "shared_city"], ["Find Mia", "shared_city"]], 4, slots);
+      const story = roundStory({
+        players: 2,
+        turns: 5,
+        maxTurns: 20,
+        lastChoice: 2,
+        gameMode: GameModes.Cooperative,
+        sharedOutcomes: [outcome("shared_city")],
+        playerOutcomes: { player1: [outcome("player1_own")], player2: [outcome("player2_own")] },
+        phases: [plan],
+      });
+
+      expect(pickedOutcome(story, "player1")?.outcomeId).toBeUndefined();
+    });
+
+    it("has nothing to fall back on in a story without outcomes", () => {
+      const plan = topicSwitch([["Meet Sir Bram", GUILD]], 4);
+      const story = roundStory({ turns: 5, maxTurns: 20, lastChoice: 2, phases: [plan] });
+
+      expect(pickedOutcome(story, "player1")?.outcomeId).toBeUndefined();
+    });
+  });
 });
 
 describe("threadPacingBlock", () => {
@@ -250,5 +326,16 @@ describe("threadPacingBlock", () => {
     expect(block).not.toContain("Allowed lengths");
     expect(block).toContain(`${GUILD}: 0 of 3 milestones; 3 still needed.`);
     expect(block).toContain("Phase: the story's final thread.");
+  });
+
+  it("names the fallback outcome when a single player's pick names none, as the chapter will store it", () => {
+    const story = roundStory({
+      turns: 5,
+      maxTurns: 20,
+      lastChoice: 2,
+      playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: 1 }), outcome(ENCLAVE, { intendedNumberOfMilestones: 3 })] },
+      phases: [topicSwitch([["Meet Sir Bram", GUILD], ["Visit the enclave", ENCLAVE]], 4)],
+    });
+    expect(threadPacingBlock(story)).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 3 milestones; 3 still needed.`);
   });
 });

@@ -101,4 +101,18 @@ describe("checkedBeatReply", () => {
     expect(lines).toHaveLength(2);
     expect(lines.join("\n")).not.toContain(PARAGRAPH.slice(0, 20));
   });
+
+  it("uses the first reply when the retry's call fails outright: a usable short turn never fails for the retry", async () => {
+    const lines: string[] = [];
+    const invoke = jest.fn(async (prompt: string) => {
+      if (prompt === "THE PROMPT") return oneParagraph();
+      throw Object.assign(new Error(`Request timed out; the reply began ${PARAGRAPH}`), { name: "APIConnectionTimeoutError" });
+    });
+
+    await expect(checkedBeatReply("THE PROMPT", invoke, (line) => lines.push(line))).resolves.toEqual(oneParagraph());
+    expect(invoke).toHaveBeenCalledTimes(2);
+    // The error's class, never its message, which can quote the reply
+    expect(lines[1]).toContain("APIConnectionTimeoutError");
+    expect(lines.join("\n")).not.toContain(PARAGRAPH.slice(0, 20));
+  });
 });

@@ -12,8 +12,8 @@ import { THREAD_TYPE } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { Logger } from "shared/logger.js";
 import { outcomeIdsNamed } from "./outcomeIds.js";
-import { allowedLengths, turnsLeft } from "./pacing.js";
-import { UnusableResultError } from "./retryOnce.js";
+import { allowedLengths, fallbackOutcomeId, pickedOutcome, turnsLeft } from "./pacing.js";
+import { UnusableResultError, errorClass } from "./retryOnce.js";
 import { logRepairs, type Repair } from "./textRepairs.js";
 
 /*
@@ -126,6 +126,17 @@ function isJunkDirection(direction: string): boolean {
 
 export { outcomeIdsNamed };
 
+/**
+ * Planner v2's directions beside their outcomes (`topicDirections`, one pair
+ * per `topicChoices` string, in the same order). The switch turn offers the
+ * strings and the chapter planner's pick reads the pair at the chosen
+ * position, so whatever the check drops or trims leaves both lists.
+ */
+const directionsBeside = (sw: Switch): unknown[] | undefined => {
+  const held = (sw as Switch & { topicDirections?: unknown }).topicDirections;
+  return Array.isArray(held) ? held : undefined;
+};
+
 function checkFlavorSwitch(written: Switch, outcomes: StoryOutcomes, repairs: Repair[], problems: string[]): Switch {
   const label = `the flavor switch "${written.id}"`;
   if (!outcomes.skip && !outcomes.all.includes(written.outcomeId)) {
@@ -134,31 +145,35 @@ function checkFlavorSwitch(written: Switch, outcomes: StoryOutcomes, repairs: Re
   if (!written.question?.trim()) problems.push(`${label} has no question`);
   if ((written.topicChoices ?? []).length === 0) return written;
   repairs.push({ kind: "flavorDirectionsCleared", detail: written.id });
-  return { ...written, topicChoices: [] };
+  return { ...written, topicChoices: [], ...(directionsBeside(written) ? { topicDirections: [] } : {}) };
 }
 
 function checkTopicSwitch(written: Switch, outcomes: StoryOutcomes, repairs: Repair[], problems: string[]): Switch {
-  const usable = (written.topicChoices ?? []).filter((direction) => {
-    if (isJunkDirection(direction)) {
-      repairs.push({ kind: "directionJunk", detail: `${written.id}: ${JSON.stringify(direction)}` });
-      return false;
-    }
-    if (outcomes.skip) return true;
-    const named = outcomeIdsNamed(direction, outcomes.all);
-    if (named.known.length === 0 && named.unknown.length > 0) {
-      repairs.push({ kind: "directionUnknownOutcomes", detail: `${written.id}: ${named.unknown.join(", ")}` });
-      return false;
-    }
-    return true;
-  });
+  const choices = written.topicChoices ?? [];
+  const usable = choices
+    .map((direction, index) => ({ direction, index }))
+    .filter(({ direction }) => {
+      if (isJunkDirection(direction)) {
+        repairs.push({ kind: "directionJunk", detail: `${written.id}: ${JSON.stringify(direction)}` });
+        return false;
+      }
+      if (outcomes.skip) return true;
+      const named = outcomeIdsNamed(direction, outcomes.all);
+      if (named.known.length === 0 && named.unknown.length > 0) {
+        repairs.push({ kind: "directionUnknownOutcomes", detail: `${written.id}: ${named.unknown.join(", ")}` });
+        return false;
+      }
+      return true;
+    });
 
   const kept = usable.slice(0, MAX_DIRECTIONS);
-  for (const direction of usable.slice(MAX_DIRECTIONS)) {
+  for (const { direction } of usable.slice(MAX_DIRECTIONS)) {
     repairs.push({ kind: "directionsTrimmed", detail: `${written.id}: ${direction}` });
   }
-  // One known outcome per direction ships with its own field (A2); until then only noted
+  // Planner v2 writes each direction's one outcome in its own field (topicDirections); these notes read the text, so
+  // they fire on switches planned before it and on a direction whose text names another outcome's id
   if (!outcomes.skip) {
-    for (const direction of kept) {
+    for (const { direction } of kept) {
       const count = outcomeIdsNamed(direction, outcomes.all).known.length;
       if (count > 1) repairs.push({ kind: "directionManyOutcomes", note: true, detail: `${written.id}: ${direction}` });
       if (count === 0) repairs.push({ kind: "directionNoOutcome", note: true, detail: `${written.id}: ${direction}` });
@@ -169,7 +184,10 @@ function checkTopicSwitch(written: Switch, outcomes: StoryOutcomes, repairs: Rep
       `the topic switch "${written.id}" has ${kept.length} usable ${kept.length === 1 ? "direction" : "directions"} in topicChoices, and it needs ${MAX_DIRECTIONS}`
     );
   }
-  return { ...written, topicChoices: kept };
+  const beside = directionsBeside(written);
+  // A list out of step with the strings (never written by the assembly) is dropped: the pick then reads the strings
+  const paired = beside ? { topicDirections: beside.length === choices.length ? kept.map(({ index }) => beside[index]) : undefined } : {};
+  return { ...written, topicChoices: kept.map(({ direction }) => direction), ...paired };
 }
 
 /** Checks a switch plan (PL-1 to PL-3): the plan with its repairs, and the problem that keeps it from use, if any. */
@@ -260,12 +278,18 @@ function swapSides(results: Results): Results {
   return { ...results, sideAWins: results.sideBWins, sideBWins: results.sideAWins };
 }
 
-const slotNumber = (slot: string) => Number(slot.replace(/^player/, ""));
-const lowestSlot = (slots: string[]) => Math.min(...slots.map(slotNumber));
-
-/** The lowest slot of a contest on side A, as contested outcomes are written; the results swap with the sides (PL-11). */
-function withLowestSlotOnSideA(thread: Thread, repairs: Repair[]): Thread {
-  if (lowestSlot(thread.playersSideA) < lowestSlot(thread.playersSideB)) return thread;
+/**
+ * player1 on side A of a contest they are in, the results swapping with the
+ * sides (PL-11): side A is player1's side, or with three players player1's
+ * camp, as the setup writes contested outcomes and their scoreboards. A
+ * contest player1 sits out keeps the sides the planner wrote: which camp a
+ * seat is in lives in the setup's text (its roles, backgrounds and the
+ * scoreboard's tooltip), which no check reads, and the planner is told that
+ * player1's camp is side A (camps {player1, player3} against {player2} put
+ * player3 on side A of a contest with player2).
+ */
+function withPlayer1OnSideA(thread: Thread, repairs: Repair[]): Thread {
+  if (!thread.playersSideB.includes("player1")) return thread;
   repairs.push({ kind: "contestSidesSwapped", detail: thread.id });
   return {
     ...thread,
@@ -323,7 +347,20 @@ function checkThread(
     problems.push(`${label} has players on side B, which makes it a contest, but its results are not sideAWins/mixed/sideBWins`);
     return thread;
   }
-  return sidesUsable ? withLowestSlotOnSideA(thread, repairs) : thread;
+  return sidesUsable ? withPlayer1OnSideA(thread, repairs) : thread;
+}
+
+/**
+ * A single player's chapter whose outcome is the fallback, not the pick's own
+ * (pacing.ts, fallbackOutcomeId), is noted, so the log counts how often the
+ * pick names no outcome.
+ */
+function noteOutcomeFallback(story: Story, threads: Thread[], outcomes: StoryOutcomes, repairs: Repair[]): void {
+  if (story.isMultiplayer() || outcomes.skip || threads.length !== 1) return;
+  const pick = pickedOutcome(story, "player1");
+  if (pick && !pick.fallback) return;
+  const fallback = pick?.outcomeId ?? fallbackOutcomeId(story, "player1");
+  if (fallback && threads[0].outcomeId === fallback) repairs.push({ kind: "chapterOutcomeFallback", note: true });
 }
 
 /**
@@ -394,6 +431,7 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
   const uniqueThreads = withUniqueIds(placedThreads, repairs);
   const duration = durationFromSteps(reply.duration, uniqueThreads, repairs, problems);
   const threads = uniqueThreads.map((thread) => checkThread(story, thread, outcomes, repairs, problems));
+  noteOutcomeFallback(story, threads, outcomes, repairs);
   if (story.isMultiplayer() && !story.hasThreadAnalysis()) {
     checkFirstThread(story, threads, outcomes, problems);
   }
@@ -443,7 +481,8 @@ type PlanKind<P> = {
  * can't be used or its length is one PACING does not allow. A length problem
  * alone never fails the turn: a second reply whose only problem is its
  * length is used (noted as lengthNotAllowed), and so is a first reply whose
- * only problem was its length when the second can't be used at all.
+ * only problem was its length when the second can't be used at all or its
+ * call fails (after the chat model's own re-sends).
  */
 async function checkedPlan<P>(
   kind: PlanKind<P>,
@@ -467,10 +506,21 @@ async function checkedPlan<P>(
 
   const first = await attempt();
   if (!first.problem && !first.lengthProblem) return first.plan;
-  const second = await attempt(both(first));
-  if (!second.problem) return second.plan;
-  if (!first.problem) return first.plan;
-  throw new UnusableResultError(kind.what, second.problem);
+  if (first.problem) {
+    const second = await attempt(both(first));
+    if (!second.problem) return second.plan;
+    throw new UnusableResultError(kind.what, second.problem);
+  }
+  // The first plan is usable, only its length is off: the retry may fix it, but a failed call never costs the plan
+  try {
+    const second = await attempt(both(first));
+    return second.problem ? first.plan : second.plan;
+  } catch (error) {
+    Logger.Story.warn(
+      `The ${kind.what} retry for story ${story.getId()} at turn ${story.getCurrentTurn() + 1} failed (${errorClass(error)}); using the first plan`
+    );
+    return first.plan;
+  }
 }
 
 /** A switch plan call, checked: the repaired plan, one retry told the problem, else an UnusableResultError. */

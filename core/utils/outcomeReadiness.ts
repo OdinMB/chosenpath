@@ -1,6 +1,6 @@
 import type { Outcome } from "../types/outcome.js";
 import type { PlayerCount } from "../types/player.js";
-import type { StoryState } from "../types/story.js";
+import { GameModes, type GameMode, type StoryState } from "../types/story.js";
 import { getPlayerSlots } from "./playerUtils.js";
 
 /*
@@ -37,6 +37,16 @@ const holdsOutcome = (list: OutcomeList): boolean => (list?.length ?? 0) > 0;
 export function isContestedOutcome(outcome: Outcome): boolean {
   const resolutions: unknown = outcome.possibleResolutions;
   return typeof resolutions === "object" && resolutions !== null && "sideAWins" in resolutions;
+}
+
+/**
+ * Whether a story of this mode and player count can play a contest: two or
+ * more players in a competitive or cooperative-competitive game. The plan
+ * check refuses a contest anywhere else, and a contest has two sides (with
+ * three players, two camps).
+ */
+export function contestsPlayable(gameMode: GameMode | undefined, playerCount: number): boolean {
+  return playerCount > 1 && (gameMode === GameModes.Competitive || gameMode === GameModes.CooperativeCompetitive);
 }
 
 /** Why a story with these outcomes can't start, or null when it can. */

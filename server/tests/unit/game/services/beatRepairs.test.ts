@@ -241,6 +241,24 @@ describe("repairBeatReply: a number written as text (the scoreboard's move, setu
     const rank = statChange("player1", "player_rank", "setString", "Master");
     expect(repaired(withStats(laterSwitchBeat(1)), rank)).toEqual({ changes: [rank], kinds: [] });
   });
+
+  it.each([
+    ["-10% on a percentage", "player_energy", "-10%"],
+    ["+10% on a percentage", "player_energy", "+10%"],
+    ["-10 on a percentage", "player_energy", "-10"],
+    ["+5 on a number", "player_gold", "+5"],
+    ["-10 on a number", "player_gold", "-10"],
+    ["a negative number on a percentage", "player_energy", -10],
+  ] as const)("leaves a signed change, %s, as it was: a delta, never an absolute set", (_, id, value) => {
+    const story = withStats(laterSwitchBeat(1), { playerStats: [stat("player_energy", { type: "percentage" }), stat("player_gold", { type: "number" })] });
+    const signed = statChange("player1", id, "setString", value);
+    expect(repaired(story, signed)).toEqual({ changes: [signed], kinds: [] });
+  });
+
+  it("leaves a signed scoreboard move as it was", () => {
+    const signed = statChange("shared", "shared_bounty_claim", "setString", "-15");
+    expect(repaired(contest(), signed)).toEqual({ changes: [signed], kinds: [] });
+  });
 });
 
 describe("repairBeatReply: string values off the ladder (TR-8)", () => {

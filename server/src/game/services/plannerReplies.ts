@@ -10,7 +10,7 @@ import {
   type SwitchAnalysis,
   type ThreadAnalysis,
 } from "core/types/index.js";
-import { outcomesFor, pickedOutcome } from "./pacing.js";
+import { fallbackOutcomeId, outcomesFor, pickedOutcome } from "./pacing.js";
 
 /*
  * The planners' replies, adopted with planner v2 on 2026-09-28 (turn doc A2,
@@ -24,7 +24,9 @@ import { outcomesFor, pickedOutcome } from "./pacing.js";
  * - A chapter states its kind first, then its question, its milestones, the
  *   steps before the last and a last step whose three results are the
  *   milestones, and its plan. A single player's chapter writes no outcome:
- *   the player's pick sets it (pacing.ts, pickedOutcome). The code fills the
+ *   the player's pick sets it (pacing.ts, pickedOutcome), or, when the pick
+ *   names none the story knows, the fallback the planner's prompt was told
+ *   (fallbackOutcomeId). The code fills the
  *   last step's results, the length and the ids. The kind, question and plan
  *   ride along on the stored thread.
  * The eval's measured form is storyTextRounds/turnRound1Planners.ts
@@ -291,13 +293,19 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
   };
 }
 
-/** A chapter planner's reply as the thread plan the story stores; a single player's chapter takes the outcome the pick set. */
+/**
+ * A chapter planner's reply as the thread plan the story stores; a single
+ * player's chapter takes the outcome the pick set, or the fallback when the
+ * pick names none the story knows (pacing.ts), so the plan check never finds
+ * an outcome the reply had no field to write.
+ */
 export function assembleThreadPlan(story: Story, parsed: unknown): ThreadAnalysis {
   const reply = asObject(parsed);
   const restated = asString(reply.relevantSwitchAndThreadInstructions);
   if (!story.isMultiplayer()) {
     const written = asObject(reply.thread);
-    const thread = storedThread(written, pickedOutcome(story, "player1")?.outcomeId ?? "", ["player1"], []);
+    const outcomeId = pickedOutcome(story, "player1")?.outcomeId ?? fallbackOutcomeId(story, "player1") ?? "";
+    const thread = storedThread(written, outcomeId, ["player1"], []);
     return {
       relevantSwitchAndThreadInstructions: restated,
       coordinationPatternSummary: asString(written.plan),

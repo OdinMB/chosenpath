@@ -15,6 +15,9 @@ export class UnusableResultError extends Error {
   }
 }
 
+/** An error's class for a log line ("APIConnectionTimeoutError"); its message can quote the model's reply. */
+export const errorClass = (error: unknown): string => (error instanceof Error ? error.name || "Error" : typeof error);
+
 /**
  * Runs `attempt` and checks its result with `problemOf`. A result with a
  * problem gets one more attempt, which is told that problem; when the second

@@ -11,8 +11,8 @@ import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
-import { threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import { SCOREBOARD_ENDING_RULE, SHARED_OUTCOMES_LINE, adoptedTurnPrompt } from "../../../helpers/adoptedDeltas.js";
+import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
+import { SCOREBOARD_ENDING_RULE, SHARED_OUTCOMES_LINE, adoptedTurnPrompt, isScoreboardEnding } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -108,9 +108,12 @@ describe("single-player turns: today's form with B6 as measured", () => {
  */
 const withEndingRule = (prompt: string) => adoptedTurnPrompt(prompt, true);
 
-function contestEnding(players: number, mode: GameMode = GameModes.Competitive): Story {
+/** The contest's scoreboard, a shared opposites stat, as a contest setup writes it. */
+const SCOREBOARD = stat("shared_voice_score", { name: "Enclave's Voice|Printers' Voice", type: "opposites", initialValue: 50 });
+
+function contestEnding(players: number, mode: GameMode = GameModes.Competitive, scoreboard = true): Story {
   const slots = Array.from({ length: players }, (_, i) => `player${i + 1}`);
-  return roundStory({
+  const story = roundStory({
     players,
     turns: 6,
     maxTurns: 6,
@@ -129,6 +132,7 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive):
       endedChapter("shared_voice", 2, 4, "The printers win the vote", slots),
     ],
   });
+  return scoreboard ? story.clone({ sharedStats: [SCOREBOARD], sharedStatValues: [{ statId: SCOREBOARD.id, value: 40 }] }) : story;
 }
 
 describe("group turns: today's form, and the scoreboard ending rule on a contest's ending", () => {
@@ -158,14 +162,25 @@ describe("group turns: today's form, and the scoreboard ending rule on a contest
     expect(beatStep.request(endingBeat(1)).prompt).not.toContain(SCOREBOARD_ENDING_RULE);
   });
 
-  (frozen.length ? it : it.skip)("every frozen group turn: today's form, the rule only on a contest's ending", () => {
+  it.each([
+    // A template's author can set a contest in any mode, or leave out its scoreboard; the rule would name a stat or a side B that isn't there
+    ["a cooperative story", () => contestEnding(2, GameModes.Cooperative)],
+    ["a single player's story", () => contestEnding(1, GameModes.SinglePlayer)],
+    ["a contest without a scoreboard (no shared opposites stat)", () => contestEnding(2, GameModes.Competitive, false)],
+  ] as const)("prints no rule on the ending of %s that holds a contested outcome: today's form", (_, build) => {
+    const story = build();
+    expect(story.getCurrentBeatType()).toBe("ending");
+    expect(isScoreboardEnding(story)).toBe(false);
+    expectSame(beatStep.request(story), round0BeatStep.request(story));
+  });
+
+  (frozen.length ? it : it.skip)("every frozen group turn: today's form, the rule only on a scored contest's ending", () => {
     const cases = frozen.filter((c) => c.role === "beat" && c.tags.multiplayer);
     expect(cases.length).toBeGreaterThan(10);
     for (const c of cases) {
       const story = caseStory(c);
       const today = round0BeatStep.request(story);
-      const contested = story.getCurrentBeatType() === "ending" && story.getSharedOutcomes().some((o) => "sideAWins" in o.possibleResolutions);
-      expectSame(beatStep.request(story), contested ? { ...today, prompt: withEndingRule(today.prompt) } : today);
+      expectSame(beatStep.request(story), isScoreboardEnding(story) ? { ...today, prompt: withEndingRule(today.prompt) } : today);
     }
   });
 });

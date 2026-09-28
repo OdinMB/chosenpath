@@ -5,7 +5,7 @@ import {
 } from "./StoryStatePromptService.js";
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
 import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, THREE_WAYS, sacrificeRewardLine, takesOptionRules } from "../optionRules.js";
-import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
+import { contestsPlayable, isContestedOutcome } from "core/utils/outcomeReadiness.js";
 
 /**
  * The scoreboard ending rule (the setup document's decision 3, question 1,
@@ -18,6 +18,22 @@ import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
  */
 export const SCOREBOARD_ENDING_RULE =
   "- For a contested outcome, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
+
+/**
+ * Whether a story's ending takes the scoreboard rule: it plays contests (two
+ * or more players, competitive or cooperative-competitive), holds a contested
+ * shared outcome and keeps a shared opposites stat, the scoreboard. A
+ * template's author can put a contested outcome in a cooperative or
+ * single-player World, or leave out its scoreboard; there the rule would
+ * name a side or a stat the story doesn't have.
+ */
+export function takesScoreboardEndingRule(story: Story): boolean {
+  return (
+    contestsPlayable(story.getGameMode(), story.getNumberOfPlayers()) &&
+    story.getSharedOutcomes().some(isContestedOutcome) &&
+    story.getSharedStats().some((stat) => stat.type === "opposites")
+  );
+}
 
 /**
  * Part of the image-request instructions for every image-generating story,
@@ -206,7 +222,7 @@ ${
       "--- Use the information why the outcome resonates with the player / why the outcome is important to them.\n" +
       "--- For shared outcomes, touch on how the outcome affects the other players.\n" +
       // The scoreboard decides a contest (decision 3; two sides, with three players two camps)
-      (story.getSharedOutcomes().some(isContestedOutcome) ? SCOREBOARD_ENDING_RULE : "") +
+      (takesScoreboardEndingRule(story) ? SCOREBOARD_ENDING_RULE : "") +
       "- Include any individual and shared stats that you think are worth mentioning in the ending.\n"
     : story.getCurrentBeatType() === "switch"
     ? "- For topic switches: Present options that let the player choose which outcome/question to focus on next\n" +

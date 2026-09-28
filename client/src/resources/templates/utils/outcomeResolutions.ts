@@ -1,4 +1,5 @@
-import type { ResolutionType } from "core/types";
+import type { GameMode, ResolutionType } from "core/types";
+import { contestsPlayable } from "core/utils/outcomeReadiness";
 
 /*
  * An outcome's three possible resolutions, by kind, as the template editor
@@ -6,7 +7,8 @@ import type { ResolutionType } from "core/types";
  * (side A wins, mixed, side B wins; side A is player1's side, or player1's
  * camp with three players) and exploration (three paths). The game resolves
  * each kind as core/types/outcome.ts defines it. Contested outcomes are
- * shared: every competitive and cooperative-competitive setup writes one.
+ * shared, and only competitive and cooperative-competitive stories with two
+ * or more players play them: every such setup writes one.
  */
 
 export type ResolutionKind = "challenge" | "contest" | "exploration";
@@ -59,11 +61,23 @@ export function withResolutionField(resolutions: ResolutionType, field: string, 
 }
 
 /**
- * The kinds the editor offers: a shared outcome can be contested; a player's
- * own outcome is a challenge or an exploration, and keeps the contest kind
- * selectable only when it already holds one.
+ * Whether a World's stories can play a contest: two or more players in a
+ * competitive or cooperative-competitive World (the planners refuse a contest
+ * anywhere else). `playerCountMax` decides, since the editor offers kinds for
+ * the World as a whole; the validation card names the stories of a smaller
+ * count that can't play them.
  */
-export function resolutionKindsFor(shared: boolean, resolutions: ResolutionType): ResolutionKind[] {
+export function worldPlaysContests(gameMode: GameMode | undefined, playerCountMax: number): boolean {
+  return contestsPlayable(gameMode, playerCountMax);
+}
+
+/**
+ * The kinds the editor offers: the contest kind where it is offered (a shared
+ * outcome in a World that plays contests); elsewhere challenge and
+ * exploration, the contest kind kept selectable only on an outcome that
+ * already holds one.
+ */
+export function resolutionKindsFor(offerContest: boolean, resolutions: ResolutionType): ResolutionKind[] {
   const current = resolutionKindOf(resolutions);
-  return KINDS.filter((kind) => kind !== "contest" || shared || current === "contest");
+  return KINDS.filter((kind) => kind !== "contest" || offerContest || current === "contest");
 }

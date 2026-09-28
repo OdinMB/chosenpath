@@ -28,7 +28,7 @@ function outcome(possibleResolutions: Outcome["possibleResolutions"]): Outcome {
 
 const CONTEST = { sideAWins: "The enclave speaks", mixed: "They share the seat", sideBWins: "The printers speak" };
 
-function editing(o: Outcome, shared: boolean): string {
+function editing(o: Outcome, shared: boolean, contests = true): string {
   return renderMarkup(
     <OutcomeEditor
       outcome={o}
@@ -38,6 +38,7 @@ function editing(o: Outcome, shared: boolean): string {
       onDelete={() => undefined}
       onUpdate={() => undefined}
       shared={shared}
+      contests={contests}
     />
   );
 }
@@ -59,6 +60,28 @@ describe("OutcomeEditor", () => {
     expect(option(markup, "challenge")?.[1]).toBe(' selected=""');
     expect(option(markup, "contest")).not.toBeNull();
     expect(markup).toContain('value="Reform"');
+  });
+
+  it("offers no Contest kind on a shared outcome in a World without contests (cooperative, or one player), unless it already holds one", () => {
+    expect(option(editing(outcome({ favorable: "a", mixed: "b", unfavorable: "c" }), true, false), "contest")).toBeNull();
+    const held = editing(outcome(CONTEST), true, false);
+    expect(option(held, "contest")?.[1]).toBe(' selected=""');
+    expect(held).toContain('value="The enclave speaks"');
+  });
+
+  it("offers no Contest kind unless told the World plays contests", () => {
+    const markup = renderMarkup(
+      <OutcomeEditor
+        outcome={outcome({ favorable: "a", mixed: "b", unfavorable: "c" })}
+        index={0}
+        editingOutcomes={new Set(["shared_voice"])}
+        setEditingOutcomes={() => undefined}
+        onDelete={() => undefined}
+        onUpdate={() => undefined}
+        shared
+      />
+    );
+    expect(option(markup, "contest")).toBeNull();
   });
 
   it("keeps a player's own outcome to challenge and exploration, unless it already holds a contest", () => {

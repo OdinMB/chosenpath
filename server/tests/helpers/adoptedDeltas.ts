@@ -7,6 +7,7 @@
  * "Adoption into production").
  */
 
+import type { Story } from "core/models/Story.js";
 import type { GameMode } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
 
@@ -51,6 +52,21 @@ export function adoptedThreadSchema(measuredJson: string): string {
 export const SHARED_OUTCOMES_LINE = "--- For shared outcomes, touch on how the outcome affects the other players.\n";
 export const SCOREBOARD_ENDING_RULE =
   "- For a contested outcome, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
+
+/**
+ * The endings that take the rule: a contest mode with two or more players, a
+ * contested shared outcome, and a shared opposites stat to keep its score. A
+ * template can hold a contest in a mode without contests, or no scoreboard;
+ * the rule would then name a side or a stat the story doesn't have.
+ */
+export function isScoreboardEnding(story: Story): boolean {
+  return (
+    story.getCurrentBeatType() === "ending" &&
+    isContestSetup(story.getNumberOfPlayers(), story.getGameMode()) &&
+    story.getSharedOutcomes().some((o) => "sideAWins" in o.possibleResolutions) &&
+    story.getSharedStats().some((s) => s.type === "opposites")
+  );
+}
 
 /** The measured turn prompt as production sends it: the rule on a contest's ending. */
 export function adoptedTurnPrompt(measured: string, contestEnding: boolean): string {

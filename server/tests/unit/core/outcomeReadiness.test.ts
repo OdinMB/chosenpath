@@ -1,7 +1,9 @@
 import type { Outcome, StoryState } from "core/types/index.js";
+import { GameModes } from "core/types/index.js";
 import {
   NO_OUTCOMES_PROBLEM,
   NO_SHARED_OUTCOME_PROBLEM,
+  contestsPlayable,
   isContestedOutcome,
   storyStartProblem,
   storyStateStartProblem,
@@ -89,5 +91,19 @@ describe("isContestedOutcome", () => {
     });
     expect(isContestedOutcome(contest)).toBe(true);
     expect(isContestedOutcome(outcome("shared_ritual_stopped"))).toBe(false);
+  });
+});
+
+describe("contestsPlayable", () => {
+  it("is true for two or more players in a competitive or cooperative-competitive game", () => {
+    expect(contestsPlayable(GameModes.Competitive, 2)).toBe(true);
+    expect(contestsPlayable(GameModes.CooperativeCompetitive, 3)).toBe(true);
+  });
+
+  it("is false in cooperative and single-player games, and for one player in any mode", () => {
+    expect(contestsPlayable(GameModes.Cooperative, 2)).toBe(false);
+    expect(contestsPlayable(GameModes.SinglePlayer, 1)).toBe(false);
+    expect(contestsPlayable(GameModes.Competitive, 1)).toBe(false);
+    expect(contestsPlayable(undefined, 3)).toBe(false);
   });
 });

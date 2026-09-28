@@ -21,6 +21,8 @@ interface OutcomeEditorProps {
   readOnly?: boolean;
   /** A shared outcome can be contested between the players (side A against side B) */
   shared?: boolean;
+  /** The World plays contests (two or more players, competitive or cooperative-competitive): only then does a shared outcome offer the Contest kind */
+  contests?: boolean;
 }
 
 export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
@@ -32,6 +34,7 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
   onUpdate,
   readOnly = false,
   shared = false,
+  contests = false,
 }) => {
   const { handleResolutionTypeChange, handleResolutionFieldChange } =
     useOutcomeEditor([], undefined, readOnly);
@@ -159,7 +162,9 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
                       Possible answers to the question defined above. Challenge
                       outcomes use Favorable, Mixed, and Unfavorable
                       resolutions. Contest outcomes, shared by players who
-                      compete, use Side A wins, Mixed, and Side B wins; side A
+                      compete (competitive and cooperative-competitive Worlds
+                      for two or more players), use Side A wins, Mixed, and
+                      Side B wins; side A
                       is player1&apos;s side (with three players, player1&apos;s
                       camp). Exploration outcomes list multiple qualitative
                       resolutions.
@@ -202,7 +207,7 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
                   handleResolutionTypeChange(e.target.value, data, onChange);
                 }}
               >
-                {resolutionKindsFor(shared, resolutions).map((option) => (
+                {resolutionKindsFor(shared && contests, resolutions).map((option) => (
                   <option key={option} value={option}>
                     {RESOLUTION_KIND_LABELS[option]}
                   </option>

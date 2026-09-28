@@ -164,16 +164,23 @@ function isOffLadder(change: StatChange, definition: Stat | undefined): boolean 
 
 const NUMBER_TYPES: Stat["type"][] = ["percentage", "opposites", "number"];
 
+/** A text that starts with a sign, or a number below 0: a delta written as a value. */
+const isSigned = (value: unknown): boolean =>
+  (typeof value === "string" && /^\s*[+-]/.test(value)) || (typeof value === "number" && value < 0);
+
 /**
  * A number, percentage or opposites stat set with a text that reads as one
  * value (the switch turn after setup round 3's bounty contest wrote the
  * scoreboard's move as setString "35|65", which ChangeService drops, so the
  * score never moved): the setNumber the game applies, read as a background
  * value is ("a|b" summing to 100 is a, "40%" is 40, "12" is 12). The same
- * change as it was otherwise.
+ * change as it was otherwise, and always for a signed value ("-10%", "+5", or
+ * a number below 0): that is a change by so much, not a value to set, and
+ * read as one it would set health to 0 or gold to 5.
  */
 function numberWrittenAsText(change: StatChange, definition: Stat | undefined): StatChange {
   if (change.change !== "setString" || !definition || !NUMBER_TYPES.includes(definition.type)) return change;
+  if (isSigned(change.value)) return change;
   const fit = statValueFit(definition, change.value);
   if (fit !== "converts" && fit !== "clamps") return change;
   const value = checkStatValue(definition, change.value).value;

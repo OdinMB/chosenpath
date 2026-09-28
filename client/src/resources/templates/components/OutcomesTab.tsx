@@ -19,6 +19,8 @@ interface OutcomesTabProps {
     updates: Record<PlayerSlot, PlayerOptionsGeneration>
   ) => void;
   playerStats?: Stat[];
+  /** The World plays contests (worldPlaysContests): only then do shared outcomes offer the Contest kind */
+  contests?: boolean;
   showContextCards?: boolean;
   isAiIterating?: boolean;
   isSparse?: boolean;
@@ -36,6 +38,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
   playerOptions,
   onPlayerOptionsChange,
   playerStats,
+  contests = false,
   showContextCards = true,
   isAiIterating,
   isSparse = false,
@@ -142,6 +145,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
           }
           readOnly={readOnly}
           shared
+          contests={contests}
         />
       ))}
 

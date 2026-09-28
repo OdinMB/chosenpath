@@ -5,7 +5,11 @@ import {
   PlayerCount,
 } from "core/types";
 import { TemplateImageManifest } from "core/types/api";
-import { templateStartProblem } from "core/utils/outcomeReadiness";
+import {
+  contestsPlayable,
+  isContestedOutcome,
+  templateStartProblem,
+} from "core/utils/outcomeReadiness";
 import { checkStatValue, statValueFit } from "core/utils/statValueCheck";
 import { getPlayerSlots } from "core/utils/playerUtils";
 import { checkPlayerBackgroundConsistency } from "../hooks/useTemplateWarnings";
@@ -58,6 +62,9 @@ export const validateTemplateIntegrity = (
 
   // Validate that stories from this template can start
   issues.push(...validateOutcomeReadiness(template));
+
+  // Validate that contested outcomes sit in stories that play contests
+  issues.push(...validateContestedOutcomes(template));
 
   // Validate image requirements if manifest is provided
   // Check images regardless of containsImages flag to catch missing required images
@@ -423,6 +430,16 @@ const storiesLabel = (
   return `Stories for ${failing.join(" or ")} player${last === 1 ? "" : "s"}`;
 };
 
+/** The player counts a template allows, lowest first. */
+const allowedPlayerCounts = (template: StoryTemplate): PlayerCount[] => {
+  const min = template.playerCountMin ?? 1;
+  const max = Math.max(template.playerCountMax ?? min, min);
+  return Array.from(
+    { length: max - min + 1 },
+    (_, i) => (min + i) as PlayerCount
+  );
+};
+
 /**
  * Validates that stories from this template can start: the server refuses a
  * story whose seats in play and shared outcomes break the start rule
@@ -434,12 +451,8 @@ const validateOutcomeReadiness = (
   template: StoryTemplate
 ): ValidationIssue[] => {
   const issues: ValidationIssue[] = [];
-  const min = template.playerCountMin ?? 1;
-  const max = Math.max(template.playerCountMax ?? min, min) as PlayerCount;
-  const allowed = Array.from(
-    { length: max - min + 1 },
-    (_, i) => (min + i) as PlayerCount
-  );
+  const allowed = allowedPlayerCounts(template);
+  const max = (allowed[allowed.length - 1] ?? 1) as PlayerCount;
 
   const failingByProblem = new Map<string, PlayerCount[]>();
   allowed.forEach((count) => {
@@ -494,6 +507,35 @@ const validateOutcomeReadiness = (
   }
 
   return issues;
+};
+
+/**
+ * Warns about contested shared outcomes (side A against side B) in stories
+ * that can't play them: only competitive and cooperative-competitive stories
+ * with two or more players have contests, and elsewhere the planners can't
+ * set a contest's sides (and the chapter fails) or the ending looks for a
+ * side B that isn't there. The editor offers the Contest kind only where it
+ * plays; an outcome can still hold one from before, from an import, or from
+ * a change of game mode or player count.
+ */
+const validateContestedOutcomes = (
+  template: StoryTemplate
+): ValidationIssue[] => {
+  const contested = (template.sharedOutcomes ?? []).filter(isContestedOutcome);
+  if (contested.length === 0) return [];
+  const allowed = allowedPlayerCounts(template);
+  const failing = allowed.filter((count) => !contestsPlayable(template.gameMode, count));
+  if (failing.length === 0) return [];
+  const ids = contested.map((outcome) => outcome.id || outcome.question);
+  return [
+    {
+      type: "warning",
+      category: "outcomes",
+      message: `${storiesLabel(failing, allowed)} from this World can't play contested outcomes (side A against side B): ${ids.join(", ")}. Contests are played only in competitive and cooperative-competitive stories with two or more players; change these outcomes to Challenge or Exploration, or change the World's game mode or player count.`,
+      affectedItems: ids,
+      autoFixable: false,
+    },
+  ];
 };
 
 /**

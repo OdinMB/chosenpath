@@ -132,9 +132,33 @@ export type Pick = {
   /** How many directions the switch offered (topic) */
   directions: number;
   optionText: string;
-  /** The outcome the pick sets; undefined when the story can't tell (no outcome named, or none known) */
+  /**
+   * The outcome the pick sets. For a single player whose pick names none the
+   * story knows, the fallback (fallbackOutcomeId); undefined for a group, or
+   * when the story has no outcomes
+   */
   outcomeId?: string;
+  /** The outcome is the single player's fallback, not the pick's own */
+  fallback?: true;
 };
+
+/**
+ * The outcome a single player's next chapter pushes when the pick names none
+ * the story knows: the one that still needs the most milestones, the main
+ * outcome on a tie, then the first listed. A single player's chapter reply
+ * writes no outcome, so without this the plan would store none, fail the plan
+ * check on both attempts and stop the story at that switch. It happens when
+ * the switch turn offers a third option beside two planned directions (the
+ * turn always offers three) and the player picks it, or when a switch planned
+ * before planner v2 has a chosen direction whose text names no id.
+ */
+export function fallbackOutcomeId(story: Story, slot: string): string | undefined {
+  let best: OutcomeNeed | undefined;
+  for (const need of outcomeNeeds(story, slot, false)) {
+    if (!best || need.stillNeeded > best.stillNeeded || (need.stillNeeded === best.stillNeeded && need.main && !best.main)) best = need;
+  }
+  return best?.id;
+}
 
 /** A round switch plan keeps each direction's outcome beside its text (turnRound1Planners.ts). */
 type StructuredDirection = { direction: string; outcomeId: string };
@@ -153,7 +177,9 @@ function namedInOrder(direction: string, known: string[]): string[] {
  * outcome, or the chosen direction's by position (the option order kept the
  * direction order in 168 of 168 stored switch turns). A direction written with
  * several outcomes gives the first its text names, as the chapter planner
- * picked 21 of 24 times.
+ * picked 21 of 24 times. A single player's pick that names no outcome the
+ * story knows takes the fallback, marked as such, so the planner is told the
+ * outcome the chapter will store.
  */
 export function pickedOutcome(story: Story, slot: string): Pick | undefined {
   const plan = story.getCurrentSwitchAnalysis();
@@ -163,13 +189,18 @@ export function pickedOutcome(story: Story, slot: string): Pick | undefined {
   const choice = typeof beat.choice === "number" ? beat.choice : -1;
   const optionText = beat.options?.[choice]?.text ?? "";
   const known = new Set(outcomesFor(story, slot).map((o) => o.id));
+  const set = (outcomeId: string | undefined): { outcomeId?: string; fallback?: true } => {
+    if (outcomeId && known.has(outcomeId)) return { outcomeId };
+    const fallback = story.isMultiplayer() ? undefined : fallbackOutcomeId(story, slot);
+    return fallback ? { outcomeId: fallback, fallback: true } : {};
+  };
   if (sw.type === "flavor") {
-    return { kind: "flavor", choice, directions: 0, optionText, ...(known.has(sw.outcomeId) ? { outcomeId: sw.outcomeId } : {}) };
+    return { kind: "flavor", choice, directions: 0, optionText, ...set(sw.outcomeId) };
   }
   const structured = structuredDirections(sw);
   const directions = structured?.length ?? sw.topicChoices?.length ?? 0;
   const outcomeId = structured ? structured[choice]?.outcomeId : namedInOrder(sw.topicChoices?.[choice] ?? "", [...known])[0];
-  return { kind: "topic", choice, directions, optionText, ...(outcomeId && known.has(outcomeId) ? { outcomeId } : {}) };
+  return { kind: "topic", choice, directions, optionText, ...set(outcomeId) };
 }
 
 // --- The PACING block ---

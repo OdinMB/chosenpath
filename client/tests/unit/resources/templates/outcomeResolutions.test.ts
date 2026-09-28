@@ -1,10 +1,11 @@
-import type { ResolutionType } from "core/types";
+import { GameModes, type ResolutionType } from "core/types";
 import {
   RESOLUTION_FIELDS,
   emptyResolutions,
   resolutionKindOf,
   resolutionKindsFor,
   withResolutionField,
+  worldPlaysContests,
 } from "../../../../src/resources/templates/utils/outcomeResolutions";
 
 /*
@@ -76,12 +77,26 @@ describe("withResolutionField", () => {
 });
 
 describe("resolutionKindsFor", () => {
-  it("offers contests for shared outcomes", () => {
+  it("offers contests where they are offered (a shared outcome in a World that plays contests)", () => {
     expect(resolutionKindsFor(true, challenge)).toEqual(["challenge", "contest", "exploration"]);
   });
 
-  it("offers a player's own outcome challenge and exploration, and keeps a contest it already holds selectable", () => {
+  it("offers challenge and exploration elsewhere, and keeps a contest the outcome already holds selectable", () => {
     expect(resolutionKindsFor(false, challenge)).toEqual(["challenge", "exploration"]);
     expect(resolutionKindsFor(false, contest)).toEqual(["challenge", "contest", "exploration"]);
+  });
+});
+
+describe("worldPlaysContests", () => {
+  it("is true for competitive and cooperative-competitive Worlds with two or more players", () => {
+    expect(worldPlaysContests(GameModes.Competitive, 2)).toBe(true);
+    expect(worldPlaysContests(GameModes.CooperativeCompetitive, 3)).toBe(true);
+  });
+
+  it("is false for cooperative and single-player Worlds, and for a World of one player in any mode", () => {
+    expect(worldPlaysContests(GameModes.Cooperative, 3)).toBe(false);
+    expect(worldPlaysContests(GameModes.SinglePlayer, 1)).toBe(false);
+    expect(worldPlaysContests(GameModes.Competitive, 1)).toBe(false);
+    expect(worldPlaysContests(undefined, 2)).toBe(false);
   });
 });

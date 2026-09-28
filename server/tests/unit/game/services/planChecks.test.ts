@@ -249,6 +249,57 @@ describe("checkSwitchPlan", () => {
       expect(kinds(result.repairs)).toEqual(["directionsTrimmed"]);
     });
 
+    describe("directions kept beside their outcome (planner v2's topicDirections)", () => {
+      type Direction = { direction: string; outcomeId: string };
+      const directionsOf = (plan: SwitchAnalysis) => (plan.switches[0] as Switch & { topicDirections?: Direction[] }).topicDirections;
+      const JUNK: Direction = { direction: 'Decode the note marked "Red Dawn": who sent it?', outcomeId: "shared_escape" };
+      const HARBOR: Direction = { direction: "Confront the harbor master about the forged permits", outcomeId: "player1_trust" };
+      const COVE: Direction = { direction: "Follow the smugglers to their hidden cove at dusk", outcomeId: "shared_escape" };
+      /** A topic switch as planner v2's assembly stores it: "text (id)" strings, the pairs beside them. */
+      const v2Switch = (directions: Direction[]): Switch =>
+        ({
+          ...topic(["player1"], directions.map((d) => `${d.direction} (${d.outcomeId})`)),
+          topicDirections: directions,
+        }) as Switch;
+
+      it("drops a junk direction from both lists, so the options and their outcomes stay in step", () => {
+        const story = switchStory(1);
+
+        const result = checkSwitchPlan(story, switchPlan(story, [v2Switch([JUNK, HARBOR, COVE])]));
+
+        expect(result.plan.switches[0].topicChoices).toEqual([`${HARBOR.direction} (player1_trust)`, `${COVE.direction} (shared_escape)`]);
+        expect(directionsOf(result.plan)).toEqual([HARBOR, COVE]);
+        expect(kinds(result.repairs)).toEqual(["directionJunk"]);
+      });
+
+      it("trims both lists to three", () => {
+        const story = switchStory(1);
+        const fourth: Direction = { direction: "Bribe the lighthouse keeper for the tide tables", outcomeId: "player1_trust" };
+
+        const result = checkSwitchPlan(story, switchPlan(story, [v2Switch([HARBOR, COVE, HARBOR, fourth])]));
+
+        expect(directionsOf(result.plan)).toEqual([HARBOR, COVE, HARBOR]);
+      });
+
+      it("clears both on a flavor switch", () => {
+        const story = switchStory(1);
+        const written = { ...v2Switch([HARBOR, COVE]), type: "flavor", outcomeId: "shared_escape", question: "Do they get out?" } as Switch;
+
+        const result = checkSwitchPlan(story, switchPlan(story, [written]));
+
+        expect(result.plan.switches[0].topicChoices).toEqual([]);
+        expect(directionsOf(result.plan)).toEqual([]);
+      });
+
+      it("leaves a switch planned before planner v2 without them", () => {
+        const story = switchStory(1);
+
+        const result = checkSwitchPlan(story, switchPlan(story, [topic(["player1"], GOOD.slice(0, 3))]));
+
+        expect(directionsOf(result.plan)).toBeUndefined();
+      });
+    });
+
     it("finds fewer than two usable directions a problem", () => {
       const story = switchStory(1);
       const result = checkSwitchPlan(story, switchPlan(story, [topic(["player1"], [GOOD[0], "title״: ", ""], "choose_path")]));
@@ -538,7 +589,7 @@ describe("checkThreadPlan", () => {
       expect(result.problem).toBeUndefined();
     });
 
-    it("puts the lowest slot on side A in a three-player contest", () => {
+    it("puts player1's camp on side A in a three-player contest", () => {
       const story = threadStory(3, GameModes.Competitive);
 
       const result = checkThreadPlan(story, threadPlan([contest(["player2"], ["player1", "player3"])]));
@@ -547,7 +598,7 @@ describe("checkThreadPlan", () => {
       expect(kinds(result.repairs)).toEqual(["contestSidesSwapped"]);
     });
 
-    it("leaves a contest with the lowest slot on side A untouched", () => {
+    it("leaves a contest with player1 on side A untouched", () => {
       const story = threadStory(3, GameModes.Competitive);
       const reply = threadPlan([contest(["player1"], ["player2", "player3"])]);
 
@@ -555,6 +606,19 @@ describe("checkThreadPlan", () => {
 
       expect(result.plan).toEqual(reply);
       expect(result.repairs).toEqual([]);
+    });
+
+    it("keeps the sides as written in a contest player1 sits out: the camps live in the setup's text, not in the slots", () => {
+      // Camps {player1, player3} against {player2}: player3 holds camp A's side while player1 has a thread of their own
+      const story = threadStory(3, GameModes.CooperativeCompetitive);
+      const alone = aThread("challenge", 2, ["player1"], [], { id: "alone", outcomeId: "player1_trust" });
+      const reply = threadPlan([alone, { ...contest(["player3"], ["player2"]), id: "the_contest" }]);
+
+      const result = checkThreadPlan(story, reply);
+
+      expect(result.plan).toEqual(reply);
+      expect(kinds(result.repairs)).toEqual([]);
+      expect(result.problem).toBeUndefined();
     });
   });
 
@@ -648,6 +712,29 @@ describe("checked plan calls", () => {
 
       expect(plan.duration).toBe(4);
       expect(plan.threads[0].outcomeId).toBe("shared_escape");
+    });
+
+    it("keeps the first reply when the retry's call fails outright: a length never fails the turn", async () => {
+      const lines: string[] = [];
+      const log = (line: string) => lines.push(line);
+      const invoke = jest.fn(async (prompt: string) => {
+        if (prompt === "THE PROMPT") return tooLong();
+        throw Object.assign(new Error("Request timed out."), { name: "APIConnectionTimeoutError" });
+      });
+
+      const plan = await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, log);
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(plan.duration).toBe(4);
+    });
+
+    it("still fails when the first reply can't be used and the retry's call fails", async () => {
+      const invoke = jest.fn(async (prompt: string) => {
+        if (prompt === "THE PROMPT") return unknownOutcome();
+        throw new Error("Request timed out.");
+      });
+
+      await expect(checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, () => undefined)).rejects.toThrow("Request timed out.");
     });
 
     it("tells the retry both problems when the first reply has both", async () => {
