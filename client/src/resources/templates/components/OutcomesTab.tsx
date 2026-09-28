@@ -141,6 +141,7 @@ export const OutcomesTab: React.FC<OutcomesTabProps> = ({
             handleUpdateOutcome(idx, updatedOutcome as Outcome)
           }
           readOnly={readOnly}
+          shared
         />
       ))}
 

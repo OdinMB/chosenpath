@@ -3,9 +3,16 @@ import { v4 as uuidv4 } from "uuid";
 import {
   Outcome,
   ChallengeResolution,
+  ContestResolution,
   ExplorationResolution,
   ResolutionType,
 } from "core/types";
+import {
+  emptyResolutions,
+  resolutionKindOf,
+  withResolutionField,
+  type ResolutionKind,
+} from "../utils/outcomeResolutions";
 
 export const useOutcomeEditor = (
   initialOutcomes: Outcome[] = [],
@@ -52,58 +59,35 @@ export const useOutcomeEditor = (
     onChange(updatedOutcomes);
   };
 
-  // Type guard to check if resolutions are challenge type
+  // Type guards for the three kinds (outcomeResolutions.ts reads the kind)
   const isChallenge = (
     resolutions: ResolutionType
-  ): resolutions is ChallengeResolution => {
-    return (
-      "favorable" in resolutions &&
-      "unfavorable" in resolutions &&
-      "mixed" in resolutions
-    );
-  };
+  ): resolutions is ChallengeResolution =>
+    resolutionKindOf(resolutions) === "challenge";
 
-  // Type guard to check if resolutions are exploration type
+  const isContest = (
+    resolutions: ResolutionType
+  ): resolutions is ContestResolution =>
+    resolutionKindOf(resolutions) === "contest";
+
   const isExploration = (
     resolutions: ResolutionType
-  ): resolutions is ExplorationResolution => {
-    return (
-      "resolution1" in resolutions &&
-      "resolution2" in resolutions &&
-      "resolution3" in resolutions
-    );
-  };
+  ): resolutions is ExplorationResolution =>
+    resolutionKindOf(resolutions) === "exploration";
 
+  /** A new kind starts with that kind's empty resolutions. */
   const handleResolutionTypeChange = (
     type: string,
     outcome: Outcome,
     onOutcomeChange: (updatedOutcome: Outcome) => void
   ) => {
     if (readOnly) return;
-
-    let newResolutions: ResolutionType;
-
-    if (type === "challenge") {
-      newResolutions = {
-        favorable: "",
-        unfavorable: "",
-        mixed: "",
-      };
-    } else {
-      newResolutions = {
-        resolution1: "",
-        resolution2: "",
-        resolution3: "",
-      };
-    }
-
-    const updatedOutcome = {
-      ...outcome,
-      possibleResolutions: newResolutions,
-    };
-    onOutcomeChange(updatedOutcome);
+    const kind: ResolutionKind =
+      type === "contest" || type === "exploration" ? type : "challenge";
+    onOutcomeChange({ ...outcome, possibleResolutions: emptyResolutions(kind) });
   };
 
+  /** One resolution's text; a contest's sides are kept like any other field. */
   const handleResolutionFieldChange = (
     outcome: Outcome,
     field: string,
@@ -111,28 +95,14 @@ export const useOutcomeEditor = (
     onOutcomeChange: (updatedOutcome: Outcome) => void
   ) => {
     if (readOnly) return;
-
-    const resolutions = { ...outcome.possibleResolutions };
-
-    if (
-      isChallenge(resolutions) &&
-      (field === "favorable" || field === "unfavorable" || field === "mixed")
-    ) {
-      resolutions[field] = value;
-    } else if (
-      isExploration(resolutions) &&
-      (field === "resolution1" ||
-        field === "resolution2" ||
-        field === "resolution3")
-    ) {
-      resolutions[field] = value;
-    }
-
-    const updatedOutcome = {
+    onOutcomeChange({
       ...outcome,
-      possibleResolutions: resolutions,
-    };
-    onOutcomeChange(updatedOutcome);
+      possibleResolutions: withResolutionField(
+        outcome.possibleResolutions,
+        field,
+        value
+      ),
+    });
   };
 
   return {
@@ -141,6 +111,7 @@ export const useOutcomeEditor = (
     updateOutcome: handleUpdateOutcome,
     deleteOutcome: handleRemoveOutcome,
     isChallenge,
+    isContest,
     isExploration,
     handleResolutionTypeChange,
     handleResolutionFieldChange,

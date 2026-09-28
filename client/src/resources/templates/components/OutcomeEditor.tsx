@@ -1,9 +1,15 @@
 import React from "react";
-import { Outcome, ExplorationResolution, ResolutionType } from "core/types";
+import { Outcome, ResolutionType } from "core/types";
 import { ExpandableItem } from "components";
 import { Input, Select } from "components/ui";
 import { AcademyContextButton } from "components";
 import { useOutcomeEditor } from "../hooks/useOutcomeEditor";
+import {
+  RESOLUTION_FIELDS,
+  RESOLUTION_KIND_LABELS,
+  resolutionKindOf,
+  resolutionKindsFor,
+} from "../utils/outcomeResolutions";
 
 interface OutcomeEditorProps {
   outcome: Outcome;
@@ -13,6 +19,8 @@ interface OutcomeEditorProps {
   onDelete: (index: number) => void;
   onUpdate: (index: number, updatedOutcome: Outcome) => void;
   readOnly?: boolean;
+  /** A shared outcome can be contested between the players (side A against side B) */
+  shared?: boolean;
 }
 
 export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
@@ -23,19 +31,19 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
   onDelete,
   onUpdate,
   readOnly = false,
+  shared = false,
 }) => {
-  const {
-    isChallenge,
-    isExploration,
-    handleResolutionTypeChange,
-    handleResolutionFieldChange,
-  } = useOutcomeEditor([], undefined, readOnly);
+  const { handleResolutionTypeChange, handleResolutionFieldChange } =
+    useOutcomeEditor([], undefined, readOnly);
 
   const renderOutcomeForm = (
     data: Outcome,
     onChange: (updatedData: Outcome) => void
   ) => {
     const resolutions = data.possibleResolutions as ResolutionType;
+    const kind = resolutionKindOf(resolutions);
+    const fields = RESOLUTION_FIELDS[kind];
+    const values = resolutions as Record<string, string>;
 
     return (
       <div className="flex-1 space-y-4">
@@ -150,8 +158,11 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
                     <div className="text-sm mb-2">
                       Possible answers to the question defined above. Challenge
                       outcomes use Favorable, Mixed, and Unfavorable
-                      resolutions. Exploration outcomes list multiple
-                      qualitative resolutions.
+                      resolutions. Contest outcomes, shared by players who
+                      compete, use Side A wins, Mixed, and Side B wins; side A
+                      is player1&apos;s side (with three players, player1&apos;s
+                      camp). Exploration outcomes list multiple qualitative
+                      resolutions.
                     </div>
                     <div className="text-sm mb-2">
                       Will the players stop the Faceless Crows before it's too
@@ -186,128 +197,41 @@ export const OutcomeEditor: React.FC<OutcomeEditorProps> = ({
               <Select
                 className="text-sm"
                 size="sm"
-                value={isExploration(resolutions) ? "exploration" : "challenge"}
+                value={kind}
                 onChange={(e) => {
                   handleResolutionTypeChange(e.target.value, data, onChange);
                 }}
               >
-                <option value="challenge">Challenge</option>
-                <option value="exploration">Exploration</option>
+                {resolutionKindsFor(shared, resolutions).map((option) => (
+                  <option key={option} value={option}>
+                    {RESOLUTION_KIND_LABELS[option]}
+                  </option>
+                ))}
               </Select>
             )}
           </div>
 
-          {isChallenge(resolutions) ? (
-            // Challenge resolutions
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Favorable</span>
+          <div className="space-y-2">
+            {fields.map(({ field, label, placeholder }) => (
+              <div key={field} className="flex items-center gap-2">
+                <span className="font-semibold w-36">{label}</span>
                 <Input
                   className="flex-1"
-                  value={resolutions.favorable}
+                  value={values[field] ?? ""}
                   onChange={(e) => {
                     handleResolutionFieldChange(
                       data,
-                      "favorable",
+                      field,
                       e.target.value,
                       onChange
                     );
                   }}
-                  placeholder="Resolution that is favorable to the player(s)"
+                  placeholder={placeholder}
                   disabled={readOnly}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Unfavorable</span>
-                <Input
-                  className="flex-1"
-                  value={resolutions.unfavorable}
-                  onChange={(e) => {
-                    handleResolutionFieldChange(
-                      data,
-                      "unfavorable",
-                      e.target.value,
-                      onChange
-                    );
-                  }}
-                  placeholder="Resolution that is unfavorable for the player(s)"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Mixed</span>
-                <Input
-                  className="flex-1"
-                  value={resolutions.mixed}
-                  onChange={(e) => {
-                    handleResolutionFieldChange(
-                      data,
-                      "mixed",
-                      e.target.value,
-                      onChange
-                    );
-                  }}
-                  placeholder="Resolution for a mixed outcome"
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-          ) : (
-            // Exploration resolutions
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Resolution 1</span>
-                <Input
-                  className="flex-1"
-                  value={(resolutions as ExplorationResolution).resolution1}
-                  onChange={(e) => {
-                    handleResolutionFieldChange(
-                      data,
-                      "resolution1",
-                      e.target.value,
-                      onChange
-                    );
-                  }}
-                  placeholder="First possible resolution"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Resolution 2</span>
-                <Input
-                  className="flex-1"
-                  value={(resolutions as ExplorationResolution).resolution2}
-                  onChange={(e) => {
-                    handleResolutionFieldChange(
-                      data,
-                      "resolution2",
-                      e.target.value,
-                      onChange
-                    );
-                  }}
-                  placeholder="Second possible resolution"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-36">Resolution 3</span>
-                <Input
-                  className="flex-1"
-                  value={(resolutions as ExplorationResolution).resolution3}
-                  onChange={(e) => {
-                    handleResolutionFieldChange(
-                      data,
-                      "resolution3",
-                      e.target.value,
-                      onChange
-                    );
-                  }}
-                  placeholder="Third possible resolution"
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       </div>
     );
