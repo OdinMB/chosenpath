@@ -5,6 +5,7 @@ import {
   finishingRecord,
   jobKey,
   keyOf,
+  oneRecordPerAttempt,
   runJobs,
   type CallRecord,
   type Job,
@@ -33,6 +34,26 @@ function deps(results: (spec: CallSpec) => ExecutedCall) {
 }
 
 const caps = resolveCaps({}).caps;
+
+describe("oneRecordPerAttempt", () => {
+  it("reads a job attempt recorded twice once, as its last record (whose reply the shared output file holds)", () => {
+    // 2026-09-29: two plans of one arm planned the same job, both ran at once, and both wrote outputs/<callId>.json
+    const first = record({ jobKey: "c|arm|round0|s3", outputTokens: 7305, costUsd: 0.0059 });
+    const other = record({ jobKey: "c|arm|round0|s4" });
+    const second = record({ jobKey: "c|arm|round0|s3", outputTokens: 7464, costUsd: 0.006 });
+    expect(oneRecordPerAttempt([first, other, second])).toEqual([other, second]);
+  });
+
+  it("keeps every attempt of a job, and every step of a chain", () => {
+    const records = [
+      record({ jobKey: "c|arm|round0|s1", attempt: 1, final: false, jobFinal: false, outcome: "invalid-json" }),
+      record({ jobKey: "c|arm|round0|s1", attempt: 2 }),
+      record({ jobKey: "c|chain|round0|s1", step: 1, jobFinal: false }),
+      record({ jobKey: "c|chain|round0|s1", step: 2 }),
+    ];
+    expect(oneRecordPerAttempt(records)).toEqual(records);
+  });
+});
 
 describe("runJobs", () => {
   it("skips jobs that already have a final record (resume)", async () => {

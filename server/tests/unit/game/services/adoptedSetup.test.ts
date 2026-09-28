@@ -84,8 +84,9 @@ describe("custom-story and template setup: the measured form", () => {
     expect(retest).toContain(after);
     // The identity clause did not pass its retest: production keeps "in outcomes and stats"
     expect(setupStep.request(PREMISE, 2, GameModes.Competitive, 25, "story").prompt).toContain("use those names in outcomes and stats");
-    // Nor did the Casablanca sentence (round 3c, 2026-09-29: nothing moved over its four pairs, and Susan's player stats
-    // still carried her name in 2 of 2), so production does not send it
+    // Nor did the Casablanca sentence, in both clauses (round 3c, 2026-09-29: nothing moved over its four pairs, and
+    // Susan's player stats still carried her name in 2 of 2) or in the multiplayer clause alone (round 3d: Casablanca's
+    // per-player stat sets 0 of 6 against production's 2 of 6, p 0.23, not moved), so production sends it nowhere
     for (const players of [1, 2, 3] as PlayerCount[]) {
       const mode = players === 1 ? GameModes.SinglePlayer : GameModes.Competitive;
       expect(setupStep.request(PREMISE, players, mode, 25, "story").prompt).not.toContain(PLAYER_STATS_NAMELESS);

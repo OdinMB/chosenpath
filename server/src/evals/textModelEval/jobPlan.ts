@@ -19,7 +19,7 @@ import {
 import { caseStory, hashOrder, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
-import { usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
+import { keyOf, usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
 import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type SetupInput, type VariantId } from "./variants.js";
 
 /*
@@ -434,6 +434,22 @@ function armAllowed(options: PlanOptions, key: string): boolean {
   return !options.armKeys || options.armKeys.includes(key);
 }
 
+/**
+ * Each job once: two plans of one arm on one case plan the same job key where
+ * their samples meet (--samples raising the first plan's count, 2026-09-29), and
+ * both copies would run at once under one callId, the second reply overwriting
+ * the first's output file. The first plan's copy stays.
+ */
+function oncePerKey(jobs: Job[]): Job[] {
+  const seen = new Set<string>();
+  return jobs.filter((job) => {
+    const key = keyOf(job);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measured: Map<string, number[]>): Job[] {
   const jobs: Job[] = [];
   const regular = options.rareFailure !== "only";
@@ -521,9 +537,11 @@ export function requestJob(input: {
 
 export function planJobs(cases: EvalCase[], options: PlanOptions): Job[] {
   const measured = measuredOutputs(options.records);
-  return options.roles.flatMap((role) =>
-    options.mode === "pipeline" && (role === "switch" || role === "thread")
-      ? pipelineJobs(cases, role, options, measured)
-      : roleJobs(cases, role, options, measured)
+  return oncePerKey(
+    options.roles.flatMap((role) =>
+      options.mode === "pipeline" && (role === "switch" || role === "thread")
+        ? pipelineJobs(cases, role, options, measured)
+        : roleJobs(cases, role, options, measured)
+    )
   );
 }

@@ -198,6 +198,25 @@ export const IDENTITY_CLAUSE_NO_STAT_NAMES: Record<"one" | "more", string> = {
   more: `${IDENTITY_CLAUSE_OUTCOMES.more} ${PLAYER_STATS_NAMELESS}`,
 };
 
+/**
+ * The Casablanca sentence's second retest (round 3d, 2026-09-29, the
+ * coordinator's brief after round 3c): the sentence in the multiplayer clause
+ * only, where the per-player stat sets happen, with that clause's names "in
+ * outcomes" (round 3's "in outcomes and stats" says the opposite). Round 3c
+ * did nothing for a single named player (Susan), and one player's stat named
+ * after the one character does no harm, so the one-player clause stays round
+ * 3's, byte for byte as production sends it: no one-player prompt carries the
+ * sentence, so nothing there contradicts it. Retested 2026-09-29 (setupR3d,
+ * Luna low, Casablanca six times beside production's form at six):
+ * per-player stat sets 0 of 6 against 2 of 6 (both of production's from round
+ * 3's run; none in its four new samples), p 0.23, not moved; production keeps
+ * round 3's clause.
+ */
+export const IDENTITY_CLAUSE_GROUPS_NAMELESS: Record<"one" | "more", string> = {
+  one: IDENTITY_CLAUSE.one,
+  more: IDENTITY_CLAUSE_NO_STAT_NAMES.more,
+};
+
 export const KIDS_STATS_VARIED = KIDS_STATS.replace(
   "Name each in one or two everyday words a young reader knows (for example Courage, Snacks, Forest Friends),",
   "Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins),"

@@ -152,6 +152,22 @@ export function finishingRecord(records: CallRecord[], key: string): CallRecord 
   return records.find((r) => r.jobKey === key && finishesJob(r));
 }
 
+/**
+ * One record per job attempt (job, step and attempt), for the readings: where
+ * an attempt has two records, the one written last. It happened once
+ * (2026-09-29, before planJobs skipped a repeated job key): two plans of one
+ * arm planned the same four jobs, both copies ran at once under the same
+ * callId and wrote the same outputs/<callId>.json, so the file holds the reply
+ * of the copy recorded last (checked on all four). Spend reads every record:
+ * both copies were billed.
+ */
+export function oneRecordPerAttempt(records: CallRecord[]): CallRecord[] {
+  const attemptOf = (r: CallRecord) => `${r.jobKey}|${r.step}|${r.attempt}`;
+  const last = new Map<string, number>();
+  records.forEach((r, i) => last.set(attemptOf(r), i));
+  return records.filter((r, i) => last.get(attemptOf(r)) === i);
+}
+
 /** Whether a record's output can be used (valid or repaired) */
 export function usable(record: { outcome: Outcome }): boolean {
   return USABLE_OUTCOMES.includes(record.outcome);

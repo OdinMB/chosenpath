@@ -159,6 +159,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   adoptedTemplate: "prod",
   // The Casablanca sentence (2026-09-29) against the adopted setup form, as the setup retests read
   setupR3c: "setupR3",
+  // Its second retest (the multiplayer clause only) against the adopted form too
+  setupR3d: "setupR3",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -237,6 +239,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR3b")]: [armKey(LUNA_LOW, "prod")],
   // The Casablanca sentence against the retest whose clause it extends (the sentence on its own), and today's prompt
   [armKey(LUNA_LOW, "setupR3c")]: [armKey(LUNA_LOW, "setupR3b"), armKey(LUNA_LOW, "prod")],
+  // The second retest against the first (both clauses), and today's prompt
+  [armKey(LUNA_LOW, "setupR3d")]: [armKey(LUNA_LOW, "setupR3c"), armKey(LUNA_LOW, "prod")],
   // B10's retest against B10, the note it retests
   [armKey(LUNA_LOW, "turnB10b")]: [armKey(LUNA_LOW, "turnB10")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
@@ -565,6 +569,15 @@ export const SETUP_RETEST_PREMISES = [
  */
 export const SETUP_R3C_PREMISES = ["setup-future-casablanca", "setup-custom-susan"];
 
+/**
+ * The second retest (2026-09-29, the coordinator's brief): the sentence in
+ * the multiplayer clause only, on Casablanca alone at six samples beside
+ * production's form at six, where a full fix (6 of 6 against 0 of 6) reads p
+ * 0.001; at two samples no reading of Casablanca can move.
+ */
+export const SETUP_R3D_PREMISES = ["setup-future-casablanca"];
+export const SETUP_R3D_SAMPLES = 6;
+
 /** The other thirteen setup premises: the retests' sanity pass (a test holds the two lists to the eighteen). */
 export const SETUP_SANITY_PREMISES = [
   "setup-vent-subscription",
@@ -680,7 +693,9 @@ function turnRoundArms(role: EvalRole): ArmPlan[] {
  * first. Round 3's confirmation run (setupR3, the final form) last, on Luna
  * low at two samples on all 18 premises; its setup-to-play chain is its own
  * mode (setupChain.ts). The Casablanca sentence (setupR3c, 2026-09-29) after
- * it, twice on SETUP_R3C_PREMISES.
+ * it, twice on SETUP_R3C_PREMISES; then its second retest: production's form
+ * to SETUP_R3D_SAMPLES on Casablanca (samples 1 and 2 are round 3's, stored),
+ * and setupR3d as many times, so the target reads on six pairs.
  */
 function setupRoundArms(role: EvalRole): ArmPlan[] {
   if (role !== "setup") return [];
@@ -695,6 +710,8 @@ function setupRoundArms(role: EvalRole): ArmPlan[] {
     { arm: luna("low", "setupR2bOrder"), samples: 2, scope: "all" },
     { arm: luna("low", "setupR3"), samples: 2, scope: "all" },
     { arm: luna("low", "setupR3c"), samples: 2, scope: "all", caseIds: SETUP_R3C_PREMISES },
+    { arm: luna("low", "setupR3"), samples: SETUP_R3D_SAMPLES, fromSample: 3, scope: "all", caseIds: SETUP_R3D_PREMISES },
+    { arm: luna("low", "setupR3d"), samples: SETUP_R3D_SAMPLES, scope: "all", caseIds: SETUP_R3D_PREMISES },
   ];
 }
 

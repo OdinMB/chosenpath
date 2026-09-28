@@ -95,6 +95,20 @@ describe("renderResults", () => {
     expect(text).toContain("| turn-rounds | $0.50 | $2.00 |");
     expect(text).toContain("| total | $0.75 | $40.00 |");
   });
+
+  it("reads a job attempt recorded twice once, and still counts both calls' spend", () => {
+    const twice = [
+      record({ jobKey: "a|arm|prefix|s1", caseId: "a", costUsd: 0.25, latencyMs: 30_000 }),
+      record({ jobKey: "a|arm|prefix|s1", caseId: "a", costUsd: 0.5, latencyMs: 50_000 }),
+    ];
+    const text = renderResults({ records: twice, checks: new Map(), tags: new Map([["a", tags()]]), caps: resolveCaps({}).caps, generatedAt: new Date(0) });
+    expect(text).toContain("| 0 | $0.75 | $8.00 |");
+    // One call, the later record: its wait and its cost
+    const row = text.split("\n").find((line) => line.startsWith(`| beat | ${record().armKey} (baseline) |`)) as string;
+    expect(row.split(" | ")[2]).toBe("1");
+    expect(row).toContain("| 50.0 s | 50.0 s |");
+    expect(row).toContain("$0.5000");
+  });
 });
 
 describe("renderResults: the variant section", () => {

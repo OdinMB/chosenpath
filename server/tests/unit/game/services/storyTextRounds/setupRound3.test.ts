@@ -5,6 +5,7 @@ import {
   ROUND3_PARTS,
   ROUND3B_PARTS,
   ROUND3C_PARTS,
+  ROUND3D_PARTS,
   THIS_SETUP_HEADING,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
@@ -13,6 +14,7 @@ import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request } from "
 import {
   CAMPS,
   IDENTITY_CLAUSE,
+  IDENTITY_CLAUSE_GROUPS_NAMELESS,
   IDENTITY_CLAUSE_NO_STAT_NAMES,
   IDENTITY_CLAUSE_OUTCOMES,
   KIDS_STATS,
@@ -159,6 +161,64 @@ describe("the Casablanca sentence (round 3c, 2026-09-29)", () => {
       const retest = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3C_PARTS);
       const measured = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3_PARTS);
       expect(swapped(retest.prompt)).toBe(measured.prompt);
+    }
+  });
+});
+
+describe("the Casablanca sentence in the multiplayer clause only (round 3d, 2026-09-29)", () => {
+  const round3d = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story", kids = false) =>
+    setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3D_PARTS, { kids });
+  /** Round 3d's two passages back to round 3's text: the multiplayer identity clause and the kids examples production took */
+  const swapped = (text: string) => text.replace(IDENTITY_CLAUSE_GROUPS_NAMELESS.more, IDENTITY_CLAUSE.more).replace(KIDS_STATS_VARIED, KIDS_STATS);
+
+  it("is round 3 with the multiplayer sentence on", () => {
+    expect(ROUND3D_PARTS).toEqual({ ...ROUND3_PARTS, round3d: true });
+  });
+
+  it("keeps round 3's one-player clause, and ends the multiplayer clause, names in outcomes only, on the sentence", () => {
+    expect(IDENTITY_CLAUSE_GROUPS_NAMELESS.one).toBe(IDENTITY_CLAUSE.one);
+    expect(IDENTITY_CLAUSE_GROUPS_NAMELESS.more).toBe(`${IDENTITY_CLAUSE_OUTCOMES.more} ${PLAYER_STATS_NAMELESS}`);
+    expect(IDENTITY_CLAUSE_GROUPS_NAMELESS.more).not.toContain("and stats");
+    const solo = round3d(1, GameModes.SinglePlayer).prompt;
+    expect(occurrences(solo, IDENTITY_CLAUSE.one)).toBe(1);
+    expect(solo).not.toContain(PLAYER_STATS_NAMELESS);
+    for (const players of [2, 3] as PlayerCount[]) {
+      for (const mode of MULTIPLAYER_MODES) {
+        const prompt = round3d(players, mode).prompt;
+        expect(occurrences(prompt, IDENTITY_CLAUSE_GROUPS_NAMELESS.more)).toBe(1);
+        expect(occurrences(prompt, PLAYER_STATS_NAMELESS)).toBe(1);
+        expect(prompt).not.toContain("use those names in outcomes and stats");
+      }
+    }
+  });
+
+  it("sends one player round 3's request with production's kids examples, byte for byte", () => {
+    for (const kind of KINDS) {
+      for (const kids of [false, true]) {
+        const retest = round3d(1, GameModes.SinglePlayer, kind, kids);
+        const measured = setupRound2Request(PREMISE, 1, GameModes.SinglePlayer, 25, kind, "generationOrder", ROUND3_PARTS, { kids });
+        expect(retest.prompt).toBe(measured.prompt.replace(KIDS_STATS, KIDS_STATS_VARIED));
+      }
+    }
+  });
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: round 3's request byte for byte apart from the multiplayer clause and the kids examples", (kind, players, mode) => {
+    for (const kids of [false, true]) {
+      const retest = round3d(players, mode, kind, kids);
+      const measured = setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3_PARTS, { kids });
+      expect(swapped(retest.prompt)).toBe(measured.prompt);
+      expect(JSON.stringify(json(retest.schema))).toBe(JSON.stringify(json(measured.schema)));
+    }
+  });
+
+  it("changes AI Iteration the same way", () => {
+    for (const players of [1, 2, 3] as PlayerCount[]) {
+      for (const sections of SECTION_SETS) {
+        const mode = players === 1 ? GameModes.SinglePlayer : GameModes.Competitive;
+        const retest = iterationRound2Request(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND3D_PARTS);
+        const measured = iterationRound2Request(FEEDBACK, players, mode, 25, sections, TEMPLATE, ROUND3_PARTS);
+        expect(swapped(retest.prompt)).toBe(measured.prompt);
+      }
     }
   });
 });

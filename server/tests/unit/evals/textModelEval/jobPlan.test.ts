@@ -7,6 +7,7 @@ import {
   ROUND1C_PARTS,
   ROUND3_PARTS,
   ROUND3C_PARTS,
+  ROUND3D_PARTS,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
   iterationRound1Request,
@@ -14,7 +15,7 @@ import {
   setupRound1Request,
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
-import { IDENTITY_CLAUSE_NO_STAT_NAMES } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
+import { IDENTITY_CLAUSE_GROUPS_NAMELESS, IDENTITY_CLAUSE_NO_STAT_NAMES } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
@@ -29,7 +30,8 @@ import {
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
-import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
+import { keyOf, type CallRecord, type Job } from "../../../../src/evals/textModelEval/runner.js";
+import { TRIGGER_THREAD_CASES } from "../../../../src/evals/textModelEval/triggerCases.js";
 import { caseStory, type EvalCase } from "../../../../src/evals/textModelEval/cases.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import {
@@ -545,6 +547,41 @@ describe("planJobs: the round stages and the migration check", () => {
     const request = jobs.find((j) => j.armKey === "gpt-6-luna@low/setupR3c" && j.caseId === "setup-future-casablanca")!.first.request();
     expect(requestText(request)).toContain(IDENTITY_CLAUSE_NO_STAT_NAMES.more);
     expect(requestText(request)).toBe(setupRound2Request("A premise", 2, GameModes.Competitive, 25, "story", "generationOrder", ROUND3C_PARTS, { kids: false }).prompt);
+  });
+
+  it("plans the Casablanca sentence's second retest: round 3d six times on Casablanca, production's form beside it to six samples", () => {
+    const setup = (id: string, playerCount: 1 | 2) =>
+      evalCase(id, "setup", { setup: { premise: "A premise", playerCount, gameMode: playerCount === 1 ? GameModes.SinglePlayer : GameModes.Competitive, maxTurns: 25 } });
+    const cases = [setup("setup-future-casablanca", 2), setup("setup-custom-susan", 1)];
+    const jobs = planJobs(cases, { stage: "setup-rounds", promptState: "round0", roles: ["setup"], mode: "isolated", subset15: false, records: [] });
+    const of = (arm: string) => jobs.filter((j) => j.armKey === arm).map((j) => `${j.caseId} s${j.sample}`);
+    expect(of("gpt-6-luna@low/setupR3d")).toEqual([1, 2, 3, 4, 5, 6].map((s) => `setup-future-casablanca s${s}`));
+    // Round 3's confirmation run planned samples 1 and 2 on every premise; the retest adds 3 to 6 on Casablanca only
+    expect(of("gpt-6-luna@low/setupR3")).toEqual([
+      "setup-custom-susan s1",
+      "setup-custom-susan s2",
+      ...[1, 2, 3, 4, 5, 6].map((s) => `setup-future-casablanca s${s}`),
+    ]);
+    const request = jobs.find((j) => j.armKey === "gpt-6-luna@low/setupR3d")!.first.request();
+    expect(requestText(request)).toBe(setupRound2Request("A premise", 2, GameModes.Competitive, 25, "story", "generationOrder", ROUND3D_PARTS, { kids: false }).prompt);
+    expect(requestText(request)).toContain(IDENTITY_CLAUSE_GROUPS_NAMELESS.more);
+  });
+
+  it("never plans a job twice where two plans of one arm meet, --samples included", () => {
+    // 2026-09-29: --samples 6 raised round 3's two-sample plan to six on Casablanca, beside the retest's samples 3 to 6
+    // of the same arm, and each of samples 3 to 6 ran twice
+    const casablanca = evalCase("setup-future-casablanca", "setup", { setup: { premise: "A premise", playerCount: 2, gameMode: GameModes.Competitive, maxTurns: 25 } });
+    for (const samples of [undefined, 6, 8]) {
+      const jobs = planJobs([casablanca], { stage: "setup-rounds", promptState: "round0", roles: ["setup"], mode: "isolated", subset15: false, records: [], samples });
+      const keys = jobs.map((j) => keyOf(j));
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(jobs.filter((j) => j.armKey === "gpt-6-luna@low/setupR3").map((j) => j.sample)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].slice(0, samples ?? 6));
+    }
+    // The same holds for turn round 1's two planner v2 plans on the trigger cases
+    const trigger = evalCase(TRIGGER_THREAD_CASES[0], "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-trigger" }).getState() });
+    const planned = planJobs([trigger], { stage: "turn-rounds", promptState: "round0", roles: ["thread"], mode: "isolated", subset15: false, records: [], samples: 4 });
+    const keys = planned.map((j) => keyOf(j));
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("lets planner v2's chapter plans stand in for planner v2b's only where v2b's request is v2's byte for byte, prompt and schema (one player)", () => {

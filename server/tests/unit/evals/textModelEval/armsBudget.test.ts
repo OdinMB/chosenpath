@@ -15,6 +15,7 @@ import {
   ROUND3_REPLAY_SAMPLES,
   secondReferenceKeys,
   SETUP_R3C_PREMISES,
+  SETUP_R3D_PREMISES,
   SETUP_RETEST_PREMISES,
   SETUP_SANITY_PREMISES,
   STAGES,
@@ -178,8 +179,13 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
       ["gpt-6-luna@low/setupR3", 2, "all", undefined],
       // The Casablanca sentence (2026-09-29): round 3c twice on the two premises whose player stats carried a premise's name
       ["gpt-6-luna@low/setupR3c", 2, "all", SETUP_R3C_PREMISES],
+      // Its second retest: production's form to six samples on Casablanca (1 and 2 are stored), and round 3d six times
+      ["gpt-6-luna@low/setupR3", 6, "all", SETUP_R3D_PREMISES],
+      ["gpt-6-luna@low/setupR3d", 6, "all", SETUP_R3D_PREMISES],
     ]);
     expect(SETUP_R3C_PREMISES).toEqual(["setup-future-casablanca", "setup-custom-susan"]);
+    expect(SETUP_R3D_PREMISES).toEqual(["setup-future-casablanca"]);
+    expect(armsFor("setup-rounds", "setup").map((plan) => plan.fromSample)).toEqual([...Array(10).fill(undefined), 3, undefined]);
     for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("setup-rounds", role)).toEqual([]);
     // gpt-4.x is never a new arm; its stored records are comparisons only
     expect(armsFor("setup-rounds", "setup").every((plan) => plan.arm.model.startsWith("gpt-6-") && !plan.arm.baseline)).toBe(true);
@@ -336,6 +342,7 @@ describe("budget caps", () => {
     expect(DEFAULT_STAGE_CAPS).toMatchObject({ "setup-rounds": 3, "turn-rounds": 2, migration: 1.2 });
     // The Casablanca sentence's retest (2026-09-29) books to the setup rounds, whose reason names it
     expect(STAGE_CAP_REASONS["setup-rounds"]).toMatch(/Casablanca sentence/);
+    expect(STAGE_CAP_REASONS["setup-rounds"]).toMatch(/setupR3d/);
     for (const stage of LEDGER_STAGES) expect(STAGE_CAP_REASONS[stage].length).toBeGreaterThan(20);
     // Stage 3 and 4 keep their caps; Stage 4 is closed
     expect(DEFAULT_STAGE_CAPS).toMatchObject({ "0": 8, "1-2": 13, "3": 3, "4": 4, filter: 0.3 });
@@ -382,6 +389,10 @@ describe("budget caps", () => {
     expect(referenceKey("gpt-6-luna@low/setupR3c")).toBe("gpt-6-luna@low/setupR3");
     expect(estimateBaseKey("gpt-6-luna@low/setupR3c")).toBe("gpt-6-luna@low/setupR3");
     expect(secondReferenceKeys("gpt-6-luna@low/setupR3c")).toEqual(["gpt-6-luna@low/setupR3b", "gpt-6-luna@low/prod"]);
+    // Its second retest (the multiplayer clause only) against the adopted form, then against the first retest and today's prompt
+    expect(referenceKey("gpt-6-luna@low/setupR3d")).toBe("gpt-6-luna@low/setupR3");
+    expect(estimateBaseKey("gpt-6-luna@low/setupR3d")).toBe("gpt-6-luna@low/setupR3");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR3d")).toEqual(["gpt-6-luna@low/setupR3c", "gpt-6-luna@low/prod"]);
     // Its chain reads against today's pair (planner v2b, planner v2c's own reference, never ran in a chain), and round 1's chain second
     const chain = "pipeline:gpt-6-luna@low/planV2c>gpt-6-luna@medium/chapterFullB";
     expect(referenceKeyOf(chain)).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");

@@ -18,7 +18,7 @@ import {
 import type { ProbeReport } from "./probe.js";
 import type { Direction } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
-import type { CallRecord } from "./runner.js";
+import { oneRecordPerAttempt, type CallRecord } from "./runner.js";
 import { renderTurnWaits, renderTurnWaitsBySample, turnWaitReadings, turnWaitsBySample, type TurnKind } from "./turnWaits.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
 import {
@@ -415,7 +415,9 @@ function renderVariantComparison(comparisons: VariantComparison[]): string[] {
 }
 
 export function renderResults(input: ResultsInput): string {
-  const stats = computeArmStats(input.records, input.checks, input.tags);
+  // Every reading takes one record per job attempt; spend below counts every record, since every one was billed
+  const readings = oneRecordPerAttempt(input.records);
+  const stats = computeArmStats(readings, input.checks, input.tags);
   // Probe spend lives in probe.json, not calls.jsonl; it counts against Stage 0 as the caps do
   const probeSpend = input.probe ? input.probe.totalCostUsd + (input.probe.priorSpendUsd ?? 0) : 0;
   const spend = spentByStage([
@@ -476,11 +478,11 @@ export function renderResults(input: ResultsInput): string {
     }
     lines.push("### Views: single-player with and without pregeneration, multiplayer, setup", ...renderViews(stats, promptState));
     if (input.turnKinds) {
-      const inState = input.records.filter((r) => r.promptState === promptState && input.tags.has(r.caseId));
+      const inState = readings.filter((r) => r.promptState === promptState && input.tags.has(r.caseId));
       lines.push(...renderTurnWaits(turnWaitReadings(inState, input.turnKinds)));
       lines.push(...renderTurnWaitsBySample(turnWaitsBySample(inState, input.turnKinds)));
     }
-    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference, input.sameRequest)));
+    lines.push(...renderVariantComparison(variantComparisons(readings, input.checks, input.tags, promptState, input.storedReference, input.sameRequest)));
   }
   if (input.prose) {
     lines.push("", "## Prose aggregates (beats)", "", "| Arm | Beats | Distinct openings | Opens with \"You\" | Stock phrases / 1000 words |", "|---|---|---|---|---|");

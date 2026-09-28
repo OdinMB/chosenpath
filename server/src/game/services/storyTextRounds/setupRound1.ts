@@ -16,6 +16,7 @@ import {
   GRUK_ROLE,
   GUIDELINE_FIELDS,
   IDENTITY_CLAUSE,
+  IDENTITY_CLAUSE_GROUPS_NAMELESS,
   IDENTITY_CLAUSE_NO_STAT_NAMES,
   IDENTITY_CLAUSE_OUTCOMES,
   KIDS_INVENTORY,
@@ -94,6 +95,7 @@ export type Round1Parts = {
   round3?: boolean;
   round3b?: boolean;
   round3c?: boolean;
+  round3d?: boolean;
 };
 /** Setup round 1 as it ran: all six proposals. */
 export const ROUND1_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true, fixes: false, everyPlayerStat: false };
@@ -133,6 +135,12 @@ export const ROUND3B_PARTS: Round1Parts = { ...ROUND3_PARTS, round3b: true };
  * from round 3b, so the form is production's measured text with the one change.
  */
 export const ROUND3C_PARTS: Round1Parts = { ...ROUND3_PARTS, round3c: true };
+/**
+ * The Casablanca sentence's second retest (2026-09-29): as round 3c in the
+ * multiplayer clause only; the one-player clause stays round 3's
+ * (IDENTITY_CLAUSE_GROUPS_NAMELESS). Production's kids examples too.
+ */
+export const ROUND3D_PARTS: Round1Parts = { ...ROUND3_PARTS, round3d: true };
 
 /** What a call knows beyond its premise, player count and mode: whether a child reads along (a read-with-kids story, a template tagged Kids). */
 export type SetupCallOptions = { kids?: boolean };
@@ -239,6 +247,14 @@ const PREMISE_NAMES: Record<"one" | "more", string> = {
   more: "- When the premise names the player characters, use those names in outcomes and stats, and give each seat three identities that keep the name and vary in appearance and details.",
 };
 
+/** The identity clause a form prints: its latest retest's, else round 3's, else S8's. */
+function identityClauseFor(parts: Round1Parts): Record<"one" | "more", string> {
+  if (parts.round3d) return IDENTITY_CLAUSE_GROUPS_NAMELESS;
+  if (parts.round3c) return IDENTITY_CLAUSE_NO_STAT_NAMES;
+  if (parts.round3b) return IDENTITY_CLAUSE_OUTCOMES;
+  return parts.round3 ? IDENTITY_CLAUSE : PREMISE_NAMES;
+}
+
 /**
  * A1.2, with A2.2's contested-resonance line (contest modes only). The
  * document's "(in short stories, as many as the "This setup" block says)"
@@ -251,13 +267,7 @@ function outcomesSection(on: On): string {
   // Round 3: the floor follows the story length (A10), a seat's role names its camp, and the identity-name clause
   const floor = on.parts.round3 ? SHORT_FLOOR : "";
   const camp = camps(on) ? ROLES_CAMP : "";
-  const names = on.parts.round3c
-    ? IDENTITY_CLAUSE_NO_STAT_NAMES
-    : on.parts.round3b
-      ? IDENTITY_CLAUSE_OUTCOMES
-      : on.parts.round3
-        ? IDENTITY_CLAUSE
-        : PREMISE_NAMES;
+  const names = identityClauseFor(on.parts);
   return [
     "Outcomes",
     "- Outcomes are the questions the ending answers. Milestones earned in threads move each outcome toward one of its three resolutions; they are the story's only progress bar.",
@@ -595,8 +605,9 @@ const SINGLE_PLAYER_OUTCOMES =
 function round3SlateLines(on: On): string[] {
   const M = milestoneBudgetFor(on.maxTurns);
   const length = storyLengthLine(on.maxTurns, on.players > 1);
-  // Round 3b's kids examples, which production took; round 3c builds on production's text, so it carries them too
-  const kids = kidsBudget(on) && asksStatRules(on) ? [on.parts.round3b || on.parts.round3c ? KIDS_STATS_VARIED : KIDS_STATS] : [];
+  // Round 3b's kids examples, which production took; rounds 3c and 3d build on production's text, so they carry them too
+  const variedKids = on.parts.round3b || on.parts.round3c || on.parts.round3d;
+  const kids = kidsBudget(on) && asksStatRules(on) ? [variedKids ? KIDS_STATS_VARIED : KIDS_STATS] : [];
   if (on.players === 1) {
     const slate = slateMilestones("single", M);
     const [privateLife, side] = slate.personal;
