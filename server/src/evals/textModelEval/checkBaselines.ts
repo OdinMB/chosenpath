@@ -1,6 +1,7 @@
 import { isResultRecord, percentile } from "./armStats.js";
 import type { EvalRole } from "./arms.js";
 import type { CaseTags, EvalCase } from "./cases.js";
+import type { FrameCheck } from "./chapterFrames.js";
 import type { RatingKey } from "./ratingSets.js";
 import { readRanks, type ExportedRatings } from "./ratingScore.js";
 import { usable, type CallRecord } from "./runner.js";
@@ -61,6 +62,8 @@ export type BaselineReport = {
   turnKinds: { beats: TurnKindWait[]; planners: TurnKindWait[]; chains: TurnKindWait[] };
   references: ReferenceCurrency[];
   readouts: { arm: string; outputFile: string; hit: string }[];
+  /** The stored chapters read once each on the owner's two chapter checks of 2026-09-28 (chapterFrameChecks) */
+  frames: { chapters: number; checks: Record<string, { pass: number; n: number }> };
 };
 
 export type BaselineInput = {
@@ -76,8 +79,23 @@ export type BaselineInput = {
   todaysPromptHash?: (evalCase: EvalCase) => string | undefined;
   /** Stat readouts found on stored beats, for hand-reading the check's false alarms */
   readouts?: BaselineReport["readouts"];
+  /** The stored chapters' checks on their backfilled question and their plan's kind of milestone (chapterFrameChecks) */
+  frames?: FrameCheck[];
   generatedAt: Date;
 };
+
+/** Pass counts per check over the stored chapters. */
+function frameReadings(frames: FrameCheck[]): BaselineReport["frames"] {
+  const checks: Record<string, { pass: number; n: number }> = {};
+  for (const frame of frames) {
+    for (const [name, ok] of Object.entries(frame.checks)) {
+      checks[name] ??= { pass: 0, n: 0 };
+      checks[name].n++;
+      if (ok) checks[name].pass++;
+    }
+  }
+  return { chapters: frames.length, checks };
+}
 
 /** Pooled shares: numerator count over denominator count, summed over the replies. */
 export const RATIOS: { name: string; numerator: string; denominator: string }[] = [
@@ -301,6 +319,7 @@ export function checkBaselines(input: BaselineInput): BaselineReport {
     turnKinds: turnKindWaits(replies, caseById),
     references: input.todaysPromptHash ? referenceCurrency(input.records, caseById, input.todaysPromptHash) : [],
     readouts: input.readouts ?? [],
+    frames: frameReadings(input.frames ?? []),
   };
 }
 
@@ -396,6 +415,19 @@ export function renderCheckBaselines(report: BaselineReport): string {
       "| Role | Prompt state | Cases | Identical today |",
       "|---|---|---|---|",
       ...report.references.map((r) => `| ${r.role} | ${r.promptState} | ${r.cases} | ${r.identical} |`),
+      ""
+    );
+  }
+
+  lines.push("## Stored chapters: the backfilled question and the plan's kind of milestone", "");
+  if (report.frames.chapters === 0) lines.push("No stored chapter was read.", "");
+  else {
+    lines.push(
+      `Every stored chapter the cases read, once each (${report.frames.chapters} threads): its backfilled chapter question against its outcome's question (questionNearerThanOutcome: not the outcome's question again), where a frame is attached, and its plan's kind of milestone (milestoneKindConcrete: no "progress", "advance", "step toward" or "milestone"). Today's form wrote the kind of milestone; the backfill wrote the question. Word heuristics: read them as rates.`,
+      "",
+      "| Check | Passes |",
+      "|---|---|",
+      ...Object.entries(report.frames.checks).map(([name, { pass, n }]) => `| ${name} | ${pass} of ${n} |`),
       ""
     );
   }

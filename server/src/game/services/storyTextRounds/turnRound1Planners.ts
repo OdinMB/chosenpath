@@ -312,14 +312,40 @@ function progressionItem(number: number, multiplayer: boolean): string {
    Good: "First impression: How does Rikkit win a hearing with Sir Bram?" → "Leverage: How does Rikkit use what Sir Bram fears?" → "The ask: Sir Bram names his price in front of the Guild. How does Rikkit answer?"`;
 }
 
-function threadList(multiplayer: boolean): string {
+/**
+ * Planner v2c's question item (the owner's feedback of 2026-09-28: a chapter
+ * asked its outcome's question again, "Will Arielle uncover enough concrete
+ * evidence to expose and dismantle the Clandestine Waste Ring?", with a kind
+ * of milestone "marking progress in exposing the Waste Ring"): a nearer
+ * question whose answer is one milestone, about the chapter's own situation,
+ * and a kind of milestone that names the concrete thing it settles. The
+ * example is the prompt's own worked example (Rikkit and the noble's
+ * conspiracy), so no stored story's names reach the prompt.
+ */
+const QUESTION_ITEM_START = "The thread's question and its kind of milestone.";
+const NEARER_QUESTION =
+  "The question is nearer than its outcome's: its three possible milestones answer it, and each is one milestone of that outcome.";
+const CONTEST_QUESTION = " In a contest, it asks which side comes out ahead in this situation.";
+
+function questionItem(number: number, multiplayer: boolean): string {
+  const who = multiplayer ? "[insert player names]" : "Rikkit";
+  const outcome = multiplayer ? "Will the players stop the noble's conspiracy?" : "Will Rikkit stop the noble's conspiracy?";
+  return `${number}. ${QUESTION_ITEM_START} ${NEARER_QUESTION} Ask it about this thread's own situation (a place, a person, a deadline or an object), so that its beats can answer it; never ask the outcome's question again in other words.${
+    multiplayer ? CONTEST_QUESTION : ""
+  } The kind of milestone names the concrete thing the answer settles, not progress toward the outcome.
+   Outcome: "${outcome}" Weak thread question: "Will ${who} find enough evidence to stop the noble's conspiracy?" (the outcome's question again) Good: "Will ${who} get the noble's letters out of the manor before the guards change shifts?", with the kind of milestone "whether the letters prove the noble's hand in the conspiracy", not "progress toward stopping the conspiracy".`;
+}
+
+function threadList(multiplayer: boolean, nearer: boolean): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
+  // planV2c inserts its question item before the milestones; the rest renumbers
+  const q = nearer ? 1 : 0;
   if (!multiplayer) {
     return `Create the thread, with:
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
-3. ${milestones}
-${progressionItem(4, false)}
+${nearer ? `${questionItem(3, false)}\n` : ""}${3 + q}. ${milestones}
+${progressionItem(4 + q, false)}
 
 `;
   }
@@ -327,8 +353,8 @@ ${progressionItem(4, false)}
 1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
-4. ${milestones}
-${progressionItem(5, true)}
+${nearer ? `${questionItem(4, true)}\n` : ""}${4 + q}. ${milestones}
+${progressionItem(5 + q, true)}
 
 `;
 }
@@ -350,7 +376,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story, twoSided: boolean): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -387,7 +413,7 @@ function threadInstructions(production: string, story: Story, twoSided: boolean)
     `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
-  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer));
+  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer));
   text = replaceOnce(
     LABEL,
     text,
@@ -441,6 +467,15 @@ const [CHALLENGE_STEP_RESULTS, , EXPLORATION_STEP_RESULTS] = STEP_RESULTS.option
 
 const QUESTION =
   "The one question this thread decides about its outcome, in the story's own names; its three possible milestones are the answers. After a flavor switch: the switch's question, sharpened for this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit succeed?' Good: 'Will Sir Bram suspend the Guild's bounty on goblins?'";
+/** Planner v2c's question: nearer than the outcome's, about the thread's own situation (the owner's feedback of 2026-09-28). */
+const NEARER_QUESTION_FIELD =
+  "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
+/** Planner v2c's kind of milestone, written by the planner rather than copied from the question. */
+const MILESTONE_KIND_FIELD =
+  "The kind of milestone this thread adds to its outcome: the concrete thing its answer settles, in a few words and the story's own names. Weak: 'progress toward stopping the conspiracy'. Good: 'whether the letters prove the noble's hand in the conspiracy'.";
+/** The chapter title as planner v2 ran it, and with the adoption's "without a number" (planner v2c; a plan once titled its chapter "6. …"). */
+const TITLE_AS_RAN = "The thread's title; its beats show it with their number.";
+const TITLE_WITHOUT_NUMBER = "The thread's title, without a number: its beats show it with their number.";
 const PLAN = (multiplayer: boolean) =>
   `The plan for the storyteller who writes this thread's beats; they read it at every step. Two or three sentences: the one situation the thread stays in and who pushes back, how it rises to its last step, and what the player can win or lose.${
     multiplayer ? " In multiplayer, also what each player does." : ""
@@ -488,7 +523,7 @@ function stepSchema(multiplayer: boolean) {
   });
 }
 
-function threadFields(multiplayer: boolean) {
+function threadFields(multiplayer: boolean, nearer: boolean) {
   return {
     kind: (multiplayer ? z.enum(["challenge", "contest", "exploration"]) : z.enum(["challenge", "exploration"])).describe(
       "The thread's kind, by the kind rule (the outcome decides it, not the thread type). Decide it first: the milestones and the steps below use its result names."
@@ -498,8 +533,9 @@ function threadFields(multiplayer: boolean) {
       .describe(
         "The thread type: preferably the name part of one of the story's thread types (the words before any parenthesis), one whose kind fits when the story names one; otherwise a few words (Chase, Negotiation, Fight). Not one of the player's last three (PREVIOUS THREAD TYPES)."
       ),
-    title: z.string().describe("The thread's title; its beats show it with their number."),
-    question: z.string().describe(QUESTION),
+    title: z.string().describe(nearer ? TITLE_WITHOUT_NUMBER : TITLE_AS_RAN),
+    question: z.string().describe(nearer ? NEARER_QUESTION_FIELD : QUESTION),
+    ...(nearer ? { typeOfMilestone: z.string().describe(MILESTONE_KIND_FIELD) } : {}),
     possibleMilestones: (multiplayer ? z.union([CHALLENGE_MILESTONES, CONTEST_MILESTONES, EXPLORATION_MILESTONES]) : z.union([CHALLENGE_MILESTONES, EXPLORATION_MILESTONES])).describe(
       MILESTONES_DESCRIPTION
     ),
@@ -517,12 +553,12 @@ function threadFields(multiplayer: boolean) {
   };
 }
 
-function threadReplySchema(story: Story, full: boolean): z.AnyZodObject {
+function threadReplySchema(story: Story, full: boolean, nearer: boolean): z.AnyZodObject {
   const restated: z.ZodRawShape = full ? { relevantSwitchAndThreadInstructions: threadAnalysisSchema.shape.relevantSwitchAndThreadInstructions } : {};
-  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false)) });
+  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false, nearer)) });
   const ids = storyOutcomeIds(story);
   const sides = { playersSideA: threadSchema.shape.playersSideA, playersSideB: threadSchema.shape.playersSideB };
-  const { kind, ...rest } = threadFields(true);
+  const { kind, ...rest } = threadFields(true, nearer);
   return z.object({
     ...restated,
     grouping: z.string().describe("Which players share which thread, and why, in one or two sentences."),
@@ -541,11 +577,16 @@ function threadReplySchema(story: Story, full: boolean): z.AnyZodObject {
   });
 }
 
-/** A written thread in today's stored shape, the last step's results the milestones; kind, question and plan ride along. */
+/**
+ * A written thread in today's stored shape, the last step's results the
+ * milestones; kind, question and plan ride along. The kind of milestone is
+ * the question (planner v2 writes none), or planner v2c's own where it wrote one.
+ */
 function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB: string[]): Loose {
   const milestones = asObject(written.possibleMilestones);
   const final = asObject(written.finalStep);
   const question = asString(written.question);
+  const kindOfMilestone = asString(written.typeOfMilestone).trim() || question;
   const steps = asArray(written.steps).map((s) => {
     const step = asObject(s);
     return { title: asString(step.title), question: asString(step.question), possibleResolutions: asObject(step.possibleResolutions) };
@@ -557,7 +598,7 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
     previousThreadTypesToBeAvoided: [],
     relevantSuggestedThreadTypes: [],
     typeOfThread: asString(written.typeOfThread),
-    typeOfMilestone: question,
+    typeOfMilestone: kindOfMilestone,
     possibleMilestones: milestones,
     progression: [...steps, { title: asString(final.title), question: asString(final.question), possibleResolutions: milestones }],
     title: asString(written.title),
@@ -595,14 +636,18 @@ function assembleThread(story: Story, parsed: unknown): unknown {
 /**
  * Planner v2's thread analysis request (lean, or `full` with the restated
  * instructions); `twoSided` is planV2b, contests with two sides only (setup
- * round 3's chain).
+ * round 3's chain); `nearerQuestion` with it is planV2c (the owner's feedback
+ * of 2026-09-28): the question item in the list, the nearer question and the
+ * planner's own kind of milestone in the reply, and the adoption's chapter
+ * title "without a number", so production builds it byte for byte.
  */
-export function plannerV2ThreadRequest(story: Story, full: boolean, options: { twoSided?: boolean } = {}): AssembledRequest {
+export function plannerV2ThreadRequest(story: Story, full: boolean, options: { twoSided?: boolean; nearerQuestion?: boolean } = {}): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
+  const nearer = options.nearerQuestion ?? false;
   return {
-    prompt: threadInstructions(instructions, story, options.twoSided ?? false) + threadState(state, story),
-    schema: threadReplySchema(story, full),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer) + threadState(state, story),
+    schema: threadReplySchema(story, full, nearer),
     assemble: (parsed) => assembleThread(story, parsed),
   };
 }
@@ -618,4 +663,7 @@ export const PLANNER_V2_TEXT = {
   lengthRuleStart: "Choose the length from what the thread is",
   milestoneSizeStart: "Size them to what PACING says the outcome still needs",
   oneSituation: "tells one situation rising to a climax",
+  questionItemStart: QUESTION_ITEM_START,
+  nearerQuestion: NEARER_QUESTION,
+  contestQuestion: CONTEST_QUESTION.trim(),
 };

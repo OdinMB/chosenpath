@@ -8,14 +8,15 @@ import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js"
 import { SETUP_CHAIN_PREMISES, chainSetupInput } from "../../../../src/evals/textModelEval/setupChain.js";
 import { requestFor, requestText, type EvalRequest, type RequestInput, type VariantId } from "../../../../src/evals/textModelEval/variants.js";
 import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
-import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedThreadSchema, adoptedTurnPrompt, isScoreboardEnding } from "../../../helpers/adoptedDeltas.js";
+import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurnPrompt, isScoreboardEnding } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
  * production's own code, the eval's "adopted" variant, builds byte for byte
  * the requests of the variants that passed on every frozen case the eval
  * holds: the final setup form (setupR3, a case's kids tag included), planner
- * v2 with two-sided contests (planV2b), today's turn form with B6 alone
+ * v2 with two-sided contests (planV2b) for the switch and planner v2c (the
+ * nearer chapter question, 2026-09-28) for the chapter, today's turn form with B6 alone
  * (turnB6) for a single player and today's form (prod) for groups, and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
@@ -39,8 +40,9 @@ function measuredVariant(input: RequestInput): VariantId {
     case "iteration":
       return "setupR3";
     case "switch":
-    case "thread":
       return "planV2b";
+    case "thread":
+      return "planV2c";
     case "beat":
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }
@@ -56,7 +58,6 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "iteration":
       return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: json(measured) };
     case "thread":
-      return { prompt, schema: adoptedThreadSchema(json(measured)) };
     case "switch":
       return { prompt, schema: json(measured) };
     case "beat":

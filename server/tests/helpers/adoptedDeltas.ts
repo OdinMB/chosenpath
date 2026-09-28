@@ -1,10 +1,12 @@
 /*
  * The deliberate differences between production and the eval variants it
- * adopted on 2026-09-28 (setupR3, planV2b, turnB6), the one place the
- * adoption tests read them from. Each is a logged adoption item or a settled
- * decision that no round measured; everything else production sends is the
- * measured request byte for byte (.plans/2026-09-26_build-followup.md,
- * "Adoption into production").
+ * adopted on 2026-09-28 (setupR3, planV2b for the switch, planV2c for the
+ * chapter, turnB6), the one place the adoption tests read them from. Each is
+ * a logged adoption item or a settled decision that no round measured;
+ * everything else production sends is the variant's request byte for byte
+ * (.plans/2026-09-26_build-followup.md, "Adoption into production" and "The
+ * owner's feedback of 2026-09-28"). The chapter planner has none: planV2c
+ * carries the adopted "without a number" in the chapter title's field.
  */
 
 import type { Story } from "core/models/Story.js";
@@ -37,15 +39,6 @@ export const SCOREBOARD_SENTENCES: [string, string][] = [
 /** The measured setup prompt as production sends it. */
 export function adoptedSetupPrompt(measured: string, players: number, mode: GameMode): string {
   return isContestSetup(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), measured) : measured;
-}
-
-/** Chapter planner (step 3, the logged "without a number"): the title field. */
-export const MEASURED_TITLE = "The thread's title; its beats show it with their number.";
-export const ADOPTED_TITLE = "The thread's title, without a number: its beats show it with their number.";
-
-/** The measured chapter planner's JSON schema as production sends it. */
-export function adoptedThreadSchema(measuredJson: string): string {
-  return measuredJson.replace(MEASURED_TITLE, ADOPTED_TITLE);
 }
 
 /** Turns (step 5): the scoreboard ending rule, the one line on the ending of a story with a contested outcome. */

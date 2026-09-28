@@ -14,9 +14,12 @@ import { pickedOutcome, threadPacingBlock } from "../pacing.js";
  * left; milestones are sized to what the outcome still needs; a chapter is
  * one situation rising to a climax; its kind follows its outcome's, and a
  * contest has two sides, with three players the setup's two camps (an
- * accepted engine limit). The reply is lean (plannerReplies.ts). Today's form
- * before the adoption is kept for the eval in storyTextRound0/;
- * adoptedPlanners.test.ts holds this equal to the measured planner v2.
+ * accepted engine limit). The reply is lean (plannerReplies.ts). Since the
+ * owner's feedback of 2026-09-28 the chapter asks a nearer question than its
+ * outcome, one whose answer is one milestone, and names the concrete kind of
+ * milestone it adds (planner v2c). Today's form before the adoption is kept
+ * for the eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal
+ * to the eval's planner v2c.
  */
 
 /** A4's length rule. */
@@ -51,14 +54,30 @@ function progressionItem(number: number, multiplayer: boolean): string {
    Good: "First impression: How does Rikkit win a hearing with Sir Bram?" → "Leverage: How does Rikkit use what Sir Bram fears?" → "The ask: Sir Bram names his price in front of the Guild. How does Rikkit answer?"`;
 }
 
+/**
+ * The chapter's question and kind of milestone (planner v2c, the owner's
+ * feedback of 2026-09-28: a chapter asked its outcome's question again): a
+ * nearer question whose answer is one milestone, about the chapter's own
+ * situation, and a kind of milestone that names the concrete thing it settles.
+ */
+function questionItem(number: number, multiplayer: boolean): string {
+  const who = multiplayer ? "[insert player names]" : "Rikkit";
+  const outcome = multiplayer ? "Will the players stop the noble's conspiracy?" : "Will Rikkit stop the noble's conspiracy?";
+  return `${number}. The thread's question and its kind of milestone. The question is nearer than its outcome's: its three possible milestones answer it, and each is one milestone of that outcome. Ask it about this thread's own situation (a place, a person, a deadline or an object), so that its beats can answer it; never ask the outcome's question again in other words.${
+    multiplayer ? " In a contest, it asks which side comes out ahead in this situation." : ""
+  } The kind of milestone names the concrete thing the answer settles, not progress toward the outcome.
+   Outcome: "${outcome}" Weak thread question: "Will ${who} find enough evidence to stop the noble's conspiracy?" (the outcome's question again) Good: "Will ${who} get the noble's letters out of the manor before the guards change shifts?", with the kind of milestone "whether the letters prove the noble's hand in the conspiracy", not "progress toward stopping the conspiracy".`;
+}
+
 function threadList(multiplayer: boolean): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
   if (!multiplayer) {
     return `Create the thread, with:
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
-3. ${milestones}
-${progressionItem(4, false)}
+${questionItem(3, false)}
+4. ${milestones}
+${progressionItem(5, false)}
 
 `;
   }
@@ -66,8 +85,9 @@ ${progressionItem(4, false)}
 1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
-4. ${milestones}
-${progressionItem(5, true)}
+${questionItem(4, true)}
+5. ${milestones}
+${progressionItem(6, true)}
 
 `;
 }

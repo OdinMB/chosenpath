@@ -15,6 +15,7 @@ import { htmlLeaks, metadataLeaks } from "./blinding.js";
 import { budgetCheck, resolveCaps, spentByStage, type Caps, type LedgerStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, loadStoredSnapshots, type EvalCase } from "./cases.js";
+import { chapterFrameChecks } from "./chapterFrames.js";
 import { checkBaselines, renderCheckBaselines, type BaselineReport } from "./checkBaselines.js";
 import { localCases, printDryRun, type LocalCaseSources } from "./dryRun.js";
 import { evalFiles, type EvalFiles } from "./evalFiles.js";
@@ -793,6 +794,7 @@ function checkBaselinesMode(args: Args, files: EvalFiles) {
     // Today's production-form request for a case, as the executor hashes it; a case today's code cannot build has none
     todaysPromptHash: (evalCase) => todaysRequestHash(evalCase),
     readouts: readoutSamples(records, cases, files),
+    frames: chapterFrameChecks(cases),
     generatedAt: new Date(),
   });
   files.writeCheckBaselines(renderCheckBaselines(report), report);

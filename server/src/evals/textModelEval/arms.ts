@@ -136,6 +136,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   setupR3: "setupR2bOrder",
   planV2b: "planV2",
   turnB6: "prod",
+  // The nearer chapter question (owner's feedback, 2026-09-28) against the planner it edits
+  planV2c: "planV2b",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -204,6 +206,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR2bOrder")]: [armKey(LUNA_LOW, "setupR2b"), armKey(LUNA_LOW, "prod")],
   // Setup round 3's confirmation: the final form against today's prompt too (the carry-forward guard)
   [armKey(LUNA_LOW, "setupR3")]: [armKey(LUNA_LOW, "prod")],
+  // Planner v2c: planV2b ran only in the setup chain, so planner v2's isolated plans (and today's form) are its readings too
+  [armKey(LUNA_LOW, "planV2c")]: [armKey(LUNA_LOW, "planV2"), armKey(LUNA_LOW, "prod")],
 };
 
 export function secondReferenceKeys(key: string): string[] {

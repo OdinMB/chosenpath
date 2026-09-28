@@ -21,16 +21,17 @@ import { fallbackOutcomeId, outcomesFor, pickedOutcome } from "./pacing.js";
  *   story's outcome ids as a list (free text for a story without outcomes);
  *   stored as today's "text (outcome id)" string, with the pair beside it
  *   (`topicDirections`), which the chapter planner's pick reads.
- * - A chapter states its kind first, then its question, its milestones, the
- *   steps before the last and a last step whose three results are the
- *   milestones, and its plan. A single player's chapter writes no outcome:
+ * - A chapter states its kind first, then its question (nearer than its
+ *   outcome's since 2026-09-28, planner v2c) and its kind of milestone, its
+ *   milestones, the steps before the last and a last step whose three
+ *   results are the milestones, and its plan. A single player's chapter writes no outcome:
  *   the player's pick sets it (pacing.ts, pickedOutcome), or, when the pick
  *   names none the story knows, the fallback the planner's prompt was told
  *   (fallbackOutcomeId). The code fills the
  *   last step's results, the length and the ids. The kind, question and plan
  *   ride along on the stored thread.
- * The eval's measured form is storyTextRounds/turnRound1Planners.ts
- * (planV2b); adoptedPlanners.test.ts holds these equal to it.
+ * The eval's form is storyTextRounds/turnRound1Planners.ts (planV2b for the
+ * switch, planV2c for the chapter); adoptedPlanners.test.ts holds these equal to it.
  */
 
 const NO_BLANK_ITEMS = "Every item in a list carries real content; a list never holds an empty or blank item.";
@@ -162,8 +163,12 @@ const TODAY_STEP = threadSchema.shape.progression.element;
 const STEP_RESULTS = TODAY_STEP.shape.possibleResolutions;
 const [CHALLENGE_STEP_RESULTS, , EXPLORATION_STEP_RESULTS] = STEP_RESULTS.options;
 
+/** The chapter's question, nearer than its outcome's (planner v2c, the owner's feedback of 2026-09-28). */
 const QUESTION =
-  "The one question this thread decides about its outcome, in the story's own names; its three possible milestones are the answers. After a flavor switch: the switch's question, sharpened for this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit succeed?' Good: 'Will Sir Bram suspend the Guild's bounty on goblins?'";
+  "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
+/** The kind of milestone, written by the planner (stored as the thread's typeOfMilestone) instead of copied from the question. */
+const MILESTONE_KIND =
+  "The kind of milestone this thread adds to its outcome: the concrete thing its answer settles, in a few words and the story's own names. Weak: 'progress toward stopping the conspiracy'. Good: 'whether the letters prove the noble's hand in the conspiracy'.";
 const PLAN = (multiplayer: boolean) =>
   `The plan for the storyteller who writes this thread's beats; they read it at every step. Two or three sentences: the one situation the thread stays in and who pushes back, how it rises to its last step, and what the player can win or lose.${
     multiplayer ? " In multiplayer, also what each player does." : ""
@@ -226,6 +231,7 @@ function threadFields(multiplayer: boolean) {
       ),
     title: z.string().describe(THREAD_TITLE),
     question: z.string().describe(QUESTION),
+    typeOfMilestone: z.string().describe(MILESTONE_KIND),
     possibleMilestones: (multiplayer ? z.union([CHALLENGE_MILESTONES, CONTEST_MILESTONES, EXPLORATION_MILESTONES]) : z.union([CHALLENGE_MILESTONES, EXPLORATION_MILESTONES])).describe(
       MILESTONES_DESCRIPTION
     ),
@@ -266,11 +272,16 @@ export function threadReplySchema(story: Story): z.AnyZodObject {
   });
 }
 
-/** A written thread in today's stored shape, the last step's results the milestones; kind, question and plan ride along. */
+/**
+ * A written thread in today's stored shape, the last step's results the
+ * milestones; kind, question and plan ride along. The kind of milestone is
+ * the planner's own, or the question where it wrote none.
+ */
 function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB: string[]): Loose {
   const milestones = asObject(written.possibleMilestones);
   const final = asObject(written.finalStep);
   const question = asString(written.question);
+  const kindOfMilestone = asString(written.typeOfMilestone).trim() || question;
   const steps = asArray(written.steps).map((s) => {
     const step = asObject(s);
     return { title: asString(step.title), question: asString(step.question), possibleResolutions: asObject(step.possibleResolutions) };
@@ -282,7 +293,7 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
     previousThreadTypesToBeAvoided: [],
     relevantSuggestedThreadTypes: [],
     typeOfThread: asString(written.typeOfThread),
-    typeOfMilestone: question,
+    typeOfMilestone: kindOfMilestone,
     possibleMilestones: milestones,
     progression: [...steps, { title: asString(final.title), question: asString(final.question), possibleResolutions: milestones }],
     title: asString(written.title),

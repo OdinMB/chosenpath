@@ -26,7 +26,9 @@ export { allowedLengths };
  *
  * A check that doesn't apply to a reply (no outcomes, no contest, not an
  * ending) is not reported on it, so a rate reads over the replies it applies
- * to. The prose and option counts come in pairs for pooled shares
+ * to. The owner's two chapter checks of 2026-09-28 (questionNearerThanOutcome,
+ * milestoneKindConcrete) also read the stored chapters' backfilled frames
+ * (chapterFrames.ts, chapterFrameChecks). The prose and option counts come in pairs for pooled shares
  * (youParagraphs of paragraphs, sameOddsSets of challengeSets, …).
  */
 
@@ -170,6 +172,79 @@ function storyNames(story: Story): string[] {
 /** A round thread's own fields (turnRound1Planners.ts): its written kind, question and plan. */
 type FramedThread = Thread & { kind?: unknown; question?: unknown; plan?: unknown };
 
+// --- The nearer chapter question (the owner's feedback of 2026-09-28) ---
+
+/** Words that carry no goal of their own in a question. */
+const QUESTION_STOP_WORDS = new Set(
+  (
+    "will does did can could would should is are was were be been being has have had the a an and or but nor to of in on at for with by from into onto " +
+    "over under than that this these those their his her its our your they them he she it who whom whose which what when where why how whether as so " +
+    "not no any all some enough successfully finally ultimately truly really player players character characters story outcome get gets manage manages able"
+  ).split(" ")
+);
+
+/** A word's crude stem: diacritics and a possessive off, then one common suffix, keeping at least four letters. */
+function stemOf(word: string): string {
+  const base = word
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/['’]s$/, "");
+  for (const suffix of ["ings", "ing", "ure", "ed", "es", "s", "e"]) {
+    if (base.endsWith(suffix) && base.length - suffix.length >= 4) return base.slice(0, -suffix.length);
+  }
+  return base;
+}
+
+/** A question's content words as stems, the story's own names left out. */
+function goalWords(text: string, names: Set<string>): Set<string> {
+  const words = text
+    .split(/[^\p{L}\p{N}'’]+/u)
+    .map((w) => w.replace(/^['’]+|['’]+$/g, ""))
+    .filter((w) => w.length >= 3 && !QUESTION_STOP_WORDS.has(w.toLowerCase()));
+  return new Set(words.map(stemOf).filter((stem) => !names.has(stem)));
+}
+
+const normalised = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * Whether a chapter question asks its outcome's question again: the same
+ * question, or one that holds at least two of the outcome's goal words (its
+ * content words, the story's names of people and things left out) and at
+ * least half of them. A heuristic; read it as a rate.
+ */
+export function nearDuplicateOfOutcome(question: string, outcomeQuestion: string, names: string[]): boolean {
+  if (normalised(question) !== "" && normalised(question) === normalised(outcomeQuestion)) return true;
+  const nameStems = new Set(names.flatMap((name) => name.split(/[^\p{L}\p{N}'’]+/u)).filter((w) => w.length >= 3).map(stemOf));
+  const goal = goalWords(outcomeQuestion, nameStems);
+  const asked = goalWords(question, nameStems);
+  const shared = [...goal].filter((word) => asked.has(word)).length;
+  return shared >= 2 && shared >= goal.size / 2;
+}
+
+/** A kind of milestone that names progress, a step or a milestone instead of the concrete thing a chapter settles. */
+const GENERIC_MILESTONE = /\bmilestones?\b|\bprogress\w*|\badvanc(?:e|es|ed|ing|ement|ements)\b|\bheadway\b|\bsteps? (?:toward|towards|forward|closer)\b|\bmov(?:e|es|ing) (?:closer|forward|toward|towards)\b/i;
+
+/** Whether a kind of milestone is empty or generic ("Milestone marking progress in exposing the Waste Ring"). */
+export function genericMilestoneKind(text: string): boolean {
+  return text.trim() === "" || GENERIC_MILESTONE.test(text);
+}
+
+/**
+ * The owner's two chapter checks on one thread: its question (its own, or a
+ * backfilled frame's) against its outcome's, where both are there, and its
+ * kind of milestone, where the plan writes one.
+ */
+export function chapterQuestionChecks(story: Story, thread: { outcomeId?: unknown; typeOfMilestone?: unknown }, question?: string): Record<string, boolean> {
+  const checks: Record<string, boolean> = {};
+  const outcome = typeof thread.outcomeId === "string" ? story.getOutcomeById(thread.outcomeId) : undefined;
+  if (question !== undefined && question.trim() !== "" && outcome) {
+    checks.questionNearerThanOutcome = !nearDuplicateOfOutcome(question, outcome.question, storyNames(story));
+  }
+  if (typeof thread.typeOfMilestone === "string") checks.milestoneKindConcrete = !genericMilestoneKind(thread.typeOfMilestone);
+  return checks;
+}
+
 /**
  * The thread checks of turn doc A.C. `expectation` is a built trigger case's
  * recipe (triggerCases.ts): the plan follows it when it has the recipe's length.
@@ -191,6 +266,13 @@ export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectatio
   }
   const planned = threads.filter((t) => typeof t.plan === "string");
   if (planned.length > 0) checks.planWithoutIds = planned.every((t) => asString(t.plan).trim() !== "" && !holdsIds(asString(t.plan), known));
+
+  // The owner's feedback of 2026-09-28: a question nearer than the outcome's, and a concrete kind of milestone
+  const perThread = threads.map((t) => chapterQuestionChecks(story, t, typeof t.question === "string" ? t.question : undefined));
+  for (const name of ["questionNearerThanOutcome", "milestoneKindConcrete"]) {
+    const read = perThread.filter((c) => name in c);
+    if (read.length > 0) checks[name] = read.every((c) => c[name]);
+  }
 
   // A6: the kind follows the outcome's (a three-player race runs as contests), and the written kind matches the results
   const kinded = threads.flatMap((t) => {

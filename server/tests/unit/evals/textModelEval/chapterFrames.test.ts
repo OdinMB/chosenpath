@@ -6,6 +6,7 @@ import {
   backfillCaseId,
   backfillJobs,
   backfillRequest,
+  chapterFrameChecks,
   chapterFramesFile,
   chapterKeyOf,
   collectChapters,
@@ -184,5 +185,28 @@ describe("the backfilled frames", () => {
     // No production request reads the frames
     const prod = (c: EvalCase) => requestText(requestFor("prod", requestInputFor(c)));
     expect(prod(framed)).toBe(prod(step));
+  });
+
+  it("reads each stored chapter once on its frame's question and its plan's kind of milestone (the owner's feedback of 2026-09-28)", () => {
+    const withFrame = (question: string, typeOfMilestone: string) => {
+      const planned = structuredClone(state);
+      (planned.storyPhases[3] as ThreadAnalysis).threads[0].typeOfMilestone = typeOfMilestone;
+      const stepCase = evalCase("cont-step-t5", "beat", { state: planned });
+      const later = evalCase("cont-step-t6", "beat", { state: { ...planned, players: { player1: { ...planned.players.player1, beatHistory: [...planned.players.player1.beatHistory, planned.players.player1.beatHistory[0]] } } } });
+      const [chapter] = collectChapters([stepCase]);
+      const file: ChapterFramesFile = {
+        generatedAt: "",
+        missing: [],
+        chapters: [{ ...chapterFramesFile([chapter], backfillJobs([chapter], LUNA, "round0"), [record({ jobKey: keyOf(backfillJobs([chapter], LUNA, "round0")[0]) })], () => ({ chapters: [{ id: "second_chapter", question, plan: "P." }] }), new Date()).chapters[0] }],
+      };
+      return chapterFrameChecks(withChapterFrames([stepCase, later, first], file));
+    };
+    // The fixture's outcome asks "Question of outcome_1?"
+    const restated = withFrame("Question of outcome_1?", "Milestone marking progress on outcome_1");
+    expect(restated).toEqual([{ chapterKey: expect.any(String), storyId: state.id, threadId: "second_chapter", checks: { questionNearerThanOutcome: false, milestoneKindConcrete: false } }]);
+    const nearer = withFrame("Will the crew crack the vault before dawn?", "whether the vault opens");
+    expect(nearer.map((r) => r.checks)).toEqual([{ questionNearerThanOutcome: true, milestoneKindConcrete: true }]);
+    // A chapter without a frame reads on its kind of milestone only
+    expect(chapterFrameChecks([step]).map((r) => r.checks)).toEqual([{ milestoneKindConcrete: false }]);
   });
 });

@@ -119,6 +119,12 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * case's kids tag; "planV2b" is planner v2 with two-sided contests only (the
  * chapter planner's three-player race rule gone); "turnB6" is today's turn
  * form with B6 alone, single player (group turns stay on today's form).
+ * "planV2c" is planV2b's chapter planner with the nearer chapter question
+ * (the owner's feedback of 2026-09-28: a chapter asks a question whose answer
+ * is one milestone, about its own situation, and names the concrete kind of
+ * milestone it adds) and the adoption's chapter title "without a number";
+ * production's chapter planner builds it byte for byte, and its switch
+ * planner is planV2b's.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -153,7 +159,8 @@ export type VariantId =
   | "turnR3Form"
   | "setupR3"
   | "planV2b"
-  | "turnB6";
+  | "turnB6"
+  | "planV2c";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -185,6 +192,7 @@ export const VARIANTS: VariantId[] = [
   "setupR3",
   "planV2b",
   "turnB6",
+  "planV2c",
 ];
 
 /**
@@ -398,11 +406,16 @@ function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts 
   };
 }
 
-/** Turn round 1's planner v2, lean or with the restated instructions, or (planV2b) with two-sided contests only: switch and thread analysis. */
-function plannerV2(variant: VariantId, full: boolean, twoSided = false) {
+/**
+ * Turn round 1's planner v2, lean or with the restated instructions, or
+ * (planV2b) with two-sided contests only, or (planV2c) planV2b with the
+ * nearer chapter question: switch and thread analysis. The switch planner is
+ * planner v2's in all of them.
+ */
+function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQuestion = false) {
   return (input: RequestInput): Round2Request => {
     if (input.role === "switch") return plannerV2SwitchRequest(input.story, full);
-    if (input.role === "thread") return plannerV2ThreadRequest(input.story, full, twoSided ? { twoSided } : {});
+    if (input.role === "thread") return plannerV2ThreadRequest(input.story, full, twoSided ? { twoSided, ...(nearerQuestion ? { nearerQuestion } : {}) } : {});
     throw new Error(`Variant ${variant} does not cover role ${input.role}`);
   };
 }
@@ -457,6 +470,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   },
   setupR3: setupRound2("setupR3", "generationOrder", ROUND3_PARTS),
   planV2b: plannerV2("planV2b", false, true),
+  planV2c: plannerV2("planV2c", false, true, true),
   turnB6: (input) => {
     if (input.role !== "beat") throw new Error(`Variant turnB6 does not cover role ${input.role}`);
     return todaysFormWithB6Request(input.story);

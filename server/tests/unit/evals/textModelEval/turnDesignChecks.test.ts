@@ -6,6 +6,8 @@ import {
   checkBeatDesign,
   checkSwitchDesign,
   checkThreadDesign,
+  genericMilestoneKind,
+  nearDuplicateOfOutcome,
   statReadouts,
 } from "../../../../src/evals/textModelEval/turnDesignChecks.js";
 import {
@@ -227,6 +229,83 @@ describe("turn round 1's plan checks (planner v2's fields, the kind rule, bindin
     const recipe = { caseId: "c", kind: "length" as const, length: 2, rule: "r" };
     expect(checkThreadDesign(story, framed({}), recipe).checks.triggerFollowed).toBe(true);
     expect(checkThreadDesign(story, threadAnalysis("challenge", 3, 5), recipe).checks.triggerFollowed).toBe(false);
+  });
+});
+
+describe("the nearer chapter question and the concrete kind of milestone (owner, 2026-09-28)", () => {
+  const RING = "Does the player successfully expose and dismantle the Clandestine Waste Ring?";
+  const NAMES = ["Arielle", "Clandestine Waste Ring"];
+
+  it("finds a chapter question that asks its outcome's question again", () => {
+    // The owner's example: the chapter question restates the outcome's goal
+    expect(nearDuplicateOfOutcome("Will Arielle uncover enough concrete evidence to expose and dismantle the Clandestine Waste Ring?", RING, NAMES)).toBe(true);
+    expect(nearDuplicateOfOutcome("Will Arielle uncover enough concrete evidence to expose and dismantle the Clandestine Waste Ring?", RING, [])).toBe(true);
+    expect(nearDuplicateOfOutcome(RING, RING, NAMES)).toBe(true);
+    // Inflected forms count as the same word
+    expect(nearDuplicateOfOutcome("Will Arielle succeed in exposing and dismantling the ring?", RING, NAMES)).toBe(true);
+  });
+
+  it("passes a nearer question about this chapter's own situation, even one that names the outcome's people and things", () => {
+    expect(nearDuplicateOfOutcome("Will Arielle get the shipping manifests out of the depot before the night shift?", RING, NAMES)).toBe(false);
+    expect(nearDuplicateOfOutcome("Will Arielle find proof that ties the Clandestine Waste Ring to the depot?", RING, NAMES)).toBe(false);
+    // One shared everyday verb is not a restatement
+    expect(nearDuplicateOfOutcome("Will Ada find the lighthouse key before the tide?", "Will Ada find a home?", ["Ada"])).toBe(false);
+  });
+
+  it("finds a kind of milestone that names progress instead of a concrete thing", () => {
+    for (const generic of [
+      "Milestone marking progress in exposing the Waste Ring",
+      "Progress in the race to claim the treasure",
+      "Advancing influence over the culinary timeline",
+      "Friendship development milestone",
+      "Will Camille make meaningful progress toward training for the Paris Marathon?",
+      "Will Arielle secure a Council-backed inquiry that advances the dismantling of the Clandestine Waste Ring?",
+      "A step toward the reforms",
+      "",
+      "  ",
+    ]) {
+      expect([generic, genericMilestoneKind(generic)]).toEqual([generic, true]);
+    }
+    for (const concrete of ["whether the letters prove the noble's hand in the conspiracy", "Finding a historical clue about the runes", "Which explorer gains the stronger lead toward the treasure"]) {
+      expect([concrete, genericMilestoneKind(concrete)]).toEqual([concrete, false]);
+    }
+  });
+
+  describe("on a chapter plan", () => {
+    const EXPOSE = "player1_expose_waste_ring";
+    const story = edited(
+      roundStory({
+        turns: 5,
+        maxTurns: 20,
+        playerOutcomes: { player1: [outcome(EXPOSE, { question: RING })] },
+        phases: [roundTopicSwitch([["Expose the ring", EXPOSE]], 4)],
+      }),
+      (state) => {
+        state.players.player1.name = "Arielle";
+        state.storyElements = [{ id: "ring", name: "Clandestine Waste Ring", role: "the villains", instructions: "", appearance: "", facts: [] }];
+      }
+    );
+    const plan = (fields: Record<string, unknown>): ThreadAnalysis => {
+      const base = threadAnalysis("challenge", 3, 5);
+      return { ...base, threads: [{ ...base.threads[0], outcomeId: EXPOSE, ...fields }] };
+    };
+
+    it("reads the chapter's own question against its outcome's, and its kind of milestone", () => {
+      const near = checkThreadDesign(story, plan({ question: "Will Arielle get the manifests out of the depot before the night shift?", typeOfMilestone: "whether the manifests tie the ring to the depot" }));
+      expect(near.checks).toMatchObject({ questionNearerThanOutcome: true, milestoneKindConcrete: true });
+      const same = checkThreadDesign(story, plan({ question: "Will Arielle uncover enough evidence to expose and dismantle the ring?", typeOfMilestone: "Milestone marking progress in exposing the Waste Ring" }));
+      expect(same.checks).toMatchObject({ questionNearerThanOutcome: false, milestoneKindConcrete: false });
+    });
+
+    it("reads today's plans, which write no question, on their kind of milestone only", () => {
+      const today = checkThreadDesign(story, plan({ typeOfMilestone: "Finding the depot's manifests" }));
+      expect(today.checks.milestoneKindConcrete).toBe(true);
+      expect(today.checks).not.toHaveProperty("questionNearerThanOutcome");
+    });
+
+    it("leaves the question check out where the chapter's outcome is not the story's", () => {
+      expect(checkThreadDesign(story, plan({ outcomeId: "player1_gone", question: RING })).checks).not.toHaveProperty("questionNearerThanOutcome");
+    });
   });
 });
 

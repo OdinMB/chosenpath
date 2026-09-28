@@ -143,6 +143,23 @@ describe("checkBaselines: waits per turn kind", () => {
   });
 });
 
+describe("checkBaselines: the stored chapters' backfilled frames", () => {
+  it("reads each chapter's frame checks as pass counts, and renders them in their own section", () => {
+    const frames: { chapterKey: string; storyId: string; threadId: string; checks: Record<string, boolean> }[] = [
+      { chapterKey: "a", storyId: "s", threadId: "t1", checks: { questionNearerThanOutcome: false, milestoneKindConcrete: false } },
+      { chapterKey: "b", storyId: "s", threadId: "t2", checks: { questionNearerThanOutcome: true, milestoneKindConcrete: false } },
+      { chapterKey: "c", storyId: "s", threadId: "t3", checks: { milestoneKindConcrete: true } },
+    ];
+    const report = checkBaselines(input({ frames }));
+    expect(report.frames).toEqual({ chapters: 3, checks: { questionNearerThanOutcome: { pass: 1, n: 2 }, milestoneKindConcrete: { pass: 1, n: 3 } } });
+    const md = renderCheckBaselines(report);
+    expect(md).toContain("## Stored chapters: the backfilled question and the plan's kind of milestone");
+    expect(md).toContain("| questionNearerThanOutcome | 1 of 2 |");
+    expect(md).toContain("| milestoneKindConcrete | 1 of 3 |");
+    expect(renderCheckBaselines(checkBaselines(input()))).toContain("No stored chapter was read");
+  });
+});
+
 describe("checkBaselines: stored references against today's prompts", () => {
   it("counts the cases whose stored production-form request today's code rebuilds byte for byte", () => {
     const report = checkBaselines(input({ todaysPromptHash: (c) => (c.id === "c3" ? "changed" : `hash-${c.id}`) }));

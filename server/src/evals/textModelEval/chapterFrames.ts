@@ -9,6 +9,7 @@ import { caseStory, type ChapterFrame, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { finishedPrepRecord, prepJob } from "./prepCalls.js";
 import { keyOf, type CallRecord, type Job } from "./runner.js";
+import { chapterQuestionChecks } from "./turnDesignChecks.js";
 
 /*
  * The chapter backfill (turn doc section 4, "Before round 1", item 5): the
@@ -350,6 +351,25 @@ export function chapterFramesFile(
     });
   });
   return file;
+}
+
+export type FrameCheck = { chapterKey: string; storyId: string; threadId: string; checks: Record<string, boolean> };
+
+/**
+ * The owner's two chapter checks of 2026-09-28 on every stored chapter the
+ * cases read, once each (--check-baselines): its backfilled question against
+ * its outcome's (questionNearerThanOutcome), where a frame is attached, and
+ * its plan's kind of milestone (milestoneKindConcrete), on the chapter
+ * planner's view of the story (collectChapters).
+ */
+export function chapterFrameChecks(cases: EvalCase[]): FrameCheck[] {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  return collectChapters(cases).flatMap((chapter) =>
+    chapter.threads.map((thread) => {
+      const frame = chapter.readBy.map((id) => byId.get(id)?.chapterFrames?.[thread.id]).find((f) => f !== undefined);
+      return { chapterKey: chapter.chapterKey, storyId: chapter.storyId, threadId: thread.id, checks: chapterQuestionChecks(chapter.story, thread, frame?.question) };
+    })
+  );
 }
 
 /**

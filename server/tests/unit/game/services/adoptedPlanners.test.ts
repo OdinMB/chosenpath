@@ -16,15 +16,16 @@ import {
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
-import { MEASURED_TITLE, adoptedThreadSchema } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's planners are planner v2 with two-sided contests as the eval
- * measured it (variant planV2b): the same prompt and JSON schema, byte for
- * byte, on every story the tests build and on every frozen planning case,
- * apart from the one logged adoption item in the chapter title's field
- * ("without a number"); and a reply is assembled into today's stored plan
- * the way the eval assembled it.
+ * measured it (variant planV2b) for the switch, and planner v2c for the
+ * chapter (planV2b with the nearer chapter question and the planner's own
+ * kind of milestone, the owner's feedback of 2026-09-28, and the adopted
+ * "without a number" in the chapter title's field): the same prompt and JSON
+ * schema, byte for byte, on every story the tests build and on every frozen
+ * planning case; and a reply is assembled into today's stored plan the way
+ * the eval assembles it.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -109,14 +110,14 @@ function expectSwitchLikeMeasured(story: Story) {
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
+/** planV2c: planV2b with the nearer chapter question, the planner's own kind of milestone, and the adopted title ("without a number"). */
+const planV2c = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true });
+
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
-  const measured = plannerV2ThreadRequest(story, false, { twoSided: true });
+  const measured = planV2c(story);
   expect(production.prompt).toBe(measured.prompt);
-  // The chapter title field is the one change to planV2b's schema (a multiplayer plan titled its chapter "6. …")
-  const measuredSchema = json(measured.schema);
-  expect(measuredSchema.split(MEASURED_TITLE)).toHaveLength(2);
-  expect(json(production.schema)).toBe(adoptedThreadSchema(measuredSchema));
+  expect(json(production.schema)).toBe(json(measured.schema));
 }
 
 describe("the switch planner: planner v2 as measured", () => {
@@ -129,7 +130,7 @@ describe("the switch planner: planner v2 as measured", () => {
   });
 });
 
-describe("the chapter planner: planner v2 with two-sided contests as measured", () => {
+describe("the chapter planner: planner v2c (two-sided contests, the nearer chapter question)", () => {
   it.each(THREAD_STORIES)("%s", (_, build) => expectThreadLikeMeasured(build()));
 
   (frozen.length ? it : it.skip)("every frozen chapter case", () => {
@@ -166,6 +167,7 @@ describe("a reply, assembled into today's stored plan as the eval assembled it",
         typeOfThread: "Negotiation",
         title: "The Enclave Gate",
         question: "Will Gruk open the gate?",
+        typeOfMilestone: "whether Gruk lets the enclave's envoys in",
         possibleMilestones: { favorable: "Gruk opens it", mixed: "Gruk hesitates", unfavorable: "Gruk bars it" },
         steps: [{ title: "Knock", question: "Approach: How does Rikkit ask?", possibleResolutions: { favorable: "a", mixed: "b", unfavorable: "c" } }],
         finalStep: { title: "The ask", question: "How does Rikkit settle it?" },
@@ -173,8 +175,9 @@ describe("a reply, assembled into today's stored plan as the eval assembled it",
       },
     };
     const assembled = threadStep.request(story).assemble(reply);
-    expect(assembled).toEqual(plannerV2ThreadRequest(story, false, { twoSided: true }).assemble(reply));
-    expect((assembled as { threads: { outcomeId: string }[] }).threads[0].outcomeId).toBe(ENCLAVE);
+    expect(assembled).toEqual(planV2c(story).assemble(reply));
+    const [stored] = (assembled as unknown as { threads: { outcomeId: string; typeOfMilestone: string; question: string }[] }).threads;
+    expect(stored).toMatchObject({ outcomeId: ENCLAVE, typeOfMilestone: "whether Gruk lets the enclave's envoys in", question: "Will Gruk open the gate?" });
   });
 
   it("a contest chapter: its outcome and sides as written, checked later by the plan check", () => {
@@ -198,6 +201,6 @@ describe("a reply, assembled into today's stored plan as the eval assembled it",
         },
       ],
     };
-    expect(threadStep.request(story).assemble(reply)).toEqual(plannerV2ThreadRequest(story, false, { twoSided: true }).assemble(reply));
+    expect(threadStep.request(story).assemble(reply)).toEqual(planV2c(story).assemble(reply));
   });
 });
