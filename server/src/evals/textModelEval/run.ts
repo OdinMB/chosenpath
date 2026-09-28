@@ -820,7 +820,7 @@ async function main() {
     case "judge-calibration":
       return judgeCalibrationMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_JUDGE_SAMPLES);
     case "judge-records":
-      return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE);
+      return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE, args.caseIds);
     case "balance-sim":
       return balanceSimMode(args, files);
     default:

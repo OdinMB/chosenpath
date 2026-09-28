@@ -7,7 +7,7 @@ import type { ExecutedCall } from "../../../../src/evals/textModelEval/executor.
 import { jobEstimateUsd } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { JUDGE_ARMS, JUDGE_CALIBRATION, judgeJobs, judgeRequest } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { judgeCalibrationMode, roundTurnsToJudge, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
+import { judgeCalibrationMode, roundTurnsToJudge, turnsToSend, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { CURRENT_PROMPT_STATE } from "../../../../src/evals/textModelEval/variants.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
@@ -121,6 +121,13 @@ describe("roundTurnsToJudge (--judge-records)", () => {
     ]);
     expect(turns[0].outputId).toBe("gpt6lunamediumprod-1");
     expect(turns[0].request.prompt).toContain("======= THIS CHAPTER =======");
+  });
+
+  it("sends new judge calls only on the samples a comparison pairs (1 and 2) and, given --cases, on those cases; the rest are read as judged", () => {
+    const turn = (caseId: string, sample: number) => ({ armKey: REF, caseId, sample, slot: "player1" as const, outputId: `${caseId}-${sample}`, checks: [], request: { prompt: "", schema: {} as never } });
+    const turns = [turn("c", 1), turn("c", 2), turn("c", 4), turn("d", 1)];
+    expect(turnsToSend(turns).map((t) => `${t.caseId}${t.sample}`)).toEqual(["c1", "c2", "d1"]);
+    expect(turnsToSend(turns, ["d"]).map((t) => `${t.caseId}${t.sample}`)).toEqual(["d1"]);
   });
 
   it("judges switch turns and endings on the first paragraph only (turn round 2), and leaves out first turns and arms that were not asked for", () => {

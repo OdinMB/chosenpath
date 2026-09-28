@@ -296,15 +296,26 @@ export function roundTurnsToJudge(
 
 export const DEFAULT_RECORD_JUDGE_SAMPLES = 1;
 
+/**
+ * The turns a --judge-records run sends new judge calls for: samples 1 and 2,
+ * the ones a comparison pairs (a reference's reruns for the waits, sample 3
+ * on, need no judge), and with --cases only those cases (turn round 2, which
+ * had money for its retest's chapter steps only). Turns already judged are
+ * read whatever their sample.
+ */
+export function turnsToSend(turns: RoundTurn[], caseIds?: string[]): RoundTurn[] {
+  return turns.filter((t) => t.sample <= 2 && (!caseIds || caseIds.includes(t.caseId)));
+}
+
 /** Judges a round's turns (turn round 1: the reference and the candidates), then writes judged-turns.md and .json. */
-export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | undefined, samples: number, promptState: string): Promise<void> {
+export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | undefined, samples: number, promptState: string, caseIds?: string[]): Promise<void> {
   const { files, log } = ctx;
   if (!armKeys?.length) throw new Error("--judge-records needs --arms: the beat or chain arms whose chapter steps to judge");
   const records = files.readRecords();
   const cases = files.readCases();
   const { turns, problems } = roundTurnsToJudge(records, cases, files.loadOutput, armKeys, promptState);
   const arm = JUDGE_ARMS[0];
-  const jobs = judgeJobs(turns, arm, samples, promptState);
+  const jobs = judgeJobs(turnsToSend(turns, caseIds), arm, samples, promptState);
   const done = finishedJobKeys(files.readPrepRecords());
   const open = jobs.filter((j) => !done.has(keyOf(j)));
   const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
