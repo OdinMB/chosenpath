@@ -105,13 +105,13 @@ const TOPIC = aSwitch({
   topicChoices: ["Chase the thief again (player1_catch)", "Settle down in the port (player1_home)", "Leave town"],
 });
 
-const beat = (title: string, summary: string, resolution: string | null, choice = 0) => createMockBeat({ title, summary, resolution, choice });
+const beat = (title: string, summary: string, resolution: string | null, choice = 0, text = "This is a test beat.") => createMockBeat({ title, summary, resolution, choice, text });
 
-const FIRST_BEAT = beat("The Chase Begins", "Ada hears of the theft.", "resolution1");
+const FIRST_BEAT = beat("The Chase Begins", "Ada hears of the theft.", "resolution1", 0, "The bells ring at midnight.\nSomeone has stolen the harbour seal.");
 const THREAD_BEATS = [
-  beat("Through the Fog (1/3)", "Ada searches the docks.", "favorable", 1),
-  beat("Through the Fog (2/3)", "Ada runs over the roofs.", "favorable"),
-  beat("Through the Fog (3/3)", "Ada climbs the bell tower.", "unfavorable"),
+  beat("Through the Fog (1/3)", "Ada searches the docks.", "favorable", 1, 'Fog rolls over the docks.\nAda checks the crates. [image type="story" id="docks" desc="The docks at night"]'),
+  beat("Through the Fog (2/3)", "Ada runs over the roofs.", "favorable", 0, "The roofs are slick with rain."),
+  beat("Through the Fog (3/3)", "Ada climbs the bell tower.", "unfavorable", 0, "The tower stairs creak."),
 ];
 
 function story(phases: unknown[], beats: unknown[], overrides: Partial<StoryState> = {}): StoryState {
@@ -210,9 +210,28 @@ describe("turnContext: a plain thread step", () => {
     expect(lines.slice(at + 1, at + 3)).toEqual(["  Chapter question: Will Ada catch the thief tonight?", "  Chapter plan: Ada chases the thief across the harbour roofs."]);
   });
 
-  it("orders the folds: this chapter, outcomes, before this turn, story so far, the story", () => {
-    expect(keysOf(ctx)).toEqual(["chapter", "outcomes", "before", "storySoFar", "story"]);
-    expect(ctx.map((s) => s.heading)).toEqual(["This chapter", "Outcomes", "Before this turn", "Story so far", "The story"]);
+  it("orders the folds: this chapter, outcomes, the chapter's earlier turns in full, before this turn, story so far, the story", () => {
+    expect(keysOf(ctx)).toEqual(["chapter", "outcomes", "chapterText.0", "chapterText.1", "before", "storySoFar", "story"]);
+    expect(ctx.map((s) => s.heading)).toEqual([
+      "This chapter",
+      "Outcomes",
+      "The switch that opened the chapter",
+      "Earlier in this chapter",
+      "Before this turn",
+      "Story so far",
+      "The story",
+    ]);
+  });
+
+  it("shows the switch turn that opened the chapter and the chapter's earlier turns in full: title, paragraphs as the player saw them, the choice and its result", () => {
+    expect(section(ctx, "chapterText.0").lines).toEqual(["Turn 1: The Chase Begins", "The bells ring at midnight.", "Someone has stolen the harbour seal.", "Chosen: Test option 1"]);
+    expect(section(ctx, "chapterText.1").lines).toEqual([
+      "Turn 2: Through the Fog (1/3)",
+      "Fog rolls over the docks.",
+      "Ada checks the crates. [picture: The docks at night]",
+      "Chosen: Test option 2",
+      "Outcome: it went well",
+    ]);
   });
 
   it("lists every outcome with its milestones, marking the one this chapter advances", () => {
@@ -246,7 +265,7 @@ describe("turnContext: a plain thread step", () => {
     ]);
   });
 
-  it("shows the story's title, world, rules, tone, conflicts and its own rules for chapters", () => {
+  it("shows the story's title, world, rules, tone, conflicts and its own rules for chapters, labelled as the planners' only", () => {
     expect(outline(section(ctx, "story").entries)).toEqual([
       "Title: The Harbour Heist",
       "World: A foggy port.",
@@ -256,9 +275,11 @@ describe("turnContext: a plain thread step", () => {
       "  tense",
       "Conflicts",
       "  Guild against crown",
-      "Chapter rules",
+      "Chapter rules (for the planners, not the turns)",
       "  After each chase, the guild grows suspicious.",
     ]);
+    // Only in the folded story section
+    expect(ctx.filter((s) => s.key !== "story").flatMap((s) => [...s.lines, ...outline(s.entries)]).some((l) => l.includes("the guild grows suspicious"))).toBe(false);
   });
 });
 
@@ -290,6 +311,17 @@ describe("turnContext: a switch right after a thread", () => {
       "    Leave town",
       "Planned for this turn; every version below was written from the same plan.",
     ]);
+  });
+
+  it("shows the chapter that just ended in full: the switch that opened it, then each of its turns", () => {
+    expect(keysOf(ctx)).toEqual(["chapter", "outcomes", "chapterText.0", "chapterText.1", "chapterText.2", "chapterText.3", "before", "storySoFar", "story"]);
+    expect(ctx.slice(2, 6).map((s) => s.heading)).toEqual([
+      "The switch that opened the chapter",
+      "In the chapter that just ended",
+      "In the chapter that just ended",
+      "In the chapter that just ended",
+    ]);
+    expect(section(ctx, "chapterText.3").lines).toEqual(["Turn 4: Through the Fog (3/3)", "The tower stairs creak.", "Chosen: Test option 1", "Outcome: it went badly"]);
   });
 
   it("marks the ended chapter's outcome as getting its milestone this turn, and none as advanced by the open topic switch", () => {
@@ -402,6 +434,18 @@ describe("turnContext: a new thread's first step (an analysis turn)", () => {
     expect(outline(section(ctx, "outcomes").entries)[1]).toBe("  Does Ada catch the thief? #player1_catch [advances]");
   });
 
+  it("shows the switch turn that opened the chapter in full, and no earlier step", () => {
+    expect(ctx.filter((s) => s.key?.startsWith("chapterText")).map((s) => [s.key, s.heading, s.lines[0]])).toEqual([
+      ["chapterText.0", "The switch that opened the chapter", "Turn 1: The Chase Begins"],
+    ]);
+  });
+
+  it("shows a chain item's opening switch in full too, since every version's plan was written after it", () => {
+    const chain = turnContext(BEFORE_THREAD, undefined, { chainOpening: true });
+    expect(keysOf(chain)).toEqual(["chapter", "outcomes", "chapterText.0", "before", "storySoFar", "story"]);
+    expect(section(chain, "chapterText.0").lines.slice(0, 2)).toEqual(["Turn 1: The Chase Begins", "The bells ring at midnight."]);
+  });
+
   it("does not list the new thread in the story so far", () => {
     expect(outline(section(ctx, "storySoFar").entries)).toEqual([
       "Chapter 1: The Chase Begins",
@@ -450,6 +494,15 @@ describe("turnContext: the ending", () => {
       "    Unfavorable: Lost.",
     ]);
     expect(outline(section(ctx, "outcomes").entries).filter((line) => line.includes("["))).toEqual(["  Does Ada catch the thief? #player1_catch [due]"]);
+  });
+
+  it("shows the last chapter in full, the switch that opened it first", () => {
+    expect(ctx.filter((s) => s.key?.startsWith("chapterText")).map((s) => [s.heading, s.lines[0]])).toEqual([
+      ["The switch that opened the chapter", "Turn 1: The Chase Begins"],
+      ["In the chapter that just ended", "Turn 2: Through the Fog (1/3)"],
+      ["In the chapter that just ended", "Turn 3: Through the Fog (2/3)"],
+      ["In the chapter that just ended", "Turn 4: Through the Fog (3/3)"],
+    ]);
   });
 });
 
@@ -532,6 +585,16 @@ describe("turnContext: multiplayer", () => {
     const out = outline(section(turnContext(copied), "outcomes").entries);
     expect(out).toEqual(outline(section(ctx, "outcomes").entries));
     expect(out.filter((l) => l.includes("Is the port saved?"))).toEqual(["  Is the port saved? #shared_port [advances]"]);
+  });
+
+  it("shows each player's own turns of the chapter in full, player by player, in order", () => {
+    expect(ctx.filter((s) => s.key?.startsWith("chapterText")).map((s) => [s.key, s.heading, s.lines[0]])).toEqual([
+      ["chapterText.0.player1", "The switch that opened the chapter: player 1", "Turn 1: The Chase Begins"],
+      ["chapterText.1.player1", "Earlier in this chapter: player 1", "Turn 2: Through the Fog (1/3)"],
+      ["chapterText.0.player2", "The switch that opened the chapter: player 2", "Turn 1: The Chase Begins"],
+      ["chapterText.1.player2", "Earlier in this chapter: player 2", "Turn 2: Tug of War (1/3)"],
+    ]);
+    expect(section(ctx, "chapterText.1.player2").lines.slice(-2)).toEqual(["Chosen: Test option 3", "Outcome: side A won the round"]);
   });
 
   it("gives each player's beat in the story so far", () => {
@@ -657,13 +720,26 @@ describe("renderRatingPage: the turn context", () => {
   const html = renderRatingPage(set);
   const tree = parseHtml(html);
 
-  it("folds the story so far and the story at load, and leaves the rest open", () => {
+  it("folds the story so far and the story at load, and leaves the rest open, the chapter's earlier turns included", () => {
     const folds = select(tree, "details.ctx");
-    expect(folds.map((d) => d.attrs["data-sec"])).toEqual(["chapter", "outcomes", "before", "storySoFar", "story"]);
-    expect(folds.map((d) => d.attrs.open !== undefined)).toEqual([true, true, true, false, false]);
-    expect(folds.map((d) => textOf(kids(d, "summary")[0]))).toEqual(["This chapter", "Outcomes", "Before this turn", "Story so far", "The story"]);
+    expect(folds.map((d) => d.attrs["data-sec"])).toEqual(["chapter", "outcomes", "chapterText.0", "chapterText.1", "before", "storySoFar", "story"]);
+    expect(folds.map((d) => d.attrs.open !== undefined)).toEqual([true, true, true, true, true, false, false]);
+    expect(folds.map((d) => textOf(kids(d, "summary")[0]))).toEqual([
+      "This chapter",
+      "Outcomes",
+      "The switch that opened the chapter",
+      "Earlier in this chapter",
+      "Before this turn",
+      "Story so far",
+      "The story",
+    ]);
     expect(["storySoFar", "story"].filter((key) => startsOpen("turn", key))).toEqual([]);
-    expect(["chapter", "outcomes", "before", "before.player2", "introduction", "characters"].filter((key) => !startsOpen("turn", key))).toEqual([]);
+    expect(["chapter", "outcomes", "chapterText.0", "chapterText.1.player2", "before", "before.player2", "introduction", "characters"].filter((key) => !startsOpen("turn", key))).toEqual([]);
+  });
+
+  it("shows a picture in an earlier turn's text as a muted note", () => {
+    const earlier = select(tree, "details.ctx").find((d) => d.attrs["data-sec"] === "chapterText.1") as HtmlNode;
+    expect(select(earlier, "span.picture").map(textOf)).toEqual(["[picture: The docks at night]"]);
   });
 
   it("marks the current step and the advancing outcome visibly", () => {

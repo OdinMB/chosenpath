@@ -1,6 +1,6 @@
 import type { StoryState } from "core/types/index.js";
 import type { FixedAnalysis } from "./cases.js";
-import { field, list, strings, text } from "./ratingContent.js";
+import { field, list, strings, text, withPictureNotes } from "./ratingContent.js";
 
 /*
  * The background shown above a turn's options, the same for every option of
@@ -8,8 +8,11 @@ import { field, list, strings, text } from "./ratingContent.js";
  * or switch), with the outcome it advances, its plan and the current step
  * marked, and a chapter that just ended with every step's result; every
  * outcome with its milestones, marked where this turn adds a milestone or
- * the chapter works toward it; what happened just before; the story so far,
- * chapter by chapter; and the story's world and rules for chapters.
+ * the chapter works toward it; the chapter's earlier turns in full, from the
+ * switch turn that opened it (the owner's feedback of 2026-09-28); what
+ * happened just before; the story so far, chapter by chapter, in summaries;
+ * and the story's world and its rules for chapters, labelled as the
+ * planners' (no production turn reads them since 2026-09-28).
  *
  * It reads the state the beat call saw: the frozen case state with the
  * case's fixed analysis appended, as caseStory does. The pages show isolated
@@ -68,7 +71,10 @@ export const CONTEXT_LABELS = {
   rules: "World rules",
   tone: "Tone",
   conflicts: "Conflicts",
-  chapterRules: "Chapter rules",
+  chapterRules: "Chapter rules (for the planners, not the turns)",
+  openingSwitch: "The switch that opened the chapter",
+  earlierInChapter: "Earlier in this chapter",
+  inEndedChapter: "In the chapter that just ended",
   noOutcomes: "The story holds no outcomes.",
   noIntroduction: "The story has no introduction.",
   noName: "no name in the story",
@@ -575,6 +581,72 @@ function beforeSections(view: View): ContextSection[] {
   });
 }
 
+/**
+ * The chapter a turn continues, as turn indices: the switch turn that opened
+ * it, and its turns before this one. A chapter step (and a chain item's
+ * opening, whose context stops at the switch) reads the current chapter; a
+ * switch after a chapter and the ending read the chapter that just ended,
+ * whose last turn they follow. Nothing on the first turn, or where a phase
+ * lacks its first beat's index.
+ */
+function chapterTurns(view: View): { opening?: number; turns: number[]; ended: boolean } | undefined {
+  const { phases } = view;
+  const at = (offset: number) => phases[phases.length - offset];
+  const firstBeat = (phase: unknown) => num(field(phase, "firstBeatIndex"));
+  const openingOf = (index: number) => (index >= 1 && isSwitchPhase(phases[index - 1]) ? firstBeat(phases[index - 1]) : undefined);
+  if (view.chainOpening) {
+    const opening = isSwitchPhase(at(1)) ? firstBeat(at(1)) : undefined;
+    return opening === undefined ? undefined : { opening, turns: [], ended: false };
+  }
+  const chapterAt =
+    view.beatType === "thread" || view.beatType === "ending"
+      ? phases.length - 1
+      : view.beatType === "switch" && view.turn > 0 && isThreadPhase(at(2))
+        ? phases.length - 2
+        : undefined;
+  if (chapterAt === undefined) return undefined;
+  const ended = view.beatType !== "thread";
+  const start = firstBeat(phases[chapterAt]);
+  if (start === undefined) return undefined;
+  const turns = Array.from({ length: Math.max(0, view.turn - start) }, (_, i) => start + i);
+  return { opening: openingOf(chapterAt), turns, ended };
+}
+
+/**
+ * The chapter's earlier turns in full, above the turn being judged (the
+ * owner's feedback of 2026-09-28: continuity can't be judged from
+ * summaries): the switch turn that opened it, then each turn, per player in
+ * order, as the player saw it (title, paragraphs, the choice and its result).
+ * Earlier chapters stay as summaries in the story so far.
+ */
+function chapterTextSections(view: View): ContextSection[] {
+  const range = chapterTurns(view);
+  if (!range) return [];
+  const indices = [...(range.opening !== undefined && range.opening < view.turn ? [range.opening] : []), ...range.turns];
+  return view.players.flatMap(([slot, player], playerIndex) =>
+    indices.flatMap((index) => {
+      const beat = list(field(player, "beatHistory"))[index];
+      const body = text(field(beat, "text"));
+      if (!body) return [];
+      const heading = index === range.opening ? L.openingSwitch : range.ended ? L.inEndedChapter : L.earlierInChapter;
+      const chosen = chosenText(beat);
+      const result = OUTCOME_WORDS.get(text(field(beat, "resolution")));
+      return [
+        {
+          key: view.multiplayer ? `chapterText.${indices.indexOf(index)}.${slot}` : `chapterText.${indices.indexOf(index)}`,
+          heading: view.multiplayer ? `${heading}: ${L.player} ${playerIndex + 1}` : heading,
+          lines: present([
+            `${L.turn} ${index + 1}${text(field(beat, "title")) ? `: ${text(field(beat, "title"))}` : ""}`,
+            ...withPictureNotes(body),
+            chosen ? `${L.chosen}: ${chosen}` : "",
+            result ? `${L.outcome}: ${result}` : "",
+          ]),
+        },
+      ];
+    })
+  );
+}
+
 /** The introduction and chosen characters, as before; an introduction or name the state holds empty is said to be missing. */
 function firstTurnSections(view: View): ContextSection[] {
   const intro = field(view.state, "characterSelectionIntroduction");
@@ -668,7 +740,7 @@ function storySoFarSection(view: View): ContextSection {
   };
 }
 
-/** The story's title and world, and its own rules for chapters (switchAndThreadInstructions), which the switch prompt carries. */
+/** The story's title and world, and its own rules for chapters (switchAndThreadInstructions), which only the planners read. */
 function storySection(view: View): ContextSection {
   const guidelines = field(view.state, "guidelines");
   return {
@@ -697,6 +769,7 @@ export function turnContext(state: StoryState, fixed?: FixedAnalysis, options: C
   return [
     chapterSection(view),
     outcomesSection(view),
+    ...chapterTextSections(view),
     ...(view.turn === 0 ? firstTurnSections(view) : beforeSections(view)),
     storySoFarSection(view),
     storySection(view),
