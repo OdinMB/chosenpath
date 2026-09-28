@@ -84,7 +84,7 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
   "form-gate":
     "coordinator, 2026-09-28: the request form's gate (B9: chapter-step p95 at or under 45 s and no worse than the one-message form): production's single-player turn form once as one message and once split, on the 44 stored turns in one invocation (88 turns, about $0.29 at $0.0033 a turn uncached; the split one's cache reads bill less), and a smoke",
   "final-check":
-    "coordinator, 2026-09-28: the paid final check on production's own code (the adopted variant, under a new prompt state): one sample of the 44 stored single-player turns and both planners, about $0.22, plus group turns and chains",
+    "coordinator, 2026-09-28: the paid final check on production's own code (the adopted variant, under adopted1): one sample of the 44 stored single-player turns (sample 2; the form gate ran sample 1, $0.147) and both planners (about $0.06), the 12 stored group turns (about $0.05), six Luna low custom-story setups (about $0.05) and two template setups on Sol low, the template editor's first AI Drafts on the round-3 form (about $0.22), then the chapter-opening chains per player count (about $0.10) as the cap allows",
 };
 
 export type Caps = {

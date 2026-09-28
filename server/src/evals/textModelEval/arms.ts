@@ -30,9 +30,8 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * run of its workflow a stage of its own (FEEDBACK_STAGES): the planner v2c
  * plan refresh, the reruns that rebuild turn round 1's page, the setup
  * retests, the group turn round (B10), the request form's gate (B9) and the
- * paid final check on production's own code; each run's phase sets its arms
- * (armsFor and pipelinePlans plan none for them until then). Their caps and
- * reasons are in budget.ts.
+ * paid final check on production's own code, each with the arms its phase
+ * set (armsFor, pipelinePlans). Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check"] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
@@ -155,6 +154,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnB10b: "prod",
   // The form gate (B9): production's single-player turn form sent as a split request against the one message it splits
   adoptedSplit: "adopted",
+  // The final check: the template editor's AI Draft against today's form of the same arm (Sol low's stored custom-story
+  // setups; no template form ever ran in the eval)
+  adoptedTemplate: "prod",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -233,6 +235,10 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR3b")]: [armKey(LUNA_LOW, "prod")],
   // B10's retest against B10, the note it retests
   [armKey(LUNA_LOW, "turnB10b")]: [armKey(LUNA_LOW, "turnB10")],
+  // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
+  // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
+  // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
+  [armKey(LUNA_LOW, "adopted")]: [armKey(LUNA_LOW, "setupR3"), armKey(LUNA_LOW, "setupR3b"), armKey(LUNA_LOW, "planV2"), armKey(LUNA_LOW, "planV2c")],
 };
 
 export function secondReferenceKeys(key: string): string[] {
@@ -415,7 +421,72 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return groupRoundArms(role);
     case "form-gate":
       return formGateArms(role);
+    case "final-check":
+      return finalCheckArms(role);
     default:
+      return [];
+  }
+}
+
+/**
+ * The final check's new custom-story setups (the owner's feedback workflow,
+ * 2026-09-28): two per player count, every game mode, the scoreboard's
+ * contests with two and three players (bounty hunters, the Berlin flat's two
+ * camps) and a story read with a child (the kids examples production took
+ * from the setup retests).
+ */
+export const FINAL_CHECK_SETUP_PREMISES = [
+  "setup-pretend-er-doctor",
+  "setup-custom-neo-tokyo",
+  "setup-fiction-bounty-hunters",
+  "setup-kids-animal-rescue",
+  "setup-flexible-secret-society",
+  "setup-vent-berlin-flat",
+];
+
+/**
+ * The final check's two templates on the template editor's model: one single
+ * player's, and one where the editor offers a contest (two players,
+ * cooperative-competitive). None is read with a child: template generation
+ * has no category, so no kids budget.
+ */
+export const FINAL_CHECK_TEMPLATE_PREMISES = ["setup-custom-avalon", "setup-flexible-soul-flat"];
+
+/** The sample the final check sends on the stored single-player turns: the form gate sent sample 1 on the same code. */
+export const FINAL_CHECK_TURN_SAMPLE = 2;
+
+/** Production's own code (adopted, or the template editor's adoptedTemplate) on a settings group's own model and effort. */
+function adoptedDefault(group: TextModelGroup, variant: VariantId = "adopted"): Arm {
+  const { model, reasoningEffort } = TEXT_MODEL_GROUPS[group];
+  return makeArm({ model, reasoningEffort }, variant);
+}
+
+/**
+ * The paid final check on production's own code (the owner's feedback
+ * workflow, 2026-09-28), under ADOPTED_PROMPT_STATE, on production's settings
+ * groups (TEXT_MODEL_GROUPS, never env): the stored single-player turns'
+ * second sample (the form gate ran the first on the same code), the 12 stored
+ * group turns and both planners on every planning case once, two new
+ * custom-story setups per player count on the setup group, and two templates
+ * on the template editor's (the first AI Drafts on setup round 3's form).
+ * AI Iteration is not a default role and has never run.
+ */
+function finalCheckArms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "setup":
+      return [
+        { arm: adoptedDefault("setup"), samples: 1, scope: "all", caseIds: FINAL_CHECK_SETUP_PREMISES },
+        { arm: adoptedDefault("templateEditor", "adoptedTemplate"), samples: 1, scope: "all", caseIds: FINAL_CHECK_TEMPLATE_PREMISES },
+      ];
+    case "beat":
+      return [
+        { arm: adoptedDefault("beat"), samples: FINAL_CHECK_TURN_SAMPLE, fromSample: FINAL_CHECK_TURN_SAMPLE, scope: "single-player", source: "stored" },
+        { arm: adoptedDefault("multiplayerBeat"), samples: 1, scope: "multiplayer", source: "stored" },
+      ];
+    case "switch":
+    case "thread":
+      return perPlayerCount(adoptedDefault("analysis"), adoptedDefault("multiplayerAnalysis"), 1);
+    case "iteration":
       return [];
   }
 }
@@ -922,6 +993,13 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
       return [
         { analysis: luna("low", "planV2c"), beats: [luna("medium", "chapterFullB")], samples: 2, scope: "single-player", roles: ["thread"] },
         { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: RERUNS_REFERENCE_SAMPLE, scope: "single-player", roles: ["thread"] },
+      ];
+    case "final-check":
+      // A chapter opening's wait on production's own code (the chapter planner, then the chapter's first step), on
+      // production's pair per player count, once, read against today's pair's stored chains
+      return [
+        { analysis: adoptedDefault("analysis"), beats: [adoptedDefault("beat")], samples: 1, scope: "single-player", roles: ["thread"] },
+        { analysis: adoptedDefault("multiplayerAnalysis"), beats: [adoptedDefault("multiplayerBeat")], samples: 1, scope: "multiplayer", roles: ["thread"] },
       ];
     case "turn-rounds":
       // Turn round 1: planner v2 into the chapter's first step, each turn form on production's model per player count

@@ -211,6 +211,22 @@ describe("checkSetup", () => {
     expect(result.checks).toMatchObject({ difficultyModifier: false, playerSlots: true, sharedStats: true, threadTypes: true });
   });
 
+  it("reads a template's three to five difficulty levels, each on an allowed modifier, where a custom story has one", () => {
+    const template = (modifiers: number[]): SetupShape => {
+      const { difficultyLevel, ...rest } = setup();
+      void difficultyLevel;
+      return { ...rest, difficultyLevels: modifiers.map((modifier) => ({ modifier })) };
+    };
+    expect(checkSetup(template([-10, 0, 10]), input).checks.difficultyModifier).toBe(true);
+    expect(checkSetup(template([-20, -10, 0, 10, 20]), input).checks.difficultyModifier).toBe(true);
+    expect(checkSetup(template([0, 10]), input).checks.difficultyModifier).toBe(false);
+    expect(checkSetup(template([-20, -10, 0, 10, 20, 20]), input).checks.difficultyModifier).toBe(false);
+    expect(checkSetup(template([-10, 0, 15]), input).checks.difficultyModifier).toBe(false);
+    // A custom story still needs its one level
+    expect(checkSetup(setup({ difficultyLevel: undefined }), input).checks.difficultyModifier).toBe(false);
+    expect(checkSetup(setup(), input).checks.difficultyModifier).toBe(true);
+  });
+
   it("counts only visible stats against the 3-4 rule", () => {
     const hidden = { isVisible: false };
     const withInvisibleExtra = setup({

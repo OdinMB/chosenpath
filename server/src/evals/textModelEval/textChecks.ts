@@ -311,9 +311,10 @@ export const ALLOWED_DIFFICULTY_MODIFIERS = [-20, -10, 0, 10, 20];
 
 type SetupStat = { isVisible?: boolean; effectOnPoints?: unknown[] };
 
-/** The setup fields the checks read (StorySetupGeneration has them all). */
+/** The setup fields the checks read (StorySetupGeneration has them all; a template has difficultyLevels instead of one). */
 export type SetupShape = {
   difficultyLevel?: { modifier: number };
+  difficultyLevels?: { modifier: number }[];
   sharedStats: SetupStat[];
   playerStats: SetupStat[];
   storyElements: { facts?: unknown[] }[];
@@ -356,11 +357,12 @@ export function checkSetup(output: SetupShape, input: SetupInput): CheckResult {
   const shared = output.sharedOutcomes?.length ?? 0;
   const facts = output.storyElements.map((element) => lengthOf(element, "facts"));
   const stats = [...output.sharedStats, ...output.playerStats];
+  // A custom story has one difficulty level; a template (the editor's AI Draft) three to five, each on an allowed modifier
+  const levels = output.difficultyLevels ?? (output.difficultyLevel ? [output.difficultyLevel] : []);
+  const levelCount = output.difficultyLevels ? between(levels.length, 3, 5) : levels.length === 1;
   return {
     checks: {
-      difficultyModifier:
-        output.difficultyLevel !== undefined &&
-        ALLOWED_DIFFICULTY_MODIFIERS.includes(output.difficultyLevel.modifier),
+      difficultyModifier: levelCount && levels.every((level) => ALLOWED_DIFFICULTY_MODIFIERS.includes(level.modifier)),
       playerSlots: slots.length === expected.length && expected.every((s) => slots.includes(s)),
       sharedStats: between(visibleCount(output.sharedStats), 3, 4),
       playerStats: between(visibleCount(output.playerStats), 3, 4),

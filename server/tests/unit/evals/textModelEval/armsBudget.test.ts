@@ -4,6 +4,8 @@ import {
   armSettings,
   baselineArm,
   estimateBaseKey,
+  FINAL_CHECK_SETUP_PREMISES,
+  FINAL_CHECK_TEMPLATE_PREMISES,
   makeArm,
   productionArm,
   referenceKey,
@@ -39,6 +41,8 @@ import {
   UNRECORDED_STAGE4_USD,
 } from "../../../../src/evals/textModelEval/budget.js";
 import { z } from "zod";
+import { GameModes } from "core/types/index.js";
+import { TEXT_MODEL_GROUPS } from "../../../../src/shared/llm/textModelSettings.js";
 import { requestChars } from "../../../../src/evals/textModelEval/jobPlan.js";
 
 describe("costFromUsage", () => {
@@ -377,6 +381,50 @@ describe("budget caps", () => {
     // Planner v2's records stand in for planner v2b's, and nothing else stands in
     expect(standInKey("gpt-6-luna@low/planV2b")).toBe("gpt-6-luna@low/planV2");
     expect(standInKey("gpt-6-luna@low/planV2c")).toBeUndefined();
+  });
+
+  it("runs the final check on production's own settings groups: the arms follow TEXT_MODEL_GROUPS, not a copy", () => {
+    const key = (group: keyof typeof TEXT_MODEL_GROUPS, variant: "adopted" | "adoptedTemplate" = "adopted") =>
+      armKey({ model: TEXT_MODEL_GROUPS[group].model, reasoningEffort: TEXT_MODEL_GROUPS[group].reasoningEffort }, variant);
+    const keys = (role: Parameters<typeof armsFor>[1]) => armsFor("final-check", role).map((plan) => plan.arm.key);
+    expect(keys("setup")).toEqual([key("setup"), key("templateEditor", "adoptedTemplate")]);
+    expect(keys("beat")).toEqual([key("beat"), key("multiplayerBeat")]);
+    // Both planner groups run Luna low, so one plan covers every case
+    expect(new Set([...keys("switch"), ...keys("thread")])).toEqual(new Set([key("analysis"), key("multiplayerAnalysis")]));
+    expect(keys("iteration")).toEqual([]);
+    // Production's defaults as of the adoption: the template editor on Sol low, the rest on Luna
+    expect(key("templateEditor", "adoptedTemplate")).toBe("gpt-6-sol@low/adoptedTemplate");
+    expect(key("beat")).toBe("gpt-6-luna@medium/adopted");
+    expect(stageRunsBaseline("final-check")).toBe(false);
+  });
+
+  it("gives the final check two new setups per player count and two templates, none read with a child", () => {
+    const premise = (id: string) => SETUP_PREMISES.find((p) => p.id === id)!;
+    const perCount = (ids: string[]) => ids.reduce<Record<number, number>>((acc, id) => ({ ...acc, [premise(id).playerCount]: (acc[premise(id).playerCount] ?? 0) + 1 }), {});
+    expect(perCount(FINAL_CHECK_SETUP_PREMISES)).toEqual({ 1: 2, 2: 2, 3: 2 });
+    expect(FINAL_CHECK_TEMPLATE_PREMISES).toHaveLength(2);
+    // Production's template generation has no category, so no kids budget: a kids premise would read the wrong checks
+    expect(FINAL_CHECK_TEMPLATE_PREMISES.some((id) => premise(id).tags.kids)).toBe(false);
+    // One single-player template and one where the editor offers a contest (two or more players, a competitive mode)
+    expect(FINAL_CHECK_TEMPLATE_PREMISES.map((id) => premise(id).playerCount).sort()).toEqual([1, 2]);
+    expect(FINAL_CHECK_TEMPLATE_PREMISES.map((id) => premise(id).gameMode)).toContain(GameModes.CooperativeCompetitive);
+    expect(STAGE_CAP_REASONS["final-check"]).toMatch(/template/);
+  });
+
+  it("reads production's own code against today's form, and against the measured variants it builds byte for byte", () => {
+    expect(referenceKey("gpt-6-luna@medium/adopted")).toBe("gpt-6-luna@medium/prod");
+    expect(referenceKey("gpt-6-luna@low/adopted")).toBe("gpt-6-luna@low/prod");
+    // The template editor's AI Draft against Sol's stored custom-story setups on today's form: no template form ever ran
+    expect(referenceKey("gpt-6-sol@low/adoptedTemplate")).toBe("gpt-6-sol@low/prod");
+    // Luna low's adopted arm is the setup, both planners and the group turns: each second reference reads in its own role
+    expect(secondReferenceKeys("gpt-6-luna@low/adopted")).toEqual([
+      "gpt-6-luna@low/setupR3",
+      "gpt-6-luna@low/setupR3b",
+      "gpt-6-luna@low/planV2",
+      "gpt-6-luna@low/planV2c",
+    ]);
+    expect(referenceKeyOf("pipeline:gpt-6-luna@low/adopted>gpt-6-luna@medium/adopted")).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");
+    expect(referenceKeyOf("pipeline:gpt-6-luna@low/adopted>gpt-6-luna@low/adopted")).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@low/prod");
   });
 
   it("splits the eighteen setup premises between the retests and their sanity pass", () => {

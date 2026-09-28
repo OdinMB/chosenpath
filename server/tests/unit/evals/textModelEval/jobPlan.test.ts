@@ -16,7 +16,16 @@ import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Ro
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
-import { ROUND2_SWITCH_CHAIN_CASES, ROUND3_PROBLEM_TURN, ROUND3_REPLAY_CASES, ROUND3_REPLAY_SAMPLES } from "../../../../src/evals/textModelEval/arms.js";
+import {
+  FINAL_CHECK_SETUP_PREMISES,
+  FINAL_CHECK_TEMPLATE_PREMISES,
+  ROUND2_SWITCH_CHAIN_CASES,
+  ROUND3_PROBLEM_TURN,
+  ROUND3_REPLAY_CASES,
+  ROUND3_REPLAY_SAMPLES,
+} from "../../../../src/evals/textModelEval/arms.js";
+import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
+import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import type { EvalCase } from "../../../../src/evals/textModelEval/cases.js";
@@ -406,8 +415,58 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/planV2b": ["mp-thread s1", "mp-thread s2"],
     });
     expect(plan("plan-refresh", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
-    // The feedback stage that no workflow runs yet plans nothing
-    expect(plan("final-check", { roles: ["setup", "beat", "switch", "thread"] })).toEqual([]);
+  });
+
+  it("plans the paid final check on production's own code: every role once on production's models, the single-player turns' second sample", () => {
+    // The form gate ran production's single-player turns once under the same code (sample 1), so the final check sends
+    // sample 2 on the stored turns; group turns and both planners once, on production's settings groups
+    const jobs = plan("final-check", { roles: ["setup", "beat", "switch", "thread"] });
+    expect(perArm(jobs)).toEqual({
+      "gpt-6-luna@medium/adopted": ["sp s2"],
+      "gpt-6-luna@low/adopted": ["mp s1", "mp-switch s1", "sp-switch s1", "mp-thread s1", "sp-thread s1"],
+    });
+    // Each goes out with production's limits for its role and player count
+    const limits = (caseId: string) => callLimitsOf(jobs.find((j) => j.caseId === caseId)!.first.request());
+    expect(limits("sp")).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(limits("mp")).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 14_000 });
+    expect(limits("sp-switch")).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
+    expect(limits("mp-thread")).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
+    expect(jobs.every((j) => !isSplitRequest(j.first.request()))).toBe(true);
+    // The chapter planner into the chapter's first step, production's pair per player count, once
+    const chains = plan("final-check", { mode: "pipeline", roles: ["switch", "thread"] });
+    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([
+      ["mp-thread", "pipeline:gpt-6-luna@low/adopted>gpt-6-luna@low/adopted", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/adopted>gpt-6-luna@medium/adopted", 1],
+    ]);
+  });
+
+  it("plans the final check's setups: two new custom-story setups per player count on Luna low, two templates on Sol low (the template editor)", () => {
+    const setup = (id: string) => {
+      const premise = SETUP_PREMISES.find((p) => p.id === id)!;
+      return evalCase(id, "setup", {
+        setup: { premise: premise.premise, playerCount: premise.playerCount, gameMode: premise.gameMode, maxTurns: premise.maxTurns },
+        tags: tags({ players: premise.playerCount, multiplayer: premise.playerCount > 1, kids: premise.tags.kids }),
+      });
+    };
+    const cases = SETUP_PREMISES.map((p) => setup(p.id));
+    const jobs = planJobs(cases, { stage: "final-check", promptState: "adopted1", roles: ["setup"], mode: "isolated", subset15: false, records: [] });
+    const byArm = perArm(jobs);
+    expect(Object.keys(byArm).sort()).toEqual(["gpt-6-luna@low/adopted", "gpt-6-sol@low/adoptedTemplate"]);
+    expect(byArm["gpt-6-luna@low/adopted"].sort()).toEqual(FINAL_CHECK_SETUP_PREMISES.map((id) => `${id} s1`).sort());
+    expect(byArm["gpt-6-sol@low/adoptedTemplate"].sort()).toEqual(FINAL_CHECK_TEMPLATE_PREMISES.map((id) => `${id} s1`).sort());
+    // A custom story as production asks for it (the case's kids tag rides along), a template as the editor's AI Draft does
+    for (const job of jobs) {
+      const c = cases.find((x) => x.id === job.caseId)!;
+      const { premise, playerCount, gameMode, maxTurns } = c.setup!;
+      const request = job.first.request();
+      const template = job.armKey.endsWith("/adoptedTemplate");
+      const production = template
+        ? setupStep.request(premise, playerCount, gameMode, maxTurns, "template")
+        : setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids: c.tags.kids });
+      expect(requestText(request)).toBe(production.prompt);
+      expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(production.schema)));
+      expect(callLimitsOf(request)).toEqual(template ? { timeoutMs: 150_000, maxCompletionTokens: 20_000 } : { timeoutMs: 120_000, maxCompletionTokens: 20_000 });
+    }
   });
 
   it("plans the request form's gate (B9): production's single-player turn form once as one message and once split, on the stored turns", () => {

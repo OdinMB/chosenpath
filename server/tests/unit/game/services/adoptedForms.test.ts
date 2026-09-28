@@ -8,6 +8,8 @@ import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js"
 import { SETUP_CHAIN_PREMISES, chainSetupInput } from "../../../../src/evals/textModelEval/setupChain.js";
 import { requestFor, requestText, type EvalRequest, type RequestInput, type VariantId } from "../../../../src/evals/textModelEval/variants.js";
 import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
+import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
+import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
 
 /*
@@ -87,5 +89,22 @@ whenFrozen("production builds the measured requests on every frozen case", () =>
 
   it("the setup-to-play chain's four premises, as the chain built them", () => {
     for (const premise of SETUP_CHAIN_PREMISES) expectAdopted(premise.id, { role: "setup", setup: chainSetupInput(premise) });
+  });
+
+  it("every setup case as a template (the template editor's AI Draft, the final check's adoptedTemplate): setup round 3's template form", () => {
+    const cases = frozen.filter((c) => c.role === "setup");
+    for (const c of cases) {
+      const input = requestInputFor(c);
+      if (input.role !== "setup") throw new Error(`${c.id} is not a setup case`);
+      const { premise, playerCount, gameMode, maxTurns } = input.setup;
+      // Production's template generation has no category, so no kids budget, whatever the case's tag
+      const measured = setupRound2Request(premise, playerCount, gameMode, maxTurns, "template", "generationOrder", ROUND3_PARTS);
+      const production = requestFor("adoptedTemplate", input);
+      expect({
+        id: c.id,
+        prompt: requestText(production) === adoptedSetupPrompt(measured.prompt, playerCount, gameMode),
+        schema: json(production) === json(measured),
+      }).toEqual({ id: c.id, prompt: true, schema: true });
+    }
   });
 });

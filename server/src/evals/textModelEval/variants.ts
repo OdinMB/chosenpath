@@ -53,9 +53,9 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * frozen in storyTextRound0/ when the carried-forward forms were adopted
  * (2026-09-28), so every stored "prod" record still rebuilds byte for byte;
  * it is also Stage 3's "full" form. "adopted" builds what production sends
- * now (storyTextSteps.ts), for runs on production's own code (no stage plans
- * it yet); record it under a new prompt state, since round0 names the code
- * before the adoption. The Stage 3 trims
+ * now (storyTextSteps.ts), for runs on production's own code (the form gate
+ * and the final check); record it under a new prompt state (adopted1), since
+ * round0 names the code before the adoption. The Stage 3 trims
  * (storyTextTrims.ts) drop planning fields that nothing reads after
  * generation, and the prompt lines asking for them:
  * - "slim" (beats only): the stats list, the multiplayer coordination note
@@ -139,6 +139,10 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * "adoptedSplit" is B9 on production's own single-player turn form
  * (storyTextRounds/requestFormB9.ts): the same words sent as a split request,
  * with production's limits, read against "adopted" (which carries them too).
+ * "adoptedTemplate" is production's template generation, the template
+ * editor's AI Draft (AIStoryGenerator.generateTemplateSetup: setupStep's
+ * "template" kind, no kids budget, the template editor's limits), for the
+ * final check; setup only.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -179,7 +183,8 @@ export type VariantId =
   | "setupR3b"
   | "turnB10"
   | "turnB10b"
-  | "adoptedSplit";
+  | "adoptedSplit"
+  | "adoptedTemplate";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -217,6 +222,7 @@ export const VARIANTS: VariantId[] = [
   "turnB10",
   "turnB10b",
   "adoptedSplit",
+  "adoptedTemplate",
 ];
 
 /**
@@ -529,6 +535,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   adoptedSplit: (input) => {
     if (input.role !== "beat") throw new Error(`Variant adoptedSplit does not cover role ${input.role}`);
     return productionFormRequest(input.story);
+  },
+  adoptedTemplate: (input) => {
+    if (input.role !== "setup") throw new Error(`Variant adoptedTemplate does not cover role ${input.role}`);
+    // Template generation has no category, so the case's kids tag is not read
+    const { premise, playerCount, gameMode, maxTurns } = input.setup;
+    return { ...setupStep.request(premise, playerCount, gameMode, maxTurns, "template"), limits: productionCallLimits("templateGeneration", playerCount) };
   },
 };
 
