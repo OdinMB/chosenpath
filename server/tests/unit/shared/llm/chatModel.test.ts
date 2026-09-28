@@ -142,8 +142,9 @@ describe("productionCallLimits", () => {
 
   it("gives setup and the template editor room above their slowest replies, and analysis and the filter short limits", () => {
     expect(productionCallLimits("setup", 3)).toEqual({ timeoutMs: 120_000, maxCompletionTokens: 20_000 });
-    expect(productionCallLimits("templateGeneration", 1)).toEqual({ timeoutMs: 150_000, maxCompletionTokens: 20_000 });
-    expect(productionCallLimits("templateIteration", 2)).toEqual({ timeoutMs: 150_000, maxCompletionTokens: 20_000 });
+    // 240 s since 2026-09-29: Sol's AI Drafts took 104 and 134 s on the slow evening of 2026-09-28, and no player waits on the editor
+    expect(productionCallLimits("templateGeneration", 1)).toEqual({ timeoutMs: 240_000, maxCompletionTokens: 20_000 });
+    expect(productionCallLimits("templateIteration", 2)).toEqual({ timeoutMs: 240_000, maxCompletionTokens: 20_000 });
     expect(productionCallLimits("switchAnalysis", 2)).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
     expect(productionCallLimits("threadAnalysis", 1)).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
     expect(productionCallLimits("contentFilter", 1)).toEqual({ timeoutMs: 15_000, maxCompletionTokens: 2_000 });

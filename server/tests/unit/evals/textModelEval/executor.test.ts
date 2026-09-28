@@ -147,7 +147,7 @@ describe("executeCall", () => {
 
   it("sends the template editor's AI Draft (adoptedTemplate) with the template editor's limits, and covers setup only", () => {
     const input = { role: "setup" as const, setup: { premise: "A goblin union", playerCount: 2 as const, gameMode: GameModes.Competitive, maxTurns: 20 } };
-    expect(callOptionsFor(requestFor("adoptedTemplate", input))).toEqual({ timeoutMs: 150_000, maxCompletionTokens: 20_000 });
+    expect(callOptionsFor(requestFor("adoptedTemplate", input))).toEqual({ timeoutMs: 240_000, maxCompletionTokens: 20_000 });
     expect(() => requestFor("adoptedTemplate", { role: "beat", story: threadBeat(1) })).toThrow(/adoptedTemplate/);
   });
 
