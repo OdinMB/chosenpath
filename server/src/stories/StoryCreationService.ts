@@ -236,7 +236,9 @@ export class StoryCreationService {
             playerCount,
             maxTurns,
             gameMode,
-            difficultyLevel
+            difficultyLevel,
+            // A story read with a child gets the smaller stat budget with plain names
+            { kids: category === "read-with-kids" }
           ),
         (state) => {
           const problem = storyStateStartProblem(state, playerCount);

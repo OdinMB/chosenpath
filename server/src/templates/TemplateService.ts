@@ -20,7 +20,7 @@ import {
 import { ensureStorageDirectory, getStoragePath } from "shared/storageUtils.js";
 import { Logger } from "shared/logger.js";
 import { AIStoryGenerator } from "game/services/AIStoryGenerator.js";
-import { StorySetupPromptService } from "game/services/prompts/StorySetupPromptService.js";
+import { iterationStep } from "game/services/storyTextSteps.js";
 import { templateDbService, TemplateDB } from "./TemplateDbService.js";
 import {
   extractAndAnalyzeTemplateZip,
@@ -858,9 +858,9 @@ export class TemplateService {
       // Create an instance of the AI generator
       const generator = this.aiStoryGenerator;
 
-      // Generate the partial template update based on user-selected sections
-      // (the prompt leaves out the creator's id and username)
-      const aiPrompt = StorySetupPromptService.createIterationPrompt(
+      // The partial template update for the user-selected sections: the
+      // prompt (without the creator's id and username) and the schema cut to them
+      const request = iterationStep.request(
         feedback,
         playerCount,
         gameMode,
@@ -868,10 +868,8 @@ export class TemplateService {
         sections,
         template
       );
-
-      // Create a partial schema for just the requested sections
       const updatedSections = await generator.generatePartialTemplateUpdate(
-        aiPrompt,
+        request,
         sections as TemplateIterationSections[],
         playerCount
       );

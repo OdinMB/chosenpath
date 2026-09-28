@@ -12,15 +12,15 @@ import type {
   ThreadAnalysis,
 } from "core/types/index.js";
 import {
-  createStorySetupSchema,
   createSwitchAnalysisSchema,
   threadAnalysisSchema,
   PLAYER_SLOTS,
 } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
+import type { TemplateIterationSections } from "core/types/admin.js";
 import type { Story } from "core/models/Story.js";
-import { templateIterationSections } from "core/utils/templateIterationSections.js";
-import { StorySetupPromptService } from "./prompts/StorySetupPromptService.js";
+import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
+import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
@@ -195,51 +195,57 @@ export const threadStep = {
   },
 };
 
+/** A setup request whose reply is written in the generation order: `assemble` turns it into the fields saved today. */
+export type SetupRequest = TextRequest<z.AnyZodObject> & {
+  assemble: (reply: unknown) => Record<string, unknown>;
+};
+
 export const setupStep = {
+  /**
+   * A new custom story or template from a premise (setup round 3's form):
+   * the story's length sizes the outcome slate, and a story read with a child
+   * (`kids`) gets the smaller stat budget with plain names.
+   */
   request(
     premise: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
     maxTurns: number,
-    kind: "story" | "template"
-  ): TextRequest<ReturnType<typeof createStorySetupSchema>> {
+    kind: "story" | "template",
+    options: SetupPromptOptions = {}
+  ): SetupRequest {
     return {
-      prompt: StorySetupPromptService.createSetupPrompt(
-        premise,
-        playerCount,
-        gameMode,
-        maxTurns,
-        kind
-      ),
-      schema: createStorySetupSchema(playerCount, kind),
+      prompt: StorySetupPromptService.createSetupPrompt(premise, playerCount, gameMode, maxTurns, kind, options),
+      schema: setupGenerationSchema(playerCount, gameMode, kind, options),
+      assemble: (reply) => assembleSetupReply(reply, playerCount, kind),
     };
   },
 };
 
-/** The template schema cut down to the requested sections and this player count. */
+export const iterationStep = {
+  /** AI Iteration on the given sections of a template (today's field order; the template goes without its creator). */
+  request(
+    feedback: string,
+    playerCount: PlayerCount,
+    gameMode: GameMode,
+    maxTurns: number,
+    sections: TemplateIterationSections[],
+    template: object
+  ): TextRequest<z.ZodObject<z.ZodRawShape>> {
+    return {
+      prompt: StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template),
+      schema: partialTemplateSchema(sections, playerCount, gameMode),
+    };
+  },
+};
+
+/** The template schema with the adopted descriptions, cut down to the requested sections and this player count. */
 export function partialTemplateSchema(
   sections: string[],
-  playerCount: PlayerCount
+  playerCount: PlayerCount,
+  gameMode: GameMode
 ): z.ZodObject<z.ZodRawShape> {
-  const fullSchema = createStorySetupSchema(playerCount, "template");
-  const fieldsToKeep = new Set<string>();
-  for (const section of sections) {
-    if (section in templateIterationSections) {
-      templateIterationSections[
-        section as keyof typeof templateIterationSections
-      ].forEach((field) => fieldsToKeep.add(field));
-    }
-  }
-  // Player fields match the current player count
-  if (sections.includes("players")) {
-    for (let i = 1; i <= playerCount; i++) {
-      fieldsToKeep.add(`player${i}`);
-    }
-  }
-  const filteredShape = Object.fromEntries(
-    Object.entries(fullSchema.shape).filter(([key]) => fieldsToKeep.has(key))
-  );
-  return z.object(filteredShape);
+  return iterationSchema(sections, playerCount, gameMode);
 }
 
 /** Which analysis call runs before the next beat, if any. */

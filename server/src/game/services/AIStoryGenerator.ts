@@ -39,11 +39,13 @@ import { checkedSwitchPlan, checkedThreadPlan } from "./planChecks.js";
 import { logRepairs } from "./textRepairs.js";
 import {
   beatStep,
-  partialTemplateSchema,
   setupStep,
   switchStep,
   threadStep,
+  type TextRequest,
 } from "./storyTextSteps.js";
+import type { SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
+import type { z } from "zod";
 
 dotenv.config();
 
@@ -104,13 +106,15 @@ export class AIStoryGenerator {
     playerCount: PlayerCount,
     maxTurns: number,
     gameMode: GameMode,
-    difficultyLevel: DifficultyLevel | undefined
+    difficultyLevel: DifficultyLevel | undefined,
+    options: SetupPromptOptions = {}
   ): Promise<StoryState> {
     const setup = await this.generateStorySetup(
       prompt,
       playerCount,
       gameMode,
-      maxTurns
+      maxTurns,
+      options
     );
 
     const players = this.createPlayersFromSetup(setup, playerCount);
@@ -218,11 +222,12 @@ export class AIStoryGenerator {
       });
       Logger.Story.log("Template setup generated");
 
-      // Create a new object without the characterSelectionPlan property
+      // Written in the generation order; put back into the fields saved today
+      // (the seat roles land in the plan, which is not kept after generation)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { characterSelectionPlan, ...templateSetupData } = result;
+      const { characterSelectionPlan, ...templateSetupData } = request.assemble(result);
 
-      return templateSetupData as TemplateSetupGeneration<typeof playerCount>;
+      return templateSetupData as unknown as TemplateSetupGeneration<typeof playerCount>;
     } catch (error) {
       Logger.Story.error("Failed to initialize template:", error);
       throw new Error("Failed to initialize template. Please try again.");
@@ -233,7 +238,8 @@ export class AIStoryGenerator {
     prompt: string,
     playerCount: PlayerCount,
     gameMode: GameMode,
-    maxTurns: number
+    maxTurns: number,
+    options: SetupPromptOptions = {}
   ): Promise<StorySetupGeneration<typeof playerCount>> {
     // Create a filename based on the parameters
     const mockStoriesEnabled =
@@ -273,7 +279,8 @@ export class AIStoryGenerator {
       playerCount,
       gameMode,
       maxTurns,
-      "story"
+      "story",
+      options
     );
     const structuredModel = this.modelFor(
       "setup",
@@ -285,10 +292,12 @@ export class AIStoryGenerator {
         `Generating story setup with playerCount: ${playerCount}`
       );
 
-      const result = await structuredModel.invoke(request.prompt, {
-        metadata: { players: playerCount },
-      });
-      // Logger.Story.log("Raw response:", JSON.stringify(result, null, 2));
+      // Written in the generation order; put back into the fields saved today before anything reads it
+      const result = request.assemble(
+        await structuredModel.invoke(request.prompt, {
+          metadata: { players: playerCount },
+        })
+      );
       Logger.Story.log("Story setup generated");
 
       // If mock stories are enabled, save the result to a file for later use
@@ -305,11 +314,11 @@ export class AIStoryGenerator {
         }
       }
 
-      // Create a new object without the characterSelectionPlan property
+      // The character-selection plan (with the seat roles) is not kept after generation
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { characterSelectionPlan, ...storySetupData } = result;
 
-      return storySetupData as StorySetupGeneration<typeof playerCount>;
+      return storySetupData as unknown as StorySetupGeneration<typeof playerCount>;
     } catch (error) {
       Logger.Story.error("Failed to initialize story:", error);
       throw new Error("Failed to initialize story. Please try again.");
@@ -410,13 +419,13 @@ export class AIStoryGenerator {
 
   /**
    * Generates updated sections for an existing template
-   * @param prompt The iteration prompt
+   * @param request The iteration request (iterationStep.request): its prompt and the schema cut to the sections
    * @param sections Array of sections to regenerate
    * @param playerCount Player count for the story
    * @returns Partial template update with only the requested sections
    */
   async generatePartialTemplateUpdate(
-    prompt: string,
+    request: TextRequest<z.ZodObject<z.ZodRawShape>>,
     sections: string[],
     playerCount: PlayerCount
   ): Promise<Partial<StorySetupGeneration<typeof playerCount>>> {
@@ -425,15 +434,13 @@ export class AIStoryGenerator {
         "Generating partial template update for sections:",
         sections
       );
-
-      const partialSchema = partialTemplateSchema(sections, playerCount);
-      Logger.Story.log("Fields to keep:", Object.keys(partialSchema.shape));
+      Logger.Story.log("Fields to keep:", Object.keys(request.schema.shape));
 
       const structuredModel = this.modelFor(
         "templateIteration",
         playerCount
-      ).withStructuredOutput(partialSchema);
-      const result = await structuredModel.invoke(prompt, {
+      ).withStructuredOutput(request.schema);
+      const result = await structuredModel.invoke(request.prompt, {
         metadata: { players: playerCount },
       });
 

@@ -1,15 +1,7 @@
 import type { Story } from "core/models/Story.js";
 import type { GameMode, PlayerCount } from "core/types/index.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
-import { StorySetupPromptService } from "../../game/services/prompts/StorySetupPromptService.js";
-import {
-  beatStep,
-  partialTemplateSchema,
-  setupStep,
-  switchStep,
-  threadStep,
-  type TextRequest,
-} from "../../game/services/storyTextSteps.js";
+import { beatStep, iterationStep, setupStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
 import {
   round0BeatStep,
   round0IterationRequest,
@@ -303,11 +295,11 @@ function prodRequest(input: RequestInput): TextRequest {
 }
 
 /** What production sends since the adoption (storyTextSteps.ts; TemplateService.iterateTemplate for AI Iteration). */
-function adoptedRequest(input: RequestInput): TextRequest {
+function adoptedRequest(input: RequestInput): EvalRequest {
   switch (input.role) {
     case "setup": {
-      const { premise, playerCount, gameMode, maxTurns } = input.setup;
-      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story");
+      const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
+      return setupStep.request(premise, playerCount, gameMode, maxTurns, "story", { kids });
     }
     case "beat":
       return beatStep.request(input.story);
@@ -317,10 +309,7 @@ function adoptedRequest(input: RequestInput): TextRequest {
       return threadStep.request(input.story);
     case "iteration": {
       const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
-      return {
-        prompt: StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template),
-        schema: partialTemplateSchema(sections, playerCount),
-      };
+      return iterationStep.request(feedback, playerCount, gameMode, maxTurns, sections, template);
     }
   }
 }

@@ -204,6 +204,25 @@ describe("StoryCreationService setup status", () => {
     });
   });
 
+  it.each([
+    ["read-with-kids", true],
+    ["enjoy-fiction", false],
+    [undefined, false],
+  ] as const)("asks the setup for the kids stat budget when the category is %s: %s", async (category, kids) => {
+    createInitialState.mockResolvedValue(startableState());
+    const service = new StoryCreationService();
+    const { res } = fakeResponse();
+
+    await service.createStory(PREMISE, false, false, 2, 20, GameModes.Cooperative, undefined, res, undefined, category);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(createInitialState).toHaveBeenCalledTimes(1);
+    const args = createInitialState.mock.calls[0];
+    // The story's length and players reach the setup too, since the outcome slate is sized by them
+    expect(args.slice(3, 6)).toEqual([2, 20, GameModes.Cooperative]);
+    expect(args[7]).toEqual({ kids });
+  });
+
   it("answers a content-filter refusal with its moderation response and starts no setup", async () => {
     isAppropriatePrompt.mockResolvedValue({ isAppropriate: false, reason: "Violence" });
     const service = new StoryCreationService();

@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { z } from "zod";
-import type { Beat, Change } from "core/types/index.js";
+import { GameModes, type Beat, type Change } from "core/types/index.js";
 import {
   analysisBefore,
   beatStep,
@@ -171,7 +171,7 @@ describe("analysisBefore", () => {
 
 describe("partialTemplateSchema", () => {
   it("keeps only the section fields and this player count's slots", () => {
-    const keys = Object.keys(partialTemplateSchema(["players", "media", "unknown"], 2).shape);
+    const keys = Object.keys(partialTemplateSchema(["players", "media", "unknown"], 2, GameModes.Competitive).shape);
     expect(keys.sort()).toEqual(
       ["characterSelectionIntroduction", "characterSelectionPlan", "imageInstructions", "player1", "player2"].sort()
     );
