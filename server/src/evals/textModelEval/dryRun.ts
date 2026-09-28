@@ -2,8 +2,8 @@ import type { PlayerCount, StoryState, StoryTemplate } from "core/types/index.js
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
 // Case building sends today's form (the round0 prompt state, frozen at the adoption of 2026-09-28)
 import { round0BeatStep as beatStep } from "../../game/services/storyTextRound0/round0Steps.js";
-import { baselineArm, type EvalRole, type Stage } from "./arms.js";
-import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, STAGE_CAP_REASONS, type SpendRecord } from "./budget.js";
+import { baselineArm, FEEDBACK_STAGES, type EvalRole, type FeedbackStage, type Stage } from "./arms.js";
+import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, STAGE_CAP_REASONS, UNRECORDED_STAGE4_USD, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type Snapshot } from "./cases.js";
 import { FILTER_CASES } from "./filterCases.js";
@@ -82,7 +82,17 @@ export function estimateMinutes(jobs: Job[], tpm: number, maxInFlight: number): 
 }
 
 /** The stages whose rows also list their arms. */
-const ROUND_STAGES: Stage[] = ["setup-rounds", "turn-rounds"];
+const ROUND_STAGES: Stage[] = ["setup-rounds", "turn-rounds", ...FEEDBACK_STAGES];
+
+/** The owner's feedback workflow's runs (2026-09-28), each on its own stage and cap. */
+const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
+  "plan-refresh": "Plan refresh",
+  reruns: "Reruns",
+  "setup-retests": "Setup retests",
+  groups: "Groups (B10)",
+  "form-gate": "Request-form gate (B9)",
+  "final-check": "Final check",
+};
 
 /** Jobs by arm key, in plan order. */
 function byArm(jobs: Job[]): Map<string, Job[]> {
@@ -146,6 +156,10 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     ["Turn rounds pipeline chains", "turn-rounds", plan("turn-rounds", analysis)],
     ["Migration check (production defaults, isolated)", "migration", plan("migration", { mode: "isolated" })],
     ["Migration check pipeline chains", "migration", plan("migration", analysis)],
+    ...FEEDBACK_STAGES.flatMap((stage): [string, Stage, Job[]][] => [
+      [`${FEEDBACK_LABELS[stage]} (isolated)`, stage, plan(stage, { mode: "isolated" })],
+      [`${FEEDBACK_LABELS[stage]} pipeline chains`, stage, plan(stage, analysis)],
+    ]),
   ];
   const caps = resolveCaps({}).caps;
   const probeEstimate = probeChecks().reduce((sum, check) => sum + estimateCheckCost(check), 0);
@@ -173,7 +187,9 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     const label = stage === "filter" ? "Filter check" : `Stage ${stage}`;
     log(`  ${label}: $${spend.byStage[stage].toFixed(2)} of $${caps.stageCaps[stage]} (${STAGE_CAP_REASONS[stage]})`);
   }
-  log(`  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $30 by the owner on 2026-09-27; the first target was about $25)`);
+  log(
+    `  Total: $${spend.total.toFixed(2)} of $${HARD_CEILING} (hard cap, raised from $33 by the owner on 2026-09-28 and from $30 on 2026-09-27; the first target was about $25; the stalled Stage 4 calls may add about $${UNRECORDED_STAGE4_USD.toFixed(2)} the ledger does not hold)`
+  );
   log(
     `Baseline arms (the pre-migration comparison, fixed in arms.ts): setup ${baselineArm("setup").key}, beat ${baselineArm("beat").key}, analysis ${baselineArm("switch").key}`
   );

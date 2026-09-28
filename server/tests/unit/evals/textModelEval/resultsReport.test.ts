@@ -93,7 +93,7 @@ describe("renderResults", () => {
       generatedAt: new Date(0),
     });
     expect(text).toContain("| turn-rounds | $0.50 | $2.00 |");
-    expect(text).toContain("| total | $0.75 | $33.00 |");
+    expect(text).toContain("| total | $0.75 | $40.00 |");
   });
 });
 

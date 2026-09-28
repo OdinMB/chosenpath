@@ -1,4 +1,6 @@
-import { STAGES, type Stage } from "./arms.js";
+import { FEEDBACK_STAGES, STAGES, type Stage } from "./arms.js";
+
+export { FEEDBACK_STAGES };
 
 /*
  * The spend caps. Owner (2026-09-26): target about $25 for the whole
@@ -7,14 +9,17 @@ import { STAGES, type Stage } from "./arms.js";
  * $25 is justified because the owner explicitly prioritised Sol for story
  * setups, and setup inputs are 21-23K tokens with the schema, not the 15K
  * the plan assumed. The owner raised the hard cap to $33 on 2026-09-27, for
- * the setup and turn rounds after the Round 0 play fixes. The stage caps are
- * $8 / $13 / $3 / $4 for Stages 0 to 4, and $3 / $2 / $1.20 for the setup
- * rounds, the turn rounds and the migration check (STAGE_CAP_REASONS says
- * why); a stage cap above its default needs a recorded reason, and the global
- * cap can only be lowered. The probe and case building count as Stage 0. The
- * content-filter check (--filter-check, filterCheck.ts) is its own ledger
- * stage, "filter", capped at $0.30: its calls cost fractions of a cent, and
- * it has no --run stage.
+ * the setup and turn rounds after the Round 0 play fixes, and to $40 on
+ * 2026-09-28, for the missing steps after the owner's feedback of that day
+ * (going on although the stalled Stage 4 calls may have been billed). The
+ * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
+ * the setup rounds, the turn rounds and the migration check, and $0.10 /
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 for the feedback workflow's runs
+ * (STAGE_CAP_REASONS says why); a stage cap above its default needs a
+ * recorded reason, and the global cap can only be lowered. The probe and case
+ * building count as Stage 0. The content-filter check (--filter-check,
+ * filterCheck.ts) is its own ledger stage, "filter", capped at $0.30: its
+ * calls cost fractions of a cent, and it has no --run stage.
  */
 
 /** A stage of the spend ledger: the --run stages plus the filter check. */
@@ -30,12 +35,30 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "turn-rounds": 2,
   migration: 1.2,
   filter: 0.3,
+  "plan-refresh": 0.1,
+  reruns: 0.6,
+  "setup-retests": 0.1,
+  groups: 0.4,
+  "form-gate": 0.4,
+  "final-check": 0.6,
 };
-export const HARD_CEILING = 33;
+/** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
+export const HARD_CEILING = 40;
 export const DEFAULT_GLOBAL_CAP = HARD_CEILING;
 
-/** The ledger total when the round stages opened (2026-09-27): $26.39 of the $33 hard cap, $6.61 left. */
+/** The ledger total when the round stages opened (2026-09-27): $26.39 of the then $33 hard cap, $6.61 left. */
 export const LEDGER_WHEN_ROUNDS_OPENED = 26.39;
+
+/** The ledger total when the feedback workflow's stages opened (2026-09-28): $31.99 of the $40 hard cap. */
+export const LEDGER_WHEN_FEEDBACK_OPENED = 31.99;
+
+/**
+ * What the ledger may not record: Stage 4's 43 hung GPT-6 calls are booked at
+ * their estimate, and if OpenAI billed them as 300 s replies the real total is
+ * about $1.3 higher (open since 2026-09-26; the owner went on regardless on
+ * 2026-09-28). The feedback stages' caps fit the $40 with it on top.
+ */
+export const UNRECORDED_STAGE4_USD = 1.3;
 
 /** Why each stage's cap is what it is (printed by the dry run beside the spend). */
 export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
@@ -50,6 +73,17 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
   migration:
     "production's GPT-6 defaults on today's prompts at two samples, and the single-player chains: dry run $0.75, plus AI Iteration (--role iteration, about $0.02) and setup estimates that read about 30% low",
   filter: "the content filter's fixed test set; its calls cost fractions of a cent",
+  "plan-refresh":
+    "coordinator, 2026-09-28 (the owner's feedback, $40 hard cap): planner v2c's chapter plans on the planning cases, which the reruns' chapter turns are written from; about $0.0013 a plan, 38 plans a sample",
+  reruns:
+    "coordinator, 2026-09-28: turn round 1's page rebuilt with new outputs (the framed chapter turn on planner v2c's plans and today's form beside it, chapter steps and chain openings) and their judged checks; round 1's two turn forms and chains came to about $0.80 at two samples",
+  "setup-retests":
+    "coordinator, 2026-09-28: the setup retests (the Casablanca clause, about $0.011, and any setup sentence the feedback adds), a few Luna low setups at about $0.006 each",
+  groups: "coordinator, 2026-09-28: the group turn round (B10), about $0.18 at one sample (turn round 3's estimate), with room for today's group form beside it",
+  "form-gate":
+    "coordinator, 2026-09-28: the request form's gate (B9: chapter-step p95 at or under 45 s), about $0.20 (turn round 3's estimate) plus today's form rerun beside it for the waits",
+  "final-check":
+    "coordinator, 2026-09-28: the paid final check on production's own code (the adopted variant, under a new prompt state): one sample of the 44 stored single-player turns and both planners, about $0.22, plus group turns and chains",
 };
 
 export type Caps = {

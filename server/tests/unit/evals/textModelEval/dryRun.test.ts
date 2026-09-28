@@ -71,6 +71,23 @@ describe("printDryRun: the prompt state it plans under", () => {
     expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
   });
 
+  it("plans a row for each run of the owner's feedback workflow against its own cap, and names the $40 hard cap", async () => {
+    const lines = await dryRun([]);
+    for (const [label, cap] of [
+      ["Plan refresh", "0.1"],
+      ["Reruns", "0.6"],
+      ["Setup retests", "0.1"],
+      ["Groups \\(B10\\)", "0.4"],
+      ["Request-form gate \\(B9\\)", "0.4"],
+      ["Final check", "0.6"],
+    ]) {
+      expect([label, lines.some((line) => new RegExp(`^${label} \\(isolated\\): \\d+ jobs .*\\(stage cap \\$${cap}\\)`).test(line))]).toEqual([label, true]);
+      expect([label, lines.some((line) => new RegExp(`^${label} pipeline chains: \\d+ jobs .*\\(stage cap \\$${cap}\\)`).test(line))]).toEqual([label, true]);
+    }
+    expect(lines.some((line) => /Stage final-check: \$0\.00 of \$0\.6 \(.*2026-09-28.*\)/.test(line))).toBe(true);
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}Total: \$\d+\.\d\d of \$40 \(hard cap, raised from \$33 by the owner on 2026-09-28/));
+  });
+
   it("lists the round stages' open jobs per arm, each with its estimate", async () => {
     const setupCase = evalCase("setup-learn-lemonade", "setup", { setup: { premise: "A premise", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
     const lines = await dryRun([], undefined, [setupCase], ["setup"]);

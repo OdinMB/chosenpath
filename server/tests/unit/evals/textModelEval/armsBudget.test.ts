@@ -24,12 +24,15 @@ import {
 import {
   budgetCheck,
   DEFAULT_STAGE_CAPS,
+  FEEDBACK_STAGES,
   HARD_CEILING,
   LEDGER_STAGES,
+  LEDGER_WHEN_FEEDBACK_OPENED,
   LEDGER_WHEN_ROUNDS_OPENED,
   resolveCaps,
   spentByStage,
   STAGE_CAP_REASONS,
+  UNRECORDED_STAGE4_USD,
 } from "../../../../src/evals/textModelEval/budget.js";
 import { z } from "zod";
 import { requestChars } from "../../../../src/evals/textModelEval/jobPlan.js";
@@ -277,11 +280,11 @@ describe("budget caps", () => {
     expect(budgetCheck(caps, spend(7.5), 0, "0", 0.2)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.05)).toEqual({ ok: true });
     expect(budgetCheck(caps, spend(8, 12.9), 0, "1-2", 0.2)).toMatchObject({ ok: false });
-    // Stage caps sum to $28, so the $33 global cap only binds after a raised stage cap
-    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 17.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
+    // Stage caps sum to $28, so the $40 global cap only binds after a raised stage cap
+    const nearGlobal = spentByStage([{ stage: "0", costUsd: 8 }, { stage: "1-2", costUsd: 24.9 }, { stage: "3", costUsd: 3 }, { stage: "4", costUsd: 4 }]);
     const { caps: raised } = resolveCaps({ stage: "4", stageCap: 10, overTargetReason: "rerun the rewrite" });
     expect(budgetCheck(raised, nearGlobal, 0, "4", 0.05)).toEqual({ ok: true });
-    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$33/) });
+    expect(budgetCheck(raised, nearGlobal, 0, "4", 0.2)).toMatchObject({ ok: false, reason: expect.stringMatching(/Global cap \$40/) });
     expect(budgetCheck(caps, spend(0), 0.95, "0", 0.1)).toMatchObject({ ok: false });
   });
 
@@ -292,7 +295,7 @@ describe("budget caps", () => {
       () => new Date("2026-09-27T00:00:00Z")
     );
     expect(caps.stageCaps["1-2"]).toBe(14);
-    expect(caps.globalCap).toBe(33);
+    expect(caps.globalCap).toBe(40);
     expect(override).toEqual({ at: "2026-09-27T00:00:00.000Z", stage: "1-2", stageCap: 14, globalCap: undefined, reason: "more Sol setup samples" });
     // Lowering a cap needs no reason
     expect(resolveCaps({ stage: "0", stageCap: 2 }).override).toBeUndefined();
@@ -327,6 +330,26 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_ROUNDS_OPENED + newCaps + DEFAULT_STAGE_CAPS.filter).toBeLessThanOrEqual(HARD_CEILING);
   });
 
+  it("gives each run of the owner's feedback workflow (2026-09-28) its own stage, cap and reason, inside the $40 hard cap", () => {
+    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "plan-refresh": 0.1, reruns: 0.6, "setup-retests": 0.1, groups: 0.4, "form-gate": 0.4, "final-check": 0.6 });
+    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check"]);
+    for (const stage of FEEDBACK_STAGES) {
+      expect(STAGES).toContain(stage);
+      expect(LEDGER_STAGES).toContain(stage);
+      expect(stageRunsBaseline(stage)).toBe(false);
+      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-28/);
+    }
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all six caps still fit
+    const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
+    expect(caps).toBeCloseTo(2.2);
+    expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
+    // A run's stage only spends its own cap
+    const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
+    const { caps: defaults } = resolveCaps({});
+    expect(budgetCheck(defaults, spend, 0, "plan-refresh", 0.02)).toMatchObject({ ok: false, reason: expect.stringMatching(/Stage plan-refresh cap \$0\.10/) });
+    expect(budgetCheck(defaults, spend, 0, "reruns", 0.02)).toEqual({ ok: true });
+  });
+
   it("books and checks spend of the new stages on their own caps", () => {
     const spend = spentByStage([{ stage: "setup-rounds", costUsd: 2.95 }, { stage: "turn-rounds", costUsd: 1 }]);
     expect(spend.byStage["setup-rounds"]).toBeCloseTo(2.95);
@@ -340,10 +363,13 @@ describe("budget caps", () => {
     expect(STAGES.filter(stageRunsBaseline)).toEqual(["0", "1-2", "3", "4"]);
   });
 
-  it("never lets the global cap pass $33, whatever the reason", () => {
-    expect(() => resolveCaps({ globalCap: 33.01, overTargetReason: "anything" })).toThrow(/\$33/);
-    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$33/);
+  it("never lets the global cap pass $40 (the owner's raise of 2026-09-28), whatever the reason", () => {
+    expect(HARD_CEILING).toBe(40);
+    expect(() => resolveCaps({ globalCap: 40.01, overTargetReason: "anything" })).toThrow(/\$40/);
+    expect(() => resolveCaps({ globalCap: 50, overTargetReason: "the owner's old ceiling" })).toThrow(/\$40/);
+    expect(resolveCaps({ globalCap: 40 }).caps.globalCap).toBe(40);
+    expect(resolveCaps({}).caps.globalCap).toBe(40);
+    // Lowering it back to the old hard cap needs no reason
     expect(resolveCaps({ globalCap: 33 }).caps.globalCap).toBe(33);
-    expect(resolveCaps({}).caps.globalCap).toBe(33);
   });
 });

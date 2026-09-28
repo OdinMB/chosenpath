@@ -26,13 +26,21 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * closed). The rounds after the Round 0 play fixes (2026-09-27) each have their
  * own: "setup-rounds" and "turn-rounds" for the candidates of the two
  * improvement documents, and "migration" for checks of production's GPT-6
- * defaults on today's prompts. Their caps and reasons are in budget.ts.
+ * defaults on today's prompts. The owner's feedback of 2026-09-28 gives each
+ * run of its workflow a stage of its own (FEEDBACK_STAGES): the planner v2c
+ * plan refresh, the reruns that rebuild turn round 1's page, the setup
+ * retests, the group turn round (B10), the request form's gate (B9) and the
+ * paid final check on production's own code; each run's phase sets its arms
+ * (armsFor and pipelinePlans plan none for them until then). Their caps and
+ * reasons are in budget.ts.
  */
-export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration";
-export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration"];
+export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check"] as const;
+export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
+export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
+export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration", ...FEEDBACK_STAGES];
 
 /** Stages that read against stored references: they plan no baseline job and gate no candidate on one. */
-const STORED_REFERENCE_STAGES: Stage[] = ["setup-rounds", "turn-rounds", "migration"];
+const STORED_REFERENCE_STAGES: Stage[] = ["setup-rounds", "turn-rounds", "migration", ...FEEDBACK_STAGES];
 
 /**
  * Whether a stage runs the comparison baseline (gpt-4.1, gpt-4.1-mini) on its
