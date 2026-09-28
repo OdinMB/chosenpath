@@ -9,8 +9,6 @@ import type {
   Change,
   SetOfBeatGenerationSchema,
   ImageRequest,
-  SwitchAnalysis,
-  ThreadAnalysis,
   PlayerCount,
   GameMode,
   DifficultyLevel,
@@ -335,14 +333,13 @@ export class AIStoryGenerator {
       story.getNumberOfPlayers()
     ).withStructuredOutput(request.schema);
 
-    // Checked before it becomes the story: repaired, or asked for once more
-    const plan = await checkedSwitchPlan(
-      story,
-      request.prompt,
-      async (prompt) =>
-        (await structuredModel.invoke(prompt, {
+    // The lean reply as the plan the story stores, checked before it becomes the story: repaired, or asked for once more
+    const plan = await checkedSwitchPlan(story, request.prompt, async (prompt) =>
+      request.assemble(
+        await structuredModel.invoke(prompt, {
           metadata: storyTags(story, context),
-        })) as SwitchAnalysis
+        })
+      )
     );
     Logger.Story.log("Switches generated");
 
@@ -359,14 +356,14 @@ export class AIStoryGenerator {
       story.getNumberOfPlayers()
     ).withStructuredOutput(request.schema);
 
-    // Checked before it becomes the story: repaired, or asked for once more
-    const plan = await checkedThreadPlan(
-      story,
-      request.prompt,
-      async (prompt) =>
-        (await structuredModel.invoke(prompt, {
+    // The lean reply as the plan the story stores (a single player's pick sets its outcome),
+    // checked before it becomes the story: repaired, or asked for once more
+    const plan = await checkedThreadPlan(story, request.prompt, async (prompt) =>
+      request.assemble(
+        await structuredModel.invoke(prompt, {
           metadata: storyTags(story, context),
-        })) as ThreadAnalysis
+        })
+      )
     );
     Logger.Story.log("Threads generated");
 

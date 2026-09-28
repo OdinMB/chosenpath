@@ -7,6 +7,7 @@ import type {
   Outcome,
 } from "core/types/index.js";
 import { Story } from "core/models/Story.js";
+import { switchPacingBlock } from "../pacing.js";
 
 export interface SectionConfig {
   gameMode?: boolean;
@@ -23,9 +24,13 @@ export interface SectionConfig {
   switchConfiguration?: boolean;
   switchWithDecisionsConfiguration?: boolean;
   threadConfigurationForSwitches?: boolean;
+  /** The switch planner's view of the thread that just ended: named as such, with each beat's chosen option only (planner v2, A5) */
+  threadJustEndedForSwitches?: boolean;
   threadConfigurationForThreadBeats?: boolean;
   threadConfigurationForSwitchBeats?: boolean;
   switchAndThreadInstructions?: boolean;
+  /** The switch planner's PACING block, where STORY PROGRESS would print (planner v2, A4) */
+  switchPacing?: boolean;
 }
 
 export class StoryStatePromptService {
@@ -61,6 +66,9 @@ export class StoryStatePromptService {
     if (sections.storyProgress) {
       promptSections.push(this.createStoryProgressSection(story));
     }
+    if (sections.switchPacing) {
+      promptSections.push(`\n${switchPacingBlock(story)}\n`);
+    }
     if (sections.threadConfigurationForThreadBeats) {
       promptSections.push(
         this.createThreadConfigurationSection("current", false, story) +
@@ -77,6 +85,11 @@ export class StoryStatePromptService {
     if (sections.threadConfigurationForSwitches) {
       promptSections.push(
         this.createThreadConfigurationSection("current", true, story)
+      );
+    }
+    if (sections.threadJustEndedForSwitches) {
+      promptSections.push(
+        this.createThreadConfigurationSection("current", true, story, true)
       );
     }
     if (sections.switchConfiguration) {
@@ -453,9 +466,11 @@ ${modeDescriptions[story.getGameMode()]}
     }/${story.getMaxTurns()}\nTurns left (including this one): ${turnsLeft}\n`;
   }
 
+  /** `decisions`: the PLAYER DECISIONS block to print instead of each player's chosen option (the chapter planner's, planner v2) */
   public static getSwitchConfiguration(
     story: Story,
-    withDecisions: boolean
+    withDecisions: boolean,
+    decisions?: string
   ): string {
     const switchAnalysis = story.getCurrentSwitchAnalysis();
     if (!switchAnalysis) {
@@ -469,21 +484,23 @@ ${modeDescriptions[story.getGameMode()]}
     const { switches, coordinationPatternSummary } = switchAnalysis;
 
     // Get player decisions if needed
-    const playerDecisionsSection = withDecisions
-      ? [
-          "\nPLAYER DECISIONS:",
-          story
-            .getPlayerSlots()
-            .map((slot) => {
-              const lastBeat = story.getCurrentBeat(slot);
-              const choice =
-                lastBeat?.options?.[lastBeat?.choice]?.text ||
-                "No decision made";
-              return `${slot}: ${choice}`;
-            })
-            .join("\n"),
-        ].join("\n")
-      : "";
+    const playerDecisionsSection = !withDecisions
+      ? ""
+      : decisions !== undefined
+        ? `\n${decisions}`
+        : [
+            "\nPLAYER DECISIONS:",
+            story
+              .getPlayerSlots()
+              .map((slot) => {
+                const lastBeat = story.getCurrentBeat(slot);
+                const choice =
+                  lastBeat?.options?.[lastBeat?.choice]?.text ||
+                  "No decision made";
+                return `${slot}: ${choice}`;
+              })
+              .join("\n"),
+          ].join("\n");
 
     const switchConfigs = switches
       .map((singleSwitch) => {
@@ -540,10 +557,12 @@ ${modeDescriptions[story.getGameMode()]}
     return switchConfigsReturn;
   }
 
+  /** `justEnded`: the switch planner's view, headed as the thread that just ended, each beat with its chosen option only. */
   private static createThreadConfigurationSection(
     type: "current" | "previous",
     lastBeatOnly: boolean,
-    story: Story
+    story: Story,
+    justEnded = false
   ): string {
     let threadAnalysis;
     if (type === "current") {
@@ -629,7 +648,8 @@ ${modeDescriptions[story.getGameMode()]}
         const beatProgressionItems = this.formatBeatProgression(
           thread,
           lastBeatOnly,
-          story
+          story,
+          justEnded
         );
 
         // A resolved thread names its type, which after-thread adjustments are keyed on
@@ -650,13 +670,15 @@ ${modeDescriptions[story.getGameMode()]}
       })
       .join("\n\n" + "-".repeat(40) + "\n\n");
 
-    return `\n======= ${type.toUpperCase()} THREAD CONFIGURATION =======\n\n${threadConfigs}`;
+    const heading = justEnded ? "THE THREAD THAT JUST ENDED" : `${type.toUpperCase()} THREAD CONFIGURATION`;
+    return `\n======= ${heading} =======\n\n${threadConfigs}`;
   }
 
   private static formatBeatProgression(
     thread: Thread,
     lastBeatOnly: boolean,
-    story: Story
+    story: Story,
+    chosenOnly = false
   ): string {
     const beatsCompleted = thread.progression.filter(
       (beat) => beat.resolution !== null
@@ -676,7 +698,8 @@ ${modeDescriptions[story.getGameMode()]}
         thread,
         story,
         lastBeatIndex,
-        lastBeatIndex
+        lastBeatIndex,
+        chosenOnly
       );
       return `${beatProgressionOverview}\n\nPREVIOUS BEAT TEXT:\n${playerTexts}`;
     }
@@ -699,13 +722,15 @@ ${modeDescriptions[story.getGameMode()]}
    * @param story The story instance
    * @param startIndex The start index of beats to include
    * @param endIndex The end index of beats to include (inclusive)
+   * @param chosenOnly List each past beat's chosen option only (a planner never needs the ones not chosen)
    * @returns Formatted beat texts for all players
    */
   private static formatPlayerBeatTexts(
     thread: Thread,
     story: Story,
     startIndex: number,
-    endIndex: number
+    endIndex: number,
+    chosenOnly = false
   ): string {
     return [...thread.playersSideA, ...thread.playersSideB]
       .map((playerSlot) => {
@@ -733,7 +758,7 @@ ${modeDescriptions[story.getGameMode()]}
             // List options, highlighting the chosen option
             let optionsText = "";
             if (beat.resolution !== null && playerBeat?.choice !== undefined) {
-              optionsText = this.listBeatOptionsFromPastBeat(playerBeat);
+              optionsText = this.listBeatOptionsFromPastBeat(playerBeat, chosenOnly);
             }
 
             const resolution = beat.resolution
@@ -767,7 +792,7 @@ ${modeDescriptions[story.getGameMode()]}
    * @param beat The player's beat
    * @returns Formatted list of all options from a past beat, highlighting the chosen option
    */
-  private static listBeatOptionsFromPastBeat(beat: Beat): string {
+  private static listBeatOptionsFromPastBeat(beat: Beat, chosenOnly = false): string {
     if (beat.choice === undefined || !beat.options) return "";
 
     const chosenOption = beat.options[beat.choice];
@@ -780,6 +805,7 @@ ${modeDescriptions[story.getGameMode()]}
 
     // Start with the chosen option
     const result = [`CHOSEN OPTION: ${resourceType}${chosenOption.text}`];
+    if (chosenOnly) return result[0];
     result.push(
       "NOT CHOSEN (ignore for storytelling purposes; only mentioned so you can avoid offering similar options in this new beat to prevent repetition):"
     );

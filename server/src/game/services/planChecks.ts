@@ -11,7 +11,9 @@ import { GameModes } from "core/types/index.js";
 import { THREAD_TYPE } from "core/types/thread.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { Logger } from "shared/logger.js";
-import { withOneRetry } from "./retryOnce.js";
+import { outcomeIdsNamed } from "./outcomeIds.js";
+import { allowedLengths, turnsLeft } from "./pacing.js";
+import { UnusableResultError } from "./retryOnce.js";
 import { logRepairs, type Repair } from "./textRepairs.js";
 
 /*
@@ -31,7 +33,16 @@ export type PlanCheck<P> = {
   repairs: Repair[];
   /** Why the plan can't be used, phrased to follow a colon; absent when it can */
   problem?: string;
+  /**
+   * A chapter length PACING does not allow (only with the `lengths` option):
+   * worth the one retry, but never a reason to fail the turn, so a plan with
+   * only this problem is still used.
+   */
+  lengthProblem?: string;
 };
+
+/** What a thread plan check reads beyond the plan's structure: `lengths`, the length PACING allows (production's planner call). */
+export type ThreadCheckOptions = { lengths?: boolean };
 
 const OUTCOME_CHECKS_SKIPPED = "outcomeChecksSkipped";
 
@@ -105,10 +116,6 @@ const FIELD_NAMES = ["relationshipToOtherSwitches", "title", "id", "description"
 /** A switch field's name written as a direction: followed by a quote, a colon, or nothing but whitespace */
 const FIELD_NAME_START = new RegExp(`^\\s*(?:${FIELD_NAMES.join("|")})(?:[${QUOTES}:]|\\s*$)`);
 const QUOTE_THEN_COLON = new RegExp(`[${QUOTES}]:`);
-/** An id-like word, as the rating page reads directions: it holds an underscore ("player1_trust"), so "(optional)" is not one */
-const ID_WORD = /^[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+$/;
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Reply text that is not a direction: blank, too short, or a piece of the reply's JSON. */
 function isJunkDirection(direction: string): boolean {
@@ -117,16 +124,7 @@ function isJunkDirection(direction: string): boolean {
   return letters < MIN_DIRECTION_LETTERS || FIELD_NAME_START.test(direction) || QUOTE_THEN_COLON.test(direction);
 }
 
-/** The story's outcome ids a direction names anywhere, and the id-like words in its brackets that the story doesn't hold (also the eval's direction checks). */
-export function outcomeIdsNamed(direction: string, known: string[]): { known: string[]; unknown: string[] } {
-  const mentioned = known.filter((id) =>
-    new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(id)}(?![A-Za-z0-9_])`).test(direction)
-  );
-  const bracketed = [...direction.matchAll(/\(([^()]*)\)/g)]
-    .flatMap((match) => match[1].split(/[\s,;]+/))
-    .filter((word) => ID_WORD.test(word) && !known.includes(word));
-  return { known: mentioned, unknown: [...new Set(bracketed)] };
-}
+export { outcomeIdsNamed };
 
 function checkFlavorSwitch(written: Switch, outcomes: StoryOutcomes, repairs: Repair[], problems: string[]): Switch {
   const label = `the flavor switch "${written.id}"`;
@@ -350,8 +348,29 @@ function checkFirstThread(story: Story, threads: Thread[], outcomes: StoryOutcom
   }
 }
 
-/** Checks a thread plan (PL-4 to PL-11): the plan with its repairs, and the problem that keeps it from use, if any. */
-export function checkThreadPlan(story: Story, reply: ThreadAnalysis): PlanCheck<ThreadAnalysis> {
+const lengthsText = (lengths: number[]) =>
+  lengths.length === 1 ? `${lengths[0]} beats` : `${lengths.slice(0, -1).join(", ")} or ${lengths[lengths.length - 1]} beats`;
+
+/**
+ * A chapter length the PACING block does not allow (turn doc A4): 2 to 4
+ * beats that end the story on its turn count or leave at least a switch and a
+ * two-beat chapter; the last chapter takes exactly the turns left. When no
+ * length fits (too few turns left), any is accepted.
+ */
+function chapterLengthProblem(story: Story, duration: number): string | undefined {
+  const left = turnsLeft(story);
+  const lengths = allowedLengths(left);
+  if (lengths.length === 0 || lengths.includes(duration)) return undefined;
+  return `the thread is ${duration} beats long, and with ${left} turns left, this one included, PACING allows ${lengthsText(lengths)}`;
+}
+
+/**
+ * Checks a thread plan (PL-4 to PL-11): the plan with its repairs, and the
+ * problem that keeps it from use, if any; with `lengths`, also a chapter
+ * length PACING does not allow, apart (production's planner call reads it;
+ * the eval's plan readings stay on the check as it was measured).
+ */
+export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: ThreadCheckOptions = {}): PlanCheck<ThreadAnalysis> {
   const repairs: Repair[] = [];
   const problems: string[] = [];
   const outcomes = storyOutcomes(story, repairs);
@@ -378,7 +397,9 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis): PlanCheck<
   if (story.isMultiplayer() && !story.hasThreadAnalysis()) {
     checkFirstThread(story, threads, outcomes, problems);
   }
-  return planCheck({ ...reply, duration, threads }, repairs, problems);
+  const checked = planCheck({ ...reply, duration, threads }, repairs, problems);
+  const lengthProblem = options.lengths ? chapterLengthProblem(story, duration) : undefined;
+  return lengthProblem ? { ...checked, lengthProblem } : checked;
 }
 
 // --- Logging and the retry ---
@@ -417,6 +438,13 @@ type PlanKind<P> = {
   check: (story: Story, reply: P) => PlanCheck<P>;
 };
 
+/**
+ * One planner call, checked, and one more told the problem when the plan
+ * can't be used or its length is one PACING does not allow. A length problem
+ * alone never fails the turn: a second reply whose only problem is its
+ * length is used (noted as lengthNotAllowed), and so is a first reply whose
+ * only problem was its length when the second can't be used at all.
+ */
 async function checkedPlan<P>(
   kind: PlanKind<P>,
   story: Story,
@@ -424,23 +452,25 @@ async function checkedPlan<P>(
   invoke: (prompt: string) => Promise<P>,
   log?: (line: string) => void
 ): Promise<P> {
-  const checked = await withOneRetry(
-    async (previousProblem?: string) => {
-      const reply = await invoke(previousProblem ? withPlanProblem(prompt, previousProblem) : prompt);
-      const result = kind.check(story, reply);
-      logPlanRepairs(kind.role, story, result.repairs, log);
-      return result;
-    },
-    (result) => {
-      // The problem stays out of the log: it names model-written ids
-      if (result.problem) {
-        Logger.Story.warn(`The ${kind.what} for story ${story.getId()} at turn ${story.getCurrentTurn() + 1} could not be used`);
-      }
-      return result.problem;
-    },
-    kind.what
-  );
-  return checked.plan;
+  const attempt = async (previousProblem?: string): Promise<PlanCheck<P>> => {
+    const reply = await invoke(previousProblem ? withPlanProblem(prompt, previousProblem) : prompt);
+    const result = kind.check(story, reply);
+    const repairs = result.lengthProblem ? [...result.repairs, { kind: "lengthNotAllowed", note: true }] : result.repairs;
+    logPlanRepairs(kind.role, story, repairs, log);
+    // The problem stays out of the log: it names model-written ids
+    if (result.problem) {
+      Logger.Story.warn(`The ${kind.what} for story ${story.getId()} at turn ${story.getCurrentTurn() + 1} could not be used`);
+    }
+    return result;
+  };
+  const both = (result: PlanCheck<P>) => [result.problem, result.lengthProblem].filter(Boolean).join("; ");
+
+  const first = await attempt();
+  if (!first.problem && !first.lengthProblem) return first.plan;
+  const second = await attempt(both(first));
+  if (!second.problem) return second.plan;
+  if (!first.problem) return first.plan;
+  throw new UnusableResultError(kind.what, second.problem);
 }
 
 /** A switch plan call, checked: the repaired plan, one retry told the problem, else an UnusableResultError. */
@@ -453,12 +483,17 @@ export function checkedSwitchPlan(
   return checkedPlan({ what: "switch plan", role: "switchAnalysis", check: checkSwitchPlan }, story, prompt, invoke, log);
 }
 
-/** A thread plan call, checked: the repaired plan, one retry told the problem, else an UnusableResultError. */
+/**
+ * A thread plan call, checked with the length PACING allows: the repaired
+ * plan, one retry told the problem, else an UnusableResultError (never for a
+ * length alone).
+ */
 export function checkedThreadPlan(
   story: Story,
   prompt: string,
   invoke: (prompt: string) => Promise<ThreadAnalysis>,
   log?: (line: string) => void
 ): Promise<ThreadAnalysis> {
-  return checkedPlan({ what: "thread plan", role: "threadAnalysis", check: checkThreadPlan }, story, prompt, invoke, log);
+  const check = (checked: Story, reply: ThreadAnalysis) => checkThreadPlan(checked, reply, { lengths: true });
+  return checkedPlan({ what: "thread plan", role: "threadAnalysis", check }, story, prompt, invoke, log);
 }

@@ -391,6 +391,39 @@ describe("checkThreadPlan", () => {
     });
   });
 
+  describe("the length PACING allows (planner v2's length rule, production's check only)", () => {
+    // Turn 4 of 10: 6 turns left, this one included, so 2 or 3 beats (4 would leave 2, too few for a switch and a chapter)
+    it("finds a length PACING does not allow a problem, naming the lengths it does", () => {
+      const result = checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 4, ["player1"])]), { lengths: true });
+
+      expect(result.problem).toBeUndefined();
+      expect(result.lengthProblem).toBe("the thread is 4 beats long, and with 6 turns left, this one included, PACING allows 2 or 3 beats");
+    });
+
+    it("asks the last chapter for exactly the turns left", () => {
+      const story = threadStory(1).clone({ maxTurns: 7 });
+      const result = checkThreadPlan(story, threadPlan([aThread("challenge", 2, ["player1"])]), { lengths: true });
+
+      expect(result.lengthProblem).toBe("the thread is 2 beats long, and with 3 turns left, this one included, PACING allows 3 beats");
+      expect(checkThreadPlan(story, threadPlan([aThread("challenge", 3, ["player1"])]), { lengths: true }).lengthProblem).toBeUndefined();
+    });
+
+    it("reads the length after it is taken from the steps, the same for a group", () => {
+      const story = threadStory(2);
+      const reply = threadPlan([aThread("challenge", 4, ["player1", "player2"])], 3);
+      expect(checkThreadPlan(story, reply, { lengths: true }).lengthProblem).toContain("the thread is 4 beats long");
+    });
+
+    it("finds nothing when no length fits (too few turns left to end on the turn count)", () => {
+      const story = threadStory(1).clone({ maxTurns: 5 });
+      expect(checkThreadPlan(story, threadPlan([aThread("challenge", 3, ["player1"])]), { lengths: true }).lengthProblem).toBeUndefined();
+    });
+
+    it("is not read without the option, so the eval's plan readings stay as they ran", () => {
+      expect(checkThreadPlan(threadStory(1), threadPlan([aThread("challenge", 4, ["player1"])])).lengthProblem).toBeUndefined();
+    });
+  });
+
   describe("one kind per thread (PL-8)", () => {
     it("finds exploration steps followed by a challenge step a problem", () => {
       const mixed = aThread("exploration", 3, ["player1"]);
@@ -581,6 +614,51 @@ describe("checked plan calls", () => {
     await expect(failure).rejects.toBeInstanceOf(UnusableResultError);
     await expect(failure).rejects.toThrow(/^Failed to generate a usable thread plan$/);
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  describe("a chapter length PACING does not allow", () => {
+    const tooLong = () => threadPlan([aThread("challenge", 4, ["player1"])]);
+    const fits = () => threadPlan([aThread("challenge", 3, ["player1"])]);
+    const lengthProblem = () => checkThreadPlan(threadStory(1), tooLong(), { lengths: true }).lengthProblem ?? "";
+
+    it("calls once more, told the lengths PACING allows, and applies the reply that fits", async () => {
+      const { invoke, prompts } = planner(tooLong(), fits());
+
+      const plan = await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, () => undefined);
+
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", lengthProblem()));
+      expect(plan.duration).toBe(3);
+    });
+
+    it("keeps the second reply when only its length still misses: a length never fails the turn", async () => {
+      const lines: string[] = [];
+      const { invoke } = planner(tooLong(), tooLong());
+
+      const plan = await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, (line) => lines.push(line));
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(plan.duration).toBe(4);
+      expect(lines.join("\n")).toContain('"lengthNotAllowed":1');
+    });
+
+    it("keeps the first reply when the second can't be used at all", async () => {
+      const { invoke } = planner(tooLong(), unknownOutcome());
+
+      const plan = await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, () => undefined);
+
+      expect(plan.duration).toBe(4);
+      expect(plan.threads[0].outcomeId).toBe("shared_escape");
+    });
+
+    it("tells the retry both problems when the first reply has both", async () => {
+      const both = () => threadPlan([aThread("challenge", 4, ["player1"], [], { outcomeId: "shared_escpe" })]);
+      const { invoke, prompts } = planner(both(), fits());
+
+      await checkedThreadPlan(threadStory(1), "THE PROMPT", invoke, () => undefined);
+
+      const checked = checkThreadPlan(threadStory(1), both(), { lengths: true });
+      expect(prompts[1]).toBe(withPlanProblem("THE PROMPT", `${checked.problem}; ${checked.lengthProblem}`));
+    });
   });
 
   it("checks switch plans the same way", async () => {

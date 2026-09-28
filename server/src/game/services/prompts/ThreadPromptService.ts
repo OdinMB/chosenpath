@@ -3,6 +3,95 @@ import {
   StoryStatePromptService,
   type SectionConfig,
 } from "./StoryStatePromptService.js";
+import { pickedOutcome, threadPacingBlock } from "../pacing.js";
+
+/*
+ * The chapter planner (planner v2 with two-sided contests, adopted on
+ * 2026-09-28; turn doc A2 to A6): the player's pick sets the chapter's
+ * outcome (PLAYER DECISIONS says which, and a single player's reply writes
+ * none); the length follows what the chapter is, among the lengths the
+ * computed PACING block allows, the last chapter taking exactly the turns
+ * left; milestones are sized to what the outcome still needs; a chapter is
+ * one situation rising to a climax; its kind follows its outcome's, and a
+ * contest has two sides, with three players the setup's two camps (an
+ * accepted engine limit). The reply is lean (plannerReplies.ts). Today's form
+ * before the adoption is kept for the eval in storyTextRound0/;
+ * adoptedPlanners.test.ts holds this equal to the measured planner v2.
+ */
+
+/** A4's length rule. */
+const LENGTH_RULE =
+  "Choose the length from what the thread is: two beats for a transaction, a breather or a personal moment; three for a challenge; four for a showdown, or for the thread that settles an outcome's last open milestone. If the story's thread types or SWITCH/THREAD INSTRUCTIONS give this thread type a length, use it. Read PACING: choose one of the lengths it allows, and when it says this is the story's last thread, use exactly its number of beats and make the thread the story's climax.";
+
+/** A4's milestone size rule. */
+const MILESTONE_SIZE =
+  "Size them to what PACING says the outcome still needs: while it needs more than one, each is one step toward a resolution; when this is its last one, each settles the outcome in its own direction; when the outcome is already complete, each is an aftermath that confirms or complicates the resolution its milestones already point to.";
+
+/** A6's kind rule; in multiplayer a contest has two sides, with three players the setup's two camps. */
+function kindRule(story: Story): string {
+  if (!story.isMultiplayer()) {
+    return "As a rule, match the thread's kind to the outcome it pushes: favorable/mixed/unfavorable resolutions → Challenge thread; three paths → Exploration thread.";
+  }
+  const sides =
+    story.getNumberOfPlayers() === 3
+      ? "with three players, the sides are the two camps the outcome's resolutions and its scoreboard name, and player1's camp is always Side A"
+      : "in a two-player game, player1 is always Side A and player2 Side B";
+  return `As a rule, match the thread's kind to the outcome it pushes: favorable/mixed/unfavorable resolutions → Challenge thread; Side A/Side B resolutions → Contest thread (${sides}, so the result matches the outcome's sides and its scoreboard); three paths → Exploration thread. A contest always has exactly two sides.`;
+}
+
+function progressionItem(number: number, multiplayer: boolean): string {
+  const who = multiplayer ? "players" : "player";
+  return `${number}. A progression of steps, as many as the length, that tells one situation rising to a climax:
+   - The thread stays with one situation: the same people, place, rival or problem from step to step. Each step raises the stakes of that situation instead of starting a new activity, and every step stays on the thread's outcome.
+   - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${who} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.
+   - The last step is the decisive moment: its question brings the thread's question to a head.
+   - Each step asks how the ${who} act${multiplayer ? "" : "s"} ("Stealth: How does Rikkit get past the Guild's night watch?").${multiplayer ? " In a contest, every step is the same moment for both sides, and its question names them all." : ""}
+   - No step settles the thread early, and the ${who} can't leave or derail it.
+   Weak: "Rally supporters" → "Print posters" → "Negotiate with the Guild" (three activities, and the last one belongs to a different question).
+   Good: "First impression: How does Rikkit win a hearing with Sir Bram?" → "Leverage: How does Rikkit use what Sir Bram fears?" → "The ask: Sir Bram names his price in front of the Guild. How does Rikkit answer?"`;
+}
+
+function threadList(multiplayer: boolean): string {
+  const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
+  if (!multiplayer) {
+    return `Create the thread, with:
+1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
+2. The type of thread.
+3. ${milestones}
+${progressionItem(4, false)}
+
+`;
+  }
+  return `Create a list of threads, each with:
+1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
+2. Players involved (Side A and, if it's a Contest thread, Side B)
+3. The type of thread.
+4. ${milestones}
+${progressionItem(5, true)}
+
+`;
+}
+
+/** The resonance without a scoreboard's trailing "Scored by …" sentence. */
+const withoutScoreLine = (resonance: string): string => resonance.replace(/\s*Scored by\b[^.]*\.?\s*$/i, "").trim();
+
+/** A2's PLAYER DECISIONS: the position chosen and the outcome that sets, or the approach after a flavor switch. */
+function playerDecisions(story: Story): string {
+  const lines = story.getPlayerSlots().map((slot) => {
+    const pick = pickedOutcome(story, slot);
+    const option = pick?.optionText || "No decision made";
+    const outcome = pick?.outcomeId ? story.getOutcomeById(pick.outcomeId) : null;
+    const lead = story.isMultiplayer() ? "That choice pushes" : "This thread pushes";
+    if (!pick) return `${slot}: ${option}`;
+    if (pick.kind === "flavor") {
+      const set = outcome ? `\n${lead} the outcome the switch set: ${outcome.question} (${outcome.id}). The choice sets the approach, not the outcome.` : "";
+      return `${slot} chose: "${option}"${set}`;
+    }
+    const pushes = outcome ? `\n${lead}: ${outcome.question} (${outcome.id}). Why it matters: ${withoutScoreLine(outcome.resonance)}` : "";
+    return `${slot} chose direction ${pick.choice + 1} of ${pick.directions}: "${option}"${pushes}`;
+  });
+  return ["PLAYER DECISIONS:", ...lines].join("\n");
+}
 
 export class ThreadPromptService {
   private static readonly SECTIONS: SectionConfig = {
@@ -15,18 +104,13 @@ export class ThreadPromptService {
     outcomes: true,
     players: true,
     previousThreads: true,
-    // storyProgress: true,
     // Actually, the switch/thread instructions are only needed for
     // switches (for designing the next threads) and switch beats (for stat changes after threads)
     switchAndThreadInstructions: true,
   } as const;
 
-  private static readonly SECTIONS_SWITCH: SectionConfig = {
-    switchWithDecisionsConfiguration: true,
-  } as const;
-
   static createThreadPrompt(story: Story): string {
-    const prompt =
+    return (
       this.createContextSection(story) +
       "\n\n" +
       this.createInstructionsSection(story) +
@@ -36,19 +120,18 @@ export class ThreadPromptService {
       "\n\n======= CURRENT GAME STATE =======\n" +
       StoryStatePromptService.createStoryStatePrompt(story, this.SECTIONS) +
       "\n\n" +
-      StoryStatePromptService.createStoryStatePrompt(
-        story,
-        this.SECTIONS_SWITCH
-      );
-    // console.debug("\x1b[36m%s\x1b[0m", prompt);
-    return prompt;
+      StoryStatePromptService.getSwitchConfiguration(story, true, playerDecisions(story)) +
+      "\n\n" +
+      threadPacingBlock(story)
+    );
   }
 
   private static createContextSection(story: Story): string {
+    const multiplayer = story.isMultiplayer();
     return `CONTEXT
 
 Outcomes
-pose questions that define the ending of the story. ("Will [insert player names] unravel the mystery of the dark forest?")
+pose questions that define the ending of the story. ("${multiplayer ? "Will [insert player names] unravel" : "Will Rikkit unravel"} the mystery of the dark forest?")
 Outcomes can be individual or shared between players.
 Each outcome has 3 possible resolutions.
 
@@ -62,13 +145,9 @@ Beats are the smallest narrative unit in the game.
 Switches
 are a narrative structure of exactly 1 beat. Their purpose is to give the player agency over the direction of the story.
 So far, the players have only decided which direction this thread should take. You must now create a thread (or set of threads) that is based on these choices.
-${
-  story.isMultiplayer()
-    ? "Switches and the decisions that players made in them also determine how you should allocate players to threads.\n"
-    : ""
-}
+${multiplayer ? "Switches and the decisions that players made in them also determine how you should allocate players to threads.\n" : ""}
 Threads
-are a narrative structure of 2-4 beats that push one or more story outcomes closer to their resolution.
+are a narrative structure of 2-4 beats that push one story outcome closer to its resolution.
 They do this by adding a milestone to an outcome. Which milestone is added depends on how the thread unfolds.
 
 Story structure
@@ -77,38 +156,38 @@ It is time to create the next thread to this sequence for all players.`;
   }
 
   private static createInstructionsSection(story: Story): string {
+    const multiplayer = story.isMultiplayer();
     let instructions = `======= YOUR JOB: GENERATE THE NEXT THREAD (OR SET OF THREADS) TO MOVE THE STORY FORWARD =======
 
 OUTPUT FORMAT
 
-A duration for this thread (or set of threads) between 2-4 beats.
-- 2 beats: interludes, breathers, reflections, and simple transactions (~30% of all threads)
+${multiplayer ? "A duration for this thread (or set of threads) between 2-4 beats." : "The thread's length: 2 to 4 beats, one step per beat."}
+- 2 beats: interludes, breathers, reflections, and simple transactions
 --- Simple transactions (e.g. buying an artifact, meeting a friendly npc to get information)
 --- Reflections (e.g. a moment of realization, a moment of doubt)
 --- Resource gathering and management (e.g. gathering materials, buying supplies, finding a place to sleep, sending armies around)
 --- Maintenance (e.g. healing, repairing a ship, taking care of a pet)
 --- Quick decisions (e.g. deciding whether to trust someone, choosing a contract with the crew)
 --- Information exchange (e.g. interviewing a witness, consulting an expert, sharing intel)
-- 3 beats: drama and challenges (~50% of all threads)
+- 3 beats: drama and challenges
 --- Encounters (e.g. a fight, an escape)
 --- Investigations (e.g. crime scene, tracking someone)
 --- Social challenges (e.g. navigating a social event, building alliances, resolving conflicts)
 --- Skill challenges (e.g. climbing a mountain, crafting a special item, performing a ritual)
 --- Journeys (e.g. traveling through dangerous territory, navigating obstacles)
 --- Character development (building a relationship, facing a fear)
-- 4 beats: showdowns and transformations (~20% of all threads)
+- 4 beats: showdowns and transformations
 --- Showdowns (e.g. a epic battle, the make-or-break concert of the band, the council session to become the new king)
 --- Transformative events (e.g. ascension ceremonies, magical transformations, a coronation)
-- The duration is the same for all threads in this batch
-- Choose a duration that works for all threads`;
+${LENGTH_RULE}${multiplayer ? " In multiplayer, the length is the same for every thread in this batch." : ""}`;
 
-    if (story.isMultiplayer()) {
+    if (multiplayer) {
       // The first thread plan runs after the opening switch beat, at turn 1
       if (!story.hasThreadAnalysis()) {
         instructions += `
 
-MANDATORY FIRST THREAD REQUIREMENT: 
-Since this is the first thread of a multiplayer game, you MUST create EXACTLY ONE thread that involves ALL players together. 
+MANDATORY FIRST THREAD REQUIREMENT:${" "}
+Since this is the first thread of a multiplayer game, you MUST create EXACTLY ONE thread that involves ALL players together.${" "}
 DO NOT create multiple threads or separate players in any way.
 ALL players must experience the same thread together as a group.
 This is NON-NEGOTIABLE - no matter what the switches or player choices were, all players MUST end up in the same thread.
@@ -127,14 +206,14 @@ Possible player configurations:
       instructions += `\n\nFor single-player games, there is always only one thread.`;
     }
 
-    instructions += `\n\nTypes of Threads:
+    const who = multiplayer ? "The group" : "Rikkit";
+    instructions += `\n\nThread kinds:
 1. Challenge Threads
 - One or several players work towards a goal
 - Resolutions are favorable/mixed/unfavorable
-- Example milestones (one will be added to the outcome at the end of the thread): "The group finds the artifact", "The group finds a clue about the artifact's location", "The group fails to find any trace of the artifact"
-- This is the default type of thread. You must have good reasons to use a different type of thread.`;
+- Example milestones (one will be added to the outcome at the end of the thread): "${who} finds the artifact", "${who} finds a clue about the artifact's location", "${who} fails to find any trace of the artifact"`;
 
-    if (story.isMultiplayer()) {
+    if (multiplayer) {
       instructions += `
 2. Contest Threads
 - Players are split into Side A and Side B, competing over an outcome
@@ -143,73 +222,24 @@ Possible player configurations:
 - Only relevant for multiplayer games with a competitive element (game mode is "competitive" or "cooperative-competitive")`;
     }
 
+    const paths = multiplayer
+      ? `"[insert player name] takes over the family hotel", "[insert player name] helps at the family hotel while doing occassional photography jobs", "[insert player name] is no longer engaged in the family business"`
+      : `"Rikkit takes over the family hotel", "Rikkit helps at the family hotel while doing occasional photography jobs", "Rikkit is no longer engaged in the family business"`;
     instructions += `
-${story.isMultiplayer() ? "3" : "2"}. Exploration Threads
+${multiplayer ? "3" : "2"}. Exploration Threads
 - Players explore their characters (preferences, morality, etc.) or choose among equally valid narrative paths
 - Exploration Threads should not include any challenges or contests.
 - Steps in Exploration Threads should never be about succeeding or failing at something.
 - Resolutions are "Resolution 1"/"Resolution 2"/"Resolution 3" representing different choices or directions
-- Example milestones (one will be added to the outcome at the end of the thread): "[insert player name] takes over the family hotel", "[insert player name] helps at the family hotel while doing occassional photography jobs", "[insert player name] is no longer engaged in the family business"
-- Use for character development, or when multiple valid paths exist without clear "better" or "worse" options
+- Example milestones (one will be added to the outcome at the end of the thread): ${paths}
 - Often works well with 2-beat threads
-- Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.
 
-Create a list of threads, each with:
-1. The outcome ID this thread will add a milestone to (to drive the outcome closer to resolution)
-2. Players involved (Side A and, if it's a Contest thread, Side B)
-3. A list of previous thread types that the players in this thread have been involved in. (These types of threads should be avoided for the next thread to avoid repetition.)
-4. Thread types that are suggested for this story in general and that might work well for this thread.
-5. The type of thread, summarized in a few words. Examples: Romantic Date, Physical Fight, Witness Interview, etc.
-6. Possible milestones that might be added to that outcome
-   - Remember that it takes several milestones to resolve an outcome. The milestone options should only establish one step toward the outcome's resolution.
-   - Be very specific. Bad: "The familiar fails." Good: "The familiar fails to stop the dark stone's influence over Layla." (At the end of the game, when we read the milestones, we should be able to determine the outcome's overall resolution.)
-7. A progression of 2-4 beats (matching the duration) that:
-   - Adds to the variety of threads in the story. (If one of the three previous threads was a chase/negotiation/fight/whatever, this thread should not be another chase/negotiation/fight/whatever.)
-   - Builds dramatic tension toward the thread's climax on the last beat
-   - For Challenge${
-     story.isMultiplayer() ? " and Contest" : ""
-   } threads: Has each beat establish advantages/disadvantages for the next beat, without making the next beat impossible to reach or resolve. Example: Failing to be stealthy in the first beat must only give a disadvantage on the second beat, not have the players be carried away by the police.
-   - For Exploration threads: Has each beat explore different paths, while still making sure that the following steps in the beat progression can be reached.
-   - Each progression step is defined by a question about how the players are acting to deal with this step's challenge or decision. Bad: "What do [insert player names] find in the cellar?" Good: "How do [insert player names] search for clues in the cellar?"
-   - Always gets through the entire beat progression. Specifically, no step should preempt the final resolution of the thread. (That will be decided with the player decision on the last beat.) Players should not be able to leave the thread or derail it.
-${
-  story.isMultiplayer() && !story.hasThreadAnalysis()
-    ? `
+${kindRule(story)}
 
-IMPORTANT REMINDER: For this first thread of the game, you MUST create a single thread that includes ALL players together. No player should be in a separate thread.`
-    : ""
-}
+${threadList(multiplayer)}EXAMPLE 1: 3-BEAT CHALLENGE THREAD
+${multiplayer ? MULTIPLAYER_CHALLENGE_EXAMPLE : SINGLE_PLAYER_CHALLENGE_EXAMPLE}`;
 
-EXAMPLE 1: 3-BEAT CHALLENGE THREAD
-Players (Side A): player1, player2
-Type: Infiltration
-Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
-Possible Milestones:
-- Favorable: "The group steals incriminating documents about the noble's involvement"
-- Mixed: "The group finds hints about the noble's involvement but no solid proof"
-- Unfavorable: "The group flees the noble's manor and fails to find any evidence"
-Title: Infiltrating the Noble's Manor
-(Note that the possible milestones only mark one stop toward the outcome's resolution. More than one thread is needed to resolve the outcome.)
-
-Beat Progression:
-1. Getting Past the Guards
-Question: Stealth: How do [insert player names] approach the manor's security?
-- Favorable: The guards are distracted, giving easy access to the manor
-- Mixed: [insert player names] find a way in but the guards are on higher alert
-- Unfavorable: The guards are suspicious and increase their patrols
-(Note how the beat progression can continue no matter the resolution of step 1.)
-
-2. Searching the Study
-Question: Thievery: How do [insert player names] search the study without leaving traces?
-- Favorable: [insert player names] find promising leads and the study remains undisturbed
-- Mixed: [insert player names] find some leads but leave signs of searching
-- Unfavorable: The study is a mess and [insert player names] alert the household
-
-3. Final Confrontation
-Question: Escape: The noble returns early! How do [insert player names] handle the situation?
-Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
-
-    if (story.isMultiplayer()) {
+    if (multiplayer) {
       instructions += `
 
 EXAMPLE 2: 2-BEAT CONTEST THREAD
@@ -238,7 +268,7 @@ Since this is the final beat of the thread, the possible results are the list of
 
     instructions += `
 
-EXAMPLE ${story.isMultiplayer() ? "3" : "2"}: 2-BEAT EXPLORATORY THREAD
+EXAMPLE ${multiplayer ? "3" : "2"}: 2-BEAT EXPLORATORY THREAD
 Title: Personal Crossroads
 Players: player1
 Type: Choosing a Life Path
@@ -263,9 +293,62 @@ Question: Choosing a Career: What does Alex ultimately prioritize when forced to
 Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.
 `;
 
-    instructions +=
-      "\nAlso consider the SWITCH/THREAD INSTRUCTIONS below that are specific to this story.\n";
+    instructions += "\nAlso consider the SWITCH/THREAD INSTRUCTIONS below that are specific to this story.\n";
 
     return instructions;
   }
 }
+
+const MULTIPLAYER_CHALLENGE_EXAMPLE = `Players (Side A): player1, player2
+Type: Infiltration
+Outcome: Will the players stop the noble's conspiracy? (with ID shared_uncover_conspiracy)
+Possible Milestones:
+- Favorable: "The group steals incriminating documents about the noble's involvement"
+- Mixed: "The group finds hints about the noble's involvement but no solid proof"
+- Unfavorable: "The group flees the noble's manor and fails to find any evidence"
+Title: Infiltrating the Noble's Manor
+
+Beat Progression:
+1. Getting Past the Guards
+Question: Stealth: How do [insert player names] approach the manor's security?
+- Favorable: The guards are distracted, giving easy access to the manor
+- Mixed: [insert player names] find a way in but the guards are on higher alert
+- Unfavorable: The guards are suspicious and increase their patrols
+(Note how the beat progression can continue no matter the resolution of step 1.)
+
+2. Searching the Study
+Question: Thievery: How do [insert player names] search the study without leaving traces?
+- Favorable: [insert player names] find promising leads and the study remains undisturbed
+- Mixed: [insert player names] find some leads but leave signs of searching
+- Unfavorable: The study is a mess and [insert player names] alert the household
+
+3. Final Confrontation
+Question: Escape: The noble returns early! How do [insert player names] handle the situation?
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;
+
+const SINGLE_PLAYER_CHALLENGE_EXAMPLE = `Players: player1
+Type: Infiltration
+Outcome: Will Rikkit stop the noble's conspiracy? (with ID player1_uncover_conspiracy)
+Possible Milestones:
+- Favorable: "Rikkit steals incriminating documents about the noble's involvement"
+- Mixed: "Rikkit finds hints about the noble's involvement but no solid proof"
+- Unfavorable: "Rikkit flees the noble's manor and fails to find any evidence"
+Title: Infiltrating the Noble's Manor
+
+Beat Progression:
+1. Getting Past the Guards
+Question: Stealth: How does Rikkit approach the manor's security?
+- Favorable: The guards are distracted, giving easy access to the manor
+- Mixed: Rikkit finds a way in but the guards are on higher alert
+- Unfavorable: The guards are suspicious and increase their patrols
+(Note how the beat progression can continue no matter the resolution of step 1.)
+
+2. Searching the Study
+Question: Thievery: How does Rikkit search the study without leaving traces?
+- Favorable: Rikkit finds promising leads and the study remains undisturbed
+- Mixed: Rikkit finds some leads but leaves signs of searching
+- Unfavorable: The study is a mess and Rikkit alerts the household
+
+3. Final Confrontation
+Question: Escape: The noble returns early! How does Rikkit handle the situation?
+Since this is the final beat of the thread, the possible results are the list of possible milestones that can be added to the outcome.`;

@@ -23,14 +23,14 @@ describe("Story.hasThreadAnalysis", () => {
 });
 
 describe("ThreadPromptService: the multiplayer first-thread rule", () => {
-  it("prints for the first thread plan, which runs at turn 1", () => {
+  it("prints once for the first thread plan, which runs at turn 1 (planner v2 dropped the reminder that repeated it)", () => {
     const story = firstThreadAnalysis(2);
     expect(story.getCurrentTurn()).toBe(1);
 
     const prompt = ThreadPromptService.createThreadPrompt(story);
 
-    expect(prompt).toContain(FIRST_THREAD_RULE);
-    expect(prompt).toContain(FIRST_THREAD_REMINDER);
+    expect(prompt.split(FIRST_THREAD_RULE)).toHaveLength(2);
+    expect(prompt).not.toContain(FIRST_THREAD_REMINDER);
     expect(prompt).not.toContain(LATER_SET_UP);
   });
 

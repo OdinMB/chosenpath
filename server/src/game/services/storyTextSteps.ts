@@ -11,16 +11,13 @@ import type {
   SwitchAnalysis,
   ThreadAnalysis,
 } from "core/types/index.js";
-import {
-  createSwitchAnalysisSchema,
-  threadAnalysisSchema,
-  PLAYER_SLOTS,
-} from "core/types/index.js";
+import { PLAYER_SLOTS } from "core/types/index.js";
 import { createSetOfBeatGenerationSchema } from "core/types/beat.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
 import type { Story } from "core/models/Story.js";
 import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
+import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
@@ -139,13 +136,16 @@ export const beatStep = {
   },
 };
 
+/** A planner's request: its reply is lean, and `assemble` puts it into the plan shape the story stores. */
+export type PlanRequest<P> = TextRequest<z.AnyZodObject> & { assemble: (reply: unknown) => P };
+
 export const switchStep = {
-  request(story: Story): TextRequest<ReturnType<typeof createSwitchAnalysisSchema>> {
+  /** The switch planner (planner v2): directions that each name one outcome, read against the computed PACING. */
+  request(story: Story): PlanRequest<SwitchAnalysis> {
     return {
       prompt: SwitchPromptService.createSwitchAnalysisPrompt(story),
-      schema: createSwitchAnalysisSchema(
-        Object.keys(story.getPlayers()).length as PlayerCount
-      ),
+      schema: switchReplySchema(story),
+      assemble: (reply) => assembleSwitchPlan(story, reply),
     };
   },
 
@@ -160,10 +160,12 @@ export const switchStep = {
 };
 
 export const threadStep = {
-  request(story: Story): TextRequest<typeof threadAnalysisSchema> {
+  /** The chapter planner (planner v2, two-sided contests): a single player's pick sets the chapter's outcome in the assembly. */
+  request(story: Story): PlanRequest<ThreadAnalysis> {
     return {
       prompt: ThreadPromptService.createThreadPrompt(story),
-      schema: threadAnalysisSchema,
+      schema: threadReplySchema(story),
+      assemble: (reply) => assembleThreadPlan(story, reply),
     };
   },
 
