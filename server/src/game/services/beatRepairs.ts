@@ -10,6 +10,7 @@ import type {
 } from "core/types/index.js";
 import { getThreadType } from "core/types/thread.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
+import { checkStatValue, statValueFit } from "core/utils/statValueCheck.js";
 import { canAddMilestones, isPlayerBeat } from "./storyTextSteps.js";
 import type { Repair } from "./textRepairs.js";
 
@@ -161,6 +162,24 @@ function isOffLadder(change: StatChange, definition: Stat | undefined): boolean 
   return ladder.length > 0 && !ladder.includes(String(change.value).toLowerCase());
 }
 
+const NUMBER_TYPES: Stat["type"][] = ["percentage", "opposites", "number"];
+
+/**
+ * A number, percentage or opposites stat set with a text that reads as one
+ * value (the switch turn after setup round 3's bounty contest wrote the
+ * scoreboard's move as setString "35|65", which ChangeService drops, so the
+ * score never moved): the setNumber the game applies, read as a background
+ * value is ("a|b" summing to 100 is a, "40%" is 40, "12" is 12). The same
+ * change as it was otherwise.
+ */
+function numberWrittenAsText(change: StatChange, definition: Stat | undefined): StatChange {
+  if (change.change !== "setString" || !definition || !NUMBER_TYPES.includes(definition.type)) return change;
+  const fit = statValueFit(definition, change.value);
+  if (fit !== "converts" && fit !== "clamps") return change;
+  const value = checkStatValue(definition, change.value).value;
+  return typeof value === "number" ? { ...change, change: "setNumber", value } : change;
+}
+
 function repairStatChanges(changes: Change[], known: Known, repairs: Repair[]): Change[] {
   const kept: Change[] = [];
   for (const change of changes) {
@@ -177,9 +196,13 @@ function repairStatChanges(changes: Change[], known: Known, repairs: Repair[]): 
     for (const kind of target.kinds) {
       repairs.push({ kind, detail: `${written} -> ${target.group}/${target.stat}` });
     }
-    const repaired: StatChange = { ...change, group: target.group, stat: target.stat };
+    const placed: StatChange = { ...change, group: target.group, stat: target.stat };
     const definition =
       target.group === "shared" ? known.sharedStats.get(target.stat) : known.playerStats.get(target.stat);
+    const repaired = numberWrittenAsText(placed, definition);
+    if (repaired !== placed) {
+      repairs.push({ kind: "statNumberAsText", detail: `${target.group}/${target.stat}: ${String(placed.value)} -> ${String(repaired.value)}` });
+    }
     if (isOffLadder(repaired, definition)) {
       repairs.push({ kind: "offLadderValue", note: true, detail: `${target.stat}: ${String(repaired.value)}` });
     }

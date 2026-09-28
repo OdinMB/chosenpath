@@ -33,6 +33,32 @@ const SECTION_SETS: TemplateIterationSections[][] = Array.from({ length: 2 ** SE
 
 const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJsonSchema(schema));
 
+/**
+ * The one deliberate change to the measured text: with the scoreboard ending
+ * rule (decision 3, adopted with it), three sentences that were true only
+ * while no stat decided an outcome now say that a contested outcome's
+ * scoreboard does, in the setups that have one (competitive and
+ * cooperative-competitive multiplayer). Everywhere else the text is as measured.
+ */
+const SCOREBOARD_SENTENCES: [string, string][] = [
+  [
+    "At the end, one beat per player writes that player's ending from the outcomes' milestones.",
+    "At the end, one beat per player writes that player's ending from the outcomes' milestones and, for a contested outcome, from its scoreboard: the side ahead wins unless the milestones clearly say otherwise.",
+  ],
+  [
+    "they are the story's only progress bar.",
+    "they are the story's progress bar, and a contested outcome's scoreboard decides it at the ending unless its milestones clearly say otherwise.",
+  ],
+  [
+    "nothing in the game reads a stat to decide an outcome or to end the story.",
+    "no stat decides an outcome or ends the story, apart from a contested outcome's scoreboard at the ending.",
+  ],
+];
+const isContest = (players: number, mode: GameMode) => players > 1 && (mode === GameModes.Competitive || mode === GameModes.CooperativeCompetitive);
+/** The measured prompt with the scoreboard sentences where a contest has a scoreboard. */
+const adopted = (prompt: string, players: number, mode: GameMode) =>
+  isContest(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), prompt) : prompt;
+
 describe("custom-story and template setup: the measured form", () => {
   for (const kind of ["story", "template"] as const) {
     it.each(INPUTS)(`${kind}, %i players, %s: every story length, with and without a child reading along`, (players, mode) => {
@@ -40,12 +66,22 @@ describe("custom-story and template setup: the measured form", () => {
         for (const kids of [false, true]) {
           const production = setupStep.request(PREMISE, players, mode, maxTurns, kind, { kids });
           const measured = setupRound2Request(PREMISE, players, mode, maxTurns, kind, "generationOrder", ROUND3_PARTS, { kids });
-          expect(production.prompt).toBe(measured.prompt);
+          expect(production.prompt).toBe(adopted(measured.prompt, players, mode));
           expect(json(production.schema)).toBe(json(measured.schema));
         }
       }
     });
   }
+
+  it("says a contest's scoreboard decides it at the ending in all three places, and only where a contest has one", () => {
+    for (const [players, mode] of INPUTS) {
+      const prompt = setupStep.request(PREMISE, players, mode, 25, "story").prompt;
+      for (const [from, to] of SCOREBOARD_SENTENCES) {
+        expect(prompt.split(isContest(players, mode) ? to : from)).toHaveLength(2);
+        expect(prompt).not.toContain(isContest(players, mode) ? from : to);
+      }
+    }
+  });
 
   it("prints the kids budget only when a child reads along", () => {
     expect(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true }).prompt).toContain("A child reads this story along with an adult");
@@ -59,7 +95,7 @@ describe("AI Iteration: the measured form on today's field order", () => {
       for (const maxTurns of [10, 20, 25]) {
         const production = iterationStep.request(FEEDBACK, players, mode, maxTurns, sections, TEMPLATE);
         const measured = iterationRound2Request(FEEDBACK, players, mode, maxTurns, sections, TEMPLATE, ROUND3_PARTS);
-        expect(production.prompt).toBe(measured.prompt);
+        expect(production.prompt).toBe(adopted(measured.prompt, players, mode));
         expect(json(production.schema)).toBe(json(measured.schema));
       }
     }

@@ -200,6 +200,49 @@ describe("repairBeatReply: stat changes (TR-1)", () => {
   });
 });
 
+describe("repairBeatReply: a number written as text (the scoreboard's move, setup round 3's chain)", () => {
+  /** A two-player story with an opposites scoreboard at 50, as a contest setup writes it. */
+  const contest = () =>
+    withStats(laterSwitchBeat(2), {
+      sharedStats: [stat("shared_bounty_claim", { name: "Paper Claim|Field Claim", type: "opposites", initialValue: 50 })],
+      sharedStatValues: [{ statId: "shared_bounty_claim", value: 50 }],
+    });
+
+  function repaired(story: Story, change: Change) {
+    const { reply, repairs } = repairBeatReply(story, beatSet(story.getNumberOfPlayers(), { statChanges: [change] }));
+    return { changes: reply.statChanges, kinds: kinds(repairs, "stat") };
+  }
+
+  it("reads an opposites scoreboard written as 'a|b' as the number the game keeps", () => {
+    const result = repaired(contest(), statChange("shared", "shared_bounty_claim", "setString", "35|65"));
+    expect(result.changes).toEqual([statChange("shared", "shared_bounty_claim", "setNumber", 35)]);
+    expect(result.kinds).toEqual(["statNumberAsText"]);
+  });
+
+  it("moves the score end to end, where ChangeService dropped the text", () => {
+    const story = contest();
+    const { reply } = repairBeatReply(story, beatSet(2, { statChanges: [statChange("shared", "shared_bounty_claim", "setString", "35|65")] }));
+    const [updated, changes] = beatStep.apply(story, reply);
+    const applied = new ChangeService().applyChanges(updated, changes);
+    expect(applied.getState().sharedStatValues).toContainEqual({ statId: "shared_bounty_claim", value: 35 });
+  });
+
+  it("reads a percentage or a number written as text the same way", () => {
+    expect(repaired(withStats(laterSwitchBeat(1)), statChange("player1", "player_energy", "setString", "40%")).changes).toEqual([
+      statChange("player1", "player_energy", "setNumber", 40),
+    ]);
+    const counted = withStats(laterSwitchBeat(1), { playerStats: [stat("player_gold", { type: "number" })] });
+    expect(repaired(counted, statChange("player1", "player_gold", "setString", "12")).changes).toEqual([statChange("player1", "player_gold", "setNumber", 12)]);
+  });
+
+  it("leaves a text that reads as no number, and string stats, as they were", () => {
+    const sides = statChange("shared", "shared_bounty_claim", "setString", "30|60");
+    expect(repaired(contest(), sides)).toEqual({ changes: [sides], kinds: [] });
+    const rank = statChange("player1", "player_rank", "setString", "Master");
+    expect(repaired(withStats(laterSwitchBeat(1)), rank)).toEqual({ changes: [rank], kinds: [] });
+  });
+});
+
 describe("repairBeatReply: string values off the ladder (TR-8)", () => {
   function notesFor(story: Story, change: Change) {
     const { reply, repairs } = repairBeatReply(story, beatSet(1, { statChanges: [change] }));

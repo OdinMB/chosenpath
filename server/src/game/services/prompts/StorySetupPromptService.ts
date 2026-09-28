@@ -99,7 +99,7 @@ export class StorySetupPromptService {
   private static buildPrompt(call: SetupCall, prompt: string, templateJson: string): string {
     return (
       this.getCreationModeInstructions(call.kind === "iteration") +
-      `${engineBlock(camps(call))}\n\n` +
+      `${engineBlock(camps(call), contested(call))}\n\n` +
       "Guidelines for story setups:\n\n" +
       this.getGuidelinesInstructions(call.sections) +
       this.getInventoryInstructions(call) +

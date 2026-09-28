@@ -36,10 +36,26 @@ const ENGINE_LINES = [
   "- These are facts about the engine. Don't restate them anywhere in the setup.",
 ];
 
-/** The engine block; where three players contest, each side is a camp. */
-export function engineBlock(camps: boolean): string {
-  const text = ENGINE_LINES.join("\n");
-  return camps ? text.replace("set side A against side B.", "set side A against side B. With three players, each side is a camp.") : text;
+/**
+ * With the scoreboard ending rule, a contested outcome's scoreboard decides
+ * it at the ending unless its milestones clearly say otherwise (the beat
+ * prompt's SCOREBOARD_ENDING_RULE). Three sentences of the measured form were
+ * true only while no stat decided an outcome; in the setups that have a
+ * contest they say so (logged at setup round 1c to change with the rule).
+ */
+const ENDING_FROM_MILESTONES = "At the end, one beat per player writes that player's ending from the outcomes' milestones.";
+const ENDING_WITH_SCOREBOARD =
+  "At the end, one beat per player writes that player's ending from the outcomes' milestones and, for a contested outcome, from its scoreboard: the side ahead wins unless the milestones clearly say otherwise.";
+const ONLY_PROGRESS_BAR = "they are the story's only progress bar.";
+const PROGRESS_BAR_AND_SCOREBOARD = "they are the story's progress bar, and a contested outcome's scoreboard decides it at the ending unless its milestones clearly say otherwise.";
+const NO_STAT_DECIDES = "nothing in the game reads a stat to decide an outcome or to end the story.";
+const ONLY_THE_SCOREBOARD_DECIDES = "no stat decides an outcome or ends the story, apart from a contested outcome's scoreboard at the ending.";
+
+/** The engine block; where three players contest, each side is a camp; where a contest has a scoreboard, it decides the ending. */
+export function engineBlock(camps: boolean, contested: boolean): string {
+  let text = ENGINE_LINES.join("\n");
+  if (camps) text = text.replace("set side A against side B.", "set side A against side B. With three players, each side is a camp.");
+  return contested ? text.replace(ENDING_FROM_MILESTONES, ENDING_WITH_SCOREBOARD) : text;
 }
 
 // ---------------------------------------------------------------- the inventory
@@ -66,7 +82,7 @@ export function outcomesSection(players: number, contested: boolean, camps: bool
   const multiplayer = players > 1;
   return [
     "Outcomes",
-    "- Outcomes are the questions the ending answers. Milestones earned in threads move each outcome toward one of its three resolutions; they are the story's only progress bar.",
+    `- Outcomes are the questions the ending answers. Milestones earned in threads move each outcome toward one of its three resolutions; ${contested ? PROGRESS_BAR_AND_SCOREBOARD : ONLY_PROGRESS_BAR}`,
     "- Each player's outcomes cover both sides of that character's story: the story's main conflict (the public question) and the character's private life (a relationship, a belief, a secret, who they are becoming).",
     multiplayer
       ? "- No two outcomes ask the same question in other words. A shared outcome is never repeated as a personal one, and no two players get the same personal outcome."
@@ -118,7 +134,7 @@ export function statsThatAct(players: number, contested: boolean): string {
         ? " A relationship between the player characters themselves is one shared stat, not a copy for each player. Every player gets every player stat, so none is written for one role or named after one player."
         : ""
     }`,
-    `${progressMeters} Milestones already track how close an outcome is to its resolution, and nothing in the game reads a stat to decide an outcome or to end the story. Weak: 'Reform Progress (0-100%)', 'Fragments collected', 'Dream: Beginning → Fulfillment'. A list of concrete clues, allies or items is fine when each item opens options on its own.`,
+    `${progressMeters} Milestones already track how close an outcome is to its resolution, and ${contested ? ONLY_THE_SCOREBOARD_DECIDES : NO_STAT_DECIDES} Weak: 'Reform Progress (0-100%)', 'Fragments collected', 'Dream: Beginning → Fulfillment'. A list of concrete clues, allies or items is fine when each item opens options on its own.`,
     "- No two stats track the same thing. A stat may bear on an outcome as a lever the player spends or protects (a standing with the court, next to an outcome about the court's verdict).",
     "- Don't track the remaining turns or the players' ordinary decisions; the game tracks both.",
   ].join("\n");
