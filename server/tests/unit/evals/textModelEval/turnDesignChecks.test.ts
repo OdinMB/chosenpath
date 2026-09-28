@@ -18,6 +18,7 @@ import {
   threadBeat,
 } from "../../../helpers/promptStories.js";
 import { beatGeneration, beatSet, challengeOptions, outcome, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { endedChapter as roundEndedChapter, roundStory, topicSwitch as roundTopicSwitch } from "../../../helpers/roundStories.js";
 
 beforeEach(() => {
   jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -154,6 +155,78 @@ describe("checkThreadDesign", () => {
     plan.threads[0].progression[1].question = "Race: How does Ada cross the bay first?";
     expect(checkThreadDesign(story, plan).checks.contestStepsNameBothSides).toBe(false);
     expect(checkThreadDesign(story, threadAnalysis("challenge", 2, 4, ["player1", "player2"])).checks).not.toHaveProperty("contestStepsNameBothSides");
+  });
+});
+
+describe("turn round 1's plan checks (planner v2's fields, the kind rule, binding late, triggers)", () => {
+  const TRUST = "player1_trust";
+  const HOME = "player1_home";
+  const story = roundStory({
+    turns: 5,
+    maxTurns: 20,
+    playerOutcomes: { player1: [outcome(TRUST), outcome(HOME, { possibleResolutions: { resolution1: "stay", resolution2: "leave", resolution3: "build" } })] },
+    phases: [roundTopicSwitch([["Win Mira's trust", TRUST], ["Find a home", HOME]], 4)],
+  });
+  const withElement = edited(story, (state) => {
+    state.storyElements = [{ id: "mira", name: "Mira Vell", role: "a smuggler", instructions: "", appearance: "", facts: [] }];
+  });
+  const framed = (
+    fields: Record<string, unknown>,
+    milestones: ThreadAnalysis["threads"][number]["possibleMilestones"] = { favorable: "a", mixed: "b", unfavorable: "c" }
+  ): ThreadAnalysis => {
+    const plan = threadAnalysis("challenge", 2, 5);
+    const [thread] = plan.threads;
+    return { ...plan, threads: [{ ...thread, outcomeId: TRUST, possibleMilestones: milestones, progression: thread.progression.map((s) => ({ ...s, possibleResolutions: milestones })), ...fields }] };
+  };
+
+  it("wants the chapter's question to name something from the story, and its plan to carry no ids", () => {
+    expect(checkThreadDesign(withElement, framed({ question: "Will Mira vouch for Rikkit?", plan: "Rikkit waits for Mira at the docks." })).checks).toMatchObject({
+      questionPresent: true,
+      planWithoutIds: true,
+    });
+    expect(checkThreadDesign(withElement, framed({ question: "Will it work?", plan: `Push ${TRUST} forward.` })).checks).toMatchObject({ questionPresent: false, planWithoutIds: false });
+    expect(checkThreadDesign(withElement, framed({})).checks).not.toHaveProperty("questionPresent");
+  });
+
+  it("wants the chapter's kind to follow its outcome's, and the written kind to match its results", () => {
+    expect(checkThreadDesign(story, framed({ kind: "challenge" })).checks).toMatchObject({ kindFollowsOutcome: true, kindFieldMatches: true });
+    const explored = framed({ kind: "challenge" }, { resolution1: "a", resolution2: "b", resolution3: "c" });
+    expect(checkThreadDesign(story, explored).checks).toMatchObject({ kindFollowsOutcome: false, kindFieldMatches: false });
+    expect(checkThreadDesign(story, framed({})).checks).not.toHaveProperty("kindFieldMatches");
+  });
+
+  it("wants a round direction's text free of ids", () => {
+    const plan = roundTopicSwitch([["Win Mira's trust", TRUST]], 5);
+    const withDirections = (text: string) => ({ ...plan, switches: plan.switches.map((sw) => ({ ...sw, topicDirections: [{ direction: text, outcomeId: TRUST }] })) });
+    expect(checkSwitchDesign(story, withDirections("Win Mira's trust at the docks")).checks.directionsNoIds).toBe(true);
+    expect(checkSwitchDesign(story, withDirections(`Win Mira's trust (${TRUST})`)).checks.directionsNoIds).toBe(false);
+    expect(checkSwitchDesign(story, plan).checks).not.toHaveProperty("directionsNoIds");
+  });
+
+  it("wants a binding switch to offer an outcome no chapter has pushed yet, when one needs milestones", () => {
+    // Turn 17 of 20: 4 turns left fit one chapter; the trust outcome had a chapter, the home outcome none
+    const late = roundStory({
+      turns: 16,
+      maxTurns: 20,
+      playerOutcomes: { player1: [outcome(TRUST), outcome(HOME)] },
+      phases: [roundTopicSwitch([["Trust", TRUST]], 12), roundEndedChapter(TRUST, 3, 13, "m")],
+    });
+    expect(checkSwitchDesign(late, topicSwitch([`Find a home (${HOME})`, `Trust (${TRUST})`])).checks.lateOffersUntouched).toBe(true);
+    expect(checkSwitchDesign(late, topicSwitch([`Trust again (${TRUST})`])).checks.lateOffersUntouched).toBe(false);
+    // Turn 6 of 40: 35 turns left fit 8 chapters for the 4 milestones still needed, so pacing does not bind
+    const early = roundStory({ turns: 5, maxTurns: 40, playerOutcomes: { player1: [outcome(TRUST), outcome(HOME)] } });
+    expect(checkSwitchDesign(early, topicSwitch([`Trust again (${TRUST})`])).checks).not.toHaveProperty("lateOffersUntouched");
+  });
+
+  it("reads a built trigger case's rule: a flavor switch on the outcome it bears on, or the recipe's length", () => {
+    const expectation = { caseId: "c", kind: "flavor" as const, outcomeId: TRUST, rule: "r" };
+    expect(checkSwitchDesign(story, flavorSwitch(TRUST), expectation).checks.triggerFollowed).toBe(true);
+    expect(checkSwitchDesign(story, flavorSwitch(HOME), expectation).checks.triggerFollowed).toBe(false);
+    expect(checkSwitchDesign(story, topicSwitch([`Trust (${TRUST})`]), expectation).checks.triggerFollowed).toBe(false);
+    expect(checkSwitchDesign(story, flavorSwitch(TRUST)).checks).not.toHaveProperty("triggerFollowed");
+    const recipe = { caseId: "c", kind: "length" as const, length: 2, rule: "r" };
+    expect(checkThreadDesign(story, framed({}), recipe).checks.triggerFollowed).toBe(true);
+    expect(checkThreadDesign(story, threadAnalysis("challenge", 3, 5), recipe).checks.triggerFollowed).toBe(false);
   });
 });
 

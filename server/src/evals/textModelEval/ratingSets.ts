@@ -2,7 +2,7 @@ import type { StoryState } from "core/types/index.js";
 import type { EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { SETUP_FIELD_LABELS, TURN_FIELD_LABELS, setupCard, turnContent, type OptionContent } from "./ratingContent.js";
-import { CONTEXT_LABELS, turnContext, type ContextSection } from "./ratingContext.js";
+import { CONTEXT_LABELS, chapterPlanLines, turnContext, type ContextSection } from "./ratingContext.js";
 import { usable, type CallRecord } from "./runner.js";
 
 /*
@@ -44,6 +44,13 @@ export type RatingSpec = {
   pairwise?: boolean;
   /** The repeated item; on unless false (--no-repeat) */
   repeat?: boolean;
+  /**
+   * A pairwise turn page's chapter openings: two chain arms (the reference
+   * first), each item a chapter plan's case, each option the chain's first
+   * turn with its own plan shown in its column
+   */
+  chainArms?: ArmRef[];
+  chainItems?: number;
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -76,6 +83,8 @@ export type KeyItem = {
   labels: Record<string, LabelRef>;
   repeatOf?: string;
   control?: "baseline-vs-baseline";
+  /** A chain item's reference (a chapter plan, then its first turn): its own reference chain, not the page's baseline */
+  reference?: ArmRef;
 };
 
 export type RatingKey = {
@@ -165,8 +174,8 @@ export function pairwiseInstructions(kind: RatingKind): string[] {
   return PAIRWISE_INSTRUCTIONS[kind];
 }
 
-/** An item before labels become final: the case and its options in page order. */
-type Draft = { caseId: string; refs: LabelRef[]; repeat?: boolean; control?: "baseline-vs-baseline" };
+/** An item before labels become final: the case and its options in page order; a chain item carries its reference. */
+type Draft = { caseId: string; refs: LabelRef[]; repeat?: boolean; control?: "baseline-vs-baseline"; reference?: ArmRef };
 
 const byHash = (seed: string) => (a: string, b: string) =>
   sha256(`${seed}|${a}`).localeCompare(sha256(`${seed}|${b}`));
@@ -175,17 +184,26 @@ function groupOf(kind: RatingKind): "setup" | "beat" {
   return kind === "setup" ? "setup" : "beat";
 }
 
+const isChainKey = (armKey: string) => armKey.startsWith("pipeline:");
+
+/** A ref's output: the setup or beat record, or a chain's second step (the turn after its plan). */
 function findOutput(records: CallRecord[], kind: RatingKind, ref: LabelRef): CallRecord | undefined {
+  const chain = isChainKey(ref.armKey);
   return records.find(
     (r) =>
       r.caseId === ref.caseId &&
       r.armKey === ref.armKey &&
       r.promptState === ref.promptState &&
       r.sample === ref.sample &&
-      r.group === groupOf(kind) &&
+      (chain ? r.group === "pipeline" && r.step === 2 : r.group === groupOf(kind)) &&
       r.jobFinal &&
       usable(r)
   );
+}
+
+/** A chain's plan: its first step's usable final record, beside the turn record. */
+function chainPlanOf(records: CallRecord[], turn: CallRecord): CallRecord | undefined {
+  return records.find((r) => r.jobKey === turn.jobKey && r.step === 1 && r.final && usable(r));
 }
 
 function stratum(evalCase: EvalCase): string {
@@ -205,6 +223,26 @@ function qualifying(spec: RatingSpec, records: CallRecord[], cases: EvalCase[]):
       (!spec.caseIds || spec.caseIds.includes(c.id)) &&
       spec.arms.every((arm) => findOutput(records, spec.kind, { ...arm, sample: 1, caseId: c.id }))
   );
+}
+
+/** A chapter plan's cases where both chain arms have a usable sample-1 turn after their plan. */
+function qualifyingChains(spec: RatingSpec, records: CallRecord[], cases: EvalCase[]): EvalCase[] {
+  const arms = spec.chainArms ?? [];
+  return cases.filter((c) => c.role === "thread" && arms.every((arm) => findOutput(records, spec.kind, { ...arm, sample: 1, caseId: c.id })));
+}
+
+/** The chain items: the reference chain and the candidate chain per case, the reference at A on every other item. */
+function chainDrafts(spec: RatingSpec, records: CallRecord[], cases: EvalCase[], salt: string, notes: string[]): Draft[] {
+  const [reference, candidate] = spec.chainArms ?? [];
+  if (!reference || !candidate || !spec.chainItems) return [];
+  const picked = stratifiedPick(qualifyingChains(spec, records, cases), spec.chainItems, `${salt}|chain`);
+  if (picked.length < spec.chainItems) notes.push(`Only ${picked.length} of ${spec.chainItems} requested chapter-opening items qualified.`);
+  return [...picked]
+    .sort((a, b) => byHash(`${salt}|chain-assign`)(a.id, b.id))
+    .map((c, index) => {
+      const refs = [reference, candidate].map((arm) => ({ ...arm, sample: 1, caseId: c.id }));
+      return { caseId: c.id, refs: index % 2 === 0 ? refs : [refs[1], refs[0]], reference };
+    });
 }
 
 /** Round-robin over strata, each in salted hash order. */
@@ -309,9 +347,9 @@ function withControls(
   }
   if (spec.repeat === false) {
     notes.push("No repeated item: switched off.");
-  } else if (result.length >= REPEAT_MIN_DISTANCE) {
-    // The same arms the first item showed, in a fresh order; a pair with its labels swapped
-    const first = result[0];
+  } else if (result.length >= REPEAT_MIN_DISTANCE && result.some((d) => !d.reference)) {
+    // The same arms the first item showed, in a fresh order; a pair with its labels swapped (a regular item, not a chain's)
+    const first = result.find((d) => !d.reference) as Draft;
     const isBaseline = (ref: LabelRef) => ref.armKey === spec.arms[0].armKey && ref.promptState === spec.arms[0].promptState;
     const baseline = first.refs.find(isBaseline) as LabelRef;
     const others = first.refs.filter((ref) => !isBaseline(ref));
@@ -359,16 +397,25 @@ export function planRatingSet(
   if (spec.pairwise && spec.arms.length !== 2) {
     throw new Error(`A pairwise page compares exactly two arms: the reference and the candidate (got ${spec.arms.length}).`);
   }
+  if (spec.chainArms && (!spec.pairwise || spec.kind !== "turn" || spec.chainArms.length !== 2)) {
+    throw new Error("Chapter-opening items (chain arms) go on a pairwise turn page, as exactly two chains: the reference and the candidate.");
+  }
   const notes: string[] = [];
   const picked = stratifiedPick(qualifying(spec, records, cases), spec.items, deps.salt);
   if (picked.length < spec.items) {
     notes.push(`Only ${picked.length} of ${spec.items} requested items qualified.`);
   }
-  const drafts = withControls(spec, itemDrafts(spec, picked, deps.salt), records, cases, deps.salt, notes);
+  // Chain items join the regular ones in the same salted page order (the regular items keep theirs among themselves)
+  const pageOrder = byHash(`${deps.salt}|order`);
+  const orderKey = (d: Draft) => (d.reference ? `${d.caseId}|chain` : d.caseId);
+  const isolated = itemDrafts(spec, picked, deps.salt);
+  const chains = chainDrafts(spec, records, cases, deps.salt, notes);
+  const regular = chains.length ? [...isolated, ...chains].sort((a, b) => pageOrder(orderKey(a), orderKey(b))) : isolated;
+  const drafts = withControls(spec, regular, records, cases, deps.salt, notes);
 
   const caseById = new Map(cases.map((c) => [c.id, c]));
   const itemId = (index: number) => `${spec.kind}-${String(index + 1).padStart(2, "0")}`;
-  const firstItemId = itemId(drafts.findIndex((d) => !d.repeat && !d.control));
+  const firstItemId = itemId(drafts.findIndex((d) => !d.repeat && !d.control && !d.reference));
   const baseline = spec.arms[0];
   const labelDistribution: Record<string, number> = {};
   const keyItems: Record<string, KeyItem> = {};
@@ -380,8 +427,10 @@ export function planRatingSet(
       labels: Object.fromEntries(draft.refs.map((ref, position) => [LABELS[position], ref])),
       repeatOf: draft.repeat ? firstItemId : undefined,
       control: draft.control,
+      ...(draft.reference ? { reference: draft.reference } : {}),
     };
-    const baselineAt = draft.refs.findIndex((r) => r.armKey === baseline.armKey && r.promptState === baseline.promptState);
+    const reference = draft.reference ?? baseline;
+    const baselineAt = draft.refs.findIndex((r) => r.armKey === reference.armKey && r.promptState === reference.promptState);
     if (!draft.control && !draft.repeat && baselineAt >= 0) {
       labelDistribution[LABELS[baselineAt]] = (labelDistribution[LABELS[baselineAt]] ?? 0) + 1;
     }
@@ -440,15 +489,27 @@ function buildItem(
 ): RatingItem {
   const evalCase = caseById.get(keyItem.caseId);
   if (!evalCase) throw new Error(`Unknown case ${keyItem.caseId}`);
+  const chain = keyItem.reference !== undefined;
+  // The state the beat call saw: the frozen state with the fixed analysis (caseStory) and its chapter's frame; a chain
+  // item's context stops before the plan, which each option wrote itself
+  const context =
+    kind === "turn" && evalCase.state
+      ? chain
+        ? turnContext(evalCase.state, undefined, { chainOpening: true })
+        : turnContext(evalCase.state, evalCase.fixedAnalysis, { frames: evalCase.chapterFrames })
+      : [];
   return {
     id,
     premise: evalCase.setup?.premise,
-    // The state the beat call saw: the frozen state with the fixed analysis (caseStory)
-    context: kind === "turn" && evalCase.state ? turnContext(evalCase.state, evalCase.fixedAnalysis) : [],
+    context,
     options: Object.entries(keyItem.labels).map(([label, ref]) => {
       const record = findOutput(records, kind, ref);
       if (!record) throw new Error(`No usable output for ${id} option ${label}`);
-      return { label, content: optionContent(kind, loadOutput(record), evalCase.state) };
+      const content = optionContent(kind, loadOutput(record), evalCase.state);
+      if (!chain || content.kind !== "turn" || !evalCase.state) return { label, content };
+      const plan = chainPlanOf(records, record);
+      if (!plan) throw new Error(`No usable chapter plan for ${id} option ${label}`);
+      return { label, content: { ...content, plan: chapterPlanLines(evalCase.state, loadOutput(plan)) } };
     }),
   };
 }

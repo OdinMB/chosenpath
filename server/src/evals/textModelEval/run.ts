@@ -43,14 +43,16 @@ import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
 import {
   DEFAULT_JUDGE_SAMPLES,
+  DEFAULT_RECORD_JUDGE_SAMPLES,
   backfillChaptersMode,
   buildRoundCasesMode,
   judgeCalibrationMode,
+  judgeRecordsMode,
   printPrepPlan,
   spendBeside,
   type PrepContext,
 } from "./turnPrep.js";
-import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
+import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
 
 /*
  * CLI for the text-model eval. Run from server/ (npm run eval:text -- …):
@@ -62,6 +64,8 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
  *     --pairwise: exactly two arms, the reference then the candidate, Which is better? per item;
+ *     --chain-arms <ref chain>,<candidate chain> [--chain-items 4]: on a pairwise turn page, chapter openings
+ *     too, each option the chain's first turn with its own plan;
  *     --no-repeat: leaves the repeated item out)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
@@ -78,6 +82,8 @@ import { PRE_FIX_PROMPT_STATE, retiredPromptStateProblem } from "./variants.js";
  *   --backfill-chapters [--max-spend 0.10]  a chapter question and plan per stored chapter (chapterFrames.ts)
  *   --judge-calibration [--arms gpt-6-luna@low] [--samples 2] [--max-spend 0.10]  the judged checks on the
  *     hand-read turns (judgedChecks.ts)
+ *   --judge-records --arms <beat or chain keys> --prompt-state <tag> [--samples 1] [--max-spend 0.10]  the judged
+ *     checks on a round's chapter steps (the reference and the candidates), then judged-turns.md and .json
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -101,7 +107,8 @@ type Mode =
   | "results"
   | "build-round-cases"
   | "backfill-chapters"
-  | "judge-calibration";
+  | "judge-calibration"
+  | "judge-records";
 
 type Args = {
   mode: Mode;
@@ -130,6 +137,9 @@ type Args = {
   pairwise: boolean;
   /** Rating pages: the repeated item (--no-repeat turns it off) */
   repeat: boolean;
+  /** Pairwise turn pages: the chapter-opening items' two chains (reference, candidate), and how many */
+  chainArmKeys?: string[];
+  chainItems?: number;
   preview: boolean;
   /** Preview pages from stored beats and setups (no eval output needed) */
   stored: boolean;
@@ -149,6 +159,8 @@ const DEFAULT_BUILD_MAX_SPEND = 0.75;
 const DEFAULT_ITEMS: Record<RatingKind, number> = { setup: 6, turn: 15 };
 /** The round pages: nine setup premises (setup doc section 4), about 14 turns (turn doc round 1) */
 const DEFAULT_PAIRWISE_ITEMS: Record<RatingKind, number> = { setup: 9, turn: 14 };
+/** Turn round 1's page: 3-4 chapter-opening items beside about 10 chapter steps (turn doc section 4) */
+const DEFAULT_CHAIN_ITEMS = 4;
 const MAX_IN_FLIGHT = 6;
 
 function numberArg(name: string, value: string | undefined): number {
@@ -196,6 +208,7 @@ function parseArgs(argv: string[]): Args {
       case "--build-round-cases":
       case "--backfill-chapters":
       case "--judge-calibration":
+      case "--judge-records":
         args.mode = arg.slice(2) as Mode;
         break;
       case "--ratings":
@@ -261,6 +274,12 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--pairwise":
         args.pairwise = true;
+        break;
+      case "--chain-arms":
+        args.chainArmKeys = (next() ?? "").split(",").filter(Boolean);
+        break;
+      case "--chain-items":
+        args.chainItems = numberArg(arg, next());
         break;
       case "--no-repeat":
         args.repeat = false;
@@ -608,11 +627,12 @@ async function filterCheck(args: Args, files: EvalFiles) {
   console.log(`${result.stoppedReason ? `Stopped: ${result.stoppedReason}` : "Filter check complete"}. This run spent $${filterSpendUsd(result.records).toFixed(4)}. Wrote filter-check.md.`);
 }
 
-function armRefs(args: Args): ArmRef[] {
+/** `promptState:armKey` or a bare key in --prompt-state; a chain key ("pipeline:…") is never read as a state. */
+function armRefs(args: Args, keys: string[] | undefined = args.armKeys): ArmRef[] {
   const promptState = args.promptState ?? "prefix";
-  return (args.armKeys ?? []).map((ref) => {
+  return (keys ?? []).map((ref) => {
     const colon = ref.indexOf(":");
-    return colon > 0 && !ref.slice(0, colon).includes("@")
+    return colon > 0 && !ref.slice(0, colon).includes("@") && !ref.startsWith("pipeline:")
       ? { promptState: ref.slice(0, colon), armKey: ref.slice(colon + 1) }
       : { promptState, armKey: ref };
   });
@@ -638,8 +658,20 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
     throw new UsageError("--pairwise needs exactly two arms: --arms <reference>,<candidate>.");
   }
   const items = args.items ?? (args.pairwise ? DEFAULT_PAIRWISE_ITEMS : DEFAULT_ITEMS)[kind];
+  const chainArms = args.chainArmKeys?.length ? armRefs(args, args.chainArmKeys) : undefined;
+  if (chainArms && (!args.pairwise || chainArms.length !== 2)) throw new UsageError("--chain-arms needs --pairwise and exactly two chains: <reference>,<candidate>.");
   const { set, key } = planRatingSet(
-    { kind, arms, items, preview: args.preview, perItem: args.perItem, caseIds: args.caseIds, pairwise: args.pairwise, repeat: args.repeat },
+    {
+      kind,
+      arms,
+      items,
+      preview: args.preview,
+      perItem: args.perItem,
+      caseIds: args.caseIds,
+      pairwise: args.pairwise,
+      repeat: args.repeat,
+      ...(chainArms ? { chainArms, chainItems: args.chainItems ?? DEFAULT_CHAIN_ITEMS } : {}),
+    },
     records,
     cases,
     { loadOutput, salt: crypto.randomBytes(16).toString("hex"), now: new Date() }
@@ -760,6 +792,8 @@ async function main() {
       return backfillChaptersMode(prepContext(args, files));
     case "judge-calibration":
       return judgeCalibrationMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_JUDGE_SAMPLES);
+    case "judge-records":
+      return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE);
     default:
       return dryRun(args, files, dirs);
   }

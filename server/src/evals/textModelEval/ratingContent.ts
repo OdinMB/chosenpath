@@ -1,5 +1,6 @@
 import type { StoryState } from "core/types/index.js";
 import { playerParagraphs } from "./playerText.js";
+import type { ContextLine } from "./ratingContext.js";
 
 /*
  * What a rater sees of one output: a setup as its whole design (everything
@@ -85,6 +86,7 @@ export const SETUP_FIELD_LABELS = {
 /** Every fixed string a turn option shows; they join the page's field labels likewise. */
 export const TURN_FIELD_LABELS = {
   forPlayer: "For",
+  chapterPlan: "The chapter this version planned",
   title: "Title",
   text: "Text",
   options: "Options",
@@ -173,7 +175,8 @@ export type TurnBeat = {
   interludes: string[];
 };
 
-export type TurnContent = { kind: "turn"; beats: TurnBeat[] };
+/** A turn option; a chapter-opening item's option also shows the chapter plan it was written from (ratingContext's chapterPlanLines). */
+export type TurnContent = { kind: "turn"; beats: TurnBeat[]; plan?: ContextLine[] };
 
 export type OptionContent = SetupCard | TurnContent;
 

@@ -36,6 +36,8 @@ import {
   type Round2Order,
   type Round2Request,
 } from "../../game/services/storyTextRounds/setupRound2.js";
+import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../game/services/storyTextRounds/turnRound1Planners.js";
+import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from "../../game/services/storyTextRounds/turnRound1Turns.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -74,6 +76,13 @@ import {
  * "setupR1c" is round 1b with proposal 1's one fix-and-retest (every player
  * gets every player stat). "setupR2b" and "setupR2bOrder" are round 2's two arms again, on round 1b's
  * passing changes (ROUND2B_BASE_PARTS).
+ * Turn round 1's candidates (storyTextRounds/turnRound1*.ts): "planV2" is
+ * planner v2 for the switch and thread analysis (turn doc A2 to A6, with
+ * binding late pacing), its reply assembled into today's plan shape;
+ * "planV2Full" is the same with the field that restates the story's
+ * switch/thread instructions kept (A5's trigger comparison). "chapterFull" is
+ * a chapter step's beat with B2 and B3 rows 11, 14 and 15 on production's full
+ * reply; "chapterSlim" the same on B4's slim reply, titles written by code.
  */
 
 export type VariantId =
@@ -92,7 +101,11 @@ export type VariantId =
   | "setupR1b"
   | "setupR1c"
   | "setupR2b"
-  | "setupR2bOrder";
+  | "setupR2bOrder"
+  | "planV2"
+  | "planV2Full"
+  | "chapterFull"
+  | "chapterSlim";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -110,6 +123,10 @@ export const VARIANTS: VariantId[] = [
   "setupR1c",
   "setupR2b",
   "setupR2bOrder",
+  "planV2",
+  "planV2Full",
+  "chapterFull",
+  "chapterSlim",
 ];
 
 /**
@@ -188,7 +205,8 @@ export type IterationInput = {
 
 export type RequestInput =
   | { role: "setup"; setup: SetupInput }
-  | { role: "beat" | "switch" | "thread"; story: Story }
+  /** A beat case may carry its stored chapter's backfilled question and plan (chapterFrames.ts); only turn round 1's chapter turns read them */
+  | { role: "beat" | "switch" | "thread"; story: Story; chapterFrames?: ChapterFrameText }
   | { role: "iteration"; iteration: IterationInput };
 
 /** Template iteration exactly as TemplateService.iterateTemplate builds it. */
@@ -306,6 +324,23 @@ function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts 
   };
 }
 
+/** Turn round 1's planner v2, lean or with the restated instructions: switch and thread analysis. */
+function plannerV2(variant: VariantId, full: boolean) {
+  return (input: RequestInput): Round2Request => {
+    if (input.role === "switch") return plannerV2SwitchRequest(input.story, full);
+    if (input.role === "thread") return plannerV2ThreadRequest(input.story, full);
+    throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+  };
+}
+
+/** Turn round 1's chapter turns on the full or the slim reply: chapter steps only. */
+function chapterTurn(variant: VariantId, form: ChapterTurnForm) {
+  return (input: RequestInput): Round2Request => {
+    if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+    return chapterTurnRequest(input.story, form, input.chapterFrames);
+  };
+}
+
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
@@ -323,6 +358,10 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   setupR1c: setupRound1With("setupR1c", ROUND1C_PARTS),
   setupR2b: setupRound2("setupR2b", "fieldOrder", ROUND2B_BASE_PARTS),
   setupR2bOrder: setupRound2("setupR2bOrder", "generationOrder", ROUND2B_BASE_PARTS),
+  planV2: plannerV2("planV2", false),
+  planV2Full: plannerV2("planV2Full", true),
+  chapterFull: chapterTurn("chapterFull", "full"),
+  chapterSlim: chapterTurn("chapterSlim", "slim"),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

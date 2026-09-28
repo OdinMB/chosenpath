@@ -7,10 +7,10 @@ import type { ExecutedCall } from "../../../../src/evals/textModelEval/executor.
 import { jobEstimateUsd } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { JUDGE_ARMS, JUDGE_CALIBRATION, judgeJobs, judgeRequest } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { judgeCalibrationMode, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
+import { judgeCalibrationMode, roundTurnsToJudge, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { CURRENT_PROMPT_STATE } from "../../../../src/evals/textModelEval/variants.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
-import { threadBeat } from "../../../helpers/promptStories.js";
+import { laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { beatGeneration, beatSet, challengeOptions } from "../../../helpers/textFixtures.js";
 import { evalCase, executed, record } from "./fixtures.js";
 
@@ -101,5 +101,31 @@ describe("judgeCalibrationMode --max-spend", () => {
     expect(prep.length).toBeGreaterThan(0);
     const spent = prep.reduce((sum, r) => sum + r.costUsd, 0);
     expect(spent).toBeLessThanOrEqual(maxSpend);
+  });
+});
+
+describe("roundTurnsToJudge (--judge-records)", () => {
+  const REF = "gpt-6-luna@medium/prod";
+  const OTHER = "gpt-6-luna@medium/chapterFull";
+  const beatRecord = (armKey: string, sample: number, overrides: Partial<CallRecord> = {}) =>
+    record({ caseId: "c", group: "beat", role: "beat", armKey, callArmKey: armKey, promptState: "round0", sample, outputFile: `outputs/${armKey.replace(/\W/g, "")}-${sample}.json`, ...overrides });
+
+  it("judges each named arm's final chapter-step turns in the prompt state, one per player", () => {
+    const records = [beatRecord(REF, 1), beatRecord(REF, 2), beatRecord(OTHER, 1), beatRecord(REF, 1, { promptState: "postfix" })];
+    const { turns, problems } = roundTurnsToJudge(records, [CASE], () => reply(), [REF, OTHER], "round0");
+    expect(problems).toEqual([]);
+    expect(turns.map((t) => [t.armKey, t.sample, t.slot, t.checks.length])).toEqual([
+      [REF, 1, "player1", 3],
+      [REF, 2, "player1", 3],
+      [OTHER, 1, "player1", 3],
+    ]);
+    expect(turns[0].outputId).toBe("gpt6lunamediumprod-1");
+    expect(turns[0].request.prompt).toContain("======= THIS CHAPTER =======");
+  });
+
+  it("leaves out turns that are no chapter step, and arms that were not asked for", () => {
+    const switchCase = evalCase("s", "beat", { state: laterSwitchBeat(1).getState() });
+    const records = [beatRecord(REF, 1, { caseId: "s" }), beatRecord("gpt-6-luna@low/prod", 1)];
+    expect(roundTurnsToJudge(records, [CASE, switchCase], () => reply(), [REF], "round0").turns).toEqual([]);
   });
 });

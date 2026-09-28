@@ -10,12 +10,15 @@ import {
   judgeJobs,
   judgeRequest,
   judgedChecksFor,
+  judgedReadings,
   outputIdOf,
   renderCalibration,
+  renderJudgedReadings,
   scoreCalibration,
   verdictsFrom,
   type CalibrationItem,
   type JudgedItem,
+  type JudgedTurn,
 } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import { keyOf } from "../../../../src/evals/textModelEval/runner.js";
 import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
@@ -178,5 +181,41 @@ describe("scoreCalibration", () => {
     expect(md).toContain("hand yes, judged yes/yes");
     expect(md).toContain("hand partial, judged yes/no");
     expect(md).toContain("- x: missing");
+  });
+});
+
+describe("judged checks on a round's turns (reference against candidate)", () => {
+  const turn = (armKey: string, caseId: string, sample: number, verdicts: Partial<Record<(typeof JUDGED_CHECKS)[number], boolean>>): JudgedTurn => ({
+    armKey,
+    caseId,
+    sample,
+    slot: "player1",
+    outputId: `${armKey}-${caseId}-${sample}`,
+    checks: Object.keys(verdicts) as (typeof JUDGED_CHECKS)[number][],
+    verdicts,
+  });
+  const REF = "gpt-6-luna@medium/prod";
+  const CAND = "gpt-6-luna@medium/chapterFull";
+  const cases = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+  // The reference passes the first paragraph on 5 of 10 per sample (the same 5), the candidate on all 20
+  const turns = [
+    ...cases.flatMap((c, i) => [1, 2].map((s) => turn(REF, c, s, { firstParagraphNarratesChoice: i < 5, concreteProgress: true }))),
+    ...cases.flatMap((c) => [1, 2].map((s) => turn(CAND, c, s, { firstParagraphNarratesChoice: true, concreteProgress: true }))),
+  ];
+
+  it("reads each candidate against its reference on the matched turns, with the reference's two-sample noise and the stop rule", () => {
+    const readings = judgedReadings(turns, (key) => (key === CAND ? REF : undefined));
+    const cand = readings.find((r) => r.armKey === CAND);
+    expect(cand?.rates.firstParagraphNarratesChoice).toEqual({ hits: 20, n: 20 });
+    const moved = cand?.vsReference?.find((v) => v.check === "firstParagraphNarratesChoice");
+    expect(moved).toMatchObject({ reference: { hits: 10, n: 20 }, arm: { hits: 20, n: 20 }, noise: 0, moved: "higher" });
+    const same = cand?.vsReference?.find((v) => v.check === "concreteProgress");
+    expect(same?.moved).toBeUndefined();
+    expect(readings.find((r) => r.armKey === REF)?.vsReference).toBeUndefined();
+  });
+
+  it("renders a table per arm with the reading", () => {
+    const md = renderJudgedReadings(judgedReadings(turns, (key) => (key === CAND ? REF : undefined)), { spentUsd: 0.02, generatedAt: new Date("2026-09-28T00:00:00Z") });
+    expect(md).toContain(`| ${CAND} | firstParagraphNarratesChoice | 20 of 20 (100%) | 10 of 20 (50%) | 0 pts | moved higher (p`);
   });
 });

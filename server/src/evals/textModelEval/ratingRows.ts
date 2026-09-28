@@ -10,7 +10,7 @@ import {
   type SetupStat,
   type TurnContent,
 } from "./ratingContent.js";
-import { escapeHtml, fields, listOf, meta, paragraphs, row, textRow } from "./ratingHtml.js";
+import { contextLinesHtml, escapeHtml, fields, listOf, meta, paragraphs, row, textRow } from "./ratingHtml.js";
 import type { RatingKind } from "./ratingSets.js";
 
 /*
@@ -298,11 +298,18 @@ export function setupRows(cards: SetupCard[]): Row[] {
 
 const T = TURN_FIELD_LABELS;
 
-/** Per player: title, text, options and interludes; under a player row when the turn has several players. */
+/**
+ * Per player: title, text, options and interludes; under a player row when
+ * the turn has several players. A chapter-opening item's options first show
+ * the chapter plan each was written from.
+ */
 export function turnRows(turns: TurnContent[]): Row[] {
   const K: RatingKind = "turn";
   const players = Math.max(0, ...turns.map((t) => t.beats.length));
-  return Array.from({ length: players }, (_, index) => {
+  const plan = turns.some((t) => t.plan !== undefined)
+    ? leaf(K, "chapterPlan", T.chapterPlan, turns.map((t) => (t.plan ? contextLinesHtml(t.plan) || EMPTY : undefined)))
+    : undefined;
+  return [plan, ...Array.from({ length: players }, (_, index) => {
     const beats = turns.map((t) => t.beats[index]);
     const first = beats.find((b) => b !== undefined);
     const prefix = players > 1 && first ? `${first.slot}.` : "";
@@ -326,7 +333,6 @@ export function turnRows(turns: TurnContent[]): Row[] {
     ];
     if (!prefix || !first) return parts;
     return [parent(K, first.slot, `${T.forPlayer} ${first.playerName}`, parts, turns.map(() => ""))];
-  })
-    .flat()
+  }).flat()]
     .filter((r): r is Row => r !== undefined);
 }

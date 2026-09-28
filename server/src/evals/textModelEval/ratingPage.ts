@@ -1,6 +1,5 @@
 import type { OptionContent, SetupCard, TurnContent } from "./ratingContent.js";
-import { MARK_TEXT, type ContextLine } from "./ratingContext.js";
-import { escapeHtml, paragraphs } from "./ratingHtml.js";
+import { contextLinesHtml, escapeHtml, paragraphs } from "./ratingHtml.js";
 import { setupRows, startsOpen, turnRows, type Row } from "./ratingRows.js";
 import { PAIRWISE_LABELS, type RatingItem, type RatingSet } from "./ratingSets.js";
 
@@ -48,23 +47,6 @@ function rowHtml(row: Row, labels: string[], depth: number): string {
     ? `<div class="kids">${row.children.map((child) => rowHtml(child, labels, depth + 1)).join("")}</div>`
     : `<div class="body grid">${labels.map((label, i) => `<div class="cell" data-option="${e(label)}">${tag(label)}${row.cells?.[i] ?? ABSENT}</div>`).join("")}</div>`;
   return `<details class="sec" data-sec="${e(row.key)}" data-depth="${depth}"${row.open ? " open" : ""}><summary><span class="head"><span class="row-title">${e(row.title)}</span>${head}</span></summary>${body}</details>`;
-}
-
-/** Structured context lines as nested lists: a bold label, the text, an outcome id small, and a badge per mark on a marked line. */
-function contextLinesHtml(lines: ContextLine[] = []): string {
-  if (!lines.length) return "";
-  const item = (line: ContextLine) => {
-    const marks = line.marks ?? [];
-    const label = line.label ? `<span class="k">${e(line.label)}${line.text ? ":" : ""}</span>` : "";
-    const parts = [
-      label,
-      line.text ? `<span class="t">${e(line.text)}</span>` : "",
-      line.id ? `<code class="id">${e(line.id)}</code>` : "",
-      ...marks.map((mark) => `<span class="badge">${e(MARK_TEXT[mark])}</span>`),
-    ].filter(Boolean);
-    return `<li${marks.length ? ` class="${marks.join(" ")}"` : ""}>${parts.join(" ")}${contextLinesHtml(line.sub)}</li>`;
-  };
-  return `<ul class="ctx-lines">${lines.map(item).join("")}</ul>`;
 }
 
 function contextHtml(item: RatingItem, kind: RatingSet["kind"]): string {

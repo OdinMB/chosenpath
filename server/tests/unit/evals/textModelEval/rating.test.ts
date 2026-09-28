@@ -31,6 +31,8 @@ import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
 import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
 import { all, closest, kids, parseHtml, select, textOf, type HtmlNode } from "./htmlTree.js";
+import { threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
+import { beatGeneration, beatSet, challengeOptions, threadAnalysis } from "../../../helpers/textFixtures.js";
 
 const ARMS = [BASELINE, LUNA, SOL].map((a) => ({ promptState: "prefix", armKey: a.key }));
 
@@ -1324,5 +1326,92 @@ describe("scoreRatings", () => {
     const md = renderScores(scores);
     expect(md).toContain("rank order identical");
     expect(md).not.toMatch(/agree on \d+%/);
+  });
+});
+
+describe("a pairwise turn page with chapter openings (turn round 1)", () => {
+  const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
+  const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/chapterFull" };
+  const REF_CHAIN = { promptState: "round0", armKey: "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod" };
+  const CAND_CHAIN = { promptState: "round0", armKey: "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterFull" };
+  const turnOutput = (title: string) => beatSet(1, { player1: { ...beatGeneration({ title, text: `${title} happens.` }), options: challengeOptions() } });
+  const planOutput = (title: string) => {
+    const plan = threadAnalysis("challenge", 2, 4);
+    return { ...plan, threads: plan.threads.map((t) => ({ ...t, title, question: "A version-only question?", plan: "A version-only plan." })) };
+  };
+
+  function turnFixture() {
+    const beats = Array.from({ length: 12 }, (_, i) => evalCase(`step-${i}`, "beat", { state: threadBeat(1, { id: `story-${i}` }).getState() }));
+    const threads = Array.from({ length: 5 }, (_, i) => evalCase(`open-${i}`, "thread", { state: threadAnalysisAfterSwitch(1, { id: `story-t${i}` }).getState() }));
+    const records: CallRecord[] = [];
+    const outputs = new Map<string, unknown>();
+    const add = (r: Partial<CallRecord>, output: unknown) => {
+      outputs.set(r.outputFile ?? "", output);
+      records.push(record({ ...r, callArmKey: r.armKey, baseline: false }));
+    };
+    for (const c of beats) {
+      for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+        for (const sample of samples) add({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, sample, outputFile: `${c.id}-${arm.armKey}-${sample}` }, turnOutput(`Turn ${arm === REF ? "one" : "two"}`));
+      }
+    }
+    for (const c of threads) {
+      for (const chain of [REF_CHAIN, CAND_CHAIN]) {
+        const jobKey = `${c.id}|${chain.armKey}|round0|s1`;
+        const which = chain === REF_CHAIN ? "one" : "two";
+        add({ jobKey, caseId: c.id, group: "pipeline", role: "thread", promptState: "round0", armKey: chain.armKey, sample: 1, step: 1, jobFinal: false, outputFile: `${jobKey}-plan` }, planOutput(`Plan of ${which}`));
+        add({ jobKey, caseId: c.id, group: "pipeline", role: "beat", promptState: "round0", armKey: chain.armKey, sample: 1, step: 2, outputFile: `${jobKey}-turn` }, turnOutput(`Opening ${which}`));
+      }
+    }
+    return { cases: [...beats, ...threads], records, load: (r: CallRecord) => outputs.get(r.outputFile ?? "") };
+  }
+
+  const { cases, records, load } = turnFixture();
+  const spec: RatingSpec = { kind: "turn", arms: [REF, CAND], items: 10, preview: false, pairwise: true, chainArms: [REF_CHAIN, CAND_CHAIN], chainItems: 4 };
+  const { set, key } = planRatingSet(spec, records, cases, { loadOutput: load, salt: "chains", now: new Date(0) });
+  const chainItems = Object.entries(key.items).filter(([, i]) => i.reference);
+
+  it("adds the chapter openings beside the steps, each pairing the two chains with their own reference", () => {
+    expect(chainItems).toHaveLength(4);
+    for (const [, item] of chainItems) {
+      expect(item.reference).toEqual(REF_CHAIN);
+      expect(Object.values(item.labels).map((l) => l.armKey).sort()).toEqual([CAND_CHAIN.armKey, REF_CHAIN.armKey].sort());
+    }
+    expect(Object.values(key.items).filter((i) => !i.reference && !i.repeatOf && !i.control)).toHaveLength(10);
+    // The reference chain sits at A on half the chapter openings
+    expect(chainItems.filter(([, i]) => i.labels.A.armKey === REF_CHAIN.armKey)).toHaveLength(2);
+    // The repeat repeats a chapter step, never a chain item
+    const repeat = Object.values(key.items).find((i) => i.repeatOf);
+    expect(repeat?.reference).toBeUndefined();
+  });
+
+  it("shows each chain option its own plan, with only the fields every planner form writes, and stops the context at the switch", () => {
+    const item = set.items.find((i) => i.id === chainItems[0][0]);
+    const plans = item?.options.map((o) => (o.content.kind === "turn" ? o.content.plan : undefined)) ?? [];
+    expect(plans.every((p) => p && p.length === 1)).toBe(true);
+    const planText = JSON.stringify(plans);
+    expect(planText).toContain("Plan of ");
+    expect(planText).not.toContain("version-only");
+    const chapter = item?.context.find((s) => s.key === "chapter");
+    expect(JSON.stringify(chapter)).toContain("The switch the player chose from");
+    expect(JSON.stringify(chapter)).toContain("planned this chapter itself");
+  });
+
+  it("renders the plans in a row of their own and leaks no arm, chain sides included", () => {
+    const html = renderRatingPage(set);
+    expect(sectionKeys(parseHtml(html))).toContain("chapterPlan");
+    expect(htmlLeaks(html, key)).toEqual([]);
+    expect(metadataLeaks(set)).toEqual([]);
+    expect(htmlLeaks("gpt-6-luna@medium/chapterFull", key).length).toBeGreaterThan(0);
+  });
+
+  it("scores a chain item against its own reference", () => {
+    const [chainId, item] = chainItems[0];
+    const candidateLabel = Object.entries(item.labels).find(([, l]) => l.armKey === CAND_CHAIN.armKey)?.[0] ?? "";
+    const exported: ExportedRatings = { pageId: key.pageId, setId: key.setId, exportedAt: "2026-09-28T00:00:00Z", mode: "pairwise", ratings: {}, preferences: { [chainId]: candidateLabel } };
+    expect(scorePairwise(exported, key).items.find((i) => i.item === chainId)?.result).toBe("win");
+  });
+
+  it("rebuilds the page from its key", () => {
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
   });
 });

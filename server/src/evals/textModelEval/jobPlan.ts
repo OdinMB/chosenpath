@@ -67,7 +67,8 @@ export function requestInputFor(evalCase: EvalCase): RequestInput {
       if (!evalCase.iteration) throw new Error(`${evalCase.id} has no iteration input`);
       return { role: "iteration", iteration: evalCase.iteration };
     case "beat":
-      return { role: "beat", story: caseStory(evalCase) };
+      // A stored chapter's backfilled question and plan: only turn round 1's chapter turns read them
+      return { role: "beat", story: caseStory(evalCase), ...(evalCase.chapterFrames ? { chapterFrames: evalCase.chapterFrames } : {}) };
     case "switch":
     case "thread":
       return { role: evalCase.role, story: caseStory(evalCase, false) };
@@ -312,11 +313,12 @@ function casesFor(
   cases: EvalCase[],
   role: EvalRole,
   options: PlanOptions,
-  plan: Pick<ArmPlan, "scope" | "caseIds" | "source"> = { scope: "all" }
+  plan: Pick<ArmPlan, "scope" | "caseIds" | "source" | "beatType"> = { scope: "all" }
 ): EvalCase[] {
   const subsetOnly = role === "beat" && (options.subset15 || plan.scope === "subset15");
   const roundCasesOut = stageRunsBaseline(options.stage);
   const isRound = (c: EvalCase) => c.tags.source === "round";
+  const chapterStepOnly = role === "beat" && plan.beatType === "thread";
   return inTurnOrder(
     cases.filter(
       (c) =>
@@ -329,9 +331,15 @@ function casesFor(
         (!subsetOnly || c.tags.subset15) &&
         !(plan.scope === "single-player" && c.tags.multiplayer) &&
         !(plan.scope === "multiplayer" && !c.tags.multiplayer) &&
-        !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c))
+        !(options.skipMultiplayerContinuations && isMultiplayerContinuation(c)) &&
+        !(chapterStepOnly && !isChapterStep(c))
     )
   );
+}
+
+/** A beat case whose turn is a chapter step (the chapter's first step included), as the game decides it. */
+function isChapterStep(evalCase: EvalCase): boolean {
+  return evalCase.role === "beat" && evalCase.state !== undefined && caseStory(evalCase).getCurrentBeatType() === "thread";
 }
 
 function armAllowed(options: PlanOptions, key: string): boolean {
@@ -353,7 +361,7 @@ function roleJobs(cases: EvalCase[], role: EvalRole, options: PlanOptions, measu
     const scoped = casesFor(cases, role, options, plan);
     const samples = options.samples ?? plan.samples;
     for (const evalCase of regular ? scoped : []) {
-      for (let sample = 1; sample <= samples; sample++) jobs.push(callJob(options, evalCase, plan.arm, sample, measured));
+      for (let sample = plan.fromSample ?? 1; sample <= samples; sample++) jobs.push(callJob(options, evalCase, plan.arm, sample, measured));
     }
     // Rare-failure batch: extra single samples, spread over the cases in hash order
     const ordered = options.rareFailure === "skip" ? [] : hashOrder(scoped, (c) => c.id);

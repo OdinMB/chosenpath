@@ -264,7 +264,39 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("3").some((j) => j.baseline)).toBe(true);
   });
 
-  it("plans setup rounds 1 and 2 in the setup rounds, and nothing yet in the turn rounds", () => {
+  it("plans turn round 1: planner v2 on every planning case, the chapter turns on single-player chapter steps, full then slim", () => {
+    expect(perArm(plan("turn-rounds", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
+      // In story order: the round case's story id sorts first
+      "gpt-6-luna@medium/chapterFull": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
+      "gpt-6-luna@medium/chapterSlim": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
+      "gpt-6-luna@low/planV2": ["mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2", "mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
+    });
+    expect(plan("turn-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
+  });
+
+  it("chains planner v2 into the chapter's first step in turn round 1: both turn forms for one player, the full form on Luna low for groups", () => {
+    expect(plan("turn-rounds", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
+    const chains = plan("turn-rounds", { mode: "pipeline", roles: ["thread"] });
+    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([
+      ["mp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@low/chapterFull", 1],
+      ["mp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@low/chapterFull", 2],
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterFull", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterFull", 2],
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterSlim", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterSlim", 2],
+    ]);
+  });
+
+  it("runs the trigger comparison on the built trigger cases: the full planner at four samples, the lean one's samples 3 and 4 on top", () => {
+    const trigger = evalCase("round-switch-trigger-stat-8988006e-t8", "switch", { state: createMockStoryState(), tags: tags({ source: "round" }) });
+    const jobs = planJobs([trigger], { stage: "turn-rounds", promptState: "round0", roles: ["switch"], mode: "isolated", subset15: false, records: [] });
+    expect(perArm(jobs)).toEqual({
+      "gpt-6-luna@low/planV2": [1, 2, 3, 4].map((s) => `${trigger.id} s${s}`),
+      "gpt-6-luna@low/planV2Full": [1, 2, 3, 4].map((s) => `${trigger.id} s${s}`),
+    });
+  });
+
+  it("plans setup rounds 1 and 2 in the setup rounds", () => {
     // The lemonade premise is on the owner's round-1 page, so Sol low runs it too; round 2's two arms run on Luna low only
     expect(perArm(plan("setup-rounds"))).toEqual({
       "gpt-6-luna@low/setupR1": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
@@ -277,8 +309,6 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/setupR2bOrder": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
     });
     expect(plan("setup-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
-    expect(plan("turn-rounds")).toEqual([]);
-    expect(plan("turn-rounds", { mode: "pipeline", roles: ["switch"] })).toEqual([]);
   });
 
   it("builds the turn rounds' references in the migration check: production's GPT-6 defaults per player count, no setup", () => {

@@ -61,7 +61,7 @@ export type VariantComparison = {
 };
 
 /** The reference's key: the arm's reference, or for a chain the reference of each side. */
-function referenceKeyOf(armKey: string): string | undefined {
+export function referenceKeyOf(armKey: string): string | undefined {
   const chain = chainSides(armKey);
   if (!chain) return referenceKey(armKey);
   const analysis = referenceKey(chain.analysis);

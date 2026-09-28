@@ -30,6 +30,7 @@ import type { CallRecord } from "./runner.js";
  *   prep-calls.jsonl       the rounds' own calls: chapter backfill and judged checks (prepCalls.ts)
  *   chapter-frames.json    the backfilled chapter questions and plans (--backfill-chapters)
  *   judge-calibration.md|json  the judged checks against the hand verdicts (--judge-calibration)
+ *   judged-turns.md|json   the judged checks on a round's turns, reference against candidate (--judge-records)
  */
 
 function readJsonl<T>(file: string): T[] {
@@ -99,6 +100,11 @@ export function evalFiles(outDir: string) {
     writeJudgeCalibration: (markdown: string, json: unknown) => {
       writeJson(at("judge-calibration.json"), json);
       fs.writeFileSync(at("judge-calibration.md"), markdown);
+    },
+    /** The judged checks on a round's turns (--judge-records) */
+    writeJudgedTurns: (markdown: string, json: unknown) => {
+      writeJson(at("judged-turns.json"), json);
+      fs.writeFileSync(at("judged-turns.md"), markdown);
     },
     readProbe: (): ProbeReport | undefined =>
       fs.existsSync(at("probe.json")) ? (JSON.parse(fs.readFileSync(at("probe.json"), "utf-8")) as ProbeReport) : undefined,

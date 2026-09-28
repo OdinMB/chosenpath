@@ -1,3 +1,4 @@
+import { chainSides } from "./arms.js";
 import type { ContextLine } from "./ratingContext.js";
 import type { RatingKey, RatingSet } from "./ratingSets.js";
 
@@ -50,15 +51,23 @@ export function metadataLeaks(set: RatingSet): string[] {
 /** Literal tokens from the key that must never appear in the page. */
 export function keyTokens(key: RatingKey): string[] {
   const tokens = new Set<string>([key.keyFile]);
+  const addArm = (armKey: string) => {
+    tokens.add(armKey);
+    const [model, rest = ""] = armKey.split("@");
+    tokens.add(model);
+    const [setting, variant = ""] = rest.split("/");
+    tokens.add(`@${setting.split("+")[0]}`);
+    if (variant) tokens.add(`/${variant}`);
+  };
   for (const item of Object.values(key.items)) {
     for (const ref of Object.values(item.labels)) {
-      const armKey = ref.armKey;
-      tokens.add(armKey);
-      const [model, rest = ""] = armKey.split("@");
-      tokens.add(model);
-      const [setting, variant = ""] = rest.split("/");
-      tokens.add(`@${setting.split("+")[0]}`);
-      if (variant) tokens.add(`/${variant}`);
+      // A chain's key names both its arms: each is scanned for on its own too
+      const sides = chainSides(ref.armKey);
+      if (sides) {
+        tokens.add(ref.armKey);
+        addArm(sides.analysis);
+        addArm(sides.beat);
+      } else addArm(ref.armKey);
     }
   }
   return [...tokens].filter((t) => t.length > 1);

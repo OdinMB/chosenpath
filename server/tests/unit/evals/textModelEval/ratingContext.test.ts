@@ -203,6 +203,13 @@ describe("turnContext: a plain thread step", () => {
     ]);
   });
 
+  it("adds the chapter's backfilled question and plan after the kind of milestone, when the case carries them", () => {
+    const framed = turnContext(PLAIN, undefined, { frames: { through_the_fog: { question: "Will Ada catch the thief tonight?", plan: "Ada chases the thief across the harbour roofs." } } });
+    const lines = outline(section(framed, "chapter").entries);
+    const at = lines.indexOf("  Kind of milestone: Whether the thief is caught");
+    expect(lines.slice(at + 1, at + 3)).toEqual(["  Chapter question: Will Ada catch the thief tonight?", "  Chapter plan: Ada chases the thief across the harbour roofs."]);
+  });
+
   it("orders the folds: this chapter, outcomes, before this turn, story so far, the story", () => {
     expect(keysOf(ctx)).toEqual(["chapter", "outcomes", "before", "storySoFar", "story"]);
     expect(ctx.map((s) => s.heading)).toEqual(["This chapter", "Outcomes", "Before this turn", "Story so far", "The story"]);

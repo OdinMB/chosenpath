@@ -488,15 +488,17 @@ export function scorePairwise(exported: ExportedRatings, key: RatingKey): Pairwi
   const reference = `${key.baseline.promptState}:${key.baseline.armKey}`;
   const entries = Object.entries(key.items);
   const regular = entries.filter(([, item]) => !item.control && !item.repeatOf);
-  const candidateRef = regular.flatMap(([, item]) => Object.values(item.labels)).find((ref) => armOf(ref) !== reference);
+  const candidateRef = regular.flatMap(([, item]) => (item.reference ? [] : Object.values(item.labels))).find((ref) => armOf(ref) !== reference);
   const preferences = exported.preferences ?? {};
+  // A chain item (a chapter plan, then its first turn) names its own reference arm
+  const referenceOf = (item: KeyItem) => (item.reference ? `${item.reference.promptState}:${item.reference.armKey}` : reference);
 
   const items: PairwiseItem[] = regular.map(([itemId, item]) => ({
     item: itemId,
     caseId: item.caseId,
-    result: pairwiseResult(item, preferences[itemId], reference),
-    referenceAcceptable: verdictOf(item, exported.ratings[itemId], true, reference),
-    candidateAcceptable: verdictOf(item, exported.ratings[itemId], false, reference),
+    result: pairwiseResult(item, preferences[itemId], referenceOf(item)),
+    referenceAcceptable: verdictOf(item, exported.ratings[itemId], true, referenceOf(item)),
+    candidateAcceptable: verdictOf(item, exported.ratings[itemId], false, referenceOf(item)),
   }));
   const count = (result: PairwiseResult) => items.filter((i) => i.result === result).length;
   const [wins, ties, losses] = [count("win"), count("tie"), count("loss")];

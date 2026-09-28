@@ -18,6 +18,7 @@ import {
   type CheckResult,
   type SetupShape,
 } from "./textChecks.js";
+import { triggerExpectation } from "./triggerCases.js";
 import { checkBeatDesign, checkSwitchDesign, checkThreadDesign } from "./turnDesignChecks.js";
 
 /*
@@ -33,7 +34,8 @@ import { checkBeatDesign, checkSwitchDesign, checkThreadDesign } from "./turnDes
  * when the prompt is stored. Also collects beat prose per arm.
  */
 
-function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[], load: (r: CallRecord) => unknown) {
+/** The story a beat record was written for: its case, or for a chain's beat the case with that chain's own analysis applied as the game keeps it. */
+export function beatInput(record: CallRecord, evalCase: EvalCase, records: CallRecord[], load: (r: CallRecord) => unknown) {
   if (record.group !== "pipeline") return caseStory(evalCase);
   const analysis = records.find((r) => r.jobKey === record.jobKey && r.step === 1 && r.final && usable(r));
   const parsed = analysis ? load(analysis) : undefined;
@@ -111,12 +113,12 @@ export function checksForRecords(
       const story = caseStory(evalCase, false);
       const checked = checkSwitchPlan(story, output as SwitchAnalysis);
       rules = withRepairs(checkSwitch(checked.plan, story), checked.repairs, checked);
-      designed = checkSwitchDesign(story, checked.plan);
+      designed = checkSwitchDesign(story, checked.plan, triggerExpectation(evalCase.id));
     } else if (record.role === "thread") {
       const story = caseStory(evalCase, false);
       const checked = checkThreadPlan(story, output as ThreadAnalysis);
       rules = withRepairs(checkThread(checked.plan), checked.repairs, checked);
-      designed = checkThreadDesign(story, checked.plan);
+      designed = checkThreadDesign(story, checked.plan, triggerExpectation(evalCase.id));
     }
     if (!rules || !designed) continue;
     const result = merge([rules, designed]);

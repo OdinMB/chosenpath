@@ -6,6 +6,7 @@ import {
   type TextRole,
   type Verbosity,
 } from "shared/llm/textModelSettings.js";
+import { TRIGGER_SWITCH_CASES, TRIGGER_THREAD_CASES } from "./triggerCases.js";
 import type { VariantId } from "./variants.js";
 
 /*
@@ -62,6 +63,10 @@ export type ArmPlan = {
   source?: "stored" | "round";
   /** Rare-failure batch: this many extra single-sample calls spread over the cases */
   extraCalls?: number;
+  /** The first sample planned (default 1): extra samples of an arm another plan already runs at 1 and 2 */
+  fromSample?: number;
+  /** Beats only: only cases whose turn is a chapter step (a thread beat, a chapter's first step included) */
+  beatType?: "thread";
 };
 
 const PRODUCTION_ROLE: Record<EvalRole, TextRole> = {
@@ -110,6 +115,12 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   setupR1c: "prod",
   setupR2b: "setupR1c",
   setupR2bOrder: "setupR1c",
+  // Turn round 1: planner v2 and the chapter turns against today's form (the migration check's round0 records);
+  // the full planner against the lean one, so the restated instructions' effect reads on its own
+  planV2: "prod",
+  planV2Full: "planV2",
+  chapterFull: "prod",
+  chapterSlim: "prod",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -156,7 +167,11 @@ export function referenceKey(key: string): string | undefined {
  * carry-forward guard).
  */
 const LUNA_LOW = { model: "gpt-6-luna", reasoningEffort: "low" } as const;
+const LUNA_MEDIUM = { model: "gpt-6-luna", reasoningEffort: "medium" } as const;
 const SECOND_REFERENCES: Record<string, string[]> = {
+  // Turn round 1: slim against the full chapter turn (B4 on its own), and the full planner against today's form too
+  [armKey(LUNA_MEDIUM, "chapterSlim")]: [armKey(LUNA_MEDIUM, "chapterFull")],
+  [armKey(LUNA_LOW, "planV2Full")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
   [armKey({ model: "gpt-6-sol", reasoningEffort: "low" }, "setupR1")]: [armKey(LUNA_LOW, "setupR1")],
@@ -286,8 +301,38 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return setupRoundArms(role);
     case "migration":
       return migrationArms(role);
+    case "turn-rounds":
+      return turnRoundArms(role);
     default:
-      // The turn rounds get their candidates with the eval-only variants they test
+      return [];
+  }
+}
+
+/**
+ * Turn round 1 (turn doc section 4; coordinator's brief of 2026-09-27):
+ * planner v2 on Luna low at two samples on every planning case, stored and
+ * built; the lean-against-full trigger comparison on the built trigger cases,
+ * both forms at four samples (the lean form's samples 3 and 4 on top of its
+ * two); the chapter turns on Luna medium, full then slim, at two samples on
+ * every single-player chapter step. gpt-4.x is never a new arm.
+ */
+function turnRoundArms(role: EvalRole): ArmPlan[] {
+  switch (role) {
+    case "switch":
+    case "thread": {
+      const triggers = role === "switch" ? TRIGGER_SWITCH_CASES : TRIGGER_THREAD_CASES;
+      return [
+        { arm: luna("low", "planV2"), samples: 2, scope: "all" },
+        { arm: luna("low", "planV2"), samples: 4, scope: "all", caseIds: triggers, fromSample: 3 },
+        { arm: luna("low", "planV2Full"), samples: 4, scope: "all", caseIds: triggers },
+      ];
+    }
+    case "beat":
+      return [
+        { arm: luna("medium", "chapterFull"), samples: 2, scope: "single-player", beatType: "thread" },
+        { arm: luna("medium", "chapterSlim"), samples: 2, scope: "single-player", beatType: "thread" },
+      ];
+    default:
       return [];
   }
 }
@@ -536,6 +581,13 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
           scope: "multiplayer",
           roles: ["thread"],
         },
+      ];
+    case "turn-rounds":
+      // Turn round 1: planner v2 into the chapter's first step, each turn form on production's model per player count
+      // (the slim form is single-player only), two samples like the reference's chains after their second sample
+      return [
+        { analysis: luna("low", "planV2"), beats: [luna("medium", "chapterFull"), luna("medium", "chapterSlim")], samples: 2, scope: "single-player", roles: ["thread"] },
+        { analysis: luna("low", "planV2"), beats: [luna("low", "chapterFull")], samples: 2, scope: "multiplayer", roles: ["thread"] },
       ];
     default:
       return [];

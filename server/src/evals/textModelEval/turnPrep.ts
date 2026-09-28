@@ -1,4 +1,4 @@
-import type { SetOfBeatGenerationSchema } from "core/types/index.js";
+import type { PlayerSlot, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
 import { productionArm } from "./arms.js";
@@ -18,17 +18,22 @@ import {
   judgeCaseId,
   judgeJobs,
   judgeRequest,
+  judgedReadings,
   outputIdOf,
   renderCalibration,
+  renderJudgedReadings,
   scoreCalibration,
   verdictsFrom,
   type CalibrationItem,
   type JudgedCheck,
   type JudgedItem,
+  type JudgedTurn,
 } from "./judgedChecks.js";
+import { beatInput } from "./outputChecks.js";
 import { finishedPrepRecord, prepArmKey, prepSpend } from "./prepCalls.js";
 import { buildRoundCases, type RoundCall, type StoredLookup } from "./roundCases.js";
-import { finishedJobKeys, finishingRecord, jobKey, keyOf, runJobs, usable, type Job, type RunnerDeps } from "./runner.js";
+import { finishedJobKeys, finishingRecord, jobKey, keyOf, runJobs, usable, type CallRecord, type Job, type RunnerDeps } from "./runner.js";
+import { referenceKeyOf } from "./variantComparison.js";
 import { CURRENT_PROMPT_STATE, requestText } from "./variants.js";
 
 /*
@@ -248,6 +253,88 @@ function writeCalibration(files: EvalFiles, turns: CalibrationTurn[], problems: 
     for (const a of scores[label]) log(`${label} ${a.check}: ${a.agree} of ${a.decided} agree, samples ${a.pairsAgree} of ${a.pairs}: ${a.reliable ? "reliable" : "not reliable"} (v${version})`);
   }
   log(`Judge calls so far $${spentUsd.toFixed(4)}. Wrote judge-calibration.md and .json.`);
+}
+
+// --- --judge-records ---
+
+export type RoundTurn = { armKey: string; caseId: string; sample: number; slot: PlayerSlot; outputId: string; checks: JudgedCheck[]; request: TextRequest };
+
+/**
+ * The judge requests for a round's turns: every final usable beat record of
+ * the named arms in the prompt state (an isolated beat, or a chain's beat on
+ * the chain's own plan), on chapter steps only, one per player, each on the
+ * turn as the game keeps it (the beat repairs) with its chapter's frame.
+ */
+export function roundTurnsToJudge(
+  records: CallRecord[],
+  cases: EvalCase[],
+  load: (record: CallRecord) => unknown,
+  armKeys: string[],
+  promptState: string
+): { turns: RoundTurn[]; problems: string[] } {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const problems: string[] = [];
+  const turns = records.flatMap((r): RoundTurn[] => {
+    const isTurn = (r.group === "beat" && r.role === "beat") || (r.group === "pipeline" && r.step === 2);
+    if (!isTurn || !r.final || !usable(r) || !r.outputFile || r.promptState !== promptState || !armKeys.includes(r.armKey)) return [];
+    const evalCase = byId.get(r.caseId);
+    if (!evalCase) {
+      problems.push(`${r.caseId}: no frozen case for ${r.armKey}`);
+      return [];
+    }
+    const story = beatInput(r, evalCase, records, load);
+    if (story.getCurrentBeatType() !== "thread") return [];
+    const { reply } = repairBeatReply(story, load(r) as SetOfBeatGenerationSchema);
+    return story.getPlayerSlots().flatMap((slot) => {
+      const judged = judgeRequest(story, reply, slot, evalCase.chapterFrames);
+      return judged ? [{ armKey: r.armKey, caseId: r.caseId, sample: r.sample, slot, outputId: outputIdOf(r.outputFile as string), checks: judged.checks, request: judged.request }] : [];
+    });
+  });
+  return { turns, problems };
+}
+
+export const DEFAULT_RECORD_JUDGE_SAMPLES = 1;
+
+/** Judges a round's turns (turn round 1: the reference and the candidates), then writes judged-turns.md and .json. */
+export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | undefined, samples: number, promptState: string): Promise<void> {
+  const { files, log } = ctx;
+  if (!armKeys?.length) throw new Error("--judge-records needs --arms: the beat or chain arms whose chapter steps to judge");
+  const records = files.readRecords();
+  const cases = files.readCases();
+  const { turns, problems } = roundTurnsToJudge(records, cases, files.loadOutput, armKeys, promptState);
+  const arm = JUDGE_ARMS[0];
+  const jobs = judgeJobs(turns, arm, samples, promptState);
+  const done = finishedJobKeys(files.readPrepRecords());
+  const open = jobs.filter((j) => !done.has(keyOf(j)));
+  const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
+  ctx.refuse(STAGE, estimate);
+  log(`${turns.length} turns of ${armKeys.length} arms × ${samples} samples on ${arm.key}, ${open.length} open, est $${estimate.toFixed(3)}`);
+  const result = await runJobs(jobs, ctx.deps("prep"), {
+    caps: ctx.caps,
+    previous: files.readPrepRecords(),
+    extraSpend: spendBeside(files, "prep"),
+    tokensPerMinute: ctx.tpm,
+    maxInFlight: ctx.maxInFlight,
+  });
+  if (result.stoppedReason) log(`Stopped: ${result.stoppedReason}`);
+  writeJudgedTurns(files, turns, problems, promptState, log);
+}
+
+function writeJudgedTurns(files: EvalFiles, turns: RoundTurn[], problems: string[], promptState: string, log: (line: string) => void) {
+  const prep = files.readPrepRecords();
+  const arm = JUDGE_ARMS[0];
+  const judged: JudgedTurn[] = turns.flatMap((turn) => {
+    const record = finishedPrepRecord(prep, jobKey(judgeCaseId(turn.outputId, turn.slot), prepArmKey("judge", arm), promptState, 1));
+    if (!record) return [];
+    const { request, ...rest } = turn;
+    void request;
+    return [{ ...rest, verdicts: verdictsFrom(files.loadOutput(record), turn.checks) }];
+  });
+  const readings = judgedReadings(judged, referenceKeyOf);
+  const spentUsd = sumCost(prep.filter((r) => r.armKey.startsWith("judge>") && turns.some((t) => r.caseId === judgeCaseId(t.outputId, t.slot))));
+  const generatedAt = new Date();
+  files.writeJudgedTurns(renderJudgedReadings(readings, { spentUsd, generatedAt, problems }), { generatedAt: generatedAt.toISOString(), promptState, readings, judged, problems, spentUsd });
+  log(`Judged ${judged.length} of ${turns.length} turns; these judge calls $${spentUsd.toFixed(4)}. Wrote judged-turns.md and .json.`);
 }
 
 // --- The dry run's view ---

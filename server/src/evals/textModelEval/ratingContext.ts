@@ -46,6 +46,10 @@ export const CONTEXT_LABELS = {
   whose: "For",
   milestonesSoFar: "Milestones so far",
   kindOfMilestone: "Kind of milestone",
+  chapterQuestion: "Chapter question",
+  chapterPlan: "Chapter plan",
+  switchChosenFrom: "The switch the player chose from",
+  eachPlanned: "Each version below planned this chapter itself: its plan heads its column.",
   length: "Length",
   plan: "Plan",
   step: "Step",
@@ -156,7 +160,13 @@ type View = {
   holdsOutcomes: boolean;
   /** An analysis ran for this turn: the case's fixed analysis */
   planned: boolean;
+  /** A stored chapter's backfilled question and plan, per thread id */
+  frames?: Record<string, { question: string; plan: string }>;
+  /** A chapter opening whose plan each option wrote itself (a chain item): the context stops at the switch */
+  chainOpening?: boolean;
 };
+
+export type ContextOptions = { frames?: View["frames"]; chainOpening?: boolean };
 
 function present<T>(items: (T | undefined | null | false | "")[]): T[] {
   return items.filter((item): item is T => Boolean(item));
@@ -182,7 +192,7 @@ function beatTypeOf(phases: unknown[], turn: number, maxTurns: number | undefine
   return ended ? "ending" : "thread";
 }
 
-function viewOf(state: StoryState, fixed?: FixedAnalysis): View {
+function viewOf(state: StoryState, fixed?: FixedAnalysis, options: ContextOptions = {}): View {
   const held = field(state, "players");
   const players = held && typeof held === "object" ? Object.entries(held as Record<string, unknown>) : [];
   const phases = [...list(field(state, "storyPhases")), ...(fixed ? [fixed.phase] : [])];
@@ -219,6 +229,8 @@ function viewOf(state: StoryState, fixed?: FixedAnalysis): View {
     outcomes,
     holdsOutcomes: Array.isArray(field(state, "sharedOutcomes")) || players.some(([, player]) => Array.isArray(field(player, "outcomes"))),
     planned: fixed !== undefined,
+    ...(options.frames ? { frames: options.frames } : {}),
+    ...(options.chainOpening ? { chainOpening: true } : {}),
   };
 }
 
@@ -324,11 +336,25 @@ function stepLine(step: unknown, index: number, current: number | undefined): Co
   return index === current ? { ...base, marks: ["current"], sub: resultLines(resolutions) } : base;
 }
 
-function threadChapter(view: View, thread: unknown, duration: number | undefined): ContextLine {
+/** A chapter's question and plan: its own (a round's planner writes them), else its backfilled frame. */
+function frameOf(view: View, thread: unknown): { question: string; plan: string } {
+  const own = { question: text(field(thread, "question")), plan: text(field(thread, "plan")) };
+  if (own.question) return own;
+  const frame = view.frames?.[text(field(thread, "id"))];
+  return { question: frame?.question ?? "", plan: frame?.plan ?? "" };
+}
+
+/**
+ * A chapter's lines. `blind` shows only what every planner form writes (a
+ * chain item's options: one column is today's plan, the other a round's), so
+ * the lines give no version away.
+ */
+function threadChapter(view: View, thread: unknown, duration: number | undefined, blind = false): ContextLine {
   const steps = list(field(thread, "progression"));
   const contest = list(field(thread, "playersSideB")).length > 0;
   const current = view.beatType === "thread" ? stepsDone(thread) : undefined;
   const results = resultLines(field(thread, "possibleMilestones"));
+  const frame = blind ? { question: "", plan: "" } : frameOf(view, thread);
   return {
     label: L.chapterLine,
     text: text(field(thread, "title")),
@@ -338,7 +364,9 @@ function threadChapter(view: View, thread: unknown, duration: number | undefined
         ? [line(L.sideA, playerNames(view, field(thread, "playersSideA"))), line(L.sideB, playerNames(view, field(thread, "playersSideB")))]
         : [view.multiplayer ? line(L.players, playerNames(view, field(thread, "playersSideA"))) : undefined]),
       advancesLine(view, text(field(thread, "outcomeId")), true),
-      line(L.kindOfMilestone, field(thread, "typeOfMilestone")),
+      blind ? undefined : line(L.kindOfMilestone, field(thread, "typeOfMilestone")),
+      line(L.chapterQuestion, frame.question),
+      line(L.chapterPlan, frame.plan),
       duration === undefined ? undefined : { label: L.length, text: `${duration} ${L.turns}` },
       steps.length ? { label: L.plan, sub: steps.map((step, i) => stepLine(step, i, current)) } : undefined,
       results.length ? { label: L.possibleResults, sub: results } : undefined,
@@ -434,7 +462,24 @@ function turnLine(view: View): ContextLine {
   return { label: L.turn, text: kind ? `${at} · ${kind}` : at };
 }
 
+/** A chain item's chapter fold: the turn opens a chapter, the switch the player chose from, and each version's own plan below. */
+function chainOpeningSection(view: View): ContextSection {
+  const current = view.phases[view.phases.length - 1];
+  const at = view.maxTurns === undefined ? `${view.turn + 1}` : `${view.turn + 1} ${L.of} ${view.maxTurns}`;
+  return {
+    key: "chapter",
+    heading: L.chapter,
+    lines: [],
+    entries: [
+      { label: L.turn, text: `${at} · ${L.threadStep} 1, ${L.newThread}` },
+      ...switchesOf(current).map((sw) => ({ ...switchChapter(view, sw), label: L.switchChosenFrom })),
+      { text: L.eachPlanned },
+    ],
+  };
+}
+
 function chapterSection(view: View): ContextSection {
+  if (view.chainOpening) return chainOpeningSection(view);
   const current = view.phases[view.phases.length - 1];
   const duration = num(field(current, "duration"));
   const chapters =
@@ -647,8 +692,8 @@ function storySection(view: View): ContextSection {
  * first turn the introduction and chosen characters), the story so far and
  * the story. A section with nothing to show is left out.
  */
-export function turnContext(state: StoryState, fixed?: FixedAnalysis): ContextSection[] {
-  const view = viewOf(state, fixed);
+export function turnContext(state: StoryState, fixed?: FixedAnalysis, options: ContextOptions = {}): ContextSection[] {
+  const view = viewOf(state, fixed, options);
   return [
     chapterSection(view),
     outcomesSection(view),
@@ -656,4 +701,17 @@ export function turnContext(state: StoryState, fixed?: FixedAnalysis): ContextSe
     storySoFarSection(view),
     storySection(view),
   ].filter((s) => s.lines.length > 0 || (s.entries?.length ?? 0) > 0);
+}
+
+/**
+ * A chapter plan as a chain item's option shows it: each chapter's title,
+ * kind and type, players or sides, the outcome it advances, its length, its
+ * steps with the first marked current and its possible results. Only what
+ * every planner form writes, so the lines give no version away.
+ */
+export function chapterPlanLines(state: StoryState, plan: unknown): ContextLine[] {
+  if (!isThreadPhase(plan)) return [];
+  const view = viewOf(state, { kind: "thread", phase: plan as FixedAnalysis["phase"] } as FixedAnalysis);
+  const duration = num(field(plan, "duration"));
+  return threadsOf(plan).map((thread) => threadChapter(view, thread, duration ?? num(field(thread, "duration")), true));
 }

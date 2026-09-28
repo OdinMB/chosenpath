@@ -7,6 +7,7 @@ import type { ChapterFrame } from "./cases.js";
 import { playerParagraphs } from "./playerText.js";
 import { prepJob } from "./prepCalls.js";
 import type { Job } from "./runner.js";
+import { rateMove, type RateMove } from "./stopRule.js";
 
 /*
  * The turn document's judged checks (Appendix A.C, B2 and B9), one cheap
@@ -82,15 +83,20 @@ function previousChoice(story: Story, slot: PlayerSlot): { text: string; result:
   return { text: option.text, result: `${result}${lever}` };
 }
 
-/** The chapter frame a step reads: the chapter question and plan (or the outcome's question), and the step. */
-function chapterLines(story: Story, slot: PlayerSlot, frames?: Record<string, ChapterFrame>): string[] {
+/**
+ * The chapter frame a step reads: the chapter question and plan (the chapter's
+ * own, which planner v2 writes, else the backfilled frame; or the outcome's
+ * question), and the step.
+ */
+function chapterLines(story: Story, slot: PlayerSlot, frames?: Record<string, Pick<ChapterFrame, "question" | "plan">>): string[] {
   const analysis = story.getCurrentThreadAnalysis();
   const thread = analysis?.threads.find((t) => t.playersSideA.includes(slot) || t.playersSideB.includes(slot));
   if (!analysis || !thread) return [];
   const done = thread.progression.filter((s) => s.resolution !== null).length;
   const step = thread.progression[done];
   const outcome = story.getOutcomeById(thread.outcomeId);
-  const frame = frames?.[thread.id];
+  const own = thread as typeof thread & { question?: unknown; plan?: unknown };
+  const frame = typeof own.question === "string" && own.question.trim() ? { question: own.question, plan: typeof own.plan === "string" ? own.plan : "" } : frames?.[thread.id];
   const last = done + 1 === thread.progression.length;
   return [
     frame ? `Chapter question: ${frame.question}` : "Chapter question: none written; the outcome's question stands in.",
@@ -145,7 +151,7 @@ export function judgeRequest(
   story: Story,
   reply: SetOfBeatGenerationSchema,
   slot: PlayerSlot,
-  frames?: Record<string, ChapterFrame>
+  frames?: Record<string, Pick<ChapterFrame, "question" | "plan">>
 ): { checks: JudgedCheck[]; request: TextRequest } | undefined {
   const view = turnView(reply, slot);
   const checks = judgedChecksFor(story);
@@ -442,5 +448,102 @@ export function renderCalibration(input: {
   );
   if (disagreements.length) lines.push("", "## Where sample 1 disagrees with the hand verdict", "", ...disagreements);
   if (input.problems.length) lines.push("", "## Problems", "", ...input.problems.map((p) => `- ${p}`));
+  return `${lines.join("\n")}\n`;
+}
+
+// --- A round's turns, judged (turn round 1: the reference and the candidates) ---
+
+/** One player's turn of a round's record, judged once. */
+export type JudgedTurn = {
+  armKey: string;
+  caseId: string;
+  sample: number;
+  slot: PlayerSlot;
+  outputId: string;
+  checks: JudgedCheck[];
+  verdicts: Partial<Record<JudgedCheck, boolean>>;
+};
+
+type CheckTally = { hits: number; n: number };
+
+export type JudgedComparison = { check: JudgedCheck; reference: CheckTally; arm: CheckTally; noise?: number } & RateMove;
+
+export type JudgedArmReading = {
+  armKey: string;
+  turns: number;
+  rates: Partial<Record<JudgedCheck, CheckTally>>;
+  referenceKey?: string;
+  /** Read on the turns both arms have (case, sample, player), with the reference's sample-1-against-sample-2 noise on those cases */
+  vsReference?: JudgedComparison[];
+};
+
+const tallyOf = (turns: JudgedTurn[], check: JudgedCheck): CheckTally | undefined => {
+  const judged = turns.filter((t) => t.verdicts[check] !== undefined);
+  return judged.length ? { hits: judged.filter((t) => t.verdicts[check]).length, n: judged.length } : undefined;
+};
+
+const rateOf = (t?: CheckTally) => (t && t.n ? t.hits / t.n : undefined);
+const turnPair = (t: JudgedTurn) => `${t.caseId}|${t.sample}|${t.slot}`;
+
+/** Each arm's pass rates per judged check, and a candidate's reading against its reference under the stop rule. */
+export function judgedReadings(turns: JudgedTurn[], referenceOf: (armKey: string) => string | undefined): JudgedArmReading[] {
+  const byArm = new Map<string, JudgedTurn[]>();
+  for (const t of turns) byArm.set(t.armKey, [...(byArm.get(t.armKey) ?? []), t]);
+  return [...byArm.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([armKey, own]) => {
+      const rates = Object.fromEntries(JUDGED_CHECKS.flatMap((check) => (tallyOf(own, check) ? [[check, tallyOf(own, check)]] : [])));
+      const referenceKey = referenceOf(armKey);
+      const reference = referenceKey ? byArm.get(referenceKey) : undefined;
+      if (!referenceKey || !reference) return { armKey, turns: own.length, rates };
+      const shared = new Set(reference.map(turnPair).filter((p) => own.some((t) => turnPair(t) === p)));
+      const armShared = own.filter((t) => shared.has(turnPair(t)));
+      const refShared = reference.filter((t) => shared.has(turnPair(t)));
+      const cases = new Set(armShared.map((t) => t.caseId));
+      const refOnCases = reference.filter((t) => cases.has(t.caseId));
+      const vsReference = JUDGED_CHECKS.flatMap((check): JudgedComparison[] => {
+        const [ref, arm] = [tallyOf(refShared, check), tallyOf(armShared, check)];
+        if (!ref || !arm) return [];
+        const [s1, s2] = [rateOf(tallyOf(refOnCases.filter((t) => t.sample === 1), check)), rateOf(tallyOf(refOnCases.filter((t) => t.sample === 2), check))];
+        const noise = s1 !== undefined && s2 !== undefined ? Math.abs(s1 - s2) : undefined;
+        return [{ check, reference: ref, arm, ...(noise === undefined ? {} : { noise, ...rateMove(ref, arm, noise) }) }];
+      });
+      return { armKey, turns: own.length, rates, referenceKey, vsReference };
+    });
+}
+
+const tallyText = (t?: CheckTally) => (t ? `${t.hits} of ${t.n} (${Math.round((100 * t.hits) / t.n)}%)` : "–");
+const pText = (p?: number) => (p === undefined ? "" : p < 0.001 ? " (p < 0.001)" : ` (p ${p.toFixed(3)})`);
+
+function readingText(c: JudgedComparison): string {
+  if (c.noise === undefined) return "no noise figure (the reference has one sample)";
+  if (c.moved) return `moved ${c.moved}${pText(c.p)}`;
+  if (c.beyondNoise) return `beyond the noise, not moved${pText(c.p)}`;
+  return "within the noise";
+}
+
+/** judged-turns.md: per arm and judged check the pass rate, and a candidate's reading against its reference. */
+export function renderJudgedReadings(readings: JudgedArmReading[], input: { spentUsd: number; generatedAt: Date; problems?: string[] }): string {
+  const lines = [
+    "# Judged checks on the round's turns",
+    "",
+    `Generated ${input.generatedAt.toISOString()} from prep-calls.jsonl: one judge call (${DEFAULT_JUDGE_ARM}, prompt v${JUDGE_PROMPT_VERSION}) per player's turn of each arm's chapter steps. A candidate is read against its reference on the turns both have, with the reference's sample-1-against-sample-2 difference as the noise and the stop rule on top (moved only beyond the noise and at a one-sided Fisher p < 0.10). Calibration (judge-calibration.md): firstParagraphNarratesChoice is judged reliably on Luna low, with every hand no a gpt-4.1-mini turn; stepLeftOpen and concreteProgress are readings only. Spent on these judge calls: $${input.spentUsd.toFixed(4)}.`,
+    "",
+    "| Arm | Check | Arm passes | Reference passes | Noise | Reading |",
+    "|---|---|---|---|---|---|",
+  ];
+  for (const r of readings) {
+    for (const check of JUDGED_CHECKS) {
+      const own = r.rates[check];
+      if (!own) continue;
+      const c = r.vsReference?.find((v) => v.check === check);
+      lines.push(
+        c
+          ? `| ${r.armKey} | ${check} | ${tallyText(c.arm)} | ${tallyText(c.reference)} | ${c.noise === undefined ? "–" : `${Math.round(100 * c.noise)} pts`} | ${readingText(c)} |`
+          : `| ${r.armKey} | ${check} | ${tallyText(own)} | – | – | ${r.referenceKey ? "no matched turns" : "reference"} |`
+      );
+    }
+  }
+  if (input.problems?.length) lines.push("", "## Problems", "", ...input.problems.map((p) => `- ${p}`));
   return `${lines.join("\n")}\n`;
 }

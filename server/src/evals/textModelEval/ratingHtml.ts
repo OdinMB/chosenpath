@@ -1,3 +1,5 @@
+import { MARK_TEXT, type ContextLine } from "./ratingContext.js";
+
 /*
  * The small HTML pieces a rating page is built from. Every string passes
  * through escapeHtml here, so nothing narrative reaches the page as markup.
@@ -47,4 +49,21 @@ export function meta(pairs: [string, string][]): string {
   return shown.length
     ? `<p class="meta">${shown.map(([label, value]) => `<span class="k">${e(label)}:</span> ${e(value)}`).join(" · ")}</p>`
     : "";
+}
+
+/** Structured context lines as nested lists: a bold label, the text, an outcome id small, and a badge per mark on a marked line. */
+export function contextLinesHtml(lines: ContextLine[] = []): string {
+  if (!lines.length) return "";
+  const item = (line: ContextLine) => {
+    const marks = line.marks ?? [];
+    const label = line.label ? `<span class="k">${e(line.label)}${line.text ? ":" : ""}</span>` : "";
+    const parts = [
+      label,
+      line.text ? `<span class="t">${e(line.text)}</span>` : "",
+      line.id ? `<code class="id">${e(line.id)}</code>` : "",
+      ...marks.map((mark) => `<span class="badge">${e(MARK_TEXT[mark])}</span>`),
+    ].filter(Boolean);
+    return `<li${marks.length ? ` class="${marks.join(" ")}"` : ""}>${parts.join(" ")}${contextLinesHtml(line.sub)}</li>`;
+  };
+  return `<ul class="ctx-lines">${lines.map(item).join("")}</ul>`;
 }

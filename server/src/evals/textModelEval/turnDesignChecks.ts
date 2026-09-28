@@ -3,9 +3,13 @@ import type { BeatOption, Change, Outcome, SetOfBeatGenerationSchema, Stat, Swit
 import { GameModes } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
+import { allowedLengths, chaptersThatFit, outcomeNeeds, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
+import type { TriggerExpectation } from "./triggerCases.js";
+
+export { allowedLengths };
 
 /*
  * The turn document's new automatic checks (DOCS/2026-09-27_turn-generation-
@@ -30,19 +34,14 @@ const asObject = (value: unknown): Loose => (value !== null && typeof value === 
 const asArray = <T = unknown>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 const asString = (value: unknown): string => (typeof value === "string" ? value : "");
 
-// --- Pacing arithmetic (turn doc A4) ---
-
-/**
- * The lengths a chapter may have when it starts with this many turns left,
- * this one included: 2 to 4, and either exactly the turns left (the story
- * ends with it) or leaving at least 3 (a switch and a two-turn chapter).
- */
-export function allowedLengths(turnsLeft: number): number[] {
-  return [2, 3, 4].filter((length) => turnsLeft - length === 0 || turnsLeft - length >= 3);
-}
+// --- Pacing arithmetic (turn doc A4; the one helper is storyTextRounds/pacing.ts) ---
 
 /** Turns left in the story, the one being written included (STORY PROGRESS). */
-const turnsLeftOf = (story: Story) => story.getMaxTurns() - story.getCurrentTurn();
+const turnsLeftOf = turnsLeft;
+
+/** An id-like word ("player1_trust"), as the rating page reads directions, or a story outcome id anywhere in the text. */
+const ID_LIKE = /(^|[^A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+(?![A-Za-z0-9_])/;
+const holdsIds = (text: string, known: string[]) => ID_LIKE.test(text) || known.some((id) => text.includes(id));
 
 /** The outcomes a player's chapters can push: the shared ones and the player's own. */
 function outcomesOf(story: Story, slots: string[]): Outcome[] {
@@ -74,10 +73,27 @@ function offeredOutcomes(written: Switch, known: string[]): string[] {
   return [...new Set(asArray<string>(written.topicChoices).flatMap((direction) => outcomeIdsNamed(asString(direction), known).known))];
 }
 
-export function checkSwitchDesign(story: Story, plan: SwitchAnalysis): CheckResult {
+/** A round switch plan keeps each direction as written beside today's "text (id)" string (turnRound1Planners.ts). */
+const writtenDirections = (sw: Switch): string[] | undefined => {
+  const held = (sw as Switch & { topicDirections?: unknown }).topicDirections;
+  return Array.isArray(held) ? held.map((d) => asString(asObject(d).direction)) : undefined;
+};
+
+/**
+ * The switch checks of turn doc A.C. `expectation` is a built trigger case's
+ * rule (triggerCases.ts): the plan follows it when it is a flavor switch on
+ * the outcome the rule bears on.
+ */
+export function checkSwitchDesign(story: Story, plan: SwitchAnalysis, expectation?: TriggerExpectation): CheckResult {
   const checks: Record<string, boolean> = {};
   const known = knownOutcomeIds(story);
   const switches = asArray<Switch>(asObject(plan).switches).filter((s) => s && typeof s === "object");
+  if (expectation?.kind === "flavor") {
+    checks.triggerFollowed = switches.some((s) => asArray<string>(s.players).includes("player1") && s.type === "flavor" && s.outcomeId === expectation.outcomeId);
+  }
+  // A2: a round direction as the player reads it carries no ids
+  const written = switches.flatMap((s) => writtenDirections(s) ?? []);
+  if (switches.some((s) => writtenDirections(s) !== undefined && s.type === "topic")) checks.directionsNoIds = written.every((d) => !holdsIds(d, known));
   if (known.length === 0) return { checks, counts: {}, unknownIds: [] };
 
   const topics = switches.filter((s) => s.type === "topic" && asArray(s.topicChoices).length > 0);
@@ -91,20 +107,27 @@ export function checkSwitchDesign(story: Story, plan: SwitchAnalysis): CheckResu
   }
 
   const complete = (outcome: Outcome) => stillNeeded(story, outcome) === 0;
-  const fit = Math.floor(turnsLeftOf(story) / 4);
+  const fit = chaptersThatFit(turnsLeftOf(story));
   let noComplete = true;
   let late: boolean | undefined;
+  let untouched: boolean | undefined;
   for (const written of switches) {
     const relevant = outcomesOf(story, asArray<string>(written.players));
     const byId = new Map(relevant.map((o) => [o.id, o]));
-    const offered = offeredOutcomes(written, known).flatMap((id) => (byId.has(id) ? [byId.get(id) as Outcome] : []));
+    const offeredIds = offeredOutcomes(written, known);
+    const offered = offeredIds.flatMap((id) => (byId.has(id) ? [byId.get(id) as Outcome] : []));
     if (!relevant.every(complete) && offered.some(complete)) noComplete = false;
     // Binding late (owner, decision 3 (b)): fewer chapters fit than milestones are still needed
     const needed = relevant.reduce((sum, o) => sum + stillNeeded(story, o), 0);
     if (fit < needed && offered.length > 0) late = (late ?? true) && offered.every((o) => !complete(o));
+    // ... and those no chapter has pushed yet go first: one of them is offered while any still needs milestones
+    const [slot] = asArray<string>(written.players);
+    const fresh = slot ? outcomeNeeds(story, slot, true).filter((n) => n.stillNeeded > 0 && n.noChapterYet).map((n) => n.id) : [];
+    if (fit < needed && offered.length > 0 && fresh.length > 0) untouched = (untouched ?? true) && offeredIds.some((id) => fresh.includes(id));
   }
   checks.noCompleteOutcomeOffered = noComplete;
   if (late !== undefined) checks.lateDirectionsOnNeeded = late;
+  if (untouched !== undefined) checks.lateOffersUntouched = untouched;
   return { checks, counts: {}, unknownIds: [] };
 }
 
@@ -136,13 +159,52 @@ function pickedOutcomes(story: Story, thread: Thread, known: string[]): string[]
   return picked.length > 0 ? picked : undefined;
 }
 
-export function checkThreadDesign(story: Story, plan: ThreadAnalysis): CheckResult {
+/** Names a chapter question can use: the story elements' names and their longer words, and the player characters'. */
+function storyNames(story: Story): string[] {
+  const elements = story.getStoryElements().flatMap((e) => [e.name, ...e.name.split(/\s+/).filter((w) => w.length >= 4)]);
+  return [...elements, ...story.getPlayerSlots().flatMap((slot) => characterNames(story, slot))].filter((n) => n.trim().length >= 3);
+}
+
+/** A round thread's own fields (turnRound1Planners.ts): its written kind, question and plan. */
+type FramedThread = Thread & { kind?: unknown; question?: unknown; plan?: unknown };
+
+/**
+ * The thread checks of turn doc A.C. `expectation` is a built trigger case's
+ * recipe (triggerCases.ts): the plan follows it when it has the recipe's length.
+ */
+export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectation?: TriggerExpectation): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
-  const threads = asArray<Thread>(asObject(plan).threads).filter((t) => t && typeof t === "object");
+  const threads = asArray<FramedThread>(asObject(plan).threads).filter((t) => t && typeof t === "object");
   const known = knownOutcomeIds(story);
   const duration = asObject(plan).duration;
   if (typeof duration === "number") counts.chapterLength = duration;
+  if (expectation?.kind === "length") checks.triggerFollowed = duration === expectation.length;
+
+  // A3: the chapter's question names something from the story; its plan carries no ids (planner v2's fields)
+  const questioned = threads.filter((t) => typeof t.question === "string");
+  if (questioned.length > 0) {
+    const names = storyNames(story);
+    checks.questionPresent = questioned.every((t) => asString(t.question).trim() !== "" && mentions(asString(t.question), names));
+  }
+  const planned = threads.filter((t) => typeof t.plan === "string");
+  if (planned.length > 0) checks.planWithoutIds = planned.every((t) => asString(t.plan).trim() !== "" && !holdsIds(asString(t.plan), known));
+
+  // A6: the kind follows the outcome's (a three-player race runs as contests), and the written kind matches the results
+  const kinded = threads.flatMap((t) => {
+    const outcome = story.getOutcomeById(t.outcomeId);
+    const expected = outcome ? resultKind(outcome.possibleResolutions) : undefined;
+    return expected ? [{ thread: t, expected }] : [];
+  });
+  if (kinded.length > 0) {
+    const race = story.getNumberOfPlayers() === 3;
+    checks.kindFollowsOutcome = kinded.every(({ thread, expected }) => {
+      const kind = resultKind(thread.possibleMilestones);
+      return kind === expected || (race && expected === "exploration" && kind === "contest");
+    });
+  }
+  const written = threads.filter((t) => typeof t.kind === "string");
+  if (written.length > 0) checks.kindFieldMatches = written.every((t) => t.kind === resultKind(t.possibleMilestones));
 
   if (known.length > 0 && threads.length > 0) {
     checks.threadOutcomeKnown = threads.every((t) => known.includes(t.outcomeId));
