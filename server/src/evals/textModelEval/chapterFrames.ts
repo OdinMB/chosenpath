@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { Story } from "core/models/Story.js";
 import type { Outcome, StoryPhase, StoryState, Thread, ThreadAnalysis } from "core/types/index.js";
-import { threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
+import type { TextRequest } from "../../game/services/storyTextSteps.js";
+// The chapter planner's view as production built it at the round0 prompt state, so the backfill requests stay as they ran
+import { round0ThreadStep as threadStep } from "../../game/services/storyTextRound0/round0Steps.js";
 import type { Arm } from "./arms.js";
 import { caseStory, type ChapterFrame, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";

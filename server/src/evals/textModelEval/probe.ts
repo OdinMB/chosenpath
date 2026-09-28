@@ -7,7 +7,8 @@ import { chatModelFields } from "shared/llm/chatModel.js";
 import type { ReasoningEffort } from "shared/llm/textModelSettings.js";
 import { callMetricsFromCompletion, type CallMetrics } from "shared/llm/usageRecorder.js";
 import { contentFilterSchema } from "../../game/services/ContentFilterService.js";
-import { partialTemplateSchema } from "../../game/services/storyTextSteps.js";
+// The schemas the probe of 2026-09-26 checked: production's at the time (the round0 prompt state kept them)
+import { round0PartialTemplateSchema as partialTemplateSchema } from "../../game/services/storyTextRound0/round0Steps.js";
 import { makeArm } from "./arms.js";
 import type { CallSpec, ExecutedCall } from "./executor.js";
 import { costFromUsage } from "./pricing.js";

@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { Story } from "core/models/Story.js";
 import { GameModes, type ThreadAnalysis } from "core/types/index.js";
-import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
+// The chapter turns edit production's beat request as it stood at the round0 prompt state
+import { round0BeatStep as beatStep } from "../../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { CHAPTER_TURN_TEXT, chapterTurnRequest } from "../../../../../src/game/services/storyTextRounds/turnRound1Turns.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
 import { stat } from "../../../../helpers/textFixtures.js";

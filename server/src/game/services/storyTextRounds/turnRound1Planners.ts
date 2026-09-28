@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { PLAYER_SLOTS, switchSchema, switchTypeSchema, threadAnalysisSchema, threadSchema } from "core/types/index.js";
 import { StoryStatePromptService } from "../prompts/StoryStatePromptService.js";
-import { switchStep, threadStep, type TextRequest } from "../storyTextSteps.js";
+import type { TextRequest } from "../storyTextSteps.js";
+// Production's requests as they stood at the round0 prompt state, so planner v2's requests stay as they ran
+import { round0SwitchStep as switchStep, round0ThreadStep as threadStep } from "../storyTextRound0/round0Steps.js";
 import { outcomesFor, pickedOutcome, switchPacingBlock, threadPacingBlock } from "./pacing.js";
 import { replaceOnce, replaceUntil, slugOf, splitAtState } from "./roundEdits.js";
 

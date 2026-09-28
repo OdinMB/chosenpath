@@ -18,7 +18,7 @@ import { caseStory, type EvalCase } from "../../../../src/evals/textModelEval/ca
 import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { keyOf } from "../../../../src/evals/textModelEval/runner.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
-import { threadStep } from "../../../../src/game/services/storyTextSteps.js";
+import { round0ThreadStep as threadStep } from "../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { firstSwitchBeat, firstThreadAnalysis, resolvedThread } from "../../../helpers/promptStories.js";
 import { outcome, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { LUNA, evalCase, record, tags } from "./fixtures.js";

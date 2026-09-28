@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
-import { beatStep, setupStep, switchStep, threadStep, type TextRequest } from "./storyTextSteps.js";
+import type { TextRequest } from "./storyTextSteps.js";
+import {
+  round0BeatStep as beatStep,
+  round0SetupStep as setupStep,
+  round0SwitchStep as switchStep,
+  round0ThreadStep as threadStep,
+} from "./storyTextRound0/round0Steps.js";
 
 /*
  * Stage 3 of the text-model eval: production's request for an input, minus
@@ -10,7 +16,9 @@ import { beatStep, setupStep, switchStep, threadStep, type TextRequest } from ".
  * carried stays. Eval only: the harness's variants.ts is the one caller, and
  * production keeps storyTextSteps.ts as it is.
  *
- * Each trim starts from production's own request. Kept schema fields are
+ * Each trim starts from production's request as it stood at the round0
+ * prompt state (storyTextRound0/, frozen at the adoption of 2026-09-28, so
+ * these requests stay as they were built). Kept schema fields are
  * production's zod instances; prompt edits are anchored on production's
  * wording, touch only the instructions before the story state or premise,
  * and each must match exactly once, so a production prompt change fails

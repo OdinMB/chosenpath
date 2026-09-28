@@ -20,6 +20,8 @@ import {
   threadStep,
   type TextRequest,
 } from "../../game/services/storyTextSteps.js";
+// The cases were built on today's form, which the round0 prompt state froze at the adoption of 2026-09-28
+import { round0BeatStep, round0SwitchStep, round0ThreadStep } from "../../game/services/storyTextRound0/round0Steps.js";
 import type { EvalRole } from "./arms.js";
 import {
   analysisCase,
@@ -192,7 +194,7 @@ async function playTemplate(
     return partial;
   };
 
-  const switchOut = await deps.callBaseline("switch", switchCase.id, switchStep.request(start), playerCount);
+  const switchOut = await deps.callBaseline("switch", switchCase.id, round0SwitchStep.request(start), playerCount);
   if (!switchOut) return skip(`${prefix}: baseline switch analysis failed`);
   const beatInput = switchStep.apply(start, switchOut as SwitchAnalysis);
   if (wants.firstBeat) {
@@ -207,7 +209,7 @@ async function playTemplate(
 
   // A first-beat case's baseline sample 1 is this very call (same id, same prompt), so it is reused
   const beatCallId = wants.firstBeat ? `first-${prefix}` : `build-beat-${prefix}-t0`;
-  const beatOut = await deps.callBaseline("beat", beatCallId, beatStep.request(beatInput), playerCount);
+  const beatOut = await deps.callBaseline("beat", beatCallId, round0BeatStep.request(beatInput), playerCount);
   if (!beatOut) return skip(`${prefix}: baseline first beat failed`, result);
   const [withBeat, changes] = beatStep.apply(beatInput, beatOut as SetOfBeatGenerationSchema, true);
   const chosen = chooseAndResolve(new ChangeService().applyChanges(withBeat, changes), prefix);
@@ -217,7 +219,7 @@ async function playTemplate(
 
   if (wants.continuation) {
     const threadInput = caseStory(result.threadCase, false);
-    const threadOut = await deps.callBaseline("thread", result.threadCase.id, threadStep.request(threadInput), playerCount);
+    const threadOut = await deps.callBaseline("thread", result.threadCase.id, round0ThreadStep.request(threadInput), playerCount);
     if (!threadOut) return skip(`${prefix}: baseline thread analysis failed`, result);
     const threadPhase = lastPhase(threadStep.apply(threadInput, threadOut as ThreadAnalysis)) as ThreadAnalysis;
     result.continuation = {
@@ -243,7 +245,7 @@ async function withBuiltAnalysis(deps: BuildDeps, evalCase: EvalCase, skipped: s
   if (!evalCase.tags.analysisTurn) return evalCase;
   const story = caseStory(evalCase, false);
   const kind = story.determineNextBeatType() === "switch" ? "switch" : "thread";
-  const request = kind === "switch" ? switchStep.request(story) : threadStep.request(story);
+  const request = kind === "switch" ? round0SwitchStep.request(story) : round0ThreadStep.request(story);
   const output = await deps.callBaseline(kind, `${kind}-${evalCase.id}`, request, evalCase.tags.players);
   if (!output) {
     skipped.push(`${evalCase.id}: baseline ${kind} analysis failed`);

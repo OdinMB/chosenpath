@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import type { ThreadAnalysis } from "core/types/index.js";
-import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
+// B6 alone edits production's beat request as it stood at the round0 prompt state
+import { round0BeatStep as beatStep } from "../../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { TURN_ROUND2_TEXT, todaysFormWithB6Request } from "../../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../../helpers/roundStories.js";
 import { threadAnalysis, type ThreadKind } from "../../../../helpers/textFixtures.js";

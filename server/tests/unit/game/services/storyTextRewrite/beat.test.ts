@@ -4,6 +4,8 @@ import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import type { Story } from "core/models/Story.js";
 import type { Change, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
+// The rewrite is built on production's request as it stood at the round0 prompt state; how a reply changes the story stays production's
+import { round0BeatStep } from "../../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { trimmedBeatRequest } from "../../../../../src/game/services/storyTextTrims.js";
 import { rewriteBeatRequest, type RewriteScaffold } from "../../../../../src/game/services/storyTextRewrite/beat.js";
 import { NO_EMPTY_ITEMS, type RewriteCounts } from "../../../../../src/game/services/storyTextRewrite/common.js";
@@ -57,7 +59,7 @@ const instructionsOf = (perCall: string) => perCall.slice(0, perCall.indexOf(STA
 describe("rewriteBeatRequest", () => {
   it.each(CASES)("%s, %s: builds, and production takes the branch", (scaffold, _, build, marker) => {
     const story = build();
-    expect(beatStep.request(story).prompt).toContain(marker);
+    expect(round0BeatStep.request(story).prompt).toContain(marker);
     expect(() => rewriteBeatRequest(story, scaffold)).not.toThrow();
     expect(() => rewriteBeatRequest(story, scaffold, "worded")).not.toThrow();
   });
@@ -88,7 +90,7 @@ describe("rewriteBeatRequest", () => {
 
   it.each(FORM_CASES)("%s counts, %s, %s: the per-call message ends with production's story state, byte for byte", (counts, scaffold, _, build) => {
     const story = build();
-    const production = beatStep.request(story).prompt;
+    const production = round0BeatStep.request(story).prompt;
     const state = production.slice(production.indexOf(STATE_MARKER));
     const { perCall } = rewriteBeatRequest(story, scaffold, counts);
     expect(perCall.endsWith(state)).toBe(true);
@@ -99,7 +101,7 @@ describe("rewriteBeatRequest", () => {
 describe("the rewrite's schema", () => {
   it.each(FORM_CASES)("%s counts, %s, %s: the field set, types, key order and shared references of its base", (counts, scaffold, _, build) => {
     const story = build();
-    const base = scaffold === "full" ? beatStep.request(story).schema : trimmedBeatRequest(story, "slim").schema;
+    const base = scaffold === "full" ? round0BeatStep.request(story).schema : trimmedBeatRequest(story, "slim").schema;
     const rewrite = rewriteBeatRequest(story, scaffold, counts).schema;
     expect(JSON.stringify(withoutCounts(toJsonSchema(rewrite)))).toBe(JSON.stringify(withoutCounts(toJsonSchema(base))));
   });
@@ -161,7 +163,7 @@ describe("a rewrite reply works in production code", () => {
     beat.plan.establishedFacts = [fact];
     const reply = { ...beatSet(1, { statChanges: [statChange], newMilestones: [milestone], player1: beat }), multiplayerCoordination: "" };
 
-    const fromProduction: SetOfBeatGenerationSchema = beatStep.request(story).schema.parse(reply);
+    const fromProduction: SetOfBeatGenerationSchema = round0BeatStep.request(story).schema.parse(reply);
     const fromRewrite: SetOfBeatGenerationSchema = rewriteBeatRequest(story, scaffold, counts).schema.parse(reply);
     const [productionStory, productionChanges] = beatStep.apply(story, fromProduction);
     const [rewriteStory, rewriteChanges] = beatStep.apply(story, fromRewrite);
@@ -297,7 +299,7 @@ const RESTATED_BY_PRODUCTION_DESCRIPTIONS = [
 ];
 
 describe("no rule in the prompt is restated in a field description", () => {
-  const productionDescriptions = (story: Story) => descriptionsOf(toJsonSchema(beatStep.request(story).schema)).join("\n");
+  const productionDescriptions = (story: Story) => descriptionsOf(toJsonSchema(round0BeatStep.request(story).schema)).join("\n");
 
   it("every pinned clause is production's (a later switch on the full scaffold carries them all)", () => {
     const production = productionDescriptions(laterSwitchBeat(1));

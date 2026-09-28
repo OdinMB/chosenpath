@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { getThreadType, type Beat, type Thread } from "core/types/index.js";
-import { beatStep, type TextRequest } from "../storyTextSteps.js";
+import type { TextRequest } from "../storyTextSteps.js";
+// Production's beat request as it stood at the round0 prompt state, so these requests stay as they ran
+import { round0BeatStep as beatStep } from "../storyTextRound0/round0Steps.js";
 import { replaceOnce, replaceUntil, splitAtState } from "./roundEdits.js";
 import { NO_BLANK_ITEMS } from "./setupRound1.js";
 

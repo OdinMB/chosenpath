@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import { PLAYER_SLOTS, getThreadType, type Stat, type Thread } from "core/types/index.js";
 import { StoryStatePromptService } from "../prompts/StoryStatePromptService.js";
-import { beatStep, type TextRequest } from "../storyTextSteps.js";
+import type { TextRequest } from "../storyTextSteps.js";
+// Production's beat request as it stood at the round0 prompt state, so these requests stay as they ran
+import { round0BeatStep as beatStep } from "../storyTextRound0/round0Steps.js";
 import { trimmedBeatRequest } from "../storyTextTrims.js";
 import { replaceOnce, replaceUntil, splitAtState } from "./roundEdits.js";
 import { withoutScoreLine } from "./turnRound1Planners.js";

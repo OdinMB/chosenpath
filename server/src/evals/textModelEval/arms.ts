@@ -100,6 +100,8 @@ export function armKey(settings: TextModelSettings, variant: VariantId): string 
  */
 const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   prod: undefined,
+  // Production's own code since the adoption (the final check) against today's form, the stored round0 references
+  adopted: "prod",
   slim: "prod",
   minimal: "prod",
   rewrite: "prod",

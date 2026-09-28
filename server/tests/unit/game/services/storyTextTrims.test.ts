@@ -12,12 +12,14 @@ import {
   type ThreadAnalysis,
 } from "core/types/index.js";
 import { ChangeService } from "../../../../src/game/services/ChangeService.js";
+import { beatStep, switchStep, threadStep } from "../../../../src/game/services/storyTextSteps.js";
+// The trims are built on production's requests as they stood at the round0 prompt state; how a reply changes the story stays production's
 import {
-  beatStep,
-  setupStep,
-  switchStep,
-  threadStep,
-} from "../../../../src/game/services/storyTextSteps.js";
+  round0BeatStep,
+  round0SetupStep,
+  round0SwitchStep,
+  round0ThreadStep,
+} from "../../../../src/game/services/storyTextRound0/round0Steps.js";
 import {
   applyPromptEdits,
   trimmedBeatRequest,
@@ -114,7 +116,7 @@ const SETUP_INPUTS: [PlayerCount, GameMode][] = [
 ];
 
 const setupRequests = (players: PlayerCount, gameMode: GameMode) => ({
-  production: setupStep.request("A lighthouse keeper's last winter", players, gameMode, 25, "story"),
+  production: round0SetupStep.request("A lighthouse keeper's last winter", players, gameMode, 25, "story"),
   trimmed: trimmedSetupRequest("A lighthouse keeper's last winter", players, gameMode, 25),
 });
 
@@ -160,7 +162,7 @@ describe("every production branch builds, and the story state and premise stay a
   describe.each(LEVELS)("beats, %s", (level) => {
     it.each(BEAT_BRANCHES)("%s", (_, build, branchText) => {
       const story = build();
-      const production = beatStep.request(story).prompt;
+      const production = round0BeatStep.request(story).prompt;
       expect(production).toContain(branchText);
       expect(fromMarker(trimmedBeatRequest(story, level).prompt, STATE_MARKER)).toBe(fromMarker(production, STATE_MARKER));
     });
@@ -168,14 +170,14 @@ describe("every production branch builds, and the story state and premise stay a
 
   it.each(SWITCH_BRANCHES)("switch, %s", (_, build, branchText) => {
     const story = build();
-    const production = switchStep.request(story).prompt;
+    const production = round0SwitchStep.request(story).prompt;
     expect(production).toContain(branchText);
     expect(fromMarker(trimmedSwitchRequest(story).prompt, STATE_MARKER)).toBe(fromMarker(production, STATE_MARKER));
   });
 
   it.each(THREAD_BRANCHES)("thread, %s", (_, build, branchText) => {
     const story = build();
-    const production = threadStep.request(story).prompt;
+    const production = round0ThreadStep.request(story).prompt;
     expect(production).toContain(branchText);
     expect(fromMarker(trimmedThreadRequest(story).prompt, STATE_MARKER)).toBe(fromMarker(production, STATE_MARKER));
   });
@@ -237,7 +239,7 @@ describe("removed steps and kept rules", () => {
 describe("trimmed schemas", () => {
   describe.each(LEVELS)("beats, %s", (level) => {
     it.each([1, 2])("%i players: keys in production order, kept fields are production's instances", (players) => {
-      const spy = jest.spyOn(beatStep, "request");
+      const spy = jest.spyOn(round0BeatStep, "request");
       const trimmed = objectShape(trimmedBeatRequest(laterSwitchBeat(players), level).schema);
       const production = productionSchemaOf(spy.mock.results);
       expect(Object.keys(trimmed)).toEqual(["statChanges", "newMilestones", ...slotsOf(players)]);
@@ -273,7 +275,7 @@ describe("trimmed schemas", () => {
   });
 
   it.each([1, 2])("switch, %i players", (players) => {
-    const spy = jest.spyOn(switchStep, "request");
+    const spy = jest.spyOn(round0SwitchStep, "request");
     const trimmed = objectShape(trimmedSwitchRequest(switchAnalysisAfterThread(players)).schema);
     const production = productionSchemaOf(spy.mock.results);
     expect(Object.keys(trimmed)).toEqual(["coordinationPatternSummary", "switches"]);
@@ -286,7 +288,7 @@ describe("trimmed schemas", () => {
   });
 
   it("thread", () => {
-    const spy = jest.spyOn(threadStep, "request");
+    const spy = jest.spyOn(round0ThreadStep, "request");
     const trimmed = objectShape(trimmedThreadRequest(threadAnalysisAfterSwitch(1)).schema);
     const production = productionSchemaOf(spy.mock.results);
     expect(Object.keys(trimmed)).toEqual(["duration", "threads"]);
@@ -299,7 +301,7 @@ describe("trimmed schemas", () => {
   });
 
   it.each(SETUP_INPUTS)("setup, %i players: player slots match production's apart from descriptions", (players, gameMode) => {
-    const spy = jest.spyOn(setupStep, "request");
+    const spy = jest.spyOn(round0SetupStep, "request");
     const trimmedShape = objectShape(trimmedSetupRequest("A premise", players, gameMode, 25).schema);
     const productionShape = productionSchemaOf(spy.mock.results);
     expect(Object.keys(trimmedShape)).toEqual(Object.keys(productionShape).filter((key) => key !== "characterSelectionPlan"));
@@ -369,7 +371,7 @@ describe("a trimmed reply works in production code", () => {
     expect(changed.getState().storyElements.map((e) => e.id)).toContain("ferry_inn");
     expect(changed.getState().worldFacts).toContain(fact.fact);
     expect(changed.getPlayer("player1")?.knownStoryElements).toContain("ferry_inn");
-    expect(beatStep.request(played(changed)).prompt).toContain(beat.summary);
+    expect(round0BeatStep.request(played(changed)).prompt).toContain(beat.summary);
   });
 
   it.each([1, 2])("switch, minimal, %i players: production's switch beat shows the kept fields", (players) => {
@@ -389,7 +391,7 @@ describe("a trimmed reply works in production code", () => {
     expect(Object.keys(parsed.switches[0])).not.toContain("relevantSuggestedThreadTypes");
 
     const next = switchStep.apply(story, parsed);
-    const prompt = beatStep.request(next).prompt;
+    const prompt = round0BeatStep.request(next).prompt;
     for (const text of [reply.coordinationPatternSummary, "The only switch in this turn.", "The Lighthouse Gambit", ...topicChoices]) {
       expect(prompt).toContain(text);
     }
@@ -416,7 +418,7 @@ describe("a trimmed reply works in production code", () => {
     const next = threadStep.apply(story, parsed);
     expect(next.getPlayer("player1")?.previousTypesOfThreads).toContain("Heist");
     expect(next.getCurrentThreadDuration()).toBe(3);
-    const prompt = beatStep.request(next).prompt;
+    const prompt = round0BeatStep.request(next).prompt;
     for (const text of ["Storming the Archive", question, "The ledger is theirs", "The ledger burns"]) {
       expect(prompt).toContain(text);
     }

@@ -1,6 +1,7 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes, type GameMode, type PlayerCount } from "core/types/index.js";
-import { setupStep } from "../../../../../src/game/services/storyTextSteps.js";
+// The rewrite is built on production's request as it stood at the round0 prompt state
+import { round0SetupStep as setupStep } from "../../../../../src/game/services/storyTextRound0/round0Steps.js";
 import {
   EXAMPLES_HEADING,
   productionExamples,

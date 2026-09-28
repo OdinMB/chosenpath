@@ -1,8 +1,12 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { z } from "zod";
 import { GameModes, type GameMode, type PlayerCount } from "core/types/index.js";
-import { partialTemplateSchema, setupStep } from "../../../../../src/game/services/storyTextSteps.js";
-import { StorySetupPromptService } from "../../../../../src/game/services/prompts/StorySetupPromptService.js";
+// The rounds edit production's request as it stood at the round0 prompt state
+import {
+  round0PartialTemplateSchema as partialTemplateSchema,
+  round0SetupStep as setupStep,
+} from "../../../../../src/game/services/storyTextRound0/round0Steps.js";
+import { Round0SetupPromptService as StorySetupPromptService } from "../../../../../src/game/services/storyTextRound0/Round0SetupPromptService.js";
 import { NO_EMPTY_ITEMS } from "../../../../../src/game/services/storyTextRewrite/common.js";
 import {
   ENGINE_HEADING,

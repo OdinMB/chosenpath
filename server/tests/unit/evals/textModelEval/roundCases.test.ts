@@ -23,7 +23,8 @@ import {
   type RoundCall,
 } from "../../../../src/evals/textModelEval/roundCases.js";
 import { milestoneBudget } from "../../../../src/evals/textModelEval/setupDesignChecks.js";
-import { threadStep, type TextRequest } from "../../../../src/game/services/storyTextSteps.js";
+import type { TextRequest } from "../../../../src/game/services/storyTextSteps.js";
+import { round0ThreadStep as threadStep } from "../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { firstThreadAnalysis, switchAnalysisAfterThread } from "../../../helpers/promptStories.js";
 import { createMockStoryState } from "../../../helpers/testHelpers.js";
 import { beatSet, challengeOptions, explorationOptions, outcome, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createStorySetupSchema, GameModes, PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
 import { templateIterationSections } from "core/utils/templateIterationSections.js";
-import { StorySetupPromptService } from "../prompts/StorySetupPromptService.js";
+import { Round0SetupPromptService as StorySetupPromptService } from "../storyTextRound0/Round0SetupPromptService.js";
 import type { TextRequest } from "../storyTextSteps.js";
 import {
   CAMP_SCOREBOARD_LINE,
@@ -44,8 +44,10 @@ import {
  * otherwise; each adjustment is listed in .plans/2026-09-26_build-followup.md
  * under "Setup rounds" and "Setup rounds, review fixes".
  *
- * It edits production's own request: the prompt at anchors in production's
- * wording (each must occur exactly once in the instructions before the
+ * It edits production's own request as it stood at the round0 prompt state
+ * (storyTextRound0/, frozen when round 3's form was adopted, so these requests
+ * stay byte for byte as they ran): the prompt at anchors in that wording
+ * (each must occur exactly once in the instructions before the
  * configuration block, so a production edit there fails the tests instead of
  * silently undoing a change), and the schema by extending production's zod
  * instances, so the stat, outcome and player instances stay shared across

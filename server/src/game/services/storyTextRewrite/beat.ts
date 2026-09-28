@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Story } from "core/models/Story.js";
-import { GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION } from "../prompts/BeatPromptService.js";
-import { beatStep } from "../storyTextSteps.js";
+// Production's beat request and image instruction as they stood at the round0 prompt state (frozen at the adoption of 2026-09-28)
+import { ROUND0_GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION as GENERIC_ELEMENT_IMAGES_FIRST_INSTRUCTION } from "../storyTextRound0/Round0BeatPromptService.js";
+import { round0BeatStep as beatStep } from "../storyTextRound0/round0Steps.js";
 import {
   asArray,
   asDiscriminatedUnion,

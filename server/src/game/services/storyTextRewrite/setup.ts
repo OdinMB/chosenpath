@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
-import { setupStep } from "../storyTextSteps.js";
+// Production's setup request as it stood at the round0 prompt state (frozen at the adoption of 2026-09-28)
+import { round0SetupStep as setupStep } from "../storyTextRound0/round0Steps.js";
 import {
   asArray,
   asObject,

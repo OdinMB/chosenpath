@@ -10,7 +10,13 @@ import { BeatResolutionService } from "../../game/services/BeatResolutionService
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { ChangeService } from "../../game/services/ChangeService.js";
 import { ThreadResolutionService } from "../../game/services/ThreadResolutionService.js";
-import { beatStep, switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
+import { beatStep, type TextRequest } from "../../game/services/storyTextSteps.js";
+// The round cases were built on today's form, which the round0 prompt state froze at the adoption of 2026-09-28
+import {
+  round0BeatStep,
+  round0SwitchStep as switchStep,
+  round0ThreadStep as threadStep,
+} from "../../game/services/storyTextRound0/round0Steps.js";
 import type { EvalRole } from "./arms.js";
 import { chooseAndResolve } from "./caseBuilder.js";
 import { caseStory, type EvalCase, type FixedAnalysis } from "./cases.js";
@@ -459,7 +465,7 @@ export async function multiplayerAfterFirstCases(base: EvalCase, stored: RoundRe
   for (let guard = 0; story.getCurrentBeatType() === "thread" && !story.isCurrentThreadResolved() && guard < 4; guard++) {
     const turn = story.getCurrentTurn();
     const buildId = `build-beat-round-mp-${tag}-t${turn}`;
-    const reply = await call("beat", buildId, beatStep.request(story), players);
+    const reply = await call("beat", buildId, round0BeatStep.request(story), players);
     if (!reply) return { cases: [], problems: [`${buildId}: the chapter step call produced nothing usable`] };
     replies.push(reply.outputFile);
     story = chooseByHash(afterBeatReply(story, reply.parsed as SetOfBeatGenerationSchema), buildId);
@@ -488,7 +494,7 @@ export async function multiplayerAfterFirstCases(base: EvalCase, stored: RoundRe
     fixedAnalysis: { kind: "switch", phase: phaseOf(planned) as SwitchAnalysis },
     note: `The multiplayer switch turn after the first chapter, with production's default switch plan (${plan.outputFile}) fixed. ${history}`,
   });
-  const turnReply = await call("beat", switchTurn.id, beatStep.request(planned), players);
+  const turnReply = await call("beat", switchTurn.id, round0BeatStep.request(planned), players);
   if (!turnReply) return { cases: [switchCase, switchTurn], problems: [`${switchTurn.id}: the switch turn call produced nothing usable`] };
   const after = chooseByHash(afterBeatReply(planned, turnReply.parsed as SetOfBeatGenerationSchema), switchTurn.id);
   const later = `${history} The switch plan (${plan.outputFile}) and switch turn (${turnReply.outputFile}) are production's defaults' replies; each player's direction was picked by hash.`;

@@ -1,5 +1,7 @@
 import type { PlayerCount, StoryState, StoryTemplate } from "core/types/index.js";
-import { beatStep, type TextRequest } from "../../game/services/storyTextSteps.js";
+import type { TextRequest } from "../../game/services/storyTextSteps.js";
+// Case building sends today's form (the round0 prompt state, frozen at the adoption of 2026-09-28)
+import { round0BeatStep as beatStep } from "../../game/services/storyTextRound0/round0Steps.js";
 import { baselineArm, type EvalRole, type Stage } from "./arms.js";
 import { HARD_CEILING, LEDGER_STAGES, resolveCaps, spentByStage, STAGE_CAP_REASONS, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";

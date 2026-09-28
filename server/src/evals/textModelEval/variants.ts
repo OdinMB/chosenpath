@@ -11,6 +11,13 @@ import {
   type TextRequest,
 } from "../../game/services/storyTextSteps.js";
 import {
+  round0BeatStep,
+  round0IterationRequest,
+  round0SetupStep,
+  round0SwitchStep,
+  round0ThreadStep,
+} from "../../game/services/storyTextRound0/round0Steps.js";
+import {
   trimmedBeatRequest,
   trimmedSetupRequest,
   trimmedSwitchRequest,
@@ -44,8 +51,14 @@ import { turnRound3FormRequest, type TurnRound3Request } from "../../game/servic
 import type { CallLimits } from "shared/llm/chatModel.js";
 
 /*
- * The prompt/schema variant hook. "prod" builds exactly what production
- * sends; it is also Stage 3's "full" form. The Stage 3 trims
+ * The prompt/schema variant hook. "prod" builds what production sent at the
+ * round0 prompt state ("today's form" in every report up to setup round 3),
+ * frozen in storyTextRound0/ when the carried-forward forms were adopted
+ * (2026-09-28), so every stored "prod" record still rebuilds byte for byte;
+ * it is also Stage 3's "full" form. "adopted" builds what production sends
+ * now (storyTextSteps.ts), for runs on production's own code (no stage plans
+ * it yet); record it under a new prompt state, since round0 names the code
+ * before the adoption. The Stage 3 trims
  * (storyTextTrims.ts) drop planning fields that nothing reads after
  * generation, and the prompt lines asking for them:
  * - "slim" (beats only): the stats list, the multiplayer coordination note
@@ -114,10 +127,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * case's kids tag; "planV2b" is planner v2 with two-sided contests only (the
  * chapter planner's three-player race rule gone); "turnB6" is today's turn
  * form with B6 alone, single player (group turns stay on today's form).
+ * Each round variant edits the round0 form, so none of them follows a later
+ * production change.
  */
 
 export type VariantId =
   | "prod"
+  | "adopted"
   | "slim"
   | "minimal"
   | "rewrite"
@@ -148,6 +164,7 @@ export type VariantId =
   | "turnB6";
 export const VARIANTS: VariantId[] = [
   "prod",
+  "adopted",
   "slim",
   "minimal",
   "rewrite",
@@ -265,22 +282,28 @@ export type RequestInput =
   | { role: "beat" | "switch" | "thread"; story: Story; chapterFrames?: ChapterFrameText }
   | { role: "iteration"; iteration: IterationInput };
 
-/** Template iteration exactly as TemplateService.iterateTemplate builds it. */
-function iterationRequest(input: IterationInput): TextRequest {
-  return {
-    prompt: StorySetupPromptService.createIterationPrompt(
-      input.feedback,
-      input.playerCount,
-      input.gameMode,
-      input.maxTurns,
-      input.sections,
-      input.template
-    ),
-    schema: partialTemplateSchema(input.sections, input.playerCount),
-  };
+/** Today's form at the round0 prompt state (storyTextRound0/): what every stored "prod" record sent. */
+function prodRequest(input: RequestInput): TextRequest {
+  switch (input.role) {
+    case "setup": {
+      const { premise, playerCount, gameMode, maxTurns } = input.setup;
+      return round0SetupStep.request(premise, playerCount, gameMode, maxTurns, "story");
+    }
+    case "beat":
+      return round0BeatStep.request(input.story);
+    case "switch":
+      return round0SwitchStep.request(input.story);
+    case "thread":
+      return round0ThreadStep.request(input.story);
+    case "iteration": {
+      const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
+      return round0IterationRequest(feedback, playerCount, gameMode, maxTurns, sections, template);
+    }
+  }
 }
 
-function prodRequest(input: RequestInput): TextRequest {
+/** What production sends since the adoption (storyTextSteps.ts; TemplateService.iterateTemplate for AI Iteration). */
+function adoptedRequest(input: RequestInput): TextRequest {
   switch (input.role) {
     case "setup": {
       const { premise, playerCount, gameMode, maxTurns } = input.setup;
@@ -292,8 +315,13 @@ function prodRequest(input: RequestInput): TextRequest {
       return switchStep.request(input.story);
     case "thread":
       return threadStep.request(input.story);
-    case "iteration":
-      return iterationRequest(input.iteration);
+    case "iteration": {
+      const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
+      return {
+        prompt: StorySetupPromptService.createIterationPrompt(feedback, playerCount, gameMode, maxTurns, sections, template),
+        schema: partialTemplateSchema(sections, playerCount),
+      };
+    }
   }
 }
 
@@ -408,6 +436,7 @@ function roundTwoTurn(variant: VariantId, form: TurnRound2Form) {
 
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
+  adopted: adoptedRequest,
   slim: slimRequest,
   minimal: minimalRequest,
   rewrite: rewriteVariant("rewrite", "exact", { setupWithExamples: true, beat: "full" }),
