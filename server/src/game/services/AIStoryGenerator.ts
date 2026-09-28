@@ -33,6 +33,7 @@ import { llmCallLogger, type CallTags } from "shared/llm/usageRecorder.js";
 import { readStorageFile, writeStorageFile } from "shared/storageUtils.js";
 import { createEmptyPlayerState } from "./StoryStateFactory.js";
 import { repairBeatReply } from "./beatRepairs.js";
+import { checkedBeatReply } from "./beatChecks.js";
 import { checkedSwitchPlan, checkedThreadPlan } from "./planChecks.js";
 import { logRepairs } from "./textRepairs.js";
 import {
@@ -401,9 +402,15 @@ export class AIStoryGenerator {
       `Generating beats for turn: ${story.getCurrentTurn() + 1}`
     );
 
-    const response = (await structuredModel.invoke(request.prompt, {
-      metadata: storyTags(story, context, story.getCurrentBeatType()),
-    })) as SetOfBeatGenerationSchema;
+    // A text that comes back as one short paragraph gets one more call, told so
+    const response = await checkedBeatReply(
+      request.prompt,
+      async (prompt) =>
+        (await structuredModel.invoke(prompt, {
+          metadata: storyTags(story, context, story.getCurrentBeatType()),
+        })) as SetOfBeatGenerationSchema,
+      (line) => Logger.Story.warn(`${line} (story ${story.getId()}, turn ${story.getCurrentTurn() + 1})`)
+    );
 
     Logger.Story.log("Beats generated");
     return response;

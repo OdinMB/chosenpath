@@ -18,6 +18,7 @@ import type { Story } from "core/models/Story.js";
 import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/StorySetupPromptService.js";
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
+import { beatSchemaWithOptionRules, takesOptionRules } from "./optionRules.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
@@ -113,7 +114,8 @@ function mergeChanges(response: SetOfBeatGenerationSchema): Change[] {
 }
 
 export const beatStep = {
-  request(story: Story): TextRequest<ReturnType<typeof createSetOfBeatGenerationSchema>> {
+  /** A turn for every player; a single player's rolled chapter step takes the option rules (B6) in its fields too. */
+  request(story: Story): TextRequest<z.AnyZodObject> {
     const schema = createSetOfBeatGenerationSchema(
       story.getNumberOfPlayers(),
       canAddMilestones(story),
@@ -122,7 +124,10 @@ export const beatStep = {
       story.generatesImages(),
       story.hasImages()
     );
-    return { prompt: BeatPromptService.createBeatPrompt(story), schema };
+    return {
+      prompt: BeatPromptService.createBeatPrompt(story),
+      schema: takesOptionRules(story) ? beatSchemaWithOptionRules(schema) : schema,
+    };
   },
 
   /** The story with the new beats added, the changes to apply, and image requests. */

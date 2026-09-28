@@ -4,6 +4,7 @@ import {
   type SectionConfig,
 } from "./StoryStatePromptService.js";
 import { POINTS_FOR_SACRIFICE, POINTS_FOR_REWARD } from "core/config.js";
+import { NO_DOUBLE_SACRIFICE, REWARD_EXCEPTION, THREE_WAYS, sacrificeRewardLine, takesOptionRules } from "../optionRules.js";
 
 /**
  * Part of the image-request instructions for every image-generating story,
@@ -427,6 +428,8 @@ ${
   }
 
   private static createOptionInstructions(story: Story): string {
+    // The option rules (B6): a single player's rolled chapter steps only
+    const rules = takesOptionRules(story);
     return `
 Options
 - Offer exactly 3 options.
@@ -439,6 +442,8 @@ Options
         : ""
     }
 --- Don't give the player an opportunity to leave the scene, suddenly do something else, or derail the core theme of the ${story.getCurrentBeatType()} in any other way.${
+      rules ? ` ${REWARD_EXCEPTION}` : ""
+    }${
       story.isMultiplayer()
         ? "\n- Take the multiplayer coordination for this set of beats into account. If several players are on the same side in a thread, this will ensure that their options are meaningfully different and both consistent and coordinated with each other.\n" +
           "- Never offer options like 'Collaborate with [insert player name].' If the other player doesn't choose a similar option, this can lead to inconsistencies in the story. Instead, offer concrete actions and decisions that can be made independently of the other player's choice but that in a collaborative Challenge thread still constitute a meaningful collaboration. The multiplayer coordination analysis for this set of beats has notes on how to avoid this."
@@ -446,7 +451,7 @@ Options
     }
 - Be specific.
 --- Bad: 'Propose a compromise'. Good: Specify what the compromise is.
---- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'
+--- Bad: 'Create a diversion'. Good: 'Divert the guards by throwing some gold coins around.'${rules ? `\n${THREE_WAYS}` : ""}
 - Do NOT include the actual or likely consequences of a decision. (Except for mentioning the stat that is sacrificed or gained as a reward in sacrifice and reward options.)
 - Options determine how the story will continue after this beat. Whatever happened in the beat text is already established.
 - For each option, set the optionType field:
@@ -459,16 +464,24 @@ ${
 - Define if the option is a sacrifice (losing a stat in exchange for a higher chance of success) or a reward (gaining a stat as a reward for choosing a lower chance of success) or normal (neither of the above).
 --- You can only define sacrifice and reward options for stats that allow to be sacrificed or gained as a reward in their stat definitions.
 --- You can only generate either 0 or 1 sacrifice/reward option (total) per beat. The rest of the options must be normal.
---- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
+${rules ? `--- ${sacrificeRewardLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n` : ""}--- Formulate the option with flavor in mind. Bad: 'Sacrifice 10% emotional stability for a higher chance of catching his attention.'. Good: 'Bite your lips (-10% stability) and intercept Adrian directly.'
 ${
   story.getCurrentBeatType() === "thread"
     ? "- For challenge options, define how the option affects the likelihood of different resolutions\n" +
-      "--- basePoints: for normal resource types: assign a value between +5 to -15. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15 here. " +
-      POINTS_FOR_SACRIFICE +
-      " for sacrifice options. " +
-      POINTS_FOR_REWARD +
-      " for reward options.\n" +
-      "--- modifiers: identify stats (individual or shared) in the story state that given their current value have an effect on the likelihood of success. This must be consistent with the stat's definition (its 'effects on challenge success' attribute). Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Consider both positive and negative effects.\n" +
+      // With the option rules, the base-point scale is in the field itself
+      (rules
+        ? ""
+        : "--- basePoints: for normal resource types: assign a value between +5 to -15. Sensible options should get +/- 0. Options that are listed and attractive because they play to the player's strengths or assets but aren't inherently sensible for the challenge at hand should get -5 to -15 here. " +
+          POINTS_FOR_SACRIFICE +
+          " for sacrifice options. " +
+          POINTS_FOR_REWARD +
+          " for reward options.\n") +
+      "--- modifiers: identify stats (individual or shared) in the story state that given their current value have an effect on the likelihood of success. This must be consistent with the stat's definition (its 'effects on challenge success' attribute). Example: if the option is to woo an npc, player1_charisma is 70/100, and the stat defines that 70%+ gives +15 to social interactions, you can award +15. If the stat is at 60%, and the stat defines no bonuses at that level, don't award any modifier for charisma. " +
+      // A bonus comes from the option's own approach (B6), so no licence for bonuses the definition doesn't name
+      (rules
+        ? ""
+        : "That said: if it makes sense for a stat to have an influence when the specific situation is not covered in the stat's definition, you can award a modifier. ") +
+      "Only assign a modifier if the actual, current value of the stat warrents it, not if the stat in general seems relevant. Don't include bonuses/maluses for sacrificing/gaining stats. These bonuses/maluses are already covered elsewhere. Consider both positive and negative effects.\n" +
       "--- riskType: decide if this option is risky (extreme outcomes are more likely), safe (extreme outcomes become less likely), or normal.\n"
     : ""
 }
