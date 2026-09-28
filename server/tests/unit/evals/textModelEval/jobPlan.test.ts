@@ -28,7 +28,8 @@ import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremise
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
-import type { EvalCase } from "../../../../src/evals/textModelEval/cases.js";
+import { caseStory, type EvalCase } from "../../../../src/evals/textModelEval/cases.js";
+import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import {
   assembledReply,
   callLimitsOf,
@@ -804,6 +805,44 @@ describe("rebuiltToday: stored records that may stand in as a round's reference"
 
   it("has no hash for a request today's code cannot build", () => {
     expect(todaysRequestHash(setupCase, "rewriteSlim")).toBeUndefined();
+  });
+
+  it("rebuilds a chain's planner from its case and its turn from the stored plan, each on its own side's variant", () => {
+    // The final check reads production's own chains against today's pair's stored ones (2026-09-28)
+    const threadCase = evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-sp-thread" }).getState() });
+    const chain = "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod";
+    const plan = threadAnalysis("challenge", 3, 0);
+    const hash = (request: Parameters<typeof requestText>[0]) => sha256(requestText(request));
+    const plannerHash = hash(requestFor("prod", { role: "thread", story: caseStory(threadCase, false) }));
+    const turnHash = hash(requestFor("prod", { role: "beat", story: storyAfterAnalysis(caseStory(threadCase, false), "thread", plan) }));
+    const step = (n: number, promptHash: string, overrides: Partial<CallRecord> = {}) =>
+      record({
+        caseId: threadCase.id,
+        armKey: chain,
+        callArmKey: n === 1 ? "gpt-6-luna@low/prod" : "gpt-6-luna@medium/prod",
+        jobKey: `${threadCase.id}|${chain}|round0|1`,
+        group: "pipeline",
+        role: n === 1 ? "thread" : "beat",
+        step: n,
+        jobFinal: n === 2,
+        promptHash,
+        promptState: "round0",
+        outputFile: `outputs/step${n}.json`,
+        ...overrides,
+      });
+    const records = [step(1, plannerHash), step(2, turnHash)];
+    const load = (r: CallRecord) => (r.outputFile === "outputs/step1.json" ? plan : undefined);
+    const current = rebuiltToday([threadCase], { records, load });
+    expect(records.map(current)).toEqual([true, true]);
+    // A turn written from another plan, or a planner on another form, is not today's
+    expect(current(step(2, "an older turn"))).toBe(false);
+    expect(current(step(1, hash(requestFor("planV2", { role: "thread", story: caseStory(threadCase, false) }))))).toBe(false);
+    // The turn's request needs the stored plan: without the chain's records only the planner can be rebuilt
+    const alone = rebuiltToday([threadCase]);
+    expect(records.map(alone)).toEqual([true, false]);
+    // A turn whose planner step is not today's is not today's either
+    const stale = [step(1, "an older planner"), step(2, turnHash)];
+    expect(rebuiltToday([threadCase], { records: stale, load })(stale[1])).toBe(false);
   });
 });
 

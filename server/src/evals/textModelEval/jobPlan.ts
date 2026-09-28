@@ -7,6 +7,7 @@ import {
   armsFor,
   baselineArm,
   chainKey,
+  chainSides,
   estimateBaseKey,
   pipelinePlans,
   stageRunsBaseline,
@@ -105,19 +106,60 @@ export function todaysRequestHash(evalCase: EvalCase, variant: VariantId = "prod
   }
 }
 
+/** A record's variant: an arm key's last part, or for one side of a chain key that side's. */
+const variantOfKey = (key: string): VariantId | undefined => {
+  const variant = key.split("/").pop() as VariantId;
+  return VARIANTS.includes(variant) ? variant : undefined;
+};
+
 /**
  * Whether a stored record's request is the one today's code builds for its
  * case on its arm's variant, byte for byte, so a round can read it as its
  * reference (variantComparison.ts, StoredReference); memoised per case and
- * variant.
+ * variant. A chain's planner step is rebuilt from its case on the planner
+ * side's variant; its turn step (with `chains`: the records and their stored
+ * outputs) from the story after its own stored plan, as the chain built it,
+ * on the turn side's variant, and only where the planner step is today's too
+ * (the final check reads production's chains against today's pair's).
  */
-export function rebuiltToday(cases: EvalCase[]): (record: CallRecord) => boolean {
+export function rebuiltToday(
+  cases: EvalCase[],
+  chains?: { records: CallRecord[]; load: (record: CallRecord) => unknown }
+): (record: CallRecord) => boolean {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const hashes = new Map<string, string | undefined>();
+  const hashOf = (key: string, build: () => EvalRequest): string | undefined => {
+    if (!hashes.has(key)) {
+      try {
+        hashes.set(key, sha256(requestText(build())));
+      } catch {
+        hashes.set(key, undefined);
+      }
+    }
+    return hashes.get(key);
+  };
+  const chainStep = (record: CallRecord, evalCase: EvalCase): boolean => {
+    const sides = chainSides(record.armKey);
+    const [planner, turn] = [sides && variantOfKey(sides.analysis), sides && variantOfKey(sides.beat)];
+    if (!planner || !turn || (evalCase.role !== "switch" && evalCase.role !== "thread")) return false;
+    const kind = evalCase.role;
+    const plannerHash = hashOf(`${record.caseId}|${planner}|${kind}`, () => requestFor(planner, { role: kind, story: caseStory(evalCase, false) }));
+    if (record.step === 1) return plannerHash === record.promptHash;
+    const plan = chains?.records.find((r) => r.jobKey === record.jobKey && r.step === 1 && r.final && usable(r));
+    if (!plan || plan.promptHash !== plannerHash || !chains) return false;
+    const written = chains.load(plan);
+    if (written === undefined) return false;
+    const turnHash = hashOf(`${plan.outputFile ?? plan.jobKey}|${turn}|beat`, () =>
+      requestFor(turn, { role: "beat", story: storyAfterAnalysis(caseStory(evalCase, false), kind, written as SwitchAnalysis | ThreadAnalysis) })
+    );
+    return turnHash === record.promptHash;
+  };
   return (record) => {
     const evalCase = byId.get(record.caseId);
-    const variant = record.armKey.split("/").pop() as VariantId;
-    if (!evalCase || !record.promptHash || !VARIANTS.includes(variant)) return false;
+    if (!evalCase || !record.promptHash) return false;
+    if (record.group === "pipeline") return chainStep(record, evalCase);
+    const variant = variantOfKey(record.armKey);
+    if (!variant) return false;
     const key = `${record.caseId}|${variant}`;
     if (!hashes.has(key)) hashes.set(key, todaysRequestHash(evalCase, variant));
     return hashes.get(key) === record.promptHash;

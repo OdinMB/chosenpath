@@ -630,7 +630,8 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       filterCheckUsd: filterSpendUsd(files.readFilterRecords()),
       sideSpend: prepSpend(files.readPrepRecords()),
       prose,
-      storedReference: rebuiltToday(cases),
+      // A chain's turn is rebuilt from its own stored plan, so the chains' records and outputs go along
+      storedReference: rebuiltToday(cases, { records, load: files.loadOutput }),
       sameRequest: sameRequestAs(cases),
       turnKinds: new Map(cases.flatMap((c) => {
         const kind = turnKindOf(c);
