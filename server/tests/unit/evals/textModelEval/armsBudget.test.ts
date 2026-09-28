@@ -19,6 +19,7 @@ import {
   standInKey,
 } from "../../../../src/evals/textModelEval/arms.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
+import { referenceKeyOf } from "../../../../src/evals/textModelEval/variantComparison.js";
 import {
   costFromUsage,
   estimateCall,
@@ -367,6 +368,12 @@ describe("budget caps", () => {
     expect(secondReferenceKeys("gpt-6-luna@medium/chapterFullB")).toEqual(["gpt-6-luna@medium/chapterFull"]);
     expect(referenceKey("gpt-6-luna@low/setupR3b")).toBe("gpt-6-luna@low/setupR3");
     expect(secondReferenceKeys("gpt-6-luna@low/setupR3b")).toEqual(["gpt-6-luna@low/prod"]);
+    // Its chain reads against today's pair (planner v2b, planner v2c's own reference, never ran in a chain), and round 1's chain second
+    const chain = "pipeline:gpt-6-luna@low/planV2c>gpt-6-luna@medium/chapterFullB";
+    expect(referenceKeyOf(chain)).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");
+    expect(secondReferenceKeys(chain)).toEqual(["pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterFull"]);
+    // Other chains still chain their sides' references
+    expect(referenceKeyOf("pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/chapterFull")).toBe("pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod");
     // Planner v2's records stand in for planner v2b's, and nothing else stands in
     expect(standInKey("gpt-6-luna@low/planV2b")).toBe("gpt-6-luna@low/planV2");
     expect(standInKey("gpt-6-luna@low/planV2c")).toBeUndefined();

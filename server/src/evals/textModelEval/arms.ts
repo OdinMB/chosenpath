@@ -220,8 +220,10 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR3")]: [armKey(LUNA_LOW, "prod")],
   // Planner v2c: planV2b ran only in the setup chain, so planner v2's isolated plans (and today's form) are its readings too
   [armKey(LUNA_LOW, "planV2c")]: [armKey(LUNA_LOW, "planV2"), armKey(LUNA_LOW, "prod")],
-  // The reruns' framed turn against round 1's framed turn too (the nearer frames and no chapter rules on their own)
+  // The reruns' framed turn against round 1's framed turn too (the nearer frames and no chapter rules on their own), and
+  // its chain after planner v2c against round 1's chain (planner v2 into the framed turn)
   [armKey(LUNA_MEDIUM, "chapterFullB")]: [armKey(LUNA_MEDIUM, "chapterFull")],
+  [chainKey(armKey(LUNA_LOW, "planV2c"), armKey(LUNA_MEDIUM, "chapterFullB"))]: [chainKey(armKey(LUNA_LOW, "planV2"), armKey(LUNA_MEDIUM, "chapterFull"))],
   // The setup retests against today's prompt too (the carry-forward guard)
   [armKey(LUNA_LOW, "setupR3b")]: [armKey(LUNA_LOW, "prod")],
 };
@@ -244,6 +246,22 @@ const STAND_INS: Record<string, string> = {
 
 export function standInKey(key: string): string | undefined {
   return STAND_INS[key];
+}
+
+/**
+ * Chains whose reference is not their sides' own references chained: the
+ * reruns' planner v2c into the framed turn reads against today's pair, as
+ * turn round 1's planner v2 into the framed turn did (planner v2c's own
+ * reference, planner v2b, never ran in a chain), with turn round 1's chain as
+ * its second reference.
+ */
+const CHAIN_REFERENCES: Record<string, string> = {
+  [chainKey(armKey(LUNA_LOW, "planV2c"), armKey(LUNA_MEDIUM, "chapterFullB"))]: chainKey(armKey(LUNA_LOW, "prod"), armKey(LUNA_MEDIUM, "prod")),
+};
+
+/** A chain's own reference where it is set apart (CHAIN_REFERENCES), else undefined. */
+export function chainReferenceKey(key: string): string | undefined {
+  return CHAIN_REFERENCES[key];
 }
 
 /**

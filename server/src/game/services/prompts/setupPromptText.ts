@@ -277,8 +277,14 @@ function storyLengthLine(maxTurns: number, multiplayer: boolean): string {
   return `- Story length: about ${maxTurns} turns, so each player plays about ${threads} thread${threads === 1 ? "" : "s"} and earns about ${milestoneBudgetFor(maxTurns)} milestones in total${counting}.`;
 }
 
+/**
+ * The kids budget line. Its examples are the setup retests' of 2026-09-28
+ * (the eval's setupR3b, KIDS_STATS_VARIED): round 3's "for example Courage,
+ * Snacks, Forest Friends" had a kids setup copy an example in 4 of 4, Courage
+ * every time; examples from other kinds of story, 1 of 4.
+ */
 export const KIDS_STATS =
-  "- A child reads this story along with an adult, so keep the stats few and plain: two visible shared stats and two visible player stats, and no hidden ones. Name each in one or two everyday words a young reader knows (for example Courage, Snacks, Forest Friends), and give it a tooltip of one short, simple sentence.";
+  "- A child reads this story along with an adult, so keep the stats few and plain: two visible shared stats and two visible player stats, and no hidden ones. Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins), and give it a tooltip of one short, simple sentence.";
 
 const CAMPS =
   "Contests have two sides, so the three players form two camps: side A is player1's camp and side B the other, and one camp holds two players. The seat roles say which seat is in which camp.";

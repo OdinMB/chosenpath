@@ -3,9 +3,9 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { GameModes, type GameMode, type PlayerCount } from "core/types/index.js";
 import type { TemplateIterationSections } from "core/types/admin.js";
 import { iterationStep, setupStep } from "../../../../src/game/services/storyTextSteps.js";
-import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
+import { ROUND3_PARTS, ROUND3B_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { assembleGenerationOrder, iterationRound2Request, setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
-import { SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup } from "../../../helpers/adoptedDeltas.js";
+import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's setup form is setup round 3's as the eval measured it
@@ -70,6 +70,19 @@ describe("custom-story and template setup: the measured form", () => {
   it("prints the kids budget only when a child reads along", () => {
     expect(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true }).prompt).toContain("A child reads this story along with an adult");
     expect(setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story").prompt).not.toContain("A child reads this story");
+  });
+
+  it("names the kids stat examples as the setup retests measured them (setupR3b), and keeps the identity clause as round 3 measured it", () => {
+    const [before, after] = KIDS_EXAMPLES;
+    const kids = setupStep.request(PREMISE, 2, GameModes.Cooperative, 25, "story", { kids: true }).prompt;
+    expect(kids).toContain(after);
+    expect(kids).not.toContain(before);
+    expect(kids).not.toMatch(/Courage/);
+    // The same passage as the retest's form sends it
+    const retest = setupRound2Request(PREMISE, 2, GameModes.Cooperative, 25, "story", "generationOrder", ROUND3B_PARTS, { kids: true }).prompt;
+    expect(retest).toContain(after);
+    // The identity clause did not pass its retest: production keeps "in outcomes and stats"
+    expect(setupStep.request(PREMISE, 2, GameModes.Competitive, 25, "story").prompt).toContain("use those names in outcomes and stats");
   });
 });
 

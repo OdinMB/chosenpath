@@ -2,7 +2,8 @@
  * The deliberate differences between production and the eval variants it
  * adopted on 2026-09-28 (setupR3, planV2b for the switch, planV2c for the
  * chapter, turnB6), the one place the adoption tests read them from. Each is
- * a logged adoption item or a settled decision that no round measured;
+ * a logged adoption item, a settled decision that no round measured, or (the
+ * kids stat examples) a retested passage measured in another variant;
  * everything else production sends is the variant's request byte for byte
  * (.plans/2026-09-26_build-followup.md, "Adoption into production" and "The
  * owner's feedback of 2026-09-28"). The chapter planner has none: planV2c
@@ -13,6 +14,7 @@ import type { Story } from "core/models/Story.js";
 import type { GameMode } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
 import { StoryStatePromptService } from "../../src/game/services/prompts/StoryStatePromptService.js";
+import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyTextRounds/setupRound3Text.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -37,9 +39,19 @@ export const SCOREBOARD_SENTENCES: [string, string][] = [
   ],
 ];
 
+/**
+ * Setup (the setup retests of 2026-09-28, measured as setupR3b): the kids
+ * stat examples from other kinds of story, in place of round 3's "Courage"
+ * first, which named a stat in all four kids setups (4 of 4 copied an
+ * example; 1 of 4 on the retest). The retest's other clause, the identity
+ * clause's names in outcomes only, did not pass and stays as measured.
+ */
+export const KIDS_EXAMPLES: [string, string] = [KIDS_STATS, KIDS_STATS_VARIED];
+
 /** The measured setup prompt as production sends it. */
 export function adoptedSetupPrompt(measured: string, players: number, mode: GameMode): string {
-  return isContestSetup(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), measured) : measured;
+  const kids = measured.split(KIDS_EXAMPLES[0]).join(KIDS_EXAMPLES[1]);
+  return isContestSetup(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), kids) : kids;
 }
 
 /** Turns (step 5): the scoreboard ending rule, the one line on the ending of a story with a contested outcome. */

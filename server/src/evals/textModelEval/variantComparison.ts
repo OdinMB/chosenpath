@@ -1,5 +1,5 @@
 import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
-import { chainKey, chainSides, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
+import { chainKey, chainReferenceKey, chainSides, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
 import { RATIOS } from "./checkBaselines.js";
 import { finishesJob, type CallRecord } from "./runner.js";
@@ -73,6 +73,8 @@ export type VariantComparison = {
 export function referenceKeyOf(armKey: string): string | undefined {
   const chain = chainSides(armKey);
   if (!chain) return referenceKey(armKey);
+  const set = chainReferenceKey(armKey);
+  if (set) return set;
   const analysis = referenceKey(chain.analysis);
   const beat = referenceKey(chain.beat);
   return analysis || beat ? chainKey(analysis ?? chain.analysis, beat ?? chain.beat) : undefined;
