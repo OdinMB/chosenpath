@@ -1493,6 +1493,36 @@ describe("the rebuilt turn round 1 page (turns-r1b, 2026-09-28): the nearer fram
   });
 });
 
+describe("a pairwise turn page for the group round (B10): the group questions, every player's turn per option", () => {
+  const REF = { promptState: "round0", armKey: "gpt-6-luna@low/prod" };
+  const CAND = { promptState: "round0", armKey: "gpt-6-luna@low/turnB10" };
+  const cases = Array.from({ length: 5 }, (_, i) => evalCase(`group-${i}`, "beat", { state: threadBeat(2, { id: `story-g${i}` }).getState(), tags: tags({ multiplayer: true, players: 2 }) }));
+  const records: CallRecord[] = [];
+  const outputs = new Map<string, unknown>();
+  for (const c of cases) {
+    for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+      for (const sample of samples) {
+        const outputFile = `${c.id}-${arm.armKey}-${sample}`;
+        outputs.set(outputFile, beatSet(2, { player1: beatGeneration({ text: `First player scene in ${c.id}.` }), player2: beatGeneration({ text: `Second player scene in ${c.id}.` }) }));
+        records.push(record({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, callArmKey: arm.armKey, baseline: false, sample, players: 2, outputFile }));
+      }
+    }
+  }
+  const load = (r: CallRecord) => outputs.get(r.outputFile ?? "");
+  const { set, key } = planRatingSet({ kind: "turn", arms: [REF, CAND], items: 4, preview: false, pairwise: true, criteria: "groups" }, records, cases, { loadOutput: load, salt: "groups", now: new Date(0) });
+
+  it("asks whether the players' turns tell their shared moments alike, keeps the questions in the key, and leaks nothing", () => {
+    const text = set.instructions.join(" ");
+    for (const question of PAIRWISE_CRITERIA_SETS.groups) expect(text).toContain(question);
+    expect(text).toContain("the same lines, from the same speakers");
+    expect(key.criteria).toBe("groups");
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+    expect(metadataLeaks(set)).toEqual([]);
+    expect(htmlLeaks(renderRatingPage(set), key)).toEqual([]);
+    expect(renderRatingPage(set)).toContain("Second player scene in");
+  });
+});
+
 describe("a pairwise turn page for turn round 2: the owner's round-2 questions, and endings as the player sees them", () => {
   const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
   const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/turnR2" };

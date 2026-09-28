@@ -44,6 +44,44 @@ describe("variantComparisons", () => {
     expect(comparison.reference.calls).toBe(1);
   });
 
+  it("reads a one-sample reference's noise from the arm it builds on (production's form ran once; today's form twice), and says so", () => {
+    // B9's gate (2026-09-28): the request form against production's one-message form, which ran once beside it; the
+    // noise is today's form's two samples on the same cases (the stored round0 references), which production's form edits
+    const [SPLIT, ADOPTED, PROD] = ["gpt-6-luna@medium/adoptedSplit", "gpt-6-luna@medium/adopted", "gpt-6-luna@medium/prod"];
+    const at = (armKey: string, caseId: string, sample: number, promptState: string) =>
+      call(armKey, caseId, sample, { promptState, jobKey: `${caseId}|${armKey}|${promptState}|s${sample}` });
+    const records = [
+      at(SPLIT, "a", 1, "adopted1"),
+      at(SPLIT, "b", 1, "adopted1"),
+      at(ADOPTED, "a", 1, "adopted1"),
+      at(ADOPTED, "b", 1, "adopted1"),
+      at(PROD, "a", 1, "round0"),
+      at(PROD, "a", 2, "round0"),
+      at(PROD, "b", 1, "round0"),
+      at(PROD, "b", 2, "round0"),
+    ];
+    const passes = (r: CallRecord, ok: boolean) => [r, { sentences: ok }] as [CallRecord, Record<string, boolean>];
+    const checks = checked([
+      passes(records[0], true),
+      passes(records[1], true),
+      passes(records[2], true),
+      passes(records[3], true),
+      // Today's form: 2 of 2 on sample 1, 1 of 2 on sample 2, so a 50-point noise
+      passes(records[4], true),
+      passes(records[5], true),
+      passes(records[6], true),
+      passes(records[7], false),
+    ]);
+    const all = variantComparisons(records, checks, caseTags("a", "b"), "adopted1", () => true);
+    const comparison = all.find((c) => c.armKey === SPLIT && c.referenceKey === ADOPTED);
+    expect(comparison).toMatchObject({ hasNoise: true, noiseFrom: { armKey: PROD, promptState: "round0" }, pairs: 2 });
+    expect(comparison?.checks.find((c) => c.name === "sentences")).toMatchObject({ reference: 1, arm: 1 });
+    // Without an arm to borrow from, a one-sample reference still has no noise
+    const alone = variantComparisons(records.slice(0, 4), checks, caseTags("a", "b"), "adopted1", () => true).find((c) => c.armKey === SPLIT);
+    expect(alone).toMatchObject({ hasNoise: false });
+    expect(alone?.noiseFrom).toBeUndefined();
+  });
+
   it("pairs each Stage 4 arm with its reference arm", () => {
     const keys = ["gpt-6-luna@medium/slim", "gpt-6-luna@medium/rewriteSlim", "gpt-6-luna@medium+vlow/rewriteSlim"];
     const comparisons = variantComparisons(keys.map((key) => call(key, "a", 1)), new Map(), caseTags("a"), "postfix");

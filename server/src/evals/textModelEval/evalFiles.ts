@@ -31,6 +31,7 @@ import type { CallRecord } from "./runner.js";
  *   chapter-frames.json    the backfilled chapter questions and plans (--backfill-chapters)
  *   judge-calibration.md|json  the judged checks against the hand verdicts (--judge-calibration)
  *   judged-turns.md|json   the judged checks on a round's turns, reference against candidate (--judge-records)
+ *   judged-groups.md|json  the group round's judged consistency check and its calibration (--judge-groups)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  */
 
@@ -119,6 +120,11 @@ export function evalFiles(outDir: string) {
     writeJudgedTurns: (markdown: string, json: unknown, set: FrameSet = "backfilled") => {
       writeJson(at(`${JUDGED_FILES[set]}.json`), json);
       fs.writeFileSync(at(`${JUDGED_FILES[set]}.md`), markdown);
+    },
+    /** The group round's judged check (--judge-groups, groupJudge.ts) */
+    writeJudgedGroups: (markdown: string, json: unknown) => {
+      writeJson(at("judged-groups.json"), json);
+      fs.writeFileSync(at("judged-groups.md"), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {

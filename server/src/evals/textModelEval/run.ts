@@ -50,6 +50,7 @@ import {
   backfillChaptersMode,
   buildRoundCasesMode,
   judgeCalibrationMode,
+  judgeGroupsMode,
   judgeRecordsMode,
   printPrepPlan,
   spendBeside,
@@ -92,6 +93,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-records --arms <beat or chain keys> --prompt-state <tag> [--samples 1] [--max-spend 0.10]  the judged
  *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json;
  *     --frames nearer --stage reruns: on the nearer frames, judged-turns-nearer.md and .json
+ *   --judge-groups --arms <reference,candidate> --prompt-state <tag> [--stage groups] [--max-spend 0.10]  the group
+ *     round's judged consistency check (groupJudge.ts): its calibration on today's stored group turns (the reference's
+ *     sample 1, judged twice) and every group reply of the arms once, then judged-groups.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -124,6 +128,7 @@ type Mode =
   | "backfill-chapters"
   | "judge-calibration"
   | "judge-records"
+  | "judge-groups"
   | "balance-sim"
   | "setup-chain";
 
@@ -237,14 +242,17 @@ function parseArgs(argv: string[]): Args {
       case "--backfill-chapters":
       case "--judge-calibration":
       case "--judge-records":
+      case "--judge-groups":
       case "--balance-sim":
       case "--setup-chain":
         args.mode = arg.slice(2) as Mode;
         break;
       case "--criteria": {
         const value = next();
-        if (value !== "turn-round2") throw new UsageError("--criteria is turn-round2 (a pairwise turn page with turn round 2's questions)");
-        args.criteria = "turnRound2";
+        if (value !== "turn-round2" && value !== "groups") {
+          throw new UsageError("--criteria is turn-round2 (a pairwise turn page with turn round 2's questions) or groups (the group round's)");
+        }
+        args.criteria = value === "groups" ? "groups" : "turnRound2";
         break;
       }
       case "--ratings":
@@ -872,6 +880,9 @@ async function main() {
         frames: args.frames,
         stage: args.stage,
       });
+    case "judge-groups":
+      // The group round's judged check books to its own stage (groups) unless another is given
+      return judgeGroupsMode(prepContext(args, files, args.stage ?? "groups"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, { stage: args.stage ?? "groups" });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

@@ -285,7 +285,7 @@ function storyShare(stats: ArmStats, basis: CostBasis = "billed"): number | unde
 const referenceLabel = (c: VariantComparison) =>
   `${c.referenceState ? `${c.referenceState}:${c.referenceKey} (stored)` : c.referenceKey}${
     c.standIns ? ` (with ${c.standIns.records} records of ${c.standIns.armKey}, its request byte for byte)` : ""
-  }${c.secondReference ? " (second reference)" : ""}`;
+  }${c.noiseFrom ? ` (one sample; noise from ${c.noiseFrom.promptState}:${c.noiseFrom.armKey}'s two samples on the same cases)` : ""}${c.secondReference ? " (second reference)" : ""}`;
 
 function renderArmRows(comparisons: VariantComparison[]): string[] {
   const lines = [

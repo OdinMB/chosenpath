@@ -2,9 +2,11 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { z } from "zod";
+import { GameModes } from "core/types/index.js";
 import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { EVAL_TIMEOUT_MS, callOptionsFor, executeCall, type FetchFn } from "../../../../src/evals/textModelEval/executor.js";
-import { MESSAGE_SEPARATOR } from "../../../../src/evals/textModelEval/variants.js";
+import { MESSAGE_SEPARATOR, requestFor } from "../../../../src/evals/textModelEval/variants.js";
+import { threadBeat } from "../../../helpers/promptStories.js";
 import { BASELINE, LUNA, record } from "./fixtures.js";
 
 function replyWith(content: string): FetchFn {
@@ -128,6 +130,19 @@ describe("executeCall", () => {
       const plain = await sent(LUNA, split);
       expect(JSON.stringify(plain.body)).not.toContain("max_completion_tokens");
     });
+  });
+
+  it("sends production's own code (the adopted variant) with production's limits for the role and player count, as production does", () => {
+    const beat = (players: number) => requestFor("adopted", { role: "beat", story: players > 1 ? threadBeat(players) : threadBeat(1) });
+    expect(callOptionsFor(beat(1))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(callOptionsFor(beat(3))).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 16_000 });
+    expect(callOptionsFor(requestFor("adopted", { role: "thread", story: threadBeat(1) }))).toEqual({ timeoutMs: 30_000, maxCompletionTokens: 4_000 });
+    const setup = requestFor("adopted", { role: "setup", setup: { premise: "A goblin union", playerCount: 2, gameMode: GameModes.Cooperative, maxTurns: 20 } });
+    expect(callOptionsFor(setup)).toEqual({ timeoutMs: 120_000, maxCompletionTokens: 20_000 });
+    // B9 on production's form carries the same turn limits, so the gate compares the two request shapes alone
+    expect(callOptionsFor(requestFor("adoptedSplit", { role: "beat", story: threadBeat(1) }))).toEqual(callOptionsFor(beat(1)));
+    // Today's frozen form (prod) keeps the eval's 300 s and no cap, as every stored reference ran
+    expect(callOptionsFor(requestFor("prod", { role: "beat", story: threadBeat(1) }))).toEqual({ timeoutMs: EVAL_TIMEOUT_MS });
   });
 
   it("waits a request's own timeout where it carries production's limits, else the eval's 300 s", () => {

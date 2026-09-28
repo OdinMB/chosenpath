@@ -41,6 +41,10 @@ import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../game/servi
 import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from "../../game/services/storyTextRounds/turnRound1Turns.js";
 import { todaysFormWithB6Request, turnRound2Request, type TurnRound2Form } from "../../game/services/storyTextRounds/turnRound2.js";
 import { turnRound3FormRequest, type TurnRound3Request } from "../../game/services/storyTextRounds/turnRound3.js";
+import { groupTurnB10Request } from "../../game/services/storyTextRounds/turnRound3Groups.js";
+import { productionFormRequest } from "../../game/services/storyTextRounds/requestFormB9.js";
+import { productionCallLimits } from "shared/llm/chatModel.js";
+import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
 
 /*
@@ -126,6 +130,15 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * milestone it adds) and the adoption's chapter title "without a number";
  * production's chapter planner builds it byte for byte, and its switch
  * planner is planV2b's.
+ * "turnB10" is the group turn round's B10 (storyTextRounds/turnRound3Groups.ts):
+ * today's group turn with the sharpened coordination note (the shared
+ * moments word for word, each player's part, the shared facts, options that
+ * work alone), "other beats" kept; groups only. "turnB10b" is its one
+ * fix-and-retest: the shared moment's script (every line spoken there, at
+ * most four, given alike and nothing more) and each turn's own close.
+ * "adoptedSplit" is B9 on production's own single-player turn form
+ * (storyTextRounds/requestFormB9.ts): the same words sent as a split request,
+ * with production's limits, read against "adopted" (which carries them too).
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -163,7 +176,10 @@ export type VariantId =
   | "turnB6"
   | "planV2c"
   | "chapterFullB"
-  | "setupR3b";
+  | "setupR3b"
+  | "turnB10"
+  | "turnB10b"
+  | "adoptedSplit";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -198,6 +214,9 @@ export const VARIANTS: VariantId[] = [
   "planV2c",
   "chapterFullB",
   "setupR3b",
+  "turnB10",
+  "turnB10b",
+  "adoptedSplit",
 ];
 
 /**
@@ -310,8 +329,18 @@ function prodRequest(input: RequestInput): TextRequest {
   }
 }
 
-/** What production sends since the adoption (storyTextSteps.ts; TemplateService.iterateTemplate for AI Iteration). */
+/**
+ * What production sends since the adoption (storyTextSteps.ts;
+ * TemplateService.iterateTemplate for AI Iteration), with production's
+ * timeout and output cap for the role and player count (productionCallLimits),
+ * as production sends it.
+ */
 function adoptedRequest(input: RequestInput): EvalRequest {
+  const players = input.role === "setup" ? input.setup.playerCount : input.role === "iteration" ? input.iteration.playerCount : input.story.getNumberOfPlayers();
+  return { ...adoptedWords(input), limits: productionCallLimits(productionRole(input.role), players) };
+}
+
+function adoptedWords(input: RequestInput): EvalRequest {
   switch (input.role) {
     case "setup": {
       const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
@@ -488,6 +517,18 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnB6: (input) => {
     if (input.role !== "beat") throw new Error(`Variant turnB6 does not cover role ${input.role}`);
     return todaysFormWithB6Request(input.story);
+  },
+  turnB10: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant turnB10 does not cover role ${input.role}`);
+    return groupTurnB10Request(input.story);
+  },
+  turnB10b: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant turnB10b does not cover role ${input.role}`);
+    return groupTurnB10Request(input.story, "script");
+  },
+  adoptedSplit: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant adoptedSplit does not cover role ${input.role}`);
+    return productionFormRequest(input.story);
   },
 };
 

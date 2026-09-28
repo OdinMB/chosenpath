@@ -1,5 +1,5 @@
 import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
-import { chainKey, chainReferenceKey, chainSides, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
+import { chainKey, chainReferenceKey, chainSides, noiseReferenceKey, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
 import { RATIOS } from "./checkBaselines.js";
 import { finishesJob, type CallRecord } from "./runner.js";
@@ -58,6 +58,8 @@ export type VariantComparison = {
   secondReference?: true;
   /** Another arm's records read as the reference's where its request is the reference's byte for byte (standInKey) */
   standIns?: { armKey: string; records: number };
+  /** The arm whose two samples gave the noise, where the reference ran once (noiseReferenceKey) */
+  noiseFrom?: { armKey: string; promptState: string };
   /** (case, sample) pairs both arms finished; both sides are read on these only */
   pairs: number;
   arm: ArmStats;
@@ -152,7 +154,14 @@ function shareReadings(arm: ArmStats, reference: ArmStats, noise: { s1: ArmStats
   });
 }
 
-function compare(armRecords: CallRecord[], referenceRecords: CallRecord[], key: string, inputs: Inputs): VariantComparison | undefined {
+function compare(
+  armRecords: CallRecord[],
+  referenceRecords: CallRecord[],
+  key: string,
+  inputs: Inputs,
+  /** Another arm's records whose two samples give the noise where the reference has only one (noiseReferenceKey) */
+  noiseFrom?: CallRecord[]
+): VariantComparison | undefined {
   const referenceFinished = finishedPairs(referenceRecords);
   const shared = new Set([...finishedPairs(armRecords)].filter((pair) => referenceFinished.has(pair)));
   if (shared.size === 0) return undefined;
@@ -161,8 +170,11 @@ function compare(armRecords: CallRecord[], referenceRecords: CallRecord[], key: 
   const reference = armStatsOf(onShared(referenceRecords), inputs.checks, inputs.tags);
   // The noise: the reference's two samples on the matched cases, whichever samples the arm ran
   const sharedCases = new Set(armRecords.filter((r) => shared.has(pairOf(r))).map((r) => r.caseId));
-  const noiseRecords = referenceRecords.filter((r) => sharedCases.has(r.caseId) && referenceFinished.has(pairOf(r)));
-  const noise = noiseSamples(noiseRecords, inputs);
+  const noiseOn = (records: CallRecord[]) => {
+    const finished = finishedPairs(records);
+    return records.filter((r) => sharedCases.has(r.caseId) && finished.has(pairOf(r)));
+  };
+  const noise = noiseSamples(noiseOn(referenceRecords), inputs) ?? (noiseFrom ? noiseSamples(noiseOn(noiseFrom), inputs) : undefined);
   return {
     group: arm.group,
     armKey: arm.armKey,
@@ -258,12 +270,20 @@ export function variantComparisons(
       const candidate = storedReference ? storedReferenceRecords(records, tags, armRecords, key, storedReference) : undefined;
       const stored = candidate && (!sameState || coverage(armRecords, candidate) > coverage(armRecords, sameState)) ? candidate : undefined;
       const referenceRecords = stored ?? sameState;
-      const comparison = referenceRecords ? compare(armRecords, referenceRecords, key, { checks, tags }) : undefined;
-      if (!comparison) continue;
+      const first = referenceRecords ? compare(armRecords, referenceRecords, key, { checks, tags }) : undefined;
+      if (!first || !referenceRecords) continue;
+      // A reference that ran once reads its noise from the arm it builds on, in this state or stored
+      const noiseKey = first.hasNoise ? undefined : noiseReferenceKey(key);
+      const noiseRecords = noiseKey
+        ? (byArm.get(`${group}|${noiseKey}`) ?? (storedReference ? storedReferenceRecords(records, tags, armRecords, noiseKey, storedReference) : undefined))
+        : undefined;
+      const borrowed = noiseRecords ? compare(armRecords, referenceRecords, key, { checks, tags }, noiseRecords) : undefined;
+      const comparison = borrowed?.hasNoise ? borrowed : first;
       comparisons.push({
         ...comparison,
         ...(stored ? { referenceState: stored[0].promptState } : standIns ? { standIns } : {}),
         ...(second ? { secondReference: true as const } : {}),
+        ...(borrowed?.hasNoise && noiseKey && noiseRecords ? { noiseFrom: { armKey: noiseKey, promptState: noiseRecords[0].promptState } } : {}),
       });
     }
   }

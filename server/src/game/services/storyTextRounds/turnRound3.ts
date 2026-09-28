@@ -38,29 +38,35 @@ const LABEL = "Turn round 3 request form";
 
 export const THIS_BEAT_HEADING = "THIS BEAT";
 
-type Move = {
+export type Move = {
   /** The passage as the one-message form has it */
   passage: string;
   /** What stays in the fixed rules in its place */
   pointer: string;
 };
 
-const LAST_STEP =
+// Today's per-call passages, which the round-2 form and production's turn form (B9 on it, requestFormB9.ts) keep word for word
+export const LAST_STEP =
   "- This is the last beat of the thread. Remember that the resolution of the overall thread will only be determined AFTER this beat, based on players' choices in this beat. Don't define or narrate the resolution of the thread. (That will happen in the next round, based on players' choices.)\n";
-const NOT_LAST_STEP =
+export const NOT_LAST_STEP =
   "- This is not yet the last beat of the thread. While each beat should contribute toward the resolution of the thread, the question of how the thread overall will be resolved should only be answered after the players' decisions in the last step of the thread.\n" +
   "--- Example: In a 3-beat thread, if the question is 'Will [insert player name] acquire the artifact?', the player will not gain or permanently lose the chance to gain the artifact in steps 1 and 2.\n";
-const RESULTS =
+export const RESULTS =
   "\nResults of the player's actions depend on the resolution of the previous beat. The thread configuration lays out what it means specifically to succeed and fail. Follow those guidelines.";
-const TONE =
+export const TONE =
   "\n- If the previous beat for this player was favorable / mixed / unfavorable, adjust the tone of this beat accordingly. Beats following a favorable beat should feel like there is positive momentum. Beats following an unfavorable beat should feel difficult.\n";
 
-const STEP_POINTER = "- THIS BEAT says which beat of the thread this is, and whether it is the last.\n";
-const TITLE_POINTER = "Add the beat number of the current thread after the title, as THIS BEAT gives it.";
-const LEVER_POINTER = "--- THIS BEAT says whether a sacrifice or reward fits this turn.\n";
-const SOURCE_POINTER = "- For player characters, use ids player1, player2, etc., with the source THIS BEAT names.\n";
+export const STEP_POINTER = "- THIS BEAT says which beat of the thread this is, and whether it is the last.\n";
+export const TITLE_POINTER = "Add the beat number of the current thread after the title, as THIS BEAT gives it.";
+export const LEVER_POINTER = "--- THIS BEAT says whether a sacrifice or reward fits this turn.\n";
+export const SOURCE_POINTER = "- For player characters, use ids player1, player2, etc., with the source THIS BEAT names.\n";
 
-const showsImages = (story: Story) => story.hasImages() || story.generatesImages();
+export const showsImages = (story: Story) => story.hasImages() || story.generatesImages();
+
+/** A chapter step's position line and its title line, as today's form writes them. */
+export const stepLine = (step: number, of: number) => `- Remember that this is beat ${step}/${of} of the current thread (or set of threads).\n`;
+export const titleLine = (step: number, of: number) => `Add '(${step}/${of})' after the title to indicate the beat number of the current thread.`;
+export const sourceLine = (story: Story) => `- For player characters, use ids player1, player2, etc. and source ${story.isBasedOnTemplate() ? "template" : "story"}.\n`;
 
 /** A chapter step's lines: which beat, last or not, the title number, and after the first step the results and tone lines. */
 function chapterMoves(story: Story): Move[] {
@@ -69,9 +75,9 @@ function chapterMoves(story: Story): Move[] {
   const later = step > 1;
   const challenge = story.getCurrentThreadType() !== "exploration";
   return [
-    { passage: `- Remember that this is beat ${step}/${of} of the current thread (or set of threads).\n`, pointer: STEP_POINTER },
+    { passage: stepLine(step, of), pointer: STEP_POINTER },
     { passage: step === of ? LAST_STEP : NOT_LAST_STEP, pointer: "" },
-    { passage: `Add '(${step}/${of})' after the title to indicate the beat number of the current thread.`, pointer: TITLE_POINTER },
+    { passage: titleLine(step, of), pointer: TITLE_POINTER },
     ...(later && challenge ? [{ passage: RESULTS, pointer: "" }] : []),
     // Without it the text reads as a chapter's first step does
     ...(later ? [{ passage: TONE, pointer: "" }] : []),
@@ -86,8 +92,7 @@ function firstTurnMoves(story: Story): Move[] {
 
 function sourceMoves(story: Story): Move[] {
   if (!showsImages(story)) return [];
-  const source = story.isBasedOnTemplate() ? "template" : "story";
-  return [{ passage: `- For player characters, use ids player1, player2, etc. and source ${source}.\n`, pointer: SOURCE_POINTER }];
+  return [{ passage: sourceLine(story), pointer: SOURCE_POINTER }];
 }
 
 function movesFor(story: Story): Move[] {
@@ -105,15 +110,18 @@ function asItem(passage: string): string {
 }
 
 /** The fixed rules with each per-call passage replaced by its pointer, and THIS BEAT's items in prompt order. */
-function splitRules(instructions: string, moves: Move[]): { fixed: string; items: string[] } {
+export function splitRules(instructions: string, moves: Move[], label = LABEL): { fixed: string; items: string[] } {
   const ordered = moves
     .map((move) => ({ move, at: instructions.indexOf(move.passage) }))
     .sort((a, b) => a.at - b.at)
     .map(({ move }) => move);
   let fixed = instructions;
-  for (const move of ordered) fixed = replaceOnce(LABEL, fixed, move.passage, move.pointer);
+  for (const move of ordered) fixed = replaceOnce(label, fixed, move.passage, move.pointer);
   return { fixed: fixed.trimEnd(), items: ordered.map((move) => asItem(move.passage)) };
 }
+
+/** The per-call message: THIS BEAT's items, when there are any, then the story state. */
+export const perCallMessage = (items: string[], state: string) => `${items.length > 0 ? `${THIS_BEAT_HEADING}\n${items.join("\n")}\n\n` : ""}${state}`;
 
 /** B9's request for a single-player turn of any kind: the round-2 form with B9's paragraph rule, fixed rules first. */
 export function turnRound3FormRequest(story: Story): TurnRound3Request {
@@ -121,10 +129,9 @@ export function turnRound3FormRequest(story: Story): TurnRound3Request {
   const oneMessage = turnRound2Request(story, "paragraphsLast");
   const { instructions, state } = splitAtState(LABEL, oneMessage.prompt);
   const { fixed, items } = splitRules(instructions, movesFor(story));
-  const thisBeat = items.length > 0 ? `${THIS_BEAT_HEADING}\n${items.join("\n")}\n\n` : "";
   return {
     fixed,
-    perCall: `${thisBeat}${state}`,
+    perCall: perCallMessage(items, state),
     schema: oneMessage.schema,
     ...(oneMessage.assemble ? { assemble: oneMessage.assemble } : {}),
     limits: productionCallLimits("beat", 1),

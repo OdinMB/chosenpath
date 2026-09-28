@@ -150,6 +150,11 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // stored round0 references); the setup retests against the adopted setup form (setupR3, production's byte for byte)
   chapterFullB: "prod",
   setupR3b: "setupR3",
+  // The group round (B10): the sharpened coordination note against today's group turn (production's group form, round0)
+  turnB10: "prod",
+  turnB10b: "prod",
+  // The form gate (B9): production's single-player turn form sent as a split request against the one message it splits
+  adoptedSplit: "adopted",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -226,6 +231,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [chainKey(armKey(LUNA_LOW, "planV2c"), armKey(LUNA_MEDIUM, "chapterFullB"))]: [chainKey(armKey(LUNA_LOW, "planV2"), armKey(LUNA_MEDIUM, "chapterFull"))],
   // The setup retests against today's prompt too (the carry-forward guard)
   [armKey(LUNA_LOW, "setupR3b")]: [armKey(LUNA_LOW, "prod")],
+  // B10's retest against B10, the note it retests
+  [armKey(LUNA_LOW, "turnB10b")]: [armKey(LUNA_LOW, "turnB10")],
 };
 
 export function secondReferenceKeys(key: string): string[] {
@@ -246,6 +253,22 @@ const STAND_INS: Record<string, string> = {
 
 export function standInKey(key: string): string | undefined {
   return STAND_INS[key];
+}
+
+/**
+ * Where a reference that ran once reads its noise: the arm it builds on,
+ * whose two samples on the same cases give the floor. Production's
+ * single-player turn form (adopted) ran once beside B9's request form (the
+ * form gate, 2026-09-28: the stage had room for one sample of each); it is
+ * today's form (prod, two stored samples on every stored single-player turn)
+ * with the option rules on rolled chapter steps and the logged deltas.
+ */
+const NOISE_FROM: Record<string, string> = {
+  [armKey(LUNA_MEDIUM, "adopted")]: armKey(LUNA_MEDIUM, "prod"),
+};
+
+export function noiseReferenceKey(key: string): string | undefined {
+  return NOISE_FROM[key];
 }
 
 /**
@@ -388,9 +411,59 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return role === "beat" ? [{ arm: luna("medium", "chapterFullB"), samples: 2, scope: "single-player", beatType: "thread" }] : [];
     case "setup-retests":
       return setupRetestArms(role);
+    case "groups":
+      return groupRoundArms(role);
+    case "form-gate":
+      return formGateArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of runs on production's own code (the adopted variant and
+ * the request form built on it): the code after the adoption of 2026-09-28
+ * and the owner's feedback fixes of that day. round0 names the code before the
+ * adoption, so these records carry their own tag.
+ */
+export const ADOPTED_PROMPT_STATE = "adopted1";
+
+/**
+ * The request form's gate (B9; the owner's feedback workflow, 2026-09-28):
+ * production's own single-player turn form on Luna medium, once as the one
+ * message production sends and once as the split request B9 sends, both with
+ * production's limits, on the 44 stored single-player turns, one after the
+ * other in one invocation so the server's pace is shared. The stage has room
+ * for one sample of each; the noise is today's form's two stored samples
+ * (noiseReferenceKey).
+ */
+function formGateArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return [
+    { arm: luna("medium", "adopted"), samples: 1, scope: "single-player", source: "stored" },
+    { arm: luna("medium", "adoptedSplit"), samples: 1, scope: "single-player", source: "stored" },
+  ];
+}
+
+/** The sample the group round's rerun of today's group form records as (sample 1 is the migration check's). */
+export const GROUPS_REFERENCE_SAMPLE = 2;
+
+/**
+ * The group round (B10; the owner's feedback workflow, 2026-09-28): the
+ * sharpened coordination note (turnB10) on Luna low, production's group
+ * model, twice on the 12 stored group turns, with today's group form's sample
+ * 2 beside it (its sample 1 is the migration check's, so the reference gets
+ * its two-sample noise and a run at the candidate's hour for the waits).
+ * "Other beats" stays in both.
+ */
+function groupRoundArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  return [
+    { arm: luna("low", "turnB10"), samples: 2, scope: "multiplayer", source: "stored" },
+    { arm: productionDefault("multiplayerBeat"), samples: GROUPS_REFERENCE_SAMPLE, fromSample: GROUPS_REFERENCE_SAMPLE, scope: "multiplayer", source: "stored" },
+    // B10's one fix-and-retest (B10b): the shared moment's script and each turn's own close, the same way
+    { arm: luna("low", "turnB10b"), samples: 2, scope: "multiplayer", source: "stored" },
+  ];
 }
 
 /**

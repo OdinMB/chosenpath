@@ -406,8 +406,33 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/planV2b": ["mp-thread s1", "mp-thread s2"],
     });
     expect(plan("plan-refresh", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
-    // The other feedback stages that this workflow does not run yet plan nothing
-    for (const stage of ["groups", "form-gate", "final-check"] as const) expect(plan(stage, { roles: ["setup", "beat", "switch", "thread"] })).toEqual([]);
+    // The feedback stage that no workflow runs yet plans nothing
+    expect(plan("final-check", { roles: ["setup", "beat", "switch", "thread"] })).toEqual([]);
+  });
+
+  it("plans the request form's gate (B9): production's single-player turn form once as one message and once split, on the stored turns", () => {
+    const jobs = plan("form-gate", { roles: ["setup", "beat", "switch", "thread"] });
+    expect(perArm(jobs)).toEqual({
+      "gpt-6-luna@medium/adopted": ["sp s1"],
+      "gpt-6-luna@medium/adoptedSplit": ["sp s1"],
+    });
+    // The split one goes out as fixed rules and a per-call part, the one message as production sends it; both with production's limits
+    const [oneMessage, split] = ["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/adoptedSplit"].map((key) => jobs.find((j) => j.armKey === key)?.first.request());
+    expect(oneMessage && isSplitRequest(oneMessage)).toBe(false);
+    expect(split && isSplitRequest(split)).toBe(true);
+    expect(plan("form-gate", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
+  });
+
+  it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {
+    // Today's form ran once on the stored group turns (the migration check), so its sample 2 gives the noise and the
+    // same-hour waits; no chain, no planner, no single-player turn
+    // Then B10's one fix-and-retest (B10b, the shared moment's script), the same way
+    expect(perArm(plan("groups", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
+      "gpt-6-luna@low/turnB10": ["mp s1", "mp s2"],
+      "gpt-6-luna@low/prod": ["mp s2"],
+      "gpt-6-luna@low/turnB10b": ["mp s1", "mp s2"],
+    });
+    expect(plan("groups", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
   });
 
   it("plans the reruns: the framed turn without the chapter rules twice on every single-player chapter step, and planner v2c into it on the chapter plans", () => {

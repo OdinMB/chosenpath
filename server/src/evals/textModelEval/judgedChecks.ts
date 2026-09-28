@@ -49,10 +49,10 @@ export function judgedChecksFor(story: Story): JudgedCheck[] {
 
 const IMAGE_TAG = /\[image\s+[^\]]*\]/g;
 
-type TurnView = { title: string; paragraphs: string[]; options: string[] };
+export type TurnView = { title: string; paragraphs: string[]; options: string[] };
 
 /** A player's turn as they read it: title, paragraphs without image tags, option texts. */
-function turnView(reply: SetOfBeatGenerationSchema, slot: PlayerSlot): TurnView | undefined {
+export function turnView(reply: SetOfBeatGenerationSchema, slot: PlayerSlot): TurnView | undefined {
   const beat = (reply as unknown as Record<string, unknown>)[slot] as Partial<Beat> | undefined;
   if (!beat || typeof beat !== "object" || typeof beat.text !== "string") return undefined;
   return {

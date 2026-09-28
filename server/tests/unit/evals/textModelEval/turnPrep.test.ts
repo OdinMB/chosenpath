@@ -7,7 +7,8 @@ import type { ExecutedCall } from "../../../../src/evals/textModelEval/executor.
 import { jobEstimateUsd } from "../../../../src/evals/textModelEval/jobPlan.js";
 import { JUDGE_ARMS, JUDGE_CALIBRATION, JUDGE_PROMPT_VERSION, judgeCaseId, judgeJobs, judgeRequest } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { judgeCalibrationMode, roundTurnsToJudge, turnsToSend, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
+import { groupRepliesToJudge, judgeCalibrationMode, roundTurnsToJudge, turnsToSend, withCalibrationSamples, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
+import { GROUP_JUDGE_CALIBRATION, groupJudgeCaseId, groupJudgeJobs } from "../../../../src/evals/textModelEval/groupJudge.js";
 import { CURRENT_PROMPT_STATE } from "../../../../src/evals/textModelEval/variants.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
@@ -101,6 +102,52 @@ describe("judgeCalibrationMode --max-spend", () => {
     expect(prep.length).toBeGreaterThan(0);
     const spent = prep.reduce((sum, r) => sum + r.costUsd, 0);
     expect(spent).toBeLessThanOrEqual(maxSpend);
+  });
+});
+
+describe("groupRepliesToJudge (--judge-groups, the group round)", () => {
+  const REF = "gpt-6-luna@low/prod";
+  const B10 = "gpt-6-luna@low/turnB10";
+  const GROUP_CASE = evalCase("g", "beat", { state: firstSwitchBeat(2).getState() });
+  const SOLO_CASE = evalCase("s", "beat", { state: firstSwitchBeat(1).getState() });
+  const groupReply = (): SetOfBeatGenerationSchema =>
+    beatSet(2, {
+      player1: { ...beatGeneration({ title: "The Grove", text: TEXT }), options: challengeOptions() },
+      player2: { ...beatGeneration({ title: "The Grove", text: TEXT }), options: challengeOptions() },
+    });
+  const beatRecord = (armKey: string, sample: number, overrides: Partial<CallRecord> = {}) =>
+    record({ caseId: "g", group: "beat", role: "beat", armKey, callArmKey: armKey, promptState: "round0", sample, players: 2, outputFile: `outputs/${armKey.replace(/\W/g, "")}-${sample}.json`, ...overrides });
+
+  it("judges every named arm's group replies in the prompt state, samples 1 and 2, one call per reply; a single player's turn has none", () => {
+    const records = [beatRecord(REF, 1), beatRecord(REF, 2), beatRecord(B10, 1), beatRecord(B10, 3), beatRecord(REF, 1, { promptState: "postfix" }), beatRecord(REF, 1, { caseId: "s", players: 1 })];
+    const { replies, problems } = groupRepliesToJudge(records, [GROUP_CASE, SOLO_CASE], () => groupReply(), [REF, B10], "round0");
+    expect(problems).toEqual([]);
+    expect(replies.map((r) => [r.armKey, r.caseId, r.sample])).toEqual([
+      [REF, "g", 1],
+      [REF, "g", 2],
+      [B10, "g", 1],
+    ]);
+    expect(replies[0].outputId).toBe("gpt6lunalowprod-1");
+    expect(replies[0].request.prompt).toContain("share one switch");
+  });
+
+  it("judges the calibration's stored turns twice, every other reply once, and each reply only once", () => {
+    const calibrated = GROUP_JUDGE_CALIBRATION[0].outputId;
+    const request = { prompt: "p", schema: {} as never };
+    const jobs = groupJudgeJobs(
+      withCalibrationSamples([
+        { armKey: REF, caseId: "g", sample: 1, outputId: calibrated, request },
+        { armKey: B10, caseId: "g", sample: 1, outputId: "other", request },
+      ]),
+      JUDGE_ARMS[0],
+      "round0",
+      "groups"
+    );
+    expect(jobs.map((j) => [j.caseId, j.sample])).toEqual([
+      [groupJudgeCaseId(calibrated), 1],
+      [groupJudgeCaseId(calibrated), 2],
+      [groupJudgeCaseId("other"), 1],
+    ]);
   });
 });
 

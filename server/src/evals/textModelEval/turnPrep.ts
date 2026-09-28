@@ -29,6 +29,19 @@ import {
   type JudgedItem,
   type JudgedTurn,
 } from "./judgedChecks.js";
+import {
+  GROUP_JUDGE_CALIBRATION,
+  GROUP_JUDGE_PROMPT_VERSION,
+  groupEvidenceFrom,
+  groupJudgeCaseId,
+  groupJudgeJobs,
+  groupJudgeRequest,
+  groupReadings,
+  groupVerdictsFrom,
+  renderGroupJudge,
+  scoreGroupCalibration,
+  type JudgedReply,
+} from "./groupJudge.js";
 import { beatInput } from "./outputChecks.js";
 import { finishedPrepRecord, prepArmKey, prepSpend } from "./prepCalls.js";
 import { buildRoundCases, type RoundCall, type StoredLookup } from "./roundCases.js";
@@ -405,6 +418,109 @@ function writeJudgedTurns(files: EvalFiles, turns: RoundTurn[], problems: string
   const generatedAt = new Date();
   files.writeJudgedTurns(renderJudgedReadings(readings, { spentUsd, generatedAt, problems }), { generatedAt: generatedAt.toISOString(), promptState, frames, readings, judged, problems, spentUsd }, frames);
   log(`Judged ${judged.length} of ${turns.length} turns; these judge calls $${spentUsd.toFixed(4)}. Wrote ${JUDGED_FILES[frames]}.md and .json.`);
+}
+
+// --- --judge-groups (the group round, B10) ---
+
+export type GroupReply = { armKey: string; caseId: string; sample: number; outputId: string; request: TextRequest };
+
+/**
+ * The group judge's requests for a round's group replies: every final usable
+ * isolated beat record of the named arms in the prompt state, samples 1 and 2
+ * (the ones a comparison pairs), whose story has several players, on the
+ * reply as the game keeps it (the beat repairs).
+ */
+export function groupRepliesToJudge(
+  records: CallRecord[],
+  cases: EvalCase[],
+  load: (record: CallRecord) => unknown,
+  armKeys: string[],
+  promptState: string
+): { replies: GroupReply[]; problems: string[] } {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const problems: string[] = [];
+  const replies = records.flatMap((r): GroupReply[] => {
+    if (r.group !== "beat" || r.role !== "beat" || !r.final || !usable(r) || !r.outputFile || r.promptState !== promptState || !armKeys.includes(r.armKey) || r.sample > 2) return [];
+    const evalCase = byId.get(r.caseId);
+    if (!evalCase) {
+      problems.push(`${r.caseId}: no frozen case for ${r.armKey}`);
+      return [];
+    }
+    const story = beatInput(r, evalCase, records, load);
+    if (!story.isMultiplayer()) return [];
+    const { reply } = repairBeatReply(story, load(r) as SetOfBeatGenerationSchema);
+    const request = groupJudgeRequest(story, reply);
+    if (!request) {
+      problems.push(`${r.caseId} ${r.armKey} s${r.sample}: fewer than two turns to judge`);
+      return [];
+    }
+    return [{ armKey: r.armKey, caseId: r.caseId, sample: r.sample, outputId: outputIdOf(r.outputFile), request }];
+  });
+  return { replies, problems };
+}
+
+/** Each reply once, the calibration's stored turns at two samples (the judge's self-agreement), the rest at one. */
+export function withCalibrationSamples(replies: GroupReply[]): { outputId: string; request: TextRequest; samples: number }[] {
+  const calibrated = new Set(GROUP_JUDGE_CALIBRATION.map((item) => item.outputId));
+  const byOutput = new Map<string, { outputId: string; request: TextRequest; samples: number }>();
+  for (const reply of replies) {
+    if (!byOutput.has(reply.outputId)) byOutput.set(reply.outputId, { outputId: reply.outputId, request: reply.request, samples: calibrated.has(reply.outputId) ? 2 : 1 });
+  }
+  return [...byOutput.values()];
+}
+
+/**
+ * The group round's judged check (groupJudge.ts): the calibration on today's
+ * stored group turns (the reference's sample 1, judged twice) and every group
+ * reply of the named arms once, booked to the stage given (groups), then
+ * judged-groups.md and .json. The reference must be among the arms, since
+ * its sample-1 replies are the calibration set.
+ */
+export async function judgeGroupsMode(ctx: PrepContext, armKeys: string[] | undefined, promptState: string, options: { stage?: LedgerStage } = {}): Promise<void> {
+  const { files, log } = ctx;
+  if (!armKeys?.length) throw new Error("--judge-groups needs --arms: the group turn arms to judge, the reference first (its stored turns are the calibration set)");
+  const stage = options.stage ?? "groups";
+  const records = files.readRecords();
+  const { replies, problems } = groupRepliesToJudge(records, files.readCases(), files.loadOutput, armKeys, promptState);
+  const missing = GROUP_JUDGE_CALIBRATION.filter((item) => !replies.some((r) => r.outputId === item.outputId));
+  for (const item of missing) problems.push(`${item.caseId}: the calibration turn ${item.outputId} is not among the arms' replies`);
+  const arm = JUDGE_ARMS[0];
+  const jobs = groupJudgeJobs(withCalibrationSamples(replies), arm, promptState, stage as Stage);
+  const done = finishedJobKeys(files.readPrepRecords());
+  const open = jobs.filter((j) => !done.has(keyOf(j)));
+  const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
+  ctx.refuse(stage, estimate);
+  log(`${replies.length} group replies of ${armKeys.length} arms on ${arm.key} (stage ${stage}), ${jobs.length} calls, ${open.length} open, est $${estimate.toFixed(3)}`);
+  const result = await runJobs(jobs, ctx.deps("prep"), { caps: ctx.caps, previous: files.readPrepRecords(), extraSpend: spendBeside(files, "prep"), tokensPerMinute: ctx.tpm, maxInFlight: ctx.maxInFlight });
+  if (result.stoppedReason) log(`Stopped: ${result.stoppedReason}`);
+  writeJudgedGroups(files, replies, problems, promptState, log);
+}
+
+function writeJudgedGroups(files: EvalFiles, replies: GroupReply[], problems: string[], promptState: string, log: (line: string) => void) {
+  const prep = files.readPrepRecords();
+  const arm = JUDGE_ARMS[0];
+  const parsedAt = (outputId: string, sample: number) => {
+    const record = finishedPrepRecord(prep, jobKey(groupJudgeCaseId(outputId), prepArmKey("judge", arm), promptState, sample));
+    return record ? files.loadOutput(record) : undefined;
+  };
+  const judged: JudgedReply[] = replies.flatMap((reply) => {
+    const parsed = parsedAt(reply.outputId, 1);
+    return parsed === undefined ? [] : [{ armKey: reply.armKey, caseId: reply.caseId, sample: reply.sample, outputId: reply.outputId, verdicts: groupVerdictsFrom(parsed) }];
+  });
+  const calibrationJudged = GROUP_JUDGE_CALIBRATION.map((item) => {
+    const parsed = [1, 2].map((sample) => parsedAt(item.outputId, sample)).filter((p) => p !== undefined);
+    return { itemId: item.id, samples: parsed.map(groupVerdictsFrom), evidence: parsed.map(groupEvidenceFrom) };
+  });
+  const calibration = scoreGroupCalibration(GROUP_JUDGE_CALIBRATION, calibrationJudged);
+  const readings = groupReadings(judged, referenceKeyOf);
+  const spentUsd = sumCost(prep.filter((r) => r.caseId.startsWith("judge-group-")));
+  const generatedAt = new Date();
+  files.writeJudgedGroups(
+    renderGroupJudge({ items: GROUP_JUDGE_CALIBRATION, calibration, readings, judged: calibrationJudged, spentUsd, generatedAt, problems }),
+    { generatedAt: generatedAt.toISOString(), promptState, promptVersion: GROUP_JUDGE_PROMPT_VERSION, calibration, calibrationJudged, readings, judged, problems, spentUsd }
+  );
+  for (const a of calibration) log(`${a.check}: ${a.agree} of ${a.decided} agree, samples ${a.pairsAgree} of ${a.pairs}: ${a.reliable ? "reliable" : "not reliable"}`);
+  log(`Judged ${judged.length} of ${replies.length} group replies; group judge calls $${spentUsd.toFixed(4)}. Wrote judged-groups.md and .json.`);
 }
 
 // --- The dry run's view ---

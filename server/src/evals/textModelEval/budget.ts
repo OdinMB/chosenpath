@@ -79,9 +79,10 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-28: turn round 1's page rebuilt with new outputs (the framed chapter turn on planner v2c's plans and today's form beside it, chapter steps and chain openings) and their judged checks; round 1's two turn forms and chains came to about $0.80 at two samples",
   "setup-retests":
     "coordinator, 2026-09-28: the setup retests (the Casablanca clause, about $0.011, and any setup sentence the feedback adds), a few Luna low setups at about $0.006 each",
-  groups: "coordinator, 2026-09-28: the group turn round (B10), about $0.18 at one sample (turn round 3's estimate), with room for today's group form beside it",
+  groups:
+    "coordinator, 2026-09-28: the group turn round (B10): the sharpened note twice on the 12 stored group turns and today's group form's sample 2 beside it (36 turns, about $0.17 at the migration check's $0.0042-0.0055 a group turn), the group judge's calibration and readings (about 60 Luna low calls, about $0.03) and a smoke; about $0.21, with room for B10's one fix-and-retest (B10b, 24 turns and their judge calls, about $0.11)",
   "form-gate":
-    "coordinator, 2026-09-28: the request form's gate (B9: chapter-step p95 at or under 45 s), about $0.20 (turn round 3's estimate) plus today's form rerun beside it for the waits",
+    "coordinator, 2026-09-28: the request form's gate (B9: chapter-step p95 at or under 45 s and no worse than the one-message form): production's single-player turn form once as one message and once split, on the 44 stored turns in one invocation (88 turns, about $0.29 at $0.0033 a turn uncached; the split one's cache reads bill less), and a smoke",
   "final-check":
     "coordinator, 2026-09-28: the paid final check on production's own code (the adopted variant, under a new prompt state): one sample of the 44 stored single-player turns and both planners, about $0.22, plus group turns and chains",
 };

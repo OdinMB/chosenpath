@@ -175,6 +175,17 @@ export const PAIRWISE_CRITERIA_SETS = {
     "Does the prose sound like this story?",
     "Does the ending answer each question the story asked?",
   ],
+  /**
+   * The group round (B10, turn doc section 4 "What you rate: group turns (do
+   * the players' turns agree?)"): each option is every player's turn of one
+   * reply, so the first question reads across a column.
+   */
+  groups: [
+    "Do the players' turns tell the moments they share the same way: the same lines, from the same speakers?",
+    "Does each turn move the chapter's question and follow its plan?",
+    "Is there a real choice among each player's options, and does each option work whatever the other players choose?",
+    "Does the prose sound like this story?",
+  ],
 } as const;
 export type PairwiseCriteriaSet = keyof typeof PAIRWISE_CRITERIA_SETS;
 
