@@ -4,7 +4,10 @@ import { GameModes, type PlayerCount } from "core/types/index.js";
 import {
   CHAIN_ARMS,
   SETUP_CHAIN_PREMISES,
+  chainFile,
+  chainRunsFrom,
   chainSetupInput,
+  mergeChainRuns,
   playSetupChain,
   renderChainReport,
   storyFromSetup,
@@ -224,6 +227,35 @@ describe("playSetupChain", () => {
     expect(run.stopped).toMatch(/chapter plan.*no usable reply/);
     const { call: noSetup } = fakeCall(1, { setup: undefined });
     expect((await playSetupChain(premise, input(1), noSetup, { sample: 1 })).steps).toHaveLength(1);
+  });
+
+  it("merges a new run into the chain file's runs, a chain and sample replaced, the others kept in the chains' order", async () => {
+    const { call } = fakeCall(1);
+    const [short, kids] = [SETUP_CHAIN_PREMISES[0], SETUP_CHAIN_PREMISES[1]];
+    const shortRun = await playSetupChain(short, input(1), call, { sample: 1 });
+    const kidsRun = { ...shortRun, premise: kids };
+    const again = { ...shortRun, stopped: "again" };
+    expect(mergeChainRuns([kidsRun], [shortRun]).map((r) => r.premise.id)).toEqual([short.id, kids.id]);
+    expect(mergeChainRuns([shortRun, kidsRun], [again]).map((r) => [r.premise.id, r.stopped])).toEqual([
+      [short.id, "again"],
+      [kids.id, shortRun.stopped],
+    ]);
+    expect(mergeChainRuns([shortRun], [{ ...shortRun, sample: 2 }]).map((r) => r.sample)).toEqual([1, 2]);
+  });
+
+  it("reads a chain file back as it was written, and loads a step's output from its output file where the file lacks it", async () => {
+    const { call } = fakeCall(1);
+    const run = await playSetupChain(premise, input(1), call, { sample: 1 });
+    const file = JSON.parse(JSON.stringify(chainFile([run], new Date(0))));
+    const load = jest.fn((outputFile: string) => ({ loaded: outputFile.length > 0 }));
+    const [back] = chainRunsFrom(file, load);
+    expect(renderChainReport([back], new Date(0))).toBe(renderChainReport([run], new Date(0)));
+    expect(load).not.toHaveBeenCalled();
+    // A file written before outputs were kept
+    file.runs[0].steps[0].output = undefined;
+    const [older] = chainRunsFrom(file, load);
+    expect(older.steps[0].output).toEqual({ loaded: true });
+    expect(load).toHaveBeenCalledWith(String(run.steps[0].outputFile));
   });
 
   it("keeps each step's checks, and a report names what the chain wrote", async () => {

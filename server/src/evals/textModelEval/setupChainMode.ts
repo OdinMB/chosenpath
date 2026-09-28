@@ -2,7 +2,17 @@ import type { EvalRole } from "./arms.js";
 import { sha256 } from "./executor.js";
 import { prepJob } from "./prepCalls.js";
 import { finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
-import { SETUP_CHAIN_PREMISES, chainFile, chainSetupInput, playSetupChain, renderChainReport, type ChainCall, type ChainRun } from "./setupChain.js";
+import {
+  SETUP_CHAIN_PREMISES,
+  chainFile,
+  chainRunsFrom,
+  chainSetupInput,
+  mergeChainRuns,
+  playSetupChain,
+  renderChainReport,
+  type ChainCall,
+  type ChainRun,
+} from "./setupChain.js";
 import { capsAfter, spendBeside, type PrepContext } from "./turnPrep.js";
 import { CURRENT_PROMPT_STATE, requestText } from "./variants.js";
 
@@ -70,19 +80,31 @@ export function chainCallFor(ctx: PrepContext, sample: number): ChainCall {
   };
 }
 
-/** Plays the chains (all four, or those --cases names), then writes setup-chain.md and .json. */
-export async function setupChainMode(ctx: PrepContext, options: { sample: number; caseIds?: string[] }): Promise<void> {
+/**
+ * Plays the chains (all four, or those --cases names), then writes
+ * setup-chain.md and .json with every run the chain file already holds (a
+ * chain and sample played again replaces its run). `reportOnly` plays
+ * nothing and renders the file afresh; `mergeFile` adds the runs of another
+ * chain file (one an earlier invocation overwrote).
+ */
+export async function setupChainMode(ctx: PrepContext, options: { sample: number; caseIds?: string[]; reportOnly?: boolean; mergeFile?: string }): Promise<void> {
+  const { files, log } = ctx;
   const premises = SETUP_CHAIN_PREMISES.filter((p) => !options.caseIds?.length || options.caseIds.includes(p.id));
   if (premises.length === 0) throw new Error(`No chain premise among --cases; one of ${SETUP_CHAIN_PREMISES.map((p) => p.id).join(", ")}`);
-  const call = chainCallFor(ctx, options.sample);
-  const settled = await Promise.allSettled(premises.map((p) => playSetupChain(p, chainSetupInput(p), call, { sample: options.sample })));
   const runs: ChainRun[] = [];
-  settled.forEach((outcome, i) => {
-    if (outcome.status === "fulfilled") runs.push(outcome.value);
-    else ctx.log(`${premises[i].id}: ${outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)}`);
-  });
+  if (!options.reportOnly) {
+    const call = chainCallFor(ctx, options.sample);
+    const settled = await Promise.allSettled(premises.map((p) => playSetupChain(p, chainSetupInput(p), call, { sample: options.sample })));
+    settled.forEach((outcome, i) => {
+      if (outcome.status === "fulfilled") runs.push(outcome.value);
+      else log(`${premises[i].id}: ${outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)}`);
+    });
+  }
+  const read = (file?: string) => chainRunsFrom(files.readSetupChain(file) ?? {}, files.loadOutputFile);
+  const kept = mergeChainRuns(read(), options.mergeFile ? read(options.mergeFile) : []);
+  const all = mergeChainRuns(kept, runs);
   const now = new Date();
-  ctx.files.writeSetupChain(renderChainReport(runs, now), chainFile(runs, now));
+  files.writeSetupChain(renderChainReport(all, now), chainFile(all, now));
   const cost = sum(runs.flatMap((run) => run.steps.map((s) => s.costUsd ?? 0)));
-  ctx.log(`Played ${runs.length} of ${premises.length} chains, ${sum(runs.map((r) => r.steps.length))} calls, $${cost.toFixed(4)}. Wrote setup-chain.md and .json.`);
+  log(`Played ${runs.length} of ${options.reportOnly ? 0 : premises.length} chains, ${sum(runs.map((r) => r.steps.length))} calls, $${cost.toFixed(4)}. Wrote setup-chain.md and .json (${all.length} runs).`);
 }

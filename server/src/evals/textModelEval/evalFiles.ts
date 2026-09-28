@@ -112,6 +112,13 @@ export function evalFiles(outDir: string) {
       writeJson(at("setup-chain.json"), json);
       fs.writeFileSync(at("setup-chain.md"), markdown);
     },
+    /** The chain file, or another one to merge (a path), when it exists */
+    readSetupChain: (file?: string): unknown => {
+      const chain = file ?? at("setup-chain.json");
+      return fs.existsSync(chain) ? JSON.parse(fs.readFileSync(chain, "utf-8")) : undefined;
+    },
+    /** The parsed reply an output file holds (outputs/<callId>.json, as a record names it) */
+    loadOutputFile: (outputFile: string): unknown => (JSON.parse(fs.readFileSync(at(outputFile), "utf-8")) as { parsed?: unknown }).parsed,
     readProbe: (): ProbeReport | undefined =>
       fs.existsSync(at("probe.json")) ? (JSON.parse(fs.readFileSync(at("probe.json"), "utf-8")) as ProbeReport) : undefined,
     writeProbe: (report: ProbeReport) => writeJson(at("probe.json"), report),

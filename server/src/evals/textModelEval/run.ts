@@ -88,9 +88,11 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
- *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20]  setup round 3's setup-to-play chain
- *     (setupChain.ts): new setups on the final form, played through the first chapter; prep-calls.jsonl, in the
- *     setup-rounds stage; writes setup-chain.md and .json (--samples picks the chain's sample, default 1)
+ *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
+ *     round 3's setup-to-play chain (setupChain.ts): new setups on the final form, played through the first chapter;
+ *     prep-calls.jsonl, in the setup-rounds stage; writes setup-chain.md and .json with the runs the file already
+ *     holds (--samples picks the chain's sample, default 1; --report-only renders afresh without calls; --merge adds
+ *     another chain file's runs)
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -161,6 +163,10 @@ type Args = {
   ratingsFiles: string[];
   /** Pairwise pages: a round's own questions (--criteria turn-round2) */
   criteria?: PairwiseCriteriaSet;
+  /** --setup-chain --report-only: render setup-chain.md afresh from setup-chain.json, no calls */
+  reportOnly: boolean;
+  /** --setup-chain --merge <file>: add another chain file's runs */
+  mergeFile?: string;
 };
 
 class UsageError extends Error {}
@@ -204,6 +210,7 @@ function parseArgs(argv: string[]): Args {
     stored: false,
     fresh: false,
     ratingsFiles: [],
+    reportOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -335,6 +342,12 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--fresh":
         args.fresh = true;
+        break;
+      case "--report-only":
+        args.reportOnly = true;
+        break;
+      case "--merge":
+        args.mergeFile = path.resolve(next() ?? "");
         break;
       default:
         throw new UsageError(`Unknown argument: ${arg}`);
@@ -833,7 +846,12 @@ async function main() {
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":
-      return setupChainMode(prepContext(args, files, "setup-rounds", DEFAULT_CHAIN_MAX_SPEND), { sample: args.samples ?? 1, caseIds: args.caseIds });
+      return setupChainMode(prepContext(args, files, "setup-rounds", DEFAULT_CHAIN_MAX_SPEND), {
+        sample: args.samples ?? 1,
+        caseIds: args.caseIds,
+        reportOnly: args.reportOnly,
+        mergeFile: args.mergeFile,
+      });
     default:
       return dryRun(args, files, dirs);
   }

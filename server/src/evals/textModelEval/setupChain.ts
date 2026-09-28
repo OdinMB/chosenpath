@@ -515,11 +515,37 @@ export function renderChainReport(runs: ChainRun[], generatedAt: Date): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** The chain as JSON: every step without its in-memory output (the output file holds it), and the states at start and end. */
+/**
+ * The chain file's runs with new ones: a chain and sample played again
+ * replaces its earlier run, every other run stays, in the chains' order and
+ * then by sample.
+ */
+export function mergeChainRuns(existing: ChainRun[], added: ChainRun[]): ChainRun[] {
+  const key = (run: ChainRun) => `${run.premise.id}|${run.sample}`;
+  const replaced = new Set(added.map(key));
+  const order = (run: ChainRun) => {
+    const at = SETUP_CHAIN_PREMISES.findIndex((p) => p.id === run.premise.id);
+    return at < 0 ? SETUP_CHAIN_PREMISES.length : at;
+  };
+  return [...existing.filter((run) => !replaced.has(key(run))), ...added].sort((a, b) => order(a) - order(b) || a.sample - b.sample);
+}
+
+/**
+ * A chain file's runs read back. A step whose output the file lacks (a file
+ * written before outputs were kept) gets its output file's reply, the reply
+ * as written rather than as the game kept it (before the plan check or the
+ * beat repairs).
+ */
+export function chainRunsFrom(file: unknown, load: (outputFile: string) => unknown): ChainRun[] {
+  const runs = asArray(asObject(file).runs) as ChainRun[];
+  return runs.map((run) => ({ ...run, steps: run.steps.map((step) => (step.output === undefined && step.outputFile ? { ...step, output: load(step.outputFile) } : step)) }));
+}
+
+/** The chain as JSON: every step with the reply as the game kept it, and the states at start and end. */
 export function chainFile(runs: ChainRun[], generatedAt: Date) {
   return {
     generatedAt: generatedAt.toISOString(),
     arms: { setup: CHAIN_ARMS.setup.key, planner: CHAIN_ARMS.planner.key, turnOnePlayer: CHAIN_ARMS.turn(1).key, turnGroups: CHAIN_ARMS.turn(2).key },
-    runs: runs.map((run) => ({ ...run, steps: run.steps.map((step) => Object.fromEntries(Object.entries(step).filter(([key]) => key !== "output"))) })),
+    runs,
   };
 }

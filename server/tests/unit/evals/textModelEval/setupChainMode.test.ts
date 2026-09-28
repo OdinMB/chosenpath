@@ -4,8 +4,8 @@ import { LEDGER_STAGES, type Caps, type LedgerStage } from "../../../../src/eval
 import type { EvalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { sha256, type ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { CHAIN_ARMS } from "../../../../src/evals/textModelEval/setupChain.js";
-import { chainCallFor } from "../../../../src/evals/textModelEval/setupChainMode.js";
+import { CHAIN_ARMS, SETUP_CHAIN_PREMISES } from "../../../../src/evals/textModelEval/setupChain.js";
+import { chainCallFor, setupChainMode } from "../../../../src/evals/textModelEval/setupChainMode.js";
 import type { PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { executed, record } from "./fixtures.js";
 
@@ -90,5 +90,26 @@ describe("chainCallFor: the chain's calls in the rounds' own ledger", () => {
   it("gives back nothing for a reply production could not use after its retries", async () => {
     const { ctx } = context({ outcome: "invalid-json" });
     expect(await chainCallFor(ctx, 1)(spec)).toBeUndefined();
+  });
+});
+
+describe("setupChainMode --report-only: the chain file rendered afresh, another file's runs merged in", () => {
+  const run = (id: string) => ({ premise: SETUP_CHAIN_PREMISES.find((p) => p.id === id), sample: 1, input: {}, steps: [{ kind: "setup", turn: 0, caseId: `${id}-s1-00-setup`, armKey: CHAIN_ARMS.setup.key, outputFile: "outputs/x.json" }], stopped: "the setup: no usable reply" });
+
+  it("sends nothing, keeps the file's runs, adds the merged file's, and loads each step's output where the file lacks it", async () => {
+    const { ctx, execute } = context();
+    const written: unknown[] = [];
+    const chains: Record<string, unknown> = { main: { runs: [run("chain-cofounders")] }, other: { runs: [run("chain-short-subscription")] } };
+    Object.assign(ctx.files, {
+      readSetupChain: (file?: string) => chains[file ?? "main"],
+      loadOutputFile: () => ({ title: "Loaded" }),
+      writeSetupChain: (markdown: string, json: unknown) => written.push(markdown, json),
+    });
+    await setupChainMode(ctx, { sample: 1, reportOnly: true, mergeFile: "other" });
+    expect(execute).not.toHaveBeenCalled();
+    const [markdown, json] = written as [string, { runs: { premise: { id: string } }[] }];
+    expect(json.runs.map((r) => r.premise.id)).toEqual(["chain-short-subscription", "chain-cofounders"]);
+    expect(markdown).toContain("## chain-short-subscription (sample 1)");
+    expect(markdown).toContain("## chain-cofounders (sample 1)");
   });
 });
