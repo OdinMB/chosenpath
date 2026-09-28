@@ -24,6 +24,7 @@ import {
   ROUND1C_PARTS,
   ROUND3_PARTS,
   ROUND3B_PARTS,
+  ROUND3C_PARTS,
   iterationRequestFromRound1,
   iterationRound1Request,
   setupRequestFromRound1,
@@ -143,6 +144,10 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * editor's AI Draft (AIStoryGenerator.generateTemplateSetup: setupStep's
  * "template" kind, no kids budget, the template editor's limits), for the
  * final check; setup only.
+ * "setupR3c" is the Casablanca sentence (2026-09-29): setup round 3 with round
+ * 3b's identity clause (names in outcomes only) followed by "Player stats
+ * never carry a player character's name, even one the premise gives.", and
+ * the kids examples production took from round 3b (ROUND3C_PARTS).
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -184,7 +189,8 @@ export type VariantId =
   | "turnB10"
   | "turnB10b"
   | "adoptedSplit"
-  | "adoptedTemplate";
+  | "adoptedTemplate"
+  | "setupR3c";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -223,6 +229,7 @@ export const VARIANTS: VariantId[] = [
   "turnB10b",
   "adoptedSplit",
   "adoptedTemplate",
+  "setupR3c",
 ];
 
 /**
@@ -518,6 +525,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   },
   setupR3: setupRound2("setupR3", "generationOrder", ROUND3_PARTS),
   setupR3b: setupRound2("setupR3b", "generationOrder", ROUND3B_PARTS),
+  setupR3c: setupRound2("setupR3c", "generationOrder", ROUND3C_PARTS),
   planV2b: plannerV2("planV2b", false, true),
   planV2c: plannerV2("planV2c", false, true, true),
   turnB6: (input) => {

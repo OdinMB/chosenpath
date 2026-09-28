@@ -4,6 +4,7 @@ import {
   ROUND1C_PARTS,
   ROUND3_PARTS,
   ROUND3B_PARTS,
+  ROUND3C_PARTS,
   THIS_SETUP_HEADING,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
@@ -12,9 +13,11 @@ import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request } from "
 import {
   CAMPS,
   IDENTITY_CLAUSE,
+  IDENTITY_CLAUSE_NO_STAT_NAMES,
   IDENTITY_CLAUSE_OUTCOMES,
   KIDS_STATS,
   KIDS_STATS_VARIED,
+  PLAYER_STATS_NAMELESS,
   ROUND3_TEXT,
   slateMilestones,
   storyLengthLine,
@@ -102,6 +105,58 @@ describe("the setup retests (round 3b, the owner's feedback workflow of 2026-09-
   it("changes AI Iteration the same way", () => {
     for (const sections of SECTION_SETS) {
       const retest = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3B_PARTS);
+      const measured = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3_PARTS);
+      expect(swapped(retest.prompt)).toBe(measured.prompt);
+    }
+  });
+});
+
+describe("the Casablanca sentence (round 3c, 2026-09-29)", () => {
+  const round3c = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story", kids = false) =>
+    setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3C_PARTS, { kids });
+  /** Round 3c's two passages back to round 3's text: the identity clause and the kids examples production took from round 3b */
+  const swapped = (text: string) =>
+    text
+      .replace(IDENTITY_CLAUSE_NO_STAT_NAMES.one, IDENTITY_CLAUSE.one)
+      .replace(IDENTITY_CLAUSE_NO_STAT_NAMES.more, IDENTITY_CLAUSE.more)
+      .replace(KIDS_STATS_VARIED, KIDS_STATS);
+
+  it("is round 3 with the sentence on", () => {
+    expect(ROUND3C_PARTS).toEqual({ ...ROUND3_PARTS, round3c: true });
+  });
+
+  it("names premise-named players in outcomes only, and says once that player stats never carry a player character's name", () => {
+    expect(PLAYER_STATS_NAMELESS).toBe("Player stats never carry a player character's name, even one the premise gives.");
+    for (const form of ["one", "more"] as const) {
+      // Round 3b's clause (names in outcomes only), with the sentence after it
+      expect(IDENTITY_CLAUSE_NO_STAT_NAMES[form]).toBe(`${IDENTITY_CLAUSE_OUTCOMES[form]} ${PLAYER_STATS_NAMELESS}`);
+      expect(IDENTITY_CLAUSE_NO_STAT_NAMES[form]).not.toContain("and stats");
+    }
+    for (const players of [1, 2, 3] as PlayerCount[]) {
+      const prompt = round3c(players, players === 1 ? GameModes.SinglePlayer : GameModes.Competitive).prompt;
+      expect(occurrences(prompt, IDENTITY_CLAUSE_NO_STAT_NAMES[players === 1 ? "one" : "more"])).toBe(1);
+      expect(occurrences(prompt, PLAYER_STATS_NAMELESS)).toBe(1);
+    }
+  });
+
+  it("carries the kids examples production took from the retests", () => {
+    const kids = round3c(2, GameModes.Cooperative, "story", true).prompt;
+    expect(occurrences(kids, KIDS_STATS_VARIED)).toBe(1);
+    expect(kids).not.toContain(KIDS_STATS);
+  });
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: round 3's request byte for byte apart from the identity clause and the kids examples", (kind, players, mode) => {
+    for (const kids of [false, true]) {
+      const retest = round3c(players, mode, kind, kids);
+      const measured = setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3_PARTS, { kids });
+      expect(swapped(retest.prompt)).toBe(measured.prompt);
+      expect(JSON.stringify(json(retest.schema))).toBe(JSON.stringify(json(measured.schema)));
+    }
+  });
+
+  it("changes AI Iteration the same way", () => {
+    for (const sections of SECTION_SETS) {
+      const retest = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3C_PARTS);
       const measured = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3_PARTS);
       expect(swapped(retest.prompt)).toBe(measured.prompt);
     }

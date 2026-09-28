@@ -6,6 +6,7 @@ import {
   ROUND1B_PARTS,
   ROUND1C_PARTS,
   ROUND3_PARTS,
+  ROUND3C_PARTS,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
   iterationRound1Request,
@@ -13,6 +14,7 @@ import {
   setupRound1Request,
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
+import { IDENTITY_CLAUSE_NO_STAT_NAMES } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
@@ -525,6 +527,24 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/setupR3b setup-future-casablanca s2",
       "gpt-6-luna@low/setupR3b setup-learn-peer-review s1",
     ]);
+  });
+
+  it("plans the Casablanca sentence's retest in the setup rounds: round 3c twice on Casablanca and Susan, nowhere else", () => {
+    const setup = (id: string, playerCount: 1 | 2) =>
+      evalCase(id, "setup", { setup: { premise: "A premise", playerCount, gameMode: playerCount === 1 ? GameModes.SinglePlayer : GameModes.Competitive, maxTurns: 25 } });
+    const cases = [setup("setup-future-casablanca", 2), setup("setup-custom-susan", 1), setup("setup-learn-peer-review", 2)];
+    const jobs = planJobs(cases, { stage: "setup-rounds", promptState: "round0", roles: ["setup", "beat"], mode: "isolated", subset15: false, records: [] });
+    // Setup queues by player count
+    expect(jobs.filter((j) => j.armKey === "gpt-6-luna@low/setupR3c").map((j) => `${j.caseId} s${j.sample}`)).toEqual([
+      "setup-custom-susan s1",
+      "setup-custom-susan s2",
+      "setup-future-casablanca s1",
+      "setup-future-casablanca s2",
+    ]);
+    // The request is round 3c's, with the sentence
+    const request = jobs.find((j) => j.armKey === "gpt-6-luna@low/setupR3c" && j.caseId === "setup-future-casablanca")!.first.request();
+    expect(requestText(request)).toContain(IDENTITY_CLAUSE_NO_STAT_NAMES.more);
+    expect(requestText(request)).toBe(setupRound2Request("A premise", 2, GameModes.Competitive, 25, "story", "generationOrder", ROUND3C_PARTS, { kids: false }).prompt);
   });
 
   it("lets planner v2's chapter plans stand in for planner v2b's only where v2b's request is v2's byte for byte, prompt and schema (one player)", () => {

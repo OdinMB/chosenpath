@@ -178,6 +178,26 @@ export const IDENTITY_CLAUSE_OUTCOMES: Record<"one" | "more", string> = {
   more: IDENTITY_CLAUSE.more.replace("use those names in outcomes and stats,", "use those names in outcomes,"),
 };
 
+/**
+ * The Casablanca sentence (round 3c, 2026-09-29, the final status note's
+ * recommendation): round 3b's clause still gave Casablanca one set of player
+ * stats per named player in 1 of 2 setups, and Susan's player stats carried her
+ * name in 2 of 2 on both forms. The clause keeps round 3b's "in outcomes" (so
+ * it no longer asks for the names in stats) and says it outright once, right
+ * after: player stats never carry a player character's name, the premise's own
+ * included. The scoreboard, a shared stat, may still name the premise's
+ * characters (its own line says so). Retested 2026-09-29 (setupR3c, Luna low,
+ * Casablanca and Susan twice each): Casablanca's per-player stats 2 of 2 on
+ * round 3 to 0 of 2, Susan's named stats 2 of 2 to 2 of 2; nothing moved under
+ * the stop rule over the four pairs, so production keeps round 3's clause.
+ */
+export const PLAYER_STATS_NAMELESS = "Player stats never carry a player character's name, even one the premise gives.";
+
+export const IDENTITY_CLAUSE_NO_STAT_NAMES: Record<"one" | "more", string> = {
+  one: `${IDENTITY_CLAUSE_OUTCOMES.one} ${PLAYER_STATS_NAMELESS}`,
+  more: `${IDENTITY_CLAUSE_OUTCOMES.more} ${PLAYER_STATS_NAMELESS}`,
+};
+
 export const KIDS_STATS_VARIED = KIDS_STATS.replace(
   "Name each in one or two everyday words a young reader knows (for example Courage, Snacks, Forest Friends),",
   "Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins),"

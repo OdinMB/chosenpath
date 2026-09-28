@@ -5,6 +5,7 @@ import type { TemplateIterationSections } from "core/types/admin.js";
 import { iterationStep, setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { ROUND3_PARTS, ROUND3B_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { assembleGenerationOrder, iterationRound2Request, setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
+import { PLAYER_STATS_NAMELESS } from "../../../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { KIDS_EXAMPLES, SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup } from "../../../helpers/adoptedDeltas.js";
 
 /*
@@ -83,6 +84,12 @@ describe("custom-story and template setup: the measured form", () => {
     expect(retest).toContain(after);
     // The identity clause did not pass its retest: production keeps "in outcomes and stats"
     expect(setupStep.request(PREMISE, 2, GameModes.Competitive, 25, "story").prompt).toContain("use those names in outcomes and stats");
+    // Nor did the Casablanca sentence (round 3c, 2026-09-29: nothing moved over its four pairs, and Susan's player stats
+    // still carried her name in 2 of 2), so production does not send it
+    for (const players of [1, 2, 3] as PlayerCount[]) {
+      const mode = players === 1 ? GameModes.SinglePlayer : GameModes.Competitive;
+      expect(setupStep.request(PREMISE, players, mode, 25, "story").prompt).not.toContain(PLAYER_STATS_NAMELESS);
+    }
   });
 });
 

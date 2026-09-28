@@ -67,7 +67,7 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
   "3": "the Stage 3 trims; closed with $2.26 spent",
   "4": "the Stage 4 rewrite; closed, its 4b count fix ran on the owner's one-off $6 raise",
   "setup-rounds":
-    "coordinator, 2026-09-27: setup rounds 1 to 3 on Luna low, with Sol low in round 1 (about $0.95 for nine premises) and a two-sample Luna noise run per round (about $0.11); the setup doc's three rounds came to $2.63",
+    "coordinator, 2026-09-27: setup rounds 1 to 3 on Luna low, with Sol low in round 1 (about $0.95 for nine premises) and a two-sample Luna noise run per round (about $0.11); the setup doc's three rounds came to $2.63; coordinator, 2026-09-29: the Casablanca sentence's retest (setupR3c, four Luna low setups, about $0.02-0.03) from what is left",
   "turn-rounds":
     "coordinator, 2026-09-27: turn rounds 1 and 2 on Luna medium turns and Luna low planners, with the judged checks and their calibration (turn doc: about $0.90), plus retries and cold caches",
   migration:
