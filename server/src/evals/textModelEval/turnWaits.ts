@@ -30,7 +30,15 @@ export const LUNA_MEDIUM_ALLOWANCE_S = 45;
 
 const LUNA_MEDIUM = /^gpt-6-luna@medium[+/]/;
 
-export function allowanceFor(armKey: string): number {
+/**
+ * The allowance per arm and kind. A chapter opening waits for the chapter
+ * planner and the chapter's first step, and may take up to 60 s p95 if no
+ * slower than today's form (coordinator, 2026-09-28, on the turn baseline
+ * report's question; the "no slower" half is read beside the table against
+ * today's form); 45 s stays for every other Luna medium turn.
+ */
+export function allowanceFor(armKey: string, kind?: TurnKind): number {
+  if (kind === "chapter opening") return PREGEN_TURN_CAP_S;
   return LUNA_MEDIUM.test(armKey) ? LUNA_MEDIUM_ALLOWANCE_S : PREGEN_TURN_CAP_S;
 }
 
@@ -175,7 +183,7 @@ export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnK
             : { p95: turnP95, n: alone.records.length, source: "turn only" };
       }
     }
-    const allowanceS = allowanceFor(armKey);
+    const allowanceS = allowanceFor(armKey, kind);
     readings.push({
       promptState,
       armKey,
@@ -291,7 +299,7 @@ export function renderTurnWaits(readings: TurnWait[]): string[] {
   if (readings.length === 0) return [];
   return [
     "",
-    `### Turn waits per kind (the turn rounds' allowance: p95 at or under ${LUNA_MEDIUM_ALLOWANCE_S} s on Luna medium, at or under ${PREGEN_TURN_CAP_S} s everywhere)`,
+    `### Turn waits per kind (the turn rounds' allowance: p95 at or under ${LUNA_MEDIUM_ALLOWANCE_S} s on Luna medium, at or under ${PREGEN_TURN_CAP_S} s everywhere; a chapter opening at or under ${PREGEN_TURN_CAP_S} s if no slower than today's form)`,
     "",
     "A switch turn waits for the switch planner and the turn, a chapter opening for the chapter planner and the chapter's first step, every other turn for itself (turn doc A.C). Where a chain measured the pair, its wait is read (chain, with its count); otherwise the planner's p95 is added to the turn's (summed, which reads high). A turn alone waits for its whole job: an attempt re-sent at once, as production's parse retries are (a reply cut at the output cap among them), adds its wait to the answer's. Hung calls hit the eval's timeout and are in no percentile, so they are counted apart, and so are the attempts cut at the output cap. Readings, not verdicts.",
     "",

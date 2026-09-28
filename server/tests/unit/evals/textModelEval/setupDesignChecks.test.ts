@@ -237,9 +237,14 @@ describe("checkSetupDesign: stats (proposals 3 and 4)", () => {
     expect(checkSetupDesign(board(catchUp), multi(2, GameModes.CooperativeCompetitive)).checks.effectsTwoOrThree).toBe(true);
     expect(checkSetupDesign(board([]), multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
     expect(checkSetupDesign(board([...catchUp, "+5 in a", "+5 in b", "+5 in c"]), multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
-    // No scoreboard in a cooperative game, and no rule gives a three-player lead string one effect
+    // No scoreboard in a cooperative game. Since contests have two sides in every player count (owner, 2026-09-28), a
+    // three-player contest's opposites scoreboard (two camps) may carry its catch-up alone too; a lead string may not
     expect(checkSetupDesign(board(catchUp), multi(2, GameModes.Cooperative)).checks.effectsTwoOrThree).toBe(false);
-    expect(checkSetupDesign(board(catchUp), multi(3, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
+    expect(checkSetupDesign(board(catchUp), multi(3, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(true);
+    const leadString = duelSetup({
+      sharedStats: [stat("Supplies"), stat("Who Leads the Hunt", { type: "string", effectOnPoints: catchUp, tooltip: "Who is ahead in the hunt." })],
+    });
+    expect(checkSetupDesign(leadString, multi(3, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
     // Any other stat keeps two or three
     const thin = duelSetup({ sharedStats: [stat("Supplies", { effectOnPoints: ["+10 when rested"] })] });
     expect(checkSetupDesign(thin, multi(2, GameModes.Competitive)).checks.effectsTwoOrThree).toBe(false);
@@ -411,6 +416,70 @@ describe("checkSetupDesign: facts (proposal 11) and example copies (proposal 5)"
   it("does not throw on a malformed reply", () => {
     for (const output of [{}, { guidelines: "x", sharedStats: "x", player1: null }, { player1: { outcomes: [null, 3] } }]) {
       expect(() => checkSetupDesign(output, multi(2, GameModes.Competitive))).not.toThrow();
+      expect(() => checkSetupDesign(output, { ...multi(3, GameModes.Competitive), kids: true })).not.toThrow();
     }
+  });
+
+  it("counts the story elements whose role carries the NPC's pronouns (S2)", () => {
+    const withPronouns = soloSetup({
+      storyElements: [
+        { id: "mira", name: "Mira Holt", role: "Mira Holt (she/her), the ferry's owner, is a rival.", facts: ["Owes the guild a debt."] },
+        { id: "harbour", name: "Old Harbour", role: "A prize both guilds want.", facts: ["Floods at spring tide."] },
+      ],
+    });
+    expect(checkSetupDesign(withPronouns, solo).counts.rolePronouns).toBe(1);
+    expect(checkSetupDesign(soloSetup(), solo).counts.rolePronouns).toBe(0);
+  });
+});
+
+describe("checkSetupDesign: setup round 3's checks (owner notes of 2026-09-28)", () => {
+  const withNames = (names: string[]) => soloSetup({ player1: player(names, (soloSetup().player1 as { outcomes: Loose[] }).outcomes) });
+
+  it("wants a seat's three identities to have different names, unless the premise names the character", () => {
+    expect(checkSetupDesign(soloSetup(), solo).checks.distinctIdentities).toBe(true);
+    // The fix run's defects: the same name three times, a role for a name, one first name under titles and surnames
+    for (const names of [["Rowan", "Rowan", "Rowan"], ["The Detective", "The Detective", "The Detective"], ["Dr. Alex Chen", "Alex Rivera", "Mia Stone"]]) {
+      expect({ names, passes: checkSetupDesign(withNames(names), solo).checks.distinctIdentities }).toEqual({ names, passes: false });
+    }
+    // A premise that gives the character a name keeps it in every identity (smaller decision S8)
+    expect(checkSetupDesign(withNames(["Susan", "Susan", "Susan"]), { ...solo, premise: "Susan's Magical Night: her stuffed animals come alive." }).checks.distinctIdentities).toBe(true);
+    // A role the premise names is still no name
+    expect(checkSetupDesign(withNames(["The Detective", "The Detective", "The Detective"]), { ...solo, premise: "A Neo-Tokyo Detective Story." }).checks.distinctIdentities).toBe(false);
+    // Each seat on its own: two seats may share nothing, and a seat is read by itself
+    const seats = duelSetup({ player2: player(["Dora Fenn", "Dora Fenn", "Emil Rast"], []) });
+    expect(checkSetupDesign(seats, multi(2, GameModes.Competitive)).checks.distinctIdentities).toBe(false);
+    expect(checkSetupDesign(duelSetup(), multi(2, GameModes.Competitive)).checks.distinctIdentities).toBe(true);
+  });
+
+  it("holds a story read with a child to two visible stats of each kind, no hidden ones and plain names, and reports it only there", () => {
+    const kids = { ...solo, kids: true };
+    const small = soloSetup({ sharedStats: [stat("Snacks"), stat("Weather")], playerStats: [stat("Courage", { id: "player_courage" }), stat("Forest Friends", { id: "player_friends" })] });
+    expect(checkSetupDesign(small, kids)).toMatchObject({ checks: { kidsStatBudget: true, kidsPlainStatNames: true }, counts: { kidsLongStatNames: 0 } });
+    const big = soloSetup({
+      sharedStats: [stat("Snacks"), stat("Weather"), stat("Storm Shelter Warmth Level")],
+      playerStats: [stat("Courage", { id: "player_courage" }), stat("Secret Map", { id: "player_map", isVisible: false })],
+    });
+    expect(checkSetupDesign(big, kids)).toMatchObject({ checks: { kidsStatBudget: false, kidsPlainStatNames: false }, counts: { kidsLongStatNames: 1 } });
+    // An opposites stat's name reads per side
+    expect(checkSetupDesign(soloSetup({ sharedStats: [stat("Brave Bunny|Shy Bunny", { type: "opposites" })] }), kids).checks.kidsPlainStatNames).toBe(true);
+    expect(checkSetupDesign(big, solo).checks).not.toHaveProperty("kidsStatBudget");
+    expect(checkSetupDesign(big, solo).counts).not.toHaveProperty("kidsLongStatNames");
+  });
+
+  it("wants two-sided contests between two camps where three players compete, each with an opposites scoreboard", () => {
+    const third = { player3: player(["Gus Pell", "Hana Voss", "Ivo Kett"], [outcome("player3_home", "Will the archivist find a home?", 2)]) };
+    const camps = duelSetup(third);
+    expect(checkSetupDesign(camps, multi(3, GameModes.Competitive)).checks.twoCampContests).toBe(true);
+    expect(checkSetupDesign(camps, multi(3, GameModes.CooperativeCompetitive)).checks.twoCampContests).toBe(true);
+    // A three-player race written as three paths, a lead string instead of a scoreboard, or no contest at all
+    const race = duelSetup({ ...third, sharedOutcomes: [outcome("shared_flat", "Who will sign the lease on the flat?", 3, paths)] });
+    expect(checkSetupDesign(race, multi(3, GameModes.Competitive)).checks.twoCampContests).toBe(false);
+    const lead = duelSetup({ ...third, sharedStats: [stat("Supplies"), stat("Who Leads the Regatta", { type: "string", tooltip: "Who is ahead." })] });
+    expect(checkSetupDesign(lead, multi(3, GameModes.Competitive)).checks.twoCampContests).toBe(false);
+    const none = duelSetup({ ...third, sharedOutcomes: [outcome("shared_wall", "Will the sea wall hold?", 3)] });
+    expect(checkSetupDesign(none, multi(3, GameModes.Competitive)).checks.twoCampContests).toBe(false);
+    // Reported only where three players contest
+    expect(checkSetupDesign(camps, multi(2, GameModes.Competitive)).checks).not.toHaveProperty("twoCampContests");
+    expect(checkSetupDesign(camps, multi(3, GameModes.Cooperative)).checks).not.toHaveProperty("twoCampContests");
   });
 });

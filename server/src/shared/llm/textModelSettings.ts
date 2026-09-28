@@ -7,7 +7,7 @@ import { assertSupportedSettings, modelFamily } from "./chatModel.js";
  *
  * Seven setting groups, each read from its own prefix and nothing else:
  *   setup                 SETUP_MODEL_*                       gpt-6-luna low
- *   template editor       GENERATION_MODEL_*                  gpt-6-luna low
+ *   template editor       GENERATION_MODEL_*                  gpt-6-sol low
  *   beats                 TEXT_MODEL_*                        gpt-6-luna medium
  *   multiplayer beats     MULTIPLAYER_TEXT_MODEL_*            gpt-6-luna low
  *   analysis              SWITCH_THREAD_MODEL_*               gpt-6-luna low
@@ -72,11 +72,14 @@ type GroupDefault = { prefix: string; model: string; reasoningEffort: ReasoningE
  * The settled defaults (2026-09-27): single-player turns on Luna medium,
  * multiplayer turns on Luna low (medium's 3-player p95 was 62 s, over the
  * 60 s cap), everything else on Luna low. Setup is the only GPT-6 arm inside
- * the setup wait cap; templates may move to Sol after setup round 1.
+ * the setup wait cap. The template editor (AI Draft, AI Iteration) moved to
+ * Sol low on 2026-09-28 (owner, from the templates rating page: Sol better on
+ * 3 items, the same on 6, worse on none, the repeat agreeing); no player waits
+ * on it, and custom-story setup stays on Luna low.
  */
 export const TEXT_MODEL_GROUPS: Record<TextModelGroup, GroupDefault> = {
   setup: { prefix: "SETUP_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
-  templateEditor: { prefix: "GENERATION_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
+  templateEditor: { prefix: "GENERATION_MODEL", model: "gpt-6-sol", reasoningEffort: "low" },
   beat: { prefix: "TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "medium" },
   multiplayerBeat: { prefix: "MULTIPLAYER_TEXT_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },
   analysis: { prefix: "SWITCH_THREAD_MODEL", model: "gpt-6-luna", reasoningEffort: "low" },

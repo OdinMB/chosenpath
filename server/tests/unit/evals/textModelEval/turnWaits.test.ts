@@ -74,8 +74,9 @@ describe("turnWaitReadings: p95 per turn kind against the turn rounds' allowance
     expect(row(MEDIUM, "chapter step")).toMatchObject({ turns: 3, turnP95: 50, wait: { p95: 50, source: "turn" }, allowanceS: 45, within: false, hangs: 1 });
   });
 
-  it("reads a chapter opening from the chain that measured planner and turn together", () => {
-    expect(row(MEDIUM, "chapter opening")).toMatchObject({ turns: 1, turnP95: 30, wait: { p95: 40, n: 1, source: "chain", planner: LOW }, within: true });
+  it("reads a chapter opening from the chain that measured planner and turn together, against 60 s (coordinator, 2026-09-28)", () => {
+    // A chapter opening may take up to 60 s p95 if no slower than today's form; 45 s stays for every other kind
+    expect(row(MEDIUM, "chapter opening")).toMatchObject({ turns: 1, turnP95: 30, wait: { p95: 40, n: 1, source: "chain", planner: LOW }, allowanceS: 60, within: true });
   });
 
   it("adds the planner's p95 to a switch turn no chain measured (production's planner for the player count)", () => {
@@ -90,7 +91,7 @@ describe("turnWaitReadings: p95 per turn kind against the turn rounds' allowance
   it("leaves the planners and the chains out as arms of their own, and renders a table", () => {
     expect(readings.map((r) => r.armKey).every((key) => key === MEDIUM || key === LOW)).toBe(true);
     const text = renderTurnWaits(readings).join("\n");
-    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | chapter opening | 1 | 30.0 s | 40.0 s (chain, 1) | 45 s | within | 0 | 0 |");
+    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | chapter opening | 1 | 30.0 s | 40.0 s (chain, 1) | 60 s | within | 0 | 0 |");
     expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | switch turn | 1 | 30.0 s | 50.0 s (summed with gpt-6-luna@low/prod) | 45 s | over | 0 | 0 |");
   });
 

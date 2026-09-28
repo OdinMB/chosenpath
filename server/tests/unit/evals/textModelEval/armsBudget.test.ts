@@ -162,6 +162,8 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
       ["gpt-6-luna@low/setupR1c", 2, "all", undefined],
       ["gpt-6-luna@low/setupR2b", 2, "all", undefined],
       ["gpt-6-luna@low/setupR2bOrder", 2, "all", undefined],
+      // Round 3's confirmation run: the final setup form on every premise, two samples
+      ["gpt-6-luna@low/setupR3", 2, "all", undefined],
     ]);
     for (const role of ["beat", "switch", "thread", "iteration"] as const) expect(armsFor("setup-rounds", role)).toEqual([]);
     // gpt-4.x is never a new arm; its stored records are comparisons only
@@ -205,6 +207,17 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
     expect(referenceKey("gpt-6-luna@low/setupR2bOrder")).toBe("gpt-6-luna@low/setupR1c");
     expect(secondReferenceKeys("gpt-6-luna@low/setupR2b")).toEqual(["gpt-6-luna@low/prod"]);
     expect(secondReferenceKeys("gpt-6-luna@low/setupR2bOrder")).toEqual(["gpt-6-luna@low/setupR2b", "gpt-6-luna@low/prod"]);
+  });
+
+  it("reads setup round 3 against the carried-forward form it builds on and against today's prompt (the stop rule's two readings)", () => {
+    expect(referenceKey("gpt-6-luna@low/setupR3")).toBe("gpt-6-luna@low/setupR2bOrder");
+    expect(estimateBaseKey("gpt-6-luna@low/setupR3")).toBe("gpt-6-luna@low/setupR2bOrder");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR3")).toEqual(["gpt-6-luna@low/prod"]);
+  });
+
+  it("reads the chain's planner against planner v2 and its turn form against today's form", () => {
+    expect(referenceKey("gpt-6-luna@low/planV2b")).toBe("gpt-6-luna@low/planV2");
+    expect(referenceKey("gpt-6-luna@medium/turnB6")).toBe("gpt-6-luna@medium/prod");
   });
 
   it("reads turn round 2's form (and the smoke's draft) against today's form, and its paragraph arm against the round-2 form and today's form", () => {

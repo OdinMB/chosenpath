@@ -6,16 +6,17 @@ import { finishingRecord, usable, type CallRecord, type Job } from "./runner.js"
 import type { EvalRequest } from "./variants.js";
 
 /*
- * The round preparation's own calls (the chapter backfill, chapterFrames.ts,
- * and the judged checks, judgedChecks.ts): runner jobs in the group "prep",
- * recorded in prep-calls.jsonl beside calls.jsonl, so every report that reads
- * calls.jsonl keeps reading only story-role calls. Their spend joins the
- * ledger under their stage (turn-rounds) wherever the caps are checked.
- * A prep job's arm key is "<kind>><arm key>" (backfill>gpt-6-luna@low/prod),
- * so it never reads as an eval arm.
+ * The rounds' own calls (the chapter backfill, chapterFrames.ts; the judged
+ * checks, judgedChecks.ts; setup round 3's setup-to-play chain,
+ * setupChain.ts): runner jobs in the group "prep", recorded in
+ * prep-calls.jsonl beside calls.jsonl, so every report that reads calls.jsonl
+ * keeps reading only the isolated and chained cases' calls. Their spend joins
+ * the ledger under their stage (turn-rounds; setup-rounds for the chain)
+ * wherever the caps are checked. A prep job's arm key is "<kind>><arm key>"
+ * (backfill>gpt-6-luna@low/prod), so it never reads as an eval arm.
  */
 
-export type PrepKind = "backfill" | "judge";
+export type PrepKind = "backfill" | "judge" | "chain";
 
 export const prepArmKey = (kind: PrepKind, arm: Arm) => `${kind}>${arm.key}`;
 

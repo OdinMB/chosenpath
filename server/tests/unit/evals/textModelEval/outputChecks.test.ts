@@ -54,6 +54,16 @@ describe("checksForRecords", () => {
     expect(read()?.checks).not.toHaveProperty("noExampleCopy");
     expect(read()?.checks).toMatchObject({ singlePlayerOutcomes: false, startable: false });
   });
+
+  it("reads a kids premise's stat budget from the case's kids tag, and only there", () => {
+    const setup = { premise: "Forest friends in a storm.", playerCount: 1 as const, gameMode: GameModes.SinglePlayer, maxTurns: 25 };
+    const output = { guidelines: { typesOfThreads: [] }, sharedStats: [], playerStats: [], storyElements: [], player1: { outcomes: [] } };
+    const setupRecord = record({ role: "setup", group: "setup", caseId: "k", outputFile: "outputs/k.json" });
+    const read = (kids: boolean) =>
+      checksForRecords([setupRecord], [evalCase("k", "setup", { setup, tags: { ...evalCase("k", "setup").tags, kids } })], () => output, () => undefined).checks.get("outputs/k.json");
+    expect(read(true)?.checks).toMatchObject({ kidsStatBudget: true, kidsPlainStatNames: true });
+    expect(read(false)?.checks).not.toHaveProperty("kidsStatBudget");
+  });
 });
 
 describe("checksForRecords: checks read what the game keeps", () => {

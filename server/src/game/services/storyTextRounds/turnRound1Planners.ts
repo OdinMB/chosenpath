@@ -276,6 +276,28 @@ const KIND_RULE_MP =
 const RACE_RULE =
   "A race between three players (an outcome whose three paths each name a player who wins) is run as Contest threads between two of the racing players at a time; the lower player slot is Side A, and the third player gets a thread of their own in this batch. The milestones name who won. Never run a race as an Exploration thread.";
 
+/**
+ * Two-sided contests only (owner, 2026-09-28: no contests of three or more
+ * parties, an accepted engine limit): the race rule and the three-path
+ * contest line go; with three players, the sides are the setup's two camps
+ * (setup round 3), player1's camp on Side A.
+ */
+const TWO_SIDES = "A contest always has exactly two sides.";
+const TWO_PLAYER_SIDES = "in a two-player game, player1 is always Side A and player2 Side B";
+const CAMP_SIDES = "with three players, the sides are the two camps the outcome's resolutions and its scoreboard name, and player1's camp is always Side A";
+const THREE_PATH_CONTEST = " An outcome whose three paths name which player wins is a contest: run it as Contest threads between the players taking part.";
+const kindRuleTwoSided = (players: number) => {
+  const sided = players === 3 ? replaceOnce(LABEL, KIND_RULE_MP, TWO_PLAYER_SIDES, CAMP_SIDES) : KIND_RULE_MP;
+  return `${replaceOnce(LABEL, sided, THREE_PATH_CONTEST, "")} ${TWO_SIDES}`;
+};
+
+/** The kind rule and, for three players, the race rule, as planner v2 prints them, or with two-sided contests only. */
+function kindRules(story: Story, twoSided: boolean): string {
+  if (!story.isMultiplayer()) return KIND_RULE_1P;
+  if (twoSided) return kindRuleTwoSided(story.getNumberOfPlayers());
+  return `${KIND_RULE_MP}${story.getNumberOfPlayers() === 3 ? `\n${RACE_RULE}` : ""}`;
+}
+
 function progressionItem(number: number, multiplayer: boolean): string {
   const who = multiplayer ? "players" : "player";
   return `${number}. A progression of steps, as many as the length, that tells one situation rising to a climax:
@@ -326,7 +348,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -360,7 +382,7 @@ function threadInstructions(production: string, story: Story): string {
     LABEL,
     text,
     "- Whenever some resolutions are more desirable than others, use a Challenge or Contest thread instead.\n",
-    `\n${multiplayer ? KIND_RULE_MP : KIND_RULE_1P}${story.getNumberOfPlayers() === 3 ? `\n${RACE_RULE}` : ""}\n`
+    `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
   text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer));
@@ -568,12 +590,16 @@ function assembleThread(story: Story, parsed: unknown): unknown {
   };
 }
 
-/** Planner v2's thread analysis request (lean, or `full` with the restated instructions). */
-export function plannerV2ThreadRequest(story: Story, full: boolean): AssembledRequest {
+/**
+ * Planner v2's thread analysis request (lean, or `full` with the restated
+ * instructions); `twoSided` is planV2b, contests with two sides only (setup
+ * round 3's chain).
+ */
+export function plannerV2ThreadRequest(story: Story, full: boolean, options: { twoSided?: boolean } = {}): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   return {
-    prompt: threadInstructions(instructions, story) + threadState(state, story),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false) + threadState(state, story),
     schema: threadReplySchema(story, full),
     assemble: (parsed) => assembleThread(story, parsed),
   };
@@ -585,6 +611,8 @@ export const PLANNER_V2_TEXT = {
   stepB: STEP_B,
   kindRuleStart: "As a rule, match the thread's kind to the outcome it pushes",
   raceRuleStart: "A race between three players",
+  twoSides: TWO_SIDES,
+  campsSides: "with three players, the sides are the two camps",
   lengthRuleStart: "Choose the length from what the thread is",
   milestoneSizeStart: "Size them to what PACING says the outcome still needs",
   oneSituation: "tells one situation rising to a climax",

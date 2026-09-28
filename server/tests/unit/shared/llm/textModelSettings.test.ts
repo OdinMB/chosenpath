@@ -24,8 +24,9 @@ describe("resolveTextModelConfig: the GPT-6 defaults", () => {
     const single = Object.fromEntries(ALL_ROLES.map((role) => [role, settingsFor(config, role)]));
     expect(single).toEqual({
       setup: { model: "gpt-6-luna", reasoningEffort: "low" },
-      templateGeneration: { model: "gpt-6-luna", reasoningEffort: "low" },
-      templateIteration: { model: "gpt-6-luna", reasoningEffort: "low" },
+      // Templates and AI Iteration on Sol low (owner, 2026-09-28, from the templates page); custom-story setup stays on Luna
+      templateGeneration: { model: "gpt-6-sol", reasoningEffort: "low" },
+      templateIteration: { model: "gpt-6-sol", reasoningEffort: "low" },
       beat: { model: "gpt-6-luna", reasoningEffort: "medium" },
       switchAnalysis: { model: "gpt-6-luna", reasoningEffort: "low" },
       threadAnalysis: { model: "gpt-6-luna", reasoningEffort: "low" },
@@ -40,7 +41,7 @@ describe("resolveTextModelConfig: the GPT-6 defaults", () => {
   it("summarises every group as model@effort for the startup log line", () => {
     expect(describeTextModels(resolveTextModelConfig({}, quiet))).toEqual({
       setup: "gpt-6-luna@low",
-      templateEditor: "gpt-6-luna@low",
+      templateEditor: "gpt-6-sol@low",
       beat: "gpt-6-luna@medium",
       multiplayerBeat: "gpt-6-luna@low",
       analysis: "gpt-6-luna@low",
@@ -53,13 +54,15 @@ describe("resolveTextModelConfig: the GPT-6 defaults", () => {
 describe("resolveTextModelConfig: env overrides", () => {
   it("reads each group from its own prefix; setup no longer follows GENERATION_MODEL_*", () => {
     const config = resolveTextModelConfig(
-      { GENERATION_MODEL_NAME: "gpt-6-sol", GENERATION_MODEL_REASONING_EFFORT: "low" },
+      { GENERATION_MODEL_NAME: "gpt-6-luna", GENERATION_MODEL_REASONING_EFFORT: "low" },
       quiet
     );
-    // Templates can move to Sol while custom-story setup, which a player waits for, stays on Luna
-    expect(settingsFor(config, "templateGeneration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "low" });
-    expect(settingsFor(config, "templateIteration")).toEqual({ model: "gpt-6-sol", reasoningEffort: "low" });
+    // Templates can go back to Luna (a rollback by env) while custom-story setup, which a player waits for, is untouched
+    expect(settingsFor(config, "templateGeneration")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
+    expect(settingsFor(config, "templateIteration")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
     expect(settingsFor(config, "setup")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
+    // And the template default (Sol) never reaches custom-story setup
+    expect(settingsFor(resolveTextModelConfig({}, quiet), "setup")).toEqual({ model: "gpt-6-luna", reasoningEffort: "low" });
 
     const setup = resolveTextModelConfig({ SETUP_MODEL_NAME: "gpt-6-sol", SETUP_MODEL_REASONING_EFFORT: "none" }, quiet);
     expect(settingsFor(setup, "setup")).toEqual({ model: "gpt-6-sol", reasoningEffort: "none" });
@@ -95,7 +98,7 @@ describe("resolveTextModelConfig: env overrides", () => {
 describe("resolveTextModelConfig: what stops the server at startup", () => {
   it.each([
     ["SETUP_MODEL_NAME", "gpt-4.1", "SETUP_MODEL_NAME=gpt-6-luna and SETUP_MODEL_REASONING_EFFORT=low"],
-    ["GENERATION_MODEL_NAME", "gpt-4.1", "GENERATION_MODEL_NAME=gpt-6-luna and GENERATION_MODEL_REASONING_EFFORT=low"],
+    ["GENERATION_MODEL_NAME", "gpt-4.1", "GENERATION_MODEL_NAME=gpt-6-sol and GENERATION_MODEL_REASONING_EFFORT=low"],
     ["TEXT_MODEL_NAME", "gpt-4.1-mini", "TEXT_MODEL_NAME=gpt-6-luna and TEXT_MODEL_REASONING_EFFORT=medium"],
     ["MULTIPLAYER_TEXT_MODEL_NAME", "gpt-4.1-mini", "MULTIPLAYER_TEXT_MODEL_NAME=gpt-6-luna and MULTIPLAYER_TEXT_MODEL_REASONING_EFFORT=low"],
     ["SWITCH_THREAD_MODEL_NAME", "gpt-4o-mini", "SWITCH_THREAD_MODEL_NAME=gpt-6-luna and SWITCH_THREAD_MODEL_REASONING_EFFORT=low"],

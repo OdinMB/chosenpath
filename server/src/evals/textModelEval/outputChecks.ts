@@ -2,7 +2,7 @@ import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
 import { caseStory, type EvalCase } from "./cases.js";
-import { storyAfterAnalysis } from "./jobPlan.js";
+import { setupInputOf, storyAfterAnalysis } from "./jobPlan.js";
 import { usable, type CallRecord } from "./runner.js";
 import { checkSetupDesign, exampleBlock } from "./setupDesignChecks.js";
 import {
@@ -94,10 +94,12 @@ export function checksForRecords(
     // The rule checks and, beside them, the design checks of the two improvement documents
     let rules: CheckResult | undefined;
     let designed: CheckResult | undefined;
-    if (record.role === "setup" && evalCase.setup) {
+    const setup = setupInputOf(evalCase);
+    if (record.role === "setup" && setup) {
       const prompt = loadPrompt(record);
-      rules = checkSetup(output as SetupShape, evalCase.setup);
-      designed = checkSetupDesign(output, evalCase.setup, prompt === undefined ? undefined : exampleBlock(prompt));
+      // The case's kids tag rides along, for setup round 3's kids checks
+      rules = checkSetup(output as SetupShape, setup);
+      designed = checkSetupDesign(output, setup, prompt === undefined ? undefined : exampleBlock(prompt));
     } else if (record.role === "beat") {
       const story = beatInput(record, evalCase, records, load);
       const written = output as SetOfBeatGenerationSchema;

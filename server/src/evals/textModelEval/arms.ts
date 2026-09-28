@@ -129,6 +129,11 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnR2c: "prod",
   // Turn round 3: B9's request form against the round-2 form it sends
   turnR3Form: "turnR2b",
+  // Setup round 3: the final setup form against the carried-forward form it builds on (and today's prompt, second);
+  // its chain's planner against planner v2, its turn form (B6 alone) against today's
+  setupR3: "setupR2bOrder",
+  planV2b: "planV2",
+  turnB6: "prod",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -195,6 +200,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR1c")]: [armKey(LUNA_LOW, "setupR1b")],
   [armKey(LUNA_LOW, "setupR2b")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2bOrder")]: [armKey(LUNA_LOW, "setupR2b"), armKey(LUNA_LOW, "prod")],
+  // Setup round 3's confirmation: the final form against today's prompt too (the carry-forward guard)
+  [armKey(LUNA_LOW, "setupR3")]: [armKey(LUNA_LOW, "prod")],
 };
 
 export function secondReferenceKeys(key: string): string[] {
@@ -388,7 +395,9 @@ function turnRoundArms(role: EvalRole): ArmPlan[] {
  * round-1 report's fixes) on Luna low at two samples on all 18 premises, then
  * round 1c (setupR1c, proposal 1's fix-and-retest) and round 2b (setupR2b,
  * setupR2bOrder: round 2's arms on the passing changes) the same way, arm A
- * first.
+ * first. Round 3's confirmation run (setupR3, the final form) last, on Luna
+ * low at two samples on all 18 premises; its setup-to-play chain is its own
+ * mode (setupChain.ts).
  */
 function setupRoundArms(role: EvalRole): ArmPlan[] {
   if (role !== "setup") return [];
@@ -401,6 +410,7 @@ function setupRoundArms(role: EvalRole): ArmPlan[] {
     { arm: luna("low", "setupR1c"), samples: 2, scope: "all" },
     { arm: luna("low", "setupR2b"), samples: 2, scope: "all" },
     { arm: luna("low", "setupR2bOrder"), samples: 2, scope: "all" },
+    { arm: luna("low", "setupR3"), samples: 2, scope: "all" },
   ];
 }
 

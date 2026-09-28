@@ -80,7 +80,8 @@ export type BuildReport = {
   skipped: string[];
 };
 
-function selectCharacters(story: Story, caseId: string): Story {
+/** Each seat's identity and background picked by hash of the case id and slot, as a player would pick them. */
+export function selectCharacters(story: Story, caseId: string): Story {
   let updated = story;
   for (const slot of story.getPlayerSlots()) {
     const options = story.getState().characterSelectionOptions[slot];

@@ -39,6 +39,7 @@ import { renderRatingPage } from "./ratingPage.js";
 import { planRatingSet, ratingSetFromKey, type ArmRef, type PairwiseCriteriaSet, type RatingKind } from "./ratingSets.js";
 import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
+import { DEFAULT_CHAIN_MAX_SPEND, setupChainMode } from "./setupChainMode.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
@@ -87,6 +88,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
+ *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20]  setup round 3's setup-to-play chain
+ *     (setupChain.ts): new setups on the final form, played through the first chapter; prep-calls.jsonl, in the
+ *     setup-rounds stage; writes setup-chain.md and .json (--samples picks the chain's sample, default 1)
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -112,7 +116,8 @@ type Mode =
   | "backfill-chapters"
   | "judge-calibration"
   | "judge-records"
-  | "balance-sim";
+  | "balance-sim"
+  | "setup-chain";
 
 type Args = {
   mode: Mode;
@@ -216,6 +221,7 @@ function parseArgs(argv: string[]): Args {
       case "--judge-calibration":
       case "--judge-records":
       case "--balance-sim":
+      case "--setup-chain":
         args.mode = arg.slice(2) as Mode;
         break;
       case "--criteria": {
@@ -445,10 +451,13 @@ async function dryRun(args: Args, files: EvalFiles, dirs: ReturnType<typeof guar
 
 const DEFAULT_PREP_MAX_SPEND = 0.1;
 
-/** The turn rounds' preparation modes (turnPrep.ts), each capped by the turn-rounds stage and --max-spend. */
-function prepContext(args: Args, files: EvalFiles): PrepContext {
+/**
+ * The rounds' own calls (turnPrep.ts, and setup round 3's chain), each capped
+ * by its stage (turn-rounds, or setup-rounds for the chain) and --max-spend.
+ */
+function prepContext(args: Args, files: EvalFiles, stage: LedgerStage = "turn-rounds", defaultMaxSpend = DEFAULT_PREP_MAX_SPEND): PrepContext {
   requireApiKey();
-  const caps = capsFor(args, files, "turn-rounds", DEFAULT_PREP_MAX_SPEND);
+  const caps = capsFor(args, files, stage, defaultMaxSpend);
   return {
     files,
     caps,
@@ -823,6 +832,8 @@ async function main() {
       return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE, args.caseIds);
     case "balance-sim":
       return balanceSimMode(args, files);
+    case "setup-chain":
+      return setupChainMode(prepContext(args, files, "setup-rounds", DEFAULT_CHAIN_MAX_SPEND), { sample: args.samples ?? 1, caseIds: args.caseIds });
     default:
       return dryRun(args, files, dirs);
   }

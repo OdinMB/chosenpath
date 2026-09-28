@@ -19,7 +19,7 @@ import { caseStory, hashOrder, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
 import { usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
-import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type VariantId } from "./variants.js";
+import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type SetupInput, type VariantId } from "./variants.js";
 
 /*
  * Turns frozen cases and the stage's arm matrix into runner jobs: every
@@ -57,12 +57,22 @@ export type PlanOptions = {
 
 const DEFAULT_BASELINE_SAMPLES = 2;
 
+/**
+ * A setup case's input with the case's kids tag (a read-with-kids premise),
+ * which only setup round 3's form reads; the frozen input itself predates it.
+ */
+export function setupInputOf(evalCase: EvalCase): SetupInput | undefined {
+  return evalCase.setup ? { ...evalCase.setup, ...(evalCase.tags.kids ? { kids: true } : {}) } : undefined;
+}
+
 /** What a case's request is built from: the setup or iteration input, or the case's story (with its fixed analysis for beats). */
 export function requestInputFor(evalCase: EvalCase): RequestInput {
   switch (evalCase.role) {
-    case "setup":
-      if (!evalCase.setup) throw new Error(`${evalCase.id} has no setup input`);
-      return { role: "setup", setup: evalCase.setup };
+    case "setup": {
+      const setup = setupInputOf(evalCase);
+      if (!setup) throw new Error(`${evalCase.id} has no setup input`);
+      return { role: "setup", setup };
+    }
     case "iteration":
       if (!evalCase.iteration) throw new Error(`${evalCase.id} has no iteration input`);
       return { role: "iteration", iteration: evalCase.iteration };

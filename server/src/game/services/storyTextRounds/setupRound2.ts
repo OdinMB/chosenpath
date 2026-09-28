@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { GameModes, PLAYER_SLOTS, type GameMode, type PlayerCount } from "core/types/index.js";
 import type { TextRequest } from "../storyTextSteps.js";
-import { PASSING_ROUND1_PARTS, ROUND1C_PARTS, iterationRequestFromRound1, setupRequestFromRound1, type Round1Parts } from "./setupRound1.js";
+import { PASSING_ROUND1_PARTS, ROUND1C_PARTS, iterationRequestFromRound1, setupRequestFromRound1, type Round1Parts, type SetupCallOptions } from "./setupRound1.js";
+import { PLAYER_ROLES_CAMP } from "./setupRound3Text.js";
 
 /*
  * Setup round 2 of DOCS/2026-09-27_setup-generation-improvements.md (section
@@ -215,7 +216,7 @@ function sameList(list: z.ZodArray<z.ZodTypeAny>, element: z.ZodTypeAny): z.ZodA
  * the roles there. A shared list only where the base has one (the slate gives
  * a single player none, S7). Every field keeps arm A's instance, text and caps.
  */
-function generationOrderSchema(schema: z.AnyZodObject, kind: "story" | "template", players: PlayerCount, roles: boolean): z.AnyZodObject {
+function generationOrderSchema(schema: z.AnyZodObject, kind: "story" | "template", players: PlayerCount, roles: boolean, camps = false): z.AnyZodObject {
   const shape = schema.shape;
   const guidelines = asObject(shape.guidelines, "guidelines");
   const seat = asObject(shape.player1, "player1");
@@ -226,7 +227,9 @@ function generationOrderSchema(schema: z.AnyZodObject, kind: "story" | "template
   const seatWritten = seat.omit({ outcomes: true });
   const slots = slotsOf(shape);
   const plan = asObject(shape.characterSelectionPlan, "characterSelectionPlan");
-  const playerRoles: z.ZodRawShape = roles && players > 1 ? { playerRoles: z.array(z.string()).max(players).describe(PLAYER_ROLES) } : {};
+  // Setup round 3: where three players contest, each seat's line also names its camp
+  const rolesText = camps ? `${PLAYER_ROLES}${PLAYER_ROLES_CAMP}` : PLAYER_ROLES;
+  const playerRoles: z.ZodRawShape = roles && players > 1 ? { playerRoles: z.array(z.string()).max(players).describe(rolesText) } : {};
   const sharedOutcomes: z.ZodRawShape = shape.sharedOutcomes ? { sharedOutcomes: sameList(asArray(shape.sharedOutcomes, "sharedOutcomes"), written) } : {};
   const fields: z.ZodRawShape = {
     guidelines: guidelines.omit({ typesOfThreads: true, switchAndThreadInstructions: true }),
@@ -314,16 +317,18 @@ export function setupRound2Request(
   maxTurns: number,
   kind: "story" | "template",
   order: Round2Order,
-  parts: Round1Parts = PASSING_ROUND1_PARTS
+  parts: Round1Parts = PASSING_ROUND1_PARTS,
+  options: SetupCallOptions = {}
 ): Round2Request {
-  const base = setupRequestFromRound1(premise, playerCount, gameMode, maxTurns, kind, parts);
+  const base = setupRequestFromRound1(premise, playerCount, gameMode, maxTurns, kind, parts, options);
   const on: On = { players: playerCount, mode: gameMode };
   const prompt = round2Prompt(base.prompt, true, parts);
   const schema = asObject(base.schema, "setup");
   if (order === "fieldOrder") return { prompt, schema: withSteering(schema, on, true) };
+  const camps = !!parts.round3 && playerCount === 3 && contested(on);
   return {
     prompt,
-    schema: generationOrderSchema(withSteering(schema, on, false), kind, playerCount, parts.slate),
+    schema: generationOrderSchema(withSteering(schema, on, false), kind, playerCount, parts.slate, camps),
     assemble: (reply) => assembleGenerationOrder(reply, playerCount, kind),
   };
 }
@@ -341,9 +346,10 @@ export function iterationRound2Request(
   maxTurns: number,
   sections: string[],
   template: object,
-  parts: Round1Parts = PASSING_ROUND1_PARTS
+  parts: Round1Parts = PASSING_ROUND1_PARTS,
+  options: SetupCallOptions = {}
 ): TextRequest {
-  const base = iterationRequestFromRound1(feedback, playerCount, gameMode, maxTurns, sections, template, parts);
+  const base = iterationRequestFromRound1(feedback, playerCount, gameMode, maxTurns, sections, template, parts, options);
   const on: On = { players: playerCount, mode: gameMode };
   const fallback = sections.includes("guidelines") && sections.includes("stats");
   return { prompt: round2Prompt(base.prompt, false, parts), schema: withSteering(asObject(base.schema, "iteration"), on, fallback) };

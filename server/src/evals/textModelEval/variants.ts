@@ -23,6 +23,7 @@ import {
   PASSING_ROUND1_PARTS,
   ROUND1B_PARTS,
   ROUND1C_PARTS,
+  ROUND3_PARTS,
   iterationRequestFromRound1,
   iterationRound1Request,
   setupRequestFromRound1,
@@ -38,7 +39,7 @@ import {
 } from "../../game/services/storyTextRounds/setupRound2.js";
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../game/services/storyTextRounds/turnRound1Planners.js";
 import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from "../../game/services/storyTextRounds/turnRound1Turns.js";
-import { turnRound2Request, type TurnRound2Form } from "../../game/services/storyTextRounds/turnRound2.js";
+import { todaysFormWithB6Request, turnRound2Request, type TurnRound2Form } from "../../game/services/storyTextRounds/turnRound2.js";
 import { turnRound3FormRequest, type TurnRound3Request } from "../../game/services/storyTextRounds/turnRound3.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
 
@@ -106,6 +107,13 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * text field, the last paragraph at the others' length) sent as a split
  * request, the rules that differ per turn moved into the per-call part, with
  * production's timeout and output cap (the only variant that carries limits).
+ * Setup round 3 and its setup-to-play chain (setupChain.ts): "setupR3" is the
+ * final setup form, round 2b's arm B with round 3's changes (ROUND3_PARTS:
+ * two-sided contests, the kids stat budget, the identity-name clause, no
+ * "energy" in the field examples, the story length, proposal 11), reading a
+ * case's kids tag; "planV2b" is planner v2 with two-sided contests only (the
+ * chapter planner's three-player race rule gone); "turnB6" is today's turn
+ * form with B6 alone, single player (group turns stay on today's form).
  */
 
 export type VariantId =
@@ -134,7 +142,10 @@ export type VariantId =
   | "turnR2b"
   | "turnR2Paragraphs"
   | "turnR2c"
-  | "turnR3Form";
+  | "turnR3Form"
+  | "setupR3"
+  | "planV2b"
+  | "turnB6";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -162,6 +173,9 @@ export const VARIANTS: VariantId[] = [
   "turnR2Paragraphs",
   "turnR2c",
   "turnR3Form",
+  "setupR3",
+  "planV2b",
+  "turnB6",
 ];
 
 /**
@@ -231,6 +245,8 @@ export type SetupInput = {
   playerCount: PlayerCount;
   gameMode: GameMode;
   maxTurns: number;
+  /** A child reads along (a read-with-kids story; the case's kids tag): only setup round 3's form reads it */
+  kids?: boolean;
 };
 
 export type IterationInput = {
@@ -353,8 +369,9 @@ function setupRound1With(variant: VariantId, parts: Round1Parts) {
 function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts = PASSING_ROUND1_PARTS) {
   return (input: RequestInput): Round2Request => {
     if (input.role === "setup") {
-      const { premise, playerCount, gameMode, maxTurns } = input.setup;
-      return setupRound2Request(premise, playerCount, gameMode, maxTurns, "story", order, parts);
+      const { premise, playerCount, gameMode, maxTurns, kids } = input.setup;
+      // Only round 3's parts read whether a child reads along; earlier forms build as they ran
+      return setupRound2Request(premise, playerCount, gameMode, maxTurns, "story", order, parts, { kids });
     }
     if (input.role === "iteration") {
       const { feedback, playerCount, gameMode, maxTurns, sections, template } = input.iteration;
@@ -364,11 +381,11 @@ function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts 
   };
 }
 
-/** Turn round 1's planner v2, lean or with the restated instructions: switch and thread analysis. */
-function plannerV2(variant: VariantId, full: boolean) {
+/** Turn round 1's planner v2, lean or with the restated instructions, or (planV2b) with two-sided contests only: switch and thread analysis. */
+function plannerV2(variant: VariantId, full: boolean, twoSided = false) {
   return (input: RequestInput): Round2Request => {
     if (input.role === "switch") return plannerV2SwitchRequest(input.story, full);
-    if (input.role === "thread") return plannerV2ThreadRequest(input.story, full);
+    if (input.role === "thread") return plannerV2ThreadRequest(input.story, full, twoSided ? { twoSided } : {});
     throw new Error(`Variant ${variant} does not cover role ${input.role}`);
   };
 }
@@ -419,6 +436,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnR3Form: (input) => {
     if (input.role !== "beat") throw new Error(`Variant turnR3Form does not cover role ${input.role}`);
     return turnRound3FormRequest(input.story);
+  },
+  setupR3: setupRound2("setupR3", "generationOrder", ROUND3_PARTS),
+  planV2b: plannerV2("planV2b", false, true),
+  turnB6: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant turnB6 does not cover role ${input.role}`);
+    return todaysFormWithB6Request(input.story);
   },
 };
 

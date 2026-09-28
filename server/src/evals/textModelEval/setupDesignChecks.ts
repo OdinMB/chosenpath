@@ -262,6 +262,41 @@ export function exampleBlock(prompt: string): string | undefined {
   return prompt.slice(start, end < 0 ? undefined : end);
 }
 
+/** Titles and articles an identity's name may open with; a name that opens with an article is a role. */
+const NAME_TITLES = /^(dr|mr|mrs|ms|mx|miss|sir|lady|lord|dame|captain|capt|professor|prof|doctor|detective|officer|agent|the|a|an)\.?$/i;
+const ARTICLE = /^(the|a|an)\s/i;
+
+/** The name an identity is called by: its first word after any title ("Dr. Alex Chen" -> "alex"). */
+function calledBy(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const rest = words.filter((w) => !NAME_TITLES.test(w));
+  return (rest[0] ?? words[words.length - 1] ?? "").toLowerCase().replace(/[^\p{L}\p{N}'’-]/gu, "");
+}
+
+/**
+ * The identity-name clause (setup round 3; the fix run's defect): a seat's
+ * three identities have three different names, unless the premise gives the
+ * character a name, which every identity may keep (decision S8). Identities
+ * that share the name they are called by clash; a name that opens with an
+ * article ("The Detective") is a role and never the premise's name.
+ */
+function distinctIdentities(players: Loose[], premise: string): boolean {
+  return players.every((p) => {
+    const names = asArray(p.possibleCharacterIdentities).map((i) => asString(asObject(i).name).trim()).filter(Boolean);
+    const called = names.map(calledBy);
+    return names.every((name, i) => {
+      if (called.indexOf(called[i]) === i && called.lastIndexOf(called[i]) === i) return true;
+      return !ARTICLE.test(name) && containsWordAsWritten(premise, name.split(/\s+/).find((w) => calledBy(w) === called[i]) ?? name);
+    });
+  });
+}
+
+/** An NPC's pronouns beside its name in the role, as S2 asks: "Mira Holt (she/her), …". */
+const ROLE_PRONOUNS = /\((she|he|they|xe|ze|fae|it)\s*\/\s*(her|him|them|xem|zir|faer|its?)(\s*\/\s*\w+)*\)/i;
+
+/** A stat name's words per side (an opposites name reads per side). */
+const longestSideWords = (name: string) => Math.max(0, ...name.split("|").map((side) => side.trim().split(/\s+/).filter(Boolean).length));
+
 /** Two or more shared stats whose names differ only by a seat or a player's name ("Player 1 Points", "Player 2 Points"). */
 function perSeatCounters(stats: Stat[], names: IdentityNames): boolean {
   const seated = stats.filter((s) => SEAT.test(s.name) || mentionsIdentity(s.name, names));
@@ -327,6 +362,8 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   }
   counts.compoundQuestions = allOutcomes.filter((o) => /\s(and|without)\s/i.test(o.question)).length;
   checks.noIdentityNamesInOutcomes = allOutcomes.every((o) => o.texts.every((text) => !mentionsIdentity(text, names)));
+  // Setup round 3's identity-name clause: three names per seat unless the premise names the character
+  checks.distinctIdentities = distinctIdentities(players, input.premise);
   const terms = elementTerms(elements);
   counts.outcomes = allOutcomes.length;
   counts.outcomesNamingElement = allOutcomes.filter((o) => {
@@ -346,6 +383,15 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
     checks.noCoopScore = stats.every((s) => !SCORE.test(s.name) && !SCORE.test(s.tooltip)) && !perSeatCounters(sharedStats, everyName);
   }
   checks.noSlotNames = stats.every((s) => [s.name, s.possibleValues, s.tooltip].every((text) => !SEAT.test(text) && !mentionsIdentity(text, names)));
+  // Setup round 3 (owner, 2026-09-28): contests have two sides in every player count, so three players form two camps,
+  // each contest with an opposites scoreboard; no race written as three paths, no lead string
+  if (input.playerCount === 3 && contestMode) {
+    const contests = shared.filter((o) => kindOf(o) === "contest").length;
+    const races = shared.filter((o) => kindOf(o) === "paths" && CONTEST_FORMS.includes(firstWord(o.question))).length;
+    const boards = sharedStats.filter((s) => s.type === "opposites").length;
+    const leadStrings = sharedStats.filter((s) => s.type !== "opposites" && (SCORE.test(s.name) || SCORE.test(s.tooltip) || /\bnobody yet\b/i.test(s.possibleValues))).length;
+    checks.twoCampContests = contests >= 1 && races === 0 && boards >= contests && leadStrings === 0 && !perSeatCounters(sharedStats, everyName);
+  }
 
   // --- Stats (proposals 3 and 4) ---
   // The scoreboard of a contested outcome is the one stat that may track progress
@@ -354,8 +400,10 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   counts.effectNumbers = numbers.length;
   counts.effectNumbersInRange = numbers.filter((n) => n <= 15).length;
   if (numbers.length > 0) checks.effectsInRange = counts.effectNumbersInRange === numbers.length;
-  // A two-player contest's scoreboard may carry its catch-up alone (A2.1's "one way to catch up"; round 1b's one or two)
-  const fewestEffects = (s: Stat) => (input.playerCount === 2 && scoreboard(s) ? 1 : 2);
+  // A two-player contest's scoreboard may carry its catch-up alone (A2.1's "one way to catch up"; round 1b's one or two),
+  // and since contests have two sides in every player count, a three-player contest's opposites scoreboard (two camps) too
+  const campBoard = (s: Stat) => input.playerCount === 3 && s.type === "opposites";
+  const fewestEffects = (s: Stat) => ((input.playerCount === 2 || campBoard(s)) && scoreboard(s) ? 1 : 2);
   checks.effectsTwoOrThree = stats.every((s) => s.effects.length >= fewestEffects(s) && s.effects.length <= 3);
   checks.noFormula = stats.every((s) => s.effects.every((effect) => !FORMULA.test(effect)));
   const withBonus = stats.filter((s) => [s.sacrifice, s.reward].some((text) => !isNone(text) && BONUS_OR_RISK.test(text))).length;
@@ -363,6 +411,13 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   counts.sacrificeTextsWithBonus = withBonus;
   const visiblePlayer = stats.filter((s) => !s.shared && s.visible);
   counts.visiblePlayerStats = visiblePlayer.length;
+  // Setup round 3: a story read with a child keeps two visible stats of each kind, no hidden ones, and plain names
+  if (input.kids) {
+    const visibleShared = stats.filter((s) => s.shared && s.visible).length;
+    checks.kidsStatBudget = visibleShared <= 2 && visiblePlayer.length <= 2 && stats.every((s) => s.visible);
+    counts.kidsLongStatNames = stats.filter((s) => longestSideWords(s.name) > 2).length;
+    checks.kidsPlainStatNames = counts.kidsLongStatNames === 0;
+  }
   counts.spendablePlayerStats = visiblePlayer.filter((s) => !isNone(s.sacrifice) || !isNone(s.reward)).length;
   const progressLike = stats.filter((s) => !scoreboard(s) && [s.name, s.tooltip, ...s.implications].some((text) => PROGRESS.test(text))).length;
   checks.noProgressMeter = progressLike === 0;
@@ -402,6 +457,8 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
   // --- Facts (proposal 11) and example copies (proposal 5) ---
   counts.hookFacts = facts.filter((fact) => HOOK.test(fact)).length;
   counts.pronounOnlyFacts = facts.filter((fact) => PRONOUN_ONLY.test(fact)).length;
+  // S2: pronouns beside the name in the role, instead of a fact of their own
+  counts.rolePronouns = elements.filter((e) => ROLE_PRONOUNS.test(asString(e.role))).length;
   checks.noPronounOnlyFacts = counts.pronounOnlyFacts === 0;
   counts.exampleNameLeaks = exampleNameLeaks(output, stats, input.premise);
   checks.noExampleNameLeak = counts.exampleNameLeaks === 0;

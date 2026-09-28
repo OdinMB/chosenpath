@@ -64,7 +64,7 @@ const STAGE: LedgerStage = "turn-rounds";
 const sumCost = (records: { costUsd: number }[]) => records.reduce((sum, r) => sum + r.costUsd, 0);
 
 /** The caps for a mode's next runner pass: --max-spend covers the whole invocation, so what earlier passes spent comes off it. */
-const capsAfter = (caps: Caps, spent: number): Caps => ({ ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - spent });
+export const capsAfter = (caps: Caps, spent: number): Caps => ({ ...caps, maxSpend: caps.maxSpend === undefined ? undefined : caps.maxSpend - spent });
 
 /** Ledger spend beside the file a mode appends to: the probe, the filter check, and the other call ledger. */
 export function spendBeside(files: EvalFiles, writing: "calls" | "prep"): SpendRecord[] {
@@ -372,4 +372,6 @@ export function printPrepPlan(files: EvalFiles, log: (line: string) => void): vo
   const arm = JUDGE_ARMS[0];
   log(`  Judge calibration (--judge-calibration): ${turns.length} hand-read turns on ${arm.key} × ${DEFAULT_JUDGE_SAMPLES}, ${openCost(judgeJobs(turns, arm, DEFAULT_JUDGE_SAMPLES, CURRENT_PROMPT_STATE))}${problems.length ? `; ${problems.length} unusable` : ""}`);
   log(`  Prep calls so far: $${sumCost(prep).toFixed(4)} (prep-calls.jsonl)`);
+  const chain = prep.filter((r) => r.armKey.startsWith("chain>"));
+  log(`Setup round 3's chain (--setup-chain, stage setup-rounds): ${chain.length} attempts so far, $${sumCost(chain).toFixed(4)} (in prep-calls.jsonl)`);
 }

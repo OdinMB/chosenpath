@@ -630,6 +630,64 @@ export function turnRound2Request(story: Story, form: TurnRound2Form): TurnRound
   return kind === "chapter" ? request : { ...request, assemble: (parsed) => assembled(story, kind, parsed) };
 }
 
+// ---------------------------------------------------------------- B6 alone on today's form
+
+const B6_OPTIONS_FIELD: [string, string] = ["derail the core theme of the switch/thread.", "derail the core theme of the switch/thread; a reward option is the one exception."];
+
+/** Production's option kinds with B6's fields alone: the base-point scale and at most two bonuses; the rest stays production's. */
+function b6Options(options: z.ZodArray<z.ZodTypeAny>): z.ZodTypeAny {
+  if (options.description !== OLD_OPTIONS_FIELD) throw new Error(`${LABEL}: the options field's description changed`);
+  const union = options.element;
+  if (!(union instanceof z.ZodDiscriminatedUnion)) throw new Error(`${LABEL}: options are not a discriminated union`);
+  const [exploration, challenge] = (union.options as z.AnyZodObject[]).map((o, i) => asZodObject(o, `option kind ${i + 1}`));
+  const modifiers = asZodArray(challenge.shape.modifiersToSuccessRate, "modifiersToSuccessRate");
+  const edited = z.discriminatedUnion("optionType", [
+    exploration,
+    challenge.extend({
+      optionType: challenge.shape.optionType,
+      basePoints: challenge.shape.basePoints.describe(BASE_POINTS),
+      modifiersToSuccessRate: z.array(modifiers.element).max(2).describe(BONUSES),
+    }),
+  ]);
+  return z.array(edited).describe(OLD_OPTIONS_FIELD.replace(...B6_OPTIONS_FIELD));
+}
+
+/** B6's frequency line replaces the plan field's "(Many beats are better…)". */
+function b6Plan(plan: z.AnyZodObject): z.AnyZodObject {
+  const considerations = plan.shape.optionConsiderations;
+  if (!(considerations instanceof z.ZodUnion)) throw new Error(`${LABEL}: optionConsiderations is not a union`);
+  const [asText, detailed] = considerations.options as [z.ZodTypeAny, z.AnyZodObject];
+  const object = asZodObject(detailed, "optionConsiderations object");
+  const union = z.union([asText, object.extend({ upToOneSacrificeOrRewardOption: reworded(object.shape.upToOneSacrificeOrRewardOption, MANY_BEATS, "") })]);
+  return plan.extend({ optionConsiderations: considerations.description === undefined ? union : union.describe(considerations.description) });
+}
+
+/**
+ * Today's turn form with the option rules (B6) alone, the one turn change
+ * that passed the stop rule in turn round 2, where it was measured inside the
+ * round-2 form: three ways to act, the base-point scale and at most two
+ * bonuses in their fields, the reward exception (prompt and options field),
+ * the computed lever line and no double sacrifice. It changes challenge and
+ * contest chapter steps only; every other turn, which offers no lever, is
+ * today's request byte for byte. Single player: group turns stay on today's
+ * form (the group round, B10, did not run). Setup round 3's chain runs it.
+ */
+export function todaysFormWithB6Request(story: Story): TextRequest {
+  if (story.isMultiplayer()) throw new Error(`${LABEL}: B6 alone is single-player (group turns stay on today's form)`);
+  const production = beatStep.request(story);
+  if (turnKind(story) !== "chapter" || chapterKind(story) === "exploration") return production;
+  const { instructions, state } = splitAtState(LABEL, production.prompt);
+  let edited = replaceOnce(LABEL, instructions, BE_SPECIFIC, `${BE_SPECIFIC}\n${THREE_WAYS}`);
+  edited = replaceOnce(LABEL, edited, OLD_NO_LEAVE("thread"), `${OLD_NO_LEAVE("thread")} ${REWARD_EXCEPTION}`);
+  edited = replaceOnce(LABEL, edited, SACRIFICE_LIMIT, `${SACRIFICE_LIMIT}--- ${sacrificeRewardLine(story, "player1")}\n--- ${NO_DOUBLE_SACRIFICE}\n`);
+  edited = replaceOnce(LABEL, edited, OLD_BASE_POINTS, "");
+  edited = replaceOnce(LABEL, edited, OLD_LICENCE, "");
+  const root = asZodObject(production.schema, "reply");
+  const player = asZodObject(root.shape.player1, "player1");
+  const player1 = player.extend({ plan: b6Plan(asZodObject(player.shape.plan, "plan")), options: b6Options(asZodArray(player.shape.options, "options")) });
+  return { prompt: edited + state, schema: root.extend({ player1 }) };
+}
+
 /** The passages the tests pin. */
 export const TURN_ROUND2_TEXT = {
   fourthWallStart: "- Don't break the fourth wall in the text",

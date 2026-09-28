@@ -5,6 +5,7 @@ import { exampleBlock } from "../../../../src/evals/textModelEval/setupDesignChe
 import {
   ROUND1B_PARTS,
   ROUND1C_PARTS,
+  ROUND3_PARTS,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
   iterationRound1Request,
@@ -12,9 +13,11 @@ import {
   setupRound1Request,
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
+import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
+import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { ROUND2_SWITCH_CHAIN_CASES, ROUND3_PROBLEM_TURN, ROUND3_REPLAY_CASES, ROUND3_REPLAY_SAMPLES } from "../../../../src/evals/textModelEval/arms.js";
-import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
+import { planJobs, rebuiltToday, requestInputFor, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
   assembledReply,
@@ -352,6 +355,8 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/setupR1c": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
       "gpt-6-luna@low/setupR2b": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
       "gpt-6-luna@low/setupR2bOrder": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
+      // Setup round 3's confirmation run: the final form, two samples on every premise
+      "gpt-6-luna@low/setupR3": ["setup-learn-lemonade s1", "setup-learn-lemonade s2"],
     });
     expect(plan("setup-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
   });
@@ -391,7 +396,8 @@ describe("planJobs: the round stages and the migration check", () => {
       iteration: { template: { title: "T" }, feedback: "More rivalry", sections: ["stats"], playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 },
     });
     const jobs = planJobs([iteration], { stage: "migration", promptState: "round1", roles: ["iteration"], mode: "isolated", subset15: false, records: [] });
-    expect(jobs.map((j) => `${j.armKey} s${j.sample}`)).toEqual(["gpt-6-luna@low/prod s1", "gpt-6-luna@low/prod s2"]);
+    // Production's template-editor default: Sol low since the owner's templates decision (2026-09-28)
+    expect(jobs.map((j) => `${j.armKey} s${j.sample}`)).toEqual(["gpt-6-sol@low/prod s1", "gpt-6-sol@low/prod s2"]);
   });
 
   it("keeps the round cases out of the closed Stages 0 to 4, isolated and chained, and plans them in the migration check", () => {
@@ -560,6 +566,61 @@ describe("requestFor: setup round 2", () => {
     expect(block?.startsWith("EXAMPLE STAT SETUPS")).toBe(true);
     expect(block).not.toContain("Personal Dream");
     expect(block).not.toContain("Character Selection Instructions");
+  });
+});
+
+describe("requestFor: setup round 3 and the chain's planner and turn forms", () => {
+  const MULTIPLAYER_MODES = [GameModes.Cooperative, GameModes.Competitive, GameModes.CooperativeCompetitive];
+  const INPUTS: [1 | 2 | 3, GameMode][] = [[1, GameModes.SinglePlayer], ...([2, 3] as const).flatMap((n) => MULTIPLAYER_MODES.map((m): [2 | 3, GameMode] => [n, m]))];
+  const setup = (playerCount: 1 | 2 | 3, gameMode: GameMode, kids?: boolean): RequestInput => ({
+    role: "setup",
+    setup: { premise: "A premise", playerCount, gameMode, maxTurns: 25, ...(kids === undefined ? {} : { kids }) },
+  });
+
+  it.each(INPUTS)("%i players, %s: builds round 3 as round 2b's arm B with round 3's parts, in production's one-message shape", (players, mode) => {
+    for (const kids of [false, true]) {
+      const request = requestFor("setupR3", setup(players, mode, kids));
+      const expected = setupRound2Request("A premise", players, mode, 25, "story", "generationOrder", ROUND3_PARTS, { kids });
+      expect(isSplitRequest(request)).toBe(false);
+      expect(requestText(request)).toBe(expected.prompt);
+      expect(JSON.stringify(toJsonSchema(request.schema))).toBe(JSON.stringify(toJsonSchema(expected.schema)));
+      expect("assemble" in request).toBe(true);
+    }
+    expect(requestText(requestFor("setupR3", setup(players, mode)))).toBe(requestText(requestFor("setupR3", setup(players, mode, false))));
+  });
+
+  it("reads whether a child reads along from the case's tags, and leaves every earlier setup form as it was", () => {
+    const kidsCase = evalCase("setup-kids-animal-rescue", "setup", {
+      setup: { premise: "A premise", playerCount: 2, gameMode: GameModes.Cooperative, maxTurns: 25 },
+      tags: tags({ kids: true, players: 2, multiplayer: true }),
+    });
+    const input = requestInputFor(kidsCase);
+    expect(input.role === "setup" && input.setup.kids).toBe(true);
+    expect(requestText(requestFor("setupR3", input))).toContain("A child reads this story along with an adult");
+    // A form without round 3's parts ignores it: today's prompt and round 2b's arm B stay byte for byte
+    const plain = setup(2, GameModes.Cooperative, false);
+    for (const variant of ["prod", "setupR1c", "setupR2bOrder"] as VariantId[]) expect(requestText(requestFor(variant, input))).toBe(requestText(requestFor(variant, plain)));
+  });
+
+  it("builds AI Iteration on round 3's text, and refuses the turn roles", () => {
+    const iteration = { template: { title: "T" }, feedback: "More rivalry", sections: ["guidelines", "stats"], playerCount: 3 as const, gameMode: GameModes.Competitive, maxTurns: 25 };
+    expect(requestText(requestFor("setupR3", { role: "iteration", iteration }))).toBe(
+      iterationRound2Request("More rivalry", 3, GameModes.Competitive, 25, ["guidelines", "stats"], { title: "T" }, ROUND3_PARTS).prompt
+    );
+    expect(() => requestFor("setupR3", { role: "beat", story: firstSwitchBeat(1) })).toThrow("Variant setupR3 does not cover role beat");
+  });
+
+  it("builds planner v2 with two-sided contests for both planners", () => {
+    const [switchStory, threadStory] = [firstSwitchBeat(3), threadAnalysisAfterSwitch(3)];
+    expect(requestText(requestFor("planV2b", { role: "switch", story: switchStory }))).toBe(plannerV2SwitchRequest(switchStory, false).prompt);
+    expect(requestText(requestFor("planV2b", { role: "thread", story: threadStory }))).toBe(plannerV2ThreadRequest(threadStory, false, { twoSided: true }).prompt);
+    expect(() => requestFor("planV2b", { role: "beat", story: threadBeat(1) })).toThrow("Variant planV2b does not cover role beat");
+  });
+
+  it("builds today's turn form with B6 alone on single-player turns", () => {
+    const story = threadBeat(1);
+    expect(requestText(requestFor("turnB6", { role: "beat", story }))).toBe(todaysFormWithB6Request(story).prompt);
+    expect(() => requestFor("turnB6", { role: "switch", story: firstSwitchBeat(1) })).toThrow("Variant turnB6 does not cover role switch");
   });
 });
 
