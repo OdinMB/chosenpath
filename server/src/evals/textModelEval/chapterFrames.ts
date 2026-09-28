@@ -4,7 +4,8 @@ import type { Outcome, StoryPhase, StoryState, Thread, ThreadAnalysis } from "co
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
 // The chapter planner's view as production built it at the round0 prompt state, so the backfill requests stay as they ran
 import { round0ThreadStep as threadStep } from "../../game/services/storyTextRound0/round0Steps.js";
-import type { Arm } from "./arms.js";
+import { PLANNER_V2C_FIELDS } from "../../game/services/storyTextRounds/turnRound1Planners.js";
+import type { Arm, Stage } from "./arms.js";
 import { caseStory, type ChapterFrame, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { finishedPrepRecord, prepJob } from "./prepCalls.js";
@@ -206,8 +207,8 @@ const results = (value: object) =>
     .map(([key, text]) => `${key}: ${String(text)}`)
     .join("; ");
 
-/** The chapter as its plan was written, for the backfill prompt. */
-export function renderChapter(chapter: Chapter): string {
+/** The chapter as its plan was written, for the backfill prompt; the nearer backfill leaves out the stored kind of milestone it replaces. */
+export function renderChapter(chapter: Chapter, withKind = true): string {
   return chapter.threads
     .map((thread) =>
       [
@@ -215,7 +216,7 @@ export function renderChapter(chapter: Chapter): string {
         `Players: ${playerLine(chapter.story, thread)}`,
         `Outcome: ${outcomeLine(chapter.story, thread.outcomeId)}`,
         `Type of thread: ${thread.typeOfThread}`,
-        `Kind of milestone: ${thread.typeOfMilestone}`,
+        ...(withKind ? [`Kind of milestone: ${thread.typeOfMilestone}`] : []),
         `Possible milestones (one is added to the outcome when the chapter ends): ${results(thread.possibleMilestones)}`,
         `Steps (${thread.progression.length}):`,
         ...thread.progression.map((step, i) => `${i + 1}. ${step.title}: ${step.question}\n   Possible results: ${results(step.possibleResolutions)}`),
@@ -241,33 +242,91 @@ export function frameSchema(threadIds: string[]) {
   });
 }
 
-/** The backfill request: the instructions, the fixed chapter, and the chapter planner's own view of the story. */
-export function backfillRequest(chapter: Chapter): TextRequest {
+/** The chapter planner's own view of the story: its prompt after the state marker. */
+function plannerView(chapter: Chapter): string {
   const plannerPrompt = threadStep.request(chapter.story).prompt;
   const at = plannerPrompt.indexOf(STATE_MARKER);
   if (at < 0 || plannerPrompt.indexOf(STATE_MARKER, at + 1) >= 0) {
     throw new Error("The chapter planner's prompt no longer holds its state marker exactly once: fix STATE_MARKER, not the prompt");
   }
-  const prompt = [
-    INSTRUCTIONS,
-    "======= THE CHAPTER, AS PLANNED (FIXED) =======",
-    renderChapter(chapter),
-    "======= CURRENT GAME STATE =======",
-    plannerPrompt.slice(at + STATE_MARKER.length),
-  ].join("\n\n");
+  return plannerPrompt.slice(at + STATE_MARKER.length);
+}
+
+/** The backfill request: the instructions, the fixed chapter, and the chapter planner's own view of the story. */
+export function backfillRequest(chapter: Chapter): TextRequest {
+  const prompt = [INSTRUCTIONS, "======= THE CHAPTER, AS PLANNED (FIXED) =======", renderChapter(chapter), "======= CURRENT GAME STATE =======", plannerView(chapter)].join("\n\n");
   return { prompt, schema: frameSchema(chapter.threads.map((t) => t.id)) };
 }
 
-export type FrameReply = { frames: Record<string, { question: string; plan: string }>; problem?: string };
+/**
+ * Which frames: the first backfill of 2026-09-27 ("backfilled", chapter-frames.json, the frames the older rounds read),
+ * or the nearer frames of the owner's feedback of 2026-09-28 ("nearer", chapter-frames-nearer.json).
+ */
+export type FrameSet = "backfilled" | "nearer";
 
-/** The reply's question and plan per chapter; a missing or empty field is a problem. */
-export function framesFromReply(chapter: Chapter, parsed: unknown): FrameReply {
+/** Planner v2c's field texts in the backfill's chapter words. */
+const chapterWords = (text: string) => text.replace(/\bthread's\b/g, "chapter's").replace(/\bthread\b/g, "chapter").replace(/\bits beats\b/g, "its turns");
+export const NEARER_QUESTION_DESCRIPTION = chapterWords(PLANNER_V2C_FIELDS.question);
+export const NEARER_KIND_DESCRIPTION = chapterWords(PLANNER_V2C_FIELDS.typeOfMilestone);
+
+/**
+ * The nearer backfill (the owner's feedback of 2026-09-28): the same chapter
+ * and view, asking planner v2c's nearer question, its concrete kind of
+ * milestone and the plan. The stored kind of milestone is not shown, since it
+ * is what the new one replaces (the owner's example read "Milestone marking
+ * progress in exposing the Waste Ring"); the steps and milestones stay fixed.
+ */
+const NEARER_INSTRUCTIONS = `YOUR JOB: COMPLETE A CHAPTER PLAN
+
+A chapter (a thread of 2 to 4 turns) of this interactive story has been planned: its outcome, its possible milestones and its steps are fixed below and stay as they are. Write the three things its plan still lacks, for each chapter listed:
+- question: ${NEARER_QUESTION_DESCRIPTION}
+- typeOfMilestone: ${NEARER_KIND_DESCRIPTION}
+- plan: ${PLAN_DESCRIPTION}
+
+Write them as they stood when the chapter was planned: the game state below is the story as the chapter planner saw it, before the chapter's first turn. The steps keep their own questions; the chapter question is the one they all work toward, about this chapter's own situation, and its fixed possible milestones are the answers. The plan tells the storyteller how the steps build to the last one.`;
+
+/** One entry per chapter with the nearer frame's three fields, in planner v2c's order. */
+export function nearerFrameSchema(threadIds: string[]) {
+  const [first, ...rest] = threadIds;
+  if (first === undefined) throw new Error("A chapter plan holds no thread");
+  return z.object({
+    chapters: z
+      .array(
+        z.object({
+          id: z.enum([first, ...rest]).describe("The chapter's id, as listed above"),
+          question: z.string().describe(NEARER_QUESTION_DESCRIPTION),
+          typeOfMilestone: z.string().describe(NEARER_KIND_DESCRIPTION),
+          plan: z.string().describe(PLAN_DESCRIPTION),
+        })
+      )
+      .describe("One entry for each chapter listed above, in the same order"),
+  });
+}
+
+/** The nearer backfill's request: its instructions, the fixed chapter without its stored kind, and the same view. */
+export function nearerBackfillRequest(chapter: Chapter): TextRequest {
+  const prompt = [
+    NEARER_INSTRUCTIONS,
+    "======= THE CHAPTER, AS PLANNED (FIXED) =======",
+    renderChapter(chapter, false),
+    "======= CURRENT GAME STATE =======",
+    plannerView(chapter),
+  ].join("\n\n");
+  return { prompt, schema: nearerFrameSchema(chapter.threads.map((t) => t.id)) };
+}
+
+export type FrameText = { question: string; plan: string; typeOfMilestone?: string };
+export type FrameReply = { frames: Record<string, FrameText>; problem?: string };
+
+/** The reply's question and plan per chapter, and a nearer frame's kind of milestone where written; a missing or empty question or plan is a problem. */
+export function framesFromReply(chapter: Chapter, parsed: unknown, set: FrameSet = "backfilled"): FrameReply {
   const entries = Array.isArray((parsed as { chapters?: unknown })?.chapters) ? (parsed as { chapters: unknown[] }).chapters : [];
   const frames: FrameReply["frames"] = {};
   for (const entry of entries) {
-    const { id, question, plan } = (entry ?? {}) as Record<string, unknown>;
+    const { id, question, plan, typeOfMilestone } = (entry ?? {}) as Record<string, unknown>;
     if (typeof id === "string" && typeof question === "string" && typeof plan === "string" && question.trim() && plan.trim()) {
-      frames[id] = { question: question.trim(), plan: plan.trim() };
+      const kind = set === "nearer" && typeof typeOfMilestone === "string" ? typeOfMilestone.trim() : "";
+      frames[id] = { question: question.trim(), ...(kind ? { typeOfMilestone: kind } : {}), plan: plan.trim() };
     }
   }
   const missing = chapter.threads.map((t) => t.id).filter((id) => !frames[id]);
@@ -277,21 +336,27 @@ export function framesFromReply(chapter: Chapter, parsed: unknown): FrameReply {
 /** A Luna low reply: reasoning plus two short fields per chapter */
 const BACKFILL_OUTPUT_TOKENS = 1_500;
 
-export const backfillCaseId = (chapter: Pick<Chapter, "chapterKey">) => `frame-${chapter.chapterKey}`;
+export const backfillCaseId = (chapter: Pick<Chapter, "chapterKey">, set: FrameSet = "backfilled") =>
+  set === "nearer" ? `frame-nearer-${chapter.chapterKey}` : `frame-${chapter.chapterKey}`;
 
-/** One backfill call per chapter, in the turn rounds' stage. */
-export function backfillJobs(chapters: Chapter[], arm: Arm, promptState: string): Job[] {
+/**
+ * One backfill call per chapter: the first backfill in the turn rounds' stage
+ * as it ran, or (frames "nearer") the nearer backfill in the stage given (the
+ * plan refresh), keyed apart.
+ */
+export function backfillJobs(chapters: Chapter[], arm: Arm, promptState: string, options: { frames?: FrameSet; stage?: Stage } = {}): Job[] {
+  const set = options.frames ?? "backfilled";
   return chapters.map((chapter) =>
     prepJob({
       kind: "backfill",
-      stage: "turn-rounds",
+      stage: options.stage ?? "turn-rounds",
       promptState,
-      caseId: backfillCaseId(chapter),
+      caseId: backfillCaseId(chapter, set),
       sample: 1,
       arm,
       role: "thread",
       players: chapter.players,
-      build: () => backfillRequest(chapter),
+      build: () => (set === "nearer" ? nearerBackfillRequest(chapter) : backfillRequest(chapter)),
       outputTokens: BACKFILL_OUTPUT_TOKENS,
     })
   );
@@ -308,7 +373,7 @@ export type ChapterFrameRecord = {
   armKey: string;
   jobKey: string;
   outputFile: string;
-  frames: Record<string, { question: string; plan: string }>;
+  frames: Record<string, FrameText>;
 };
 
 export type ChapterFramesFile = {
@@ -324,14 +389,15 @@ export function chapterFramesFile(
   jobs: Job[],
   records: CallRecord[],
   load: (record: CallRecord) => unknown,
-  generatedAt: Date
+  generatedAt: Date,
+  set: FrameSet = "backfilled"
 ): ChapterFramesFile {
   const file: ChapterFramesFile = { generatedAt: generatedAt.toISOString(), chapters: [], missing: [] };
   chapters.forEach((chapter, i) => {
     const jobKey = keyOf(jobs[i]);
     const record = finishedPrepRecord(records, jobKey);
     const parsed = record ? load(record) : undefined;
-    const reply = parsed === undefined ? undefined : framesFromReply(chapter, parsed);
+    const reply = parsed === undefined ? undefined : framesFromReply(chapter, parsed, set);
     if (!record || !reply || reply.problem) {
       file.missing.push({ chapterKey: chapter.chapterKey, readBy: chapter.readBy, reason: reply?.problem ?? "no usable reply" });
       return;
@@ -357,19 +423,36 @@ export type FrameCheck = { chapterKey: string; storyId: string; threadId: string
 
 /**
  * The owner's two chapter checks of 2026-09-28 on every stored chapter the
- * cases read, once each (--check-baselines): its backfilled question against
- * its outcome's (questionNearerThanOutcome), where a frame is attached, and
- * its plan's kind of milestone (milestoneKindConcrete), on the chapter
- * planner's view of the story (collectChapters).
+ * cases read, once each (--check-baselines), on the chapter planner's view of
+ * the story (collectChapters). On the first frames: the backfilled question
+ * against its outcome's (questionNearerThanOutcome), where a frame is
+ * attached, and the stored plan's kind of milestone (milestoneKindConcrete).
+ * On the nearer frames: each chapter that has one, on its own question and its
+ * own kind of milestone (a blank kind fails).
  */
-export function chapterFrameChecks(cases: EvalCase[]): FrameCheck[] {
+export function chapterFrameChecks(cases: EvalCase[], set: FrameSet = "backfilled"): FrameCheck[] {
   const byId = new Map(cases.map((c) => [c.id, c]));
+  const framesOf = (c: EvalCase | undefined) => (set === "nearer" ? c?.nearerFrames : c?.chapterFrames);
   return collectChapters(cases).flatMap((chapter) =>
-    chapter.threads.map((thread) => {
-      const frame = chapter.readBy.map((id) => byId.get(id)?.chapterFrames?.[thread.id]).find((f) => f !== undefined);
-      return { chapterKey: chapter.chapterKey, storyId: chapter.storyId, threadId: thread.id, checks: chapterQuestionChecks(chapter.story, thread, frame?.question) };
+    chapter.threads.flatMap((thread) => {
+      const frame = chapter.readBy.map((id) => framesOf(byId.get(id))?.[thread.id]).find((f) => f !== undefined);
+      const read = { chapterKey: chapter.chapterKey, storyId: chapter.storyId, threadId: thread.id };
+      if (set === "backfilled") return [{ ...read, checks: chapterQuestionChecks(chapter.story, thread, frame?.question) }];
+      return frame ? [{ ...read, checks: chapterQuestionChecks(chapter.story, { outcomeId: thread.outcomeId, typeOfMilestone: frame.typeOfMilestone ?? "" }, frame.question) }] : [];
     })
   );
+}
+
+/** Each case's frames per thread id from a frames file, or undefined when its chapter has none there. */
+function framesFor(evalCase: EvalCase, byKey: Map<string, ChapterFrameRecord>): { read: boolean; frames?: Record<string, ChapterFrame> } {
+  const read = chapterKeyRead(evalCase);
+  if (!read) return { read: false };
+  const record = byKey.get(read.chapterKey);
+  if (!record) return { read: true };
+  const frames: Record<string, ChapterFrame> = Object.fromEntries(
+    read.threadIds.flatMap((id) => (record.frames[id] ? [[id, { ...record.frames[id], chapterKey: read.chapterKey }]] : []))
+  );
+  return { read: true, frames };
 }
 
 /**
@@ -380,13 +463,23 @@ export function chapterFrameChecks(cases: EvalCase[]): FrameCheck[] {
 export function withChapterFrames(cases: EvalCase[], file: ChapterFramesFile): EvalCase[] {
   const byKey = new Map(file.chapters.map((c) => [c.chapterKey, c]));
   return cases.map((evalCase) => {
-    const read = chapterKeyRead(evalCase);
+    const { read, frames } = framesFor(evalCase, byKey);
     if (!read) return evalCase;
-    const record = byKey.get(read.chapterKey);
-    if (!record) return { ...evalCase, tags: { ...evalCase.tags, chapterFrame: "fallback" } };
-    const chapterFrames: Record<string, ChapterFrame> = Object.fromEntries(
-      read.threadIds.flatMap((id) => (record.frames[id] ? [[id, { ...record.frames[id], chapterKey: read.chapterKey }]] : []))
-    );
-    return { ...evalCase, chapterFrames, tags: { ...evalCase.tags, chapterFrame: "backfilled" } };
+    if (!frames) return { ...evalCase, tags: { ...evalCase.tags, chapterFrame: "fallback" } };
+    return { ...evalCase, chapterFrames: frames, tags: { ...evalCase.tags, chapterFrame: "backfilled" } };
+  });
+}
+
+/**
+ * The cases with their chapter's nearer frame attached as nearerFrames (the
+ * owner's feedback of 2026-09-28), beside the first frames, which stay as they
+ * are so every earlier request rebuilds byte for byte. No tag: the earlier
+ * rounds' reports read chapterFrame.
+ */
+export function withNearerFrames(cases: EvalCase[], file: ChapterFramesFile): EvalCase[] {
+  const byKey = new Map(file.chapters.map((c) => [c.chapterKey, c]));
+  return cases.map((evalCase) => {
+    const { frames } = framesFor(evalCase, byKey);
+    return frames ? { ...evalCase, nearerFrames: frames } : evalCase;
   });
 }

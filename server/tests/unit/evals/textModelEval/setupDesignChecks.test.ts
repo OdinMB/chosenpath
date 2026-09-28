@@ -211,6 +211,16 @@ describe("checkSetupDesign: scoreboards and names (proposal 2)", () => {
     const npc = duelSetup({ sharedStats: [stat("Mira Holt's Favor")] });
     expect(checkSetupDesign(npc, multi(2, GameModes.Competitive)).checks.noSlotNames).toBe(true);
   });
+
+  it("finds player stats named after a player character, premise-named ones included (the setup retests, 2026-09-28: Casablanca's per-player stats)", () => {
+    const named = multi(2, GameModes.Competitive, "Ada and Dora, rivals in a harbour town.");
+    const perPlayer = duelSetup({ playerStats: [stat("Ada's Nerve"), stat("Dora's Nerve")] });
+    // The premise names them, so the seat-name check lets it pass; the per-player stats still read as one set per player
+    expect(checkSetupDesign(perPlayer, named).checks).toMatchObject({ noSlotNames: true, noPlayerNamedStats: false });
+    expect(checkSetupDesign(duelSetup({ playerStats: [stat("Nerve"), stat("Mira Holt's Favor")] }), named).checks.noPlayerNamedStats).toBe(true);
+    // One player too, and a stat's tooltip may name the character
+    expect(checkSetupDesign(soloSetup({ playerStats: [stat("Nerve", { tooltip: "How steady Ada Quill's hands are." })] }), solo).checks.noPlayerNamedStats).toBe(true);
+  });
 });
 
 describe("checkSetupDesign: stats (proposals 3 and 4)", () => {

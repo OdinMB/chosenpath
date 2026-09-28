@@ -1417,6 +1417,82 @@ describe("a pairwise turn page with chapter openings (turn round 1)", () => {
   });
 });
 
+describe("the rebuilt turn round 1 page (turns-r1b, 2026-09-28): the nearer frames and the chain items' cases", () => {
+  const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
+  const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/chapterFullB" };
+  const REF_CHAIN = { promptState: "round0", armKey: "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod" };
+  const CAND_CHAIN = { promptState: "round0", armKey: "pipeline:gpt-6-luna@low/planV2c>gpt-6-luna@medium/chapterFullB" };
+  const turnOutput = (title: string) => beatSet(1, { player1: { ...beatGeneration({ title, text: `${title} happens.` }), options: challengeOptions() } });
+  const planOutput = () => threadAnalysis("challenge", 2, 4);
+
+  function fixture() {
+    const frame = (question: string, typeOfMilestone?: string) => (state: ReturnType<ReturnType<typeof threadBeat>["getState"]>) => {
+      const id = (state.storyPhases[state.storyPhases.length - 1] as { threads: { id: string }[] }).threads[0].id;
+      return { [id]: { question, plan: `${question} plan.`, chapterKey: "k", ...(typeOfMilestone ? { typeOfMilestone } : {}) } };
+    };
+    const beats = Array.from({ length: 4 }, (_, i) => {
+      const state = threadBeat(1, { id: `story-${i}` }).getState();
+      return evalCase(`step-${i}`, "beat", { state, chapterFrames: frame("First question?")(state), nearerFrames: frame("Nearer question?", "whether the ledger names the banker")(state) });
+    });
+    const threads = Array.from({ length: 5 }, (_, i) => evalCase(`open-${i}`, "thread", { state: threadAnalysisAfterSwitch(1, { id: `story-t${i}` }).getState() }));
+    const records: CallRecord[] = [];
+    const outputs = new Map<string, unknown>();
+    const add = (r: Partial<CallRecord>, output: unknown) => {
+      outputs.set(r.outputFile ?? "", output);
+      records.push(record({ ...r, callArmKey: r.armKey, baseline: false }));
+    };
+    for (const c of beats) {
+      for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+        for (const sample of samples) add({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, sample, outputFile: `${c.id}-${arm.armKey}-${sample}` }, turnOutput("Turn"));
+      }
+    }
+    for (const c of threads) {
+      for (const chain of [REF_CHAIN, CAND_CHAIN]) {
+        const jobKey = `${c.id}|${chain.armKey}|round0|s1`;
+        add({ jobKey, caseId: c.id, group: "pipeline", role: "thread", promptState: "round0", armKey: chain.armKey, sample: 1, step: 1, jobFinal: false, outputFile: `${jobKey}-plan` }, planOutput());
+        add({ jobKey, caseId: c.id, group: "pipeline", role: "beat", promptState: "round0", armKey: chain.armKey, sample: 1, step: 2, outputFile: `${jobKey}-turn` }, turnOutput("Opening"));
+      }
+    }
+    return { cases: [...beats, ...threads], records, load: (r: CallRecord) => outputs.get(r.outputFile ?? "") };
+  }
+
+  const { cases, records, load } = fixture();
+  const spec: RatingSpec = {
+    kind: "turn",
+    arms: [REF, CAND],
+    items: 3,
+    preview: false,
+    pairwise: true,
+    chainArms: [REF_CHAIN, CAND_CHAIN],
+    chainItems: 2,
+    chainCaseIds: ["open-1", "open-3"],
+    frames: "nearer",
+  };
+  const { set, key } = planRatingSet(spec, records, cases, { loadOutput: load, salt: "nearer", now: new Date(0) });
+  const text = (itemId: string) => JSON.stringify(set.items.find((i) => i.id === itemId)?.context);
+
+  it("records the nearer frames in the key and shows them, with their kind of milestone, in each step's context", () => {
+    expect(key.frames).toBe("nearer");
+    const steps = Object.entries(key.items).filter(([, i]) => !i.reference && i.caseId.startsWith("step-"));
+    expect(steps.length).toBeGreaterThan(0);
+    for (const [id] of steps) {
+      expect(text(id)).toContain("Nearer question?");
+      expect(text(id)).toContain("whether the ledger names the banker");
+      expect(text(id)).not.toContain("First question?");
+    }
+    // Without the option, the first frames and the stored kind of milestone stand
+    const first = planRatingSet({ ...spec, frames: undefined }, records, cases, { loadOutput: load, salt: "nearer", now: new Date(0) });
+    expect(first.key.frames).toBeUndefined();
+    expect(JSON.stringify(first.set.items.map((i) => i.context))).toContain("First question?");
+    expect(JSON.stringify(first.set.items.map((i) => i.context))).not.toContain("whether the ledger names the banker");
+  });
+
+  it("takes the chapter openings from the cases named, and rebuilds the page from its key", () => {
+    expect(Object.values(key.items).filter((i) => i.reference).map((i) => i.caseId).sort()).toEqual(["open-1", "open-3"]);
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+  });
+});
+
 describe("a pairwise turn page for turn round 2: the owner's round-2 questions, and endings as the player sees them", () => {
   const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
   const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/turnR2" };

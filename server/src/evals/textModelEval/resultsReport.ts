@@ -25,6 +25,7 @@ import {
   variantComparisons,
   type CheckReading,
   type CountReading,
+  type SameRequest,
   type ShareReading,
   type StoredReference,
   type VariantComparison,
@@ -56,6 +57,8 @@ export type ResultsInput = {
   prose?: Record<string, { distinctOpenings: number; youOpenings: number; beats: number; stockPhrasesPer1000Words: number }>;
   /** Stored records of another prompt state that may stand in as a variant's reference (today's code rebuilds them) */
   storedReference?: StoredReference;
+  /** Whether a stand-in arm's record may be read as a reference arm's (standInKey: planner v2's for v2b on one player) */
+  sameRequest?: SameRequest;
   /** The turn each frozen case measures (turnWaits.ts), for the turn rounds' wait allowance per turn kind */
   turnKinds?: Map<string, TurnKind>;
   generatedAt: Date;
@@ -280,7 +283,9 @@ function storyShare(stats: ArmStats, basis: CostBasis = "billed"): number | unde
 
 /** The reference's key, with its prompt state when it is a stored reference from another state, and whether it is a second reference. */
 const referenceLabel = (c: VariantComparison) =>
-  `${c.referenceState ? `${c.referenceState}:${c.referenceKey} (stored)` : c.referenceKey}${c.secondReference ? " (second reference)" : ""}`;
+  `${c.referenceState ? `${c.referenceState}:${c.referenceKey} (stored)` : c.referenceKey}${
+    c.standIns ? ` (with ${c.standIns.records} records of ${c.standIns.armKey}, its request byte for byte)` : ""
+  }${c.secondReference ? " (second reference)" : ""}`;
 
 function renderArmRows(comparisons: VariantComparison[]): string[] {
   const lines = [
@@ -475,7 +480,7 @@ export function renderResults(input: ResultsInput): string {
       lines.push(...renderTurnWaits(turnWaitReadings(inState, input.turnKinds)));
       lines.push(...renderTurnWaitsBySample(turnWaitsBySample(inState, input.turnKinds)));
     }
-    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference)));
+    lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference, input.sameRequest)));
   }
   if (input.prose) {
     lines.push("", "## Prose aggregates (beats)", "", "| Arm | Beats | Distinct openings | Opens with \"You\" | Stock phrases / 1000 words |", "|---|---|---|---|---|");

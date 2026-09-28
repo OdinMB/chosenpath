@@ -5,7 +5,7 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import type { EvalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import type { ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import { jobEstimateUsd } from "../../../../src/evals/textModelEval/jobPlan.js";
-import { JUDGE_ARMS, JUDGE_CALIBRATION, judgeJobs, judgeRequest } from "../../../../src/evals/textModelEval/judgedChecks.js";
+import { JUDGE_ARMS, JUDGE_CALIBRATION, JUDGE_PROMPT_VERSION, judgeCaseId, judgeJobs, judgeRequest } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { judgeCalibrationMode, roundTurnsToJudge, turnsToSend, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { CURRENT_PROMPT_STATE } from "../../../../src/evals/textModelEval/variants.js";
@@ -128,6 +128,31 @@ describe("roundTurnsToJudge (--judge-records)", () => {
     const turns = [turn("c", 1), turn("c", 2), turn("c", 4), turn("d", 1)];
     expect(turnsToSend(turns).map((t) => `${t.caseId}${t.sample}`)).toEqual(["c1", "c2", "d1"]);
     expect(turnsToSend(turns, ["d"]).map((t) => `${t.caseId}${t.sample}`)).toEqual(["d1"]);
+  });
+
+  it("judges on the nearer frames when asked (the reruns), tagging only the turns whose request they change, so the rest reuse their judge calls", () => {
+    const threadId = caseStory(CASE).getCurrentThreadAnalysis()?.threads[0].id as string;
+    const frame = (question: string) => ({ [threadId]: { question, plan: "The crew stays in the vault.", chapterKey: "k" } });
+    const framed = { ...CASE, chapterFrames: frame("Will the crew crack the vault?"), nearerFrames: { [threadId]: { ...frame("Will the crew get the ledger out before dawn?")[threadId], typeOfMilestone: "whether the ledger names the banker" } } };
+    const unframed = evalCase("u", "beat", { state: threadBeat(1).getState() });
+    const records = [beatRecord(REF, 1), beatRecord(REF, 1, { caseId: "u" })];
+    const first = roundTurnsToJudge(records, [framed, unframed], () => reply(), [REF], "round0");
+    const nearer = roundTurnsToJudge(records, [framed, unframed], () => reply(), [REF], "round0", "nearer");
+    expect(first.turns.map((t) => t.frameTag)).toEqual([undefined, undefined]);
+    expect(nearer.turns.map((t) => [t.caseId, t.frameTag])).toEqual([
+      ["c", "nearer"],
+      ["u", undefined],
+    ]);
+    expect(nearer.turns[0].request.prompt).toContain("Chapter question: Will the crew get the ledger out before dawn?");
+    expect(first.turns[0].request.prompt).toContain("Chapter question: Will the crew crack the vault?");
+    // The unframed case's request is the same either way, and so is its judge call's key
+    expect(nearer.turns[1].request.prompt).toBe(first.turns[1].request.prompt);
+    const [tagged, untagged] = judgeJobs(nearer.turns, JUDGE_ARMS[0], 1, "round0", "reruns");
+    const [firstTagged, firstUntagged] = judgeJobs(first.turns, JUDGE_ARMS[0], 1, "round0");
+    expect(tagged.caseId).toBe(judgeCaseId(nearer.turns[0].outputId, "player1", JUDGE_PROMPT_VERSION, "nearer"));
+    expect(tagged.caseId).not.toBe(firstTagged.caseId);
+    expect(untagged.caseId).toBe(firstUntagged.caseId);
+    expect([tagged.stage, firstTagged.stage]).toEqual(["reruns", "turn-rounds"]);
   });
 
   it("judges switch turns and endings on the first paragraph only (turn round 2), and leaves out first turns and arms that were not asked for", () => {

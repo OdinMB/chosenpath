@@ -132,6 +132,21 @@ describe("the THIS THREAD block (B2)", () => {
     expect(prompt).toContain("Negotiation threads take two beats: the opening offer, then the price.");
     expect(beatStep.request(chapterStory(1, 3)).prompt).not.toContain("SPECIAL SWITCH/THREAD INSTRUCTIONS:");
   });
+
+  it("leaves the chapter rules out on request (chapterFullB, the owner's feedback of 2026-09-28: the rules are the planners'), and changes nothing else", () => {
+    for (const story of [chapterStory(1, 3), chapterStory(2, 3), chapterStory(1, 3, { players: 2 })]) {
+      const withRules = chapterTurnRequest(story, "full", FRAMES);
+      const without = chapterTurnRequest(story, "full", FRAMES, { chapterRules: false });
+      expect(without.prompt).not.toContain("SPECIAL SWITCH/THREAD INSTRUCTIONS:");
+      expect(without.prompt).not.toContain("Negotiation threads take two beats");
+      // The measured form is the new one plus the rules section at its end
+      expect(withRules.prompt.startsWith(without.prompt)).toBe(true);
+      expect(withRules.prompt.slice(without.prompt.length).trim().startsWith("SPECIAL SWITCH/THREAD INSTRUCTIONS:")).toBe(true);
+      expect(JSON.stringify(toJsonSchema(without.schema))).toBe(JSON.stringify(toJsonSchema(withRules.schema)));
+    }
+    // The slim forms keep their rules as they ran
+    expect(chapterTurnRequest(chapterStory(1, 3), "slim", FRAMES).prompt).toContain("SPECIAL SWITCH/THREAD INSTRUCTIONS:");
+  });
 });
 
 describe("the progress rule (B2) and each rule once (B3 rows 11, 14, 15)", () => {

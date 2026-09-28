@@ -17,8 +17,9 @@ import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import { ROUND2_SWITCH_CHAIN_CASES, ROUND3_PROBLEM_TURN, ROUND3_REPLAY_CASES, ROUND3_REPLAY_SAMPLES } from "../../../../src/evals/textModelEval/arms.js";
-import { planJobs, rebuiltToday, requestInputFor, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
+import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
+import type { EvalCase } from "../../../../src/evals/textModelEval/cases.js";
 import {
   assembledReply,
   callLimitsOf,
@@ -77,6 +78,21 @@ describe("planJobs: --no-mp-continuations", () => {
 
   it("keeps every beat case without the flag", () => {
     expect(new Set(planJobs(cases, options(false)).map((j) => j.caseId))).toEqual(new Set(cases.map((c) => c.id)));
+  });
+});
+
+describe("requestInputFor: the chapter frames a beat case carries", () => {
+  it("gives the reruns' framed turn (chapterFullB) the nearer frame and turn round 1's form the first one; production's form reads neither", () => {
+    const state = threadBeat(1).getState();
+    const threadId = (state.storyPhases[state.storyPhases.length - 1] as { threads: { id: string }[] }).threads[0].id;
+    const frame = (question: string) => ({ [threadId]: { question, plan: "Stay in the vault.", chapterKey: "k" } });
+    const plain = evalCase("sp", "beat", { state });
+    const framed: EvalCase = { ...plain, chapterFrames: frame("First question?"), nearerFrames: frame("Nearer question?") };
+    const prompt = (variant: VariantId, c: EvalCase = framed) => requestText(requestFor(variant, requestInputFor(c)));
+    expect(prompt("chapterFullB")).toContain("It decides: Nearer question?");
+    expect(prompt("chapterFull")).toContain("It decides: First question?");
+    expect(prompt("chapterFull")).not.toContain("Nearer question?");
+    expect(prompt("prod")).toBe(prompt("prod", plain));
   });
 });
 
@@ -380,6 +396,65 @@ describe("planJobs: the round stages and the migration check", () => {
         "sp-thread s2",
       ],
     });
+  });
+
+  it("plans the plan refresh (the owner's feedback, 2026-09-28): planner v2c twice on every chapter-planning case, planner v2b twice on the group ones", () => {
+    // Planner v2b's chapter request differs from planner v2's only in groups (two-sided contests); on one player planner
+    // v2's records stand in (standInKey). Planner v2c's switch planner is planner v2b's, so no switch case runs.
+    expect(perArm(plan("plan-refresh", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
+      "gpt-6-luna@low/planV2c": ["mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
+      "gpt-6-luna@low/planV2b": ["mp-thread s1", "mp-thread s2"],
+    });
+    expect(plan("plan-refresh", { mode: "pipeline", roles: ["switch", "thread"] })).toEqual([]);
+    // The other feedback stages that this workflow does not run yet plan nothing
+    for (const stage of ["groups", "form-gate", "final-check"] as const) expect(plan(stage, { roles: ["setup", "beat", "switch", "thread"] })).toEqual([]);
+  });
+
+  it("plans the reruns: the framed turn without the chapter rules twice on every single-player chapter step, and planner v2c into it on the chapter plans", () => {
+    expect(perArm(plan("reruns", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
+      "gpt-6-luna@medium/chapterFullB": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
+    });
+    const chains = plan("reruns", { mode: "pipeline", roles: ["switch", "thread"] });
+    // Today's pair beside it, up to sample 3: its samples 1 and 2 are stored, so only sample 3 is sent
+    expect(chains.map((j) => [j.caseId, j.armKey, j.sample])).toEqual([
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2c>gpt-6-luna@medium/chapterFullB", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/planV2c>gpt-6-luna@medium/chapterFullB", 2],
+      ["sp-thread", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1],
+      ["sp-thread", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 2],
+      ["sp-thread", "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 3],
+    ]);
+  });
+
+  it("plans the setup retests: round 3b twice on the named-player and kids premises, then once on the others", () => {
+    const setup = (id: string) => evalCase(id, "setup", { setup: { premise: "A premise", playerCount: 2, gameMode: GameModes.Competitive, maxTurns: 25 } });
+    const jobs = planJobs([setup("setup-future-casablanca"), setup("setup-learn-peer-review")], {
+      stage: "setup-retests",
+      promptState: "round0",
+      roles: ["setup", "beat"],
+      mode: "isolated",
+      subset15: false,
+      records: [],
+    });
+    expect(jobs.map((j) => `${j.armKey} ${j.caseId} s${j.sample}`)).toEqual([
+      "gpt-6-luna@low/setupR3b setup-future-casablanca s1",
+      "gpt-6-luna@low/setupR3b setup-future-casablanca s2",
+      "gpt-6-luna@low/setupR3b setup-learn-peer-review s1",
+    ]);
+  });
+
+  it("lets planner v2's chapter plans stand in for planner v2b's only where v2b's request is v2's byte for byte, prompt and schema (one player)", () => {
+    const sp = evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-sp-thread" }).getState() });
+    const mp = evalCase("mp-thread", "thread", { state: threadAnalysisAfterSwitch(2, { id: "story-mp-thread" }).getState(), tags: tags({ multiplayer: true, players: 2 }) });
+    const V2 = "gpt-6-luna@low/planV2";
+    const v2Record = (c: typeof sp) => record({ caseId: c.id, armKey: V2, callArmKey: V2, group: "thread", role: "thread", promptHash: todaysRequestHash(c, "planV2") });
+    const same = sameRequestAs([sp, mp]);
+    expect(same(v2Record(sp), "gpt-6-luna@low/planV2b")).toBe(true);
+    // Two-sided contests change the group prompt
+    expect(same(v2Record(mp), "gpt-6-luna@low/planV2b")).toBe(false);
+    // Planner v2c's schema and prompt differ everywhere; a record without a hash or a case never stands in
+    expect(same(v2Record(sp), "gpt-6-luna@low/planV2c")).toBe(false);
+    expect(same({ ...v2Record(sp), promptHash: undefined }, "gpt-6-luna@low/planV2b")).toBe(false);
+    expect(same({ ...v2Record(sp), caseId: "unknown" }, "gpt-6-luna@low/planV2b")).toBe(false);
   });
 
   it("chains the migration check's planner into its first turn on the chapter-plan cases only, with production's pair per player count, at one sample", () => {

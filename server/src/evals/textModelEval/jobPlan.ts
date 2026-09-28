@@ -77,8 +77,14 @@ export function requestInputFor(evalCase: EvalCase): RequestInput {
       if (!evalCase.iteration) throw new Error(`${evalCase.id} has no iteration input`);
       return { role: "iteration", iteration: evalCase.iteration };
     case "beat":
-      // A stored chapter's backfilled question and plan: only turn round 1's chapter turns read them
-      return { role: "beat", story: caseStory(evalCase), ...(evalCase.chapterFrames ? { chapterFrames: evalCase.chapterFrames } : {}) };
+      // A stored chapter's backfilled question and plan: only turn round 1's chapter turns read them, and its nearer
+      // frame only the reruns' framed turn (chapterFullB)
+      return {
+        role: "beat",
+        story: caseStory(evalCase),
+        ...(evalCase.chapterFrames ? { chapterFrames: evalCase.chapterFrames } : {}),
+        ...(evalCase.nearerFrames ? { nearerFrames: evalCase.nearerFrames } : {}),
+      };
     case "switch":
     case "thread":
       return { role: evalCase.role, story: caseStory(evalCase, false) };
@@ -115,6 +121,36 @@ export function rebuiltToday(cases: EvalCase[]): (record: CallRecord) => boolean
     const key = `${record.caseId}|${variant}`;
     if (!hashes.has(key)) hashes.set(key, todaysRequestHash(evalCase, variant));
     return hashes.get(key) === record.promptHash;
+  };
+}
+
+/**
+ * Whether a stand-in record (arms.ts, standInKey) may be read as another
+ * arm's: the request today's code builds for its case on that arm's variant
+ * hashes to the record's promptHash, and its JSON schema is the one the
+ * record's own variant builds (the hash covers the text only); memoised per
+ * case and variant pair.
+ */
+export function sameRequestAs(cases: EvalCase[]): (record: CallRecord, referenceArmKey: string) => boolean {
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const known = new Map<string, boolean>();
+  const variantOf = (key: string) => key.split("/").pop() as VariantId;
+  return (record, referenceArmKey) => {
+    const evalCase = byId.get(record.caseId);
+    const [own, other] = [variantOf(record.armKey), variantOf(referenceArmKey)];
+    if (!evalCase || !record.promptHash || !VARIANTS.includes(own) || !VARIANTS.includes(other)) return false;
+    const key = `${record.caseId}|${own}|${other}|${record.promptHash}`;
+    if (!known.has(key)) {
+      try {
+        const input = requestInputFor(evalCase);
+        const [theirs, ours] = [requestFor(other, input), requestFor(own, input)];
+        const schema = (request: EvalRequest) => JSON.stringify(toJsonSchema(request.schema));
+        known.set(key, sha256(requestText(theirs)) === record.promptHash && schema(theirs) === schema(ours));
+      } catch {
+        known.set(key, false);
+      }
+    }
+    return known.get(key) as boolean;
   };
 }
 

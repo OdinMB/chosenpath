@@ -231,7 +231,7 @@ function playersLine(thread: Thread): string {
     : `Players: ${thread.playersSideA.join(", ")}`;
 }
 
-function stateEdits(state: string, story: Story, frames?: ChapterFrameText): string {
+function stateEdits(state: string, story: Story, frames?: ChapterFrameText, chapterRules = true): string {
   let text = state;
   for (const thread of story.getCurrentThreadAnalysis()?.threads ?? []) {
     const outcome = story.getOutcomeById(thread.outcomeId);
@@ -241,6 +241,7 @@ function stateEdits(state: string, story: Story, frames?: ChapterFrameText): str
   }
   const step = `\n\nCURRENT STEP IN THREAD PROGRESSION: Turn ${story.getCurrentThreadBeatsCompleted() + 1}/${story.getCurrentThreadDuration()}\n`;
   text = replaceOnce(LABEL, text, step, "\n");
+  if (!chapterRules) return text;
   const instructions = StoryStatePromptService.createStoryStatePrompt(story, { switchAndThreadInstructions: true });
   return instructions ? `${text}\n${instructions}\n` : text;
 }
@@ -321,8 +322,14 @@ function withTitles(story: Story, parsed: unknown): unknown {
   return reply;
 }
 
-/** Round 1's request for a chapter step, on production's full reply or B4's slim one. */
-export function chapterTurnRequest(story: Story, form: ChapterTurnForm, frames?: ChapterFrameText): ChapterTurnRequest {
+/**
+ * Round 1's request for a chapter step, on production's full reply or B4's
+ * slim one. `chapterRules: false` (chapterFullB, the reruns of the owner's
+ * feedback of 2026-09-28: the chapter rules are for the planners only, as
+ * production's turns have them since then) leaves the story's switch/thread
+ * instructions off the end; everything else is the form as it ran.
+ */
+export function chapterTurnRequest(story: Story, form: ChapterTurnForm, frames?: ChapterFrameText, options: { chapterRules?: boolean } = {}): ChapterTurnRequest {
   if (story.getCurrentBeatType() !== "thread") throw new Error(`${LABEL}: round 1's chapter turns cover chapter steps only, not a ${story.getCurrentBeatType()} beat`);
   if (isSlim(form) && story.isMultiplayer()) throw new Error(`${LABEL}: the slim form is single-player in round 1 (B4 keeps the coordination note for groups, unmeasured)`);
   const production = beatStep.request(story);
@@ -330,7 +337,7 @@ export function chapterTurnRequest(story: Story, form: ChapterTurnForm, frames?:
   const productionPlan = asZodObject(asZodObject(asZodObject(production.schema, "reply").shape.player1, "player1").shape.plan, "plan");
   const { instructions, state } = splitAtState(LABEL, base.prompt);
   const request: ChapterTurnRequest = {
-    prompt: instructionEdits(instructions, story, form) + stateEdits(state, story, frames),
+    prompt: instructionEdits(instructions, story, form) + stateEdits(state, story, frames, options.chapterRules ?? true),
     schema: editedSchema(asZodObject(base.schema, "reply"), form, productionPlan),
   };
   return isSlim(form) ? { ...request, assemble: (parsed) => withTitles(story, parsed) } : request;

@@ -16,10 +16,12 @@ import {
   GRUK_ROLE,
   GUIDELINE_FIELDS,
   IDENTITY_CLAUSE,
+  IDENTITY_CLAUSE_OUTCOMES,
   KIDS_INVENTORY,
   KIDS_PLAYER_LIST,
   KIDS_SHARED_LIST,
   KIDS_STATS,
+  KIDS_STATS_VARIED,
   MILESTONE_COUNT,
   PLAYER_LIST_COUNT,
   QUESTION_FORMS,
@@ -82,7 +84,7 @@ type Kind = "story" | "template" | "iteration";
  * the story length (proposal 10) and conflict rules and hook facts with NPC
  * pronouns in the role (proposal 11, S2).
  */
-export type Round1Parts = { slate: boolean; scoreboard: boolean; example: boolean; fixes: boolean; everyPlayerStat: boolean; round3?: boolean };
+export type Round1Parts = { slate: boolean; scoreboard: boolean; example: boolean; fixes: boolean; everyPlayerStat: boolean; round3?: boolean; round3b?: boolean };
 /** Setup round 1 as it ran: all six proposals. */
 export const ROUND1_PARTS: Round1Parts = { slate: true, scoreboard: true, example: true, fixes: false, everyPlayerStat: false };
 /**
@@ -107,6 +109,12 @@ export const ROUND1C_PARTS: Round1Parts = { ...ROUND1B_PARTS, everyPlayerStat: t
  * generation order on top.
  */
 export const ROUND3_PARTS: Round1Parts = { ...ROUND1C_PARTS, round3: true };
+/**
+ * The setup retests of the owner's feedback workflow (2026-09-28): round 3
+ * with the identity clause's names in outcomes only and varied kids stat
+ * examples (setupRound3Text.ts, IDENTITY_CLAUSE_OUTCOMES, KIDS_STATS_VARIED).
+ */
+export const ROUND3B_PARTS: Round1Parts = { ...ROUND3_PARTS, round3b: true };
 
 /** What a call knows beyond its premise, player count and mode: whether a child reads along (a read-with-kids story, a template tagged Kids). */
 export type SetupCallOptions = { kids?: boolean };
@@ -225,7 +233,7 @@ function outcomesSection(on: On): string {
   // Round 3: the floor follows the story length (A10), a seat's role names its camp, and the identity-name clause
   const floor = on.parts.round3 ? SHORT_FLOOR : "";
   const camp = camps(on) ? ROLES_CAMP : "";
-  const names = on.parts.round3 ? IDENTITY_CLAUSE : PREMISE_NAMES;
+  const names = on.parts.round3b ? IDENTITY_CLAUSE_OUTCOMES : on.parts.round3 ? IDENTITY_CLAUSE : PREMISE_NAMES;
   return [
     "Outcomes",
     "- Outcomes are the questions the ending answers. Milestones earned in threads move each outcome toward one of its three resolutions; they are the story's only progress bar.",
@@ -563,7 +571,7 @@ const SINGLE_PLAYER_OUTCOMES =
 function round3SlateLines(on: On): string[] {
   const M = milestoneBudgetFor(on.maxTurns);
   const length = storyLengthLine(on.maxTurns, on.players > 1);
-  const kids = kidsBudget(on) && asksStatRules(on) ? [KIDS_STATS] : [];
+  const kids = kidsBudget(on) && asksStatRules(on) ? [on.parts.round3b ? KIDS_STATS_VARIED : KIDS_STATS] : [];
   if (on.players === 1) {
     const slate = slateMilestones("single", M);
     const [privateLife, side] = slate.personal;

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Story } from "core/models/Story.js";
 import type { Beat, BeatOption, PlayerSlot, SetOfBeatGenerationSchema } from "core/types/index.js";
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
-import { makeArm, type Arm } from "./arms.js";
+import { makeArm, type Arm, type Stage } from "./arms.js";
 import type { ChapterFrame } from "./cases.js";
 import { playerParagraphs } from "./playerText.js";
 import { prepJob } from "./prepCalls.js";
@@ -274,24 +274,29 @@ export const JUDGE_CALIBRATION: CalibrationItem[] = [
 /** A Luna low judge's reply: some reasoning and three short answers */
 const JUDGE_OUTPUT_TOKENS: Record<string, number> = { low: 900, medium: 2_500 };
 
-/** A judge call's case id: the turn it reads and the prompt version (v1's ids carry none). */
-export const judgeCaseId = (outputId: string, slot: PlayerSlot, version = JUDGE_PROMPT_VERSION) =>
-  version === 1 ? `judge-${outputId}-${slot}` : `judge-v${version}-${outputId}-${slot}`;
+/**
+ * A judge call's case id: the turn it reads and the prompt version (v1's ids
+ * carry none), and "nearer" where the turn is judged on its chapter's nearer
+ * frame (the reruns, 2026-09-28), which changes the request.
+ */
+export const judgeCaseId = (outputId: string, slot: PlayerSlot, version = JUDGE_PROMPT_VERSION, frameTag?: "nearer") =>
+  version === 1 ? `judge-${outputId}-${slot}` : `judge-v${version}-${frameTag ? `${frameTag}-` : ""}${outputId}-${slot}`;
 
-/** One judge call per turn and sample, in the turn rounds' stage, on the current prompt version. */
+/** One judge call per turn and sample, on the current prompt version: in the turn rounds' stage, or the stage given (the reruns). */
 export function judgeJobs(
-  turns: { outputId: string; slot: PlayerSlot; request: TextRequest }[],
+  turns: { outputId: string; slot: PlayerSlot; request: TextRequest; frameTag?: "nearer" }[],
   arm: Arm,
   samples: number,
-  promptState: string
+  promptState: string,
+  stage: Stage = "turn-rounds"
 ): Job[] {
   return turns.flatMap((turn) =>
     Array.from({ length: samples }, (_, i) =>
       prepJob({
         kind: "judge",
-        stage: "turn-rounds",
+        stage,
         promptState,
-        caseId: judgeCaseId(turn.outputId, turn.slot),
+        caseId: judgeCaseId(turn.outputId, turn.slot, JUDGE_PROMPT_VERSION, turn.frameTag),
         sample: i + 1,
         arm,
         role: "beat",

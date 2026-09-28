@@ -146,6 +146,10 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnB6: "prod",
   // The nearer chapter question (owner's feedback, 2026-09-28) against the planner it edits
   planV2c: "planV2b",
+  // The reruns: the framed chapter turn without the chapter rules, on the nearer frames, against today's form (the
+  // stored round0 references); the setup retests against the adopted setup form (setupR3, production's byte for byte)
+  chapterFullB: "prod",
+  setupR3b: "setupR3",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -216,10 +220,30 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR3")]: [armKey(LUNA_LOW, "prod")],
   // Planner v2c: planV2b ran only in the setup chain, so planner v2's isolated plans (and today's form) are its readings too
   [armKey(LUNA_LOW, "planV2c")]: [armKey(LUNA_LOW, "planV2"), armKey(LUNA_LOW, "prod")],
+  // The reruns' framed turn against round 1's framed turn too (the nearer frames and no chapter rules on their own)
+  [armKey(LUNA_MEDIUM, "chapterFullB")]: [armKey(LUNA_MEDIUM, "chapterFull")],
+  // The setup retests against today's prompt too (the carry-forward guard)
+  [armKey(LUNA_LOW, "setupR3b")]: [armKey(LUNA_LOW, "prod")],
 };
 
 export function secondReferenceKeys(key: string): string[] {
   return SECOND_REFERENCES[key] ?? [];
+}
+
+/**
+ * An arm whose records stand in for a reference arm's where that arm has none
+ * on a pair and its request for the case is the stand-in's byte for byte
+ * (variantComparison.ts, the same-request check in jobPlan.ts): planner v2b's
+ * chapter requests are planner v2's for one player (two-sided contests change
+ * only group prompts), and planner v2b ran alone only in groups (the plan
+ * refresh, 2026-09-28), so planner v2c reads against v2b on every case.
+ */
+const STAND_INS: Record<string, string> = {
+  [armKey(LUNA_LOW, "planV2b")]: armKey(LUNA_LOW, "planV2"),
+};
+
+export function standInKey(key: string): string | undefined {
+  return STAND_INS[key];
 }
 
 /**
@@ -340,9 +364,77 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return migrationArms(role);
     case "turn-rounds":
       return turnRoundArms(role);
+    case "plan-refresh":
+      return planRefreshArms(role);
+    case "reruns":
+      return role === "beat" ? [{ arm: luna("medium", "chapterFullB"), samples: 2, scope: "single-player", beatType: "thread" }] : [];
+    case "setup-retests":
+      return setupRetestArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The setup retests' premises (the owner's feedback workflow, 2026-09-28):
+ * those whose premise names the player characters (Casablanca's Fatima and
+ * Layla, the Okafor siblings, Susan, the stuffed animals), where the identity
+ * clause reads, and the two read with a child, where the kids examples do.
+ */
+export const SETUP_RETEST_PREMISES = [
+  "setup-future-casablanca",
+  "setup-future-cocoa-farm",
+  "setup-custom-susan",
+  "setup-kids-stuffed-animals",
+  "setup-kids-animal-rescue",
+];
+
+/** The other thirteen setup premises: the retests' sanity pass (a test holds the two lists to the eighteen). */
+export const SETUP_SANITY_PREMISES = [
+  "setup-vent-subscription",
+  "setup-pretend-er-doctor",
+  "setup-learn-lemonade",
+  "setup-custom-shed",
+  "setup-custom-vanilla",
+  "setup-custom-avalon",
+  "setup-custom-neo-tokyo",
+  "setup-fiction-bounty-hunters",
+  "setup-flexible-soul-flat",
+  "setup-learn-peer-review",
+  "setup-flexible-secret-society",
+  "setup-vent-berlin-flat",
+  "setup-pretend-cofounders",
+];
+
+/**
+ * The setup retests: round 3b (setupR3b) on Luna low at two samples on the
+ * retest premises, then once on every other premise as the sanity pass, which
+ * a cap stop cuts first (three players last).
+ */
+function setupRetestArms(role: EvalRole): ArmPlan[] {
+  if (role !== "setup") return [];
+  return [
+    { arm: luna("low", "setupR3b"), samples: 2, scope: "all", caseIds: SETUP_RETEST_PREMISES },
+    { arm: luna("low", "setupR3b"), samples: 1, scope: "all", caseIds: SETUP_SANITY_PREMISES },
+  ];
+}
+
+/**
+ * The plan refresh (the owner's feedback of 2026-09-28, coordinator's brief):
+ * planner v2c's chapter planner on Luna low at two samples on every
+ * chapter-planning case, stored and built, and planner v2b beside it on the
+ * group cases, where its request differs from planner v2's (on one player
+ * planner v2's records stand in, standInKey). Planner v2c's switch planner is
+ * planner v2b's, which is planner v2's byte for byte, so no switch case runs.
+ * The nearer chapter backfill books to this stage too (--backfill-chapters
+ * --frames nearer --stage plan-refresh).
+ */
+function planRefreshArms(role: EvalRole): ArmPlan[] {
+  if (role !== "thread") return [];
+  return [
+    { arm: luna("low", "planV2c"), samples: 2, scope: "all" },
+    { arm: luna("low", "planV2b"), samples: 2, scope: "multiplayer" },
+  ];
 }
 
 /**
@@ -468,6 +560,13 @@ const MIGRATION_SAMPLES = 2;
 
 /** The sample turn round 2's rerun of today's form records as (samples 1 and 2 are the references, 3 round 1's rerun). */
 export const ROUND2_RERUN_SAMPLE = 4;
+
+/**
+ * The reruns' chain of today's pair beside planner v2c into the framed turn
+ * (2026-09-28): its chains' samples 1 (the migration check) and 2 (turn round
+ * 1's rerun) are stored, so planning up to 3 sends sample 3 only.
+ */
+export const RERUNS_REFERENCE_SAMPLE = 3;
 
 /**
  * Turn round 2's switch chains (switch planner, then the switch turn), about
@@ -723,6 +822,15 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
         },
         // Turn round 2's reference switch chains: today's pair on its switch cases, two samples (their noise)
         { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: 2, scope: "single-player", roles: ["switch"], caseIds: ROUND2_SWITCH_CHAIN_CASES },
+      ];
+    case "reruns":
+      // The reruns (owner's feedback, 2026-09-28): planner v2c into the framed turn without the chapter rules, the chapter
+      // openings of turn round 1's page rebuilt, two samples like the reference's chains
+      // Today's pair beside them as sample 3 (its samples 1 and 2 are stored), for the chapter openings' wait at this
+      // hour's server pace; after the candidate on each case, so a cap stop cuts it too
+      return [
+        { analysis: luna("low", "planV2c"), beats: [luna("medium", "chapterFullB")], samples: 2, scope: "single-player", roles: ["thread"] },
+        { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: RERUNS_REFERENCE_SAMPLE, scope: "single-player", roles: ["thread"] },
       ];
     case "turn-rounds":
       // Turn round 1: planner v2 into the chapter's first step, each turn form on production's model per player count

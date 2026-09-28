@@ -363,3 +363,36 @@ describe("variantComparisons: stored references from another prompt state", () =
     expect(comparisons.find((c) => c.armKey === SOL_ROUND1)?.hasNoise).toBe(true);
   });
 });
+
+describe("variantComparisons: stand-in records (the plan refresh, 2026-09-28)", () => {
+  const V2 = "gpt-6-luna@low/planV2";
+  const V2B = "gpt-6-luna@low/planV2b";
+  const V2C = "gpt-6-luna@low/planV2c";
+  const thread = (armKey: string, caseId: string, sample: number) =>
+    call(armKey, caseId, sample, { group: "thread", role: "thread", promptState: "round0", jobKey: `${caseId}|${armKey}|round0|s${sample}` });
+  // One player ("solo"): planner v2b's request is planner v2's byte for byte; a group ("group"): it is not, so v2b ran there
+  // Planner v2's sample 3 (a trigger comparison's) pairs with no planner v2c record, so it is no stand-in
+  const records = [
+    ...[1, 2].flatMap((s) => [thread(V2C, "solo", s), thread(V2C, "group", s), thread(V2, "solo", s), thread(V2, "group", s), thread(V2B, "group", s)]),
+    thread(V2, "solo", 3),
+  ];
+  const sameRequest = (r: CallRecord, armKey: string) => armKey === V2B && r.caseId === "solo";
+
+  it("reads planner v2c against planner v2b with planner v2's records standing in where v2b's request is v2's byte for byte", () => {
+    const comparisons = variantComparisons(records, new Map(), caseTags("solo", "group"), "round0", undefined, sameRequest);
+    const own = comparisons.find((c) => c.armKey === V2C && c.referenceKey === V2B);
+    expect(own).toMatchObject({ pairs: 4, standIns: { armKey: V2, records: 2 }, hasNoise: true });
+    expect(own?.reference.calls).toBe(4);
+    // Planner v2 as its second reference is read on every pair, as itself
+    expect(comparisons.find((c) => c.armKey === V2C && c.referenceKey === V2)).toMatchObject({ pairs: 4, secondReference: true });
+    expect(comparisons.find((c) => c.armKey === V2C && c.referenceKey === V2)?.standIns).toBeUndefined();
+  });
+
+  it("uses no stand-in without the same-request check, or where the arm's own records cover the pair", () => {
+    const withoutCheck = variantComparisons(records, new Map(), caseTags("solo", "group"), "round0");
+    expect(withoutCheck.find((c) => c.armKey === V2C && c.referenceKey === V2B)).toMatchObject({ pairs: 2 });
+    const everywhere = variantComparisons(records, new Map(), caseTags("solo", "group"), "round0", undefined, () => true);
+    // planner v2b's own group records stand; planner v2's stand in on the solo case only
+    expect(everywhere.find((c) => c.armKey === V2C && c.referenceKey === V2B)).toMatchObject({ pairs: 4, standIns: { armKey: V2, records: 2 } });
+  });
+});

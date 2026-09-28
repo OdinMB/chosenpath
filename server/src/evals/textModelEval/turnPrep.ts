@@ -1,11 +1,11 @@
 import type { PlayerSlot, SetOfBeatGenerationSchema } from "core/types/index.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import type { TextRequest } from "../../game/services/storyTextSteps.js";
-import { productionArm } from "./arms.js";
+import { productionArm, type Stage } from "./arms.js";
 import type { Caps, LedgerStage, SpendRecord } from "./budget.js";
 import { caseStory, type EvalCase } from "./cases.js";
-import { backfillJobs, chapterFramesFile, collectChapters } from "./chapterFrames.js";
-import type { EvalFiles } from "./evalFiles.js";
+import { backfillJobs, chapterFramesFile, collectChapters, type Chapter, type FrameSet } from "./chapterFrames.js";
+import { FRAME_FILES, JUDGED_FILES, type EvalFiles } from "./evalFiles.js";
 import { sha256 } from "./executor.js";
 import { filterSpendUsd } from "./filterCheck.js";
 import { jobEstimateUsd, requestJob } from "./jobPlan.js";
@@ -113,33 +113,46 @@ export async function buildRoundCasesMode(ctx: PrepContext, replace: boolean): P
 
 // --- --backfill-chapters ---
 
-/** The chapters every turn and planning case reads, and their backfill jobs (Luna low, production's planner default). */
-function backfillPlan(cases: EvalCase[]) {
+/**
+ * The chapters every turn and planning case reads, and their backfill jobs
+ * (Luna low, production's planner default): the first backfill in the turn
+ * rounds' stage, or the nearer one in the stage given (the plan refresh).
+ */
+export function backfillPlan(cases: EvalCase[], frames: FrameSet = "backfilled", stage?: Stage) {
   const chapters = collectChapters(cases);
-  return { chapters, jobs: backfillJobs(chapters, productionArm("thread", 1), CURRENT_PROMPT_STATE) };
+  return { chapters, jobs: backfillJobs(chapters, productionArm("thread", 1), CURRENT_PROMPT_STATE, { frames, ...(stage ? { stage } : {}) }) };
 }
 
-export async function backfillChaptersMode(ctx: PrepContext): Promise<void> {
+/** The backfill jobs a run sends: every chapter's, or with --cases (a smoke) those of the chapters the cases read. */
+export function backfillJobsToRun(chapters: Chapter[], jobs: Job[], caseIds?: string[]): Job[] {
+  return caseIds ? jobs.filter((_, i) => chapters[i].readBy.some((id) => caseIds.includes(id))) : jobs;
+}
+
+export async function backfillChaptersMode(ctx: PrepContext, options: { frames?: FrameSet; stage?: LedgerStage; caseIds?: string[] } = {}): Promise<void> {
   const { files, log } = ctx;
-  const { chapters, jobs } = backfillPlan(files.readCases());
+  const frames = options.frames ?? "backfilled";
+  const stage = options.stage ?? STAGE;
+  const { chapters, jobs } = backfillPlan(files.readCases(), frames, stage as Stage);
   const previous = files.readPrepRecords();
   const done = finishedJobKeys(previous);
-  const open = jobs.filter((j) => !done.has(keyOf(j)));
+  const toRun = backfillJobsToRun(chapters, jobs, options.caseIds);
+  const open = toRun.filter((j) => !done.has(keyOf(j)));
   const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
-  ctx.refuse(STAGE, estimate);
-  log(`${chapters.length} chapters (${chapters.filter((c) => c.exactInput).length} from the planner's own input), ${open.length} open, est $${estimate.toFixed(3)}`);
-  const result = await runJobs(jobs, ctx.deps("prep"), {
+  ctx.refuse(stage, estimate);
+  log(`${chapters.length} chapters (${chapters.filter((c) => c.exactInput).length} from the planner's own input), ${frames} frames in stage ${stage}, ${toRun.length} to run, ${open.length} open, est $${estimate.toFixed(3)}`);
+  // The frames file is written over every chapter, whatever this run sent
+  const result = await runJobs(toRun, ctx.deps("prep"), {
     caps: ctx.caps,
     previous,
     extraSpend: spendBeside(files, "prep"),
     tokensPerMinute: ctx.tpm,
     maxInFlight: ctx.maxInFlight,
   });
-  const file = chapterFramesFile(chapters, jobs, files.readPrepRecords(), files.loadOutput, new Date());
-  files.writeChapterFrames(file);
+  const file = chapterFramesFile(chapters, jobs, files.readPrepRecords(), files.loadOutput, new Date(), frames);
+  files.writeChapterFrames(file, frames);
   const readBy = (n: number) => file.chapters.reduce((sum, c) => sum + c.readBy.length, n);
   log(
-    `${result.stoppedReason ? `Stopped: ${result.stoppedReason}. ` : ""}Framed ${file.chapters.length} chapters, read by ${readBy(0)} cases; ${file.missing.length} without a frame. This run spent $${sumCost(result.records).toFixed(4)}. Wrote chapter-frames.json.`
+    `${result.stoppedReason ? `Stopped: ${result.stoppedReason}. ` : ""}Framed ${file.chapters.length} chapters, read by ${readBy(0)} cases; ${file.missing.length} without a frame. This run spent $${sumCost(result.records).toFixed(4)}. Wrote ${FRAME_FILES[frames]}.`
   );
 }
 
@@ -257,20 +270,34 @@ function writeCalibration(files: EvalFiles, turns: CalibrationTurn[], problems: 
 
 // --- --judge-records ---
 
-export type RoundTurn = { armKey: string; caseId: string; sample: number; slot: PlayerSlot; outputId: string; checks: JudgedCheck[]; request: TextRequest };
+export type RoundTurn = {
+  armKey: string;
+  caseId: string;
+  sample: number;
+  slot: PlayerSlot;
+  outputId: string;
+  checks: JudgedCheck[];
+  request: TextRequest;
+  /** Judged on its chapter's nearer frame, which changed the request (the reruns); its judge call is keyed apart */
+  frameTag?: "nearer";
+};
 
 /**
  * The judge requests for a round's turns: every final usable beat record of
  * the named arms in the prompt state (an isolated beat, or a chain's beat on
  * the chain's own plan), on chapter steps only, one per player, each on the
- * turn as the game keeps it (the beat repairs) with its chapter's frame.
+ * turn as the game keeps it (the beat repairs) with its chapter's frame: the
+ * first backfill's, or (frames "nearer", the reruns of 2026-09-28) the nearer
+ * one, tagged where it changes the request, so a turn whose chapter has none
+ * (a chain's own plan, a first turn) reuses its judge call.
  */
 export function roundTurnsToJudge(
   records: CallRecord[],
   cases: EvalCase[],
   load: (record: CallRecord) => unknown,
   armKeys: string[],
-  promptState: string
+  promptState: string,
+  frames: FrameSet = "backfilled"
 ): { turns: RoundTurn[]; problems: string[] } {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const problems: string[] = [];
@@ -288,7 +315,22 @@ export function roundTurnsToJudge(
     const { reply } = repairBeatReply(story, load(r) as SetOfBeatGenerationSchema);
     return story.getPlayerSlots().flatMap((slot) => {
       const judged = judgeRequest(story, reply, slot, evalCase.chapterFrames);
-      return judged ? [{ armKey: r.armKey, caseId: r.caseId, sample: r.sample, slot, outputId: outputIdOf(r.outputFile as string), checks: judged.checks, request: judged.request }] : [];
+      if (!judged) return [];
+      const nearer = frames === "nearer" ? judgeRequest(story, reply, slot, evalCase.nearerFrames) : undefined;
+      const tagged = nearer !== undefined && nearer.request.prompt !== judged.request.prompt;
+      const used = tagged ? nearer : judged;
+      return [
+        {
+          armKey: r.armKey,
+          caseId: r.caseId,
+          sample: r.sample,
+          slot,
+          outputId: outputIdOf(r.outputFile as string),
+          checks: used.checks,
+          request: used.request,
+          ...(tagged ? { frameTag: "nearer" as const } : {}),
+        },
+      ];
     });
   });
   return { turns, problems };
@@ -307,20 +349,34 @@ export function turnsToSend(turns: RoundTurn[], caseIds?: string[]): RoundTurn[]
   return turns.filter((t) => t.sample <= 2 && (!caseIds || caseIds.includes(t.caseId)));
 }
 
-/** Judges a round's turns (turn round 1: the reference and the candidates), then writes judged-turns.md and .json. */
-export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | undefined, samples: number, promptState: string, caseIds?: string[]): Promise<void> {
+export type JudgeRecordsOptions = {
+  caseIds?: string[];
+  /** The frames the judge reads: the first backfill's (the rounds), or the nearer ones (the reruns) */
+  frames?: FrameSet;
+  /** The ledger stage the new judge calls book to: turn-rounds, or a feedback run's own (the reruns) */
+  stage?: LedgerStage;
+};
+
+/**
+ * Judges a round's turns (turn round 1: the reference and the candidates),
+ * then writes judged-turns.md and .json, or on the nearer frames
+ * judged-turns-nearer.md and .json beside them.
+ */
+export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | undefined, samples: number, promptState: string, options: JudgeRecordsOptions = {}): Promise<void> {
   const { files, log } = ctx;
   if (!armKeys?.length) throw new Error("--judge-records needs --arms: the beat or chain arms whose chapter steps to judge");
+  const frames = options.frames ?? "backfilled";
+  const stage = options.stage ?? STAGE;
   const records = files.readRecords();
   const cases = files.readCases();
-  const { turns, problems } = roundTurnsToJudge(records, cases, files.loadOutput, armKeys, promptState);
+  const { turns, problems } = roundTurnsToJudge(records, cases, files.loadOutput, armKeys, promptState, frames);
   const arm = JUDGE_ARMS[0];
-  const jobs = judgeJobs(turnsToSend(turns, caseIds), arm, samples, promptState);
+  const jobs = judgeJobs(turnsToSend(turns, options.caseIds), arm, samples, promptState, stage as Stage);
   const done = finishedJobKeys(files.readPrepRecords());
   const open = jobs.filter((j) => !done.has(keyOf(j)));
   const estimate = open.reduce((sum, j) => sum + jobEstimateUsd(j), 0);
-  ctx.refuse(STAGE, estimate);
-  log(`${turns.length} turns of ${armKeys.length} arms × ${samples} samples on ${arm.key}, ${open.length} open, est $${estimate.toFixed(3)}`);
+  ctx.refuse(stage, estimate);
+  log(`${turns.length} turns of ${armKeys.length} arms × ${samples} samples on ${arm.key} (${frames} frames, stage ${stage}), ${open.length} open, est $${estimate.toFixed(3)}`);
   const result = await runJobs(jobs, ctx.deps("prep"), {
     caps: ctx.caps,
     previous: files.readPrepRecords(),
@@ -329,24 +385,26 @@ export async function judgeRecordsMode(ctx: PrepContext, armKeys: string[] | und
     maxInFlight: ctx.maxInFlight,
   });
   if (result.stoppedReason) log(`Stopped: ${result.stoppedReason}`);
-  writeJudgedTurns(files, turns, problems, promptState, log);
+  writeJudgedTurns(files, turns, problems, promptState, frames, log);
 }
 
-function writeJudgedTurns(files: EvalFiles, turns: RoundTurn[], problems: string[], promptState: string, log: (line: string) => void) {
+function writeJudgedTurns(files: EvalFiles, turns: RoundTurn[], problems: string[], promptState: string, frames: FrameSet, log: (line: string) => void) {
   const prep = files.readPrepRecords();
   const arm = JUDGE_ARMS[0];
+  const caseIdOf = (t: RoundTurn) => judgeCaseId(t.outputId, t.slot, JUDGE_PROMPT_VERSION, t.frameTag);
   const judged: JudgedTurn[] = turns.flatMap((turn) => {
-    const record = finishedPrepRecord(prep, jobKey(judgeCaseId(turn.outputId, turn.slot), prepArmKey("judge", arm), promptState, 1));
+    const record = finishedPrepRecord(prep, jobKey(caseIdOf(turn), prepArmKey("judge", arm), promptState, 1));
     if (!record) return [];
-    const { request, ...rest } = turn;
+    const { request, frameTag, ...rest } = turn;
     void request;
+    void frameTag;
     return [{ ...rest, verdicts: verdictsFrom(files.loadOutput(record), turn.checks) }];
   });
   const readings = judgedReadings(judged, referenceKeyOf);
-  const spentUsd = sumCost(prep.filter((r) => r.armKey.startsWith("judge>") && turns.some((t) => r.caseId === judgeCaseId(t.outputId, t.slot))));
+  const spentUsd = sumCost(prep.filter((r) => r.armKey.startsWith("judge>") && turns.some((t) => r.caseId === caseIdOf(t))));
   const generatedAt = new Date();
-  files.writeJudgedTurns(renderJudgedReadings(readings, { spentUsd, generatedAt, problems }), { generatedAt: generatedAt.toISOString(), promptState, readings, judged, problems, spentUsd });
-  log(`Judged ${judged.length} of ${turns.length} turns; these judge calls $${spentUsd.toFixed(4)}. Wrote judged-turns.md and .json.`);
+  files.writeJudgedTurns(renderJudgedReadings(readings, { spentUsd, generatedAt, problems }), { generatedAt: generatedAt.toISOString(), promptState, frames, readings, judged, problems, spentUsd }, frames);
+  log(`Judged ${judged.length} of ${turns.length} turns; these judge calls $${spentUsd.toFixed(4)}. Wrote ${JUDGED_FILES[frames]}.md and .json.`);
 }
 
 // --- The dry run's view ---
@@ -368,6 +426,10 @@ export function printPrepPlan(files: EvalFiles, log: (line: string) => void): vo
   const framed = cases.filter((c) => c.tags.chapterFrame === "backfilled").length;
   const fallback = cases.filter((c) => c.tags.chapterFrame === "fallback").length;
   log(`  Chapter backfill (--backfill-chapters): ${chapters.length} chapters, ${openCost(jobs)}; cases backfilled ${framed}, fallback ${fallback}`);
+  const nearer = backfillPlan(cases, "nearer", "plan-refresh");
+  log(
+    `The nearer chapter backfill (--backfill-chapters --frames nearer --stage plan-refresh): ${nearer.chapters.length} chapters, ${openCost(nearer.jobs)}; cases with a nearer frame ${cases.filter((c) => c.nearerFrames).length}`
+  );
   const { turns, problems } = calibrationTurns(files);
   const arm = JUDGE_ARMS[0];
   log(`  Judge calibration (--judge-calibration): ${turns.length} hand-read turns on ${arm.key} × ${DEFAULT_JUDGE_SAMPLES}, ${openCost(judgeJobs(turns, arm, DEFAULT_JUDGE_SAMPLES, CURRENT_PROMPT_STATE))}${problems.length ? `; ${problems.length} unusable` : ""}`);

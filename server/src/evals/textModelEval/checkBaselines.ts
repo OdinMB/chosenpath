@@ -64,6 +64,8 @@ export type BaselineReport = {
   readouts: { arm: string; outputFile: string; hit: string }[];
   /** The stored chapters read once each on the owner's two chapter checks of 2026-09-28 (chapterFrameChecks) */
   frames: { chapters: number; checks: Record<string, { pass: number; n: number }> };
+  /** The same chapters on their nearer frames (the plan refresh of 2026-09-28): the new question and the new kind of milestone */
+  nearerFrames: { chapters: number; checks: Record<string, { pass: number; n: number }> };
 };
 
 export type BaselineInput = {
@@ -81,6 +83,8 @@ export type BaselineInput = {
   readouts?: BaselineReport["readouts"];
   /** The stored chapters' checks on their backfilled question and their plan's kind of milestone (chapterFrameChecks) */
   frames?: FrameCheck[];
+  /** The same checks on the nearer frames (chapterFrameChecks(cases, "nearer")) */
+  nearerFrames?: FrameCheck[];
   generatedAt: Date;
 };
 
@@ -320,6 +324,7 @@ export function checkBaselines(input: BaselineInput): BaselineReport {
     references: input.todaysPromptHash ? referenceCurrency(input.records, caseById, input.todaysPromptHash) : [],
     readouts: input.readouts ?? [],
     frames: frameReadings(input.frames ?? []),
+    nearerFrames: frameReadings(input.nearerFrames ?? []),
   };
 }
 
@@ -428,6 +433,19 @@ export function renderCheckBaselines(report: BaselineReport): string {
       "| Check | Passes |",
       "|---|---|",
       ...Object.entries(report.frames.checks).map(([name, { pass, n }]) => `| ${name} | ${pass} of ${n} |`),
+      ""
+    );
+  }
+
+  lines.push("## Stored chapters: the nearer frames' question and kind of milestone", "");
+  if (report.nearerFrames.chapters === 0) lines.push("No nearer frame was read.", "");
+  else {
+    lines.push(
+      `The same chapters re-framed by the plan refresh (the owner's feedback of 2026-09-28, chapter-frames-nearer.json: planner v2c's nearer question and its own kind of milestone, the steps and milestones kept), each chapter with a nearer frame once (${report.nearerFrames.chapters} threads): the new question against its outcome's, and the new kind of milestone (a blank one fails). Word heuristics: read them as rates.`,
+      "",
+      "| Check | Passes |",
+      "|---|---|",
+      ...Object.entries(report.nearerFrames.checks).map(([name, { pass, n }]) => `| ${name} | ${pass} of ${n} |`),
       ""
     );
   }

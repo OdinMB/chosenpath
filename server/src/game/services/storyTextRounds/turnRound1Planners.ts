@@ -658,6 +658,9 @@ export function plannerV2ThreadRequest(story: Story, full: boolean, options: { t
   };
 }
 
+/** Planner v2c's question and kind-of-milestone fields, which the eval's nearer chapter backfill asks in chapter words. */
+export const PLANNER_V2C_FIELDS = { question: NEARER_QUESTION_FIELD, typeOfMilestone: MILESTONE_KIND_FIELD };
+
 /** The passages the tests count, so each rule is pinned once. */
 export const PLANNER_V2_TEXT = {
   stepA: STEP_A,

@@ -51,8 +51,12 @@ export type RatingSpec = {
    */
   chainArms?: ArmRef[];
   chainItems?: number;
+  /** The chapter-opening items come only from these chapter-planning cases (turns-r1b: the page it replaces had these) */
+  chainCaseIds?: string[];
   /** A pairwise page's questions when a round asks others than PAIRWISE_CRITERIA's (turn round 2) */
   criteria?: PairwiseCriteriaSet;
+  /** The chapter frames a turn item's context shows: the nearer ones (turns-r1b, 2026-09-28), else the first backfill's */
+  frames?: "nearer";
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -105,6 +109,8 @@ export type RatingKey = {
   notes: string[];
   /** The page's own questions, when not PAIRWISE_CRITERIA's (absent on every key before turn round 2) */
   criteria?: PairwiseCriteriaSet;
+  /** The chapter frames the contexts show: "nearer" on turns-r1b (2026-09-28); absent on every page before it (the first backfill's) */
+  frames?: "nearer";
 };
 
 export const LABELS = ["A", "B", "C", "D"];
@@ -249,7 +255,12 @@ function qualifying(spec: RatingSpec, records: CallRecord[], cases: EvalCase[]):
 /** A chapter plan's cases where both chain arms have a usable sample-1 turn after their plan. */
 function qualifyingChains(spec: RatingSpec, records: CallRecord[], cases: EvalCase[]): EvalCase[] {
   const arms = spec.chainArms ?? [];
-  return cases.filter((c) => c.role === "thread" && arms.every((arm) => findOutput(records, spec.kind, { ...arm, sample: 1, caseId: c.id })));
+  return cases.filter(
+    (c) =>
+      c.role === "thread" &&
+      (!spec.chainCaseIds || spec.chainCaseIds.includes(c.id)) &&
+      arms.every((arm) => findOutput(records, spec.kind, { ...arm, sample: 1, caseId: c.id }))
+  );
 }
 
 /** The chain items: the reference chain and the candidate chain per case, the reference at A on every other item. */
@@ -455,7 +466,7 @@ export function planRatingSet(
     if (!draft.control && !draft.repeat && baselineAt >= 0) {
       labelDistribution[LABELS[baselineAt]] = (labelDistribution[LABELS[baselineAt]] ?? 0) + 1;
     }
-    return buildItem(spec.kind, id, keyItems[id], caseById, records, deps.loadOutput);
+    return buildItem(spec.kind, id, keyItems[id], caseById, records, deps.loadOutput, spec.frames);
   });
 
   const setId = `text-${spec.kind}`;
@@ -476,6 +487,7 @@ export function planRatingSet(
       labelDistribution,
       notes,
       ...(criteria ? { criteria } : {}),
+      ...(spec.frames ? { frames: spec.frames } : {}),
     },
   };
 }
@@ -508,18 +520,19 @@ function buildItem(
   keyItem: KeyItem,
   caseById: Map<string, EvalCase>,
   records: CallRecord[],
-  loadOutput: PlanDeps["loadOutput"]
+  loadOutput: PlanDeps["loadOutput"],
+  frames?: RatingKey["frames"]
 ): RatingItem {
   const evalCase = caseById.get(keyItem.caseId);
   if (!evalCase) throw new Error(`Unknown case ${keyItem.caseId}`);
   const chain = keyItem.reference !== undefined;
-  // The state the beat call saw: the frozen state with the fixed analysis (caseStory) and its chapter's frame; a chain
-  // item's context stops before the plan, which each option wrote itself
+  // The state the beat call saw: the frozen state with the fixed analysis (caseStory) and its chapter's frame (the
+  // nearer one on turns-r1b); a chain item's context stops before the plan, which each option wrote itself
   const context =
     kind === "turn" && evalCase.state
       ? chain
         ? turnContext(evalCase.state, undefined, { chainOpening: true })
-        : turnContext(evalCase.state, evalCase.fixedAnalysis, { frames: evalCase.chapterFrames })
+        : turnContext(evalCase.state, evalCase.fixedAnalysis, { frames: frames === "nearer" ? evalCase.nearerFrames : evalCase.chapterFrames })
       : [];
   return {
     id,
@@ -550,7 +563,7 @@ export function ratingSetFromKey(
 ): RatingSet {
   const kind: RatingKind = key.setId === "text-setup" ? "setup" : "turn";
   const caseById = new Map(cases.map((c) => [c.id, c]));
-  const items = Object.entries(key.items).map(([id, keyItem]) => buildItem(kind, id, keyItem, caseById, records, loadOutput));
+  const items = Object.entries(key.items).map(([id, keyItem]) => buildItem(kind, id, keyItem, caseById, records, loadOutput, key.frames));
   return pageSet(kind, key.mode ?? "ranked", key.setId, key.pageId, items, false, key.criteria);
 }
 

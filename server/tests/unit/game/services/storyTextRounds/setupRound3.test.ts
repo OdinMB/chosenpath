@@ -3,6 +3,7 @@ import { GameModes, type GameMode, type PlayerCount } from "core/types/index.js"
 import {
   ROUND1C_PARTS,
   ROUND3_PARTS,
+  ROUND3B_PARTS,
   THIS_SETUP_HEADING,
   WORKED_EXAMPLE_HEADING,
   iterationRequestFromRound1,
@@ -10,7 +11,10 @@ import {
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request } from "../../../../../src/game/services/storyTextRounds/setupRound2.js";
 import {
   CAMPS,
+  IDENTITY_CLAUSE,
+  IDENTITY_CLAUSE_OUTCOMES,
   KIDS_STATS,
+  KIDS_STATS_VARIED,
   ROUND3_TEXT,
   slateMilestones,
   storyLengthLine,
@@ -57,6 +61,52 @@ const block = (prompt: string) => {
   const start = prompt.indexOf(`${THIS_SETUP_HEADING}\n`) + THIS_SETUP_HEADING.length + 1;
   return prompt.slice(start, prompt.indexOf("\n\n", start));
 };
+
+describe("the setup retests (round 3b, the owner's feedback workflow of 2026-09-28)", () => {
+  const round3b = (players: PlayerCount, mode: GameMode, kind: "story" | "template" = "story", kids = false) =>
+    setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3B_PARTS, { kids });
+  const swapped = (text: string) =>
+    text
+      .replace(IDENTITY_CLAUSE_OUTCOMES.one, IDENTITY_CLAUSE.one)
+      .replace(IDENTITY_CLAUSE_OUTCOMES.more, IDENTITY_CLAUSE.more)
+      .replace(KIDS_STATS_VARIED, KIDS_STATS);
+
+  it("is round 3 with the retests on", () => {
+    expect(ROUND3B_PARTS).toEqual({ ...ROUND3_PARTS, round3b: true });
+  });
+
+  it("names premise-named players in outcomes only, and varies the kids examples, with Courage gone", () => {
+    expect(IDENTITY_CLAUSE_OUTCOMES.more).toContain("use those names in outcomes, and give each named seat");
+    expect(IDENTITY_CLAUSE_OUTCOMES.one).toContain("use that name in outcomes, and give the player");
+    expect(`${IDENTITY_CLAUSE_OUTCOMES.one}${IDENTITY_CLAUSE_OUTCOMES.more}`).not.toContain("and stats");
+    expect(KIDS_STATS_VARIED).not.toMatch(/Courage|Forest Friends/);
+    expect(KIDS_STATS_VARIED).toContain("from this story's own world");
+    const kids = round3b(2, GameModes.Cooperative, "story", true).prompt;
+    expect(occurrences(kids, KIDS_STATS_VARIED)).toBe(1);
+    expect(kids).not.toContain(KIDS_STATS);
+    for (const players of [1, 2, 3] as PlayerCount[]) {
+      const prompt = round3b(players, players === 1 ? GameModes.SinglePlayer : GameModes.Competitive).prompt;
+      expect(occurrences(prompt, IDENTITY_CLAUSE_OUTCOMES[players === 1 ? "one" : "more"])).toBe(1);
+    }
+  });
+
+  it.each(KIND_INPUTS)("%s, %i players, %s: round 3's request byte for byte apart from the two retested passages", (kind, players, mode) => {
+    for (const kids of [false, true]) {
+      const retest = round3b(players, mode, kind, kids);
+      const measured = setupRound2Request(PREMISE, players, mode, 25, kind, "generationOrder", ROUND3_PARTS, { kids });
+      expect(swapped(retest.prompt)).toBe(measured.prompt);
+      expect(JSON.stringify(json(retest.schema))).toBe(JSON.stringify(json(measured.schema)));
+    }
+  });
+
+  it("changes AI Iteration the same way", () => {
+    for (const sections of SECTION_SETS) {
+      const retest = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3B_PARTS);
+      const measured = iterationRound2Request(FEEDBACK, 2, GameModes.Competitive, 25, sections, TEMPLATE, ROUND3_PARTS);
+      expect(swapped(retest.prompt)).toBe(measured.prompt);
+    }
+  });
+});
 
 describe("round 3 builds on round 2b's arm B", () => {
   it("is round 1c's parts with round 3's changes on", () => {

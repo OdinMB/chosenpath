@@ -1,5 +1,5 @@
 import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
-import { chainKey, chainSides, referenceKey, secondReferenceKeys } from "./arms.js";
+import { chainKey, chainSides, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
 import { RATIOS } from "./checkBaselines.js";
 import { finishesJob, type CallRecord } from "./runner.js";
@@ -41,6 +41,13 @@ export type ShareReading = { name: string; reference: number; arm: number; noise
  */
 export type StoredReference = (record: CallRecord) => boolean;
 
+/**
+ * Whether a stand-in arm's record (standInKey) may be read as the reference
+ * arm's: the request today's code builds for its case on the reference arm's
+ * variant is the record's, prompt and schema (run.ts builds it from jobPlan.ts).
+ */
+export type SameRequest = (record: CallRecord, referenceArmKey: string) => boolean;
+
 export type VariantComparison = {
   group: CallRecord["group"];
   armKey: string;
@@ -49,6 +56,8 @@ export type VariantComparison = {
   referenceState?: string;
   /** A second reference the round reads beside the arm's own (secondReferenceKeys) */
   secondReference?: true;
+  /** Another arm's records read as the reference's where its request is the reference's byte for byte (standInKey) */
+  standIns?: { armKey: string; records: number };
   /** (case, sample) pairs both arms finished; both sides are read on these only */
   pairs: number;
   arm: ArmStats;
@@ -209,7 +218,8 @@ export function variantComparisons(
   checks: Map<string, CheckResult>,
   tags: Map<string, CaseTags>,
   promptState: string,
-  storedReference?: StoredReference
+  storedReference?: StoredReference,
+  sameRequest?: SameRequest
 ): VariantComparison[] {
   const byArm = new Map<string, CallRecord[]>();
   for (const r of records) {
@@ -217,6 +227,24 @@ export function variantComparisons(
     const key = `${r.group}|${r.armKey}`;
     byArm.set(key, [...(byArm.get(key) ?? []), r]);
   }
+  /**
+   * The reference's records in this state with its stand-in's (standInKey)
+   * on the pairs it has none of, where the stand-in's request is its own byte
+   * for byte, read as the reference's.
+   */
+  const withStandIns = (group: string, key: string, armRecords: CallRecord[]): { records?: CallRecord[]; standIns?: VariantComparison["standIns"] } => {
+    const own = byArm.get(`${group}|${key}`) ?? [];
+    const standIn = standInKey(key);
+    const covered = finishedPairs(own);
+    const wanted = finishedPairs(armRecords);
+    // Only on the arm's own pairs, so the count says how many of the reference's pairs are stand-ins
+    const borrowed =
+      standIn && sameRequest
+        ? (byArm.get(`${group}|${standIn}`) ?? []).filter((r) => wanted.has(pairOf(r)) && !covered.has(pairOf(r)) && sameRequest(r, key)).map((r) => ({ ...r, armKey: key }))
+        : [];
+    const all = [...own, ...borrowed];
+    return { records: all.length ? all : undefined, ...(standIn && borrowed.length ? { standIns: { armKey: standIn, records: borrowed.length } } : {}) };
+  };
   const comparisons: VariantComparison[] = [];
   for (const armRecords of byArm.values()) {
     const { group, armKey, baseline } = armRecords[0];
@@ -224,7 +252,7 @@ export function variantComparisons(
     const own = referenceKeyOf(armKey);
     const keys = [...(own ? [{ key: own, second: false }] : []), ...secondReferenceKeys(armKey).map((key) => ({ key, second: true }))];
     for (const { key, second } of keys) {
-      const sameState = byArm.get(`${group}|${key}`);
+      const { records: sameState, standIns } = withStandIns(group, key, armRecords);
       const candidate = storedReference ? storedReferenceRecords(records, tags, armRecords, key, storedReference) : undefined;
       const stored = candidate && (!sameState || coverage(armRecords, candidate) > coverage(armRecords, sameState)) ? candidate : undefined;
       const referenceRecords = stored ?? sameState;
@@ -232,7 +260,7 @@ export function variantComparisons(
       if (!comparison) continue;
       comparisons.push({
         ...comparison,
-        ...(stored ? { referenceState: stored[0].promptState } : {}),
+        ...(stored ? { referenceState: stored[0].promptState } : standIns ? { standIns } : {}),
         ...(second ? { secondReference: true as const } : {}),
       });
     }

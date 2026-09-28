@@ -11,8 +11,10 @@ import {
   chapterKeyOf,
   collectChapters,
   framesFromReply,
+  nearerBackfillRequest,
   stateAtChapterStart,
   withChapterFrames,
+  withNearerFrames,
   type ChapterFramesFile,
 } from "../../../../src/evals/textModelEval/chapterFrames.js";
 import { caseStory, type EvalCase } from "../../../../src/evals/textModelEval/cases.js";
@@ -208,5 +210,77 @@ describe("the backfilled frames", () => {
     expect(nearer.map((r) => r.checks)).toEqual([{ questionNearerThanOutcome: true, milestoneKindConcrete: true }]);
     // A chapter without a frame reads on its kind of milestone only
     expect(chapterFrameChecks([step]).map((r) => r.checks)).toEqual([{ milestoneKindConcrete: false }]);
+  });
+});
+
+describe("the nearer frames (the owner's feedback of 2026-09-28)", () => {
+  const { state, phase } = secondChapter(1);
+  const step = evalCase("cont-step-t5", "beat", { state });
+  const reply = {
+    chapters: [{ id: "second_chapter", question: " Will the crew get the ledger out of the vault before the guards change? ", typeOfMilestone: " whether the ledger names the banker ", plan: "The crew stays in the vault." }],
+  };
+  let chapters: ReturnType<typeof collectChapters>;
+  beforeEach(() => {
+    chapters = collectChapters([step]);
+  });
+
+  it("asks for planner v2c's nearer question, its kind of milestone and the plan, on the same view, without the stored kind", () => {
+    const { prompt, schema } = nearerBackfillRequest(chapters[0]);
+    const planner = threadStep.request(chapters[0].story).prompt;
+    expect(prompt.endsWith(planner.split(STATE_MARKER)[1])).toBe(true);
+    expect(prompt).toContain("nearer than its outcome's");
+    expect(prompt).toContain("never the outcome's question reworded");
+    expect(prompt).toContain("After a topic switch: the chosen direction, narrowed to a question about this chapter's own situation, even where the direction restates its outcome.");
+    expect(prompt).toContain("- typeOfMilestone: The kind of milestone this chapter adds to its outcome: the concrete thing its answer settles");
+    expect(prompt).not.toContain("asked as a question");
+    // The stored, generic kind of milestone is what the new one replaces, so it is not shown
+    expect(prompt).not.toContain("Kind of milestone:");
+    expect(prompt).toContain("Steps (3):");
+    expect(schema.safeParse({ chapters: [{ id: "second_chapter", question: "Q?", typeOfMilestone: "K", plan: "P." }] }).success).toBe(true);
+    expect(schema.safeParse({ chapters: [{ id: "second_chapter", question: "Q?", plan: "P." }] }).success).toBe(false);
+    // The first backfill's request stays as it ran
+    expect(backfillRequest(chapters[0]).prompt).toContain("asked as a question");
+    expect(backfillRequest(chapters[0]).prompt).toContain("Kind of milestone:");
+  });
+
+  it("keys its calls apart from the first backfill's, in the stage it is given", () => {
+    const [first] = backfillJobs(chapters, LUNA, "round0");
+    const [nearer] = backfillJobs(chapters, LUNA, "round0", { frames: "nearer", stage: "plan-refresh" });
+    expect(nearer).toMatchObject({ stage: "plan-refresh", caseId: `frame-nearer-${chapters[0].chapterKey}`, armKey: `backfill>${LUNA.key}` });
+    expect(keyOf(nearer)).not.toBe(keyOf(first));
+    expect(requestText(nearer.first.request())).toBe(nearerBackfillRequest(chapters[0]).prompt);
+    expect(first.stage).toBe("turn-rounds");
+  });
+
+  it("reads the kind of milestone beside the question and plan, and attaches the frames as nearerFrames beside the first ones", () => {
+    expect(framesFromReply(chapters[0], reply, "nearer")).toEqual({
+      frames: { second_chapter: { question: "Will the crew get the ledger out of the vault before the guards change?", typeOfMilestone: "whether the ledger names the banker", plan: "The crew stays in the vault." } },
+    });
+    // A blank kind keeps the frame (the check fails it), a blank question does not
+    expect(framesFromReply(chapters[0], { chapters: [{ ...reply.chapters[0], typeOfMilestone: " " }] }, "nearer").frames.second_chapter).toEqual({
+      question: "Will the crew get the ledger out of the vault before the guards change?",
+      plan: "The crew stays in the vault.",
+    });
+    expect(framesFromReply(chapters[0], { chapters: [{ ...reply.chapters[0], question: "" }] }, "nearer").problem).toContain("second_chapter");
+    const jobs = backfillJobs(chapters, LUNA, "round0", { frames: "nearer", stage: "plan-refresh" });
+    const file = chapterFramesFile(chapters, jobs, [record({ jobKey: keyOf(jobs[0]), stage: "plan-refresh" })], () => reply, new Date(), "nearer");
+    const [withBoth] = withNearerFrames(withChapterFrames([step], { generatedAt: "", missing: [], chapters: [{ ...file.chapters[0], frames: { second_chapter: { question: "Old?", plan: "Old." } } }] }), file);
+    expect(withBoth.chapterFrames?.second_chapter.question).toBe("Old?");
+    expect(withBoth.nearerFrames?.second_chapter).toEqual({ ...file.chapters[0].frames.second_chapter, chapterKey: chapters[0].chapterKey });
+    expect(withBoth.tags.chapterFrame).toBe("backfilled");
+    // chapterKeyOf is the same key the first frames use
+    expect(file.chapters[0].chapterKey).toBe(chapterKeyOf(state.id, phase));
+  });
+
+  it("reads the nearer frames on their own question and kind of milestone", () => {
+    const jobs = backfillJobs(chapters, LUNA, "round0", { frames: "nearer", stage: "plan-refresh" });
+    const framed = (typeOfMilestone: string, question = reply.chapters[0].question) =>
+      withNearerFrames([step], chapterFramesFile(chapters, jobs, [record({ jobKey: keyOf(jobs[0]) })], () => ({ chapters: [{ ...reply.chapters[0], typeOfMilestone, question }] }), new Date(), "nearer"));
+    expect(chapterFrameChecks(framed("whether the ledger names the banker"), "nearer").map((r) => r.checks)).toEqual([{ questionNearerThanOutcome: true, milestoneKindConcrete: true }]);
+    expect(chapterFrameChecks(framed("progress toward the heist"), "nearer").map((r) => r.checks)).toEqual([{ questionNearerThanOutcome: true, milestoneKindConcrete: false }]);
+    // A blank kind fails; the question of the outcome again fails
+    expect(chapterFrameChecks(framed(" ", "Question of outcome_1?"), "nearer").map((r) => r.checks)).toEqual([{ questionNearerThanOutcome: false, milestoneKindConcrete: false }]);
+    // A chapter with no nearer frame is not read on this set
+    expect(chapterFrameChecks([step], "nearer")).toEqual([]);
   });
 });

@@ -383,6 +383,9 @@ export function checkSetupDesign(output: unknown, input: SetupInput, exampleText
     checks.noCoopScore = stats.every((s) => !SCORE.test(s.name) && !SCORE.test(s.tooltip)) && !perSeatCounters(sharedStats, everyName);
   }
   checks.noSlotNames = stats.every((s) => [s.name, s.possibleValues, s.tooltip].every((text) => !SEAT.test(text) && !mentionsIdentity(text, names)));
+  // The setup retests (2026-09-28): no player stat named after a player character, premise-named ones included (round 3's
+  // identity clause, "use those names in outcomes and stats", gave Casablanca one set of player stats per named player)
+  checks.noPlayerNamedStats = stats.filter((s) => !s.shared).every((s) => !SEAT.test(s.name) && !mentionsIdentity(s.name, everyName));
   // Setup round 3 (owner, 2026-09-28): contests have two sides in every player count, so three players form two camps,
   // each contest with an opposites scoreboard; no race written as three paths, no lead string
   if (input.playerCount === 3 && contestMode) {

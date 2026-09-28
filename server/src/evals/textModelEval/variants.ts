@@ -23,6 +23,7 @@ import {
   ROUND1B_PARTS,
   ROUND1C_PARTS,
   ROUND3_PARTS,
+  ROUND3B_PARTS,
   iterationRequestFromRound1,
   iterationRound1Request,
   setupRequestFromRound1,
@@ -160,7 +161,9 @@ export type VariantId =
   | "setupR3"
   | "planV2b"
   | "turnB6"
-  | "planV2c";
+  | "planV2c"
+  | "chapterFullB"
+  | "setupR3b";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -193,6 +196,8 @@ export const VARIANTS: VariantId[] = [
   "planV2b",
   "turnB6",
   "planV2c",
+  "chapterFullB",
+  "setupR3b",
 ];
 
 /**
@@ -278,8 +283,11 @@ export type IterationInput = {
 
 export type RequestInput =
   | { role: "setup"; setup: SetupInput }
-  /** A beat case may carry its stored chapter's backfilled question and plan (chapterFrames.ts); only turn round 1's chapter turns read them */
-  | { role: "beat" | "switch" | "thread"; story: Story; chapterFrames?: ChapterFrameText }
+  /**
+   * A beat case may carry its stored chapter's backfilled question and plan (chapterFrames.ts), which only turn round
+   * 1's chapter turns read, and its nearer frame (the plan refresh of 2026-09-28), which only chapterFullB reads
+   */
+  | { role: "beat" | "switch" | "thread"; story: Story; chapterFrames?: ChapterFrameText; nearerFrames?: ChapterFrameText }
   | { role: "iteration"; iteration: IterationInput };
 
 /** Today's form at the round0 prompt state (storyTextRound0/): what every stored "prod" record sent. */
@@ -420,11 +428,15 @@ function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQu
   };
 }
 
-/** Turn round 1's chapter turns on the full or the slim reply: chapter steps only. */
-function chapterTurn(variant: VariantId, form: ChapterTurnForm) {
+/**
+ * Turn round 1's chapter turns on the full or the slim reply: chapter steps
+ * only. The reruns' framed turn (chapterFullB) is the full form without the
+ * chapter rules, on the chapter's nearer frame.
+ */
+function chapterTurn(variant: VariantId, form: ChapterTurnForm, reruns = false) {
   return (input: RequestInput): Round2Request => {
     if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
-    return chapterTurnRequest(input.story, form, input.chapterFrames);
+    return reruns ? chapterTurnRequest(input.story, form, input.nearerFrames, { chapterRules: false }) : chapterTurnRequest(input.story, form, input.chapterFrames);
   };
 }
 
@@ -459,6 +471,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   chapterFull: chapterTurn("chapterFull", "full"),
   chapterSlim: chapterTurn("chapterSlim", "slim"),
   chapterSlimPlans: chapterTurn("chapterSlimPlans", "slimPlans"),
+  chapterFullB: chapterTurn("chapterFullB", "full", true),
   // The smoke's draft: today's builder, whose first-turn text changed after the smoke; its records stay as the smoke's
   turnR2: roundTwoTurn("turnR2", "round2"),
   turnR2b: roundTwoTurn("turnR2b", "round2"),
@@ -469,6 +482,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
     return turnRound3FormRequest(input.story);
   },
   setupR3: setupRound2("setupR3", "generationOrder", ROUND3_PARTS),
+  setupR3b: setupRound2("setupR3b", "generationOrder", ROUND3B_PARTS),
   planV2b: plannerV2("planV2b", false, true),
   planV2c: plannerV2("planV2c", false, true, true),
   turnB6: (input) => {

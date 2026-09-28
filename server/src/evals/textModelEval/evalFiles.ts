@@ -3,7 +3,7 @@ import path from "path";
 import type { BudgetOverride } from "./budget.js";
 import type { BuildReport } from "./caseBuilder.js";
 import type { EvalCase } from "./cases.js";
-import { withChapterFrames, type ChapterFramesFile } from "./chapterFrames.js";
+import { withChapterFrames, withNearerFrames, type ChapterFramesFile, type FrameSet } from "./chapterFrames.js";
 import type { RoundBuildReport } from "./roundCases.js";
 import type { FilterRecord } from "./filterCheck.js";
 import type { ProbeReport } from "./probe.js";
@@ -34,6 +34,12 @@ import type { CallRecord } from "./runner.js";
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  */
 
+/** Each frame set's file: the first backfill's, and the nearer backfill's (the owner's feedback of 2026-09-28). */
+export const FRAME_FILES: Record<FrameSet, string> = { backfilled: "chapter-frames.json", nearer: "chapter-frames-nearer.json" };
+
+/** judged-turns.md and .json per frame set: the reruns judge on the nearer frames beside the rounds' file. */
+export const JUDGED_FILES: Record<FrameSet, string> = { backfilled: "judged-turns", nearer: "judged-turns-nearer" };
+
 function readJsonl<T>(file: string): T[] {
   if (!fs.existsSync(file)) return [];
   return fs
@@ -63,12 +69,19 @@ export function evalFiles(outDir: string) {
       fs.appendFileSync(at("budget-overrides.jsonl"), `${JSON.stringify(override)}\n`);
     },
     casesExist: () => fs.existsSync(at("cases", "cases.json")),
-    /** The frozen cases, each carrying its chapter's backfilled frame once chapter-frames.json exists */
+    /**
+     * The frozen cases, each carrying its chapter's backfilled frame once
+     * chapter-frames.json exists, and its nearer frame once
+     * chapter-frames-nearer.json does
+     */
     readCases: (): EvalCase[] => {
       const index = JSON.parse(fs.readFileSync(at("cases", "cases.json"), "utf-8")) as { id: string }[];
       const cases = index.map((entry) => JSON.parse(fs.readFileSync(at("cases", `${entry.id}.json`), "utf-8")) as EvalCase);
-      const frames = at("chapter-frames.json");
-      return fs.existsSync(frames) ? withChapterFrames(cases, JSON.parse(fs.readFileSync(frames, "utf-8")) as ChapterFramesFile) : cases;
+      const read = (file: string) => (fs.existsSync(at(file)) ? (JSON.parse(fs.readFileSync(at(file), "utf-8")) as ChapterFramesFile) : undefined);
+      const first = read(FRAME_FILES.backfilled);
+      const nearer = read(FRAME_FILES.nearer);
+      const framed = first ? withChapterFrames(cases, first) : cases;
+      return nearer ? withNearerFrames(framed, nearer) : framed;
     },
     writeCases: (cases: EvalCase[], report: BuildReport) => {
       for (const evalCase of cases) writeJson(at("cases", `${evalCase.id}.json`), evalCase);
@@ -97,15 +110,15 @@ export function evalFiles(outDir: string) {
       fs.mkdirSync(outDir, { recursive: true });
       fs.appendFileSync(at("prep-calls.jsonl"), `${JSON.stringify(record)}\n`);
     },
-    writeChapterFrames: (file: ChapterFramesFile) => writeJson(at("chapter-frames.json"), file),
+    writeChapterFrames: (file: ChapterFramesFile, set: FrameSet = "backfilled") => writeJson(at(FRAME_FILES[set]), file),
     writeJudgeCalibration: (markdown: string, json: unknown) => {
       writeJson(at("judge-calibration.json"), json);
       fs.writeFileSync(at("judge-calibration.md"), markdown);
     },
-    /** The judged checks on a round's turns (--judge-records) */
-    writeJudgedTurns: (markdown: string, json: unknown) => {
-      writeJson(at("judged-turns.json"), json);
-      fs.writeFileSync(at("judged-turns.md"), markdown);
+    /** The judged checks on a round's turns (--judge-records), on the first frames or (the reruns) the nearer ones */
+    writeJudgedTurns: (markdown: string, json: unknown, set: FrameSet = "backfilled") => {
+      writeJson(at(`${JUDGED_FILES[set]}.json`), json);
+      fs.writeFileSync(at(`${JUDGED_FILES[set]}.md`), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {
@@ -142,10 +155,17 @@ export function evalFiles(outDir: string) {
       return path.join(dir, fileName);
     },
     writeKey: (key: RatingKey) => writeJson(at("keys", key.keyFile), key),
+    /**
+     * A page's answer key: in keys/, else in keys/superseded/, where a
+     * replaced page's key goes, so an export from a superseded page still
+     * scores (turns-r1.html, replaced by turns-r1b.html on 2026-09-28)
+     */
     readKey: (pageId: string): RatingKey | undefined => {
-      const dir = at("keys");
-      const file = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.endsWith(`-${pageId}.json`)) : undefined;
-      return file ? (JSON.parse(fs.readFileSync(path.join(dir, file), "utf-8")) as RatingKey) : undefined;
+      for (const dir of [at("keys"), at("keys", "superseded")]) {
+        const file = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.endsWith(`-${pageId}.json`)) : undefined;
+        if (file) return JSON.parse(fs.readFileSync(path.join(dir, file), "utf-8")) as RatingKey;
+      }
+      return undefined;
     },
     writeScores: (name: string, markdown: string, json: unknown) => {
       writeJson(at("scores", `${name}.json`), json);

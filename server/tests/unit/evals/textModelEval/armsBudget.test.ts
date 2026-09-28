@@ -12,8 +12,11 @@ import {
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
   secondReferenceKeys,
+  SETUP_RETEST_PREMISES,
+  SETUP_SANITY_PREMISES,
   STAGES,
   stageRunsBaseline,
+  standInKey,
 } from "../../../../src/evals/textModelEval/arms.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import {
@@ -357,6 +360,22 @@ describe("budget caps", () => {
     const { caps } = resolveCaps({});
     expect(budgetCheck(caps, spend, 0, "setup-rounds", 0.1)).toMatchObject({ ok: false, reason: expect.stringMatching(/Stage setup-rounds cap \$3\.00/) });
     expect(budgetCheck(caps, spend, 0, "turn-rounds", 0.1)).toEqual({ ok: true });
+  });
+
+  it("reads the reruns' framed turn against today's form and round 1's framed turn, and the setup retests against the adopted form and today's prompt", () => {
+    expect(referenceKey("gpt-6-luna@medium/chapterFullB")).toBe("gpt-6-luna@medium/prod");
+    expect(secondReferenceKeys("gpt-6-luna@medium/chapterFullB")).toEqual(["gpt-6-luna@medium/chapterFull"]);
+    expect(referenceKey("gpt-6-luna@low/setupR3b")).toBe("gpt-6-luna@low/setupR3");
+    expect(secondReferenceKeys("gpt-6-luna@low/setupR3b")).toEqual(["gpt-6-luna@low/prod"]);
+    // Planner v2's records stand in for planner v2b's, and nothing else stands in
+    expect(standInKey("gpt-6-luna@low/planV2b")).toBe("gpt-6-luna@low/planV2");
+    expect(standInKey("gpt-6-luna@low/planV2c")).toBeUndefined();
+  });
+
+  it("splits the eighteen setup premises between the retests and their sanity pass", () => {
+    expect([...SETUP_RETEST_PREMISES, ...SETUP_SANITY_PREMISES].sort()).toEqual(SETUP_PREMISES.map((p) => p.id).sort());
+    // The retests are the premises that name the player characters, and the two read with a child
+    expect(SETUP_PREMISES.filter((p) => p.tags.kids).map((p) => p.id).every((id) => SETUP_RETEST_PREMISES.includes(id))).toBe(true);
   });
 
   it("runs no baseline in the round and migration stages, and in every older stage", () => {

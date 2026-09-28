@@ -166,8 +166,8 @@ type View = {
   holdsOutcomes: boolean;
   /** An analysis ran for this turn: the case's fixed analysis */
   planned: boolean;
-  /** A stored chapter's backfilled question and plan, per thread id */
-  frames?: Record<string, { question: string; plan: string }>;
+  /** A stored chapter's backfilled question and plan, per thread id; a nearer frame carries its own kind of milestone */
+  frames?: Record<string, { question: string; plan: string; typeOfMilestone?: string }>;
   /** A chapter opening whose plan each option wrote itself (a chain item): the context stops at the switch */
   chainOpening?: boolean;
 };
@@ -342,12 +342,16 @@ function stepLine(step: unknown, index: number, current: number | undefined): Co
   return index === current ? { ...base, marks: ["current"], sub: resultLines(resolutions) } : base;
 }
 
-/** A chapter's question and plan: its own (a round's planner writes them), else its backfilled frame. */
-function frameOf(view: View, thread: unknown): { question: string; plan: string } {
-  const own = { question: text(field(thread, "question")), plan: text(field(thread, "plan")) };
+/**
+ * A chapter's question, plan and kind of milestone: its own (a round's planner
+ * writes them), else its backfilled frame, whose kind of milestone (a nearer
+ * frame's) replaces the stored one where it has one.
+ */
+function frameOf(view: View, thread: unknown): { question: string; plan: string; kind: unknown } {
+  const own = { question: text(field(thread, "question")), plan: text(field(thread, "plan")), kind: field(thread, "typeOfMilestone") };
   if (own.question) return own;
   const frame = view.frames?.[text(field(thread, "id"))];
-  return { question: frame?.question ?? "", plan: frame?.plan ?? "" };
+  return { question: frame?.question ?? "", plan: frame?.plan ?? "", kind: frame?.typeOfMilestone || field(thread, "typeOfMilestone") };
 }
 
 /**
@@ -360,7 +364,7 @@ function threadChapter(view: View, thread: unknown, duration: number | undefined
   const contest = list(field(thread, "playersSideB")).length > 0;
   const current = view.beatType === "thread" ? stepsDone(thread) : undefined;
   const results = resultLines(field(thread, "possibleMilestones"));
-  const frame = blind ? { question: "", plan: "" } : frameOf(view, thread);
+  const frame = blind ? { question: "", plan: "", kind: undefined } : frameOf(view, thread);
   return {
     label: L.chapterLine,
     text: text(field(thread, "title")),
@@ -370,7 +374,7 @@ function threadChapter(view: View, thread: unknown, duration: number | undefined
         ? [line(L.sideA, playerNames(view, field(thread, "playersSideA"))), line(L.sideB, playerNames(view, field(thread, "playersSideB")))]
         : [view.multiplayer ? line(L.players, playerNames(view, field(thread, "playersSideA"))) : undefined]),
       advancesLine(view, text(field(thread, "outcomeId")), true),
-      blind ? undefined : line(L.kindOfMilestone, field(thread, "typeOfMilestone")),
+      blind ? undefined : line(L.kindOfMilestone, frame.kind),
       line(L.chapterQuestion, frame.question),
       line(L.chapterPlan, frame.plan),
       duration === undefined ? undefined : { label: L.length, text: `${duration} ${L.turns}` },

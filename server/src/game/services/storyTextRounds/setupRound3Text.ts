@@ -163,6 +163,26 @@ export const IDENTITY_CLAUSE: Record<"one" | "more", string> = {
   more: "- When the premise gives the player characters names (not only roles), use those names in outcomes and stats, and give each named seat three identities that keep its name and vary in appearance and details. Otherwise a seat's three identities have three different names.",
 };
 
+// ---------------------------------------------------------------- the retests (round 3b, 2026-09-28)
+
+/**
+ * The owner's feedback workflow's setup retests (round 3b): the identity
+ * clause names premise-named players in outcomes only (round 3's "in outcomes
+ * and stats" gave the Casablanca premise one set of player stats per named
+ * player in both samples, against round 1c's "every player gets every player
+ * stat"), and the kids stat examples no longer lead with Courage, which named a
+ * stat in all four kids setups.
+ */
+export const IDENTITY_CLAUSE_OUTCOMES: Record<"one" | "more", string> = {
+  one: IDENTITY_CLAUSE.one.replace("use that name in outcomes and stats,", "use that name in outcomes,"),
+  more: IDENTITY_CLAUSE.more.replace("use those names in outcomes and stats,", "use those names in outcomes,"),
+};
+
+export const KIDS_STATS_VARIED = KIDS_STATS.replace(
+  "Name each in one or two everyday words a young reader knows (for example Courage, Snacks, Forest Friends),",
+  "Name each in one or two everyday words a young reader knows, taken from this story's own world (a picnic story might count Snacks, a pirate story Gold Coins),"
+);
+
 // ---------------------------------------------------------------- no "energy" in the field examples
 
 /** Round 1's field examples and production's stat fields, each swap exactly once. */

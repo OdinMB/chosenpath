@@ -54,8 +54,12 @@ export type CaseTags = {
   chapterFrame?: "backfilled" | "fallback";
 };
 
-/** A chapter's question and plan (turn doc A3), backfilled for a stored chapter plan (chapterFrames.ts). */
-export type ChapterFrame = { question: string; plan: string; chapterKey: string };
+/**
+ * A chapter's question and plan (turn doc A3), backfilled for a stored chapter
+ * plan (chapterFrames.ts); the nearer frames (the owner's feedback of
+ * 2026-09-28) carry their own kind of milestone too.
+ */
+export type ChapterFrame = { question: string; plan: string; chapterKey: string; typeOfMilestone?: string };
 
 export type FixedAnalysis =
   | { kind: "switch"; phase: SwitchAnalysis }
@@ -80,6 +84,12 @@ export type EvalCase = {
    * production request reads it.
    */
   chapterFrames?: Record<string, ChapterFrame>;
+  /**
+   * The same chapter re-framed with planner v2c's nearer question and its own
+   * kind of milestone (chapter-frames-nearer.json, the owner's feedback of
+   * 2026-09-28); only the reruns' framed turn, its judge and its page read it.
+   */
+  nearerFrames?: Record<string, ChapterFrame>;
 };
 
 export type Snapshot = {

@@ -158,6 +158,17 @@ describe("checkBaselines: the stored chapters' backfilled frames", () => {
     expect(md).toContain("| milestoneKindConcrete | 1 of 3 |");
     expect(renderCheckBaselines(checkBaselines(input()))).toContain("No stored chapter was read");
   });
+
+  it("reads the nearer frames (the plan refresh of 2026-09-28) in a section of their own, beside the first frames", () => {
+    const nearer = [{ chapterKey: "a", storyId: "s", threadId: "t1", checks: { questionNearerThanOutcome: true, milestoneKindConcrete: true } }];
+    const report = checkBaselines(input({ nearerFrames: nearer }));
+    expect(report.nearerFrames).toEqual({ chapters: 1, checks: { questionNearerThanOutcome: { pass: 1, n: 1 }, milestoneKindConcrete: { pass: 1, n: 1 } } });
+    const md = renderCheckBaselines(report);
+    expect(md).toContain("## Stored chapters: the nearer frames' question and kind of milestone");
+    expect(md).toContain("| questionNearerThanOutcome | 1 of 1 |");
+    // Without nearer frames the section says so
+    expect(renderCheckBaselines(checkBaselines(input()))).toContain("No nearer frame was read");
+  });
 });
 
 describe("checkBaselines: stored references against today's prompts", () => {

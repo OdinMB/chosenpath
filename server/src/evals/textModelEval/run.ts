@@ -15,7 +15,7 @@ import { htmlLeaks, metadataLeaks } from "./blinding.js";
 import { budgetCheck, resolveCaps, spentByStage, type Caps, type LedgerStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
 import { caseStory, loadStoredSnapshots, type EvalCase } from "./cases.js";
-import { chapterFrameChecks } from "./chapterFrames.js";
+import { chapterFrameChecks, type FrameSet } from "./chapterFrames.js";
 import { checkBaselines, renderCheckBaselines, type BaselineReport } from "./checkBaselines.js";
 import { localCases, printDryRun, type LocalCaseSources } from "./dryRun.js";
 import { evalFiles, type EvalFiles } from "./evalFiles.js";
@@ -31,7 +31,7 @@ import {
   runFilterCheck,
   scoreFilterCheck,
 } from "./filterCheck.js";
-import { jobEstimateUsd, planJobs, rebuiltToday, requestJob, todaysRequestHash, type PlanOptions } from "./jobPlan.js";
+import { jobEstimateUsd, planJobs, rebuiltToday, requestJob, sameRequestAs, todaysRequestHash, type PlanOptions } from "./jobPlan.js";
 import { checksForRecords } from "./outputChecks.js";
 import { prepSpend } from "./prepCalls.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
@@ -69,7 +69,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     --pairwise: exactly two arms, the reference then the candidate, Which is better? per item;
  *     --chain-arms <ref chain>,<candidate chain> [--chain-items 4]: on a pairwise turn page, chapter openings
  *     too, each option the chain's first turn with its own plan;
- *     --no-repeat: leaves the repeated item out; --criteria turn-round2: a pairwise turn page with turn round 2's questions)
+ *     --no-repeat: leaves the repeated item out; --criteria turn-round2: a pairwise turn page with turn round 2's questions;
+ *     --chain-cases a,b: the chapter openings from those cases only; --frames nearer: the contexts show the nearer
+ *     chapter frames, recorded in the key)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
  *   --results                     rewrites results.md from the stored records (after a reading changed); no API calls
@@ -82,11 +84,14 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   The turn rounds' preparation (turnPrep.ts), in the turn-rounds stage:
  *   --build-round-cases [--rebuild-cases] [--max-spend 0.10]  the cases play never produced (roundCases.ts),
  *     frozen beside the others; the few missing turns and plans come from production's GPT-6 defaults
- *   --backfill-chapters [--max-spend 0.10]  a chapter question and plan per stored chapter (chapterFrames.ts)
+ *   --backfill-chapters [--max-spend 0.10]  a chapter question and plan per stored chapter (chapterFrames.ts);
+ *     --frames nearer --stage plan-refresh: the nearer frames (planner v2c's question and kind of milestone,
+ *     chapter-frames-nearer.json); --cases limits a run to the chapters those cases read (a smoke)
  *   --judge-calibration [--arms gpt-6-luna@low] [--samples 2] [--max-spend 0.10]  the judged checks on the
  *     hand-read turns (judgedChecks.ts)
  *   --judge-records --arms <beat or chain keys> --prompt-state <tag> [--samples 1] [--max-spend 0.10]  the judged
- *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json
+ *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json;
+ *     --frames nearer --stage reruns: on the nearer frames, judged-turns-nearer.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -168,6 +173,10 @@ type Args = {
   reportOnly: boolean;
   /** --setup-chain --merge <file>: add another chain file's runs */
   mergeFile?: string;
+  /** --frames nearer: the nearer chapter frames (the owner's feedback of 2026-09-28) for the backfill, the judge and a turn page */
+  frames?: FrameSet;
+  /** --chain-cases: the chapter-opening items' cases on a pairwise turn page (turns-r1b: the old page's four) */
+  chainCaseIds?: string[];
 };
 
 class UsageError extends Error {}
@@ -349,6 +358,15 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--merge":
         args.mergeFile = path.resolve(next() ?? "");
+        break;
+      case "--frames": {
+        const value = next();
+        if (value !== "backfilled" && value !== "nearer") throw new UsageError("--frames is backfilled or nearer");
+        args.frames = value;
+        break;
+      }
+      case "--chain-cases":
+        args.chainCaseIds = (next() ?? "").split(",").filter(Boolean);
         break;
       default:
         throw new UsageError(`Unknown argument: ${arg}`);
@@ -605,6 +623,7 @@ function writeResults(files: EvalFiles, caps: Caps, cases: EvalCase[]) {
       sideSpend: prepSpend(files.readPrepRecords()),
       prose,
       storedReference: rebuiltToday(cases),
+      sameRequest: sameRequestAs(cases),
       turnKinds: new Map(cases.flatMap((c) => {
         const kind = turnKindOf(c);
         return kind ? [[c.id, kind] as const] : [];
@@ -707,7 +726,9 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
       pairwise: args.pairwise,
       repeat: args.repeat,
       ...(chainArms ? { chainArms, chainItems: args.chainItems ?? DEFAULT_CHAIN_ITEMS } : {}),
+      ...(args.chainCaseIds?.length ? { chainCaseIds: args.chainCaseIds } : {}),
       ...(args.criteria ? { criteria: args.criteria } : {}),
+      ...(args.frames === "nearer" ? { frames: "nearer" as const } : {}),
     },
     records,
     cases,
@@ -795,6 +816,7 @@ function checkBaselinesMode(args: Args, files: EvalFiles) {
     todaysPromptHash: (evalCase) => todaysRequestHash(evalCase),
     readouts: readoutSamples(records, cases, files),
     frames: chapterFrameChecks(cases),
+    nearerFrames: chapterFrameChecks(cases, "nearer"),
     generatedAt: new Date(),
   });
   files.writeCheckBaselines(renderCheckBaselines(report), report);
@@ -840,11 +862,16 @@ async function main() {
     case "build-round-cases":
       return buildRoundCasesMode(prepContext(args, files), args.rebuildCases);
     case "backfill-chapters":
-      return backfillChaptersMode(prepContext(args, files));
+      // --stage routes the calls to a feedback run's own stage (the nearer backfill: plan-refresh); --cases runs a smoke
+      return backfillChaptersMode(prepContext(args, files, args.stage), { frames: args.frames, stage: args.stage, caseIds: args.caseIds });
     case "judge-calibration":
       return judgeCalibrationMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_JUDGE_SAMPLES);
     case "judge-records":
-      return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE, args.caseIds);
+      return judgeRecordsMode(prepContext(args, files, args.stage), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE, {
+        caseIds: args.caseIds,
+        frames: args.frames,
+        stage: args.stage,
+      });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":
