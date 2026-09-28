@@ -12,6 +12,7 @@
 import type { Story } from "core/models/Story.js";
 import type { GameMode } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
+import { StoryStatePromptService } from "../../src/game/services/prompts/StoryStatePromptService.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -64,4 +65,26 @@ export function isScoreboardEnding(story: Story): boolean {
 /** The measured turn prompt as production sends it: the rule on a contest's ending. */
 export function adoptedTurnPrompt(measured: string, contestEnding: boolean): string {
   return contestEnding ? measured.replace(SHARED_OUTCOMES_LINE, `${SHARED_OUTCOMES_LINE}${SCOREBOARD_ENDING_RULE}`) : measured;
+}
+
+/** The chapter rules as the measured switch turn printed them: the story's thread types and switch/thread instructions. */
+export const CHAPTER_RULES_HEADING = "SPECIAL SWITCH/THREAD INSTRUCTIONS:";
+
+/**
+ * Turns (the owner's feedback of 2026-09-28): the chapter rules are for the
+ * planners only. The switch turn was the one turn that carried them, as its
+ * prompt's last section; production's switch turn ends before it. The
+ * after-chapter stat changes it applies are each stat's own "Adjustments
+ * after threads", which the switch turn still reads. Unmeasured, as decided.
+ */
+export function withoutChapterRules(measured: string, story: Story): string {
+  if (story.getCurrentBeatType() !== "switch") return measured;
+  const tail = `\n${StoryStatePromptService.createStoryStatePrompt(story, { switchAndThreadInstructions: true })}`;
+  if (!measured.endsWith(tail)) throw new Error("The measured switch turn no longer ends with its chapter rules");
+  return measured.slice(0, -tail.length);
+}
+
+/** Every turn delta: the scoreboard rule on a scored contest's ending, and no chapter rules on a switch turn. */
+export function adoptedTurn(measured: string, story: Story): string {
+  return withoutChapterRules(adoptedTurnPrompt(measured, isScoreboardEnding(story)), story);
 }

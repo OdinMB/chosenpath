@@ -59,8 +59,8 @@ export class BeatPromptService {
   private static getSectionsForContext(story: Story): SectionConfig {
     return {
       switchConfiguration: story.getCurrentBeatType() === "switch",
-      // switch and thread instructions can include instructions for stat changes after threads
-      switchAndThreadInstructions: story.getCurrentBeatType() === "switch",
+      // No turn reads the story's switch/thread instructions (the owner's feedback of 2026-09-28): they are the
+      // planners' rules; the switch turn applies each stat's own "Adjustments after threads" instead
       // thread configuration for thread beats
       threadConfigurationForThreadBeats:
         story.getCurrentBeatType() === "thread",

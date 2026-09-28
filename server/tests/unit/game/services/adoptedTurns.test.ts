@@ -4,15 +4,22 @@ import path from "node:path";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import { GameModes, type GameMode, type ThreadAnalysis } from "core/types/index.js";
-import { beatStep } from "../../../../src/game/services/storyTextSteps.js";
+import { beatStep, switchStep, threadStep } from "../../../../src/game/services/storyTextSteps.js";
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { round0BeatStep } from "../../../../src/game/services/storyTextRound0/round0Steps.js";
 import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
-import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
+import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { stat, threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
-import { SCOREBOARD_ENDING_RULE, SHARED_OUTCOMES_LINE, adoptedTurnPrompt, isScoreboardEnding } from "../../../helpers/adoptedDeltas.js";
+import {
+  CHAPTER_RULES_HEADING,
+  SCOREBOARD_ENDING_RULE,
+  SHARED_OUTCOMES_LINE,
+  adoptedTurn,
+  adoptedTurnPrompt,
+  isScoreboardEnding,
+} from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -20,7 +27,10 @@ import { SCOREBOARD_ENDING_RULE, SHARED_OUTCOMES_LINE, adoptedTurnPrompt, isScor
  * and contest chapter steps get B6's lines, fields and computed lever line;
  * every other single-player turn, and every group turn (B6 was never built or
  * measured for groups), is today's request (the frozen round0 form), byte
- * for byte, on the stories the tests build and on every frozen beat case.
+ * for byte, on the stories the tests build and on every frozen beat case,
+ * apart from the logged turn deltas (adoptedDeltas.ts): the scoreboard rule
+ * on a scored contest's ending, and, since the owner's feedback of
+ * 2026-09-28, no chapter rules on a switch turn.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -79,10 +89,13 @@ function expectSame(production: { prompt: string; schema: Parameters<typeof toJs
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
+/** The measured request with the turn deltas applied (adoptedDeltas.ts): what production must send for this story. */
+const asAdopted = <T extends { prompt: string }>(measured: T, story: Story): T => ({ ...measured, prompt: adoptedTurn(measured.prompt, story) });
+
 describe("single-player turns: today's form with B6 as measured", () => {
   it.each(SINGLE_PLAYER)("%s", (_, build) => {
     const story = build();
-    expectSame(beatStep.request(story), todaysFormWithB6Request(story));
+    expectSame(beatStep.request(story), asAdopted(todaysFormWithB6Request(story), story));
   });
 
   it("gives a challenge step B6's lines and a single player's other turns none", () => {
@@ -95,7 +108,55 @@ describe("single-player turns: today's form with B6 as measured", () => {
     expect(cases.length).toBeGreaterThan(40);
     for (const c of cases) {
       const story = caseStory(c);
-      expectSame(beatStep.request(story), todaysFormWithB6Request(story));
+      expectSame(beatStep.request(story), asAdopted(todaysFormWithB6Request(story), story));
+    }
+  });
+});
+
+/*
+ * The chapter rules are for the planners only (the owner's feedback of
+ * 2026-09-28): the switch turn, the one turn that carried them, drops them;
+ * it still reads each stat's "Adjustments after threads", the after-chapter
+ * changes it applies. The switch and chapter planners keep them.
+ */
+describe("the chapter rules: the planners' only", () => {
+  const RULE = "When Public Support falls below 30%, the next thread is about winning back the crowd.";
+  const withRules = (story: Story) =>
+    story.clone({
+      guidelines: { ...story.getGuidelines(), typesOfThreads: ["Rally (challenge, 3): win the square"], switchAndThreadInstructions: [RULE] },
+      sharedStats: [stat("shared_support", { name: "Public Support", adjustmentsAfterThreads: ["+10% after a favorable rally thread"] })],
+      sharedStatValues: [{ statId: "shared_support", value: 40 }],
+    });
+  const TURNS: [string, () => Story][] = [
+    ["a single player's first switch", () => firstSwitchBeat(1)],
+    ["a single player's later switch", () => laterSwitchBeat(1)],
+    ["a group's later switch", () => laterSwitchBeat(2)],
+    ["a chapter step", () => threadBeat(1)],
+    ["the ending", () => endingBeat(1)],
+  ];
+
+  it.each(TURNS)("%s: no chapter rules in the turn", (_, build) => {
+    const story = withRules(build());
+    const prompt = beatStep.request(story).prompt;
+    expect(prompt).not.toContain(CHAPTER_RULES_HEADING);
+    expect(prompt).not.toContain(RULE);
+    expect(prompt).not.toContain("Rally (challenge, 3)");
+  });
+
+  it("was printed on the measured switch turn only, and the switch turn still reads the after-chapter stat changes", () => {
+    const story = withRules(laterSwitchBeat(1));
+    expect(round0BeatStep.request(story).prompt).toContain(`${CHAPTER_RULES_HEADING}\n- Types of threads`);
+    expect(round0BeatStep.request(withRules(threadBeat(1))).prompt).not.toContain(CHAPTER_RULES_HEADING);
+    expect(beatStep.request(story).prompt).toContain("- Adjustments after threads: +10% after a favorable rally thread");
+    expect(beatStep.request(story).prompt).toContain("Consider the 'Adjustments after threads' parameter in the stat definitions.");
+  });
+
+  it("stays in both planners' prompts", () => {
+    for (const story of [withRules(laterSwitchBeat(1)), withRules(laterSwitchBeat(2))]) {
+      expect(switchStep.request(story).prompt).toContain(RULE);
+    }
+    for (const story of [withRules(threadAnalysisAfterSwitch(1)), withRules(threadAnalysisAfterSwitch(2))]) {
+      expect(threadStep.request(story).prompt).toContain(RULE);
     }
   });
 });
@@ -138,7 +199,7 @@ function contestEnding(players: number, mode: GameMode = GameModes.Competitive, 
 describe("group turns: today's form, and the scoreboard ending rule on a contest's ending", () => {
   it.each(GROUPS)("%s", (_, build) => {
     const story = build();
-    expectSame(beatStep.request(story), round0BeatStep.request(story));
+    expectSame(beatStep.request(story), asAdopted(round0BeatStep.request(story), story));
   });
 
   it.each([
@@ -180,7 +241,7 @@ describe("group turns: today's form, and the scoreboard ending rule on a contest
     for (const c of cases) {
       const story = caseStory(c);
       const today = round0BeatStep.request(story);
-      expectSame(beatStep.request(story), isScoreboardEnding(story) ? { ...today, prompt: withEndingRule(today.prompt) } : today);
+      expectSame(beatStep.request(story), asAdopted(today, story));
     }
   });
 });

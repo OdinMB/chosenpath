@@ -8,7 +8,7 @@ import { requestInputFor } from "../../../../src/evals/textModelEval/jobPlan.js"
 import { SETUP_CHAIN_PREMISES, chainSetupInput } from "../../../../src/evals/textModelEval/setupChain.js";
 import { requestFor, requestText, type EvalRequest, type RequestInput, type VariantId } from "../../../../src/evals/textModelEval/variants.js";
 import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../src/game/services/prompts/BeatPromptService.js";
-import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurnPrompt, isScoreboardEnding } from "../../../helpers/adoptedDeltas.js";
+import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurn } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * The adoption's free final test (rounds status note, section 9, step 3):
@@ -61,7 +61,7 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "switch":
       return { prompt, schema: json(measured) };
     case "beat":
-      return { prompt: adoptedTurnPrompt(prompt, isScoreboardEnding(input.story)), schema: json(measured) };
+      return { prompt: adoptedTurn(prompt, input.story), schema: json(measured) };
   }
 }
 
