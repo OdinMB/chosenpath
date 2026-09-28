@@ -199,3 +199,31 @@ describe("the slim reply (B4)", () => {
     expect(chapterTurnRequest(chapterStory(1, 3), "full", FRAMES).assemble).toBeUndefined();
   });
 });
+
+describe("slim's one fix-and-retest: the step and world-building plans kept (round 1: facts 3.97 → 3.28 per turn, the step left open 91% → 81%)", () => {
+  const plan = (form: "slim" | "slimPlans") => {
+    const json = toJsonSchema(chapterTurnRequest(chapterStory(1, 3), form, FRAMES).schema) as { properties: Record<string, { properties: Record<string, { properties: Record<string, unknown> }> }> };
+    return json.properties.player1.properties.plan.properties;
+  };
+  const production = () =>
+    (
+      toJsonSchema(beatStep.request(chapterStory(1, 3)).schema) as {
+        properties: Record<string, { properties: Record<string, { properties: Record<string, { description?: string }> }> }>;
+      }
+    ).properties.player1.properties.plan.properties;
+
+  it("is slim with production's beatTypeConsiderations and worldBuilding fields back, in production's places: before the new elements and the facts", () => {
+    const keys = Object.keys(plan("slimPlans"));
+    expect(keys).toEqual(["beatTypeConsiderations", "worldBuilding", ...Object.keys(plan("slim"))]);
+    expect(keys.indexOf("worldBuilding")).toBeLessThan(keys.indexOf("establishedFacts"));
+    for (const field of ["beatTypeConsiderations", "worldBuilding"]) {
+      expect((plan("slimPlans")[field] as { description?: string }).description).toBe(production()[field].description);
+    }
+  });
+
+  it("changes nothing else: the same prompt, titles written by code", () => {
+    const [slim, retest] = (["slim", "slimPlans"] as const).map((form) => chapterTurnRequest(chapterStory(1, 3), form, FRAMES));
+    expect(retest.prompt).toBe(slim.prompt);
+    expect((retest.assemble?.({ player1: { text: "t" } }) as Record<string, { title: string }>).player1.title).toBe("The Print Shop (2/3)");
+  });
+});

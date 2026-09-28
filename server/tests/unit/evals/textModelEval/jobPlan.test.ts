@@ -269,6 +269,7 @@ describe("planJobs: the round stages and the migration check", () => {
       // In story order: the round case's story id sorts first
       "gpt-6-luna@medium/chapterFull": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@medium/chapterSlim": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
+      "gpt-6-luna@medium/chapterSlimPlans": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@low/planV2": ["mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2", "mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
     });
     expect(plan("turn-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);

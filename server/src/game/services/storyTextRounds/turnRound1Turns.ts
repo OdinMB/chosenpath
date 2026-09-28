@@ -36,7 +36,21 @@ import { withoutScoreLine } from "./turnRound1Planners.js";
  * Model-facing text says "thread" and "beat" (turn doc Appendix A).
  */
 
-export type ChapterTurnForm = "full" | "slim";
+/**
+ * "slimPlans" is slim's one fix-and-retest after round 1, where slim was worse
+ * than today's form on two checks its own changes target: facts per turn fell
+ * from 3.97 to 3.28 (B4's gate is 3.5) and the step left open for the options
+ * from 91% to 81% of turns (B2, B3 row 15). Both read what a planning field
+ * that slim drops asked for: worldBuilding (the new details to establish) and
+ * beatTypeConsiderations (the step this beat implements). The retest keeps
+ * those two, in production's places; everything else is slim's.
+ */
+export type ChapterTurnForm = "full" | "slim" | "slimPlans";
+
+/** The planning fields slimPlans keeps, as production writes them. */
+const KEPT_PLANS = ["beatTypeConsiderations", "worldBuilding"];
+
+const isSlim = (form: ChapterTurnForm) => form !== "full";
 /** A stored chapter's backfilled question and plan, per thread id (the eval's chapterFrames). */
 export type ChapterFrameText = Record<string, { question: string; plan: string }>;
 
@@ -125,7 +139,7 @@ function instructionEdits(production: string, story: Story, form: ChapterTurnFor
   );
   // B3 row 14: the summary carries the decision
   text = replaceOnce(LABEL, text, "\n- The players' decisions are tracked separately and don't have to be tracked.", "");
-  if (form === "slim") {
+  if (isSlim(form)) {
     // B4: the facts and new-elements rules live in their fields
     text = replaceOnce(
       LABEL,
@@ -242,13 +256,25 @@ function asZodObject(schema: unknown, label: string): z.AnyZodObject {
   return schema;
 }
 
-/** One player's beat with B2/B3's field edits, and on the slim form B4's; production reuses one instance for every slot, so this does too. */
-function editedBeat(player: z.AnyZodObject, form: ChapterTurnForm): z.AnyZodObject {
-  const plan = asZodObject(player.shape.plan, "plan");
+/** The slim plan with production's kept planning fields back, in production's key order (slimPlans, the retest). */
+function withKeptPlans(slimPlan: z.AnyZodObject, productionPlan: z.AnyZodObject): z.AnyZodObject {
+  const shape = Object.fromEntries(
+    Object.keys(productionPlan.shape).flatMap((key) =>
+      KEPT_PLANS.includes(key) ? [[key, productionPlan.shape[key]]] : key in slimPlan.shape ? [[key, slimPlan.shape[key]]] : []
+    )
+  );
+  const plan = z.object(shape);
+  return slimPlan.description === undefined ? plan : plan.describe(slimPlan.description);
+}
+
+/** One player's beat with B2/B3's field edits, and on the slim forms B4's; production reuses one instance for every slot, so this does too. */
+function editedBeat(player: z.AnyZodObject, form: ChapterTurnForm, productionPlan: z.AnyZodObject): z.AnyZodObject {
+  const trimmed = asZodObject(player.shape.plan, "plan");
+  const plan = form === "slimPlans" ? withKeptPlans(trimmed, productionPlan) : trimmed;
   const planEdits: z.ZodRawShape = {
     showDontTell: reworded(plan.shape.showDontTell, " Remember: don't define the resolution of this step in the thread progression. That will happen in the next round, based on players' choices in this beat.", ""),
   };
-  if (form === "slim") {
+  if (isSlim(form)) {
     planEdits.establishedFacts = plan.shape.establishedFacts.describe(FACTS);
     planEdits.newIntroductionsOfStoryElements = plan.shape.newIntroductionsOfStoryElements.describe(INTRODUCTIONS);
     planEdits.newGameElements = plan.shape.newGameElements.describe(NEW_ELEMENTS);
@@ -262,17 +288,17 @@ function editedBeat(player: z.AnyZodObject, form: ChapterTurnForm): z.AnyZodObje
     ),
     summary: player.shape.summary.describe(SUMMARY),
   });
-  return form === "slim" ? beat.omit({ title: true }) : beat;
+  return isSlim(form) ? beat.omit({ title: true }) : beat;
 }
 
-function editedSchema(root: z.AnyZodObject, form: ChapterTurnForm): z.AnyZodObject {
+function editedSchema(root: z.AnyZodObject, form: ChapterTurnForm, productionPlan: z.AnyZodObject): z.AnyZodObject {
   const done = new Map<z.ZodTypeAny, z.AnyZodObject>();
   const slots = Object.keys(root.shape).filter((key) => PLAYER_SLOTS.includes(key));
   return root.extend(
     Object.fromEntries(
       slots.map((slot) => {
         const player = root.shape[slot];
-        const edited = done.get(player) ?? editedBeat(asZodObject(player, slot), form);
+        const edited = done.get(player) ?? editedBeat(asZodObject(player, slot), form, productionPlan);
         done.set(player, edited);
         return [slot, edited];
       })
@@ -296,14 +322,16 @@ function withTitles(story: Story, parsed: unknown): unknown {
 /** Round 1's request for a chapter step, on production's full reply or B4's slim one. */
 export function chapterTurnRequest(story: Story, form: ChapterTurnForm, frames?: ChapterFrameText): ChapterTurnRequest {
   if (story.getCurrentBeatType() !== "thread") throw new Error(`${LABEL}: round 1's chapter turns cover chapter steps only, not a ${story.getCurrentBeatType()} beat`);
-  if (form === "slim" && story.isMultiplayer()) throw new Error(`${LABEL}: the slim form is single-player in round 1 (B4 keeps the coordination note for groups, unmeasured)`);
-  const base = form === "slim" ? trimmedBeatRequest(story, "slim") : beatStep.request(story);
+  if (isSlim(form) && story.isMultiplayer()) throw new Error(`${LABEL}: the slim form is single-player in round 1 (B4 keeps the coordination note for groups, unmeasured)`);
+  const production = beatStep.request(story);
+  const base = isSlim(form) ? trimmedBeatRequest(story, "slim") : production;
+  const productionPlan = asZodObject(asZodObject(asZodObject(production.schema, "reply").shape.player1, "player1").shape.plan, "plan");
   const { instructions, state } = splitAtState(LABEL, base.prompt);
   const request: ChapterTurnRequest = {
     prompt: instructionEdits(instructions, story, form) + stateEdits(state, story, frames),
-    schema: editedSchema(asZodObject(base.schema, "reply"), form),
+    schema: editedSchema(asZodObject(base.schema, "reply"), form, productionPlan),
   };
-  return form === "slim" ? { ...request, assemble: (parsed) => withTitles(story, parsed) } : request;
+  return isSlim(form) ? { ...request, assemble: (parsed) => withTitles(story, parsed) } : request;
 }
 
 /** The passages the tests pin. */

@@ -82,7 +82,11 @@ import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from 
  * "planV2Full" is the same with the field that restates the story's
  * switch/thread instructions kept (A5's trigger comparison). "chapterFull" is
  * a chapter step's beat with B2 and B3 rows 11, 14 and 15 on production's full
- * reply; "chapterSlim" the same on B4's slim reply, titles written by code.
+ * reply; "chapterSlim" the same on B4's slim reply, titles written by code;
+ * "chapterSlimPlans" is slim's one fix-and-retest, slim with production's
+ * beatTypeConsiderations and worldBuilding planning fields back (round 1 read
+ * slim's facts at 3.28 per turn against B4's gate of 3.5, and the step left
+ * open on 81% of turns against today's 91%).
  */
 
 export type VariantId =
@@ -105,7 +109,8 @@ export type VariantId =
   | "planV2"
   | "planV2Full"
   | "chapterFull"
-  | "chapterSlim";
+  | "chapterSlim"
+  | "chapterSlimPlans";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -127,6 +132,7 @@ export const VARIANTS: VariantId[] = [
   "planV2Full",
   "chapterFull",
   "chapterSlim",
+  "chapterSlimPlans",
 ];
 
 /**
@@ -362,6 +368,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   planV2Full: plannerV2("planV2Full", true),
   chapterFull: chapterTurn("chapterFull", "full"),
   chapterSlim: chapterTurn("chapterSlim", "slim"),
+  chapterSlimPlans: chapterTurn("chapterSlimPlans", "slimPlans"),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

@@ -121,6 +121,7 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   planV2Full: "planV2",
   chapterFull: "prod",
   chapterSlim: "prod",
+  chapterSlimPlans: "prod",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -171,6 +172,8 @@ const LUNA_MEDIUM = { model: "gpt-6-luna", reasoningEffort: "medium" } as const;
 const SECOND_REFERENCES: Record<string, string[]> = {
   // Turn round 1: slim against the full chapter turn (B4 on its own), and the full planner against today's form too
   [armKey(LUNA_MEDIUM, "chapterSlim")]: [armKey(LUNA_MEDIUM, "chapterFull")],
+  // Slim's fix-and-retest against the slim form it retests, and against the full form
+  [armKey(LUNA_MEDIUM, "chapterSlimPlans")]: [armKey(LUNA_MEDIUM, "chapterSlim"), armKey(LUNA_MEDIUM, "chapterFull")],
   [armKey(LUNA_LOW, "planV2Full")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
@@ -331,6 +334,8 @@ function turnRoundArms(role: EvalRole): ArmPlan[] {
       return [
         { arm: luna("medium", "chapterFull"), samples: 2, scope: "single-player", beatType: "thread" },
         { arm: luna("medium", "chapterSlim"), samples: 2, scope: "single-player", beatType: "thread" },
+        // Slim's one fix-and-retest (round 1: facts 3.97 → 3.28 per turn, the step left open 91% → 81%): the two planning fields kept
+        { arm: luna("medium", "chapterSlimPlans"), samples: 2, scope: "single-player", beatType: "thread" },
       ];
     default:
       return [];
