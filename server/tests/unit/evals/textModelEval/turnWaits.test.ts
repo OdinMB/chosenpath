@@ -2,7 +2,14 @@ import { describe, expect, it } from "@jest/globals";
 import { renderResults } from "../../../../src/evals/textModelEval/resultsReport.js";
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { renderTurnWaits, turnKindOf, turnWaitReadings, type TurnKind } from "../../../../src/evals/textModelEval/turnWaits.js";
+import {
+  renderTurnWaits,
+  renderTurnWaitsBySample,
+  turnKindOf,
+  turnWaitReadings,
+  turnWaitsBySample,
+  type TurnKind,
+} from "../../../../src/evals/textModelEval/turnWaits.js";
 import type { FixedAnalysis } from "../../../../src/evals/textModelEval/cases.js";
 import { createMockStoryState } from "../../../helpers/testHelpers.js";
 import { switchAnalysisAfterThread, threadAnalysisAfterSwitch } from "../../../helpers/promptStories.js";
@@ -98,5 +105,53 @@ describe("turnWaitReadings: p95 per turn kind against the turn rounds' allowance
     });
     expect(text).toContain("### Turn waits per kind");
     expect(text).toContain("| round0 | gpt-6-luna@low/prod | 2 | first turn | 1 | 55.0 s | 55.0 s (turn) | 60 s | within | 0 |");
+  });
+});
+
+describe("turnWaitsBySample: each sample of an arm as its own run, for the drift between runs (turn round 2)", () => {
+  const kinds = new Map<string, TurnKind>([
+    ["step-1", "chapter step"],
+    ["step-2", "chapter step"],
+    ["plan-s", "switch turn"],
+  ]);
+  const at = (minute: number) => new Date(Date.UTC(2026, 8, 28, 10, minute)).toISOString();
+  const beat = (caseId: string, sample: number, seconds: number, outputTokens: number, minute: number, overrides: Partial<CallRecord> = {}): CallRecord =>
+    record({
+      jobKey: `${caseId}|${MEDIUM}|round0|s${sample}`,
+      promptState: "round0",
+      caseId,
+      armKey: MEDIUM,
+      callArmKey: MEDIUM,
+      model: "gpt-6-luna",
+      baseline: false,
+      sample,
+      latencyMs: seconds * 1000,
+      outputTokens,
+      startedAt: at(minute),
+      ...overrides,
+    });
+  const records = [
+    beat("step-1", 1, 20, 2000, 0),
+    beat("step-2", 1, 40, 4000, 5),
+    beat("step-1", 4, 30, 2000, 50),
+    beat("step-2", 4, 60, 4000, 55),
+    // A chain's turn: its wait is the chain's, its pace the turn's own
+    beat("plan-s", 1, 25, 2500, 20, { armKey: `pipeline:${LOW}>${MEDIUM}`, group: "pipeline", step: 2, turnLatencyMs: 32_000 }),
+  ];
+  const rows = turnWaitsBySample(records, kinds);
+
+  it("reads each sample apart: its turns, median and p95, pace per output token and its hours", () => {
+    expect(rows.find((r) => r.armKey === MEDIUM && r.sample === 1)).toMatchObject({ kind: "chapter step", turns: 2, p50: 20, p95: 40, msPerToken: 10, from: at(0), to: at(5) });
+    expect(rows.find((r) => r.armKey === MEDIUM && r.sample === 4)).toMatchObject({ turns: 2, p50: 30, p95: 60, msPerToken: 15 });
+  });
+
+  it("reads a chain by its measured wait", () => {
+    expect(rows.find((r) => r.armKey.startsWith("pipeline:"))).toMatchObject({ kind: "switch turn", turns: 1, p95: 32, msPerToken: 10 });
+  });
+
+  it("renders a table", () => {
+    const text = renderTurnWaitsBySample(rows).join("\n");
+    expect(text).toContain("### Turn waits per sample");
+    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | chapter step | 4 | 2 | 30.0 s | 60.0 s | 15.0 | 2026-09-28 10:50-10:55 UTC |");
   });
 });

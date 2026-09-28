@@ -122,6 +122,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   chapterFull: "prod",
   chapterSlim: "prod",
   chapterSlimPlans: "prod",
+  // Turn round 2: its form against today's (round 1 carried no turn form), the paragraph arm against the round-2 form it builds on
+  turnR2: "prod",
+  turnR2Paragraphs: "turnR2",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -175,6 +178,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   // Slim's fix-and-retest against the slim form it retests, and against the full form
   [armKey(LUNA_MEDIUM, "chapterSlimPlans")]: [armKey(LUNA_MEDIUM, "chapterSlim"), armKey(LUNA_MEDIUM, "chapterFull")],
   [armKey(LUNA_LOW, "planV2Full")]: [armKey(LUNA_LOW, "prod")],
+  // Turn round 2's paragraph arm against today's form too: a form carried forward must be no worse than today's on its target
+  [armKey(LUNA_MEDIUM, "turnR2Paragraphs")]: [armKey(LUNA_MEDIUM, "prod")],
   [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
   [armKey({ model: "gpt-6-sol", reasoningEffort: "low" }, "setupR1")]: [armKey(LUNA_LOW, "setupR1")],
@@ -336,6 +341,11 @@ function turnRoundArms(role: EvalRole): ArmPlan[] {
         { arm: luna("medium", "chapterSlim"), samples: 2, scope: "single-player", beatType: "thread" },
         // Slim's one fix-and-retest (round 1: facts 3.97 → 3.28 per turn, the step left open 91% → 81%): the two planning fields kept
         { arm: luna("medium", "chapterSlimPlans"), samples: 2, scope: "single-player", beatType: "thread" },
+        // Turn round 2 on every single-player turn: twice on the stored cases, once on the round cases (as the reference ran),
+        // then the paragraph arm (B9 item 2) once on the stored cases
+        { arm: luna("medium", "turnR2"), samples: 2, scope: "single-player", source: "stored" },
+        { arm: luna("medium", "turnR2"), samples: 1, scope: "single-player", source: "round" },
+        { arm: luna("medium", "turnR2Paragraphs"), samples: 1, scope: "single-player", source: "stored" },
       ];
     default:
       return [];
@@ -408,6 +418,28 @@ function perPlayerCount(single: Arm, multi: Arm, samples: number): ArmPlan[] {
 
 const MIGRATION_SAMPLES = 2;
 
+/** The sample turn round 2's rerun of today's form records as (samples 1 and 2 are the references, 3 round 1's rerun). */
+export const ROUND2_RERUN_SAMPLE = 4;
+
+/**
+ * Turn round 2's switch chains (switch planner, then the switch turn), about
+ * eight cases as the turn doc plans: four first switches (three single-player
+ * templates without a first-turn beat case of their own, and the built IPO to
+ * Mars opening rule, a flavor first switch) and four switches after a chapter
+ * (two stored Novi Reg branches, the late switch with five turns left, and the
+ * stat trigger).
+ */
+export const ROUND2_SWITCH_CHAIN_CASES = [
+  "switch-tpl-1c4a4c37-p1-t0",
+  "switch-tpl-22b80460-p1-t0",
+  "switch-tpl-af322f5d-p1-t0",
+  "round-switch-trigger-opening-2db542e9-t0",
+  "switch-8988006e-t4-o0",
+  "switch-8988006e-t4-o2",
+  "round-switch-late5-8988006e-t8",
+  "round-switch-trigger-stat-8988006e-t8",
+];
+
 /**
  * The migration check: production's GPT-6 defaults (the code's, never env) on
  * today's prompts, the turn rounds' references in today's form (coordinator,
@@ -431,6 +463,9 @@ function migrationArms(role: EvalRole): ArmPlan[] {
         { arm: productionDefault("beat"), samples: MIGRATION_SAMPLES, scope: "single-player", source: "stored" },
         { arm: productionDefault("beat"), samples: 1, scope: "single-player", source: "round" },
         { arm: productionDefault("multiplayerBeat"), samples: 1, scope: "multiplayer", source: "stored" },
+        // Turn round 2's rerun of today's form beside its candidates, for the waits (round 1 met 25-50% drift per token in
+        // three hours): sample 4 on every stored single-player turn, so no earlier run's sample mixes in
+        { arm: productionDefault("beat"), samples: ROUND2_RERUN_SAMPLE, fromSample: ROUND2_RERUN_SAMPLE, scope: "single-player", source: "stored" },
       ];
     case "switch":
     case "thread":
@@ -558,7 +593,7 @@ function stage4bArms(role: EvalRole): ArmPlan[] {
  * Pipeline chains: this analysis arm, then each beat arm built from its
  * output, on the cases of `roles` (both planners when absent).
  */
-export type PipelinePlan = { analysis: Arm; beats: Arm[]; samples: number; scope: ArmPlan["scope"]; roles?: ("switch" | "thread")[] };
+export type PipelinePlan = { analysis: Arm; beats: Arm[]; samples: number; scope: ArmPlan["scope"]; roles?: ("switch" | "thread")[]; caseIds?: string[] };
 
 /** The stage's candidate chains (the baseline chain runs in every stage that runs the baseline). */
 export function pipelinePlans(stage: Stage): PipelinePlan[] {
@@ -586,13 +621,17 @@ export function pipelinePlans(stage: Stage): PipelinePlan[] {
           scope: "multiplayer",
           roles: ["thread"],
         },
+        // Turn round 2's reference switch chains: today's pair on its switch cases, two samples (their noise)
+        { analysis: productionDefault("analysis"), beats: [productionDefault("beat")], samples: 2, scope: "single-player", roles: ["switch"], caseIds: ROUND2_SWITCH_CHAIN_CASES },
       ];
     case "turn-rounds":
       // Turn round 1: planner v2 into the chapter's first step, each turn form on production's model per player count
-      // (the slim form is single-player only), two samples like the reference's chains after their second sample
+      // (the slim form is single-player only), two samples like the reference's chains after their second sample.
+      // Turn round 2: planner v2 (carried forward) into the round-2 switch turn on its switch cases, two samples.
       return [
         { analysis: luna("low", "planV2"), beats: [luna("medium", "chapterFull"), luna("medium", "chapterSlim")], samples: 2, scope: "single-player", roles: ["thread"] },
         { analysis: luna("low", "planV2"), beats: [luna("low", "chapterFull")], samples: 2, scope: "multiplayer", roles: ["thread"] },
+        { analysis: luna("low", "planV2"), beats: [luna("medium", "turnR2")], samples: 2, scope: "single-player", roles: ["switch"], caseIds: ROUND2_SWITCH_CHAIN_CASES },
       ];
     default:
       return [];

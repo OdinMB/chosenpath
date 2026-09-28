@@ -93,6 +93,17 @@ describe("checkBeatSet", () => {
     expect(checkBeatSet(beatSet(1), ending).checks.threeOptions).toBe(true);
   });
 
+  it("leaves interludes, facts, new elements and introductions unread at the ending, where the game never shows or reads them", () => {
+    const ending = Story.create(story.getState());
+    jest.spyOn(ending, "getCurrentBeatType").mockReturnValue("ending");
+    const { checks, counts } = checkBeatSet(beatSet(1, { player1: beatGeneration({ options: [], interludes: [] }) }), ending);
+    expect(checks).not.toHaveProperty("threeInterludes");
+    expect(checks).not.toHaveProperty("interludesTwoToFour");
+    for (const name of ["interludes", "facts", "newElements", "introductions"]) expect(counts).not.toHaveProperty(name);
+    expect(counts).toHaveProperty("words");
+    expect(checkBeatSet(beatSet(1), story).counts).toHaveProperty("facts");
+  });
+
   it("wants a sacrifice option at exactly the fixed sacrifice bonus", () => {
     const inThread = Story.create({ ...story.getState(), storyPhases: [threadAnalysis("challenge", 2, 0)] });
     const withSacrifice = (basePoints: number) => {

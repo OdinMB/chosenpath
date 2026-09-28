@@ -11,6 +11,7 @@ import { WIDE_FROM, renderRatingPage } from "../../../../src/evals/textModelEval
 import { ENTRY_STARTS_OPEN, startsOpen } from "../../../../src/evals/textModelEval/ratingRows.js";
 import {
   LABELS,
+  PAIRWISE_CRITERIA_SETS,
   pageFieldLabels,
   pairwiseInstructions,
   planRatingSet,
@@ -31,7 +32,7 @@ import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
 import { GameModes } from "core/types/index.js";
 import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
 import { all, closest, kids, parseHtml, select, textOf, type HtmlNode } from "./htmlTree.js";
-import { threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
+import { endingBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { beatGeneration, beatSet, challengeOptions, threadAnalysis } from "../../../helpers/textFixtures.js";
 
 const ARMS = [BASELINE, LUNA, SOL].map((a) => ({ promptState: "prefix", armKey: a.key }));
@@ -1413,5 +1414,59 @@ describe("a pairwise turn page with chapter openings (turn round 1)", () => {
 
   it("rebuilds the page from its key", () => {
     expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+  });
+});
+
+describe("a pairwise turn page for turn round 2: the owner's round-2 questions, and endings as the player sees them", () => {
+  const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
+  const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/turnR2" };
+  function fixture() {
+    const cases = [
+      ...Array.from({ length: 3 }, (_, i) => evalCase(`end-${i}`, "beat", { state: endingBeat(1, { id: `story-e${i}` }).getState(), tags: tags({ ending: true }) })),
+      ...Array.from({ length: 3 }, (_, i) => evalCase(`step-${i}`, "beat", { state: threadBeat(1, { id: `story-s${i}` }).getState() })),
+    ];
+    const records: CallRecord[] = [];
+    const outputs = new Map<string, unknown>();
+    for (const c of cases) {
+      for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+        for (const sample of samples) {
+          const outputFile = `${c.id}-${arm.armKey}-${sample}`;
+          // Today's ending still writes options and interludes, which the game hides
+          outputs.set(outputFile, beatSet(1, { player1: beatGeneration({ title: "The End", text: `Ending of ${c.id}.`, options: arm === REF ? challengeOptions() : [], interludes: arm === REF ? beatGeneration().interludes : [] }) }));
+          records.push(record({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, callArmKey: arm.armKey, baseline: false, sample, outputFile }));
+        }
+      }
+    }
+    return { cases, records, load: (r: CallRecord) => outputs.get(r.outputFile ?? "") };
+  }
+  const { cases, records, load } = fixture();
+  const { set, key } = planRatingSet({ kind: "turn", arms: [REF, CAND], items: 4, preview: false, pairwise: true, criteria: "turnRound2" }, records, cases, {
+    loadOutput: load,
+    salt: "round2",
+    now: new Date(0),
+  });
+
+  it("prints round 2's questions instead of round 1's, and keeps them in the key for a re-render", () => {
+    const text = set.instructions.join(" ");
+    for (const question of PAIRWISE_CRITERIA_SETS.turnRound2) expect(text).toContain(question);
+    expect(text).not.toContain("follow its plan");
+    expect(key.criteria).toBe("turnRound2");
+    expect(ratingSetFromKey(key, records, cases, load)).toEqual(set);
+    expect(metadataLeaks(set)).toEqual([]);
+    expect(htmlLeaks(renderRatingPage(set), key)).toEqual([]);
+  });
+
+  it("shows no options or interludes at an ending, for either version: the game shows none", () => {
+    const endings = Object.entries(key.items).filter(([, item]) => item.caseId.startsWith("end-"));
+    expect(endings.length).toBeGreaterThan(0);
+    for (const [id] of endings) {
+      for (const option of set.items.find((i) => i.id === id)?.options ?? []) {
+        if (option.content.kind !== "turn") throw new Error("a turn option");
+        expect(option.content.beats.every((b) => b.options.length === 0 && b.interludes.length === 0)).toBe(true);
+      }
+    }
+    const step = set.items.find((i) => key.items[i.id].caseId.startsWith("step-") && !key.items[i.id].control);
+    const shown = step?.options.flatMap((o) => (o.content.kind === "turn" ? o.content.beats.map((b) => b.options.length) : []));
+    expect(shown).toContain(3);
   });
 });

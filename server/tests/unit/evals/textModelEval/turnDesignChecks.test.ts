@@ -337,6 +337,84 @@ describe("checkBeatDesign", () => {
     });
   });
 
+  describe("turn round 2's beat checks (B6, B7, B8)", () => {
+    const GUILD = "player1_guild_reform";
+    const ENCLAVE = "player1_enclave_trust";
+    const PAMPHLET = "player1_pamphlet";
+    const outcomes = { player1: [outcome(GUILD, { milestones: ["m"] }), outcome(ENCLAVE), outcome(PAMPHLET)] };
+    const switchStory = roundStory({
+      turns: 5,
+      maxTurns: 20,
+      playerOutcomes: outcomes,
+      phases: [
+        roundTopicSwitch([["Petition the Guild hall", GUILD]], 0),
+        roundEndedChapter(GUILD, 4, 1, "The Guild hears the petition"),
+        roundTopicSwitch([["Petition the Guild hall", GUILD], ["Win over the goblin enclave", ENCLAVE], ["Print the secret pamphlet", PAMPHLET]], 5),
+      ],
+    });
+    const withOptions = (texts: string[]) => {
+      const beats = beatSet(1);
+      beats.player1 = beatGeneration({ options: texts.map((text) => ({ optionType: "exploration" as const, resourceType: "normal" as const, text })) });
+      return beats;
+    };
+
+    it("wants a topic switch's options in the directions' order, and free of ids", () => {
+      const inOrder = withOptions(["Carry the petition to the Guild hall", "Visit the goblin enclave's elders", "Set the secret pamphlet in type"]);
+      expect(checkBeatDesign(switchStory, inOrder, inOrder).checks).toMatchObject({ switchOptionsFollowDirections: true, switchOptionsNoIds: true });
+      const swapped = withOptions(["Visit the goblin enclave's elders", "Carry the petition to the Guild hall", "Set the secret pamphlet in type"]);
+      expect(checkBeatDesign(switchStory, swapped, swapped).checks.switchOptionsFollowDirections).toBe(false);
+      const ids = withOptions([`Carry the petition to the Guild hall (${GUILD})`, "Visit the goblin enclave's elders", "Set the secret pamphlet in type"]);
+      expect(checkBeatDesign(switchStory, ids, ids).checks.switchOptionsNoIds).toBe(false);
+      expect(checkBeatDesign(threadBeat(1), inOrder, inOrder).checks).not.toHaveProperty("switchOptionsFollowDirections");
+    });
+
+    it("wants direct speech in a first turn's first paragraph", () => {
+      const speech = beatSet(1);
+      speech.player1 = beatGeneration({ text: "\"You're late,\" Gruk says. The poster is still wet.\n\nYou nod." });
+      expect(checkBeatDesign(firstSwitchBeat(1), speech, speech).checks.firstParagraphSpeech).toBe(true);
+      const summary = beatSet(1);
+      summary.player1 = beatGeneration({ text: "You recall the Guild and the enclave.\n\nGruk says, \"Tonight.\"" });
+      expect(checkBeatDesign(firstSwitchBeat(1), summary, summary).checks.firstParagraphSpeech).toBe(false);
+      expect(checkBeatDesign(threadBeat(1), speech, speech).checks).not.toHaveProperty("firstParagraphSpeech");
+    });
+
+    it("wants the ending's answers to cover every outcome once, with one of its own resolutions, and an outcome without milestones mixed", () => {
+      // endingBeat's last chapter ends on outcome_1, which this ending gives a milestone
+      const story = endingBeat(1, { sharedOutcomes: [outcome("outcome_1"), outcome("outcome_2")] });
+      const answered = (answers: { outcomeId: string; resolution: string }[]) => {
+        const beats = beatSet(1);
+        beats.player1 = { ...beatGeneration({ options: [] }), outcomeEndings: answers.map((a) => ({ ...a, basis: "b" })) } as never;
+        return checkBeatDesign(story, beats, beats).checks;
+      };
+      expect(answered([{ outcomeId: "outcome_1", resolution: "favorable" }, { outcomeId: "outcome_2", resolution: "mixed" }])).toMatchObject({
+        endingAnswersEveryOutcome: true,
+        endingNoMilestoneMixed: true,
+      });
+      expect(answered([{ outcomeId: "outcome_1", resolution: "favorable" }]).endingAnswersEveryOutcome).toBe(false);
+      expect(answered([{ outcomeId: "outcome_1", resolution: "sideAWins" }, { outcomeId: "outcome_2", resolution: "mixed" }]).endingAnswersEveryOutcome).toBe(false);
+      expect(answered([{ outcomeId: "outcome_1", resolution: "favorable" }, { outcomeId: "outcome_2", resolution: "unfavorable" }]).endingNoMilestoneMixed).toBe(false);
+      expect(checkBeatDesign(story, beatSet(1), beatSet(1)).checks).not.toHaveProperty("endingAnswersEveryOutcome");
+    });
+
+    it("wants no lever on a challenge turn the computed rate line gives none", () => {
+      const story = edited(threadBeat(1), (state) => {
+        const history = state.players.player1.beatHistory;
+        const options = challengeOptions();
+        options[1] = { ...options[1], resourceType: "reward", basePoints: -30 };
+        history[history.length - 1] = { ...history[history.length - 1], options } as Beat;
+      });
+      const lever = beatSet(1);
+      const options = challengeOptions();
+      options[0] = { ...options[0], resourceType: "sacrifice", basePoints: 30 };
+      lever.player1 = beatGeneration({ options });
+      expect(checkBeatDesign(story, lever, lever).checks.leverFollowsRateLine).toBe(false);
+      const plain = beatSet(1, { player1: beatGeneration({ options: challengeOptions() }) });
+      expect(checkBeatDesign(story, plain, plain).checks.leverFollowsRateLine).toBe(true);
+      // No lever in the last two challenge turns: one fits, so either way passes and nothing is reported
+      expect(checkBeatDesign(threadBeat(1), lever, lever).checks).not.toHaveProperty("leverFollowsRateLine");
+    });
+  });
+
   it("does not throw on a malformed reply", () => {
     const junk = { statChanges: "x", newMilestones: 3, player1: { options: "x", text: 4 } } as unknown as SetOfBeatGenerationSchema;
     expect(() => checkBeatDesign(laterSwitchBeat(1), junk, junk)).not.toThrow();

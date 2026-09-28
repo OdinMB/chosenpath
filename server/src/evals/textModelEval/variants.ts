@@ -38,6 +38,7 @@ import {
 } from "../../game/services/storyTextRounds/setupRound2.js";
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../game/services/storyTextRounds/turnRound1Planners.js";
 import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from "../../game/services/storyTextRounds/turnRound1Turns.js";
+import { turnRound2Request, type TurnRound2Form } from "../../game/services/storyTextRounds/turnRound2.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -87,6 +88,11 @@ import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from 
  * beatTypeConsiderations and worldBuilding planning fields back (round 1 read
  * slim's facts at 3.28 per turn against B4's gate of 3.5, and the step left
  * open on 81% of turns against today's 91%).
+ * Turn round 2's candidates (storyTextRounds/turnRound2.ts), every
+ * single-player turn on today's form: "turnR2" is the rest of B3, B5 to B8
+ * and B1's milestone field, its first turn, switch after a chapter and ending
+ * assembled into today's stored shape; "turnR2Paragraphs" adds B9 item 2 (the
+ * paragraph count at the text field, the shouted copies gone).
  */
 
 export type VariantId =
@@ -110,7 +116,9 @@ export type VariantId =
   | "planV2Full"
   | "chapterFull"
   | "chapterSlim"
-  | "chapterSlimPlans";
+  | "chapterSlimPlans"
+  | "turnR2"
+  | "turnR2Paragraphs";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -133,6 +141,8 @@ export const VARIANTS: VariantId[] = [
   "chapterFull",
   "chapterSlim",
   "chapterSlimPlans",
+  "turnR2",
+  "turnR2Paragraphs",
 ];
 
 /**
@@ -347,6 +357,14 @@ function chapterTurn(variant: VariantId, form: ChapterTurnForm) {
   };
 }
 
+/** Turn round 2's form, or its paragraph arm: every single-player turn. */
+function roundTwoTurn(variant: VariantId, form: TurnRound2Form) {
+  return (input: RequestInput): Round2Request => {
+    if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+    return turnRound2Request(input.story, form);
+  };
+}
+
 const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   prod: prodRequest,
   slim: slimRequest,
@@ -369,6 +387,8 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   chapterFull: chapterTurn("chapterFull", "full"),
   chapterSlim: chapterTurn("chapterSlim", "slim"),
   chapterSlimPlans: chapterTurn("chapterSlimPlans", "slimPlans"),
+  turnR2: roundTwoTurn("turnR2", "round2"),
+  turnR2Paragraphs: roundTwoTurn("turnR2Paragraphs", "paragraphs"),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

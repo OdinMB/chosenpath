@@ -13,6 +13,7 @@ import {
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
+import { ROUND2_SWITCH_CHAIN_CASES } from "../../../../src/evals/textModelEval/arms.js";
 import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
@@ -264,15 +265,39 @@ describe("planJobs: the round stages and the migration check", () => {
     expect(plan("3").some((j) => j.baseline)).toBe(true);
   });
 
-  it("plans turn round 1: planner v2 on every planning case, the chapter turns on single-player chapter steps, full then slim", () => {
+  it("plans turn rounds 1 and 2: planner v2 on every planning case, round 1's chapter turns, round 2's form on every single-player turn and its paragraph arm", () => {
     expect(perArm(plan("turn-rounds", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
       // In story order: the round case's story id sorts first
       "gpt-6-luna@medium/chapterFull": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@medium/chapterSlim": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@medium/chapterSlimPlans": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
+      // Round 2: twice on the stored cases (their reference's two samples), once on the round cases; the paragraph arm once
+      "gpt-6-luna@medium/turnR2": ["sp s1", "sp s2", "round-sp s1"],
+      "gpt-6-luna@medium/turnR2Paragraphs": ["sp s1"],
       "gpt-6-luna@low/planV2": ["mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2", "mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
     });
     expect(plan("turn-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
+  });
+
+  it("chains round 2's switch cases: planner v2 into the round-2 turn, today's pair beside it in the migration check, two samples each", () => {
+    const [id] = ROUND2_SWITCH_CHAIN_CASES;
+    const chains = (stage: PlanOptions["stage"]) =>
+      planJobs([evalCase(id, "switch", { state: createMockStoryState() }), evalCase("sp-switch", "switch", { state: createMockStoryState() })], {
+        stage,
+        promptState: "round0",
+        roles: ["switch"],
+        mode: "pipeline",
+        subset15: false,
+        records: [],
+      }).map((j) => [j.caseId, j.armKey, j.sample]);
+    expect(chains("turn-rounds")).toEqual([
+      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2", 1],
+      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2", 2],
+    ]);
+    expect(chains("migration")).toEqual([
+      [id, "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1],
+      [id, "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 2],
+    ]);
   });
 
   it("chains planner v2 into the chapter's first step in turn round 1: both turn forms for one player, the full form on Luna low for groups", () => {
@@ -315,9 +340,10 @@ describe("planJobs: the round stages and the migration check", () => {
   it("builds the turn rounds' references in the migration check: production's GPT-6 defaults per player count, no setup", () => {
     // Single-player beats on Luna medium, twice on the stored cases and once on the round cases; multiplayer beats on
     // Luna low once, on the stored cases only; the planners on Luna low twice everywhere. Setup reads the stored
-    // setups, which today's code rebuilds byte for byte.
+    // setups, which today's code rebuilds byte for byte. Sample 4 is turn round 2's rerun of today's form beside its
+    // candidates, for the waits.
     expect(perArm(plan("migration", { roles: ["setup", "beat", "switch", "thread"] }))).toEqual({
-      "gpt-6-luna@medium/prod": ["sp s1", "sp s2", "round-sp s1"],
+      "gpt-6-luna@medium/prod": ["sp s1", "sp s2", "round-sp s1", "sp s4"],
       "gpt-6-luna@low/prod": [
         "mp s1",
         "mp-switch s1",

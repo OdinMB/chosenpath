@@ -152,6 +152,8 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
   ];
   const past = (prose.match(PAST_MARKERS) ?? []).length;
   const present = (prose.match(PRESENT_MARKERS) ?? []).length;
+  // The game never shows an ending's interludes and reads no facts, elements or introductions after it (turn doc M21, B8)
+  const ending = story.getCurrentBeatType() === "ending";
   const checks: Record<string, boolean> = {
     paragraphs: paragraphs.length >= 5 && paragraphs.length <= 6,
     sentences: paragraphs.every((p) => sentenceCount(p) >= 3 && sentenceCount(p) <= 5),
@@ -163,8 +165,7 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
     noImageInLastParagraph: tags.every((t) => t.paragraph < paragraphs.length - 1),
     requestedImageUsed: !requested || tags.some((t) => t.id === requested),
     // Production's contract says 3; rule B32's own breakdown (and the worded rewrite) allows 2 to 4
-    threeInterludes: beat.interludes.length === 3,
-    interludesTwoToFour: beat.interludes.length >= 2 && beat.interludes.length <= 4,
+    ...(ending ? {} : { threeInterludes: beat.interludes.length === 3, interludesTwoToFour: beat.interludes.length >= 2 && beat.interludes.length <= 4 }),
     basePoints: beat.options.every(basePointsInRange),
     modifierRange: beat.options.every(
       (o) => o.optionType !== "challenge" || o.modifiersToSuccessRate.every((m) => m.effect >= -15 && m.effect <= 15)
@@ -176,10 +177,14 @@ function checkBeat(beat: BeatGeneration, slot: string, story: Story, ids: Return
     characterNames: !unchosenNames(story).some((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`).test(visible)),
   };
   const counts = {
-    facts: beat.plan.establishedFacts.length,
-    newElements: beat.plan.newGameElements.length,
-    introductions: beat.plan.newIntroductionsOfStoryElements.length,
-    interludes: beat.interludes.length,
+    ...(ending
+      ? {}
+      : {
+          facts: beat.plan.establishedFacts.length,
+          newElements: beat.plan.newGameElements.length,
+          introductions: beat.plan.newIntroductionsOfStoryElements.length,
+          interludes: beat.interludes.length,
+        }),
     paragraphs: paragraphs.length,
     // Prose and planning lengths apart: whether verbosity reaches strings inside the JSON is undocumented
     words: prose.split(/\s+/).filter(Boolean).length,

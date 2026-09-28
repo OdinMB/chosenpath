@@ -171,6 +171,83 @@ export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnK
   return readings;
 }
 
+/**
+ * One sample of one arm and turn kind, read as its own run (turn round 2):
+ * the server's pace drifts by the hour (round 1 met 25-50% more milliseconds
+ * per output token within three hours), and each sample of an arm ran at its
+ * own hour, so a round reads its candidates against the reference's sample
+ * that ran beside them. A chain's row reads the chain's measured wait.
+ */
+export type SampleWait = {
+  promptState: string;
+  /** The isolated beat arm, or the chain's key */
+  armKey: string;
+  players: number;
+  kind: TurnKind;
+  sample: number;
+  turns: number;
+  p50?: number;
+  p95?: number;
+  /** Median milliseconds per output token (reasoning included) of the turn calls: the server's pace */
+  msPerToken?: number;
+  /** The first and last call's start (ISO) */
+  from: string;
+  to: string;
+};
+
+export function turnWaitsBySample(records: CallRecord[], kinds: Map<string, TurnKind>): SampleWait[] {
+  const groups = new Map<string, CallRecord[]>();
+  for (const r of records) {
+    const kind = kinds.get(r.caseId);
+    const isTurn = (r.group === "beat" && r.role === "beat") || (r.group === "pipeline" && r.step === 2);
+    if (!kind || !isTurn || !good(r)) continue;
+    const key = [r.promptState, r.armKey, r.players, kind, r.sample].join(SEP);
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  return [...groups.entries()]
+    .map(([key, group]) => {
+      const [promptState, armKey, players, kind, sample] = key.split(SEP);
+      const waits = group.map((r) => seconds(r.group === "pipeline" ? r.turnLatencyMs ?? r.latencyMs : r.latencyMs));
+      const pace = group.filter((r) => r.outputTokens > 0).map((r) => r.latencyMs / r.outputTokens);
+      const starts = group.map((r) => r.startedAt).sort();
+      return {
+        promptState,
+        armKey,
+        players: Number(players),
+        kind: kind as TurnKind,
+        sample: Number(sample),
+        turns: group.length,
+        p50: percentile(waits, 50),
+        p95: percentile(waits, 95),
+        msPerToken: percentile(pace, 50),
+        from: starts[0],
+        to: starts[starts.length - 1],
+      };
+    })
+    .sort((a, b) => a.promptState.localeCompare(b.promptState) || a.armKey.localeCompare(b.armKey) || a.players - b.players || a.kind.localeCompare(b.kind) || a.sample - b.sample);
+}
+
+const hour = (iso: string) => iso.slice(11, 16);
+const windowOf = (row: SampleWait) => `${row.from.slice(0, 10)} ${hour(row.from)}-${hour(row.to)} UTC`;
+
+/** The by-sample readings as a table (resultsReport.ts renders it after the turn waits). */
+export function renderTurnWaitsBySample(rows: SampleWait[]): string[] {
+  if (rows.length === 0) return [];
+  return [
+    "",
+    "### Turn waits per sample (each sample of an arm is its own run; the server's pace drifts by the hour)",
+    "",
+    "Read a candidate against the reference's sample that ran beside it (turn round 2's rerun of today's form is its sample 4). Ms per token is the median of each call's wait over its output tokens, reasoning included: the server's pace, which drifts while the tokens don't. A chain's row reads the chain's measured wait and its turn's pace.",
+    "",
+    "| Prompt state | Arm | Players | Kind | Sample | Turns | p50 | p95 | Ms per token | Ran |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+    ...rows.map(
+      (r) =>
+        `| ${r.promptState} | ${r.armKey} | ${r.players} | ${r.kind} | ${r.sample} | ${r.turns} | ${secs(r.p50)} | ${secs(r.p95)} | ${r.msPerToken === undefined ? "–" : r.msPerToken.toFixed(1)} | ${windowOf(r)} |`
+    ),
+  ];
+}
+
 const secs = (x?: number) => (x === undefined ? "–" : `${x.toFixed(1)} s`);
 
 function sourceText(wait: TurnWait["wait"]): string {

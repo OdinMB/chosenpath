@@ -19,7 +19,7 @@ import type { ProbeReport } from "./probe.js";
 import type { Direction } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
 import type { CallRecord } from "./runner.js";
-import { renderTurnWaits, turnWaitReadings, type TurnKind } from "./turnWaits.js";
+import { renderTurnWaits, renderTurnWaitsBySample, turnWaitReadings, turnWaitsBySample, type TurnKind } from "./turnWaits.js";
 import { FIRST_ATTEMPT_FLOOR, validityVerdict } from "./validityGate.js";
 import {
   variantComparisons,
@@ -473,6 +473,7 @@ export function renderResults(input: ResultsInput): string {
     if (input.turnKinds) {
       const inState = input.records.filter((r) => r.promptState === promptState && input.tags.has(r.caseId));
       lines.push(...renderTurnWaits(turnWaitReadings(inState, input.turnKinds)));
+      lines.push(...renderTurnWaitsBySample(turnWaitsBySample(inState, input.turnKinds)));
     }
     lines.push(...renderVariantComparison(variantComparisons(input.records, input.checks, input.tags, promptState, input.storedReference)));
   }

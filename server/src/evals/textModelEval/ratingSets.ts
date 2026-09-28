@@ -51,6 +51,8 @@ export type RatingSpec = {
    */
   chainArms?: ArmRef[];
   chainItems?: number;
+  /** A pairwise page's questions when a round asks others than PAIRWISE_CRITERIA's (turn round 2) */
+  criteria?: PairwiseCriteriaSet;
 };
 
 export type RatingOption = { label: string; content: OptionContent };
@@ -101,6 +103,8 @@ export type RatingKey = {
   /** Label -> how often the first arm (baseline) sits there, over the regular items */
   labelDistribution: Record<string, number>;
   notes: string[];
+  /** The page's own questions, when not PAIRWISE_CRITERIA's (absent on every key before turn round 2) */
+  criteria?: PairwiseCriteriaSet;
 };
 
 export const LABELS = ["A", "B", "C", "D"];
@@ -152,26 +156,43 @@ export const PAIRWISE_CRITERIA: Record<RatingKind, string[]> = {
   ],
 };
 
-const PAIRWISE_INSTRUCTIONS: Record<RatingKind, string[]> = {
-  setup: [
-    "Each item shows one premise and two story setups written from it, in random order, side by side.",
-    INSTRUCTIONS.setup[1],
-    "Click a section heading to open or fold that section in both columns at once. Some sections start folded; single stats, story elements, outcomes, identities and backgrounds open one by one.",
-    "Acceptable? is the minimum bar, for each of the two: coherent and true to the premise, sensible stats, and distinct playable characters.",
-    `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${PAIRWISE_CRITERIA.setup.join("; ")}.`,
-    INSTRUCTIONS.setup[5],
+/**
+ * The questions of a round that asks others: turn round 2 (turn doc section
+ * 4, round 2, "What you rate", and B7's after-chapter question), on first
+ * turns, turns after a chapter, challenge steps and endings.
+ */
+export const PAIRWISE_CRITERIA_SETS = {
+  turnRound2: [
+    "Does the story start with something happening?",
+    "After a chapter, does the turn say what changed and pull the story on?",
+    "Is there a real choice among the options?",
+    "Does the prose sound like this story?",
+    "Does the ending answer each question the story asked?",
   ],
-  turn: [
-    "Each item first shows the background: the chapter this turn belongs to, with its plan and the outcome it advances, every outcome, and what happened just before (the story so far and the story's world start folded). Then come two versions of the next turn, in random order, one column each.",
-    "Click a heading to fold that part in both columns at once.",
-    "Acceptable? is the minimum bar, for each of the two: no continuity error (a wrong name, fact, stat, or outcome of the choice), it shows the chosen action and its result in second person, the three options are meaningfully different, and there is no commentary about the game itself.",
-    `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${PAIRWISE_CRITERIA.turn.join(" ")}`,
-    INSTRUCTIONS.turn[4],
-  ],
-};
+} as const;
+export type PairwiseCriteriaSet = keyof typeof PAIRWISE_CRITERIA_SETS;
 
-export function pairwiseInstructions(kind: RatingKind): string[] {
-  return PAIRWISE_INSTRUCTIONS[kind];
+function pairwiseInstructionsFor(kind: RatingKind, criteria: readonly string[]): string[] {
+  return kind === "setup"
+    ? [
+        "Each item shows one premise and two story setups written from it, in random order, side by side.",
+        INSTRUCTIONS.setup[1],
+        "Click a section heading to open or fold that section in both columns at once. Some sections start folded; single stats, story elements, outcomes, identities and backgrounds open one by one.",
+        "Acceptable? is the minimum bar, for each of the two: coherent and true to the premise, sensible stats, and distinct playable characters.",
+        `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${criteria.join("; ")}.`,
+        INSTRUCTIONS.setup[5],
+      ]
+    : [
+        "Each item first shows the background: the chapter this turn belongs to, with its plan and the outcome it advances, every outcome, and what happened just before (the story so far and the story's world start folded). Then come two versions of the next turn, in random order, one column each.",
+        "Click a heading to fold that part in both columns at once.",
+        "Acceptable? is the minimum bar, for each of the two: no continuity error (a wrong name, fact, stat, or outcome of the choice), it shows the chosen action and its result in second person, the three options are meaningfully different, and there is no commentary about the game itself.",
+        `Which is better? Pick A or B, or ${PAIRWISE_LABELS.same} when neither is clearly better. Judge by: ${criteria.join(" ")}`,
+        INSTRUCTIONS.turn[4],
+      ];
+}
+
+export function pairwiseInstructions(kind: RatingKind, criteria?: PairwiseCriteriaSet): string[] {
+  return pairwiseInstructionsFor(kind, criteria ? PAIRWISE_CRITERIA_SETS[criteria] : PAIRWISE_CRITERIA[kind]);
 }
 
 /** An item before labels become final: the case and its options in page order; a chain item carries its reference. */
@@ -440,8 +461,9 @@ export function planRatingSet(
   const setId = `text-${spec.kind}`;
   const pageId = sha256(`${deps.salt}|page`).slice(0, 10);
   const mode: RatingMode = spec.pairwise ? "pairwise" : "ranked";
+  const criteria = mode === "pairwise" ? spec.criteria : undefined;
   return {
-    set: pageSet(spec.kind, mode, setId, pageId, items, spec.preview),
+    set: pageSet(spec.kind, mode, setId, pageId, items, spec.preview, criteria),
     key: {
       setId,
       pageId,
@@ -453,6 +475,7 @@ export function planRatingSet(
       items: keyItems,
       labelDistribution,
       notes,
+      ...(criteria ? { criteria } : {}),
     },
   };
 }
@@ -463,7 +486,7 @@ export function pageFieldLabels(kind: RatingKind, mode: RatingMode = "ranked"): 
   return [...FIELD_LABELS, ...(mode === "pairwise" ? Object.values(PAIRWISE_LABELS) : []), ...own];
 }
 
-function pageSet(kind: RatingKind, mode: RatingMode, setId: string, pageId: string, items: RatingItem[], preview: boolean): RatingSet {
+function pageSet(kind: RatingKind, mode: RatingMode, setId: string, pageId: string, items: RatingItem[], preview: boolean, criteria?: PairwiseCriteriaSet): RatingSet {
   const pairwise = mode === "pairwise";
   return {
     setId,
@@ -471,7 +494,7 @@ function pageSet(kind: RatingKind, mode: RatingMode, setId: string, pageId: stri
     kind,
     ...(pairwise ? { mode } : {}),
     title: TITLES[kind],
-    instructions: pairwise ? PAIRWISE_INSTRUCTIONS[kind] : INSTRUCTIONS[kind],
+    instructions: pairwise ? pairwiseInstructions(kind, criteria) : INSTRUCTIONS[kind],
     fieldLabels: pageFieldLabels(kind, mode),
     items,
     preview,
@@ -505,7 +528,7 @@ function buildItem(
     options: Object.entries(keyItem.labels).map(([label, ref]) => {
       const record = findOutput(records, kind, ref);
       if (!record) throw new Error(`No usable output for ${id} option ${label}`);
-      const content = optionContent(kind, loadOutput(record), evalCase.state);
+      const content = optionContent(kind, loadOutput(record), evalCase.state, evalCase.tags.ending);
       if (!chain || content.kind !== "turn" || !evalCase.state) return { label, content };
       const plan = chainPlanOf(records, record);
       if (!plan) throw new Error(`No usable chapter plan for ${id} option ${label}`);
@@ -528,11 +551,13 @@ export function ratingSetFromKey(
   const kind: RatingKind = key.setId === "text-setup" ? "setup" : "turn";
   const caseById = new Map(cases.map((c) => [c.id, c]));
   const items = Object.entries(key.items).map(([id, keyItem]) => buildItem(kind, id, keyItem, caseById, records, loadOutput));
-  return pageSet(kind, key.mode ?? "ranked", key.setId, key.pageId, items, false);
+  return pageSet(kind, key.mode ?? "ranked", key.setId, key.pageId, items, false, key.criteria);
 }
 
-function optionContent(kind: RatingKind, output: unknown, state: StoryState | undefined): OptionContent {
+/** A turn option as the player sees it: at an ending the game shows no options and no interludes (turn doc M21). */
+function optionContent(kind: RatingKind, output: unknown, state: StoryState | undefined, ending = false): OptionContent {
   if (kind === "setup") return setupCard(output);
   if (!state) throw new Error("A turn option needs the case's story state");
-  return turnContent(output, state);
+  const content = turnContent(output, state);
+  return ending ? { ...content, beats: content.beats.map((b) => ({ ...b, options: [], interludes: [] })) } : content;
 }

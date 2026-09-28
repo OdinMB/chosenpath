@@ -2,8 +2,10 @@ import type { Story } from "core/models/Story.js";
 import type { BeatOption, Change, Outcome, SetOfBeatGenerationSchema, Stat, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
 import { GameModes } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
+import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
 import { allowedLengths, chaptersThatFit, outcomeNeeds, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
+import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
@@ -345,6 +347,85 @@ const firstWordOf = (text: string) => text.toLowerCase().replace(/^[^\p{L}]+/u, 
 const totalPoints = (o: BeatOption) =>
   o.optionType === "challenge" ? (o.basePoints ?? 0) + asArray<{ effect: number }>(o.modifiersToSuccessRate).reduce((sum, m) => sum + (m?.effect ?? 0), 0) : 0;
 
+// --- Turn round 2's beat checks (B6, B7, B8) ---
+
+const STOP_WORDS = new Set(["with", "that", "this", "from", "into", "your", "their", "about", "them", "they", "have", "will", "what", "when", "where", "which", "while", "before", "after", "over", "under", "more", "most", "some", "than", "then", "there", "these", "those", "yourself"]);
+/** A text's content words: four letters or more, no stop words, bracketed ids left out. */
+const contentWords = (text: string) =>
+  new Set(
+    text
+      .replace(/\([^)]*\)/g, " ")
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter((w) => w.length >= 4 && !STOP_WORDS.has(w))
+  );
+const overlap = (a: Set<string>, b: Set<string>) => [...a].filter((w) => b.has(w)).length;
+
+/** Direct speech: a double quote, or a single-quoted run of words. */
+const SPEECH = /["“”]|(^|\s)['‘][^'’\n]{3,}['’](?=\s|[,.!?;:]|$)/;
+
+/** The resolution names an outcome's possible resolutions use (favorable/mixed/unfavorable, sideAWins/mixed/sideBWins, resolution1-3). */
+const resolutionKeys = (outcome: Outcome) => Object.keys(asObject(outcome.possibleResolutions));
+
+/**
+ * Round 2's checks on what a turn's reply keeps: a topic switch's options in
+ * its directions' order and free of ids (B7, A2); speech in a first turn's
+ * first paragraph (B7); the ending's per-outcome answers (B8, the round-2
+ * form's own field: not reported on a reply without it); and no lever where
+ * B6's computed rate line gives none (reported only on those turns, so the
+ * reference, which never saw the line, reads against the same turns).
+ */
+function roundTwoChecks(story: Story, reply: SetOfBeatGenerationSchema): Record<string, boolean> {
+  const checks: Record<string, boolean> = {};
+  const beatType = story.getCurrentBeatType();
+  const known = knownOutcomeIds(story);
+  for (const slot of story.getPlayerSlots()) {
+    const beat = asObject((reply as unknown as Loose)[slot]);
+    if (Object.keys(beat).length === 0) continue;
+    const options = asArray<BeatOption>(beat.options).filter((o) => o && typeof o === "object");
+    if (beatType === "switch") {
+      const written = asArray<Switch>(story.getCurrentSwitchAnalysis()?.switches).find((s) => asArray<string>(s?.players).includes(slot));
+      const directions = asArray<string>(written?.topicChoices).map(asString);
+      if (written?.type === "topic" && directions.length === 3 && options.length === 3) {
+        const words = directions.map(contentWords);
+        const follows = options.every((o, i) => {
+          const own = contentWords(asString(o.text));
+          const scores = words.map((w) => overlap(own, w));
+          return scores[i] > 0 && scores.every((s) => s <= scores[i]);
+        });
+        checks.switchOptionsFollowDirections = (checks.switchOptionsFollowDirections ?? true) && follows;
+        checks.switchOptionsNoIds = (checks.switchOptionsNoIds ?? true) && options.every((o) => !holdsIds(asString(o.text), known));
+      }
+      if (story.isFirstBeat()) {
+        const [first] = playerParagraphs(prose(asString(beat.text))).map((p) => p.trim()).filter((p) => /\p{L}/u.test(p));
+        checks.firstParagraphSpeech = (checks.firstParagraphSpeech ?? true) && SPEECH.test(first ?? "");
+      }
+    }
+    if (beatType === "ending" && Array.isArray(beat.outcomeEndings)) {
+      const answers = beat.outcomeEndings.map(asObject);
+      const outcomes = [...new Map(outcomesOf(story, [slot]).map((o) => [o.id, o])).values()];
+      const ids = answers.map((a) => asString(a.outcomeId));
+      checks.endingAnswersEveryOutcome =
+        (checks.endingAnswersEveryOutcome ?? true) &&
+        ids.length === outcomes.length &&
+        outcomes.every((o) => {
+          const own = answers.filter((a) => a.outcomeId === o.id);
+          return own.length === 1 && resolutionKeys(o).includes(asString(own[0].resolution));
+        });
+      // The setup document's ending rule: an outcome without milestones, the one this ending adds included, ends mixed
+      const ended = new Set((story.getResolvedThreadAnalysis()?.threads ?? []).map((t) => t?.outcomeId));
+      const bare = outcomes.filter((o) => (o.milestones?.length ?? 0) === 0 && !ended.has(o.id) && resolutionKeys(o).includes("mixed"));
+      if (bare.length > 0) {
+        checks.endingNoMilestoneMixed = (checks.endingNoMilestoneMixed ?? true) && bare.every((o) => answers.find((a) => a.outcomeId === o.id)?.resolution === "mixed");
+      }
+    }
+    if (beatType === "thread" && expectedOptionType(story, slot) === "challenge" && sacrificeRewardLine(story, slot).endsWith("none this turn.")) {
+      checks.leverFollowsRateLine = (checks.leverFollowsRateLine ?? true) && options.every((o) => o.resourceType === "normal");
+    }
+  }
+  return checks;
+}
+
 /**
  * The beat checks of turn doc A.C on one reply. `reply` is what the game
  * keeps (beatRepairs), `written` the reply as the model wrote it.
@@ -411,6 +492,8 @@ export function checkBeatDesign(story: Story, reply: SetOfBeatGenerationSchema, 
   counts.stockPhrases = STOCK.reduce((sum, phrase) => sum + (lower.split(phrase).length - 1), 0);
   counts.pathAhead = lower.split("the path ahead").length - 1;
   counts.anomalyWords = (lower.match(ANOMALY) ?? []).length;
+
+  Object.assign(checks, roundTwoChecks(story, reply));
 
   // Option sets (B6)
   const sets = beats.filter((b) => b.options.length === 3);

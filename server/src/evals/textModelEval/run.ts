@@ -10,6 +10,7 @@ import { createStoryStateFromTemplate } from "../../game/services/StoryStateFact
 import { contentFilterClassifier } from "../../game/services/ContentFilterService.js";
 import { loadStoryStates, loadTemplates } from "../imageModelEval/cases.js";
 import { armSettings, baselineArm, EVAL_ROLES, STAGES, type EvalRole, type Stage } from "./arms.js";
+import { balanceSimulation, renderBalanceSim, storedChallengeSets } from "./balanceSim.js";
 import { htmlLeaks, metadataLeaks } from "./blinding.js";
 import { budgetCheck, resolveCaps, spentByStage, type Caps, type LedgerStage, type SpendRecord } from "./budget.js";
 import { buildCases } from "./caseBuilder.js";
@@ -35,7 +36,7 @@ import { prepSpend } from "./prepCalls.js";
 import { previewSource, STORED_ARM } from "./previewSource.js";
 import { runProbe } from "./probe.js";
 import { renderRatingPage } from "./ratingPage.js";
-import { planRatingSet, ratingSetFromKey, type ArmRef, type RatingKind } from "./ratingSets.js";
+import { planRatingSet, ratingSetFromKey, type ArmRef, type PairwiseCriteriaSet, type RatingKind } from "./ratingSets.js";
 import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type ExportedRatings } from "./ratingScore.js";
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
@@ -66,7 +67,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     --pairwise: exactly two arms, the reference then the candidate, Which is better? per item;
  *     --chain-arms <ref chain>,<candidate chain> [--chain-items 4]: on a pairwise turn page, chapter openings
  *     too, each option the chain's first turn with its own plan;
- *     --no-repeat: leaves the repeated item out)
+ *     --no-repeat: leaves the repeated item out; --criteria turn-round2: a pairwise turn page with turn round 2's questions)
  *   --rerender-page <pageId>      renders an existing key's page afresh (same items, labels, page id)
  *   --score <export.json>
  *   --results                     rewrites results.md from the stored records (after a reading changed); no API calls
@@ -83,7 +84,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-calibration [--arms gpt-6-luna@low] [--samples 2] [--max-spend 0.10]  the judged checks on the
  *     hand-read turns (judgedChecks.ts)
  *   --judge-records --arms <beat or chain keys> --prompt-state <tag> [--samples 1] [--max-spend 0.10]  the judged
- *     checks on a round's chapter steps (the reference and the candidates), then judged-turns.md and .json
+ *     checks on a round's turns after the first (the reference and the candidates), then judged-turns.md and .json
+ *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
+ *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  * Filters: --role setup,beat,switch,thread,iteration (analysis = switch+thread),
  *   --mode isolated|pipeline, --arms, --cases, --samples N, --subset15,
  *   --no-mp-continuations (drops multiplayer beats other than first beats and endings),
@@ -108,7 +111,8 @@ type Mode =
   | "build-round-cases"
   | "backfill-chapters"
   | "judge-calibration"
-  | "judge-records";
+  | "judge-records"
+  | "balance-sim";
 
 type Args = {
   mode: Mode;
@@ -150,6 +154,8 @@ type Args = {
   fresh: boolean;
   /** --check-baselines --ratings: rating exports whose rank-1 picks to read the checks against */
   ratingsFiles: string[];
+  /** Pairwise pages: a round's own questions (--criteria turn-round2) */
+  criteria?: PairwiseCriteriaSet;
 };
 
 class UsageError extends Error {}
@@ -209,8 +215,15 @@ function parseArgs(argv: string[]): Args {
       case "--backfill-chapters":
       case "--judge-calibration":
       case "--judge-records":
+      case "--balance-sim":
         args.mode = arg.slice(2) as Mode;
         break;
+      case "--criteria": {
+        const value = next();
+        if (value !== "turn-round2") throw new UsageError("--criteria is turn-round2 (a pairwise turn page with turn round 2's questions)");
+        args.criteria = "turnRound2";
+        break;
+      }
       case "--ratings":
         args.ratingsFiles = (next() ?? "").split(",").filter(Boolean).map((file) => path.resolve(file));
         break;
@@ -671,6 +684,7 @@ async function ratingPage(args: Args, files: EvalFiles, dirs: ReturnType<typeof 
       pairwise: args.pairwise,
       repeat: args.repeat,
       ...(chainArms ? { chainArms, chainItems: args.chainItems ?? DEFAULT_CHAIN_ITEMS } : {}),
+      ...(args.criteria ? { criteria: args.criteria } : {}),
     },
     records,
     cases,
@@ -763,6 +777,19 @@ function checkBaselinesMode(args: Args, files: EvalFiles) {
   console.log(`Checked ${report.replies} stored replies. Wrote check-baselines.md and .json in ${files.outDir}`);
 }
 
+/** The reference arm whose stored challenge sets B6's balance simulation scores (today's form on Luna medium). */
+const BALANCE_SIM_ARMS = ["gpt-6-luna@medium/prod"];
+
+/** B6's balance simulation over today's stored challenge options (balanceSim.ts); no API calls. */
+function balanceSimMode(args: Args, files: EvalFiles) {
+  const promptState = args.promptState ?? CURRENT_PROMPT_STATE;
+  const armKeys = args.armKeys?.length ? args.armKeys : BALANCE_SIM_ARMS;
+  const sets = storedChallengeSets(files.readRecords(), files.readCases(), files.loadOutput, armKeys, promptState);
+  const text = renderBalanceSim(balanceSimulation(sets), new Date(), `${armKeys.join(", ")} under ${promptState}`);
+  fs.writeFileSync(files.at("balance-sim.md"), text);
+  console.log(`Scored ${sets.length} challenge sets. Wrote balance-sim.md in ${files.outDir}`);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const dirs = guardEnvironment();
@@ -794,6 +821,8 @@ async function main() {
       return judgeCalibrationMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_JUDGE_SAMPLES);
     case "judge-records":
       return judgeRecordsMode(prepContext(args, files), args.armKeys, args.samples ?? DEFAULT_RECORD_JUDGE_SAMPLES, args.promptState ?? CURRENT_PROMPT_STATE);
+    case "balance-sim":
+      return balanceSimMode(args, files);
     default:
       return dryRun(args, files, dirs);
   }

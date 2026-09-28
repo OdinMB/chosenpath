@@ -282,8 +282,9 @@ export function roundTurnsToJudge(
       problems.push(`${r.caseId}: no frozen case for ${r.armKey}`);
       return [];
     }
+    // Every turn a judged check applies to (judgedChecksFor): chapter steps get all three, switch turns and endings the
+    // first paragraph (turn round 2), a first turn none
     const story = beatInput(r, evalCase, records, load);
-    if (story.getCurrentBeatType() !== "thread") return [];
     const { reply } = repairBeatReply(story, load(r) as SetOfBeatGenerationSchema);
     return story.getPlayerSlots().flatMap((slot) => {
       const judged = judgeRequest(story, reply, slot, evalCase.chapterFrames);

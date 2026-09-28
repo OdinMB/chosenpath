@@ -527,7 +527,7 @@ export function renderJudgedReadings(readings: JudgedArmReading[], input: { spen
   const lines = [
     "# Judged checks on the round's turns",
     "",
-    `Generated ${input.generatedAt.toISOString()} from prep-calls.jsonl: one judge call (${DEFAULT_JUDGE_ARM}, prompt v${JUDGE_PROMPT_VERSION}) per player's turn of each arm's chapter steps. A candidate is read against its reference on the turns both have, with the reference's sample-1-against-sample-2 difference as the noise and the stop rule on top (moved only beyond the noise and at a one-sided Fisher p < 0.10). Calibration (judge-calibration.md): firstParagraphNarratesChoice is judged reliably on Luna low, with every hand no a gpt-4.1-mini turn; stepLeftOpen and concreteProgress are readings only. Spent on these judge calls: $${input.spentUsd.toFixed(4)}.`,
+    `Generated ${input.generatedAt.toISOString()} from prep-calls.jsonl: one judge call (${DEFAULT_JUDGE_ARM}, prompt v${JUDGE_PROMPT_VERSION}) per player's turn of each arm, after the first turn (chapter steps get all three checks; switch turns and endings, from turn round 2 on, the first paragraph only). A candidate is read against its reference on the turns both have, with the reference's sample-1-against-sample-2 difference as the noise and the stop rule on top (moved only beyond the noise and at a one-sided Fisher p < 0.10). Calibration (judge-calibration.md): firstParagraphNarratesChoice is judged reliably on Luna low, with every hand no a gpt-4.1-mini turn; stepLeftOpen and concreteProgress are readings only. Spent on these judge calls: $${input.spentUsd.toFixed(4)}.`,
     "",
     "| Arm | Check | Arm passes | Reference passes | Noise | Reading |",
     "|---|---|---|---|---|---|",

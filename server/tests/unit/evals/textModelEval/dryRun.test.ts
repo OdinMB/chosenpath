@@ -63,10 +63,11 @@ describe("printDryRun: the prompt state it plans under", () => {
   it("plans a row for each round stage and the migration check against its own cap", async () => {
     const lines = await dryRun([]);
     expect(lines.some((line) => /^Setup rounds candidates \(isolated\): 0 jobs .*\(stage cap \$3\)/.test(line))).toBe(true);
-    // Turn round 1's three chapter-turn arms (full, slim, slim's retest) on the one chapter step, two samples each
-    expect(lines.some((line) => /^Turn rounds candidates \(isolated\): 6 jobs .*\(stage cap \$2\)/.test(line))).toBe(true);
-    // The one single-player beat case at production's beat arm, two samples, and no baseline
-    expect(lines.some((line) => /^Migration check \(production defaults, isolated\): 2 jobs .*\(stage cap \$1\.2\)/.test(line))).toBe(true);
+    // Turn round 1's three chapter-turn arms (full, slim, slim's retest) on the one chapter step, two samples each, then
+    // turn round 2's form at two samples and its paragraph arm at one
+    expect(lines.some((line) => /^Turn rounds candidates \(isolated\): 9 jobs .*\(stage cap \$2\)/.test(line))).toBe(true);
+    // The one single-player beat case at production's beat arm, two samples and turn round 2's rerun (sample 4), and no baseline
+    expect(lines.some((line) => /^Migration check \(production defaults, isolated\): 3 jobs .*\(stage cap \$1\.2\)/.test(line))).toBe(true);
     expect(lines.some((line) => /Stage migration: \$0\.00 of \$1\.2 \(.+\)/.test(line))).toBe(true);
   });
 

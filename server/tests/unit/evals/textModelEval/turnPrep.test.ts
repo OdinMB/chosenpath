@@ -10,7 +10,7 @@ import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { judgeCalibrationMode, roundTurnsToJudge, type PrepContext } from "../../../../src/evals/textModelEval/turnPrep.js";
 import { CURRENT_PROMPT_STATE } from "../../../../src/evals/textModelEval/variants.js";
 import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
-import { laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
+import { firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { beatGeneration, beatSet, challengeOptions } from "../../../helpers/textFixtures.js";
 import { evalCase, executed, record } from "./fixtures.js";
 
@@ -123,9 +123,11 @@ describe("roundTurnsToJudge (--judge-records)", () => {
     expect(turns[0].request.prompt).toContain("======= THIS CHAPTER =======");
   });
 
-  it("leaves out turns that are no chapter step, and arms that were not asked for", () => {
+  it("judges switch turns and endings on the first paragraph only (turn round 2), and leaves out first turns and arms that were not asked for", () => {
     const switchCase = evalCase("s", "beat", { state: laterSwitchBeat(1).getState() });
-    const records = [beatRecord(REF, 1, { caseId: "s" }), beatRecord("gpt-6-luna@low/prod", 1)];
-    expect(roundTurnsToJudge(records, [CASE, switchCase], () => reply(), [REF], "round0").turns).toEqual([]);
+    const firstCase = evalCase("f", "beat", { state: firstSwitchBeat(1).getState() });
+    const records = [beatRecord(REF, 1, { caseId: "s" }), beatRecord(REF, 1, { caseId: "f" }), beatRecord("gpt-6-luna@low/prod", 1)];
+    const { turns } = roundTurnsToJudge(records, [CASE, switchCase, firstCase], () => reply(), [REF], "round0");
+    expect(turns.map((t) => [t.caseId, t.checks])).toEqual([["s", ["firstParagraphNarratesChoice"]]]);
   });
 });
