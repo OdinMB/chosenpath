@@ -13,11 +13,12 @@ import {
 } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { ROUND2B_BASE_PARTS, iterationRound2Request, setupRound2Request, type Round2Order } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
-import { ROUND2_SWITCH_CHAIN_CASES } from "../../../../src/evals/textModelEval/arms.js";
+import { ROUND2_SWITCH_CHAIN_CASES, ROUND3_PROBLEM_TURN, ROUND3_REPLAY_CASES, ROUND3_REPLAY_SAMPLES } from "../../../../src/evals/textModelEval/arms.js";
 import { planJobs, rebuiltToday, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
 import type { CallRecord, Job } from "../../../../src/evals/textModelEval/runner.js";
 import {
   assembledReply,
+  callLimitsOf,
   isSplitRequest,
   requestFor,
   requestText,
@@ -278,6 +279,23 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@low/planV2": ["mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2", "mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
     });
     expect(plan("turn-rounds").every((j) => !isSplitRequest(j.first.request()))).toBe(true);
+  });
+
+  it("plans round 3's replay: B9 five times on the problem turn and the problem first turn, the round-2 form's samples 3 to 5 on the problem turn", () => {
+    const cases = [...ROUND3_REPLAY_CASES, "sp"].map((id) => evalCase(id, "beat", { state: threadBeat(1, { id: `story-${id}` }).getState() }));
+    const jobs = planJobs(cases, { stage: "turn-rounds", promptState: "round0", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    const replay = jobs.filter((j) => j.armKey.endsWith("/turnR3Form") || (j.armKey.endsWith("/turnR2b") && j.sample > 2));
+    const sorted = (list: Job[]) => list.map((j) => `${j.caseId} s${j.sample}`).sort();
+    const samples = (id: string, from: number) => Array.from({ length: ROUND3_REPLAY_SAMPLES - from + 1 }, (_, i) => `${id} s${from + i}`);
+    expect(sorted(replay.filter((j) => j.armKey === "gpt-6-luna@medium/turnR3Form"))).toEqual(ROUND3_REPLAY_CASES.flatMap((id) => samples(id, 1)).sort());
+    // The shrink (the stage's $0.04): the round-2 form's extra replays only on the problem turn, where it has two samples already
+    expect(sorted(replay.filter((j) => j.armKey === "gpt-6-luna@medium/turnR2b"))).toEqual(samples(ROUND3_PROBLEM_TURN, 3));
+    // Only the replay cases, and B9 goes out split with production's limits
+    expect(replay.some((j) => j.caseId === "sp")).toBe(false);
+    const b9 = replay.find((j) => j.armKey.endsWith("/turnR3Form"))?.first.request();
+    expect(b9 && isSplitRequest(b9)).toBe(true);
+    expect(b9 && callLimitsOf(b9)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+    expect(callLimitsOf(jobs.find((j) => j.armKey.endsWith("/turnR2b"))!.first.request())).toBeUndefined();
   });
 
   it("chains round 2's switch cases: planner v2 into the round-2 turn, today's pair beside it in the migration check, two samples each", () => {

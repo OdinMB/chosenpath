@@ -47,8 +47,16 @@ import { NO_BLANK_ITEMS } from "./setupRound1.js";
  * last paragraph. It gives the last paragraph the others' length, keeps
  * characters from listing the options, and says the hooks rule rations
  * mysteries, not facts; nothing else changes.
+ * "paragraphsLast" is the paragraph arm's one fix-and-retest (round 2: 9 of
+ * its 11 sentence-rule misses were a two-sentence last paragraph): the
+ * paragraph arm with the last paragraph "three to five sentences like every
+ * other", and none of B5's other retest lines. Turn round 3's B9 sends it as
+ * a split request (turnRound3.ts).
  */
-export type TurnRound2Form = "round2" | "paragraphs" | "retest";
+export type TurnRound2Form = "round2" | "paragraphs" | "retest" | "paragraphsLast";
+
+/** The forms with B9 item 2: the paragraph count at the text field, the shouted copies gone. */
+const countAtText = (form: TurnRound2Form) => form === "paragraphs" || form === "paragraphsLast";
 
 export type TurnRound2Request = TextRequest & { assemble?: (parsed: unknown) => unknown };
 
@@ -94,10 +102,13 @@ const LAST_PARAGRAPH = `- The last paragraph brings the pressure that the option
 const LAST_PARAGRAPH_LENGTH = "three to five sentences like every other";
 const NO_OPTIONS_IN_SPEECH = "not even in a character's words";
 /** B5's retest: the last paragraph at the paragraphs' length, and no option list in a character's mouth. */
-const LAST_PARAGRAPH_RETEST = LAST_PARAGRAPH.replace("- The last paragraph brings", `- The last paragraph, ${LAST_PARAGRAPH_LENGTH}, brings`).replace(
-  "names none of them and",
-  `names none of them, ${NO_OPTIONS_IN_SPEECH}, and`
-);
+const LAST_PARAGRAPH_LENGTHENED = LAST_PARAGRAPH.replace("- The last paragraph brings", `- The last paragraph, ${LAST_PARAGRAPH_LENGTH}, brings`);
+const LAST_PARAGRAPH_RETEST = LAST_PARAGRAPH_LENGTHENED.replace("names none of them and", `names none of them, ${NO_OPTIONS_IN_SPEECH}, and`);
+
+function lastParagraphRule(form: TurnRound2Form): string {
+  if (form === "retest") return LAST_PARAGRAPH_RETEST;
+  return form === "paragraphsLast" ? LAST_PARAGRAPH_LENGTHENED : LAST_PARAGRAPH;
+}
 
 const FACTS_NOT_RATIONED = "This rations mysteries, not facts";
 
@@ -313,7 +324,7 @@ function commonEdits(text: string, kind: TurnKind, levers: boolean, form: TurnRo
   edited =
     kind === "ending"
       ? replaceOnce(LABEL, edited, `\n${OLD_LAST_PARAGRAPH}`, "")
-      : replaceOnce(LABEL, edited, OLD_LAST_PARAGRAPH, retest ? LAST_PARAGRAPH_RETEST : LAST_PARAGRAPH);
+      : replaceOnce(LABEL, edited, OLD_LAST_PARAGRAPH, lastParagraphRule(form));
   if (kind === "switch" || kind === "chapter") edited = replaceOnce(LABEL, edited, OLD_HINT, retest ? HOOKS_RETEST : HOOKS);
   if (kind !== "ending") {
     edited = replaceOnce(LABEL, edited, OLD_INTERLUDE_COUNT, "Create two to four interludes.");
@@ -402,7 +413,7 @@ function instructionEdits(text: string, story: Story, kind: TurnKind, form: Turn
   if (kind === "switch") edited = switchEdits(afterChapterEdits(edited));
   if (kind === "chapter") edited = chapterEdits(edited, story, chapterKind(story));
   if (kind === "ending") edited = endingEdits(edited);
-  return form === "paragraphs" ? replaceOnce(LABEL, edited, `\n\n${SHOUTED_COUNT}`, "") : edited;
+  return countAtText(form) ? replaceOnce(LABEL, edited, `\n\n${SHOUTED_COUNT}`, "") : edited;
 }
 
 // ---------------------------------------------------------------- the state
@@ -519,7 +530,7 @@ function textField(text: z.ZodTypeAny, kind: TurnKind, form: TurnRound2Form): z.
     edited = reworded(edited, TEXT_UNRESOLVED, "");
     edited = reworded(edited, TEXT_PLAN_LIST, "- Always");
   }
-  if (form === "paragraphs") {
+  if (countAtText(form)) {
     edited = reworded(edited, TEXT_COUNT, `- ${PARAGRAPH_COUNT}\n`);
     edited = reworded(edited, `\n\n${SHOUTED_COUNT}`, "");
   }

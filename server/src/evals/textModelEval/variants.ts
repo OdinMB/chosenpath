@@ -39,6 +39,8 @@ import {
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../game/services/storyTextRounds/turnRound1Planners.js";
 import { chapterTurnRequest, type ChapterFrameText, type ChapterTurnForm } from "../../game/services/storyTextRounds/turnRound1Turns.js";
 import { turnRound2Request, type TurnRound2Form } from "../../game/services/storyTextRounds/turnRound2.js";
+import { turnRound3FormRequest, type TurnRound3Request } from "../../game/services/storyTextRounds/turnRound3.js";
+import type { CallLimits } from "shared/llm/chatModel.js";
 
 /*
  * The prompt/schema variant hook. "prod" builds exactly what production
@@ -99,6 +101,11 @@ import { turnRound2Request, type TurnRound2Form } from "../../game/services/stor
  * fix-and-retest on turnR2b (the last paragraph at the others' length, no
  * option list in a character's mouth, the hooks rule rationing mysteries, not
  * facts).
+ * Turn round 3's B9 (storyTextRounds/turnRound3.ts): "turnR3Form" is the GPT-6
+ * request form, the round-2 form with B9's paragraph rule (the count at the
+ * text field, the last paragraph at the others' length) sent as a split
+ * request, the rules that differ per turn moved into the per-call part, with
+ * production's timeout and output cap (the only variant that carries limits).
  */
 
 export type VariantId =
@@ -126,7 +133,8 @@ export type VariantId =
   | "turnR2"
   | "turnR2b"
   | "turnR2Paragraphs"
-  | "turnR2c";
+  | "turnR2c"
+  | "turnR3Form";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -153,6 +161,7 @@ export const VARIANTS: VariantId[] = [
   "turnR2b",
   "turnR2Paragraphs",
   "turnR2c",
+  "turnR3Form",
 ];
 
 /**
@@ -160,10 +169,15 @@ export const VARIANTS: VariantId[] = [
  * then a per-call message. A one-message request may carry `assemble`: its
  * reply is written in another field order and reshaped into the saved fields.
  */
-export type EvalRequest = TextRequest | Round2Request | SplitTextRequest;
+export type EvalRequest = TextRequest | Round2Request | SplitTextRequest | TurnRound3Request;
 
 export function isSplitRequest(request: EvalRequest): request is SplitTextRequest {
   return "fixed" in request;
+}
+
+/** The timeout and output cap a request sends instead of the eval's (300 s, no cap): production's, on turn round 3's B9. */
+export function callLimitsOf(request: EvalRequest): CallLimits | undefined {
+  return "limits" in request ? request.limits : undefined;
 }
 
 /** A parsed reply as the fields saved today: assembled where the request writes another order, else as it came. */
@@ -402,6 +416,10 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnR2b: roundTwoTurn("turnR2b", "round2"),
   turnR2Paragraphs: roundTwoTurn("turnR2Paragraphs", "paragraphs"),
   turnR2c: roundTwoTurn("turnR2c", "retest"),
+  turnR3Form: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant turnR3Form does not cover role ${input.role}`);
+    return turnRound3FormRequest(input.story);
+  },
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

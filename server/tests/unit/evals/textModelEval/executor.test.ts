@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { z } from "zod";
 import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
-import { executeCall, type FetchFn } from "../../../../src/evals/textModelEval/executor.js";
+import { EVAL_TIMEOUT_MS, callOptionsFor, executeCall, type FetchFn } from "../../../../src/evals/textModelEval/executor.js";
 import { MESSAGE_SEPARATOR } from "../../../../src/evals/textModelEval/variants.js";
 import { BASELINE, LUNA, record } from "./fixtures.js";
 
@@ -120,6 +120,22 @@ describe("executeCall", () => {
     it("still sends a plain request as one user message", async () => {
       const { body } = await sent(LUNA, { prompt: "write", schema });
       expect(body.messages).toEqual([{ role: "user", content: "write" }]);
+    });
+
+    it("sends a request's own output cap where it carries production's limits, and none otherwise (the eval caps nothing)", async () => {
+      const limited = await sent(LUNA, { ...split, limits: { timeoutMs: 90_000, maxCompletionTokens: 12_000 } });
+      expect((limited.body as unknown as Record<string, unknown>).max_completion_tokens).toBe(12_000);
+      const plain = await sent(LUNA, split);
+      expect(JSON.stringify(plain.body)).not.toContain("max_completion_tokens");
+    });
+  });
+
+  it("waits a request's own timeout where it carries production's limits, else the eval's 300 s", () => {
+    const schema = z.object({ answer: z.string() });
+    expect(callOptionsFor({ prompt: "write", schema })).toEqual({ timeoutMs: EVAL_TIMEOUT_MS });
+    expect(callOptionsFor({ fixed: "f", perCall: "p", schema, limits: { timeoutMs: 90_000, maxCompletionTokens: 12_000 } })).toEqual({
+      timeoutMs: 90_000,
+      maxCompletionTokens: 12_000,
     });
   });
 });

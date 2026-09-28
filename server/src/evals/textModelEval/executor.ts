@@ -6,7 +6,7 @@ import { createChatModel, modelFamily } from "shared/llm/chatModel.js";
 import { callMetricsFromCompletion, type CallMetrics } from "shared/llm/usageRecorder.js";
 import { armSettings, productionRole, type Arm, type EvalRole } from "./arms.js";
 import { classifyCall, type Capture, type CallCheck } from "./responseCheck.js";
-import { assembledReply, isSplitRequest, requestText, type EvalRequest } from "./variants.js";
+import { assembledReply, callLimitsOf, isSplitRequest, requestText, type EvalRequest } from "./variants.js";
 
 /*
  * One eval call through the production path: the production factory and
@@ -23,6 +23,17 @@ import { assembledReply, isSplitRequest, requestText, type EvalRequest } from ".
  */
 
 export const EVAL_TIMEOUT_MS = 300_000;
+
+/**
+ * The timeout and output cap one call goes out with: the eval waits 300 s and
+ * caps nothing, so it sees the runaways production cuts, unless the request
+ * carries production's limits (turn round 3's B9, whose guards are part of
+ * the form under test).
+ */
+export function callOptionsFor(request: EvalRequest): { timeoutMs: number; maxCompletionTokens?: number } {
+  const limits = callLimitsOf(request);
+  return limits ? { timeoutMs: limits.timeoutMs, maxCompletionTokens: limits.maxCompletionTokens } : { timeoutMs: EVAL_TIMEOUT_MS };
+}
 
 export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -122,7 +133,7 @@ export async function executeCall(spec: CallSpec, deps: ExecutorDeps): Promise<E
     role: productionRole(spec.role),
     settings: armSettings(spec.arm),
     maxRetries: 0,
-    timeoutMs: EVAL_TIMEOUT_MS,
+    ...callOptionsFor(spec.request),
     configuration: { fetch: capturingFetch(inner, capture) },
   });
   const promptHash = storePrompt(deps.outDir, requestText(spec.request));

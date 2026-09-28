@@ -127,6 +127,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnR2b: "prod",
   turnR2Paragraphs: "turnR2b",
   turnR2c: "prod",
+  // Turn round 3: B9's request form against the round-2 form it sends
+  turnR3Form: "turnR2b",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -184,6 +186,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnR2Paragraphs")]: [armKey(LUNA_MEDIUM, "prod")],
   // B5's fix-and-retest against the round-2 form it retests
   [armKey(LUNA_MEDIUM, "turnR2c")]: [armKey(LUNA_MEDIUM, "turnR2b")],
+  // B9 against today's form too: no base carried forward may be worse than today's on a check the round targets
+  [armKey(LUNA_MEDIUM, "turnR3Form")]: [armKey(LUNA_MEDIUM, "prod")],
   [armKey(LUNA_LOW, "setupR2")]: [armKey(LUNA_LOW, "prod")],
   [armKey(LUNA_LOW, "setupR2Order")]: [armKey(LUNA_LOW, "prod")],
   [armKey({ model: "gpt-6-sol", reasoningEffort: "low" }, "setupR1")]: [armKey(LUNA_LOW, "setupR1")],
@@ -326,7 +330,8 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
  * built; the lean-against-full trigger comparison on the built trigger cases,
  * both forms at four samples (the lean form's samples 3 and 4 on top of its
  * two); the chapter turns on Luna medium, full then slim, at two samples on
- * every single-player chapter step. gpt-4.x is never a new arm.
+ * every single-player chapter step. Turn rounds 2 and 3 follow (their plans
+ * say what they run). gpt-4.x is never a new arm.
  */
 function turnRoundArms(role: EvalRole): ArmPlan[] {
   switch (role) {
@@ -354,6 +359,17 @@ function turnRoundArms(role: EvalRole): ArmPlan[] {
         // B5's one fix-and-retest (round 2: two-sentence last paragraphs, facts 3.77 → 3.24, options named at the end), once on
         // the stored chapter steps and switch turns, where those readings fell (what the turn-rounds stage has left)
         { arm: luna("medium", "turnR2c"), samples: 1, scope: "single-player", source: "stored", caseIds: ROUND2_RETEST_CASES },
+        // Turn round 3's B9, shrunk to the stage's last $0.04: its replay of the problem story turn and the problem first
+        // turn, five times each, then the round-2 form's samples 3 to 5 on the problem turn (it has two there already)
+        { arm: luna("medium", "turnR3Form"), samples: ROUND3_REPLAY_SAMPLES, scope: "single-player", source: "stored", caseIds: ROUND3_REPLAY_CASES },
+        {
+          arm: luna("medium", "turnR2b"),
+          samples: ROUND3_REPLAY_SAMPLES,
+          fromSample: 3,
+          scope: "single-player",
+          source: "stored",
+          caseIds: [ROUND3_PROBLEM_TURN],
+        },
       ];
     default:
       return [];
@@ -476,6 +492,18 @@ export const ROUND2_RETEST_CASES = [
   "synth-8988006e-t8-pregeneration_7_player1_2",
   "synth-8988006e-t4-pregeneration_3_player1_1",
 ];
+
+/**
+ * Turn round 3's replay (turn doc B9, "a replay of the problem turn, five
+ * times"): story 8988006e's turn 4, where Stage 4's split rewrite hung or
+ * padded on 6 of 14 turns and today's form padded once to 41,190 tokens
+ * (cont-8988006e-t4-o0, the switch after its first chapter: every form that
+ * ran there had trouble on it), and the first turn that padded to 24,500
+ * tokens on the rewrite and hung once on today's form (first-tpl-e401abf2-p1).
+ */
+export const ROUND3_PROBLEM_TURN = "cont-8988006e-t4-o0";
+export const ROUND3_REPLAY_CASES = [ROUND3_PROBLEM_TURN, "first-tpl-e401abf2-p1"];
+export const ROUND3_REPLAY_SAMPLES = 5;
 
 export const ROUND2_SWITCH_CHAIN_CASES = [
   "switch-tpl-1c4a4c37-p1-t0",

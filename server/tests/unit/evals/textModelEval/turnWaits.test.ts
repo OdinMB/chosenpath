@@ -90,8 +90,8 @@ describe("turnWaitReadings: p95 per turn kind against the turn rounds' allowance
   it("leaves the planners and the chains out as arms of their own, and renders a table", () => {
     expect(readings.map((r) => r.armKey).every((key) => key === MEDIUM || key === LOW)).toBe(true);
     const text = renderTurnWaits(readings).join("\n");
-    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | chapter opening | 1 | 30.0 s | 40.0 s (chain, 1) | 45 s | within | 0 |");
-    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | switch turn | 1 | 30.0 s | 50.0 s (summed with gpt-6-luna@low/prod) | 45 s | over | 0 |");
+    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | chapter opening | 1 | 30.0 s | 40.0 s (chain, 1) | 45 s | within | 0 | 0 |");
+    expect(text).toContain("| round0 | gpt-6-luna@medium/prod | 1 | switch turn | 1 | 30.0 s | 50.0 s (summed with gpt-6-luna@low/prod) | 45 s | over | 0 | 0 |");
   });
 
   it("appears in results.md when the case kinds are given", () => {
@@ -104,7 +104,56 @@ describe("turnWaitReadings: p95 per turn kind against the turn rounds' allowance
       generatedAt: new Date(0),
     });
     expect(text).toContain("### Turn waits per kind");
-    expect(text).toContain("| round0 | gpt-6-luna@low/prod | 2 | first turn | 1 | 55.0 s | 55.0 s (turn) | 60 s | within | 0 |");
+    expect(text).toContain("| round0 | gpt-6-luna@low/prod | 2 | first turn | 1 | 55.0 s | 55.0 s (turn) | 60 s | within | 0 | 0 |");
+  });
+});
+
+describe("a re-sent attempt is part of its turn's wait (turn round 3: B9's output cap cut a runaway, and production re-sends it)", () => {
+  const B9 = "gpt-6-luna@medium/turnR3Form";
+  const kinds = new Map<string, TurnKind>([["first-1", "first turn"]]);
+  const attempt = (sample: number, n: number, seconds: number, outcome: CallRecord["outcome"] = "valid", final = true): CallRecord =>
+    record({
+      jobKey: `first-1|${B9}|round0|s${sample}`,
+      promptState: "round0",
+      caseId: "first-1",
+      armKey: B9,
+      callArmKey: B9,
+      model: "gpt-6-luna",
+      baseline: false,
+      sample,
+      attempt: n,
+      latencyMs: seconds * 1000,
+      outcome,
+      final,
+      jobFinal: final,
+    });
+  const records = [
+    attempt(1, 1, 20),
+    // Cut at the output cap after 67.7 s, then answered in 33.3 s: the player waits for both
+    attempt(2, 1, 67.7, "length", false),
+    attempt(2, 2, 33.3),
+    // A dropped connection is retried after a backoff, not re-sent at once: it stays out of the wait, like a hang
+    attempt(3, 1, 0.1, "network-error", false),
+    attempt(3, 2, 25),
+  ];
+  const [row] = turnWaitReadings(records, kinds);
+
+  it("adds the cut attempt's wait to its retry's, and counts the cut apart from the hangs", () => {
+    expect(row).toMatchObject({ turns: 3, wait: { source: "turn" }, hangs: 0, cuts: 1 });
+    expect(row.turnP95).toBeCloseTo(101, 5);
+    expect(row.within).toBe(false);
+  });
+
+  it("reads the same whole-job wait per sample", () => {
+    const bySample = turnWaitsBySample(records, kinds);
+    expect(bySample.find((r) => r.sample === 2)?.p95).toBeCloseTo(101, 5);
+    expect(bySample.find((r) => r.sample === 3)?.p95).toBe(25);
+  });
+
+  it("renders the cut attempts beside the hung calls", () => {
+    const text = renderTurnWaits([row]).join("\n");
+    expect(text).toContain("| Hung calls | Cut at the output cap |");
+    expect(text).toContain("| round0 | gpt-6-luna@medium/turnR3Form | 1 | first turn | 3 | 101.0 s | 101.0 s (turn) | 45 s | over | 0 | 1 |");
   });
 });
 

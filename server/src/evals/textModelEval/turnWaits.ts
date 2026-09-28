@@ -2,7 +2,7 @@ import { chainSides, productionArm } from "./arms.js";
 import { percentile } from "./armStats.js";
 import { caseStory, type EvalCase } from "./cases.js";
 import { PREGEN_TURN_CAP_S } from "./gateReadings.js";
-import { usable, type CallRecord } from "./runner.js";
+import { PRODUCTION_RETRIED_OUTCOMES, usable, type CallRecord } from "./runner.js";
 
 /*
  * The turn rounds' wait allowance (stop rule, owner 2026-09-27): the p95 per
@@ -13,7 +13,11 @@ import { usable, type CallRecord } from "./runner.js";
  * the planner and the turn together, its wait is read; otherwise the
  * planner's p95 is added to the turn's, which reads high. Per prompt state,
  * isolated beat arm and player count. Hung calls (the eval's timeout) are in
- * no percentile, so they are counted apart. Readings, not verdicts.
+ * no percentile, so they are counted apart. A turn alone waits for its whole
+ * job: an attempt the runner re-sent at once, as production's parse retries
+ * do (a reply cut at the output cap among them, turn round 3's B9), adds its
+ * wait to the answer's; a transport failure, retried after a backoff, does
+ * not. Cut attempts are counted apart too. Readings, not verdicts.
  */
 
 export type TurnKind = "first turn" | "chapter step" | "chapter opening" | "switch turn" | "ending";
@@ -73,6 +77,8 @@ export type TurnWait = {
   within: boolean;
   /** Attempts on these cases that hung until the eval's timeout, the chain's included where its wait is read */
   hangs: number;
+  /** Attempts of the turns alone cut at the output cap and re-sent (only an arm that sends production's cap has them) */
+  cuts: number;
 };
 
 const seconds = (ms: number) => ms / 1000;
@@ -86,15 +92,16 @@ function plannerFor(beatArm: string, role: "switch" | "thread", players: number,
   return available.length === 1 ? available[0] : undefined;
 }
 
-type Bucket = { records: CallRecord[]; hangs: number };
+type Bucket = { records: CallRecord[]; hangs: number; cuts: number };
 
 function bucketed(records: CallRecord[], keyOf: (r: CallRecord) => string | undefined): Map<string, Bucket> {
   const buckets = new Map<string, Bucket>();
   for (const r of records) {
     const key = keyOf(r);
     if (key === undefined) continue;
-    const bucket = buckets.get(key) ?? { records: [], hangs: 0 };
+    const bucket = buckets.get(key) ?? { records: [], hangs: 0, cuts: 0 };
     if (r.outcome === "timeout") bucket.hangs++;
+    if (r.outcome === "length") bucket.cuts++;
     if (good(r)) bucket.records.push(r);
     buckets.set(key, bucket);
   }
@@ -103,9 +110,23 @@ function bucketed(records: CallRecord[], keyOf: (r: CallRecord) => string | unde
 
 const SEP = "\u0000";
 
+const attemptKey = (r: CallRecord) => [r.jobKey, r.step].join(SEP);
+
+/** Each job's (and step's) wait in ms: its answer's latency plus that of every attempt re-sent at once before it. */
+function jobWaits(records: CallRecord[]): Map<string, number> {
+  const resent = new Map<string, number>();
+  for (const r of records) {
+    if (r.final || !PRODUCTION_RETRIED_OUTCOMES.includes(r.outcome)) continue;
+    resent.set(attemptKey(r), (resent.get(attemptKey(r)) ?? 0) + r.latencyMs);
+  }
+  return resent;
+}
+
 /** p95 per turn kind for every isolated beat arm, per prompt state and player count, against its allowance. */
 export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnKind>): TurnWait[] {
   const kindOf = (r: CallRecord) => kinds.get(r.caseId);
+  const resent = jobWaits(records);
+  const jobSeconds = (r: CallRecord) => seconds(r.latencyMs + (resent.get(attemptKey(r)) ?? 0));
   // Turns alone
   const turns = bucketed(records, (r) => {
     const kind = kindOf(r);
@@ -128,8 +149,8 @@ export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnK
     const [promptState, armKey, playersText, kindText] = key.split(SEP);
     const players = Number(playersText);
     const kind = kindText as TurnKind;
-    const alone = turns.get(key) ?? { records: [], hangs: 0 };
-    const turnP95 = percentile(alone.records.map((r) => seconds(r.latencyMs)), 95);
+    const alone = turns.get(key) ?? { records: [], hangs: 0, cuts: 0 };
+    const turnP95 = percentile(alone.records.map(jobSeconds), 95);
     const role = PLANNED_KINDS[kind];
     let wait: TurnWait["wait"] = { p95: turnP95, n: alone.records.length, source: "turn" };
     let hangs = alone.hangs;
@@ -166,6 +187,7 @@ export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnK
       allowanceS,
       within: wait.p95 !== undefined && wait.p95 <= allowanceS,
       hangs,
+      cuts: alone.cuts,
     });
   }
   return readings;
@@ -196,6 +218,7 @@ export type SampleWait = {
 };
 
 export function turnWaitsBySample(records: CallRecord[], kinds: Map<string, TurnKind>): SampleWait[] {
+  const resent = jobWaits(records);
   const groups = new Map<string, CallRecord[]>();
   for (const r of records) {
     const kind = kinds.get(r.caseId);
@@ -207,7 +230,7 @@ export function turnWaitsBySample(records: CallRecord[], kinds: Map<string, Turn
   return [...groups.entries()]
     .map(([key, group]) => {
       const [promptState, armKey, players, kind, sample] = key.split(SEP);
-      const waits = group.map((r) => seconds(r.group === "pipeline" ? r.turnLatencyMs ?? r.latencyMs : r.latencyMs));
+      const waits = group.map((r) => seconds(r.group === "pipeline" ? r.turnLatencyMs ?? r.latencyMs : r.latencyMs + (resent.get(attemptKey(r)) ?? 0)));
       const pace = group.filter((r) => r.outputTokens > 0).map((r) => r.latencyMs / r.outputTokens);
       const starts = group.map((r) => r.startedAt).sort();
       return {
@@ -270,13 +293,13 @@ export function renderTurnWaits(readings: TurnWait[]): string[] {
     "",
     `### Turn waits per kind (the turn rounds' allowance: p95 at or under ${LUNA_MEDIUM_ALLOWANCE_S} s on Luna medium, at or under ${PREGEN_TURN_CAP_S} s everywhere)`,
     "",
-    "A switch turn waits for the switch planner and the turn, a chapter opening for the chapter planner and the chapter's first step, every other turn for itself (turn doc A.C). Where a chain measured the pair, its wait is read (chain, with its count); otherwise the planner's p95 is added to the turn's (summed, which reads high). Hung calls hit the eval's timeout and are in no percentile, so they are counted apart. Readings, not verdicts.",
+    "A switch turn waits for the switch planner and the turn, a chapter opening for the chapter planner and the chapter's first step, every other turn for itself (turn doc A.C). Where a chain measured the pair, its wait is read (chain, with its count); otherwise the planner's p95 is added to the turn's (summed, which reads high). A turn alone waits for its whole job: an attempt re-sent at once, as production's parse retries are (a reply cut at the output cap among them), adds its wait to the answer's. Hung calls hit the eval's timeout and are in no percentile, so they are counted apart, and so are the attempts cut at the output cap. Readings, not verdicts.",
     "",
-    "| Prompt state | Beat arm | Players | Kind | Turns | Turn alone p95 | Wait p95 (source) | Allowance | Reading | Hung calls |",
-    "|---|---|---|---|---|---|---|---|---|---|",
+    "| Prompt state | Beat arm | Players | Kind | Turns | Turn alone p95 | Wait p95 (source) | Allowance | Reading | Hung calls | Cut at the output cap |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
     ...readings.map(
       (r) =>
-        `| ${r.promptState} | ${r.armKey} | ${r.players} | ${r.kind} | ${r.turns} | ${secs(r.turnP95)} | ${secs(r.wait.p95)} (${sourceText(r.wait)}) | ${r.allowanceS} s | ${r.within ? "within" : "over"} | ${r.hangs} |`
+        `| ${r.promptState} | ${r.armKey} | ${r.players} | ${r.kind} | ${r.turns} | ${secs(r.turnP95)} | ${secs(r.wait.p95)} (${sourceText(r.wait)}) | ${r.allowanceS} s | ${r.within ? "within" : "over"} | ${r.hangs} | ${r.cuts} |`
     ),
   ];
 }

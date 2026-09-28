@@ -79,7 +79,7 @@ const STORIES: [string, () => Story][] = [
   ["exploration step", () => chapterStep("exploration", 1)],
   ["ending", ending],
 ];
-const FORMS: TurnRound2Form[] = ["round2", "paragraphs"];
+const FORMS: TurnRound2Form[] = ["round2", "paragraphs", "paragraphsLast"];
 
 describe("turnRound2Request builds", () => {
   it.each(FORMS.flatMap((form) => STORIES.map(([name, make]) => [form, name, make] as const)))("%s form, %s: every anchor found, a schema that converts", (form, _name, make) => {
@@ -428,6 +428,29 @@ describe("the paragraph arm (B9 item 2)", () => {
     const story = chapterStep("challenge", 1);
     const [base, arm] = (["round2", "paragraphs"] as const).map((form) => turnRound2Request(story, form));
     expect(arm.prompt).toBe(base.prompt.replace(`\n\n${TURN_ROUND2_TEXT.shoutedCount}`, ""));
+  });
+});
+
+describe("the paragraph arm's one fix-and-retest, B9's paragraph rule (round 2: 9 of the arm's 11 misses were a two-sentence last paragraph)", () => {
+  it("is the paragraph arm with the last paragraph at the others' length, and nothing else", () => {
+    for (const [, make] of STORIES) {
+      const story = make();
+      const [arm, fix] = (["paragraphs", "paragraphsLast"] as const).map((form) => turnRound2Request(story, form));
+      expect(JSON.stringify(toJsonSchema(fix.schema))).toBe(JSON.stringify(toJsonSchema(arm.schema)));
+      // The ending has no last-paragraph rule to lengthen
+      const expected =
+        story.getCurrentBeatType() === "ending"
+          ? arm.prompt
+          : arm.prompt.replace("- The last paragraph brings", `- The last paragraph, ${TURN_ROUND2_TEXT.lastParagraphLength}, brings`);
+      expect(fix.prompt).toBe(expected);
+    }
+  });
+
+  it("leaves B5's other retest lines out, so the fix reads against the round-2 form on the paragraph rule alone", () => {
+    const { prompt } = turnRound2Request(chapterStep("challenge", 1), "paragraphsLast");
+    expect(prompt).toContain(TURN_ROUND2_TEXT.lastParagraphLength);
+    expect(prompt).not.toContain(TURN_ROUND2_TEXT.noOptionsInSpeech);
+    expect(prompt).not.toContain(TURN_ROUND2_TEXT.factsNotRationed);
   });
 });
 

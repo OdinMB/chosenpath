@@ -8,6 +8,9 @@ import {
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
+  ROUND3_PROBLEM_TURN,
+  ROUND3_REPLAY_CASES,
+  ROUND3_REPLAY_SAMPLES,
   secondReferenceKeys,
   STAGES,
   stageRunsBaseline,
@@ -213,6 +216,19 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
     // B5's fix-and-retest: against today's form, and against the round-2 form it retests
     expect(referenceKey("gpt-6-luna@medium/turnR2c")).toBe("gpt-6-luna@medium/prod");
     expect(secondReferenceKeys("gpt-6-luna@medium/turnR2c")).toEqual(["gpt-6-luna@medium/turnR2b"]);
+  });
+
+  it("reads turn round 3's request form (B9) against the round-2 form it sends, and against today's form (the carry-forward guard)", () => {
+    expect(referenceKey("gpt-6-luna@medium/turnR3Form")).toBe("gpt-6-luna@medium/turnR2b");
+    expect(secondReferenceKeys("gpt-6-luna@medium/turnR3Form")).toEqual(["gpt-6-luna@medium/prod"]);
+    // Until B9 has measured outputs of its own, it is priced from the round-2 form's
+    expect(estimateBaseKey("gpt-6-luna@medium/turnR3Form")).toBe("gpt-6-luna@medium/turnR2b");
+  });
+
+  it("names round 3's replay cases: the problem story turn (8988006e turn 4) and the problem first turn", () => {
+    expect(ROUND3_PROBLEM_TURN).toBe("cont-8988006e-t4-o0");
+    expect(ROUND3_REPLAY_CASES).toEqual(["cont-8988006e-t4-o0", "first-tpl-e401abf2-p1"]);
+    expect(ROUND3_REPLAY_SAMPLES).toBe(5);
   });
 
   it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {
