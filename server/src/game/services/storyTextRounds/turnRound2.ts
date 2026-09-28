@@ -86,9 +86,10 @@ const HOOKS = `- Plant sparingly, pay off often. When the scene allows, bring ba
   Weak: a new unexplained flicker, sound or symbol in every beat.
   Good: "The second ledger, the one you glimpsed under the clerk's counter, lists tomorrow's arrests before they happen."`;
 
-const FIRST_TURN = `Open in a scene, not a summary: the player character is doing something in a place from the story, and someone from the STORY ELEMENTS wants something from them. Show who the character is through what they do and say. Let the switch's directions (or, in a flavor switch, its stances) arise inside this scene (a visitor, a message, a job, a rumor), so each option reads as a next move. Hint at each outcome through what someone says or wants, never by naming it.
+// The smoke's first turn narrated its character by name, in the third person: the scene is "you" doing something, as every beat is
+const FIRST_TURN = `Open in a scene, not a summary, told in the second person like every beat: you (the player character) are doing something in a place from the story, and someone from the STORY ELEMENTS wants something from you. Show who the character is through what you do and say. Let the switch's directions (or, in a flavor switch, its stances) arise inside this scene (a visitor, a message, a job, a rumor), so each option reads as a next move. Hint at each outcome through what someone says or wants, never by naming it.
 Weak: "You recall the Guild, the enclave and the print shop. The choice is yours."
-Good: "The last poster is still wet on the bakery wall when Gruk steps out of the alley: 'Sir Bram wants the one who wrote this. Tonight.'"`;
+Good: "The last poster is still wet on the bakery wall when Gruk steps out of the alley and looks straight at you: 'Sir Bram wants the one who wrote this. Tonight.'"`;
 
 const FLAVOR_OPENING = "This first switch is a flavor switch: stage its question as the scene's opening.";
 
@@ -604,7 +605,7 @@ export const TURN_ROUND2_TEXT = {
   proseStyleStart: "Prose style\n- Write in the story's tone",
   lastParagraphStart: "- The last paragraph brings the pressure that the options answer",
   hooksStart: "- Plant sparingly, pay off often.",
-  firstTurnStart: "Open in a scene, not a summary:",
+  firstTurnStart: "Open in a scene, not a summary,",
   flavorOpening: FLAVOR_OPENING,
   topicSwitch: TOPIC_SWITCH,
   flavorSwitchStart: "- Flavor switch: the three options are three stances",

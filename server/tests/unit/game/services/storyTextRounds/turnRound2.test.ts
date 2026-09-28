@@ -199,6 +199,13 @@ describe("the first turn (B3 row 3, B7)", () => {
     }
   });
 
+  it("tells the opening scene in the second person, like every beat (the smoke's first turn narrated its character by name)", () => {
+    const { prompt } = turnRound2Request(firstTurn(), "round2");
+    expect(prompt).toContain("told in the second person like every beat");
+    expect(prompt).not.toContain("the player character is doing something");
+    expect(prompt).toContain("steps out of the alley and looks straight at you");
+  });
+
   it("stages the opening of a flavor first switch", () => {
     expect(turnRound2Request(firstTurn("flavor"), "round2").prompt).toContain(TURN_ROUND2_TEXT.flavorOpening);
     expect(turnRound2Request(firstTurn(), "round2").prompt).not.toContain(TURN_ROUND2_TEXT.flavorOpening);

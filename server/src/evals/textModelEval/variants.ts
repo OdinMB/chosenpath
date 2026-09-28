@@ -89,10 +89,13 @@ import { turnRound2Request, type TurnRound2Form } from "../../game/services/stor
  * slim's facts at 3.28 per turn against B4's gate of 3.5, and the step left
  * open on 81% of turns against today's 91%).
  * Turn round 2's candidates (storyTextRounds/turnRound2.ts), every
- * single-player turn on today's form: "turnR2" is the rest of B3, B5 to B8
+ * single-player turn on today's form: "turnR2b" is the rest of B3, B5 to B8
  * and B1's milestone field, its first turn, switch after a chapter and ending
  * assembled into today's stored shape; "turnR2Paragraphs" adds B9 item 2 (the
- * paragraph count at the text field, the shouted copies gone).
+ * paragraph count at the text field, the shouted copies gone). "turnR2" is the
+ * name the smoke ran under (five turns): its first turn narrated the character
+ * in the third person, the first-turn text was fixed, and the round runs as
+ * "turnR2b" so no smoke output of the draft mixes into it.
  */
 
 export type VariantId =
@@ -118,6 +121,7 @@ export type VariantId =
   | "chapterSlim"
   | "chapterSlimPlans"
   | "turnR2"
+  | "turnR2b"
   | "turnR2Paragraphs";
 export const VARIANTS: VariantId[] = [
   "prod",
@@ -142,6 +146,7 @@ export const VARIANTS: VariantId[] = [
   "chapterSlim",
   "chapterSlimPlans",
   "turnR2",
+  "turnR2b",
   "turnR2Paragraphs",
 ];
 
@@ -387,7 +392,9 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   chapterFull: chapterTurn("chapterFull", "full"),
   chapterSlim: chapterTurn("chapterSlim", "slim"),
   chapterSlimPlans: chapterTurn("chapterSlimPlans", "slimPlans"),
+  // The smoke's draft: today's builder, whose first-turn text changed after the smoke; its records stay as the smoke's
   turnR2: roundTwoTurn("turnR2", "round2"),
+  turnR2b: roundTwoTurn("turnR2b", "round2"),
   turnR2Paragraphs: roundTwoTurn("turnR2Paragraphs", "paragraphs"),
 };
 

@@ -271,8 +271,9 @@ describe("planJobs: the round stages and the migration check", () => {
       "gpt-6-luna@medium/chapterFull": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@medium/chapterSlim": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
       "gpt-6-luna@medium/chapterSlimPlans": ["round-sp s1", "round-sp s2", "sp s1", "sp s2"],
-      // Round 2: twice on the stored cases (their reference's two samples), once on the round cases; the paragraph arm once
-      "gpt-6-luna@medium/turnR2": ["sp s1", "sp s2", "round-sp s1"],
+      // Round 2 (its form after the smoke's fix): twice on the stored cases (their reference's two samples), once on the
+      // round cases; the paragraph arm once. The smoke's draft (turnR2) is not planned again.
+      "gpt-6-luna@medium/turnR2b": ["sp s1", "sp s2", "round-sp s1"],
       "gpt-6-luna@medium/turnR2Paragraphs": ["sp s1"],
       "gpt-6-luna@low/planV2": ["mp-switch s1", "mp-switch s2", "sp-switch s1", "sp-switch s2", "mp-thread s1", "mp-thread s2", "sp-thread s1", "sp-thread s2"],
     });
@@ -291,8 +292,8 @@ describe("planJobs: the round stages and the migration check", () => {
         records: [],
       }).map((j) => [j.caseId, j.armKey, j.sample]);
     expect(chains("turn-rounds")).toEqual([
-      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2", 1],
-      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2", 2],
+      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2b", 1],
+      [id, "pipeline:gpt-6-luna@low/planV2>gpt-6-luna@medium/turnR2b", 2],
     ]);
     expect(chains("migration")).toEqual([
       [id, "pipeline:gpt-6-luna@low/prod>gpt-6-luna@medium/prod", 1],
