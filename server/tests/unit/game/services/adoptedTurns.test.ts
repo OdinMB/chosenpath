@@ -12,6 +12,7 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, threadBeat } from "../../../helpers/promptStories.js";
 import { endedChapter, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
 import { threadAnalysis, type ThreadKind } from "../../../helpers/textFixtures.js";
+import { SCOREBOARD_ENDING_RULE, SHARED_OUTCOMES_LINE, adoptedTurnPrompt } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's turns are today's form with the option rules (B6) alone, as
@@ -99,15 +100,13 @@ describe("single-player turns: today's form with B6 as measured", () => {
   });
 });
 
-/**
+/*
  * The scoreboard ending rule (decision 3, settled; it lands without B8's
  * full ending format): the one line production adds to today's form, on the
- * ending of a story with a contested outcome, two players or two camps.
+ * ending of a story with a contested outcome, two players or two camps
+ * (adoptedDeltas.ts).
  */
-const SHARED_OUTCOMES_LINE = "--- For shared outcomes, touch on how the outcome affects the other players.\n";
-const SCOREBOARD_ENDING_RULE =
-  "- For a contested outcome, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
-const withEndingRule = (prompt: string) => prompt.replace(SHARED_OUTCOMES_LINE, `${SHARED_OUTCOMES_LINE}${SCOREBOARD_ENDING_RULE}`);
+const withEndingRule = (prompt: string) => adoptedTurnPrompt(prompt, true);
 
 function contestEnding(players: number, mode: GameMode = GameModes.Competitive): Story {
   const slots = Array.from({ length: players }, (_, i) => `player${i + 1}`);

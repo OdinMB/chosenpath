@@ -16,6 +16,7 @@ import {
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
+import { MEASURED_TITLE, adoptedThreadSchema } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's planners are planner v2 with two-sided contests as the eval
@@ -28,9 +29,6 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
 
-/** The chapter title field at adoption: the one change to planV2b's schema (a multiplayer plan titled its chapter "6. …"). */
-const MEASURED_TITLE = "The thread's title; its beats show it with their number.";
-const ADOPTED_TITLE = "The thread's title, without a number: its beats show it with their number.";
 
 const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJsonSchema(schema));
 
@@ -115,9 +113,10 @@ function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
   const measured = plannerV2ThreadRequest(story, false, { twoSided: true });
   expect(production.prompt).toBe(measured.prompt);
+  // The chapter title field is the one change to planV2b's schema (a multiplayer plan titled its chapter "6. …")
   const measuredSchema = json(measured.schema);
   expect(measuredSchema.split(MEASURED_TITLE)).toHaveLength(2);
-  expect(json(production.schema)).toBe(measuredSchema.replace(MEASURED_TITLE, ADOPTED_TITLE));
+  expect(json(production.schema)).toBe(adoptedThreadSchema(measuredSchema));
 }
 
 describe("the switch planner: planner v2 as measured", () => {

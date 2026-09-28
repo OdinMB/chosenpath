@@ -5,6 +5,7 @@ import type { TemplateIterationSections } from "core/types/admin.js";
 import { iterationStep, setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { assembleGenerationOrder, iterationRound2Request, setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
+import { SCOREBOARD_SENTENCES, adoptedSetupPrompt, isContestSetup } from "../../../helpers/adoptedDeltas.js";
 
 /*
  * Production's setup form is setup round 3's as the eval measured it
@@ -33,31 +34,14 @@ const SECTION_SETS: TemplateIterationSections[][] = Array.from({ length: 2 ** SE
 
 const json = (schema: Parameters<typeof toJsonSchema>[0]) => JSON.stringify(toJsonSchema(schema));
 
-/**
- * The one deliberate change to the measured text: with the scoreboard ending
- * rule (decision 3, adopted with it), three sentences that were true only
- * while no stat decided an outcome now say that a contested outcome's
- * scoreboard does, in the setups that have one (competitive and
- * cooperative-competitive multiplayer). Everywhere else the text is as measured.
+/*
+ * The one deliberate change to the measured text (adoptedDeltas.ts): with the
+ * scoreboard ending rule, three sentences that were true only while no stat
+ * decided an outcome say that a contested outcome's scoreboard does, in the
+ * setups that have one. Everywhere else the text is as measured.
  */
-const SCOREBOARD_SENTENCES: [string, string][] = [
-  [
-    "At the end, one beat per player writes that player's ending from the outcomes' milestones.",
-    "At the end, one beat per player writes that player's ending from the outcomes' milestones and, for a contested outcome, from its scoreboard: the side ahead wins unless the milestones clearly say otherwise.",
-  ],
-  [
-    "they are the story's only progress bar.",
-    "they are the story's progress bar, and a contested outcome's scoreboard decides it at the ending unless its milestones clearly say otherwise.",
-  ],
-  [
-    "nothing in the game reads a stat to decide an outcome or to end the story.",
-    "no stat decides an outcome or ends the story, apart from a contested outcome's scoreboard at the ending.",
-  ],
-];
-const isContest = (players: number, mode: GameMode) => players > 1 && (mode === GameModes.Competitive || mode === GameModes.CooperativeCompetitive);
-/** The measured prompt with the scoreboard sentences where a contest has a scoreboard. */
-const adopted = (prompt: string, players: number, mode: GameMode) =>
-  isContest(players, mode) ? SCOREBOARD_SENTENCES.reduce((text, [from, to]) => text.split(from).join(to), prompt) : prompt;
+const isContest = isContestSetup;
+const adopted = adoptedSetupPrompt;
 
 describe("custom-story and template setup: the measured form", () => {
   for (const kind of ["story", "template"] as const) {
