@@ -44,6 +44,16 @@ export function beatInput(record: CallRecord, evalCase: EvalCase, records: CallR
   return storyAfterAnalysis(base, evalCase.role === "thread" ? "thread" : "switch", parsed as SwitchAnalysis | ThreadAnalysis);
 }
 
+/** A reply's text as JSON, or undefined where it is not stored or does not parse. */
+function replyObject(content: string | undefined): unknown {
+  if (content === undefined) return undefined;
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Every repair and note kind a role's replies show, counted on each of that
  * role's replies (0 where absent). The report averages a count over the
@@ -91,6 +101,7 @@ export function checksForRecords(
     if (!record.final || !usable(record) || !record.outputFile || !evalCase) continue;
     const output = load(record);
     if (output === undefined) continue;
+    const content = loadContent(record);
     // The rule checks and, beside them, the design checks of the two improvement documents
     let rules: CheckResult | undefined;
     let designed: CheckResult | undefined;
@@ -120,11 +131,11 @@ export function checksForRecords(
       const story = caseStory(evalCase, false);
       const checked = checkThreadPlan(story, output as ThreadAnalysis);
       rules = withRepairs(checkThread(checked.plan), checked.repairs, checked);
-      designed = checkThreadDesign(story, checked.plan, triggerExpectation(evalCase.id));
+      // The kind of milestone reads the reply as written, before the plan's fallback to the question
+      designed = checkThreadDesign(story, checked.plan, triggerExpectation(evalCase.id), replyObject(content));
     }
     if (!rules || !designed) continue;
     const result = merge([rules, designed]);
-    const content = loadContent(record);
     checks.set(record.outputFile, content === undefined ? result : withPadding(result, content));
     design.set(record.outputFile, designed);
     roleOf.set(record.outputFile, record.role);

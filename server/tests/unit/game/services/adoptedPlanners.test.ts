@@ -21,8 +21,10 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
  * Production's planners are planner v2 with two-sided contests as the eval
  * measured it (variant planV2b) for the switch, and planner v2c for the
  * chapter (planV2b with the nearer chapter question and the planner's own
- * kind of milestone, the owner's feedback of 2026-09-28, and the adopted
- * "without a number" in the chapter title's field): the same prompt and JSON
+ * kind of milestone, the owner's feedback of 2026-09-28, with a topic
+ * switch's chosen direction narrowed to the chapter's own situation as a
+ * flavor switch's question is, and the adopted "without a number" in the
+ * chapter title's field): the same prompt and JSON
  * schema, byte for byte, on every story the tests build and on every frozen
  * planning case; and a reply is assembled into today's stored plan the way
  * the eval assembles it.
@@ -137,6 +139,15 @@ describe("the chapter planner: planner v2c (two-sided contests, the nearer chapt
     const cases = frozen.filter((c) => c.role === "thread");
     expect(cases.length).toBeGreaterThan(15);
     for (const c of cases) expectThreadLikeMeasured(caseStory(c, false));
+  });
+
+  it("narrows a topic switch's chosen direction to the chapter's own situation instead of asking it as it stands (2026-09-28)", () => {
+    // A deliberate change to planner v2c before it was measured, followed by production: a direction can restate its outcome
+    for (const [, build] of THREAD_STORIES) {
+      const schema = json(threadStep.request(build()).schema);
+      expect(schema).toContain("After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome.");
+      expect(schema).not.toContain("asked as a question");
+    }
   });
 });
 

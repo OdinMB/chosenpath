@@ -124,8 +124,9 @@ export class ThreadPromptService {
     outcomes: true,
     players: true,
     previousThreads: true,
-    // Actually, the switch/thread instructions are only needed for
-    // switches (for designing the next threads) and switch beats (for stat changes after threads)
+    // The switch/thread instructions are for the planners only: the switch
+    // planner and this chapter planner. No turn reads them; the switch turn
+    // applies each stat's own "Adjustments after threads" (BeatPromptService)
     switchAndThreadInstructions: true,
   } as const;
 

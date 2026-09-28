@@ -42,6 +42,20 @@ describe("checksForRecords", () => {
     expect(checks.get("outputs/a.json")?.checks).not.toHaveProperty("threadOutcomeKnown");
   });
 
+  it("reads a chapter plan's kind of milestone from the reply as written, where its text is stored", () => {
+    const question = "Will Rikkit get the letters out of the manor?";
+    const [first] = thread.threads;
+    const stored = { ...thread, threads: [{ ...first, question, typeOfMilestone: question }] };
+    const read = (content: string | undefined) => checksForRecords(records, cases, () => stored, () => content).checks.get("outputs/a.json")?.checks;
+    // Planner v2c left the kind blank: the stored plan holds the question, the reply the blank
+    expect(read(JSON.stringify({ thread: { question, typeOfMilestone: "" } }))?.milestoneKindConcrete).toBe(false);
+    expect(read(JSON.stringify({ thread: { question, typeOfMilestone: "whether the letters prove the noble's hand" } }))?.milestoneKindConcrete).toBe(true);
+    // Planner v2 writes none, and without the reply text the stored copy of the question is not read either
+    expect(read(JSON.stringify({ thread: { question } }))).not.toHaveProperty("milestoneKindConcrete");
+    expect(read(undefined)).not.toHaveProperty("milestoneKindConcrete");
+    expect(read("not json")).not.toHaveProperty("milestoneKindConcrete");
+  });
+
   it("reads a setup's example copies from the prompt it was sent, when stored", () => {
     const setupCase = evalCase("s", "setup", { setup: { premise: "A harbour.", playerCount: 1, gameMode: GameModes.SinglePlayer, maxTurns: 25 } });
     const setupRecord = record({ role: "setup", group: "setup", caseId: "s", outputFile: "outputs/s.json" });

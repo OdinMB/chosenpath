@@ -113,6 +113,18 @@ describe("planner v2c: the nearer chapter question (planV2c)", () => {
     expect(fields.indexOf("possibleMilestones")).toBe(fields.indexOf("typeOfMilestone") + 1);
   });
 
+  it("after a topic switch, narrows the chosen direction to the chapter's own situation instead of asking it as it stands", () => {
+    // A chosen direction can restate its outcome ("Investigate the Waste Ring to expose corruption"), so asking it as it stands asks the outcome's question again
+    for (const [, make] of STORIES) {
+      const ours = schemaText(v2c(make()).schema);
+      expect(ours).toContain("After a flavor switch: the switch's question, narrowed to this thread.");
+      expect(ours).toContain("After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome.");
+      expect(ours).not.toContain("asked as a question");
+      // planV2b as it ran
+      expect(schemaText(v2b(make()).schema)).toContain("After a topic switch: the chosen direction, asked as a question.");
+    }
+  });
+
   it("stores the written kind of milestone, and the question where the reply wrote none", () => {
     const story = onePlayer();
     const reply = (typeOfMilestone?: string) => ({

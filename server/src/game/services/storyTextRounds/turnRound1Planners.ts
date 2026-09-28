@@ -467,9 +467,15 @@ const [CHALLENGE_STEP_RESULTS, , EXPLORATION_STEP_RESULTS] = STEP_RESULTS.option
 
 const QUESTION =
   "The one question this thread decides about its outcome, in the story's own names; its three possible milestones are the answers. After a flavor switch: the switch's question, sharpened for this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit succeed?' Good: 'Will Sir Bram suspend the Guild's bounty on goblins?'";
-/** Planner v2c's question: nearer than the outcome's, about the thread's own situation (the owner's feedback of 2026-09-28). */
+/**
+ * Planner v2c's question: nearer than the outcome's, about the thread's own
+ * situation (the owner's feedback of 2026-09-28). A topic switch's chosen
+ * direction is narrowed like a flavor switch's question, since a direction can
+ * restate its outcome ("Investigate … the Clandestine Waste Ring to expose
+ * corruption"), and asking it as it stands asks the outcome's question again.
+ */
 const NEARER_QUESTION_FIELD =
-  "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, asked as a question. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
+  "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
 /** Planner v2c's kind of milestone, written by the planner rather than copied from the question. */
 const MILESTONE_KIND_FIELD =
   "The kind of milestone this thread adds to its outcome: the concrete thing its answer settles, in a few words and the story's own names. Weak: 'progress toward stopping the conspiracy'. Good: 'whether the letters prove the noble's hand in the conspiracy'.";

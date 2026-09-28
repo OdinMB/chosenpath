@@ -258,8 +258,8 @@ describe("the nearer chapter question and the concrete kind of milestone (owner,
       "Progress in the race to claim the treasure",
       "Advancing influence over the culinary timeline",
       "Friendship development milestone",
-      "Will Camille make meaningful progress toward training for the Paris Marathon?",
-      "Will Arielle secure a Council-backed inquiry that advances the dismantling of the Clandestine Waste Ring?",
+      "Meaningful progress toward training for the Paris Marathon",
+      "A Council-backed inquiry that advances the dismantling of the Clandestine Waste Ring",
       "A step toward the reforms",
       "",
       "  ",
@@ -305,6 +305,35 @@ describe("the nearer chapter question and the concrete kind of milestone (owner,
 
     it("leaves the question check out where the chapter's outcome is not the story's", () => {
       expect(checkThreadDesign(story, plan({ outcomeId: "player1_gone", question: RING })).checks).not.toHaveProperty("questionNearerThanOutcome");
+    });
+
+    // Planner v2 and v2b write no kind of milestone: their stored kind is the question, which is no kind to read
+    const QUESTION = "Will Arielle make progress with the depot's night shift?";
+
+    it("leaves the kind check out where the stored kind of milestone is the chapter's own question", () => {
+      const copied = checkThreadDesign(story, plan({ question: QUESTION, typeOfMilestone: QUESTION }));
+      expect(copied.checks).not.toHaveProperty("milestoneKindConcrete");
+      expect(copied.checks).toHaveProperty("questionNearerThanOutcome");
+      expect(checkThreadDesign(story, plan({ question: QUESTION, typeOfMilestone: ` ${QUESTION} ` })).checks).not.toHaveProperty("milestoneKindConcrete");
+    });
+
+    it("reads the kind of milestone as the reply wrote it, before the stored plan's fallback to the question", () => {
+      const stored = plan({ question: QUESTION, typeOfMilestone: QUESTION });
+      const one = (typeOfMilestone: string) => checkThreadDesign(story, stored, undefined, { thread: { question: QUESTION, typeOfMilestone } }).checks.milestoneKindConcrete;
+      // planner v2c left it blank: the plan stores the question, the check fails the blank
+      expect([one(""), one("  ")]).toEqual([false, false]);
+      expect(one("whether the manifests tie the ring to the depot")).toBe(true);
+      expect(one("progress in exposing the Waste Ring")).toBe(false);
+      // A group's threads, and today's form (its reply is the stored shape): every written kind counts
+      const group = (kinds: string[]) => checkThreadDesign(story, stored, undefined, { threads: kinds.map((typeOfMilestone) => ({ typeOfMilestone })) }).checks.milestoneKindConcrete;
+      expect(group(["whether the manifests tie the ring to the depot", "whether the foreman talks"])).toBe(true);
+      expect(group(["whether the manifests tie the ring to the depot", "a milestone for the ring"])).toBe(false);
+    });
+
+    it("leaves the kind check out where the reply wrote no kind of milestone (planner v2 and v2b)", () => {
+      const written = { thread: { question: QUESTION } };
+      expect(checkThreadDesign(story, plan({ question: QUESTION, typeOfMilestone: QUESTION }), undefined, written).checks).not.toHaveProperty("milestoneKindConcrete");
+      expect(checkThreadDesign(story, plan({ question: QUESTION, typeOfMilestone: "Finding the manifests" }), undefined, written).checks).not.toHaveProperty("milestoneKindConcrete");
     });
   });
 });

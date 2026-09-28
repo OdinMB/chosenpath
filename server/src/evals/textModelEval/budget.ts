@@ -74,7 +74,7 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "production's GPT-6 defaults on today's prompts at two samples, and the single-player chains: dry run $0.75, plus AI Iteration (--role iteration, about $0.02) and setup estimates that read about 30% low",
   filter: "the content filter's fixed test set; its calls cost fractions of a cent",
   "plan-refresh":
-    "coordinator, 2026-09-28 (the owner's feedback, $40 hard cap): planner v2c's chapter plans on the planning cases, which the reruns' chapter turns are written from; about $0.0013 a plan, 38 plans a sample",
+    "coordinator, 2026-09-28 (the owner's feedback, $40 hard cap): planner v2c's chapter plans on the planning cases, which the reruns' chapter turns are written from; about $0.0013 a plan, 19 plans a sample (planner v2's 38 plans at two samples came to $0.049)",
   reruns:
     "coordinator, 2026-09-28: turn round 1's page rebuilt with new outputs (the framed chapter turn on planner v2c's plans and today's form beside it, chapter steps and chain openings) and their judged checks; round 1's two turn forms and chains came to about $0.80 at two samples",
   "setup-retests":

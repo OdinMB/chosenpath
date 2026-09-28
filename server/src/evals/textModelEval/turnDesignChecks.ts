@@ -17,10 +17,12 @@ export { allowedLengths };
  * The turn document's new automatic checks (DOCS/2026-09-27_turn-generation-
  * improvements.md, Appendix A.C), the deterministic ones, on the reply the
  * game keeps (round 0's C7): switch and thread plans after planChecks, beats
- * after beatRepairs. The one exception is milestoneNotCopied, which reads the
- * reply as written, since a milestone the game adds from the plan is a copy
- * by construction. The judged checks (step settled early, progress on the
- * chapter question, paragraph 1 narrates the choice) are a model call each
+ * after beatRepairs. The exceptions read the reply as written:
+ * milestoneNotCopied, since a milestone the game adds from the plan is a copy
+ * by construction, and milestoneKindConcrete where the reply text is stored,
+ * since a blank kind of milestone is stored as the question. The judged
+ * checks (step settled early, progress on the chapter question, paragraph 1
+ * narrates the choice) are a model call each
  * and come later. The rules the game already repairs read as its repair
  * counts (one chapter per player, junk directions, option types, ids).
  *
@@ -233,23 +235,51 @@ export function genericMilestoneKind(text: string): boolean {
 /**
  * The owner's two chapter checks on one thread: its question (its own, or a
  * backfilled frame's) against its outcome's, where both are there, and its
- * kind of milestone, where the plan writes one.
+ * kind of milestone, where the plan writes one. A stored kind of milestone
+ * that is the thread's own question is a copy, not a kind: planner v2 and v2b
+ * write none, and planner v2c's blank one falls back to the question, so it
+ * is not read here (checkThreadDesign reads the reply as written for that).
  */
-export function chapterQuestionChecks(story: Story, thread: { outcomeId?: unknown; typeOfMilestone?: unknown }, question?: string): Record<string, boolean> {
+export function chapterQuestionChecks(
+  story: Story,
+  thread: { outcomeId?: unknown; typeOfMilestone?: unknown; question?: unknown },
+  question?: string
+): Record<string, boolean> {
   const checks: Record<string, boolean> = {};
   const outcome = typeof thread.outcomeId === "string" ? story.getOutcomeById(thread.outcomeId) : undefined;
   if (question !== undefined && question.trim() !== "" && outcome) {
     checks.questionNearerThanOutcome = !nearDuplicateOfOutcome(question, outcome.question, storyNames(story));
   }
-  if (typeof thread.typeOfMilestone === "string") checks.milestoneKindConcrete = !genericMilestoneKind(thread.typeOfMilestone);
+  const kind = thread.typeOfMilestone;
+  const copied = typeof kind === "string" && typeof thread.question === "string" && kind.trim() === thread.question.trim();
+  if (typeof kind === "string" && !copied) checks.milestoneKindConcrete = !genericMilestoneKind(kind);
   return checks;
+}
+
+/** A chapter reply's threads as the planner wrote them: a single player's one thread, or a group's (and today's form's) list. */
+function writtenThreads(written: unknown): Loose[] {
+  const reply = asObject(written);
+  if (reply.thread !== undefined) return [asObject(reply.thread)];
+  return asArray(reply.threads).map(asObject);
+}
+
+/**
+ * The kind of milestone as the reply wrote it, before the stored plan's
+ * fallback to the question: every written kind concrete, a blank one failing;
+ * undefined where the reply wrote none (planner v2 and v2b).
+ */
+function writtenKindConcrete(written: unknown): boolean | undefined {
+  const kinds = writtenThreads(written).flatMap((t) => (typeof t.typeOfMilestone === "string" ? [t.typeOfMilestone] : []));
+  return kinds.length > 0 ? kinds.every((kind) => !genericMilestoneKind(kind)) : undefined;
 }
 
 /**
  * The thread checks of turn doc A.C. `expectation` is a built trigger case's
  * recipe (triggerCases.ts): the plan follows it when it has the recipe's length.
+ * `asWritten` is the reply as the planner wrote it, where its text is stored:
+ * the kind of milestone is read there, before the plan's fallback to the question.
  */
-export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectation?: TriggerExpectation): CheckResult {
+export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectation?: TriggerExpectation, asWritten?: unknown): CheckResult {
   const checks: Record<string, boolean> = {};
   const counts: Record<string, number> = {};
   const threads = asArray<FramedThread>(asObject(plan).threads).filter((t) => t && typeof t === "object");
@@ -272,6 +302,11 @@ export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectatio
   for (const name of ["questionNearerThanOutcome", "milestoneKindConcrete"]) {
     const read = perThread.filter((c) => name in c);
     if (read.length > 0) checks[name] = read.every((c) => c[name]);
+  }
+  if (asWritten !== undefined) {
+    const concrete = writtenKindConcrete(asWritten);
+    if (concrete === undefined) delete checks.milestoneKindConcrete;
+    else checks.milestoneKindConcrete = concrete;
   }
 
   // A6: the kind follows the outcome's (a three-player race runs as contests), and the written kind matches the results
