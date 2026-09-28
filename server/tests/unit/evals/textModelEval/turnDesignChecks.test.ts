@@ -318,6 +318,15 @@ describe("checkBeatDesign", () => {
     });
   });
 
+  it("reads pointing at the choice only where options follow the text, not at an ending (turn round 2)", () => {
+    const beats = beatSet(1);
+    beats.player1 = beatGeneration({ options: [], text: "The war is over.\n\nA year later you choose your own work, by choice and without permission." });
+    const ending = checkBeatDesign(endingBeat(1), beats, beats).counts;
+    expect(ending).toMatchObject({ pointingAtChoice: 0, choiceTexts: 0, beatTexts: 1 });
+    const step = checkBeatDesign(threadBeat(1), beats, beats).counts;
+    expect(step).toMatchObject({ pointingAtChoice: 1, choiceTexts: 1 });
+  });
+
   it("counts option sets: the same odds, a lever, a reward, a shared first word, a negative base on a bonus option", () => {
     const options = challengeOptions().map((o, i) => ({ ...o, text: i < 2 ? `Climb ${i}` : "Wait here" }));
     options[1] = { ...options[1], basePoints: -10, modifiersToSuccessRate: [{ statId: "player1_energy", reason: "fit", effect: 10 }] };

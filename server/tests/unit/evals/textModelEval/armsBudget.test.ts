@@ -210,6 +210,9 @@ describe("the setup rounds' arms (setup doc section 4, rounds 1 and 2)", () => {
     expect(referenceKey("gpt-6-luna@medium/turnR2Paragraphs")).toBe("gpt-6-luna@medium/turnR2b");
     expect(secondReferenceKeys("gpt-6-luna@medium/turnR2Paragraphs")).toEqual(["gpt-6-luna@medium/prod"]);
     expect(secondReferenceKeys("gpt-6-luna@medium/turnR2b")).toEqual([]);
+    // B5's fix-and-retest: against today's form, and against the round-2 form it retests
+    expect(referenceKey("gpt-6-luna@medium/turnR2c")).toBe("gpt-6-luna@medium/prod");
+    expect(secondReferenceKeys("gpt-6-luna@medium/turnR2c")).toEqual(["gpt-6-luna@medium/turnR2b"]);
   });
 
   it("names the nine premises of the owner's round-1 setup page (key 3434afcc6f, the Casablanca control left out), all frozen premises", () => {

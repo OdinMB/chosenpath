@@ -95,7 +95,10 @@ import { turnRound2Request, type TurnRound2Form } from "../../game/services/stor
  * paragraph count at the text field, the shouted copies gone). "turnR2" is the
  * name the smoke ran under (five turns): its first turn narrated the character
  * in the third person, the first-turn text was fixed, and the round runs as
- * "turnR2b" so no smoke output of the draft mixes into it.
+ * "turnR2b" so no smoke output of the draft mixes into it. "turnR2c" is B5's one
+ * fix-and-retest on turnR2b (the last paragraph at the others' length, no
+ * option list in a character's mouth, the hooks rule rationing mysteries, not
+ * facts).
  */
 
 export type VariantId =
@@ -122,7 +125,8 @@ export type VariantId =
   | "chapterSlimPlans"
   | "turnR2"
   | "turnR2b"
-  | "turnR2Paragraphs";
+  | "turnR2Paragraphs"
+  | "turnR2c";
 export const VARIANTS: VariantId[] = [
   "prod",
   "slim",
@@ -148,6 +152,7 @@ export const VARIANTS: VariantId[] = [
   "turnR2",
   "turnR2b",
   "turnR2Paragraphs",
+  "turnR2c",
 ];
 
 /**
@@ -396,6 +401,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnR2: roundTwoTurn("turnR2", "round2"),
   turnR2b: roundTwoTurn("turnR2b", "round2"),
   turnR2Paragraphs: roundTwoTurn("turnR2Paragraphs", "paragraphs"),
+  turnR2c: roundTwoTurn("turnR2c", "retest"),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

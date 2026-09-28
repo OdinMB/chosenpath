@@ -393,6 +393,26 @@ describe("the ending (B8, B1's milestone)", () => {
   });
 });
 
+describe("B5's one fix-and-retest (round 2 read two-sentence last paragraphs, fewer facts and options named at the end)", () => {
+  it("gives the last paragraph the paragraphs' length, keeps a character from listing the options, and rations mysteries, not facts", () => {
+    const retest = turnRound2Request(chapterStep("challenge", 1), "retest").prompt;
+    expect(retest).toContain(TURN_ROUND2_TEXT.lastParagraphLength);
+    expect(retest).toContain(TURN_ROUND2_TEXT.noOptionsInSpeech);
+    expect(retest).toContain(TURN_ROUND2_TEXT.factsNotRationed);
+    const round2 = turnRound2Request(chapterStep("challenge", 1), "round2").prompt;
+    for (const fix of [TURN_ROUND2_TEXT.lastParagraphLength, TURN_ROUND2_TEXT.noOptionsInSpeech, TURN_ROUND2_TEXT.factsNotRationed]) expect(round2).not.toContain(fix);
+  });
+
+  it("changes nothing else: the same request as the round-2 form with the three passages edited", () => {
+    for (const [, make] of STORIES) {
+      const story = make();
+      const [round2, retest] = (["round2", "retest"] as const).map((form) => turnRound2Request(story, form));
+      expect(JSON.stringify(toJsonSchema(retest.schema))).toBe(JSON.stringify(toJsonSchema(round2.schema)));
+      expect(retest.prompt.length - round2.prompt.length).toBeLessThan(400);
+    }
+  });
+});
+
 describe("the paragraph arm (B9 item 2)", () => {
   it("states the count at the text field and once in the context, and nowhere else", () => {
     for (const [, make] of STORIES) {

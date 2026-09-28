@@ -39,7 +39,16 @@ import { NO_BLANK_ITEMS } from "./setupRound1.js";
  * Model-facing text says "thread" and "beat" (turn doc Appendix A).
  */
 
-export type TurnRound2Form = "round2" | "paragraphs";
+/**
+ * "retest" is B5's one fix-and-retest after round 2 read three existing checks
+ * worse, each on B5's text: last paragraphs of two sentences (8 of the 11
+ * turns that missed the sentence rule), facts per turn 3.77 → 3.24 (the
+ * hooks rule read as fewer facts), and a character naming the options in the
+ * last paragraph. It gives the last paragraph the others' length, keeps
+ * characters from listing the options, and says the hooks rule rations
+ * mysteries, not facts; nothing else changes.
+ */
+export type TurnRound2Form = "round2" | "paragraphs" | "retest";
 
 export type TurnRound2Request = TextRequest & { assemble?: (parsed: unknown) => unknown };
 
@@ -82,9 +91,21 @@ const LAST_PARAGRAPH = `- The last paragraph brings the pressure that the option
   Weak: "The Guild hall falls quiet in the evening light."
   Good: "Sir Bram slides the arrest list across the desk. 'Tell me why these three should walk free,' he says, 'and do it before the bell.'"`;
 
+const LAST_PARAGRAPH_LENGTH = "three to five sentences like every other";
+const NO_OPTIONS_IN_SPEECH = "not even in a character's words";
+/** B5's retest: the last paragraph at the paragraphs' length, and no option list in a character's mouth. */
+const LAST_PARAGRAPH_RETEST = LAST_PARAGRAPH.replace("- The last paragraph brings", `- The last paragraph, ${LAST_PARAGRAPH_LENGTH}, brings`).replace(
+  "names none of them and",
+  `names none of them, ${NO_OPTIONS_IN_SPEECH}, and`
+);
+
+const FACTS_NOT_RATIONED = "This rations mysteries, not facts";
+
 const HOOKS = `- Plant sparingly, pay off often. When the scene allows, bring back a detail the story already recorded (a fact in STORY ELEMENTS or GENERAL FACTS) and let it matter now. Plant a new mystery at most once per thread, record it as a fact, and never plant one in the last third of the story or in an ending. A hook among a new story element's facts counts as that thread's new mystery.
   Weak: a new unexplained flicker, sound or symbol in every beat.
   Good: "The second ledger, the one you glimpsed under the clerk's counter, lists tomorrow's arrests before they happen."`;
+/** B5's retest: the hooks rule says it leaves the facts alone. */
+const HOOKS_RETEST = HOOKS.replace("- Plant sparingly, pay off often.", `- Plant sparingly, pay off often. ${FACTS_NOT_RATIONED}: keep recording every new detail the text establishes as a fact, as above.`);
 
 // The smoke's first turn narrated its character by name, in the third person: the scene is "you" doing something, as every beat is
 const FIRST_TURN = `Open in a scene, not a summary, told in the second person like every beat: you (the player character) are doing something in a place from the story, and someone from the STORY ELEMENTS wants something from you. Show who the character is through what you do and say. Let the switch's directions (or, in a flavor switch, its stances) arise inside this scene (a visitor, a message, a job, a rumor), so each option reads as a next move. Hint at each outcome through what someone says or wants, never by naming it.
@@ -281,7 +302,8 @@ export function sacrificeRewardLine(story: Story, slot: string): string {
 
 // ---------------------------------------------------------------- the instructions
 
-function commonEdits(text: string, kind: TurnKind, levers: boolean): string {
+function commonEdits(text: string, kind: TurnKind, levers: boolean, form: TurnRound2Form): string {
+  const retest = form === "retest";
   let edited = replaceOnce(LABEL, text, MECHANICS, "");
   if (kind !== "first") edited = replaceOnce(LABEL, edited, OLD_STAT_CHANGES, STAT_CHANGES_NARRATED);
   edited = replaceOnce(LABEL, edited, OLD_FOURTH_WALL, fourthWall(kind, levers));
@@ -289,8 +311,10 @@ function commonEdits(text: string, kind: TurnKind, levers: boolean): string {
   // Options without a roll carry no lever, so the consequence rule's lever exception goes with them (B3 row 12)
   if (kind === "first" || kind === "switch" || (kind === "chapter" && !levers)) edited = replaceOnce(LABEL, edited, CONSEQUENCES_EXCEPTION, "");
   edited =
-    kind === "ending" ? replaceOnce(LABEL, edited, `\n${OLD_LAST_PARAGRAPH}`, "") : replaceOnce(LABEL, edited, OLD_LAST_PARAGRAPH, LAST_PARAGRAPH);
-  if (kind === "switch" || kind === "chapter") edited = replaceOnce(LABEL, edited, OLD_HINT, HOOKS);
+    kind === "ending"
+      ? replaceOnce(LABEL, edited, `\n${OLD_LAST_PARAGRAPH}`, "")
+      : replaceOnce(LABEL, edited, OLD_LAST_PARAGRAPH, retest ? LAST_PARAGRAPH_RETEST : LAST_PARAGRAPH);
+  if (kind === "switch" || kind === "chapter") edited = replaceOnce(LABEL, edited, OLD_HINT, retest ? HOOKS_RETEST : HOOKS);
   if (kind !== "ending") {
     edited = replaceOnce(LABEL, edited, OLD_INTERLUDE_COUNT, "Create two to four interludes.");
     edited = replaceOnce(LABEL, edited, OLD_INTERLUDE_CURIOSITY, NEW_INTERLUDE_CURIOSITY);
@@ -373,7 +397,7 @@ function endingEdits(text: string): string {
 }
 
 function instructionEdits(text: string, story: Story, kind: TurnKind, form: TurnRound2Form): string {
-  let edited = commonEdits(text, kind, hasLevers(kind, kind === "chapter" ? chapterKind(story) : undefined));
+  let edited = commonEdits(text, kind, hasLevers(kind, kind === "chapter" ? chapterKind(story) : undefined), form);
   if (kind === "first") edited = switchEdits(firstTurnEdits(edited, story));
   if (kind === "switch") edited = switchEdits(afterChapterEdits(edited));
   if (kind === "chapter") edited = chapterEdits(edited, story, chapterKind(story));
@@ -625,4 +649,7 @@ export const TURN_ROUND2_TEXT = {
   endingClose: "- Close; don't open.",
   paragraphCount: PARAGRAPH_COUNT,
   shoutedCount: SHOUTED_COUNT,
+  lastParagraphLength: LAST_PARAGRAPH_LENGTH,
+  noOptionsInSpeech: NO_OPTIONS_IN_SPEECH,
+  factsNotRationed: FACTS_NOT_RATIONED,
 };

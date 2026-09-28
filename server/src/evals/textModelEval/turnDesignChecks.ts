@@ -487,7 +487,10 @@ export function checkBeatDesign(story: Story, reply: SetOfBeatGenerationSchema, 
   const lasts = beats.map((b) => playerParagraphs(prose(b.text)).map((p) => p.trim()).filter((p) => /\p{L}/u.test(p)).pop() ?? "");
   counts.beatTexts = lasts.length;
   counts.waitingClose = lasts.filter((p) => WAIT.test(lastSentence(p))).length;
-  counts.pointingAtChoice = lasts.filter((p) => POINTING.test(p)).length;
+  // Pointing at the choice needs a choice after the text: an ending has none, and its closing may well say "you choose"
+  const choiceTexts = beatType === "ending" ? [] : lasts;
+  counts.choiceTexts = choiceTexts.length;
+  counts.pointingAtChoice = choiceTexts.filter((p) => POINTING.test(p)).length;
   const lower = beats.map((b) => prose(b.text).toLowerCase()).join("\n");
   counts.stockPhrases = STOCK.reduce((sum, phrase) => sum + (lower.split(phrase).length - 1), 0);
   counts.pathAhead = lower.split("the path ahead").length - 1;
