@@ -133,14 +133,18 @@ export function keyOf(job: Job): string {
   return jobKey(job.caseId, job.armKey, job.promptState, job.sample);
 }
 
+/** A 429 that no wait fixes: the account has no credit or quota left (2026-09-29), as production's retry policy reads insufficient_quota */
+const NEVER_RETRY_CODES = new Set(["credit_balance_exhausted", "insufficient_quota"]);
+
 /**
  * Whether a record finishes its job: a final record, unless it is a request
- * the API rejected, which says nothing about the model and is planned again.
- * The one definition of "finished" for resuming, case building and the
+ * the API rejected or a call refused because the account had no credit or
+ * quota left (2026-09-29), which say nothing about the model and are planned
+ * again. The one definition of "finished" for resuming, case building and the
  * variant pairing.
  */
-export function finishesJob(record: Pick<CallRecord, "jobFinal" | "rejectedParam">): boolean {
-  return record.jobFinal && !record.rejectedParam;
+export function finishesJob(record: Pick<CallRecord, "jobFinal" | "rejectedParam"> & { code?: string | null }): boolean {
+  return record.jobFinal && !record.rejectedParam && !(record.code && NEVER_RETRY_CODES.has(record.code));
 }
 
 export function finishedJobKeys(records: CallRecord[]): Set<string> {
@@ -175,11 +179,12 @@ export function usable(record: { outcome: Outcome }): boolean {
 
 const RETRY_CODES = new Set(["slow_down", "server_is_overloaded", "rate_limit_exceeded"]);
 
-/** 429, 5xx, timeouts and dropped connections; never a 4xx the request caused. Takes a check or a record. */
+/** 429, 5xx, timeouts and dropped connections; never a 4xx the request caused, nor a 429 for an account out of credit. Takes a check or a record. */
 export function isRetryable(check: Pick<CallCheck, "outcome" | "status" | "code">): boolean {
   const { outcome, status, code } = check;
   if (outcome === "timeout" || outcome === "network-error") return true;
   if (outcome !== "http-error") return false;
+  if (code && NEVER_RETRY_CODES.has(code)) return false;
   if (code && RETRY_CODES.has(code)) return true;
   return status === 429 || (status !== undefined && status >= 500);
 }

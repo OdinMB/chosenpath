@@ -102,7 +102,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     (stageCases.ts), frozen beside the others; no calls
  *   --judge-stages [--arms <chapter planner keys>] --prompt-state <tag> [--max-spend 0.10]  the judged stage check
  *     (stageJudge.ts): its calibration (two samples), the stored chapters and every isolated chapter plan of the
- *     arms (one sample), then judged-stages.md and .json
+ *     arms (one sample), then judged-stages.md and .json; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -899,7 +899,10 @@ async function main() {
       return buildStageCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
     case "judge-stages":
       // The stage scoping's judged check books to its own stage unless another is given
-      return judgeStagesMode(prepContext(args, files, args.stage ?? "stage-scoping"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, { stage: args.stage ?? "stage-scoping" });
+      return judgeStagesMode(prepContext(args, files, args.stage ?? "stage-scoping"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, {
+        stage: args.stage ?? "stage-scoping",
+        caseIds: args.caseIds,
+      });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

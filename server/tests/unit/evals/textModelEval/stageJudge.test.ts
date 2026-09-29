@@ -83,7 +83,8 @@ describe("stageJudgeRequest", () => {
     expect(prompt).toContain(`Milestones so far:\n  1. ${EXPOSED}`);
     expect(prompt).toContain("This chapter adds milestone 2: it settles stage 2 of 3. Stage 3 comes in a later chapter.");
     expect(prompt).toContain(`${STAGE_CHECK}: Does this chapter stay within stage 2 of 3?`);
-    expect(stageJudgeRequest(story(0), judgedThread(stored))?.prompt).toContain("Milestones so far: none.\nThis chapter adds milestone 1: it settles stage 1 of 3. Stages 2 to 3 come in later chapters.");
+    expect(stageJudgeRequest(story(0), judgedThread(stored))?.prompt).toContain("Milestones so far: none.\nThis chapter adds milestone 1: it settles stage 1 of 3. Stages 2 and 3 come in later chapters.");
+    expect(stageJudgeRequest(story(0, 5), judgedThread(stored))?.prompt).toContain("it settles stage 1 of 5. Stages 2 to 5 come in later chapters.");
   });
 
   it("shows the plan's steps with their results, the last one pointing at the milestones it repeats, and the chapter question", () => {

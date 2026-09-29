@@ -2,6 +2,8 @@ import { jest } from "@jest/globals";
 import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import { sha256, type CallSpec, type ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import {
+  finishedJobKeys,
+  finishesJob,
   finishingRecord,
   jobKey,
   keyOf,
@@ -85,6 +87,26 @@ describe("runJobs", () => {
     ]);
     // A rejected request is not billed
     expect(records[3].costUsd).toBe(0);
+  });
+
+  it("never retries a 429 that says the account has no credit or quota left (2026-09-29: every retry failed the same way)", async () => {
+    const queue: ExecutedCall[] = [
+      executed("http-error", { status: 429, code: "credit_balance_exhausted" }),
+      executed("http-error", { status: 429, code: "insufficient_quota" }),
+      executed("valid"),
+    ];
+    const { d, calls, records, sleeps } = deps(() => queue.shift() as ExecutedCall);
+    await runJobs([job("a", "beat", BASELINE), job("b", "beat", BASELINE, { sample: 2 })], d, { caps, previous: [], maxInFlight: 1 });
+    expect(calls).toHaveLength(2);
+    expect(sleeps).toEqual([]);
+    expect(records.map((r) => [r.caseId, r.attempt, r.final, r.outcome])).toEqual([
+      ["a", 1, true, "http-error"],
+      ["b", 1, true, "http-error"],
+    ]);
+    // It says nothing about the model: the job stays open, so the next invocation sends it once credit is back
+    expect(finishedJobKeys(records).size).toBe(0);
+    expect(finishesJob({ jobFinal: true, rejectedParam: false, code: "credit_balance_exhausted" })).toBe(false);
+    expect(finishesJob({ jobFinal: true, rejectedParam: false, code: "rate_limit_exceeded" })).toBe(true);
   });
 
   it("runs every baseline first, and no candidate where the baseline failed", async () => {

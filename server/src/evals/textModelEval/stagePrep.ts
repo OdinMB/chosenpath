@@ -149,6 +149,13 @@ export function mergedTargets(targets: StageTarget[]): StageTarget[] {
   return [...byKey.values()];
 }
 
+/** The judge calls a run sends: every target, or with --cases (a smoke) the calibration items and plans named, by item id or case id. */
+export function smokeTargets(calibration: (StageTarget & { itemId: string })[], plans: PlanToJudge[], caseIds: string[] | undefined): StageTarget[] {
+  const items = caseIds ? calibration.filter((t) => caseIds.includes(t.itemId)) : calibration;
+  const read = caseIds ? plans.filter((p) => caseIds.includes(p.caseId)) : plans;
+  return mergedTargets([...items, ...read.flatMap((p) => p.targets)]);
+}
+
 /** A plan's verdict from its threads' sample-1 answers: every thread passing; undefined while any is unanswered. */
 export function planVerdict(plan: PlanToJudge, answerOf: (key: string) => boolean | undefined): JudgedPlan | undefined {
   const answers = plan.targets.map((t) => answerOf(t.key));
@@ -172,13 +179,14 @@ export function buildStageCasesMode(ctx: Pick<PrepContext, "files" | "log">, rep
 
 // --- --judge-stages ---
 
-export async function judgeStagesMode(ctx: PrepContext, armKeys: string[] | undefined, promptState: string, options: { stage?: LedgerStage } = {}): Promise<void> {
+export async function judgeStagesMode(ctx: PrepContext, armKeys: string[] | undefined, promptState: string, options: { stage?: LedgerStage; caseIds?: string[] } = {}): Promise<void> {
   const { files, log } = ctx;
   const stage = options.stage ?? "stage-scoping";
   const lookup = { records: files.readRecords(), cases: files.readCases(), load: files.loadOutput };
   const { targets: calibration, problems } = calibrationTargets(STAGE_JUDGE_CALIBRATION, lookup);
   const plans = [...plansToJudge(armKeys ?? [], promptState, lookup), ...chaptersToJudge(lookup.cases)];
-  const targets = mergedTargets([...calibration, ...plans.flatMap((p) => p.targets)]);
+  // The file is written over everything judged so far, whatever this run sent
+  const targets = smokeTargets(calibration, plans, options.caseIds);
   const arm = JUDGE_ARMS[0];
   const jobs = stageJudgeJobs(targets, arm, promptState, stage as Stage);
   const done = finishedJobKeys(files.readPrepRecords());

@@ -7,6 +7,7 @@ import {
   mergedTargets,
   planVerdict,
   plansToJudge,
+  smokeTargets,
 } from "../../../../src/evals/textModelEval/stagePrep.js";
 import type { StageCalibrationItem } from "../../../../src/evals/textModelEval/stageJudge.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
@@ -130,6 +131,22 @@ describe("the calibration's targets", () => {
     expect(merged.map((t) => [t.key, t.samples])).toEqual([
       ["o1-t0", 2],
       ["hand-no-item", 2],
+      ["o2-t0", 1],
+    ]);
+  });
+});
+
+describe("a smoke's targets (--cases)", () => {
+  it("keeps the calibration items and plans named, by item id or case id, and everything without a list", () => {
+    const calibration = [{ itemId: "yes-item", key: "o1-t0", request: { prompt: "p", schema: undefined as never }, samples: 2 }];
+    const plans = plansToJudge([V2C], "round0", lookup);
+    expect(smokeTargets(calibration, plans, ["yes-item"]).map((t) => t.key)).toEqual(["o1-t0"]);
+    expect(smokeTargets(calibration, plans, ["thread-a"]).map((t) => [t.key, t.samples])).toEqual([
+      ["o1-t0", 1],
+      ["o2-t0", 1],
+    ]);
+    expect(smokeTargets(calibration, plans, undefined).map((t) => [t.key, t.samples])).toEqual([
+      ["o1-t0", 2],
       ["o2-t0", 1],
     ]);
   });

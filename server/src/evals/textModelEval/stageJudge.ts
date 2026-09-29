@@ -121,7 +121,11 @@ export function stageJudgeRequest(story: Story, thread: JudgedThread): TextReque
     `Step ${i + 1}${i === last ? " (the last)" : ""}: ${step.title} — ${step.question}`,
     ...(i === last && sameResults(step.possibleResolutions, thread.possibleMilestones) ? ["  (its results are the possible milestones below)"] : resultLines(step.possibleResolutions)),
   ]);
-  const later = stage.stage + 1 === stage.of ? `Stage ${stage.of} comes in a later chapter.` : `Stages ${stage.stage + 1} to ${stage.of} come in later chapters.`;
+  const remaining = stage.of - stage.stage;
+  const later =
+    remaining === 1
+      ? `Stage ${stage.of} comes in a later chapter.`
+      : `Stages ${stage.stage + 1} ${remaining === 2 ? "and" : "to"} ${stage.of} come in later chapters.`;
   const sections = [
     INTRO,
     ["======= THE STORY =======", `Title: ${story.getTitle()}`, `The players' characters: ${story.getPlayerSlots().map(name).join(", ")}`].join("\n"),
