@@ -6,7 +6,8 @@ import type { ContextLine } from "./ratingContext.js";
  * What a rater sees of one output: a setup as its whole design (everything
  * the game reads from the reply; the character-selection plan is the model's
  * scratch and is left out), and a turn as each player's visible beat (title,
- * text, options, interludes); the context above a turn is ratingContext.ts.
+ * text, options, interludes), with its choices' mechanics and the turn's
+ * changes from ratingMechanics.ts; the context above a turn is ratingContext.ts.
  * Read defensively, since later schema variants may drop fields: an absent
  * field is undefined (or "") and renders nothing, a list present but empty
  * is [] and renders as empty.
@@ -90,6 +91,8 @@ export const TURN_FIELD_LABELS = {
   title: "Title",
   text: "Text",
   options: "Options",
+  mechanics: "Choice mechanics",
+  changes: "What this turn changes",
   interludes: "Interludes",
 } as const;
 
@@ -173,10 +176,16 @@ export type TurnBeat = {
   paragraphs: string[];
   options: string[];
   interludes: string[];
+  /** Each choice's mechanics as the game plays it (ratingMechanics.ts); absent where the beat shows no options */
+  mechanics?: ContextLine[];
 };
 
-/** A turn option; a chapter-opening item's option also shows the chapter plan it was written from (ratingContext's chapterPlanLines). */
-export type TurnContent = { kind: "turn"; beats: TurnBeat[]; plan?: ContextLine[] };
+/**
+ * A turn option; a chapter-opening item's option also shows the chapter plan
+ * it was written from (ratingContext's chapterPlanLines), and every turn read
+ * from a stored reply what it changes (ratingMechanics.ts).
+ */
+export type TurnContent = { kind: "turn"; beats: TurnBeat[]; plan?: ContextLine[]; changes?: ContextLine[] };
 
 export type OptionContent = SetupCard | TurnContent;
 

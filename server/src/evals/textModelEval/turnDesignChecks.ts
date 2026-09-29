@@ -394,7 +394,8 @@ const statChangesOf = (reply: SetOfBeatGenerationSchema) =>
 const milestonesOf = (reply: SetOfBeatGenerationSchema) =>
   asArray<NewMilestone>(asObject(reply).newMilestones).filter((m) => m && m.type === "newMilestone");
 
-const statNames = (stat: Stat) => [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])].map((n) => n.trim()).filter((n) => n.length >= 4);
+/** A stat's name and, for opposites, each side: the words a turn names it by (four letters or more). */
+export const statNames = (stat: Stat) => [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])].map((n) => n.trim()).filter((n) => n.length >= 4);
 
 /**
  * A stat's name beside a number, "%" or "points" in what the player reads

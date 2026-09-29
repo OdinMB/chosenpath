@@ -10,6 +10,7 @@ import {
   type SetupStat,
   type TurnContent,
 } from "./ratingContent.js";
+import type { ContextLine } from "./ratingContext.js";
 import { contextLinesHtml, escapeHtml, fields, listOf, meta, paragraphs, row, textRow } from "./ratingHtml.js";
 import type { RatingKind } from "./ratingSets.js";
 
@@ -299,16 +300,18 @@ export function setupRows(cards: SetupCard[]): Row[] {
 const T = TURN_FIELD_LABELS;
 
 /**
- * Per player: title, text, options and interludes; under a player row when
- * the turn has several players. A chapter-opening item's options first show
- * the chapter plan each was written from.
+ * Per player: title, text, options, the choices' mechanics and interludes;
+ * under a player row when the turn has several players. What the turn
+ * changes follows the mechanics for one player, and comes once after every
+ * player for a group (its lines say whose). A chapter-opening item's options
+ * first show the chapter plan each was written from.
  */
 export function turnRows(turns: TurnContent[]): Row[] {
   const K: RatingKind = "turn";
   const players = Math.max(0, ...turns.map((t) => t.beats.length));
-  const plan = turns.some((t) => t.plan !== undefined)
-    ? leaf(K, "chapterPlan", T.chapterPlan, turns.map((t) => (t.plan ? contextLinesHtml(t.plan) || EMPTY : undefined)))
-    : undefined;
+  const lines = (value: ContextLine[] | undefined) => (value ? contextLinesHtml(value) || EMPTY : undefined);
+  const plan = turns.some((t) => t.plan !== undefined) ? leaf(K, "chapterPlan", T.chapterPlan, turns.map((t) => lines(t.plan))) : undefined;
+  const changes = leaf(K, "changes", T.changes, turns.map((t) => lines(t.changes)));
   return [plan, ...Array.from({ length: players }, (_, index) => {
     const beats = turns.map((t) => t.beats[index]);
     const first = beats.find((b) => b !== undefined);
@@ -323,6 +326,8 @@ export function turnRows(turns: TurnContent[]): Row[] {
         beats.map((b) => (b ? `<ol>${b.options.map((o) => `<li>${e(o)}</li>`).join("")}</ol>` : undefined)),
         beats.map((b) => countGist(b?.options))
       ),
+      leaf(K, `${prefix}mechanics`, T.mechanics, beats.map((b) => lines(b?.mechanics))),
+      ...(players === 1 ? [changes] : []),
       leaf(
         K,
         `${prefix}interludes`,
@@ -333,6 +338,6 @@ export function turnRows(turns: TurnContent[]): Row[] {
     ];
     if (!prefix || !first) return parts;
     return [parent(K, first.slot, `${T.forPlayer} ${first.playerName}`, parts, turns.map(() => ""))];
-  }).flat()]
+  }).flat(), ...(players > 1 ? [changes] : [])]
     .filter((r): r is Row => r !== undefined);
 }

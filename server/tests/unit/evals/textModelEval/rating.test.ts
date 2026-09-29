@@ -29,11 +29,13 @@ import {
 } from "../../../../src/evals/textModelEval/ratingScore.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
 import { makeArm, type Arm } from "../../../../src/evals/textModelEval/arms.js";
-import { GameModes } from "core/types/index.js";
+import { MECHANICS_LABELS } from "../../../../src/evals/textModelEval/ratingMechanics.js";
+import type { Story } from "core/models/Story.js";
+import { GameModes, type StoryState } from "core/types/index.js";
 import { BASELINE, LUNA, SOL, evalCase, record, tags } from "./fixtures.js";
 import { all, closest, kids, parseHtml, select, textOf, type HtmlNode } from "./htmlTree.js";
-import { endingBeat, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
-import { beatGeneration, beatSet, challengeOptions, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { endingBeat, slotsOf, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
+import { beatGeneration, beatSet, challengeOptions, explorationOptions, stat, threadAnalysis } from "../../../helpers/textFixtures.js";
 
 const ARMS = [BASELINE, LUNA, SOL].map((a) => ({ promptState: "prefix", armKey: a.key }));
 
@@ -1574,5 +1576,128 @@ describe("a pairwise turn page for turn round 2: the owner's round-2 questions, 
     const step = set.items.find((i) => key.items[i.id].caseId.startsWith("step-") && !key.items[i.id].control);
     const shown = step?.options.flatMap((o) => (o.content.kind === "turn" ? o.content.beats.map((b) => b.options.length) : []));
     expect(shown).toContain(3);
+  });
+});
+
+describe("each version's choice mechanics and the changes its turn writes (the owner's feedback of 2026-09-29)", () => {
+  const REF = { promptState: "round0", armKey: "gpt-6-luna@medium/prod" };
+  const CAND = { promptState: "round0", armKey: "gpt-6-luna@medium/turnR2b" };
+  const SUPPLIES = stat("shared_supplies", { type: "number", name: "Supplies", optionsToSacrifice: "Spend supplies" });
+  const SPEND = { type: "statChange" as const, group: "shared", stat: "shared_supplies", change: "subtractNumber" as const, value: 10 };
+
+  /** The story with Supplies at 40, every player's last choice a sacrifice of them. */
+  function spentSupplies(story: Story): StoryState {
+    const state = story.getState();
+    const [lever, a, b] = challengeOptions();
+    const players = Object.fromEntries(
+      Object.entries(state.players).map(([slot, player]) => {
+        const history = [...player.beatHistory];
+        history[history.length - 1] = { ...history[history.length - 1], options: [{ ...lever, resourceType: "sacrifice", basePoints: 30, text: "Burn 10 Supplies" }, a, b], choice: 0 };
+        return [slot, { ...player, beatHistory: history }];
+      })
+    );
+    return { ...state, sharedStats: [SUPPLIES], sharedStatValues: [{ statId: "shared_supplies", value: 40 }], players };
+  }
+
+  /** The reference pays the sacrifice with challenge options; the candidate writes no change and exploration options. */
+  const output = (players: number, reference: boolean, ending = false) =>
+    beatSet(players, {
+      statChanges: reference ? [SPEND] : [],
+      ...Object.fromEntries(slotsOf(players).map((slot) => [slot, { ...beatGeneration(), options: ending ? [] : reference ? challengeOptions() : explorationOptions() }])),
+    });
+
+  function fixture(players: number) {
+    const cases = [
+      ...Array.from({ length: 4 }, (_, i) => evalCase(`step-${i}`, "beat", { state: spentSupplies(threadBeat(players, { id: `story-s${i}` })), tags: tags({ players, multiplayer: players > 1 }) })),
+      ...(players === 1 ? Array.from({ length: 2 }, (_, i) => evalCase(`end-${i}`, "beat", { state: spentSupplies(endingBeat(1, { id: `story-e${i}` })), tags: tags({ ending: true }) })) : []),
+    ];
+    const records: CallRecord[] = [];
+    const outputs = new Map<string, unknown>();
+    for (const c of cases) {
+      for (const [arm, samples] of [[REF, [1, 2]], [CAND, [1]]] as const) {
+        for (const sample of samples) {
+          const outputFile = `${c.id}-${arm.armKey}-${sample}`;
+          outputs.set(outputFile, output(players, arm === REF, c.tags.ending));
+          records.push(record({ caseId: c.id, group: "beat", role: "beat", promptState: arm.promptState, armKey: arm.armKey, callArmKey: arm.armKey, baseline: false, sample, players, outputFile }));
+        }
+      }
+    }
+    const load = (r: CallRecord) => outputs.get(r.outputFile ?? "");
+    const { set, key } = planRatingSet({ kind: "turn", arms: [REF, CAND], items: players === 1 ? 5 : 3, preview: false, pairwise: true }, records, cases, { loadOutput: load, salt: `mechanics-${players}`, now: new Date(0) });
+    return { cases, records, load, set, key };
+  }
+
+  const single = fixture(1);
+  const group = fixture(2);
+  const rowKeys = (item: HtmlNode) => select(item, "details.sec").map((d) => d.attrs["data-sec"]);
+  const items = (html: string) => new Map(select(parseHtml(html), "section.item").map((s) => [s.attrs.id.replace(/^item-/, ""), s]));
+  const isEnding = (id: string) => single.key.items[id].caseId.startsWith("end-");
+  const labelOf = (key: typeof single.key, id: string, arm: typeof REF) => Object.entries(key.items[id].labels).find(([, ref]) => ref.armKey === arm.armKey && ref.sample === 1)?.[0];
+
+  it("gives each version's beat its choices' mechanics, read after the game's repairs, and the turn its changes", () => {
+    const steps = single.set.items.filter((i) => !isEnding(i.id));
+    expect(steps.length).toBeGreaterThan(0);
+    for (const item of steps) {
+      for (const option of item.options) {
+        if (option.content.kind !== "turn") throw new Error("a turn option");
+        const [beat] = option.content.beats;
+        // The candidate's exploration options play as challenges on a challenge step
+        expect(beat.mechanics?.map((line) => `${line.label}: ${line.text}`)).toEqual([1, 2, 3].map((n) => `Choice ${n}: challenge · risk normal · base points 0`));
+        const reference = option.label === labelOf(single.key, item.id, REF) || single.key.items[item.id].control !== undefined;
+        expect(option.content.changes?.[0]).toEqual({ label: "Previous choice sacrificed", text: reference ? "Supplies: applied, 40 → 30" : "Supplies: not applied" });
+      }
+    }
+  });
+
+  it("shows the mechanics under the options and the changes after them, both open and aligned across the versions", () => {
+    const html = renderRatingPage(single.set);
+    for (const [id, item] of items(html)) {
+      const rows = rowKeys(item);
+      expect(rows).toEqual(isEnding(id) ? ["title", "text", "options", "changes", "interludes"] : ["title", "text", "options", "mechanics", "changes", "interludes"]);
+      for (const key of ["mechanics", "changes"].filter((k) => rows.includes(k))) {
+        const section = sectionAt(item, key);
+        expect(section.attrs.open).toBeDefined();
+        expect(optionsOf(bodyCells(section))).toEqual(["A", "B"]);
+      }
+    }
+    const [id, item] = [...items(html)].find(([itemId]) => !isEnding(itemId) && !single.key.items[itemId].control) as [string, HtmlNode];
+    const referenceCell = bodyCells(sectionAt(item, "changes")).find((c) => c.attrs["data-option"] === labelOf(single.key, id, REF)) as HtmlNode;
+    expect(textOf(referenceCell)).toContain("Previous choice sacrificed: Supplies: applied, 40 → 30");
+    expect(textOf(referenceCell)).toContain("Supplies: 40 → 30");
+    // An ending shows no choices, as the game shows none, but still what its turn changes
+    const ending = [...items(html)].find(([itemId]) => isEnding(itemId));
+    expect(ending && rowKeys(ending[1])).not.toContain("mechanics");
+  });
+
+  it("puts a group turn's mechanics under each player and its changes once, grouped by whose they are", () => {
+    const html = renderRatingPage(group.set);
+    for (const [, item] of items(html)) {
+      expect(rowKeys(item)).toEqual([
+        ...["player1", "player1.title", "player1.text", "player1.options", "player1.mechanics", "player1.interludes"],
+        ...["player2", "player2.title", "player2.text", "player2.options", "player2.mechanics", "player2.interludes"],
+        "changes",
+      ]);
+    }
+    const option = group.set.items[0].options[0].content;
+    expect(option.kind === "turn" && option.changes?.map((line) => line.label)).toEqual(expect.arrayContaining(["For"]));
+  });
+
+  it("registers the fixed text with the blinding word check, reads the lines' labels, and leaks nothing", () => {
+    expect(pageFieldLabels("turn")).toEqual(expect.arrayContaining(Object.values(MECHANICS_LABELS)));
+    expect(metadataLeaks(single.set)).toEqual([]);
+    expect(htmlLeaks(renderRatingPage(single.set), single.key)).toEqual([]);
+    const [first, ...rest] = single.set.items;
+    const [a, ...others] = first.options;
+    const content = a.content as TurnContent;
+    const leaky: RatingSet = {
+      ...single.set,
+      items: [{ ...first, options: [{ ...a, content: { ...content, changes: [{ label: "Stat change, low" }] } }, ...others] }, ...rest],
+    };
+    expect(metadataLeaks(leaky)).toEqual([expect.stringContaining("Stat change, low")]);
+  });
+
+  it("rebuilds the same page from its key", () => {
+    expect(ratingSetFromKey(single.key, single.records, single.cases, single.load)).toEqual(single.set);
+    expect(ratingSetFromKey(group.key, group.records, group.cases, group.load)).toEqual(group.set);
   });
 });

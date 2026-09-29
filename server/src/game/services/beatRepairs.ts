@@ -156,7 +156,7 @@ function statTarget(change: StatChange, known: Known): StatTarget {
 }
 
 /** A string value its stat's possible values don't mention (case-insensitive), when it lists any. */
-function isOffLadder(change: StatChange, definition: Stat | undefined): boolean {
+export function isOffLadder(change: StatChange, definition: Stat | undefined): boolean {
   if (change.change !== "setString" || definition?.type !== "string") return false;
   const ladder = (definition.possibleValues ?? "").trim().toLowerCase();
   return ladder.length > 0 && !ladder.includes(String(change.value).toLowerCase());

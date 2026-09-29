@@ -30,6 +30,13 @@ function metadataStrings(set: RatingSet): { where: string; value: string }[] {
       strings.push({ where: `${item.id} context heading`, value: section.heading });
       strings.push(...labels(section.entries).map((value) => ({ where: `${item.id} context label`, value })));
     }
+    // A turn option's own lines: a chain's plan, each choice's mechanics and what the turn changes
+    for (const option of item.options) {
+      const content = option.content;
+      if (content.kind !== "turn") continue;
+      const lines = [...(content.plan ?? []), ...content.beats.flatMap((beat) => beat.mechanics ?? []), ...(content.changes ?? [])];
+      strings.push(...labels(lines).map((value) => ({ where: `${item.id} option ${option.label} label`, value })));
+    }
   }
   return strings;
 }

@@ -3,6 +3,8 @@ import type { EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { SETUP_FIELD_LABELS, TURN_FIELD_LABELS, setupCard, turnContent, type OptionContent } from "./ratingContent.js";
 import { CONTEXT_LABELS, chapterPlanLines, turnContext, type ContextSection } from "./ratingContext.js";
+import { MECHANICS_LABELS, withMechanics } from "./ratingMechanics.js";
+import { beatInput } from "./outputChecks.js";
 import { usable, type CallRecord } from "./runner.js";
 
 /*
@@ -505,7 +507,8 @@ export function planRatingSet(
 
 /** The page's fixed text, which the blinding word check reads: its own labels, each option card's and a turn's context. */
 export function pageFieldLabels(kind: RatingKind, mode: RatingMode = "ranked"): string[] {
-  const own = kind === "setup" ? Object.values(SETUP_FIELD_LABELS) : [...Object.values(TURN_FIELD_LABELS), ...Object.values(CONTEXT_LABELS)];
+  const own =
+    kind === "setup" ? Object.values(SETUP_FIELD_LABELS) : [...Object.values(TURN_FIELD_LABELS), ...Object.values(CONTEXT_LABELS), ...Object.values(MECHANICS_LABELS)];
   return [...FIELD_LABELS, ...(mode === "pairwise" ? Object.values(PAIRWISE_LABELS) : []), ...own];
 }
 
@@ -552,7 +555,10 @@ function buildItem(
     options: Object.entries(keyItem.labels).map(([label, ref]) => {
       const record = findOutput(records, kind, ref);
       if (!record) throw new Error(`No usable output for ${id} option ${label}`);
-      const content = optionContent(kind, loadOutput(record), evalCase.state, evalCase.tags.ending);
+      const output = loadOutput(record);
+      const shown = optionContent(kind, output, evalCase.state, evalCase.tags.ending);
+      // A turn's mechanics read on the story its call saw: the case's, or a chain's with its own plan applied
+      const content = shown.kind === "turn" ? withMechanics(shown, beatInput(record, evalCase, records, loadOutput), output) : shown;
       if (!chain || content.kind !== "turn" || !evalCase.state) return { label, content };
       const plan = chainPlanOf(records, record);
       if (!plan) throw new Error(`No usable chapter plan for ${id} option ${label}`);
