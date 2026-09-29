@@ -10,6 +10,7 @@ import {
   chainSides,
   estimateBaseKey,
   pipelinePlans,
+  stagePlansCase,
   stageRunsBaseline,
   type Arm,
   type ArmPlan,
@@ -394,8 +395,9 @@ function isMultiplayerContinuation(c: EvalCase): boolean {
  * The role's cases after the filters and the arm's scope, source and case
  * list, in turn order; the 15-case subset narrows beats only. The cases built
  * for the rounds (source "round") stay out of the closed Stages 0 to 4, the
- * stages that run the baseline, so their dry-run rows and records stay as
- * they ran.
+ * stages that run the baseline, and a case frozen after later stages closed
+ * stays out of every stage before its own (stagePlansCase), so their dry-run
+ * rows and records stay as they ran.
  */
 function casesFor(
   cases: EvalCase[],
@@ -412,6 +414,7 @@ function casesFor(
       (c) =>
         c.role === role &&
         !(roundCasesOut && isRound(c)) &&
+        stagePlansCase(options.stage, c.id) &&
         !(plan.source === "stored" && isRound(c)) &&
         !(plan.source === "round" && !isRound(c)) &&
         (!options.caseIds || options.caseIds.includes(c.id)) &&

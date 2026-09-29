@@ -26,6 +26,8 @@ import {
   ROUND3_PROBLEM_TURN,
   ROUND3_REPLAY_CASES,
   ROUND3_REPLAY_SAMPLES,
+  STAGE_SCOPING_NEW_CASES,
+  STAGES,
 } from "../../../../src/evals/textModelEval/arms.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
@@ -633,6 +635,24 @@ describe("planJobs: the round stages and the migration check", () => {
     }
     expect(caseIds("migration", "isolated", "switch")).toEqual(["round-switch-late", "sp-switch"]);
     expect(caseIds("migration", "pipeline", "thread")).toEqual(["round-thread-short", "sp-thread"]);
+  });
+
+  it("plans a case frozen for a later stage only from that stage on, so the stages closed before it keep their rows as they ran", () => {
+    const [built] = STAGE_SCOPING_NEW_CASES;
+    const stored = evalCase("sp-thread", "thread", { state: threadAnalysisAfterSwitch(1).getState() });
+    const frozenLater = evalCase(built, "thread", { state: threadAnalysisAfterSwitch(1).getState(), tags: tags({ source: "round" }) });
+    const planned = (cases: EvalCase[], stage: PlanOptions["stage"], mode: PlanOptions["mode"]) =>
+      planJobs(cases, { stage, promptState: "round1", roles: ["thread"], mode, subset15: false, records: [] }).map((j) => keyOf(j)).sort();
+    for (const stage of STAGES.slice(0, STAGES.indexOf("stage-scoping"))) {
+      for (const mode of ["isolated", "pipeline"] as const) {
+        expect({ stage, mode, jobs: planned([stored, frozenLater], stage, mode) }).toEqual({ stage, mode, jobs: planned([stored], stage, mode) });
+      }
+    }
+    // The stages the verifier found reopened do plan chapter-planning cases, so the comparison above is not empty there
+    for (const stage of ["turn-rounds", "migration", "plan-refresh", "final-check"] as const) expect(planned([stored], stage, "isolated")).not.toEqual([]);
+    for (const stage of ["turn-rounds", "migration", "reruns", "final-check"] as const) expect(planned([stored], stage, "pipeline")).not.toEqual([]);
+    const scoping = planJobs([stored, frozenLater], { stage: "stage-scoping", promptState: "round1", roles: ["thread"], mode: "isolated", subset15: false, records: [] });
+    expect([...new Set(scoping.map((j) => j.caseId))].sort()).toEqual([built, "sp-thread"]);
   });
 });
 

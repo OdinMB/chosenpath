@@ -127,6 +127,14 @@ describe("choiceLines: each choice's mechanics, as the game plays it", () => {
     expect(lines).toContain("    The stat allows: Regain 10% nerve by resting");
   });
 
+  it("names only the stat a lever pays when its text names two: the one that allows the lever, named beside the amount", () => {
+    const story = withStats(threadBeat(1));
+    const [a, b, c] = challengeOptions();
+    const lines = flat(choiceLines(story, reply({}, [{ ...a, resourceType: "sacrifice", basePoints: 30, text: "Burn 10 Supplies to steady your Nerve" }, b, c]), "player1"));
+    expect(lines).toContain("  Sacrifice: Supplies · amount in its text: 10");
+    expect(lines.filter((line) => line.includes("The stat allows"))).toEqual(["    The stat allows: Spend 10 supplies to push on"]);
+  });
+
   it("finds a sacrificed list item by its value, and says when no stat can be told", () => {
     const story = withStats(threadBeat(1));
     const [a, b, c] = challengeOptions();
@@ -231,6 +239,34 @@ describe("readTurn and turnMechanics: what the turn changes, after the game's re
     const read = turnMechanics(unnamed, reply());
     expect(flat(read?.changes)[0]).toBe("Previous choice sacrificed: no stat named in its text");
     expect(read?.reading.levers[0].status).toBe("unnamed");
+  });
+
+  it("reads a previous lever whose text names two stats on the stat it pays, so the other stat moving never hides an unpaid one", () => {
+    const onlyNerve = reply({ statChanges: [change("player1", "player_nerve", "addNumber", 5)] });
+    // The stat spent and the stat it helps: only the helped one changes
+    const both = withStats(threadBeat(1), sacrificeLast("Burn 10 Supplies to steady your Nerve"));
+    const unpaid = turnMechanics(both, onlyNerve);
+    expect(flat(unpaid?.changes)[0]).toBe("Previous choice sacrificed: Supplies: not applied");
+    expect(unpaid?.reading.levers[0]).toEqual(expect.objectContaining({ status: "notApplied", stat: expect.objectContaining({ id: "shared_supplies" }) }));
+    expect(tallyTurns([readTurn(both, onlyNerve)]).leverStatus).toEqual({ applied: 0, notApplied: 1, otherWay: 0, noChange: 0, unnamed: 0 });
+    const paid = turnMechanics(both, reply({ statChanges: [change("player1", "player_nerve", "addNumber", 5), change("shared", "shared_supplies", "subtractNumber", 10)] }));
+    expect(flat(paid?.changes)[0]).toBe("Previous choice sacrificed: Supplies: applied, 40 → 30");
+
+    // Named second and no amount: the stat that allows a sacrifice (Nerve allows only a reward)
+    const byRule = withStats(threadBeat(1), sacrificeLast("Steady your Nerve by burning Supplies"));
+    expect(flat(turnMechanics(byRule, onlyNerve)?.changes)[0]).toBe("Previous choice sacrificed: Supplies: not applied");
+
+    // Both allow a sacrifice: the one named beside the amount, else the one the text names first
+    const PACK = stat("player_kit", { ...KIT, name: "Pack" });
+    const packs = { playerStats: [NERVE, RANK, PACK] };
+    const byAmount = withStats(threadBeat(1), sacrificeLast("Mend your Pack with 10 Supplies"), packs);
+    expect(flat(turnMechanics(byAmount, reply({ statChanges: [change("player1", "player_kit", "removeElement", "Rope")] }))?.changes)[0]).toBe(
+      "Previous choice sacrificed: Supplies: not applied"
+    );
+    const byOrder = withStats(threadBeat(1), sacrificeLast("Strip your Pack bare and hand over the Supplies"), packs);
+    expect(flat(turnMechanics(byOrder, reply({ statChanges: [change("shared", "shared_supplies", "subtractNumber", 10)] }))?.changes)[0]).toBe(
+      "Previous choice sacrificed: Pack: not applied"
+    );
   });
 
   it("says nothing about a previous choice that was neither", () => {

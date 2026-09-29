@@ -453,6 +453,22 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
 export const STAGE_SCOPING_NEW_CASES = ["round-thread-first-8988006e-t1"];
 
 /**
+ * Cases frozen after earlier stages had closed, each with the first stage
+ * that plans it: casesFor keeps each out of every stage before that one in
+ * STAGES, so a closed stage's dry-run rows and records stay as they ran. The
+ * stage scoping's built case was frozen on 2026-09-29, after the rounds, the
+ * migration check and the feedback stages before it had closed; the round
+ * cases before it were frozen before those stages ran.
+ */
+const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map(STAGE_SCOPING_NEW_CASES.map((id): [string, Stage] => [id, "stage-scoping"]));
+
+/** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
+export function stagePlansCase(stage: Stage, caseId: string): boolean {
+  const first = CASE_FIRST_STAGE.get(caseId);
+  return first === undefined || STAGES.indexOf(stage) >= STAGES.indexOf(first);
+}
+
+/**
  * The stage scoping (the owner's feedback of 2026-09-29, coordinator's
  * brief): planner v2d's chapter planner on Luna low at two samples on every
  * chapter-planning case, stored and built, and on the built first chapter

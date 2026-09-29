@@ -31,7 +31,9 @@ import { statNames } from "./turnDesignChecks.js";
  * The lever's stat is not a field of the option: it is the stat its text
  * names (the design check's sacrificeApplied reads it the same way), else the
  * stat whose held value it names (an item, a trait), else the one stat that
- * allows that lever at all. Every fixed string is in MECHANICS_LABELS, which
+ * allows that lever at all. Where the text names several, the one it pays
+ * (leverStat): of those allowing the lever, the one named beside the amount,
+ * else the first named. Every fixed string is in MECHANICS_LABELS, which
  * joins the page's field labels, so the blinding word check reads it; stat
  * names, reasons and story text go in a line's text.
  */
@@ -162,29 +164,67 @@ function shown(stat: Stat | undefined, value: StatValue | undefined): string {
 const allows = (rule: unknown): rule is string => typeof rule === "string" && rule.trim() !== "" && !/^none\b/i.test(rule.trim());
 const leverRule = (stat: Stat, kind: Lever) => (kind === "sacrifice" ? stat.optionsToSacrifice : stat.optionsToGainAsReward);
 
+const AMOUNT = /[+\-−–]?\d+(?:[.,]\d+)?(?:\s?%)?/g;
+
+/** The amounts an option's text names: "10", "10%", "-5". */
+const amountsIn = (text: string) => (text.match(AMOUNT) ?? []).map((a) => a.replace(/\s/g, ""));
+
+type Span = [start: number, end: number];
+/** A stat a lever's text names, and where it does (no place for the one stat allowing the lever). */
+type Named = { stat: Stat; spans: Span[] };
+
+function spansOf(lower: string, word: string): Span[] {
+  const needle = word.toLowerCase();
+  const spans: Span[] = [];
+  for (let at = needle ? lower.indexOf(needle) : -1; at >= 0; at = lower.indexOf(needle, at + 1)) spans.push([at, at + needle.length]);
+  return spans;
+}
+
+/** The stats whose words the text holds, in the order the text first names them. */
+function namedIn(lower: string, stats: Stat[], words: (stat: Stat) => string[]): Named[] {
+  const first = (n: Named) => Math.min(...n.spans.map(([start]) => start));
+  return stats
+    .map((stat) => ({ stat, spans: words(stat).flatMap((word) => spansOf(lower, word)) }))
+    .filter((n) => n.spans.length > 0)
+    .sort((a, b) => first(a) - first(b));
+}
+
 /**
  * The stats a sacrifice or reward option works on: those its text names;
  * else those whose held value it names (an item, a trait); else the one stat
- * that allows that lever, when only one does.
+ * that allows that lever, when only one does. In the order the text names them.
  */
-function leverStats(story: Story, slot: string, text: string, kind: Lever): Stat[] {
+function leverCandidates(story: Story, slot: string, text: string, kind: Lever): Named[] {
   const state = story.getState();
   const stats = [...state.sharedStats, ...state.playerStats];
   const lower = text.toLowerCase();
-  const byName = stats.filter((s) => statNames(s).some((n) => lower.includes(n.toLowerCase())));
+  const byName = namedIn(lower, stats, statNames);
   if (byName.length) return byName;
   const held = (s: Stat) => {
     const value = valueOf(state, groupOf(state, s, slot), s.id);
     return (Array.isArray(value) ? value : typeof value === "string" ? [value] : []).map((v) => v.trim()).filter((v) => v.length >= 4);
   };
-  const byValue = stats.filter((s) => held(s).some((v) => lower.includes(v.toLowerCase())));
+  const byValue = namedIn(lower, stats, held);
   if (byValue.length) return byValue;
   const allowing = stats.filter((s) => allows(leverRule(s, kind)));
-  return allowing.length === 1 ? allowing : [];
+  return allowing.length === 1 ? [{ stat: allowing[0], spans: [] }] : [];
 }
 
-/** The amounts an option's text names: "10", "10%", "-5". */
-const amountsIn = (text: string) => (text.match(/[+\-−–]?\d+(?:[.,]\d+)?(?:\s?%)?/g) ?? []).map((a) => a.replace(/\s/g, ""));
+/**
+ * The one stat a lever pays, when its text names several ("Burn 10 Supplies
+ * to steady your Nerve"): of those that allow this lever, or all when none
+ * does, the one named nearest an amount the text names, else the one it names
+ * first. The page reads this stat alone, so another named stat moving never
+ * reads as the lever paid.
+ */
+function leverStat(candidates: Named[], text: string, kind: Lever): Stat | undefined {
+  const allowing = candidates.filter((c) => allows(leverRule(c.stat, kind)));
+  const pool = allowing.length ? allowing : candidates;
+  const amounts = [...text.toLowerCase().matchAll(AMOUNT)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  if (pool.length < 2 || amounts.length === 0) return pool[0]?.stat;
+  const gap = (n: Named) => Math.min(...n.spans.flatMap(([start, end]) => amounts.map(([from, to]) => Math.max(0, from - end, start - to))));
+  return pool.reduce((best, n) => (gap(n) < gap(best) ? n : best)).stat;
+}
 
 /** The player's previous choice when it was a sacrifice or reward (any option type: the schema allows both). */
 function previousLever(story: Story, slot: string): { kind: Lever; text: string } | undefined {
@@ -275,16 +315,14 @@ function leverStatus(kind: Lever, stat: Stat, before: StatValue | undefined, aft
   return "applied";
 }
 
-function leverReading(state: StoryState, slot: string, kind: Lever, text: string, stats: Stat[], changes: StatChangeReading[]): LeverReading {
-  if (stats.length === 0) return { slot, kind, text, status: "unnamed" };
-  for (const stat of stats) {
-    const own = changes.filter((c) => c.statId === stat.id && c.group === groupOf(state, stat, slot));
-    if (own.length === 0) continue;
-    const before = own[0].before;
-    const after = own[own.length - 1].after;
-    return { slot, kind, text, stat, status: leverStatus(kind, stat, before, after), before, after };
-  }
-  return { slot, kind, text, stat: stats[0], status: "notApplied" };
+/** What the turn did with the lever's own stat: its changes in order, or none, "not applied". */
+function leverReading(state: StoryState, slot: string, kind: Lever, text: string, stat: Stat | undefined, changes: StatChangeReading[]): LeverReading {
+  if (!stat) return { slot, kind, text, status: "unnamed" };
+  const own = changes.filter((c) => c.statId === stat.id && c.group === groupOf(state, stat, slot));
+  if (own.length === 0) return { slot, kind, text, stat, status: "notApplied" };
+  const before = own[0].before;
+  const after = own[own.length - 1].after;
+  return { slot, kind, text, stat, status: leverStatus(kind, stat, before, after), before, after };
 }
 
 const DROPPED: Record<string, string> = {
@@ -311,9 +349,12 @@ export function readTurn(story: Story, written: SetOfBeatGenerationSchema): Turn
   const slots = story.getPlayerSlots();
   const levers = slots.flatMap((slot) => {
     const previous = previousLever(story, slot);
-    return previous ? [{ slot, ...previous, stats: leverStats(story, slot, previous.text, previous.kind) }] : [];
+    if (!previous) return [];
+    const candidates = leverCandidates(story, slot, previous.text, previous.kind);
+    return [{ slot, ...previous, candidates, stat: leverStat(candidates, previous.text, previous.kind) }];
   });
-  const exempt = new Set(levers.flatMap((l) => l.stats.map((s) => `${groupOf(state, s, l.slot)}|${s.id}`)));
+  // Any stat the lever's text names may change whatever its flag says, not only the one it pays
+  const exempt = new Set(levers.flatMap((l) => l.candidates.map(({ stat }) => `${groupOf(state, stat, l.slot)}|${stat.id}`)));
   const statChanges = readStatChanges(story, reply, exempt);
 
   const beats = slots.map((slot) => ({ slot, plan: asObject(asObject((reply as unknown as Record<string, unknown>)[slot]).plan) }));
@@ -329,7 +370,7 @@ export function readTurn(story: Story, written: SetOfBeatGenerationSchema): Turn
     slots,
     reply,
     statChanges,
-    levers: levers.map((l) => leverReading(state, l.slot, l.kind, l.text, l.stats, statChanges)),
+    levers: levers.map((l) => leverReading(state, l.slot, l.kind, l.text, l.stat, statChanges)),
     milestones: asArray<Change>(asObject(reply).newMilestones)
       .filter((m): m is Extract<Change, { type: "newMilestone" }> => Boolean(m) && m.type === "newMilestone")
       .map((m) => ({ group: m.outcomeGroup, text: m.newMilestone, question: story.getOutcomeById(m.outcome)?.question || m.outcome })),
@@ -382,17 +423,18 @@ function bonusLine(story: Story, modifier: Record<string, unknown>, index: numbe
   return { label: L.statBonus, text: `${signed(value)} ${name}${note}${reason ? `: ${reason}` : ""}` };
 }
 
-/** A sacrifice or reward option: its stat, the amount its text names, and what the stat allows. */
+/** A sacrifice or reward option: the stat it pays, the amount its text names, and what the stat allows. */
 function leverLine(story: Story, slot: string, option: BeatOption): ContextLine | undefined {
-  if (option.resourceType !== "sacrifice" && option.resourceType !== "reward") return undefined;
+  const kind = option.resourceType;
+  if (kind !== "sacrifice" && kind !== "reward") return undefined;
   const text = asString(option.text);
-  const stats = leverStats(story, slot, text, option.resourceType);
+  const stat = leverStat(leverCandidates(story, slot, text, kind), text, kind);
   const amounts = amountsIn(text);
-  const rules = stats.map((s) => leverRule(s, option.resourceType as Lever)).filter(allows);
+  const rule = stat ? leverRule(stat, kind) : undefined;
   return {
-    label: option.resourceType === "sacrifice" ? L.sacrifice : L.reward,
-    text: `${stats.length ? stats.map((s) => s.name).join(", ") : L.noStatNamed} · ${amounts.length ? `${L.amountInText}: ${amounts.join(", ")}` : L.noAmount}`,
-    ...(rules.length ? { sub: rules.map((rule) => ({ label: L.statAllows, text: rule })) } : {}),
+    label: kind === "sacrifice" ? L.sacrifice : L.reward,
+    text: `${stat ? stat.name : L.noStatNamed} · ${amounts.length ? `${L.amountInText}: ${amounts.join(", ")}` : L.noAmount}`,
+    ...(allows(rule) ? { sub: [{ label: L.statAllows, text: rule }] } : {}),
   };
 }
 
