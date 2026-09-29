@@ -172,6 +172,14 @@ describe("choiceLines: each choice's mechanics, as the game plays it", () => {
     const [first] = flat(choiceLines(story, readTurn(story, reply({}, explorationOptions())).reply, "player1"));
     expect(first).toBe("Choice 1: challenge · risk normal · base points 0");
   });
+
+  it("reads bonuses after the game's repairs: the doubled seat form names its stat, as the roll breakdown now does", () => {
+    const story = withStats(threadBeat(1));
+    const [a, b, c] = challengeOptions();
+    const options: ChallengeOption[] = [{ ...a, modifiersToSuccessRate: [bonus("player1_player_nerve", 10, "steady hands")] }, b, c];
+    const lines = flat(choiceLines(story, readTurn(story, reply({}, options)).reply, "player1"));
+    expect(lines).toContain("  Stat bonus: +10 Nerve: steady hands");
+  });
 });
 
 describe("readTurn and turnMechanics: what the turn changes, after the game's repairs", () => {

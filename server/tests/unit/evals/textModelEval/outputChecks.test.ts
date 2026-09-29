@@ -2,9 +2,9 @@ import { jest } from "@jest/globals";
 import { GameModes, type SetOfBeatGenerationSchema, type SwitchAnalysis } from "core/types/index.js";
 import { checksForRecords } from "../../../../src/evals/textModelEval/outputChecks.js";
 import type { CallRecord } from "../../../../src/evals/textModelEval/runner.js";
-import { switchAnalysisAfterThread, threadAnalysisAfterSwitch } from "../../../helpers/promptStories.js";
+import { switchAnalysisAfterThread, threadAnalysisAfterSwitch, threadBeat } from "../../../helpers/promptStories.js";
 import { createMockStoryState } from "../../../helpers/testHelpers.js";
-import { beatSet, outcome, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { beatGeneration, beatSet, challengeOptions, outcome, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { evalCase, record } from "./fixtures.js";
 
 beforeEach(() => {
@@ -98,6 +98,17 @@ describe("checksForRecords: checks read what the game keeps", () => {
       const [result] = check("beat", state, [seatForm]);
       expect(result?.checks).toMatchObject({ knownChangeIds: true, noRepairs: false });
       expect(result?.counts["repair:statIdSeatForm"]).toBe(1);
+    });
+
+    it("reads a stat bonus in the doubled seat form as the game keeps it, and counts the repair", () => {
+      const inThread = threadBeat(1).clone({ playerStats: [stat("player_energy")] }).getState();
+      const [first, ...rest] = challengeOptions();
+      const doubled = beatSet(1, {
+        player1: beatGeneration({ options: [{ ...first, modifiersToSuccessRate: [{ statId: "player1_player_energy", reason: "fit", effect: 5 }] }, ...rest] }),
+      });
+      const [result] = check("beat", inThread, [doubled]);
+      expect(result?.checks).toMatchObject({ knownIds: true, noRepairs: false });
+      expect(result?.counts["repair:bonusStatIdSeatForm"]).toBe(1);
     });
 
     it("counts every kind a role's replies show on each of them, 0 where absent, so a mean reads per reply", () => {

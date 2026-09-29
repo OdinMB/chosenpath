@@ -3,6 +3,7 @@ import type { Story } from "core/models/Story.js";
 import type {
   BeatGeneration,
   BeatOption,
+  ChallengeOption,
   Change,
   Outcome,
   SetOfBeatGenerationSchema,
@@ -14,6 +15,7 @@ import { expectedOptionType, repairBeatReply } from "../../../../src/game/servic
 import { logRepairs, type Repair } from "../../../../src/game/services/textRepairs.js";
 import { beatStep, switchStep } from "../../../../src/game/services/storyTextSteps.js";
 import { ChangeService } from "../../../../src/game/services/ChangeService.js";
+import { BeatResolutionService } from "../../../../src/game/services/BeatResolutionService.js";
 import { ThreadResolutionService } from "../../../../src/game/services/ThreadResolutionService.js";
 import {
   endingBeat,
@@ -197,6 +199,105 @@ describe("repairBeatReply: stat changes (TR-1)", () => {
     const [updated, changes] = beatStep.apply(story, reply);
     const applied = new ChangeService().applyChanges(updated, changes);
     expect(applied.getPlayer("player1")?.statValues).toContainEqual({ statId: "player_energy", value: 40 });
+  });
+});
+
+describe("repairBeatReply: stat bonuses name their stat as the game resolves it", () => {
+  type Bonus = ChallengeOption["modifiersToSuccessRate"][number];
+  const bonus = (statId: string, effect = 10): Bonus => ({ statId, reason: "it fits", effect });
+  const withBonuses = (...bonuses: Bonus[]): BeatOption[] => {
+    const [first, ...rest] = challengeOptions();
+    return [{ ...first, modifiersToSuccessRate: bonuses }, ...rest];
+  };
+  const bonusIds = (reply: SetOfBeatGenerationSchema, slot = "player1") =>
+    beatOf(reply, slot).options.flatMap((o) => (o.optionType === "challenge" ? o.modifiersToSuccessRate.map((m) => m.statId) : []));
+
+  /** A challenge chapter with Morale (shared), Energy, Rank and Luck, a player stat whose id has no player_ prefix. */
+  const story = (players = 1) =>
+    withStats(threadBeat(players), {
+      playerStats: [stat("player_energy", { name: "Energy" }), stat("player_rank", { name: "Rank", type: "string" }), stat("luck", { name: "Luck" })],
+    });
+
+  function repaired(target: Story, slot: string, ...bonuses: Bonus[]) {
+    const reply = beatSet(target.getNumberOfPlayers(), { [slot]: beatWith({}, withBonuses(...bonuses)) });
+    const { reply: out, repairs } = repairBeatReply(target, reply);
+    return { ids: bonusIds(out, slot), repairs: repairs.filter((r) => r.kind.startsWith("bonus")) };
+  }
+
+  it("writes the doubled seat form as the seat form the prompt asks for, which the game's lookup resolves", () => {
+    const result = repaired(story(), "player1", bonus("player1_player_energy"), bonus("player_player_energy"));
+    expect(result.ids).toEqual(["player1_energy", "player1_energy"]);
+    expect(result.repairs).toEqual([
+      { kind: "bonusStatIdSeatForm", detail: "player1: player1_player_energy -> player1_energy" },
+      { kind: "bonusStatIdSeatForm", detail: "player1: player_player_energy -> player1_energy" },
+    ]);
+    expect(story().getStatById("player1_player_energy")).toBeNull();
+    expect(story().getStatById("player1_energy")?.name).toBe("Energy");
+  });
+
+  it("writes the plain id where the stat's id has no player_ to replace, the only form the lookup resolves there", () => {
+    const result = repaired(story(), "player1", bonus("player1_luck"));
+    expect(result.ids).toEqual(["luck"]);
+    expect(result.repairs).toEqual([{ kind: "bonusStatIdSeatForm", detail: "player1: player1_luck -> luck" }]);
+  });
+
+  it("leaves the plain seat form, the exact player id and a shared stat untouched, with no repair", () => {
+    const result = repaired(story(), "player1", bonus("player1_energy"), bonus("player_energy"), bonus("shared_morale"));
+    expect(result.ids).toEqual(["player1_energy", "player_energy", "shared_morale"]);
+    expect(result.repairs).toEqual([]);
+  });
+
+  it("leaves an unknown id as it was and notes it, since the game still counts its points", () => {
+    const result = repaired(story(), "player1", bonus("player1_relationship_with_staff"), bonus("player1_shared_morale"));
+    expect(result.ids).toEqual(["player1_relationship_with_staff", "player1_shared_morale"]);
+    expect(result.repairs).toEqual([
+      { kind: "bonusStatUnknown", note: true, detail: "player1: player1_relationship_with_staff" },
+      { kind: "bonusStatUnknown", note: true, detail: "player1: player1_shared_morale" },
+    ]);
+  });
+
+  it("keeps a group player's own seat, and leaves another player's seat as ambiguous and a seat the story lacks as unknown", () => {
+    const own = repaired(story(2), "player2", bonus("player2_player_energy"), bonus("player_player_energy"));
+    expect(own.ids).toEqual(["player2_energy", "player2_energy"]);
+    expect(own.repairs.map((r) => r.kind)).toEqual(["bonusStatIdSeatForm", "bonusStatIdSeatForm"]);
+
+    const other = repaired(story(2), "player1", bonus("player2_player_energy"), bonus("player3_player_energy"));
+    expect(other.ids).toEqual(["player2_player_energy", "player3_player_energy"]);
+    expect(other.repairs).toEqual([
+      { kind: "bonusStatAmbiguous", note: true, detail: "player1: player2_player_energy" },
+      { kind: "bonusStatUnknown", note: true, detail: "player1: player3_player_energy" },
+    ]);
+  });
+
+  it("gives a single player's bonus that player's seat whatever seat it names, as the stat-change repair does", () => {
+    const result = repaired(story(), "player1", bonus("player2_player_energy"));
+    expect(result.ids).toEqual(["player1_energy"]);
+  });
+
+  it("repairs bonuses on every challenge option, at the ending too", () => {
+    const ending = withStats(endingBeat(1));
+    expect(expectedOptionType(ending, "player1")).toBeUndefined();
+    expect(repaired(ending, "player1", bonus("player1_player_energy")).ids).toEqual(["player1_energy"]);
+  });
+
+  it("shows the stat's name in the roll breakdown players see, the points unchanged", () => {
+    const target = story();
+    const reply = beatSet(1, { player1: beatWith({}, withBonuses(bonus("player1_player_energy", 10), bonus("player1_relationship_with_staff", 5))) });
+    const breakdown = (option: BeatOption) => {
+      const lines: Array<{ name: string; value: number; tooltip?: string }> = [];
+      const points = BeatResolutionService.calculateTotalPoints(option as ChallengeOption, lines, target);
+      return { points, lines: lines.map((l) => `${l.name} ${l.value}`) };
+    };
+    expect(breakdown(beatOf(reply).options[0])).toEqual({ points: 15, lines: ["Choice 0", "player1_player_energy 10", "player1_relationship_with_staff 5"] });
+    expect(breakdown(beatOf(repairBeatReply(target, reply).reply).options[0])).toEqual({ points: 15, lines: ["Choice 0", "Energy 10", "player1_relationship_with_staff 5"] });
+  });
+
+  it("logs the counts per kind without the ids", () => {
+    const lines: string[] = [];
+    const { repairs } = repairBeatReply(story(), beatSet(1, { player1: beatWith({}, withBonuses(bonus("player1_player_energy"), bonus("player1_relationship_with_staff"))) }));
+    logRepairs("beat", story(), repairs, (line) => lines.push(line));
+    expect(JSON.parse(lines[0].slice("repair ".length))).toMatchObject({ repairs: { bonusStatIdSeatForm: 1 }, notes: { bonusStatUnknown: 1 } });
+    expect(lines[0]).not.toMatch(/energy|staff/);
   });
 });
 
@@ -580,9 +681,10 @@ describe("repairBeatReply: option types (TR-7)", () => {
 
 describe("repairBeatReply leaves the model's reply as it was", () => {
   it("does not mutate the input", () => {
+    const [first, ...rest] = challengeOptions();
     const reply = beatSet(1, {
       statChanges: [statChange("player1", "player1_energy")],
-      player1: beatWith({}, challengeOptions()),
+      player1: beatWith({}, [{ ...first, modifiersToSuccessRate: [{ statId: "player1_player_energy", reason: "r", effect: 5 }] }, ...rest]),
     });
     const before = JSON.parse(JSON.stringify(reply)) as unknown;
     repairBeatReply(withStats(laterSwitchBeat(1)), reply);

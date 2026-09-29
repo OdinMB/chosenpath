@@ -16,10 +16,11 @@ import type { Repair } from "./textRepairs.js";
 
 /*
  * A pure pass over a beat reply before the game keeps it: what the reply
- * wrote in a form the game would drop (a stat in seat form, a fact filed
- * under a stat, a milestone in the wrong group, an option of the wrong type)
- * is put where the game reads it, and what cannot be placed is dropped. Every
- * change is recorded as a Repair; ChangeService keeps applying exact ids.
+ * wrote in a form the game would drop or not resolve (a stat in seat form, a
+ * stat bonus in doubled seat form, a fact filed under a stat, a milestone in
+ * the wrong group, an option of the wrong type) is put where the game reads
+ * it, and what cannot be placed is dropped. Every change is recorded as a
+ * Repair; ChangeService keeps applying exact ids.
  */
 
 type StatChange = Extract<Change, { type: "statChange" }>;
@@ -313,7 +314,7 @@ function repairMilestones(story: Story, milestones: Change[], repairs: Repair[])
   return kept;
 }
 
-// --- Facts, introductions and options in each player's beat ---
+// --- Facts, introductions, stat bonuses and options in each player's beat ---
 
 /** What a re-filed fact is prefixed with: the stat's name, the outcome's question or the character's name. */
 function factPrefix(story: Story, id: string, known: Known): string | undefined {
@@ -345,6 +346,60 @@ function repairIntroductions(introductions: Introduction[], known: Known, repair
     if (known.elements.has(id) || known.newElements.has(id)) return true;
     repairs.push({ kind: "introductionDropped", detail: id });
     return false;
+  });
+}
+
+type BonusTarget = { statId: string } | { note: "bonusStatAmbiguous" | "bonusStatUnknown" };
+
+/**
+ * The id a stat bonus on this player's option should name its stat by, when
+ * Story.getStatById (the roll breakdown's lookup) doesn't resolve the one
+ * written: the stat-change repair's reading of a seat form (doubled,
+ * "player1_player_skills_traits" or "player_player_skills_traits", or a seat
+ * on a stat whose id has no "player_") under the option's own seat, written as
+ * the bonus contract asks ("player1_skills_traits" for "player_skills_traits"),
+ * or as the plain id where the stat's id has no "player_" to replace. In
+ * multiplayer another player's seat is ambiguous and a seat the story lacks is
+ * unknown; in single player every seat is the one player's. Undefined: the
+ * lookup resolves the id already.
+ */
+function bonusTarget(story: Story, slot: string, id: string, known: Known): BonusTarget | undefined {
+  if (story.getStatById(id)) return undefined;
+  const seatForm = playerStatFromSeatForm(id, known.playerStats);
+  if (!seatForm) return { note: "bonusStatUnknown" };
+  const { slots } = known;
+  if (slots.length > 1 && seatForm.seat !== undefined) {
+    if (!slots.includes(seatForm.seat)) return { note: "bonusStatUnknown" };
+    if (seatForm.seat !== slot) return { note: "bonusStatAmbiguous" };
+  }
+  const seat = slots.length === 1 ? slots[0] : slot;
+  const seated = seatForm.stat.startsWith("player_") ? `${seat}_${seatForm.stat.slice("player_".length)}` : seatForm.stat;
+  return { statId: story.getStatById(seated)?.id === seatForm.stat ? seated : seatForm.stat };
+}
+
+/**
+ * Every challenge option's bonuses with their stat in a form the roll's
+ * breakdown names (the points counted as before either way); what can't be
+ * read unambiguously stays as written and is noted.
+ */
+function repairBonuses(story: Story, slot: string, options: BeatOption[], known: Known, repairs: Repair[]): BeatOption[] {
+  return options.map((option): BeatOption => {
+    if (option?.optionType !== "challenge" || !Array.isArray(option.modifiersToSuccessRate)) return option;
+    let changed = false;
+    const modifiersToSuccessRate = option.modifiersToSuccessRate.map((modifier) => {
+      const written: unknown = modifier?.statId;
+      if (typeof written !== "string") return modifier;
+      const target = bonusTarget(story, slot, written, known);
+      if (!target) return modifier;
+      if ("note" in target) {
+        repairs.push({ kind: target.note, note: true, detail: `${slot}: ${written}` });
+        return modifier;
+      }
+      repairs.push({ kind: "bonusStatIdSeatForm", detail: `${slot}: ${written} -> ${target.statId}` });
+      changed = true;
+      return { ...modifier, statId: target.statId };
+    });
+    return changed ? { ...option, modifiersToSuccessRate } : option;
   });
 }
 
@@ -389,6 +444,8 @@ function repairBeat(
         newIntroductionsOfStoryElements: repairIntroductions(plan.newIntroductionsOfStoryElements, known, repairs),
       }),
     },
-    ...(beat.options && { options: repairOptions(story, slot, beat.options, repairs) }),
+    ...(beat.options && {
+      options: repairBonuses(story, slot, repairOptions(story, slot, beat.options, repairs), known, repairs),
+    }),
   };
 }
