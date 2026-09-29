@@ -41,6 +41,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   groups: 0.4,
   "form-gate": 0.4,
   "final-check": 0.6,
+  "stage-scoping": 0.4,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
 export const HARD_CEILING = 40;
@@ -85,6 +86,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-28: the request form's gate (B9: chapter-step p95 at or under 45 s and no worse than the one-message form): production's single-player turn form once as one message and once split, on the 44 stored turns in one invocation (88 turns, about $0.29 at $0.0033 a turn uncached; the split one's cache reads bill less), and a smoke",
   "final-check":
     "coordinator, 2026-09-28: the paid final check on production's own code (the adopted variant, under adopted1): one sample of the 44 stored single-player turns (sample 2; the form gate ran sample 1, $0.147) and both planners (about $0.06), the 12 stored group turns (about $0.05), six Luna low custom-story setups (about $0.05) and two template setups on Sol low, the template editor's first AI Drafts on the round-3 form (about $0.22), then the chapter-opening chains per player count (about $0.10) as the cap allows",
+  "stage-scoping":
+    "coordinator, 2026-09-29 (the owner's feedback on a first chapter that reached into its outcome's next stage; the ledger at $33.85 of the $40 hard cap): planner v2d (planV2d) twice on the 20 chapter-planning cases and planner v2c and today's form twice on the built first chapter (about $0.06 at $0.0013 a plan), the judged stage check's calibration and its readings on the stored plans (about 200 Luna low calls, about $0.09), a smoke, and room for one fix and retest",
 };
 
 export type Caps = {

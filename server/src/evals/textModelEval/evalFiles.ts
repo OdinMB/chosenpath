@@ -32,6 +32,7 @@ import type { CallRecord } from "./runner.js";
  *   judge-calibration.md|json  the judged checks against the hand verdicts (--judge-calibration)
  *   judged-turns.md|json   the judged checks on a round's turns, reference against candidate (--judge-records)
  *   judged-groups.md|json  the group round's judged consistency check and its calibration (--judge-groups)
+ *   judged-stages.md|json  the stage scoping's judged check, "the chapter stays within its stage", and its calibration (--judge-stages)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  */
 
@@ -95,16 +96,18 @@ export function evalFiles(outDir: string) {
     /**
      * Freezes the round cases beside the others: their files, their index
      * entries after the existing ones (which stay as they are), and the round
-     * build report. An id already frozen is replaced only when `replace` is set.
+     * build report, which a build without one (the stage scoping's case,
+     * stageCases.ts) leaves as it was. An id already frozen is replaced only
+     * when `replace` is set.
      */
-    addCases: (cases: EvalCase[], report: RoundBuildReport, replace: boolean) => {
+    addCases: (cases: EvalCase[], report: RoundBuildReport | undefined, replace: boolean) => {
       const index = JSON.parse(fs.readFileSync(at("cases", "cases.json"), "utf-8")) as { id: string; role: string; tags: unknown }[];
       const ids = new Set(cases.map((c) => c.id));
       const clash = index.filter((entry) => ids.has(entry.id)).map((entry) => entry.id);
       if (clash.length && !replace) throw new Error(`Already frozen: ${clash.join(", ")}`);
       for (const evalCase of cases) writeJson(at("cases", `${evalCase.id}.json`), evalCase);
       writeJson(at("cases", "cases.json"), [...index.filter((entry) => !ids.has(entry.id)), ...cases.map((c) => ({ id: c.id, role: c.role, tags: c.tags }))]);
-      writeJson(at("cases", "round-build-report.json"), report);
+      if (report) writeJson(at("cases", "round-build-report.json"), report);
     },
     readPrepRecords: (): CallRecord[] => readJsonl<CallRecord>(at("prep-calls.jsonl")),
     appendPrepRecord: (record: CallRecord) => {
@@ -125,6 +128,11 @@ export function evalFiles(outDir: string) {
     writeJudgedGroups: (markdown: string, json: unknown) => {
       writeJson(at("judged-groups.json"), json);
       fs.writeFileSync(at("judged-groups.md"), markdown);
+    },
+    /** The stage scoping's judged check (--judge-stages, stageJudge.ts) */
+    writeJudgedStages: (markdown: string, json: unknown) => {
+      writeJson(at("judged-stages.json"), json);
+      fs.writeFileSync(at("judged-stages.md"), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {

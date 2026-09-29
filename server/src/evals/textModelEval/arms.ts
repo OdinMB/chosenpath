@@ -31,9 +31,11 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * plan refresh, the reruns that rebuild turn round 1's page, the setup
  * retests, the group turn round (B10), the request form's gate (B9) and the
  * paid final check on production's own code, each with the arms its phase
- * set (armsFor, pipelinePlans). Their caps and reasons are in budget.ts.
+ * set (armsFor, pipelinePlans). The owner's feedback of 2026-09-29 adds the
+ * stage scoping (planner v2d and its judged stage check). Their caps and
+ * reasons are in budget.ts.
  */
-export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check"] as const;
+export const FEEDBACK_STAGES = ["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping"] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
 export const STAGES: Stage[] = ["0", "1-2", "3", "4", "setup-rounds", "turn-rounds", "migration", ...FEEDBACK_STAGES];
@@ -161,6 +163,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   setupR3c: "setupR3",
   // Its second retest (the multiplayer clause only) against the adopted form too
   setupR3d: "setupR3",
+  // The outcome's stages (owner's feedback, 2026-09-29) against the chapter planner it edits, production's
+  planV2d: "planV2c",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -243,6 +247,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "setupR3d")]: [armKey(LUNA_LOW, "setupR3c"), armKey(LUNA_LOW, "prod")],
   // B10's retest against B10, the note it retests
   [armKey(LUNA_LOW, "turnB10b")]: [armKey(LUNA_LOW, "turnB10")],
+  // Planner v2d against today's form too (the carry-forward guard)
+  [armKey(LUNA_LOW, "planV2d")]: [armKey(LUNA_LOW, "prod")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -431,9 +437,37 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return formGateArms(role);
     case "final-check":
       return finalCheckArms(role);
+    case "stage-scoping":
+      return stageScopingArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The chapter-planning case the stage scoping builds (stageCase.ts): story
+ * 8988006e (Novi Reg, Arielle and the Waste Ring) before its first chapter,
+ * the chapter the owner's feedback of 2026-09-29 read, which no stored case
+ * holds.
+ */
+export const STAGE_SCOPING_NEW_CASES = ["round-thread-first-8988006e-t1"];
+
+/**
+ * The stage scoping (the owner's feedback of 2026-09-29, coordinator's
+ * brief): planner v2d's chapter planner on Luna low at two samples on every
+ * chapter-planning case, stored and built, and on the built first chapter
+ * planner v2c (its reference) and today's form (its second) at two samples
+ * too, since neither ran there; every other case reads their stored records.
+ * Its switch planner is planner v2b's, so no switch case runs. The judged
+ * stage check books to this stage too (--judge-stages).
+ */
+function stageScopingArms(role: EvalRole): ArmPlan[] {
+  if (role !== "thread") return [];
+  return [
+    { arm: luna("low", "planV2d"), samples: 2, scope: "all" },
+    { arm: luna("low", "planV2c"), samples: 2, scope: "all", caseIds: STAGE_SCOPING_NEW_CASES },
+    { arm: luna("low", "prod"), samples: 2, scope: "all", caseIds: STAGE_SCOPING_NEW_CASES },
+  ];
 }
 
 /**

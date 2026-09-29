@@ -42,6 +42,7 @@ import { renderPairwiseScores, renderScores, scorePairwise, scoreRatings, type E
 import { renderResults } from "./resultsReport.js";
 import { DEFAULT_CHAIN_MAX_SPEND, setupChainMode } from "./setupChainMode.js";
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
+import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
 import {
@@ -63,7 +64,7 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --dry-run (default) [--prompt-state <tag>, default round0]  cases, open jobs, estimated $ and duration per stage; no API calls
  *   --probe [--max-spend 1]       which parameters and schemas Sol and Luna accept
  *   --build-cases [--rebuild-cases] [--max-spend 0.75]
- *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check --prompt-state <tag> [filters]
+ *   --run --stage 0|1-2|3|4|setup-rounds|turn-rounds|migration|plan-refresh|reruns|setup-retests|groups|form-gate|final-check|stage-scoping --prompt-state <tag> [filters]
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -96,6 +97,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-groups --arms <reference,candidate> --prompt-state <tag> [--stage groups] [--max-spend 0.10]  the group
  *     round's judged consistency check (groupJudge.ts): its calibration on today's stored group turns (the reference's
  *     sample 1, judged twice) and every group reply of the arms once, then judged-groups.md and .json
+ *   The stage scoping (stagePrep.ts, the owner's feedback of 2026-09-29), in the stage-scoping stage:
+ *   --build-stage-cases [--rebuild-cases]  the Arielle story's first chapter as a chapter-planning case
+ *     (stageCases.ts), frozen beside the others; no calls
+ *   --judge-stages [--arms <chapter planner keys>] --prompt-state <tag> [--max-spend 0.10]  the judged stage check
+ *     (stageJudge.ts): its calibration (two samples), the stored chapters and every isolated chapter plan of the
+ *     arms (one sample), then judged-stages.md and .json
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -129,6 +136,8 @@ type Mode =
   | "judge-calibration"
   | "judge-records"
   | "judge-groups"
+  | "build-stage-cases"
+  | "judge-stages"
   | "balance-sim"
   | "setup-chain";
 
@@ -243,6 +252,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-calibration":
       case "--judge-records":
       case "--judge-groups":
+      case "--build-stage-cases":
+      case "--judge-stages":
       case "--balance-sim":
       case "--setup-chain":
         args.mode = arg.slice(2) as Mode;
@@ -884,6 +895,11 @@ async function main() {
     case "judge-groups":
       // The group round's judged check books to its own stage (groups) unless another is given
       return judgeGroupsMode(prepContext(args, files, args.stage ?? "groups"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, { stage: args.stage ?? "groups" });
+    case "build-stage-cases":
+      return buildStageCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-stages":
+      // The stage scoping's judged check books to its own stage unless another is given
+      return judgeStagesMode(prepContext(args, files, args.stage ?? "stage-scoping"), args.armKeys, args.promptState ?? CURRENT_PROMPT_STATE, { stage: args.stage ?? "stage-scoping" });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

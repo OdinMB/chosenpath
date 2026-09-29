@@ -71,6 +71,27 @@ describe("evalFiles", () => {
     expect(read.nearerFrames?.[threadId]).toEqual({ question: "Nearer?", plan: "P.", typeOfMilestone: "whether the letters prove it", chapterKey });
   });
 
+  it("freezes added cases after the others, and without a report keeps the round build report as it was", () => {
+    const first = evalCase("cont-a-t2", "beat", { state: threadBeat(1).getState() });
+    fs.mkdirSync(path.join(outDir, "cases"), { recursive: true });
+    fs.writeFileSync(path.join(outDir, "cases", "cases.json"), JSON.stringify([{ id: first.id, role: first.role, tags: first.tags }]));
+    fs.writeFileSync(path.join(outDir, "cases", `${first.id}.json`), JSON.stringify(first));
+    fs.writeFileSync(path.join(outDir, "cases", "round-build-report.json"), '{"built":"earlier"}');
+    const files = evalFiles(outDir);
+    const added = evalCase("round-thread-first-x-t1", "thread", { state: threadBeat(1).getState() });
+    files.addCases([added], undefined, false);
+    expect(files.readCases().map((c) => c.id)).toEqual([first.id, added.id]);
+    expect(fs.readFileSync(path.join(outDir, "cases", "round-build-report.json"), "utf-8")).toBe('{"built":"earlier"}');
+    expect(() => files.addCases([added], undefined, false)).toThrow("Already frozen: round-thread-first-x-t1");
+  });
+
+  it("writes the stage check's readings to judged-stages.md and .json", () => {
+    const files = evalFiles(outDir);
+    files.writeJudgedStages("# stages\n", { set: "stages" });
+    expect(fs.readFileSync(path.join(outDir, "judged-stages.md"), "utf-8")).toBe("# stages\n");
+    expect(JSON.parse(fs.readFileSync(path.join(outDir, "judged-stages.json"), "utf-8"))).toEqual({ set: "stages" });
+  });
+
   it("writes the nearer frames' judged turns beside the rounds' file, not over it", () => {
     const files = evalFiles(outDir);
     files.writeJudgedTurns("# rounds\n", { set: "rounds" });

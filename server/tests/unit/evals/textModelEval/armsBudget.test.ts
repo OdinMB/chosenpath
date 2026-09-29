@@ -7,6 +7,7 @@ import {
   FINAL_CHECK_SETUP_PREMISES,
   FINAL_CHECK_TEMPLATE_PREMISES,
   makeArm,
+  pipelinePlans,
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
@@ -18,6 +19,7 @@ import {
   SETUP_R3D_PREMISES,
   SETUP_RETEST_PREMISES,
   SETUP_SANITY_PREMISES,
+  STAGE_SCOPING_NEW_CASES,
   STAGES,
   stageRunsBaseline,
   standInKey,
@@ -351,24 +353,43 @@ describe("budget caps", () => {
     expect(LEDGER_WHEN_ROUNDS_OPENED + newCaps + DEFAULT_STAGE_CAPS.filter).toBeLessThanOrEqual(HARD_CEILING);
   });
 
-  it("gives each run of the owner's feedback workflow (2026-09-28) its own stage, cap and reason, inside the $40 hard cap", () => {
-    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "plan-refresh": 0.1, reruns: 0.6, "setup-retests": 0.1, groups: 0.4, "form-gate": 0.4, "final-check": 0.6 });
-    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check"]);
+  it("gives each run of the owner's feedback workflow (2026-09-28, and the stage scoping of 2026-09-29) its own stage, cap and reason, inside the $40 hard cap", () => {
+    expect(DEFAULT_STAGE_CAPS).toMatchObject({ "plan-refresh": 0.1, reruns: 0.6, "setup-retests": 0.1, groups: 0.4, "form-gate": 0.4, "final-check": 0.6, "stage-scoping": 0.4 });
+    expect(FEEDBACK_STAGES).toEqual(["plan-refresh", "reruns", "setup-retests", "groups", "form-gate", "final-check", "stage-scoping"]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
       expect(LEDGER_STAGES).toContain(stage);
       expect(stageRunsBaseline(stage)).toBe(false);
-      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-28/);
+      expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-2[89]/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all six caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all seven caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(2.2);
+    expect(caps).toBeCloseTo(2.6);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});
     expect(budgetCheck(defaults, spend, 0, "plan-refresh", 0.02)).toMatchObject({ ok: false, reason: expect.stringMatching(/Stage plan-refresh cap \$0\.10/) });
     expect(budgetCheck(defaults, spend, 0, "reruns", 0.02)).toEqual({ ok: true });
+  });
+
+  it("runs the stage scoping (2026-09-29): planner v2d twice on every chapter-planning case, with planner v2c and today's form on the built first chapter", () => {
+    const plans = armsFor("stage-scoping", "thread");
+    expect(plans.map((p) => [p.arm.key, p.samples, p.scope, p.caseIds])).toEqual([
+      ["gpt-6-luna@low/planV2d", 2, "all", undefined],
+      ["gpt-6-luna@low/planV2c", 2, "all", STAGE_SCOPING_NEW_CASES],
+      ["gpt-6-luna@low/prod", 2, "all", STAGE_SCOPING_NEW_CASES],
+    ]);
+    for (const role of ["setup", "beat", "switch", "iteration"] as const) expect(armsFor("stage-scoping", role)).toEqual([]);
+    expect(pipelinePlans("stage-scoping")).toEqual([]);
+    expect(STAGE_SCOPING_NEW_CASES).toEqual(["round-thread-first-8988006e-t1"]);
+    // Read against planner v2c, production's chapter planner, and today's form second
+    expect(referenceKey("gpt-6-luna@low/planV2d")).toBe("gpt-6-luna@low/planV2c");
+    expect(estimateBaseKey("gpt-6-luna@low/planV2d")).toBe("gpt-6-luna@low/planV2c");
+    expect(secondReferenceKeys("gpt-6-luna@low/planV2d")).toEqual(["gpt-6-luna@low/prod"]);
+    expect(STAGE_CAP_REASONS["stage-scoping"]).toMatch(/planV2d/);
+    // The ledger read $33.85 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
+    expect(33.85 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["stage-scoping"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

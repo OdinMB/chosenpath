@@ -336,6 +336,54 @@ describe("the nearer chapter question and the concrete kind of milestone (owner,
       expect(checkThreadDesign(story, plan({ question: QUESTION, typeOfMilestone: "Finding the manifests" }), undefined, written).checks).not.toHaveProperty("milestoneKindConcrete");
     });
   });
+
+  describe("planner v2d's own stages (the owner's feedback of 2026-09-29)", () => {
+    const EXPOSE = "player1_expose_waste_ring";
+    const onStage = (recorded: number) =>
+      edited(
+        roundStory({
+          turns: 5,
+          maxTurns: 20,
+          playerOutcomes: { player1: [outcome(EXPOSE, { question: RING, intendedNumberOfMilestones: 3, milestones: ["The ring's ledger is found", "m2"].slice(0, recorded) })] },
+          phases: [roundTopicSwitch([["Expose the ring", EXPOSE]], 4)],
+        }),
+        (state) => {
+          state.players.player1.name = "Arielle";
+          state.storyElements = [{ id: "ring", name: "Clandestine Waste Ring", role: "the villains", instructions: "", appearance: "", facts: [] }];
+        }
+      );
+    const STAGES = ["gather the evidence on the Waste Ring", "expose the ring's backers in public", "dismantle the ring's network"];
+    const steps = (questions: string[]) => questions.map((question) => ({ title: "Step", question, possibleResolutions: { favorable: "a", mixed: "b", unfavorable: "c" } }));
+    const plan = (fields: Record<string, unknown>): ThreadAnalysis => {
+      const base = threadAnalysis("challenge", 3, 5);
+      return { ...base, threads: [{ ...base.threads[0], outcomeId: EXPOSE, ...fields }] };
+    };
+
+    it("counts one stage per intended milestone", () => {
+      expect(checkThreadDesign(onStage(0), plan({ outcomeStages: STAGES })).checks.stagesNamed).toBe(true);
+      expect(checkThreadDesign(onStage(0), plan({ outcomeStages: STAGES.slice(0, 2) })).checks.stagesNamed).toBe(false);
+      expect(checkThreadDesign(onStage(0), plan({ outcomeStages: [...STAGES, " "] })).checks.stagesNamed).toBe(false);
+    });
+
+    it("fails a step that names a later stage's own words, the words of its own and earlier stages allowed", () => {
+      const within = plan({ outcomeStages: STAGES, progression: steps(["How does Arielle get into the depot?", "How does Arielle copy the evidence?", "How does Arielle get out before the shift?"]) });
+      expect(checkThreadDesign(onStage(0), within).checks.stepsWithinNamedStage).toBe(true);
+      // The owner's chapter: the last step turns to exposing
+      const reaching = plan({ outcomeStages: STAGES, progression: steps(["How does Arielle gather intel?", "How does Arielle infiltrate the ring's channels?", "How does Arielle plan to expose the ring based on the evidence?"]) });
+      expect(checkThreadDesign(onStage(0), reaching).checks.stepsWithinNamedStage).toBe(false);
+      // At stage 2 exposing is the thread's own stage; only dismantling is later
+      expect(checkThreadDesign(onStage(1), reaching).checks.stepsWithinNamedStage).toBe(true);
+      const dismantling = plan({ outcomeStages: STAGES, progression: steps(["How does Arielle rally the leaders?", "How does Arielle dismantle the network?"]) });
+      expect(checkThreadDesign(onStage(1), dismantling).checks.stepsWithinNamedStage).toBe(false);
+    });
+
+    it("reads only planner v2d's plans, and none at the outcome's last stage", () => {
+      expect(checkThreadDesign(onStage(0), plan({})).checks).not.toHaveProperty("stepsWithinNamedStage");
+      expect(checkThreadDesign(onStage(0), plan({})).checks).not.toHaveProperty("stagesNamed");
+      expect(checkThreadDesign(onStage(2), plan({ outcomeStages: STAGES })).checks).not.toHaveProperty("stepsWithinNamedStage");
+      expect(checkThreadDesign(onStage(2), plan({ outcomeStages: STAGES })).checks.stagesNamed).toBe(true);
+    });
+  });
 });
 
 describe("checkBeatDesign", () => {

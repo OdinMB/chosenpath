@@ -336,16 +336,44 @@ function questionItem(number: number, multiplayer: boolean): string {
    Outcome: "${outcome}" Weak thread question: "Will ${who} find enough evidence to stop the noble's conspiracy?" (the outcome's question again) Good: "Will ${who} get the noble's letters out of the manor before the guards change shifts?", with the kind of milestone "whether the letters prove the noble's hand in the conspiracy", not "progress toward stopping the conspiracy".`;
 }
 
-function threadList(multiplayer: boolean, nearer: boolean): string {
+/**
+ * Planner v2d's stage item (the owner's feedback of 2026-09-29: a first
+ * chapter on "expose and dismantle the Waste Ring" over three milestones,
+ * whose first milestone should only settle the evidence, planned a last step
+ * on how to expose it, with results about the exposé and reforms): an outcome
+ * with n intended milestones has n stages from start to finish; the thread
+ * names them consistently with the milestones already recorded, PACING says
+ * which stage it settles, and its question, steps and three results stay
+ * within that stage. The example is the prompt's own (Rikkit and the noble's
+ * letters), so no stored story's names reach the prompt, and its first stage
+ * is the one the question item's good question and the worked example settle.
+ */
+const STAGE_ITEM_START = "The outcome's stages, and the one this thread settles.";
+const STAGES_RULE =
+  "An outcome with n intended milestones has n stages from start to finish: each thread that pushes it settles the next stage, and its milestone records how that stage went.";
+
+function stageItem(number: number, multiplayer: boolean): string {
+  const results = multiplayer ? "how well it went, which side came out ahead, or which path was taken" : "how well it went, or which path was taken";
+  const outcome = multiplayer ? "Will the players stop the noble's conspiracy?" : "Will Rikkit stop the noble's conspiracy?";
+  const step = multiplayer ? "How do [insert player names] expose the noble before the Guild?" : "How does Rikkit expose the noble before the Guild?";
+  const who = multiplayer ? "The group" : "Rikkit";
+  return `${number}. ${STAGE_ITEM_START} ${STAGES_RULE} Name the outcome's stages in order, consistent with the milestones it already has: stage 1 is what its first milestone settled, stage 2 what its second settled, and so on. PACING says which stage ${
+    multiplayer ? "each" : "this"
+  } thread settles: the one after the milestones the outcome already has. The thread's question, every step and its three possible milestones stay within that stage: the three milestones are three versions of that stage's result (${results}), and nothing in the thread already does what a later stage is for: no step starts, plans or carries out a later stage's task, and no result settles the outcome early. A result may still make a later stage easier or harder. Only the last stage settles the outcome itself; when the outcome is already complete, the thread is an aftermath of its last stage.
+   Outcome: "${outcome}" with 3 milestones has the stages 1. prove the noble's hand; 2. turn the Guild against him; 3. stop the conspiracy. At stage 1 the thread is about the proof. Weak: a last step "${step}", or the milestone "${who}'s proof brings the noble down" (stages 2 and 3). Good: the milestones "${who} gets the noble's letters out of the manor: proof of his hand", "${who} gets one letter, which hints at his hand but proves nothing", "${who} flees the manor with nothing".`;
+}
+
+function threadList(multiplayer: boolean, nearer: boolean, staged = false): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
-  // planV2c inserts its question item before the milestones; the rest renumbers
+  // planV2c inserts its question item before the milestones, planV2d its stage item before that; the rest renumbers
   const q = nearer ? 1 : 0;
+  const s = staged ? 1 : 0;
   if (!multiplayer) {
     return `Create the thread, with:
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
-${nearer ? `${questionItem(3, false)}\n` : ""}${3 + q}. ${milestones}
-${progressionItem(4 + q, false)}
+${staged ? `${stageItem(3, false)}\n` : ""}${nearer ? `${questionItem(3 + s, false)}\n` : ""}${3 + s + q}. ${milestones}
+${progressionItem(4 + s + q, false)}
 
 `;
   }
@@ -353,8 +381,8 @@ ${progressionItem(4 + q, false)}
 1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
-${nearer ? `${questionItem(4, true)}\n` : ""}${4 + q}. ${milestones}
-${progressionItem(5 + q, true)}
+${staged ? `${stageItem(4, true)}\n` : ""}${nearer ? `${questionItem(4 + s, true)}\n` : ""}${4 + s + q}. ${milestones}
+${progressionItem(5 + s + q, true)}
 
 `;
 }
@@ -376,7 +404,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -413,7 +441,7 @@ function threadInstructions(production: string, story: Story, twoSided: boolean,
     `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
-  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer));
+  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged));
   text = replaceOnce(
     LABEL,
     text,
@@ -454,9 +482,9 @@ function productionDecisions(story: Story): string {
   return ["PLAYER DECISIONS:", ...lines].join("\n");
 }
 
-function threadState(state: string, story: Story): string {
+function threadState(state: string, story: Story, staged = false): string {
   const text = replaceOnce(LABEL, state, productionDecisions(story), playerDecisions(story));
-  return `${text}\n\n${threadPacingBlock(story)}`;
+  return `${text}\n\n${threadPacingBlock(story, staged ? { stages: true } : {})}`;
 }
 
 // The reply
@@ -476,6 +504,8 @@ const QUESTION =
  */
 const NEARER_QUESTION_FIELD =
   "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
+/** Planner v2d's stages of the thread's outcome, named before the question so the question is asked within this thread's stage. */
+const OUTCOME_STAGES_FIELD = `The outcome's stages from start to finish, in order: one per intended milestone, each in a few words and the story's own names, the stages its milestones already settled first, as those milestones read. This thread settles the stage PACING names. ${NO_BLANK_ITEMS}`;
 /** Planner v2c's kind of milestone, written by the planner rather than copied from the question. */
 const MILESTONE_KIND_FIELD =
   "The kind of milestone this thread adds to its outcome: the concrete thing its answer settles, in a few words and the story's own names. Weak: 'progress toward stopping the conspiracy'. Good: 'whether the letters prove the noble's hand in the conspiracy'.";
@@ -529,7 +559,7 @@ function stepSchema(multiplayer: boolean) {
   });
 }
 
-function threadFields(multiplayer: boolean, nearer: boolean) {
+function threadFields(multiplayer: boolean, nearer: boolean, staged = false) {
   return {
     kind: (multiplayer ? z.enum(["challenge", "contest", "exploration"]) : z.enum(["challenge", "exploration"])).describe(
       "The thread's kind, by the kind rule (the outcome decides it, not the thread type). Decide it first: the milestones and the steps below use its result names."
@@ -540,6 +570,7 @@ function threadFields(multiplayer: boolean, nearer: boolean) {
         "The thread type: preferably the name part of one of the story's thread types (the words before any parenthesis), one whose kind fits when the story names one; otherwise a few words (Chase, Negotiation, Fight). Not one of the player's last three (PREVIOUS THREAD TYPES)."
       ),
     title: z.string().describe(nearer ? TITLE_WITHOUT_NUMBER : TITLE_AS_RAN),
+    ...(staged ? { outcomeStages: z.array(z.string()).max(6).describe(OUTCOME_STAGES_FIELD) } : {}),
     question: z.string().describe(nearer ? NEARER_QUESTION_FIELD : QUESTION),
     ...(nearer ? { typeOfMilestone: z.string().describe(MILESTONE_KIND_FIELD) } : {}),
     possibleMilestones: (multiplayer ? z.union([CHALLENGE_MILESTONES, CONTEST_MILESTONES, EXPLORATION_MILESTONES]) : z.union([CHALLENGE_MILESTONES, EXPLORATION_MILESTONES])).describe(
@@ -559,12 +590,12 @@ function threadFields(multiplayer: boolean, nearer: boolean) {
   };
 }
 
-function threadReplySchema(story: Story, full: boolean, nearer: boolean): z.AnyZodObject {
+function threadReplySchema(story: Story, full: boolean, nearer: boolean, staged = false): z.AnyZodObject {
   const restated: z.ZodRawShape = full ? { relevantSwitchAndThreadInstructions: threadAnalysisSchema.shape.relevantSwitchAndThreadInstructions } : {};
-  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false, nearer)) });
+  if (!story.isMultiplayer()) return z.object({ ...restated, thread: z.object(threadFields(false, nearer, staged)) });
   const ids = storyOutcomeIds(story);
   const sides = { playersSideA: threadSchema.shape.playersSideA, playersSideB: threadSchema.shape.playersSideB };
-  const { kind, ...rest } = threadFields(true, nearer);
+  const { kind, ...rest } = threadFields(true, nearer, staged);
   return z.object({
     ...restated,
     grouping: z.string().describe("Which players share which thread, and why, in one or two sentences."),
@@ -585,8 +616,9 @@ function threadReplySchema(story: Story, full: boolean, nearer: boolean): z.AnyZ
 
 /**
  * A written thread in today's stored shape, the last step's results the
- * milestones; kind, question and plan ride along. The kind of milestone is
- * the question (planner v2 writes none), or planner v2c's own where it wrote one.
+ * milestones; kind, question and plan ride along, and planner v2d's stages
+ * where it wrote them. The kind of milestone is the question (planner v2
+ * writes none), or planner v2c's own where it wrote one.
  */
 function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB: string[]): Loose {
   const milestones = asObject(written.possibleMilestones);
@@ -612,6 +644,7 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
     kind: asString(written.kind),
     question,
     plan: asString(written.plan),
+    ...(Array.isArray(written.outcomeStages) ? { outcomeStages: written.outcomeStages.map(asString) } : {}),
   };
 }
 
@@ -645,15 +678,23 @@ function assembleThread(story: Story, parsed: unknown): unknown {
  * round 3's chain); `nearerQuestion` with it is planV2c (the owner's feedback
  * of 2026-09-28): the question item in the list, the nearer question and the
  * planner's own kind of milestone in the reply, and the adoption's chapter
- * title "without a number", so production builds it byte for byte.
+ * title "without a number", so production builds it byte for byte; `stages`
+ * with both is planV2d (the owner's feedback of 2026-09-29): the stage item
+ * before the question item, PACING's stage sentence, and the outcome's stages
+ * in the reply before the question.
  */
-export function plannerV2ThreadRequest(story: Story, full: boolean, options: { twoSided?: boolean; nearerQuestion?: boolean } = {}): AssembledRequest {
+export function plannerV2ThreadRequest(
+  story: Story,
+  full: boolean,
+  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean } = {}
+): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   const nearer = options.nearerQuestion ?? false;
+  const staged = options.stages ?? false;
   return {
-    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer) + threadState(state, story),
-    schema: threadReplySchema(story, full, nearer),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged) + threadState(state, story, staged),
+    schema: threadReplySchema(story, full, nearer, staged),
     assemble: (parsed) => assembleThread(story, parsed),
   };
 }
@@ -675,4 +716,6 @@ export const PLANNER_V2_TEXT = {
   questionItemStart: QUESTION_ITEM_START,
   nearerQuestion: NEARER_QUESTION,
   contestQuestion: CONTEST_QUESTION.trim(),
+  stageItemStart: STAGE_ITEM_START,
+  stagesRule: STAGES_RULE,
 };

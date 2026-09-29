@@ -240,14 +240,28 @@ function lengthsText(lengths: number[]): string {
   return `${lengths.slice(0, -1).join(", ")} or ${lengths[lengths.length - 1]} beats`;
 }
 
-function pushedLine(need: OutcomeNeed): string {
+/**
+ * The stage a chapter settles (planner v2d, the owner's feedback of
+ * 2026-09-29): an outcome with n intended milestones has n stages from start
+ * to finish, and the next chapter settles the one after the milestones it has
+ * (stage recorded + 1 of n). None once the outcome is complete: that chapter
+ * is an aftermath.
+ */
+export function stageOf(recorded: number, intended: number): { stage: number; of: number; last: boolean } | undefined {
+  if (intended < 1 || recorded >= intended) return undefined;
+  return { stage: recorded + 1, of: intended, last: recorded + 1 === intended };
+}
+
+function pushedLine(need: OutcomeNeed, stages = false): string {
   const size =
     need.stillNeeded === 0
       ? "complete, so this thread's milestone is an aftermath"
       : need.stillNeeded === 1
         ? "this thread's milestone is its last one"
         : `${need.stillNeeded} still needed`;
-  return `${need.id}: ${need.recorded} of ${need.intended} milestones; ${size}.`;
+  const stage = stages ? stageOf(need.recorded, need.intended) : undefined;
+  const settles = stage ? `; this thread settles stage ${stage.stage} of ${stage.of}${stage.last ? ", the last" : ""}` : "";
+  return `${need.id}: ${need.recorded} of ${need.intended} milestones; ${size}${settles}.`;
 }
 
 /** The outcomes the players' picks set, each once, with the slots that picked it. */
@@ -264,16 +278,21 @@ function pickedNeeds(story: Story): { need: OutcomeNeed; slots: string[] }[] {
   return [...byId.values()];
 }
 
-/** The block for the chapter planner, at the end of its state. */
-export function threadPacingBlock(story: Story): string {
+/**
+ * The block for the chapter planner, at the end of its state; `stages`
+ * (planner v2d) names the stage each pushed outcome's thread settles, and
+ * without it the block is planner v2's to v2c's as they ran.
+ */
+export function threadPacingBlock(story: Story, options: { stages?: boolean } = {}): string {
   const left = turnsLeft(story);
   const turn = story.getCurrentTurn() + 1;
   const last = isLastChapter(left);
+  const stages = options.stages ?? false;
   const lines = ["======= PACING =======", `This thread starts at turn ${turn} of ${story.getMaxTurns()}; ${plural(left, "turn")} ${left === 1 ? "is" : "are"} left, this one included.`];
   lines.push(last ? `This is the story's last thread: exactly ${left} beats. It is the story's climax.` : `Allowed lengths for this thread: ${lengthsText(allowedLengths(left))}.`);
   const picked = pickedNeeds(story);
-  if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need)}`);
-  else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need)} (${p.slots.join(", ")})`));
+  if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need, stages)}`);
+  else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need, stages)} (${p.slots.join(", ")})`));
   lines.push(recentLine(story, false));
   lines.push(`Phase: ${THREAD_PHASE[phaseOf(turn, story.getMaxTurns(), last)]}`);
   return lines.join("\n");

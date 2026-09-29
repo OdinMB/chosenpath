@@ -92,6 +92,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   groups: "Groups (B10)",
   "form-gate": "Request-form gate (B9)",
   "final-check": "Final check",
+  "stage-scoping": "Stage scoping (planner v2d)",
 };
 
 /** Jobs by arm key, in plan order. */

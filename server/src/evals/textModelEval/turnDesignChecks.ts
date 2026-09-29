@@ -4,7 +4,7 @@ import { GameModes } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
-import { allowedLengths, chaptersThatFit, outcomeNeeds, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
+import { allowedLengths, chaptersThatFit, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
@@ -256,6 +256,40 @@ export function chapterQuestionChecks(
   return checks;
 }
 
+// --- Planner v2d's own stages (the owner's feedback of 2026-09-29) ---
+
+/** Planner v2d's stage list on a stored thread, where it wrote one. */
+function outcomeStagesOf(thread: unknown): string[] | undefined {
+  const stages = asObject(thread).outcomeStages;
+  return Array.isArray(stages) ? stages.map(asString) : undefined;
+}
+
+/**
+ * The deterministic proxy of the judged stage check, on planner v2d's own
+ * stage list (other forms write none, so it reads nowhere else):
+ * stagesNamed, one stage per intended milestone and none blank; and
+ * stepsWithinNamedStage, at stage k of n with k < n, no step's question holds
+ * a word only a later stage's name has (crude stems; the story's names and
+ * the words of stage k and the stages before it left out). A heuristic on the
+ * plan's own words: a step that names a later stage in other words passes,
+ * and one that names its own stage in a later stage's word fails.
+ */
+export function namedStageChecks(story: Story, thread: unknown): Record<string, boolean> {
+  const stages = outcomeStagesOf(thread);
+  const t = asObject(thread);
+  const outcome = typeof t.outcomeId === "string" ? story.getOutcomeById(t.outcomeId) : undefined;
+  if (!stages || !outcome) return {};
+  const checks: Record<string, boolean> = { stagesNamed: stages.length === outcome.intendedNumberOfMilestones && stages.every((s) => s.trim() !== "") };
+  const stage = stageOf(outcome.milestones?.length ?? 0, outcome.intendedNumberOfMilestones);
+  if (!stage || stage.last || stages.length < stage.stage) return checks;
+  const names = new Set(storyNames(story).flatMap((name) => name.split(/[^\p{L}\p{N}'’]+/u)).filter((w) => w.length >= 3).map(stemOf));
+  const own = new Set(stages.slice(0, stage.stage).flatMap((s) => [...goalWords(s, names)]));
+  const later = new Set(stages.slice(stage.stage).flatMap((s) => [...goalWords(s, names)]).filter((w) => !own.has(w)));
+  const questions = asArray(t.progression).map((step) => asString(asObject(step).question));
+  checks.stepsWithinNamedStage = questions.every((q) => ![...goalWords(q, names)].some((w) => later.has(w)));
+  return checks;
+}
+
 /** A chapter reply's threads as the planner wrote them: a single player's one thread, or a group's (and today's form's) list. */
 function writtenThreads(written: unknown): Loose[] {
   const reply = asObject(written);
@@ -307,6 +341,13 @@ export function checkThreadDesign(story: Story, plan: ThreadAnalysis, expectatio
     const concrete = writtenKindConcrete(asWritten);
     if (concrete === undefined) delete checks.milestoneKindConcrete;
     else checks.milestoneKindConcrete = concrete;
+  }
+
+  // The owner's feedback of 2026-09-29: planner v2d's own stages, and its steps within the stage it settles
+  const staged = threads.map((t) => namedStageChecks(story, t));
+  for (const name of ["stagesNamed", "stepsWithinNamedStage"]) {
+    const read = staged.filter((c) => name in c);
+    if (read.length > 0) checks[name] = read.every((c) => c[name]);
   }
 
   // A6: the kind follows the outcome's (a three-player race runs as contests), and the written kind matches the results
