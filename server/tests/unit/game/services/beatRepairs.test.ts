@@ -7,6 +7,7 @@ import type {
   Change,
   Outcome,
   SetOfBeatGenerationSchema,
+  Stat,
   StoryState,
   ThreadAnalysis,
 } from "core/types/index.js";
@@ -787,6 +788,109 @@ describe("repairBeatReply: the scoreboard moves toward the side that won (TR-8)"
     const other = { ...licenseChapter("sideBWins", 1).threads[0], id: "rematch" };
     const story = switchAfter("sideAWins", 50, { storyPhases: [switchAnalysis(slotsOf(2), 0), { ...chapter, threads: [...chapter.threads, other] }, switchAnalysis(slotsOf(2), 3)] });
     expect(repairScore(story, [race("subtractNumber", 10)]).kinds).toEqual([]);
+  });
+});
+
+describe("repairBeatReply: a shared sacrifice or reward goes to one player per turn (TR-9)", () => {
+  const FAVORS = stat("shared_dockside_favors", {
+    type: "string[]",
+    name: "Dockside Favors",
+    optionsToSacrifice: "Call in one favor; remove that favor from the list.",
+    optionsToGainAsReward: "Gain one appropriate dockside favor by accepting a useful obligation instead of immediate payment.",
+  });
+  const CONTACTS = stat("player_contacts", { type: "string[]", name: "Personal Contacts", optionsToSacrifice: "Burn one contact for a quick favour." });
+  const IVO = "Call in Ivo Senn's dockside favor to secure the discreet work arrangement.";
+
+  /** Three players (the space pirates) in one step: the crew's shared favors, each player's own contacts. */
+  function withFavors(story: Story, contacts: Partial<Stat> = {}): Story {
+    const players = Object.fromEntries(
+      Object.entries(story.getPlayers()).map(([slot, player]) => [slot, { ...player, statValues: [{ statId: CONTACTS.id, value: [`Contact of ${slot}`] }] }])
+    );
+    return story.clone({
+      gameMode: GameModes.CooperativeCompetitive,
+      sharedStats: [FAVORS],
+      sharedStatValues: [{ statId: FAVORS.id, value: ["Ivo Senn"] }],
+      playerStats: [{ ...CONTACTS, ...contacts }],
+      players,
+    });
+  }
+  const challengeStep = () => withFavors(threadBeat(3));
+
+  const lever = (text: string, resourceType: "sacrifice" | "reward" = "sacrifice"): BeatOption => ({
+    optionType: "challenge",
+    resourceType,
+    riskType: "normal",
+    text,
+    basePoints: resourceType === "sacrifice" ? POINTS_FOR_SACRIFICE : POINTS_FOR_REWARD,
+    modifiersToSuccessRate: [],
+  });
+  const withLever = (option: BeatOption): BeatOption[] => [...challengeOptions().slice(0, 2), option];
+
+  function levers(story: Story, bySlot: Record<string, BeatOption | undefined>) {
+    const beats = Object.fromEntries(
+      slotsOf(3).map((slot) => [slot, beatWith({ forPlayer: slot }, bySlot[slot] ? withLever(bySlot[slot] as BeatOption) : challengeOptions())])
+    );
+    const { reply, repairs } = repairBeatReply(story, beatSet(3, beats));
+    return { options: (slot: string) => beatOf(reply, slot).options, repairs: repairs.filter((r) => r.kind.startsWith("sharedLever")) };
+  }
+
+  it("offers a shared sacrifice to the first player only; the others' copies leave their options (the space pirates' turn 16)", () => {
+    const result = levers(challengeStep(), {
+      player1: lever(IVO),
+      player3: lever("Call in Ivo Senn's dockside favor to support the discreet repair arrangement."),
+    });
+    expect(result.options("player1")).toEqual(withLever(lever(IVO)));
+    expect(result.options("player3")).toEqual(challengeOptions().slice(0, 2));
+    expect(result.repairs).toEqual([{ kind: "sharedLeverRepeated", detail: "player3: shared_dockside_favors (sacrifice) is player1's this turn" }]);
+  });
+
+  it("does the same for a shared reward", () => {
+    const gain = lever("Accept the harbour-master's obligation and gain a new dockside favor.", "reward");
+    const result = levers(challengeStep(), { player2: gain, player3: gain });
+    expect(result.options("player2")).toEqual(withLever(gain));
+    expect(result.options("player3")).toEqual(challengeOptions().slice(0, 2));
+  });
+
+  it("keeps a sacrifice and a reward of one shared stat: they are different favours", () => {
+    const result = levers(challengeStep(), { player1: lever(IVO), player2: lever("Take on an obligation to gain a dockside favor.", "reward") });
+    expect(result.options("player2")).toHaveLength(3);
+    expect(result.repairs).toEqual([]);
+  });
+
+  it("keeps a lever on each player's own stat for every player it is offered to", () => {
+    const own = lever("Burn one of your Personal Contacts to get the berth cleared.");
+    const result = levers(challengeStep(), { player1: own, player2: own, player3: own });
+    for (const slot of slotsOf(3)) expect(result.options(slot)).toHaveLength(3);
+    expect(result.repairs).toEqual([]);
+  });
+
+  it("reads the stat by its name, singular or plural, else by the value it holds, else as the one stat that allows the lever", () => {
+    const byName = levers(challengeStep(), { player1: lever("Spend one of the crew's dockside favors on the berth."), player2: lever("Spend a dockside favor on the berth.") });
+    expect(byName.options("player2")).toHaveLength(2);
+    const onlyOne = withFavors(threadBeat(3), { optionsToSacrifice: "None" });
+    const unnamed = levers(onlyOne, { player1: lever("Call in an old debt at the dock."), player2: lever("Call in an old debt at the dock.") });
+    expect(unnamed.options("player2")).toHaveLength(2);
+  });
+
+  it("leaves a lever whose stat its text doesn't make clear", () => {
+    const both = lever("Burn one of your Personal Contacts to call in a dockside favor.");
+    const result = levers(challengeStep(), { player1: both, player2: both });
+    expect(result.options("player2")).toHaveLength(3);
+    expect(result.repairs).toEqual([]);
+  });
+
+  it("leaves an exploration step's options in place, where an option's position is its result, and notes the repeat", () => {
+    const chapter = threadAnalysis("exploration", 3, 2, slotsOf(3));
+    chapter.threads[0].progression[0].resolution = "resolution1";
+    const story = withFavors(threadBeat(3, { storyPhases: [switchAnalysis(slotsOf(3), 1), chapter] }));
+    const favor: BeatOption = { optionType: "exploration", resourceType: "sacrifice", text: IVO };
+    const beats = Object.fromEntries(slotsOf(3).map((slot) => [slot, beatWith({ forPlayer: slot }, [...explorationOptions().slice(0, 2), favor])]));
+    const { reply, repairs } = repairBeatReply(story, beatSet(3, beats));
+    for (const slot of slotsOf(3)) expect(beatOf(reply, slot).options).toHaveLength(3);
+    expect(repairs.filter((r) => r.kind.startsWith("sharedLever"))).toEqual([
+      { kind: "sharedLeverRepeatedKept", note: true, detail: "player2: shared_dockside_favors (sacrifice) is player1's this turn" },
+      { kind: "sharedLeverRepeatedKept", note: true, detail: "player3: shared_dockside_favors (sacrifice) is player1's this turn" },
+    ]);
   });
 });
 

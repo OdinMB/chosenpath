@@ -241,13 +241,15 @@ describe("readStory", () => {
 
   it("counts one shared change that pays two players' sacrifices once, not as two paid levers", async () => {
     const shared: BeatOption = { optionType: "challenge", resourceType: "sacrifice", riskType: "normal", text: "Spend 10 Supplies to charge", basePoints: 30, modifiersToSuccessRate: [] };
-    const readings = readStory(
-      await played(2, {
-        chapterOptions: () => [leverSet()[0], leverSet()[1], shared],
-        statChanges: [{ type: "statChange", group: "shared", stat: "shared_supplies", change: "subtractNumber", value: 2 }],
-      })
-    );
-    // Both seats take the sacrifice at the same turns, and one change of Supplies follows each time
+    const run = await played(2, {
+      chapterOptions: () => [leverSet()[0], leverSet()[1], shared],
+      statChanges: [{ type: "statChange", group: "shared", stat: "shared_supplies", change: "subtractNumber", value: 2 }],
+    });
+    // Since 2026-09-30 production offers a shared lever to one seat per turn (beatRepairs, sharedLeverRepeated): only player1 takes it
+    expect(run.turns.flatMap((t) => t.levers).every((l) => l.slot === "player1")).toBe(true);
+    // A run stored before that, where both seats took it at the same turns and one change of Supplies followed each time
+    const before: PlayRun = { ...run, turns: run.turns.map((t) => ({ ...t, levers: t.levers.flatMap((l) => [l, { ...l, slot: "player2" }]) })) };
+    const readings = readStory(before);
     expect(readings.leversPaid.sharedOnce.length).toBeGreaterThan(0);
     expect(readings.leversPaid.sharedOnce[0]).toMatchObject({ stat: "Supplies", slots: ["player1", "player2"] });
     expect(readings.leversPaid.counts.sharedOnce).toBe(readings.leversPaid.sharedOnce.length);
