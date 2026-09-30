@@ -7,7 +7,7 @@ import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
 import { allowedLengths, chaptersThatFit, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
-import { chapterLeverRule, chapterLevers, o2LeverRule } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
+import { chapterLeverRule, chapterLevers, o2LeverRule, o2bLeverRule } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
@@ -681,7 +681,10 @@ export function reusedFromPrevious(previousText: string, text: string): { pairs:
  * offers a reward its line invites and today's rate (or arm O's line) gives
  * none, as after a chapter sacrifice, so its run reads leverFollowsO2Line,
  * atMostOneRewardPerChapter and rewardWhereInvitedShare instead of those two
- * (their wrong-way moves for O2 are its invitation followed). On every turn after
+ * (their wrong-way moves for O2 are its invitation followed). O2's
+ * fix-and-retest (O2b, sacrifices on today's rate) reads as leverFollowsO2bLine;
+ * it fails leverFollowsRateLine by design only where it offers an invited
+ * reward. On every turn after
  * the first, the sentences and the opening told again from the player's
  * previous beat. Counts that pool into shares are reported on every reply.
  */
@@ -737,6 +740,11 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
       }
       if (o2.sacrifice === "none" || !o2.reward) {
         and("leverFollowsO2Line", (o2.sacrifice !== "none" || sacrifices.length === 0) && (o2.reward || rewards === 0));
+      }
+      // O2b's line (its fix-and-retest): O2's reward invitation, sacrifices on today's rate
+      const o2b = o2bLeverRule(story, slot);
+      if (o2b.sacrifice === "none" || !o2b.reward) {
+        and("leverFollowsO2bLine", (o2b.sacrifice !== "none" || sacrifices.length === 0) && (o2b.reward || rewards === 0));
       }
       if (levers.sacrifices > 0 && sacrifices.length > 0) {
         add("secondSacrificeSets", 1);

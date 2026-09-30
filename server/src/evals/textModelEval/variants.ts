@@ -177,6 +177,8 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * place: the stats line with a sacrifice or reward option left out of the
  * bonus count, the retest sentence, B6's negative base said to hold, and a
  * lever line that invites a reward until the chapter has offered one.
+ * "turnO2b" is O2's one fix-and-retest after its run: O2 with sacrifices on
+ * today's rate (no strong-reason clause), the reward invitation kept.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -227,7 +229,8 @@ export type VariantId =
   | "turnC"
   | "turnOC"
   | "turnOb"
-  | "turnO2";
+  | "turnO2"
+  | "turnO2b";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -275,6 +278,7 @@ export const VARIANTS: VariantId[] = [
   "turnOC",
   "turnOb",
   "turnO2",
+  "turnO2b",
 ];
 
 /**
@@ -622,6 +626,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnOC: optionsContinuity("turnOC", { options: true, continuity: true }),
   turnOb: optionsContinuity("turnOb", { options: true, continuity: false, statsUnnamed: true }),
   turnO2: optionsContinuity("turnO2", { options: true, continuity: false, o2: true }),
+  turnO2b: optionsContinuity("turnO2b", { options: true, continuity: false, o2: true, o2RateSacrifices: true }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

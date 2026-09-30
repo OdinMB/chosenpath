@@ -731,6 +731,24 @@ describe("checkBeatDesign", () => {
       expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("leverFollowsO2Line");
     });
 
+    it("reads O2b's lever line: a reward invited where the chapter offered none, a sacrifice only as today's rate allows", () => {
+      const sacrifice = withChallenge([{ resourceType: "sacrifice", basePoints: 30, text: "Burn your last favor with Gruk (-10% Trust) before the patrol reaches the door" }, {}, {}]);
+      const reward = withChallenge([{}, {}, { resourceType: "reward", basePoints: -30 }]);
+      const plain = withChallenge([{}, {}, {}]);
+      // After a sacrifice: a reward invited, no sacrifice (today's rate gives none), whatever reason the text states
+      const afterSacrifice = chapterWith([opening(), past(["sacrifice"])]);
+      expect(checkBeatDesign(afterSacrifice, sacrifice, sacrifice).checks.leverFollowsO2bLine).toBe(false);
+      expect(checkBeatDesign(afterSacrifice, reward, reward).checks.leverFollowsO2bLine).toBe(true);
+      expect(checkBeatDesign(afterSacrifice, plain, plain).checks.leverFollowsO2bLine).toBe(true);
+      // After a reward, right away: none of either
+      const afterReward = chapterWith([opening(), past(["reward"])]);
+      expect(checkBeatDesign(afterReward, reward, reward).checks.leverFollowsO2bLine).toBe(false);
+      expect(checkBeatDesign(afterReward, sacrifice, sacrifice).checks.leverFollowsO2bLine).toBe(false);
+      // No lever yet and today's rate fits: the line forbids nothing, so nothing is reported
+      expect(checkBeatDesign(chapterWith([opening(), past()]), sacrifice, sacrifice).checks).not.toHaveProperty("leverFollowsO2bLine");
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("leverFollowsO2bLine");
+    });
+
     describe("sentences and openings reused from the previous beat", () => {
       const previous = "You step onto the café terrace, collar up against the rain. Rain drums on the striped awning above the tables.\n\nMaya slides the demand sheet across the table toward you and waits. 'Read it,' she says.";
       const after = (text: string) => edited(threadBeat(1), (state) => {

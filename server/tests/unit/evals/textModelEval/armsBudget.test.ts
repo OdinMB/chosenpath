@@ -458,11 +458,18 @@ describe("budget caps", () => {
 
   it("runs version O2 (options-o2, 2026-09-30) beside production's form under its own prompt state: Luna medium, twice on the stored rolled chapter steps, interleaved", () => {
     const plans = armsFor("options-o2", "beat");
-    const [production, o2] = ["adopted", "turnO2"].map((variant) => `gpt-6-luna@medium/${variant}`);
+    const [production, o2, o2b] = ["adopted", "turnO2", "turnO2b"].map((variant) => `gpt-6-luna@medium/${variant}`);
     expect(plans.map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.source, p.caseIds])).toEqual([
       [production, 1, 2, "single-player", "stored", OPTIONS_O2_CASES],
       [o2, 1, 2, "single-player", "stored", OPTIONS_O2_CASES],
+      // O2's one fix-and-retest, once on the same steps
+      [o2b, 1, 1, "single-player", "stored", OPTIONS_O2_CASES],
     ]);
+    // The retest against production's form, O2 second; priced from O2, the form it changes by one line
+    expect(referenceKey(o2b)).toBe(production);
+    expect(secondReferenceKeys(o2b)).toEqual([o2]);
+    expect(estimateBaseKey(o2b)).toBe(o2);
+    expect(STAGE_CAP_REASONS["options-o2"]).toMatch(/turnO2b/);
     // The 32 stored rolled chapter steps: the only turns whose request O2 changes; none from the round cases
     expect(OPTIONS_O2_CASES.length).toBe(32);
     expect(new Set(OPTIONS_O2_CASES).size).toBe(32);

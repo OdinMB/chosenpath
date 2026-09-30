@@ -187,13 +187,16 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   turnOb: "adopted",
   // Version O2 (the coordinator's brief after that run) against production's form, which runs beside it
   turnO2: "adopted",
+  // O2's one fix-and-retest (after its run of 2026-09-30) against production's form too, O2 second
+  turnO2b: "adopted",
 };
 
 /**
  * The earlier form each variant re-runs with one change, whose measured
  * outputs price it until it has its own: the Stage 4 forms of the count fix,
- * arm O for its fix-and-retest, and that retest for version O2 (whose
- * sentence O2 carries, measured on rolled steps only, as O2 runs).
+ * arm O for its fix-and-retest, that retest for version O2 (whose
+ * sentence O2 carries, measured on rolled steps only, as O2 runs), and O2 for
+ * its own fix-and-retest.
  */
 const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   rewrite2: "rewrite",
@@ -201,6 +204,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   rewrite2ZeroShot: "rewriteZeroShot",
   turnOb: "turnO",
   turnO2: "turnOb",
+  turnO2b: "turnO2",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -286,6 +290,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnOb")]: [armKey(LUNA_MEDIUM, "turnO")],
   // Version O2 against arm O (its gain and its wrong-way moves) and the retest whose sentence it carries (stored, adopted2)
   [armKey(LUNA_MEDIUM, "turnO2")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnOb")],
+  // O2's fix-and-retest against O2, the line it changes
+  [armKey(LUNA_MEDIUM, "turnO2b")]: [armKey(LUNA_MEDIUM, "turnO2")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -580,17 +586,20 @@ export const OPTIONS_O2_CASES = [
  * Version O2's run (the coordinator's brief after the run of 2026-09-30):
  * production's single-player turn form (adopted) and O2 (turnO2) on Luna
  * medium, production's single-player turn model, twice on OPTIONS_O2_CASES,
- * interleaved, so both meet the same server pace.
+ * interleaved, so both meet the same server pace. Then O2's one
+ * fix-and-retest (turnO2b, sacrifices on today's rate), once on the same
+ * steps, what the stage has left (production can't run beside it again).
  */
 function optionsO2Arms(role: EvalRole): ArmPlan[] {
   if (role !== "beat") return [];
-  return (["adopted", "turnO2"] as const).map((variant) => ({
+  const arms: ArmPlan[] = (["adopted", "turnO2"] as const).map((variant) => ({
     arm: adoptedDefault("beat", variant),
     samples: 2,
     scope: "single-player" as const,
     source: "stored" as const,
     caseIds: OPTIONS_O2_CASES,
   }));
+  return [...arms, { arm: adoptedDefault("beat", "turnO2b"), samples: 1, scope: "single-player", source: "stored", caseIds: OPTIONS_O2_CASES }];
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */

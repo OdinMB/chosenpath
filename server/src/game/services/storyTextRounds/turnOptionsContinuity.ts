@@ -34,6 +34,8 @@ import { sacrificeRewardLine, todaysFormWithB6Request } from "./turnRound2.js";
  *   stats line reworded so a sacrifice or reward option needs no stat bonus,
  *   O's retest sentence, B6's negative base said to hold, and a lever line that
  *   invites a reward until the chapter has offered one (sacrifices as arm O).
+ * - O2b, O2's one fix-and-retest after its run: sacrifices back on today's rate
+ *   (no strong-reason clause), the reward invitation kept.
  * Edits are anchored on production's wording, each exactly once (roundEdits.ts).
  * Model-facing text says "thread" and "beat".
  */
@@ -44,9 +46,11 @@ const LABEL = "Options and continuity turn";
  * Which arm: O's options, C's continuity, both; `statsUnnamed` is arm O's one
  * fix-and-retest after the run of 2026-09-30 (turnOb), one sentence closing its
  * stats line; `o2` is version O2 in arm O's place (the coordinator's brief
- * after that run), which carries the retest sentence itself.
+ * after that run), which carries the retest sentence itself;
+ * `o2RateSacrifices` is O2's one fix-and-retest (O2b), sacrifices as today's
+ * rate allows them.
  */
-export type OptionsContinuityArm = { options: boolean; continuity: boolean; statsUnnamed?: boolean; o2?: boolean };
+export type OptionsContinuityArm = { options: boolean; continuity: boolean; statsUnnamed?: boolean; o2?: boolean; o2RateSacrifices?: boolean };
 
 // ---------------------------------------------------------------- the base: production's form
 
@@ -194,6 +198,20 @@ export function o2LeverRule(story: Story, slot: string): ChapterLeverRule {
   return { reward: chapterLevers(story, slot).rewards === 0, sacrifice: chapterLeverRule(story, slot).sacrifice };
 }
 
+/*
+ * O2's one fix-and-retest (O2b, after its run of 2026-09-30). Where today's rate
+ * gives none after a chapter sacrifice, O2's strong-reason clause let the model
+ * offer a second sacrifice on 22 of the 42 sets production's form held to 5,
+ * none with a reason in the scene by hand ("Spend 20 Resource Credits on a
+ * one-use access token…"), and arm O's same clause gave 0 reasons in 7: sent
+ * twice and not followed, it reads as leave. O2b keeps O2's reward invitation
+ * and puts sacrifices back on today's rate (B6), production's sacrifice rule.
+ */
+export function o2bLeverRule(story: Story, slot: string): ChapterLeverRule {
+  const rateFits = sacrificeRewardLine(story, slot) !== NONE_THIS_TURN;
+  return { reward: chapterLevers(story, slot).rewards === 0, sacrifice: rateFits ? "fits" : "none" };
+}
+
 const REWARD_FITS = "a reward fits this turn if a stat allows it";
 const NO_REWARD_OFFERED = "No reward: this thread already offered one.";
 
@@ -206,9 +224,8 @@ const NO_REWARD_OFFERED = "No reward: this thread already offered one.";
  * reward while the chapter has offered none (arm O's "No reward this turn."
  * stopped every reward production offered against today's "none this turn").
  */
-export function o2LeverLine(story: Story, slot: string): string {
+export function o2LeverLine(story: Story, slot: string, rule: ChapterLeverRule = o2LeverRule(story, slot)): string {
   const levers = chapterLevers(story, slot);
-  const rule = o2LeverRule(story, slot);
   const strongReason = `this thread already offered ${sacrificesSoFar(levers)}, ${STRONG_REASON}.`;
   if (rule.reward) {
     if (rule.sacrifice === "fits") return `Sacrifice or reward: ${REWARD_FITS}, and so does a sacrifice.`;
@@ -220,9 +237,14 @@ export function o2LeverLine(story: Story, slot: string): string {
   return `Sacrifice or reward: ${strongReason} ${NO_REWARD_OFFERED}`;
 }
 
+/** O2b's lever line: O2's forms on O2b's rule, so never the strong-reason clause. */
+export function o2bLeverLine(story: Story, slot: string): string {
+  return o2LeverLine(story, slot, o2bLeverRule(story, slot));
+}
+
 function optionEdits(instructions: string, story: Story, arm: OptionsContinuityArm): string {
   const stats = arm.o2 ? `${O2_STATS}\n${O2_NEGATIVE_BASE}` : `${DRAWS_ON_STATS}${arm.statsUnnamed ? ` ${STATS_UNNAMED}` : ""}`;
-  const line = arm.o2 ? o2LeverLine(story, "player1") : chapterLeverLine(story, "player1");
+  const line = arm.o2 ? (arm.o2RateSacrifices ? o2bLeverLine(story, "player1") : o2LeverLine(story, "player1")) : chapterLeverLine(story, "player1");
   let edited = replaceOnce(LABEL, instructions, THIRD_WAY, `${THIRD_WAY}${stats}\n`);
   edited = replaceOnce(LABEL, edited, WEAK_ONE_APPROACH, `${WEAK_ONE_APPROACH}${RISK_ONLY_WEAK}\n`);
   return replaceOnce(LABEL, edited, `--- ${sacrificeRewardLine(story, "player1")}\n`, `--- ${line}\n`);
@@ -280,6 +302,7 @@ export function optionsContinuityRequest(story: Story, arm: OptionsContinuityArm
   if (story.isMultiplayer()) throw new Error(`${LABEL}: the arms are single-player (group turns stay on production's group form)`);
   if (arm.statsUnnamed && !arm.options) throw new Error(`${LABEL}: statsUnnamed closes arm O's stats line, so it needs arm O`);
   if (arm.o2 && (!arm.options || arm.statsUnnamed)) throw new Error(`${LABEL}: O2 takes arm O's place (options) and carries the retest sentence itself (no statsUnnamed)`);
+  if (arm.o2RateSacrifices && !arm.o2) throw new Error(`${LABEL}: O2b (o2RateSacrifices) is O2's fix-and-retest, so it needs O2`);
   const base = productionTurnForm(story);
   const options = arm.options && rollsOptions(story);
   const continuity = arm.continuity && !story.isFirstBeat();

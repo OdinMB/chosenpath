@@ -516,9 +516,11 @@ describe("planJobs: the round stages and the migration check", () => {
       evalCase("sp-other", "beat", { state: threadBeat(1, { id: "story-b" }).getState() }),
     ];
     const jobs = planJobs(cases, { stage: "options-o2", promptState: "adopted3", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
-    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey.split("/")[1]}`)).toEqual(
-      [1, 2].flatMap((s) => [first, second].flatMap((id) => ["adopted", "turnO2"].map((v) => `${id} s${s} ${v}`)))
-    );
+    // O2's one fix-and-retest (turnO2b) once, beside the first sample
+    expect(jobs.map((j) => `${j.caseId} s${j.sample} ${j.armKey.split("/")[1]}`)).toEqual([
+      ...[first, second].flatMap((id) => ["adopted", "turnO2", "turnO2b"].map((v) => `${id} s1 ${v}`)),
+      ...[first, second].flatMap((id) => ["adopted", "turnO2"].map((v) => `${id} s2 ${v}`)),
+    ]);
     for (const job of jobs) expect(callLimitsOf(job.first.request())).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
     expect(planJobs(cases, { stage: "options-o2", promptState: "adopted3", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
   });
