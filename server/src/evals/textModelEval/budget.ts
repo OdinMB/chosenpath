@@ -48,6 +48,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   "ending-state": 0.1,
   runaway: 0.08,
   playthroughs: 0.7,
+  "choice-result": 0.4,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
 export const HARD_CEILING = 40;
@@ -106,6 +107,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (production's single-player switch turn on story 8988006e after its first chapter reasons to the 12,000-token output cap and writes nothing, 3 of 4 first tries of its exact request that day, retried at about 70 s more for the player; the ledger at $36.17 of the $40 hard cap): production's request (adopted, under adopted4) and the suspected cause fixed (noSwitchReminder: the switch configuration's reminder, the chapter planner's, left out on a switch turn, the turn document's B3.13 alone) three times each on the case that ran away, interleaved, with a smoke among them: 6 turns, about $0.02 at $0.0034 a turn, plus the runaways production's retries pay (about $0.0074 each, at most two a job)",
   playthroughs:
     "coordinator, 2026-09-30 (the owner's \"do whatever additional tests you think are useful\"; the coordinator chose whole-story playthroughs; the ledger at $36.20 of the $40 hard cap): four stories set up and played to their ending on production's own code and models (adopted, under adopted4: setup, character selection, both planners with pacing and their retry, turns with repairs, stat changes, chapter resolution, the ending), an automated player, no pregeneration: a 10-turn and a 25-turn single-player story, a 25-turn two-player contest and a 25-turn three-player cooperative-competitive story, about 150 calls, about $0.49 at the final check's measured costs ($0.0034 a single-player turn, $0.0043-0.0055 a group turn, $0.0011-0.0014 a plan, $0.006-0.009 a setup), the judged stage and ending checks on them (about 30 Luna low calls, about $0.01), a two-turn smoke, and the retries and runaways production's own re-sends pay",
+  "choice-result":
+    "coordinator, 2026-09-30 (after the playthroughs: exploration options that carry out another step result than the one at their position, and challenge results that say what the player does, so the next turn follows the result and not the choice; the ledger at $36.73 of the $40 hard cap): the exploration-order turn (choiceResult) and production's turn beside it (adopted, under adopted5), twice on the two stored exploration steps and eleven built from the playthroughs' stored runs (eight single-player, three group; 52 turns, about $0.21 at $0.0037 a single-player and $0.005-0.0065 a group turn); planner v2f (planV2f: challenge and contest results say how the attempt turns out, exploration results are the player's own choices) and planner v2e beside it twice on five built chapter plans, and planner v2f once on the 23 other chapter-planning cases beside planner v2e's stored plans (under round0; 43 plans, about $0.065); the two judged checks' calibration on hand-read playthrough turns and plans and their readings (about 230 Luna low calls, about $0.09-0.11), the judged stage check on planner v2f's plans, and a smoke",
 };
 
 export type Caps = {

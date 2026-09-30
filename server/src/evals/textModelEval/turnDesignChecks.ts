@@ -1,7 +1,7 @@
 import { MAX_STAT_MODIFIER_POINTS, MAX_STAT_MODIFIERS_PER_OPTION } from "core/config.js";
 import type { Story } from "core/models/Story.js";
-import type { BeatOption, Change, Outcome, SetOfBeatGenerationSchema, Stat, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
-import { GameModes } from "core/types/index.js";
+import type { BeatOption, Change, Outcome, SetOfBeatGenerationSchema, Stat, Switch, SwitchAnalysis, Thread, ThreadAnalysis, ThreadStep } from "core/types/index.js";
+import { GameModes, getThreadType } from "core/types/index.js";
 import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
@@ -629,6 +629,39 @@ function roundTwoChecks(story: Story, reply: SetOfBeatGenerationSchema): Record<
   return checks;
 }
 
+// --- The choice-result stage (2026-09-30): an exploration step's options are its results, in order ---
+
+/**
+ * The game records an exploration option by its position as the step's result
+ * (option n, resolution n), so each option should carry out the result at its
+ * own position: `explorationOptionsFollowResults`, on a chapter step where a
+ * player's thread explores, each option sharing the most content words with
+ * its own result (as `switchOptionsFollowDirections` reads a topic switch's
+ * directions). A heuristic, the deterministic proxy of the judged
+ * `optionsFollowResults` (choiceResultJudge.ts): read it as a rate.
+ */
+function choiceResultChecks(story: Story, reply: SetOfBeatGenerationSchema): Record<string, boolean> {
+  const checks: Record<string, boolean> = {};
+  if (story.getCurrentBeatType() !== "thread") return checks;
+  const threads = asArray<Thread>(story.getCurrentThreadAnalysis()?.threads);
+  for (const slot of story.getPlayerSlots()) {
+    const thread = threads.find((t) => asArray<string>(t?.playersSideA).includes(slot) || asArray<string>(t?.playersSideB).includes(slot));
+    if (!thread || getThreadType(thread) !== "exploration") continue;
+    const step = asArray<ThreadStep>(thread.progression).find((s) => s?.resolution === null);
+    const results = asObject(step?.possibleResolutions);
+    const texts = ["resolution1", "resolution2", "resolution3"].map((key) => asString(results[key]));
+    const options = asArray<BeatOption>(asObject((reply as unknown as Loose)[slot]).options).filter((o) => o && typeof o === "object");
+    if (texts.some((t) => t === "") || options.length !== 3) continue;
+    const words = texts.map(contentWords);
+    const follows = options.every((o, i) => {
+      const scores = words.map((w) => overlap(contentWords(asString(o.text)), w));
+      return scores[i] > 0 && scores.every((s, j) => j === i || s < scores[i]);
+    });
+    checks.explorationOptionsFollowResults = (checks.explorationOptionsFollowResults ?? true) && follows;
+  }
+  return checks;
+}
+
 // --- The owner's feedback of 2026-09-30 (turnOptionsContinuity.ts): option designs, levers per chapter, continuity ---
 
 type Counted = { statId: string; effect: number };
@@ -875,6 +908,7 @@ export function checkBeatDesign(story: Story, reply: SetOfBeatGenerationSchema, 
   counts.anomalyWords = (lower.match(ANOMALY) ?? []).length;
 
   Object.assign(checks, roundTwoChecks(story, reply));
+  Object.assign(checks, choiceResultChecks(story, reply));
 
   // Option sets (B6)
   const sets = beats.filter((b) => b.options.length === 3);

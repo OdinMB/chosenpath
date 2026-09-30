@@ -99,6 +99,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "ending-state": "The ending as its milestones leave it (endingStateB beside production's ending; the smoke's draft endingState)",
   runaway: "The runaway turn (noSwitchReminder beside production's request on the case that ran away)",
   playthroughs: "Whole-story playthroughs (no --run jobs: --playthroughs plays them, listed below)",
+  "choice-result": "Choices and results (choiceResult beside production's turn under adopted5, --role beat; planV2f beside planV2e under round0, --role thread)",
 };
 
 /** Jobs by arm key, in plan order. */

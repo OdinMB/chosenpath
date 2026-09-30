@@ -99,6 +99,13 @@ describe("evalFiles", () => {
     expect(JSON.parse(fs.readFileSync(path.join(outDir, "judged-endings.json"), "utf-8"))).toEqual({ set: "endings" });
   });
 
+  it("writes the choice-result stage's judged checks to judged-choice-results.md and .json", () => {
+    const files = evalFiles(outDir);
+    files.writeJudgedChoiceResults("# choices\n", { set: "choices" });
+    expect(fs.readFileSync(path.join(outDir, "judged-choice-results.md"), "utf-8")).toBe("# choices\n");
+    expect(JSON.parse(fs.readFileSync(path.join(outDir, "judged-choice-results.json"), "utf-8"))).toEqual({ set: "choices" });
+  });
+
   it("writes the nearer frames' judged turns beside the rounds' file, not over it", () => {
     const files = evalFiles(outDir);
     files.writeJudgedTurns("# rounds\n", { set: "rounds" });

@@ -48,6 +48,7 @@ import { productionFormRequest } from "../../game/services/storyTextRounds/reque
 import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { endingStateRequest, type EndingStateForm } from "../../game/services/storyTextRounds/endingState.js";
 import { noSwitchReminderRequest } from "../../game/services/storyTextRounds/switchReminder.js";
+import { choiceResultRequest } from "../../game/services/storyTextRounds/choiceResult.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -202,6 +203,18 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * to happen next. These things have not yet happened"), the chapter planner's,
  * left out on a switch turn (the turn document's B3.13 alone), production's
  * request byte for byte elsewhere, with production's single-player turn limits.
+ * "choiceResult" is the choice-result stage's turn (2026-09-30,
+ * storyTextRounds/choiceResult.ts): production's turn, every player count,
+ * with one line on a turn where a player's thread explores (each option is
+ * the step's result at its position, the same action in the same direction,
+ * and the text carries out none of them), production's request byte for byte
+ * elsewhere, with production's turn limits for the player count.
+ * "planV2f" is planner v2e with the step results' two rules (the same stage):
+ * a challenge or contest result says how the attempt turns out, never which
+ * approach the player takes or what they say or decide; an exploration result
+ * is something the player chooses to do, which one option offers, never how
+ * others respond. Otherwise planner v2e byte for byte, its switch planner
+ * planner v2b's.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -257,7 +270,9 @@ export type VariantId =
   | "turnO2b"
   | "endingState"
   | "endingStateB"
-  | "noSwitchReminder";
+  | "noSwitchReminder"
+  | "choiceResult"
+  | "planV2f";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -310,6 +325,8 @@ export const VARIANTS: VariantId[] = [
   "endingState",
   "endingStateB",
   "noSwitchReminder",
+  "choiceResult",
+  "planV2f",
 ];
 
 /**
@@ -544,7 +561,7 @@ function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts 
  * its last step listed once: switch and thread analysis. The switch planner is
  * planner v2's in all of them.
  */
-function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQuestion = false, stages = false, climax = false, stepsOnce = false) {
+function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQuestion = false, stages = false, climax = false, stepsOnce = false, outcomeResults = false) {
   return (input: RequestInput): Round2Request => {
     if (input.role === "switch") return plannerV2SwitchRequest(input.story, full);
     if (input.role === "thread") {
@@ -552,7 +569,14 @@ function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQu
         input.story,
         full,
         twoSided
-          ? { twoSided, ...(nearerQuestion ? { nearerQuestion } : {}), ...(stages ? { stages } : {}), ...(climax ? { climax } : {}), ...(stepsOnce ? { stepsOnce } : {}) }
+          ? {
+              twoSided,
+              ...(nearerQuestion ? { nearerQuestion } : {}),
+              ...(stages ? { stages } : {}),
+              ...(climax ? { climax } : {}),
+              ...(stepsOnce ? { stepsOnce } : {}),
+              ...(outcomeResults ? { outcomeResults } : {}),
+            }
           : {}
       );
     }
@@ -642,6 +666,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   planV2d: plannerV2("planV2d", false, true, true, true),
   planV2dClimax: plannerV2("planV2dClimax", false, true, true, true, true),
   planV2e: plannerV2("planV2e", false, true, true, true, false, true),
+  planV2f: plannerV2("planV2f", false, true, true, true, false, true, true),
   turnB6: (input) => {
     if (input.role !== "beat") throw new Error(`Variant turnB6 does not cover role ${input.role}`);
     return todaysFormWithB6Request(input.story);
@@ -677,6 +702,11 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   noSwitchReminder: (input) => {
     if (input.role !== "beat") throw new Error(`Variant noSwitchReminder does not cover role ${input.role}`);
     return { ...noSwitchReminderRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // The choice-result stage's turn: an exploration step's options are its results in order, production's turn limits
+  choiceResult: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant choiceResult does not cover role ${input.role}`);
+    return { ...choiceResultRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
   },
 };
 

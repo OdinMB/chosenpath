@@ -3,6 +3,11 @@ import {
   armsFor,
   armSettings,
   baselineArm,
+  CHOICE_RESULT_BUILT_CASES,
+  CHOICE_RESULT_PLANNER_PROMPT_STATE,
+  CHOICE_RESULT_PROMPT_STATE,
+  CHOICE_RESULT_STORED_CASES,
+  CHOICE_RESULT_STORED_PLAN_CASES,
   ENDING_STATE_BUILT_CASES,
   ENDING_STATE_PROMPT_STATE,
   ENDING_STATE_STORED_CASES,
@@ -381,6 +386,7 @@ describe("budget caps", () => {
       "ending-state": 0.1,
       runaway: 0.08,
       playthroughs: 0.7,
+      "choice-result": 0.4,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -396,6 +402,7 @@ describe("budget caps", () => {
       "ending-state",
       "runaway",
       "playthroughs",
+      "choice-result",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -403,9 +410,9 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all thirteen caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all fourteen caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(5.73);
+    expect(caps).toBeCloseTo(6.13);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -606,6 +613,57 @@ describe("budget caps", () => {
     expect(stageRunsBaseline("runaway")).toBe(false);
     // The ledger read $36.17 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.17 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.runaway).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs the choice-result stage (2026-09-30): production's turn and the exploration-order turn twice on the exploration steps, interleaved, and planner v2e and v2f on the chapter plans", () => {
+    const [one, group] = [TEXT_MODEL_GROUPS.beat, TEXT_MODEL_GROUPS.multiplayerBeat].map((g) =>
+      ["adopted", "choiceResult"].map((variant) => armKey({ model: g.model, reasoningEffort: g.reasoningEffort }, variant as "adopted"))
+    );
+    expect(one).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/choiceResult"]);
+    expect(group).toEqual(["gpt-6-luna@low/adopted", "gpt-6-luna@low/choiceResult"]);
+    const single = [...CHOICE_RESULT_STORED_CASES, ...CHOICE_RESULT_BUILT_CASES.single];
+    expect(armsFor("choice-result", "beat").map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.caseIds])).toEqual([
+      [one[0], 1, 2, "single-player", single],
+      [one[1], 1, 2, "single-player", single],
+      [group[0], 1, 2, "multiplayer", CHOICE_RESULT_BUILT_CASES.groups],
+      [group[1], 1, 2, "multiplayer", CHOICE_RESULT_BUILT_CASES.groups],
+    ]);
+    // The stored exploration steps: the café's chapter opening and its second step (round-built), the only two
+    expect(CHOICE_RESULT_STORED_CASES).toEqual(["cont-checkpoi-t1-o2", "round-beat-exploration-checkpoi-t2"]);
+    // Planner v2e (production's chapter planner) and v2f twice on the built chapter plans; v2f once on every other
+    // chapter-planning case, where planner v2e's two samples are stored (round0)
+    expect(armsFor("choice-result", "thread").map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.caseIds])).toEqual([
+      ["gpt-6-luna@low/planV2e", 1, 2, "all", CHOICE_RESULT_BUILT_CASES.plans],
+      ["gpt-6-luna@low/planV2f", 1, 2, "all", CHOICE_RESULT_BUILT_CASES.plans],
+      ["gpt-6-luna@low/planV2f", 1, 1, "all", CHOICE_RESULT_STORED_PLAN_CASES],
+    ]);
+    expect(CHOICE_RESULT_STORED_PLAN_CASES).toHaveLength(23);
+    for (const role of ["setup", "switch", "iteration"] as const) expect(armsFor("choice-result", role)).toEqual([]);
+    expect(pipelinePlans("choice-result")).toEqual([]);
+    expect(stageInterleavesArms("choice-result")).toBe(true);
+    // Production's turns under a tag of their own beside the variant; the planners beside planner v2e's stored plans (round0)
+    expect(CHOICE_RESULT_PROMPT_STATE).toBe("adopted5");
+    expect(CHOICE_RESULT_PLANNER_PROMPT_STATE).toBe("round0");
+    expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE, RUNAWAY_PROMPT_STATE]).not.toContain(CHOICE_RESULT_PROMPT_STATE);
+    // The built cases are frozen after every earlier stage closed, so only this stage plans them
+    for (const id of [...CHOICE_RESULT_BUILT_CASES.single, ...CHOICE_RESULT_BUILT_CASES.groups, ...CHOICE_RESULT_BUILT_CASES.plans]) {
+      expect(stagePlansCase("choice-result", id)).toBe(true);
+      expect(stagePlansCase("playthroughs", id)).toBe(false);
+      expect(stagePlansCase("planner-v2e", id)).toBe(false);
+    }
+    // Against production's turn and chapter planner, which run beside them; priced from them
+    expect(referenceKey(one[1])).toBe(one[0]);
+    expect(referenceKey(group[1])).toBe(group[0]);
+    expect(referenceKey("gpt-6-luna@low/planV2f")).toBe("gpt-6-luna@low/planV2e");
+    expect(estimateBaseKey(one[1])).toBe(one[0]);
+    expect(estimateBaseKey("gpt-6-luna@low/planV2f")).toBe("gpt-6-luna@low/planV2e");
+    expect(STAGE_CAP_REASONS["choice-result"]).toMatch(/choiceResult/);
+    expect(STAGE_CAP_REASONS["choice-result"]).toMatch(/planV2f/);
+    expect(STAGE_CAP_REASONS["choice-result"]).toMatch(/2026-09-30/);
+    expect(stageRunsBaseline("choice-result")).toBe(false);
+    // The coordinator's cap: $0.40, inside the $40 hard cap with the ledger at $36.73 and the stalled Stage 4 calls on top
+    expect(DEFAULT_STAGE_CAPS["choice-result"]).toBe(0.4);
+    expect(36.73 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["choice-result"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("gives the whole-story playthroughs (playthroughs, 2026-09-30) a stage of their own: no --run arms, their calls prep calls in its ledger", () => {

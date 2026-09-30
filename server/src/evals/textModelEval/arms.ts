@@ -39,7 +39,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * beside production's ending, then the replay of the turn that reasons to its
  * output cap (runaway), then whole-story playthroughs on production's own
  * code (playthroughs: no --run arms; its calls are the --playthroughs mode's
- * prep calls, playthroughMode.ts). Their caps and reasons are in budget.ts.
+ * prep calls, playthroughMode.ts), then the playthroughs' choices that lead
+ * somewhere else (choice-result: the exploration-order turn beside
+ * production's, planner v2f beside planner v2e). Their caps and reasons are in
+ * budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -55,6 +58,7 @@ export const FEEDBACK_STAGES = [
   "ending-state",
   "runaway",
   "playthroughs",
+  "choice-result",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -208,6 +212,10 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The runaway turn's fix (2026-09-30: no switch reminder on a switch turn, the turn document's B3.13 alone) against
   // production's request, which runs beside it on the case that ran away
   noSwitchReminder: "adopted",
+  // The choice-result stage (2026-09-30): the turn with an exploration step's options in its results' order against
+  // production's turn, which runs beside it; planner v2f against production's chapter planner (planner v2e), which it edits
+  choiceResult: "adopted",
+  planV2f: "planV2e",
 };
 
 /**
@@ -226,6 +234,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   turnO2b: "turnO2",
   planV2e: "planV2d",
   endingStateB: "endingState",
+  planV2f: "planV2e",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -517,9 +526,111 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return endingStateArms(role);
     case "runaway":
       return runawayArms(role);
+    case "choice-result":
+      return choiceResultArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt states of the choice-result stage (2026-09-30). The turns:
+ * production's own code since the playthroughs' no-call fixes (its beat
+ * requests are adopted4's byte for byte; the fixes changed the repairs, the
+ * plan check and the queue, not a request), under a tag of their own so
+ * production runs beside the variant in the same minutes. The planners: round0,
+ * where planner v2e's two samples on every chapter-planning case are stored
+ * (production's chapter planner is planner v2e byte for byte, and today's code
+ * rebuilds those requests), so planner v2f reads against them on the same
+ * pairs, and planner v2e runs beside it on the built plans under the same tag.
+ */
+export const CHOICE_RESULT_PROMPT_STATE = "adopted5";
+export const CHOICE_RESULT_PLANNER_PROMPT_STATE = "round0";
+
+/** The stored exploration steps: the café's exploration chapter opening and its second step (round-built from a stored reply), the only two. */
+export const CHOICE_RESULT_STORED_CASES = ["cont-checkpoi-t1-o2", "round-beat-exploration-checkpoi-t2"];
+
+/**
+ * The cases built from the playthroughs' stored runs (choiceResultCases.ts, no
+ * calls): exploration steps where production's options carried out another
+ * result or none (New Avalon turns 6 and 14, lemonade turn 6; the groups' food
+ * trucks turns 14 and 17 and space pirates turn 14) and, beside them, steps
+ * where they matched (New Avalon turns 7, 10, 11 and 16, lemonade turn 9); and
+ * the chapter plans whose challenge or contest results said what the player
+ * does (New Avalon turns 18 and 22, food trucks turn 10) or whose exploration
+ * results said how others respond (food trucks turn 17), with a plan whose
+ * results were outcomes beside them (New Avalon turn 2).
+ */
+export const CHOICE_RESULT_BUILT_CASES = {
+  single: [
+    "round-choice-avalon-t6",
+    "round-choice-avalon-t7",
+    "round-choice-avalon-t10",
+    "round-choice-avalon-t11",
+    "round-choice-avalon-t14",
+    "round-choice-avalon-t16",
+    "round-choice-lemonade-t6",
+    "round-choice-lemonade-t9",
+  ],
+  groups: ["round-choice-food-trucks-t14", "round-choice-food-trucks-t17", "round-choice-space-pirates-t14"],
+  plans: ["round-choice-plan-avalon-t2", "round-choice-plan-avalon-t18", "round-choice-plan-avalon-t22", "round-choice-plan-food-trucks-t10", "round-choice-plan-food-trucks-t17"],
+} as const;
+
+/** Every other chapter-planning case (stored and built for the earlier rounds), where planner v2e's two samples are stored under round0. */
+export const CHOICE_RESULT_STORED_PLAN_CASES = [
+  "thread-8988006e-t5-o0",
+  "thread-8988006e-t5-o1",
+  "thread-8988006e-t5-o2",
+  "thread-checkpoi-t1-o0",
+  "thread-checkpoi-t1-o1",
+  "thread-checkpoi-t1-o2",
+  "thread-tpl-321db503-p2-t1",
+  "thread-tpl-965413e1-p3-t1",
+  "thread-tpl-fe7b68c7-p2-t1",
+  "thread-tpl-f0ca783b-p2-t1",
+  "thread-tpl-4546b046-p2-t1",
+  "thread-tpl-2fe196a3-p2-t1",
+  "thread-tpl-54a4e23b-p1-t1",
+  "thread-tpl-5e1c4d83-p1-t1",
+  "thread-tpl-e401abf2-p1-t1",
+  "round-thread-short10-8988006e-t5",
+  "round-thread-long20-8988006e-t5",
+  "round-thread-neonate-feeding-t1",
+  "round-thread-mp-965413e1-p3-t5",
+  "round-thread-first-8988006e-t1",
+  "round-thread-last4-8988006e-t5",
+  "round-thread-last2-8988006e-t5",
+  "round-thread-last4-mp-965413e1-p3-t5",
+];
+
+/**
+ * The choice-result stage (the coordinator's brief of 2026-09-30, after the
+ * playthroughs): production's turn (adopted) and the exploration-order turn
+ * (choiceResult) on each player count's own turn model, twice on the
+ * exploration steps, interleaved, under adopted5; planner v2e and planner v2f
+ * on Luna low, twice on the built chapter plans, and planner v2f once on every
+ * other chapter-planning case, under round0 beside planner v2e's stored plans.
+ * The turns run with --role beat under adopted5, the planners with --role
+ * thread under round0.
+ */
+function choiceResultArms(role: EvalRole): ArmPlan[] {
+  if (role === "beat") {
+    const single = [...CHOICE_RESULT_STORED_CASES, ...CHOICE_RESULT_BUILT_CASES.single];
+    const groups = [...CHOICE_RESULT_BUILT_CASES.groups];
+    return [
+      ...(["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single })),
+      ...(["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: groups })),
+    ];
+  }
+  if (role === "thread") {
+    const plans = [...CHOICE_RESULT_BUILT_CASES.plans];
+    return [
+      { arm: luna("low", "planV2e"), samples: 2, scope: "all", caseIds: plans },
+      { arm: luna("low", "planV2f"), samples: 2, scope: "all", caseIds: plans },
+      { arm: luna("low", "planV2f"), samples: 1, scope: "all", caseIds: CHOICE_RESULT_STORED_PLAN_CASES },
+    ];
+  }
+  return [];
 }
 
 /**
@@ -716,7 +827,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);
@@ -751,6 +862,8 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   ...[...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES].map((id): [string, Stage] => [id, "stage-scoping"]),
   // The built endings (2026-09-30), frozen after every stage before the ending's run had closed
   ...[...ENDING_STATE_BUILT_CASES.single, ...ENDING_STATE_BUILT_CASES.groups].map((id): [string, Stage] => [id, "ending-state"]),
+  // The choice-result stage's cases from the playthroughs (2026-09-30), frozen after every earlier stage had closed
+  ...[...CHOICE_RESULT_BUILT_CASES.single, ...CHOICE_RESULT_BUILT_CASES.groups, ...CHOICE_RESULT_BUILT_CASES.plans].map((id): [string, Stage] => [id, "choice-result"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

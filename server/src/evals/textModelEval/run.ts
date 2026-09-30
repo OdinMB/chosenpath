@@ -45,6 +45,7 @@ import { DEFAULT_PLAYTHROUGH_MAX_SPEND, PLAYTHROUGH_STAGE, playthroughsMode, pri
 import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
 import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
 import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
+import { buildChoiceCasesMode, judgeChoiceResultsMode } from "./choiceResultPrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
 import {
@@ -73,7 +74,9 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     stored plans; ending-state under adopted2: the ending told as its milestones leave it beside production's
  *     ending, interleaved, on the stored and built endings, production's stored-ending samples already recorded;
  *     runaway under adopted4: production's request and noSwitchReminder three times each on the switch turn that
- *     reasoned to its output cap, interleaved)
+ *     reasoned to its output cap, interleaved; choice-result in two parts: --role beat under adopted5, production's
+ *     turn and choiceResult on the exploration steps, interleaved, then --role thread under round0, planner v2e and
+ *     v2f on the chapter plans beside planner v2e's stored plans)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -120,6 +123,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-endings --arms <beat keys> --prompt-state <tag> [--max-spend 0.05]  the judged check "each outcome told
  *     as its milestones leave it" (endingJudge.ts): its calibration (two samples) and every ending of the arms (one
  *     sample, one call per player), then judged-endings.md and .json; --cases <item or case ids> sends only those
+ *   The choice-result stage (choiceResultPrep.ts, 2026-09-30), in its own stage:
+ *   --build-choice-cases [--rebuild-cases]  turns and chapter plans of the playthroughs' stored runs (choiceResultCases.ts,
+ *     replayed from each run's start), each only where its request is the one production sent; no calls
+ *   --judge-choice-results [--max-spend 0.15]  the two judged checks (choiceResultJudge.ts): their calibration on the
+ *     playthroughs (two samples) and the stage's turns (adopted5) and plans (round0), one sample each, then
+ *     judged-choice-results.md and .json; --cases <item or case ids> sends only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -162,6 +171,8 @@ type Mode =
   | "judge-stages"
   | "build-ending-cases"
   | "judge-endings"
+  | "build-choice-cases"
+  | "judge-choice-results"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -283,6 +294,8 @@ function parseArgs(argv: string[]): Args {
       case "--judge-stages":
       case "--build-ending-cases":
       case "--judge-endings":
+      case "--build-choice-cases":
+      case "--judge-choice-results":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -960,6 +973,11 @@ async function main() {
         stage: args.stage ?? "ending-state",
         caseIds: args.caseIds,
       });
+    case "build-choice-cases":
+      return buildChoiceCasesMode({ files, log: (line) => console.log(line) }, args.rebuildCases);
+    case "judge-choice-results":
+      // The stage's judged checks book to its own stage unless another is given
+      return judgeChoiceResultsMode(prepContext(args, files, args.stage ?? "choice-result"), { stage: args.stage ?? "choice-result", caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

@@ -318,11 +318,33 @@ const FINAL_STEP_FIELD_ONCE = "The last step, written only here and never one of
 const DURATION_FIELD = "Two, three or four beats, the same for every thread in this batch.";
 const DURATION_FIELD_ONCE = "Two, three or four beats, the same for every thread in this batch: each thread's steps plus its final step make exactly this many.";
 
-function progressionItem(number: number, multiplayer: boolean, stepsOnce = false): string {
+/** The progression item's sentences on what a step's results are, as planner v2 to v2e print them. */
+const stepResultsSentences = (multiplayer: boolean) =>
+  `In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${multiplayer ? "players" : "player"} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.`;
+
+/**
+ * Planner v2f's two rules on a step's results (the choice-result stage of
+ * 2026-09-30, the playthroughs' "choices that lead somewhere else"). A
+ * challenge or contest result is rolled against the option the player chose,
+ * so it says how the attempt turns out, never which approach the player takes
+ * or what they say or decide (New Avalon's hearing chapters: "Eli's question
+ * folds the possibility into the confirmed evidence", "Eli plainly retracts"
+ * against "Eli defends his framing", and the next turn told the rolled action
+ * over the chosen one). An exploration result is the option at its position,
+ * so it is something the player chooses to do, never how others respond (a
+ * food truck chapter's "The crew names time off…"). Planner v2e's two
+ * sentences stay, each followed by its rule.
+ */
+const stepResultRules = (multiplayer: boolean) =>
+  multiplayer
+    ? `In challenge and contest threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge or contest result, the milestones included, says how the players' attempts turn out, whatever they chose to do: what each side achieves or fails to achieve, and how others respond; never which approach a player takes or what they say or decide, since the options they choose decide that (weak: "The group bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the players can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something a player chooses to do, and the step's three options offer them one each, in order: never how others respond.`
+    : `In challenge threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge result, the milestones included, says how the player's attempt turns out, whatever they chose to do: what they achieve or fail to achieve, and how others respond; never which approach the player takes or what they say or decide, since the option they choose decides that (weak: "Rikkit bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the player can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something the player chooses to do, and the step's three options offer them one each, in order: never how others respond.`;
+
+function progressionItem(number: number, multiplayer: boolean, stepsOnce = false, outcomeResults = false): string {
   const who = multiplayer ? "players" : "player";
   return `${number}. A progression of steps, as many as the length, that tells one situation rising to a climax:
    - The thread stays with one situation: the same people, place, rival or problem from step to step. Each step raises the stakes of that situation instead of starting a new activity, and every step stays on the thread's outcome.
-   - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${who} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.
+   - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. ${outcomeResults ? stepResultRules(multiplayer) : stepResultsSentences(multiplayer)}
    - The last step is the decisive moment: its question brings the thread's question to a head.${stepsOnce ? `\n   - ${STEPS_ONCE}` : ""}
    - Each step asks how the ${who} act${multiplayer ? "" : "s"} ("Stealth: How does Rikkit get past the Guild's night watch?").${multiplayer ? " In a contest, every step is the same moment for both sides, and its question names them all." : ""}
    - No step settles the thread early, and the ${who} can't leave or derail it.
@@ -392,7 +414,7 @@ function stageItem(number: number, multiplayer: boolean, climax = false): string
    Outcome: "${outcome}" with 3 milestones has the stages 1. prove the noble's hand; 2. turn the Guild against him; 3. stop the conspiracy. At stage 1 the thread is about the proof. Weak: a last step "${step}", or the milestone "${who}'s proof brings the noble down" (stages 2 and 3). Good: the milestones "${who} gets the noble's letters out of the manor: proof of his hand", "${who} gets one letter, which hints at his hand but proves nothing", "${who} flees the manor with nothing".`;
 }
 
-function threadList(multiplayer: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false): string {
+function threadList(multiplayer: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false, outcomeResults = false): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
   // planV2c inserts its question item before the milestones, planV2d its stage item before that; the rest renumbers
   const q = nearer ? 1 : 0;
@@ -402,7 +424,7 @@ function threadList(multiplayer: boolean, nearer: boolean, staged = false, clima
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
 ${staged ? `${stageItem(3, false, climax)}\n` : ""}${nearer ? `${questionItem(3 + s, false)}\n` : ""}${3 + s + q}. ${milestones}
-${progressionItem(4 + s + q, false, stepsOnce)}
+${progressionItem(4 + s + q, false, stepsOnce, outcomeResults)}
 
 `;
   }
@@ -411,7 +433,7 @@ ${progressionItem(4 + s + q, false, stepsOnce)}
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
 ${staged ? `${stageItem(4, true, climax)}\n` : ""}${nearer ? `${questionItem(4 + s, true)}\n` : ""}${4 + s + q}. ${milestones}
-${progressionItem(5 + s + q, true, stepsOnce)}
+${progressionItem(5 + s + q, true, stepsOnce, outcomeResults)}
 
 `;
 }
@@ -433,7 +455,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false, climax = false, stepsOnce = false, outcomeResults = false): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -470,7 +492,7 @@ function threadInstructions(production: string, story: Story, twoSided: boolean,
     `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
-  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged, climax, stepsOnce));
+  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged, climax, stepsOnce, outcomeResults));
   text = replaceOnce(
     LABEL,
     text,
@@ -717,12 +739,15 @@ function assembleThread(story: Story, parsed: unknown): unknown {
  * byte; `stepsOnce` with the stages is planV2e (after the stage scoping of
  * 2026-09-30, the owner having chosen planner v2d's next-stage last chapter):
  * planner v2d with its last step listed once (STEPS_ONCE and the three field
- * descriptions), its assembly planner v2d's.
+ * descriptions), its assembly planner v2d's; `outcomeResults` with planner
+ * v2e's is planV2f (the choice-result stage of 2026-09-30): the progression
+ * item's results sentences each followed by its rule (stepResultRules), its
+ * schema and assembly planner v2e's.
  */
 export function plannerV2ThreadRequest(
   story: Story,
   full: boolean,
-  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean; climax?: boolean; stepsOnce?: boolean } = {}
+  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean; climax?: boolean; stepsOnce?: boolean; outcomeResults?: boolean } = {}
 ): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
@@ -730,8 +755,9 @@ export function plannerV2ThreadRequest(
   const staged = options.stages ?? false;
   const climax = staged && (options.climax ?? false) && foldsStages(story);
   const stepsOnce = options.stepsOnce ?? false;
+  const outcomeResults = options.outcomeResults ?? false;
   return {
-    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged, climax, stepsOnce) + threadState(state, story, staged, climax),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged, climax, stepsOnce, outcomeResults) + threadState(state, story, staged, climax),
     schema: threadReplySchema(story, full, nearer, staged, stepsOnce),
     assemble: (parsed) => assembleThread(story, parsed),
   };
@@ -758,6 +784,8 @@ export const PLANNER_V2_TEXT = {
   stagesRule: STAGES_RULE,
   climaxClause,
   stepsOnce: STEPS_ONCE,
+  /** Planner v2f's results sentences, and planner v2e's before them */
+  stepResults: (multiplayer: boolean) => ({ before: stepResultsSentences(multiplayer), after: stepResultRules(multiplayer) }),
   /** Planner v2e's three field descriptions, each with its form before the fix */
   stepsOnceFields: {
     steps: { once: STEPS_FIELD_ONCE, before: STEPS_FIELD },

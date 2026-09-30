@@ -34,6 +34,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-groups.md|json  the group round's judged consistency check and its calibration (--judge-groups)
  *   judged-stages.md|json  the stage scoping's judged check, "the chapter stays within its stage", and its calibration (--judge-stages)
  *   judged-endings.md|json the ending's judged check, "each outcome told as its milestones leave it", and its calibration (--judge-endings)
+ *   judged-choice-results.md|json  the choice-result stage's judged checks, options against results and results against their kind (--judge-choice-results)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
@@ -141,6 +142,11 @@ export function evalFiles(outDir: string) {
     writeJudgedEndings: (markdown: string, json: unknown) => {
       writeJson(at("judged-endings.json"), json);
       fs.writeFileSync(at("judged-endings.md"), markdown);
+    },
+    /** The choice-result stage's judged checks, an exploration step's options and a plan's results (--judge-choice-results, choiceResultJudge.ts) */
+    writeJudgedChoiceResults: (markdown: string, json: unknown) => {
+      writeJson(at("judged-choice-results.json"), json);
+      fs.writeFileSync(at("judged-choice-results.md"), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {

@@ -547,6 +547,56 @@ describe("checkBeatDesign", () => {
     });
   });
 
+  describe("the choice-result stage's check (2026-09-30): an exploration step's options follow its results, by words", () => {
+    const GUILD = "player1_guild_reform";
+    /** Step `done + 1` of a 3-beat exploration chapter on the guild outcome, its results as written. */
+    const explorationStep = (results: [string, string, string], done = 0) => {
+      const chapter = threadAnalysis("exploration", 3, 1);
+      const [r1, r2, r3] = results;
+      chapter.threads[0] = {
+        ...chapter.threads[0],
+        outcomeId: GUILD,
+        progression: chapter.threads[0].progression.map((step, i) => ({
+          ...step,
+          possibleResolutions: { resolution1: r1, resolution2: r2, resolution3: r3 },
+          resolution: i < done ? ("resolution2" as const) : null,
+        })),
+      };
+      return roundStory({ turns: 1 + done, maxTurns: 20, playerOutcomes: { player1: [outcome(GUILD)] }, phases: [roundTopicSwitch([["Petition the Guild hall", GUILD]], 0), chapter] });
+    };
+    const results: [string, string, string] = [
+      "Rikkit lays the full ledger before Sir Bram and invites him to check every entry",
+      "Rikkit shows Sir Bram only the verified entries and keeps the rumours private",
+      "Rikkit urges Sir Bram to act on trust without seeing the ledger",
+    ];
+    const withOptions = (texts: string[]) => {
+      const beats = beatSet(1);
+      beats.player1 = beatGeneration({ options: texts.map((text) => ({ optionType: "exploration" as const, resourceType: "normal" as const, text })) });
+      return beats;
+    };
+
+    it("passes where each option shares the most words with the result at its own position", () => {
+      const story = explorationStep(results);
+      const inOrder = withOptions(["Lay the full ledger open and invite Sir Bram to check every entry", "Show Sir Bram only the verified entries", "Urge Sir Bram to act on trust without the ledger"]);
+      expect(checkBeatDesign(story, inOrder, inOrder).checks.explorationOptionsFollowResults).toBe(true);
+    });
+
+    it("fails where an option is closer to another result, or to none (the playthroughs' lemonade turn 6: the set shifted)", () => {
+      const story = explorationStep(results, 1);
+      const shifted = withOptions(["Show Sir Bram only the verified entries", "Urge Sir Bram to act on trust without the ledger", "Lay the full ledger open and invite Sir Bram to check every entry"]);
+      expect(checkBeatDesign(story, shifted, shifted).checks.explorationOptionsFollowResults).toBe(false);
+      const elsewhere = withOptions(["Lay the full ledger open and invite Sir Bram to check every entry", "Ask Gruk what the enclave needs first", "Urge Sir Bram to act on trust without the ledger"]);
+      expect(checkBeatDesign(story, elsewhere, elsewhere).checks.explorationOptionsFollowResults).toBe(false);
+    });
+
+    it("reads only an exploration step's options: not a challenge step, a switch or the ending", () => {
+      const options = withOptions(["a", "b", "c"]);
+      for (const story of [threadBeat(1), laterSwitchBeat(1), endingBeat(1)]) {
+        expect(checkBeatDesign(story, options, options).checks).not.toHaveProperty("explorationOptionsFollowResults");
+      }
+    });
+  });
+
   describe("turn round 2's beat checks (B6, B7, B8)", () => {
     const GUILD = "player1_guild_reform";
     const ENCLAVE = "player1_enclave_trust";
