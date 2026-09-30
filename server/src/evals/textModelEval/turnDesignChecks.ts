@@ -676,7 +676,12 @@ export function reusedFromPrevious(previousText: string, text: string): { pairs:
  * (mainStatsDistinctLeverApart, a sacrifice or reward option left out of the
  * "at most one without a bonus"), its lever line (leverFollowsO2Line, where it
  * forbids a lever) and the sets where it invites a reward, with those that
- * carry one (rewardWhereInvitedShare), read on every arm. On every turn after
+ * carry one (rewardWhereInvitedShare), read on every arm. O2 fails
+ * leverFollowsRateLine and leverFollowsChapterLine by design wherever it
+ * offers a reward its line invites and today's rate (or arm O's line) gives
+ * none, as after a chapter sacrifice, so its run reads leverFollowsO2Line,
+ * atMostOneRewardPerChapter and rewardWhereInvitedShare instead of those two
+ * (their wrong-way moves for O2 are its invitation followed). On every turn after
  * the first, the sentences and the opening told again from the player's
  * previous beat. Counts that pool into shares are reported on every reply.
  */

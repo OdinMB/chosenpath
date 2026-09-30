@@ -1472,3 +1472,9 @@ No calls, no spend (ledger $33.74 of $40; the dry run's per-stage figures). The 
   - Second references are `turnO` and `turnOb` (stored `adopted2`), and O2 is priced from `turnOb`.
 - **Dry run** (`--prompt-state adopted3`): 128 jobs, est $0.48 of $0.70 (`adopted` 64, $0.234; `turnO2` 64, $0.245), at least 13 min; that leaves room for the judge (about $0.03) and one fix and retest (O2 once on the 32, about $0.11).
 - **Spend:** $0; the ledger $35.41 of $40.
+
+## Version O2, verification fix (implementer, 2026-09-30)
+
+- **Finding (minor, verified):** O2 invites a reward on the 21 rolled stored steps where today's rate gives none after a chapter sacrifice, and there `leverFollowsRateLine` (no lever where today's line gives none) and `leverFollowsChapterLine` (arm O's `chapterLeverRule`, whose reward needs the rate) both forbid one. Both run on every arm and `results.md` reads every check against production, so each invited reward O2 offers there reads as a wrong-way move with no by-design note. Only arm O's reasoned second sacrifice had one.
+- **Fix, documentation only (my call):** one sentence in `feedbackChecks`' comment and in the context doc's O2 readings: O2 fails those two checks by design wherever it offers a reward its line invites and today's rate gives none, so its run reads `leverFollowsO2Line`, `atMostOneRewardPerChapter` and `rewardWhereInvitedShare` in their place. No code change: the checks don't know the arm, and splitting them would move production's baselines (its 3 rewards on `cont-6edd813c-t2` broke its own line, which `leverFollowsRateLine` is there to see). The O2 report reads the two with this note.
+- **Spend:** $0.
