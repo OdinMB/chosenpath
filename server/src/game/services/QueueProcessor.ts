@@ -8,6 +8,7 @@ import type {
 import EventEmitter from "events";
 import { Logger } from "shared/logger.js";
 import { setImmediate } from "timers";
+import { errorClass } from "./retryOnce.js";
 
 export abstract class BaseQueueProcessor<
   TOperation extends QueueableOperation
@@ -38,17 +39,23 @@ export abstract class BaseQueueProcessor<
       createdAt: new Date(),
     } as TOperation;
 
-    this.operations.set(operationId, fullOperation);
+    this.enqueue(fullOperation);
+    return operationId;
+  }
 
-    const queueId = this.getQueueId(fullOperation);
+  /** Puts an operation at the back of its queue and makes sure the processor runs. */
+  private enqueue(operation: TOperation): void {
+    this.operations.set(operation.id, operation);
+
+    const queueId = this.getQueueId(operation);
     if (!this.queues.has(queueId)) {
       this.queues.set(queueId, []);
     }
 
     const queue = this.queues.get(queueId)!;
-    queue.push(operationId);
+    queue.push(operation.id);
 
-    Logger.Queue.log(`Added operation ${operationId} to queue ${queueId}`);
+    Logger.Queue.log(`Added operation ${operation.id} to queue ${queueId}`);
 
     if (!this.processing) {
       Logger.Queue.log("Starting processor");
@@ -56,8 +63,6 @@ export abstract class BaseQueueProcessor<
     } else {
       this.events.emit("newOperation");
     }
-
-    return operationId;
   }
 
   async getOperation(operationId: string): Promise<TOperation | null> {
@@ -80,6 +85,42 @@ export abstract class BaseQueueProcessor<
 
   protected abstract getQueueId(operation: TOperation): string;
   protected abstract processOperation(operation: TOperation): Promise<void>;
+
+  /**
+   * How many more times an operation of this kind is sent after it fails,
+   * before the failure path reports it: none unless a subclass says so
+   * (GameQueueProcessor sends a failed turn once more).
+   */
+  protected resendsFor: (operation: TOperation) => number = () => 0;
+
+  /**
+   * A failed operation queued once more, at the back of its queue, while its
+   * budget allows: true when it was, false when the failure path should
+   * report it. The sends are counted on the operation, so it never loops.
+   */
+  private resendFailed(operation: TOperation, error: unknown): boolean {
+    const sends = operation.sends ?? 1;
+    if (sends > this.resendsFor(operation)) return false;
+    const type = (operation as TOperation & { type?: string }).type || "unknown";
+    // The error's class only: a message can quote a model's reply
+    Logger.Queue.warn(
+      `The ${type} operation ${operation.id.slice(-5)} failed (${errorClass(error)}); sending it once more (send ${sends + 1})`
+    );
+    operation.status = "failed";
+    operation.completedAt = new Date();
+    operation.error = error instanceof Error ? error.message : String(error);
+    this.enqueue({
+      ...operation,
+      id: randomUUID(),
+      status: "pending",
+      createdAt: new Date(),
+      startedAt: undefined,
+      completedAt: undefined,
+      error: undefined,
+      sends: sends + 1,
+    } as TOperation);
+    return true;
+  }
 
   /**
    * Centralized error handler for all operations
@@ -190,7 +231,9 @@ export abstract class BaseQueueProcessor<
           )}`
         );
       } catch (error) {
-        this.handleOperationError(operation, error);
+        if (!this.resendFailed(operation, error)) {
+          this.handleOperationError(operation, error);
+        }
       }
 
       // Remove the processed operation from the queue

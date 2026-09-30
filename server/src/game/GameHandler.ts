@@ -30,6 +30,10 @@ export class GameHandler {
 
     // Create bound handlers for events
     this.operationErrorHandler = this.handleOperationError.bind(this);
+
+    // A failed operation reaches its players (a turn only after its one resend, GameQueueProcessor).
+    // This listener was lost in 2025-05 beside the removed storyInitialized one, so no failure reached anyone.
+    gameQueueProcessor.events.on("operationError", this.operationErrorHandler);
   }
 
   public registerSocket(socket: Socket): void {
@@ -90,6 +94,14 @@ export class GameHandler {
     console.error(`[GameHandler] Operation error: ${event.error}`);
     if (event.stack) {
       console.error(`[GameHandler] Stack trace: ${event.stack}`);
+    }
+
+    // A pregeneration runs in the background: when it fails, the turn is written once it is played, so no player is told
+    if (
+      event.operationType === "pregenerateStoryState" ||
+      event.operationType === "bulkPregenerateStoryStates"
+    ) {
+      return;
     }
 
     // Create a user-friendly error message without technical details

@@ -15,6 +15,8 @@ export interface QueueableOperation {
   startedAt?: Date;
   completedAt?: Date;
   error?: string;
+  /** How many times this operation has been sent, this one included (unset: the first); a resend after a failure counts up */
+  sends?: number;
 }
 
 // Define the operations and their handlers in one place

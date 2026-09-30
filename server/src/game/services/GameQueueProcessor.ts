@@ -49,8 +49,20 @@ export interface GameOperationExtended {
   input: unknown;
 }
 
+/**
+ * How many more times a turn (moveStoryForward) that fails is sent before the
+ * players are told it failed: once. Its own safeguards (the chat model's
+ * re-sends, the plan check's retry) have already run by then; before
+ * 2026-09-30 nothing ever sent it again, so the players were stuck at that
+ * turn for good (the playthroughs' group stories). Nothing else is resent.
+ */
+export const TURN_RESENDS = 1;
+
 export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
   private imageJobDeps: StoryImageJobDeps;
+
+  protected resendsFor = (operation: GameOperation) =>
+    operation.type === "moveStoryForward" ? TURN_RESENDS : 0;
 
   constructor() {
     super();
