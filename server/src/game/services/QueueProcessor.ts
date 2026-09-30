@@ -87,11 +87,11 @@ export abstract class BaseQueueProcessor<
   protected abstract processOperation(operation: TOperation): Promise<void>;
 
   /**
-   * How many more times an operation of this kind is sent after it fails,
+   * How many more times an operation that failed with this error is sent,
    * before the failure path reports it: none unless a subclass says so
    * (GameQueueProcessor sends a failed turn once more).
    */
-  protected resendsFor: (operation: TOperation) => number = () => 0;
+  protected resendsFor: (operation: TOperation, error: unknown) => number = () => 0;
 
   /**
    * A failed operation queued once more, at the back of its queue, while its
@@ -100,7 +100,7 @@ export abstract class BaseQueueProcessor<
    */
   private resendFailed(operation: TOperation, error: unknown): boolean {
     const sends = operation.sends ?? 1;
-    if (sends > this.resendsFor(operation)) return false;
+    if (sends > this.resendsFor(operation, error)) return false;
     const type = (operation as TOperation & { type?: string }).type || "unknown";
     // The error's class only: a message can quote a model's reply
     Logger.Queue.warn(

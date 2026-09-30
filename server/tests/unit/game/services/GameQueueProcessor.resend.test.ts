@@ -11,8 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 type Progression = (gameId: string, story: unknown) => Promise<unknown>;
 const handleProgression = jest.fn<Progression>();
 const processChoice = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-const storeStory = jest.fn(async () => undefined);
+const storeStory = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
 const broadcastStoryUpdate = jest.fn();
+const triggerPregeneration = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockModule = (jest as any).unstable_mockModule;
@@ -32,7 +33,7 @@ await mockModule("../../../../src/game/services/ChoiceProcessingService.js", () 
 }));
 await mockModule("../../../../src/game/services/PregenerationService.js", () => ({
   __esModule: true,
-  pregenerationService: { triggerPregeneration: jest.fn(), markPregenerationComplete: jest.fn(), isPregenerationInProgress: jest.fn() },
+  pregenerationService: { triggerPregeneration, markPregenerationComplete: jest.fn(), isPregenerationInProgress: jest.fn() },
 }));
 await mockModule("../../../../src/stories/StoryRepository.js", () => ({
   __esModule: true,
@@ -69,8 +70,11 @@ beforeEach(() => {
   jest.spyOn(console, "error").mockImplementation(() => undefined);
   handleProgression.mockReset();
   processChoice.mockReset();
-  storeStory.mockClear();
+  storeStory.mockReset();
+  storeStory.mockImplementation(async () => undefined);
   broadcastStoryUpdate.mockClear();
+  triggerPregeneration.mockReset();
+  triggerPregeneration.mockImplementation(async () => undefined);
   processor = new GameQueueProcessor();
   errors = [];
   processor.events.on("operationError", (event: OperationErrorEvent) => errors.push(event));
@@ -107,6 +111,28 @@ describe("GameQueueProcessor: a failed turn", () => {
     expect(storeStory).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({ gameId: "game-1", operationType: "moveStoryForward" });
+  });
+
+  it("never writes a turn again once storing it has begun: a failure storing or sending it is reported, not resent", async () => {
+    handleProgression.mockResolvedValue(progressed());
+    storeStory.mockRejectedValue(new Error("disk full"));
+    await processor.addOperation({ type: "moveStoryForward", gameId: "game-1", input: { story: story() } });
+    await drained();
+
+    expect(handleProgression).toHaveBeenCalledTimes(1);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ operationType: "moveStoryForward" });
+  });
+
+  it("neither fails nor resends a turn that was stored and sent when its pregeneration can't start", async () => {
+    handleProgression.mockResolvedValue({ ...progressed(), requiresPregeneration: true });
+    triggerPregeneration.mockRejectedValue(new Error("pregeneration failed"));
+    await processor.addOperation({ type: "moveStoryForward", gameId: "game-1", input: { story: story() } });
+    await drained();
+
+    expect(handleProgression).toHaveBeenCalledTimes(1);
+    expect(storeStory).toHaveBeenCalledTimes(1);
+    expect(errors).toEqual([]);
   });
 
   it("never sends a failed choice again", async () => {

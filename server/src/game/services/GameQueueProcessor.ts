@@ -50,19 +50,30 @@ export interface GameOperationExtended {
 }
 
 /**
- * How many more times a turn (moveStoryForward) that fails is sent before the
- * players are told it failed: once. Its own safeguards (the chat model's
- * re-sends, the plan check's retry) have already run by then; before
+ * How many more times a turn (moveStoryForward) whose writing fails is sent
+ * before the players are told it failed: once. Its own safeguards (the chat
+ * model's re-sends, the plan check's retry) have already run by then; before
  * 2026-09-30 nothing ever sent it again, so the players were stuck at that
  * turn for good (the playthroughs' group stories). Nothing else is resent.
  */
 export const TURN_RESENDS = 1;
 
+/** A written turn that could not be stored or sent: it may be stored already, so it is never written again. */
+class TurnDeliveryError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "TurnDeliveryError";
+    this.cause = cause;
+  }
+}
+
 export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
   private imageJobDeps: StoryImageJobDeps;
 
-  protected resendsFor = (operation: GameOperation) =>
-    operation.type === "moveStoryForward" ? TURN_RESENDS : 0;
+  protected resendsFor = (operation: GameOperation, error: unknown) =>
+    operation.type === "moveStoryForward" && !(error instanceof TurnDeliveryError) ? TURN_RESENDS : 0;
 
   constructor() {
     super();
@@ -137,20 +148,36 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
     const { gameId, input } = operation;
     const { story } = input;
 
+    console.log(
+      `[GameQueueProcessor] Moving story forward for game: ${gameId}`
+    );
+
+    // Writing the turn: a failure here fails the turn, which the queue sends once more (TURN_RESENDS)
+    let result: Awaited<ReturnType<typeof storyProgressionService.handleProgression>>;
     try {
-      console.log(
-        `[GameQueueProcessor] Moving story forward for game: ${gameId}`
+      result = await storyProgressionService.handleProgression(gameId, story);
+    } catch (error) {
+      Logger.Queue.error(
+        `[GameQueueProcessor] Failed to move story forward for game: ${gameId}:`,
+        error
       );
+      throw error;
+    }
 
-      // Use the new story progression service
-      const result = await storyProgressionService.handleProgression(
-        gameId,
-        story
-      );
-
-      // Store and broadcast the final story immediately (do not block on image generation)
+    // Store and broadcast the final story immediately (do not block on image generation).
+    // Once storing has begun the turn may be stored, so a failure is reported but never written again
+    try {
       await this.updateAndBroadcastStory(gameId, result.finalStory);
+    } catch (error) {
+      Logger.Queue.error(
+        `[GameQueueProcessor] Failed to store or send the next turn for game: ${gameId}:`,
+        error
+      );
+      throw new TurnDeliveryError(error);
+    }
 
+    // The turn is stored and sent: its images and pregeneration never fail it
+    try {
       // Unified image flow: collect from latest beats and spawn background generation
       if (result.finalStory.getState().generateImages) {
         await this.triggerImageGenerationFlow(gameId, result.finalStory);
@@ -162,10 +189,9 @@ export class GameQueueProcessor extends BaseQueueProcessor<GameOperation> {
       }
     } catch (error) {
       Logger.Queue.error(
-        `[GameQueueProcessor] Failed to move story forward for game: ${gameId}:`,
+        `[GameQueueProcessor] Images or pregeneration could not start after the turn for game: ${gameId}:`,
         error
       );
-      throw error;
     }
   }
 
