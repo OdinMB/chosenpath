@@ -215,6 +215,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The choice-result stage (2026-09-30): the turn with an exploration step's options in its results' order against
   // production's turn, which runs beside it; planner v2f against production's chapter planner (planner v2e), which it edits
   choiceResult: "adopted",
+  // Its one fix-and-retest against production's turn too, the run's line second
+  choiceResultB: "adopted",
   planV2f: "planV2e",
 };
 
@@ -235,6 +237,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   planV2e: "planV2d",
   endingStateB: "endingState",
   planV2f: "planV2e",
+  choiceResultB: "choiceResult",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -324,6 +327,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_MEDIUM, "turnO2")]: [armKey(LUNA_MEDIUM, "turnO"), armKey(LUNA_MEDIUM, "turnOb")],
   // O2's fix-and-retest against O2, the line it changes
   [armKey(LUNA_MEDIUM, "turnO2b")]: [armKey(LUNA_MEDIUM, "turnO2")],
+  // The choice-result turn's fix-and-retest against the run's line, the sentence it changes
+  [armKey(LUNA_MEDIUM, "choiceResultB")]: [armKey(LUNA_MEDIUM, "choiceResult")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -620,6 +625,9 @@ function choiceResultArms(role: EvalRole): ArmPlan[] {
     return [
       ...(["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single })),
       ...(["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: groups })),
+      // The one fix-and-retest (after the run: 3 of the variant's 20 single-player replies one short paragraph), twice on
+      // the single-player steps, where they fell
+      { arm: adoptedDefault("beat", "choiceResultB"), samples: 2, scope: "single-player" as const, caseIds: single },
     ];
   }
   if (role === "thread") {

@@ -209,6 +209,9 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * the step's result at its position, the same action in the same direction,
  * and the text carries out none of them), production's request byte for byte
  * elsewhere, with production's turn limits for the player count.
+ * "choiceResultB" is its one fix-and-retest after the run: the same line with
+ * its last sentence asking for the full text (three of its twenty
+ * single-player replies came back as one short paragraph).
  * "planV2f" is planner v2e with the step results' two rules (the same stage):
  * a challenge or contest result says how the attempt turns out, never which
  * approach the player takes or what they say or decide; an exploration result
@@ -272,6 +275,7 @@ export type VariantId =
   | "endingStateB"
   | "noSwitchReminder"
   | "choiceResult"
+  | "choiceResultB"
   | "planV2f";
 export const VARIANTS: VariantId[] = [
   "prod",
@@ -326,6 +330,7 @@ export const VARIANTS: VariantId[] = [
   "endingStateB",
   "noSwitchReminder",
   "choiceResult",
+  "choiceResultB",
   "planV2f",
 ];
 
@@ -707,6 +712,11 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   choiceResult: (input) => {
     if (input.role !== "beat") throw new Error(`Variant choiceResult does not cover role ${input.role}`);
     return { ...choiceResultRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  },
+  // Its one fix-and-retest: the same line asking for the full text (three one-paragraph replies in the run)
+  choiceResultB: (input) => {
+    if (input.role !== "beat") throw new Error(`Variant choiceResultB does not cover role ${input.role}`);
+    return { ...choiceResultRequest(input.story, { fullText: true }), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
   },
 };
 

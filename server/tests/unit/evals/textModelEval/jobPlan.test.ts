@@ -609,8 +609,9 @@ describe("planJobs: the round stages and the migration check", () => {
     const turns = planJobs(cases, { stage: "choice-result", promptState: "adopted5", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
     expect(turns.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
       [
-        ...[1, 2].flatMap((s) => ["adopted", "choiceResult"].map((v) => `${stored} s${s} gpt-6-luna@medium/${v}`)),
-        ...[1, 2].flatMap((s) => ["adopted", "choiceResult"].map((v) => `${single} s${s} gpt-6-luna@medium/${v}`)),
+        // With the one fix-and-retest (choiceResultB) on the single-player steps
+        ...[1, 2].flatMap((s) => ["adopted", "choiceResult", "choiceResultB"].map((v) => `${stored} s${s} gpt-6-luna@medium/${v}`)),
+        ...[1, 2].flatMap((s) => ["adopted", "choiceResult", "choiceResultB"].map((v) => `${single} s${s} gpt-6-luna@medium/${v}`)),
         ...[1, 2].flatMap((s) => ["adopted", "choiceResult"].map((v) => `${group} s${s} gpt-6-luna@low/${v}`)),
       ].sort()
     );

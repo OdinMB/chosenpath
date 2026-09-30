@@ -67,10 +67,10 @@ import { referenceKeyOf } from "./variantComparison.js";
 const STAGE: Stage = "choice-result";
 const CALIBRATION_SAMPLES = 2;
 
-const luna = (effort: "low" | "medium", variant: "adopted" | "choiceResult" | "planV2e" | "planV2f") => armKey({ model: "gpt-6-luna", reasoningEffort: effort }, variant);
+const luna = (effort: "low" | "medium", variant: "adopted" | "choiceResult" | "choiceResultB" | "planV2e" | "planV2f") => armKey({ model: "gpt-6-luna", reasoningEffort: effort }, variant);
 
-/** The stage's turn arms: production's turn and the variant, on the single-player and the group turn model. */
-export const CHOICE_TURN_ARMS = [luna("medium", "adopted"), luna("medium", "choiceResult"), luna("low", "adopted"), luna("low", "choiceResult")];
+/** The stage's turn arms: production's turn and the variant, on the single-player and the group turn model, and the variant's fix-and-retest. */
+export const CHOICE_TURN_ARMS = [luna("medium", "adopted"), luna("medium", "choiceResult"), luna("low", "adopted"), luna("low", "choiceResult"), luna("medium", "choiceResultB")];
 /** The stage's planner arms: production's chapter planner (planner v2e) and planner v2f. */
 export const CHOICE_PLAN_ARMS = [luna("low", "planV2e"), luna("low", "planV2f")];
 

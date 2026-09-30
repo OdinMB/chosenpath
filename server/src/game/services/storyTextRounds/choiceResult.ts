@@ -41,8 +41,22 @@ const OPTION_TYPES = "--- Use 'challenge' for options in Challenge threads and C
 const EXPLORATION_ORDER =
   "--- In an Exploration thread, a player's three options are the current step's three possible outcomes, in their order: option 1 is Resolution 1, option 2 is Resolution 2 and option 3 is Resolution 3, each the same action in the same direction, without its consequences, in the scene's own words. The game records the chosen option's resolution as what the player did, so an option that says something else sends the story where the player didn't choose. The beat text leads up to the three and carries out none of them.\n";
 
+/**
+ * The one fix-and-retest (choiceResultB, after the run of 2026-09-30): 3 of the
+ * variant's 20 single-player replies came back as one short paragraph, none of
+ * production's 20, each having narrated the last choice and stopped; the
+ * line's "leads up to the three" read as the text's whole job. The same line
+ * with its last sentence asking for the full text.
+ */
+const TEXT_SENTENCE = "The beat text leads up to the three and carries out none of them.\n";
+const FULL_TEXT_SENTENCE = "The beat text is written in full as always (5-6 paragraphs that set up the moment) and carries out none of the three: the player's option does.\n";
+const EXPLORATION_ORDER_FULL_TEXT = EXPLORATION_ORDER.replace(TEXT_SENTENCE, FULL_TEXT_SENTENCE);
+
 /** The passages the tests pin. */
-export const CHOICE_RESULT_TEXT = { optionTypes: OPTION_TYPES, explorationOrder: EXPLORATION_ORDER };
+export const CHOICE_RESULT_TEXT = { optionTypes: OPTION_TYPES, explorationOrder: EXPLORATION_ORDER, explorationOrderFullText: EXPLORATION_ORDER_FULL_TEXT };
+
+/** The form: the run's line (choiceResult), or its fix-and-retest asking for the full text (choiceResultB). */
+export type ChoiceResultForm = { fullText?: boolean };
 
 /** The chapter rules as the measured switch turn printed them last (the story's thread types and switch/thread instructions). */
 const chapterRulesTail = (story: Story) => `\n${StoryStatePromptService.createStoryStatePrompt(story, { switchAndThreadInstructions: true })}`;
@@ -78,9 +92,10 @@ export function takesExplorationOrder(story: Story): boolean {
 }
 
 /** Production's turn with the exploration line where a player's thread explores, production's request byte for byte elsewhere. */
-export function choiceResultRequest(story: Story): TextRequest {
+export function choiceResultRequest(story: Story, form: ChoiceResultForm = {}): TextRequest {
   const base = productionTurnToday(story);
   if (!takesExplorationOrder(story)) return base;
   const { instructions, state } = splitAtState(LABEL, base.prompt);
-  return { ...base, prompt: replaceOnce(LABEL, instructions, OPTION_TYPES, `${OPTION_TYPES}${EXPLORATION_ORDER}`) + state };
+  const line = form.fullText ? EXPLORATION_ORDER_FULL_TEXT : EXPLORATION_ORDER;
+  return { ...base, prompt: replaceOnce(LABEL, instructions, OPTION_TYPES, `${OPTION_TYPES}${line}`) + state };
 }

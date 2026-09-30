@@ -627,7 +627,13 @@ describe("budget caps", () => {
       [one[1], 1, 2, "single-player", single],
       [group[0], 1, 2, "multiplayer", CHOICE_RESULT_BUILT_CASES.groups],
       [group[1], 1, 2, "multiplayer", CHOICE_RESULT_BUILT_CASES.groups],
+      // The one fix-and-retest (after the run: three one-paragraph replies of twenty), twice on the single-player steps
+      ["gpt-6-luna@medium/choiceResultB", 1, 2, "single-player", single],
     ]);
+    expect(referenceKey("gpt-6-luna@medium/choiceResultB")).toBe(one[0]);
+    expect(secondReferenceKeys("gpt-6-luna@medium/choiceResultB")).toEqual([one[1]]);
+    expect(estimateBaseKey("gpt-6-luna@medium/choiceResultB")).toBe(one[1]);
+    expect(STAGE_CAP_REASONS["choice-result"]).toMatch(/choiceResultB/);
     // The stored exploration steps: the café's chapter opening and its second step (round-built), the only two
     expect(CHOICE_RESULT_STORED_CASES).toEqual(["cont-checkpoi-t1-o2", "round-beat-exploration-checkpoi-t2"]);
     // Planner v2e (production's chapter planner) and v2f twice on the built chapter plans; v2f once on every other

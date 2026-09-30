@@ -8,7 +8,7 @@ import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { CHOICE_RESULT_TEXT, choiceResultRequest, productionTurnToday, takesExplorationOrder } from "../../../../../src/game/services/storyTextRounds/choiceResult.js";
 import { evalFiles } from "../../../../../src/evals/textModelEval/evalFiles.js";
 import { caseStory } from "../../../../../src/evals/textModelEval/cases.js";
-import { callLimitsOf, requestFor } from "../../../../../src/evals/textModelEval/variants.js";
+import { callLimitsOf, requestFor, requestText } from "../../../../../src/evals/textModelEval/variants.js";
 import { productionCallLimits } from "../../../../../src/shared/llm/chatModel.js";
 import { endingBeat, firstSwitchBeat, laterSwitchBeat, slotsOf, threadBeat } from "../../../../helpers/promptStories.js";
 import { createMockMultiplayerStory, createMockStory } from "../../../../helpers/testHelpers.js";
@@ -135,6 +135,27 @@ describe("choiceResultRequest: an exploration step's options are its results, in
     expect(callLimitsOf(single)).toEqual(productionCallLimits("beat", 1));
     expect(callLimitsOf(requestFor("choiceResult", { role: "beat", story: chapterStep(2, ["exploration"], 0) }))).toEqual(productionCallLimits("beat", 2));
     expect(() => requestFor("choiceResult", { role: "thread", story: chapterStep(1, ["exploration"], 0) })).toThrow(/does not cover role thread/);
+  });
+
+  it("has its one fix-and-retest (choiceResultB): the same line with its last sentence asking for the full text, in the same place, nothing else changed", () => {
+    // The run of 2026-09-30: 3 of the variant's 20 single-player replies came back as one short paragraph (none of
+    // production's), each having narrated the last choice and stopped
+    const { explorationOrder, explorationOrderFullText } = CHOICE_RESULT_TEXT;
+    expect(explorationOrder.endsWith("The beat text leads up to the three and carries out none of them.\n")).toBe(true);
+    expect(explorationOrderFullText.endsWith("The beat text is written in full as always (5-6 paragraphs that set up the moment) and carries out none of the three: the player's option does.\n")).toBe(true);
+    const cut = (line: string) => line.slice(0, line.indexOf("The beat text"));
+    expect(cut(explorationOrderFullText)).toBe(cut(explorationOrder));
+    for (const [, make] of EXPLORATION_STEPS) {
+      const story = make();
+      const [fixed, first] = [choiceResultRequest(story, { fullText: true }), choiceResultRequest(story)];
+      expect(fixed.prompt).toBe(first.prompt.replace(explorationOrder, explorationOrderFullText));
+      expect(json(fixed.schema)).toBe(json(first.schema));
+    }
+    for (const [, make] of OTHER_TURNS) expect(choiceResultRequest(make(), { fullText: true }).prompt).toBe(beatStep.request(make()).prompt);
+    const single = requestFor("choiceResultB", { role: "beat", story: chapterStep(1, ["exploration"], 0) });
+    expect(requestText(single)).toBe(choiceResultRequest(chapterStep(1, ["exploration"], 0), { fullText: true }).prompt);
+    expect(callLimitsOf(single)).toEqual(productionCallLimits("beat", 1));
+    expect(() => requestFor("choiceResultB", { role: "switch", story: chapterStep(1, ["exploration"], 0) })).toThrow(/does not cover role switch/);
   });
 
   (frozen.length ? it : it.skip)("changes only the exploration steps among the frozen turn cases", () => {

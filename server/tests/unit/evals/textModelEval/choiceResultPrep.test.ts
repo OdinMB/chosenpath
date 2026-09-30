@@ -136,7 +136,14 @@ describe("the stage's own replies and plans to judge", () => {
   });
 
   it("names the stage's arms: production's turn and the variant per player count, planner v2e and v2f", () => {
-    expect(CHOICE_TURN_ARMS).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/choiceResult", "gpt-6-luna@low/adopted", "gpt-6-luna@low/choiceResult"]);
+    expect(CHOICE_TURN_ARMS).toEqual([
+      "gpt-6-luna@medium/adopted",
+      "gpt-6-luna@medium/choiceResult",
+      "gpt-6-luna@low/adopted",
+      "gpt-6-luna@low/choiceResult",
+      // The one fix-and-retest
+      "gpt-6-luna@medium/choiceResultB",
+    ]);
     expect(CHOICE_PLAN_ARMS).toEqual(["gpt-6-luna@low/planV2e", "gpt-6-luna@low/planV2f"]);
   });
 });
