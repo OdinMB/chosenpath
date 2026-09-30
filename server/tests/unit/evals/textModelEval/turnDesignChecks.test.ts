@@ -673,6 +673,24 @@ describe("checkBeatDesign", () => {
       expect(checkBeatDesign(firstSwitchBeat(1), beatSet(1), beatSet(1)).counts).toMatchObject({ secondSacrificeSets: 0, unreasonedSecondSacrifices: 0 });
     });
 
+    it("reads arm O's chapter lever line apart from today's rate: a second sacrifice it allows for a strong reason, no lever it gives none of", () => {
+      const sacrifice = withChallenge([{ resourceType: "sacrifice", basePoints: 30, text: "Burn your last favor with Gruk (-10% Trust) before the patrol reaches the door" }, {}, {}]);
+      const reward = withChallenge([{}, {}, { resourceType: "reward", basePoints: -30 }]);
+      const plain = withChallenge([{}, {}, {}]);
+      // A sacrifice last step: today's rate gives none, the chapter's line a second sacrifice for a strong reason and no reward
+      const afterSacrifice = chapterWith([opening(), past(["sacrifice"])]);
+      expect(checkBeatDesign(afterSacrifice, sacrifice, sacrifice).checks).toMatchObject({ leverFollowsChapterLine: true, leverFollowsRateLine: false });
+      expect(checkBeatDesign(afterSacrifice, reward, reward).checks).toMatchObject({ leverFollowsChapterLine: false, leverFollowsRateLine: false });
+      expect(checkBeatDesign(afterSacrifice, plain, plain).checks).toMatchObject({ leverFollowsChapterLine: true, leverFollowsRateLine: true });
+      // A reward last step: the chapter offered no sacrifice, so none either way
+      const afterReward = chapterWith([opening(), past(["reward"])]);
+      expect(checkBeatDesign(afterReward, sacrifice, sacrifice).checks.leverFollowsChapterLine).toBe(false);
+      expect(checkBeatDesign(afterReward, plain, plain).checks.leverFollowsChapterLine).toBe(true);
+      // No lever yet and today's rate fits: the line forbids nothing, so nothing is reported
+      expect(checkBeatDesign(chapterWith([opening(), past()]), reward, reward).checks).not.toHaveProperty("leverFollowsChapterLine");
+      expect(checkBeatDesign(firstSwitchBeat(1), reward, reward).checks).not.toHaveProperty("leverFollowsChapterLine");
+    });
+
     describe("sentences and openings reused from the previous beat", () => {
       const previous = "You step onto the café terrace, collar up against the rain. Rain drums on the striped awning above the tables.\n\nMaya slides the demand sheet across the table toward you and waits. 'Read it,' she says.";
       const after = (text: string) => edited(threadBeat(1), (state) => {

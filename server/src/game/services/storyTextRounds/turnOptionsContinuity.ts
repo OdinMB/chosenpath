@@ -20,11 +20,10 @@ import { sacrificeRewardLine, todaysFormWithB6Request } from "./turnRound2.js";
  *   take their main stat bonus from the same stat, at most one has none) and
  *   risk alone tells none apart, one line inside B6's three ways with a weak
  *   example; and the game's lever line counted per chapter (thread) from its
- *   history, on top of today's rate and never looser: at most one reward a
- *   chapter, the first sacrifice as today's rate allows, and from the second
- *   on (where the rate allows one) the line says one was offered and whether
- *   it was taken, so another comes only for a strong reason the option's text
- *   makes clear.
+ *   history: a reward as today's rate allows and at most one a chapter, the
+ *   first sacrifice as today's rate allows, and from the second on, whatever
+ *   the rate, the line says one was offered and whether it was taken, so
+ *   another comes only for a strong reason the option's text makes clear.
  * - Arm C (continuity), on every turn after the first: a chapter's first step
  *   gets the switch's full text (the one turn whose previous beat the state
  *   shows only as a summary), and one instruction replaces the narrow "continue
@@ -107,16 +106,19 @@ export type ChapterLeverRule = { reward: boolean; sacrifice: "fits" | "none" | "
 const NONE_THIS_TURN = "Sacrifice or reward: none this turn.";
 
 /**
- * Today's rate (B6) with the chapter's own counts on top, never looser: where
- * today's line gives none, none; where one fits, no second reward in a
- * chapter, and a sacrifice after the chapter's first only for a strong reason.
- * (A second sacrifice under a looser gate than a first would contradict the
- * rate the first one meets.)
+ * The coordinator's per-chapter rule (the owner's "at most one reward" and
+ * "several sacrifices … a strong justification starting at the second one"):
+ * a reward as today's rate (B6) allows and never a second in a chapter; the
+ * chapter's first sacrifice as today's rate allows; from its second on, the
+ * chapter's count and not the rate: one only for a strong reason. Gating the
+ * second on the rate too (the build's first form) left it unreachable in a
+ * two- or three-step chapter, where the rate already refuses a lever two
+ * challenge turns after any.
  */
 export function chapterLeverRule(story: Story, slot: string): ChapterLeverRule {
-  if (sacrificeRewardLine(story, slot) === NONE_THIS_TURN) return { reward: false, sacrifice: "none" };
+  const rateFits = sacrificeRewardLine(story, slot) !== NONE_THIS_TURN;
   const { rewards, sacrifices } = chapterLevers(story, slot);
-  return { reward: rewards === 0, sacrifice: sacrifices > 0 ? "strongReason" : "fits" };
+  return { reward: rateFits && rewards === 0, sacrifice: sacrifices > 0 ? "strongReason" : rateFits ? "fits" : "none" };
 }
 
 const WORDS = ["no", "one", "two", "three", "four", "five"];
@@ -128,14 +130,16 @@ function sacrificesSoFar({ sacrifices, sacrificesTaken }: ChapterLevers): string
   return `${inWords(sacrifices)} sacrifices, and the player took ${took}`;
 }
 
-const STRONG_REASON = "so offer another only if the scene gives a strong reason to pay again, and make that reason clear in the option's text";
+// "for it", not "to pay again": the player may not have taken the one offered
+const STRONG_REASON = "so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text";
 
 /**
  * Arm O's lever line: today's line (B6's rate, from the player's last two
- * rolled turns) where it gives none or the chapter has offered no lever; else
- * the chapter's own counts in words: no reward once the chapter offered one,
- * and from the second sacrifice on, what was offered and taken, and another
- * only for a strong reason in the scene. It never asks for a lever.
+ * rolled turns) where the chapter has offered no lever, or offered only a
+ * reward and today's line gives none; else the chapter's own counts in words:
+ * from the second sacrifice on, what was offered and taken, and another only
+ * for a strong reason in the scene; no reward once the chapter offered one,
+ * or where today's line gives none. It never asks for a lever.
  */
 export function chapterLeverLine(story: Story, slot: string): string {
   const today = sacrificeRewardLine(story, slot);
@@ -143,7 +147,7 @@ export function chapterLeverLine(story: Story, slot: string): string {
   const rule = chapterLeverRule(story, slot);
   if (rule.sacrifice === "none" || (levers.rewards === 0 && levers.sacrifices === 0)) return today;
   const sacrifice = rule.sacrifice === "strongReason" ? `this thread already offered ${sacrificesSoFar(levers)}, ${STRONG_REASON}.` : "a sacrifice fits this turn if a stat allows it.";
-  const reward = rule.reward ? "A reward fits this turn if a stat allows it." : "No reward: this thread already offered one.";
+  const reward = rule.reward ? "A reward fits this turn if a stat allows it." : levers.rewards > 0 ? "No reward: this thread already offered one." : "No reward this turn.";
   return `Sacrifice or reward: ${sacrifice} ${reward}`;
 }
 

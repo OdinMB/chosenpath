@@ -7,7 +7,7 @@ import { expectedOptionType } from "../../game/services/beatRepairs.js";
 import { outcomeIdsNamed, resultKind } from "../../game/services/planChecks.js";
 import { allowedLengths, chaptersThatFit, outcomeNeeds, stageOf, turnsLeft } from "../../game/services/storyTextRounds/pacing.js";
 import { sacrificeRewardLine } from "../../game/services/storyTextRounds/turnRound2.js";
-import { chapterLevers } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
+import { chapterLeverRule, chapterLevers } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
 import { canAddMilestones } from "../../game/services/storyTextSteps.js";
 import { playerParagraphs } from "./playerText.js";
 import type { CheckResult } from "./textChecks.js";
@@ -669,8 +669,10 @@ export function reusedFromPrevious(previousText: string, text: string): { pairs:
  * on a rolled chapter step, the chapter's rewards and sacrifices with this
  * turn's (read from the history, turnOptionsContinuity.ts), no second reward,
  * and a second-or-later sacrifice and one whose text states no reason (a
- * heuristic, for the hand read); the rate part of arm O's lever line reads as
- * leverFollowsRateLine. On every turn after the first, the sentences and the
+ * heuristic, for the hand read); arm O's lever line (chapterLeverRule) reads
+ * as leverFollowsChapterLine, no lever it gives none of, and today's rate as
+ * leverFollowsRateLine, which a second sacrifice arm O allows for a strong
+ * reason fails by design. On every turn after the first, the sentences and the
  * opening told again from the player's previous beat. Counts that pool into
  * shares are reported on every reply.
  */
@@ -702,6 +704,11 @@ function feedbackChecks(story: Story, reply: SetOfBeatGenerationSchema): CheckRe
       add("chapterRewards", levers.rewards + rewards);
       add("chapterSacrifices", levers.sacrifices + sacrifices.length);
       and("atMostOneRewardPerChapter", rewards <= 1 && !(rewards > 0 && levers.rewards > 0));
+      // Arm O's line, where it forbids a lever: a second sacrifice it allows for a strong reason (read apart below), which today's rate may not
+      const rule = chapterLeverRule(story, slot);
+      if (rule.sacrifice === "none" || !rule.reward) {
+        and("leverFollowsChapterLine", (rule.sacrifice !== "none" || sacrifices.length === 0) && (rule.reward || rewards === 0));
+      }
       if (levers.sacrifices > 0 && sacrifices.length > 0) {
         add("secondSacrificeSets", 1);
         add("unreasonedSecondSacrifices", sacrifices.filter((o) => !STATED_REASON.test(asString(o.text))).length);

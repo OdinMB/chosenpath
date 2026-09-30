@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { Story } from "core/models/Story.js";
-import type { Beat, BeatOption, ThreadAnalysis } from "core/types/index.js";
+import { getThreadType, type Beat, type BeatOption, type ThreadAnalysis } from "core/types/index.js";
 import { beatStep } from "../../../../../src/game/services/storyTextSteps.js";
 import { sacrificeRewardLine } from "../../../../../src/game/services/storyTextRounds/turnRound2.js";
 import {
@@ -81,10 +81,10 @@ function challengeBeat(levers: BeatOption["resourceType"][] = [], choice = 0): B
 }
 const switchBeat = (): Beat => ({ ...beatGeneration(), choice: 0, resolution: null });
 
-/** A three-step challenge chapter from history index `first`, as far as the history goes, with this history. */
-function withHistory(history: Beat[], first = 1, earlier: ThreadAnalysis[] = []): Story {
+/** A challenge chapter of `duration` steps from history index `first`, as far as the history goes, with this history. */
+function withHistory(history: Beat[], first = 1, earlier: ThreadAnalysis[] = [], duration = 4): Story {
   const done = history.length - first;
-  const analysis = threadAnalysis("challenge", 4, first);
+  const analysis = threadAnalysis("challenge", duration, first);
   const chapter: ThreadAnalysis = {
     ...analysis,
     threads: analysis.threads.map((t) => ({ ...t, outcomeId: GUILD, progression: t.progression.map((step, i) => ({ ...step, resolution: i < done ? ("favorable" as const) : null })) })),
@@ -175,6 +175,49 @@ describe("arm O: options that lean on different strengths, and the lever line co
     expect(optionsContinuityRequest(story, O).prompt).toBe(productionTurnForm(story).prompt);
     expect(json(optionsContinuityRequest(story, O).schema)).toBe(json(productionTurnForm(story).schema));
   });
+
+  it("where the chapter offered a sacrifice, arms O and OC send the chapter's lever line in place of today's, and production keeps today's", () => {
+    // A three-step chapter's second step, after a sacrifice at its first: the two lines differ
+    const story = withHistory([switchBeat(), challengeBeat(["sacrifice"])], 1, [], 3);
+    const [line, today] = [chapterLeverLine(story, "player1"), sacrificeRewardLine(story, "player1")];
+    expect(line).not.toBe(today);
+    const base = productionTurnForm(story).prompt;
+    expect(base).toContain(`--- ${today}\n`);
+    for (const arm of [O, OC]) {
+      const { prompt } = optionsContinuityRequest(story, arm);
+      expect(prompt).toContain(`--- ${line}\n`);
+      expect(prompt).not.toContain(`--- ${today}\n`);
+      expect(occurrences(prompt, "Sacrifice or reward: ")).toBe(1);
+    }
+    // Nothing else changes in arm O: the base with its three edits undone
+    const undone = optionsContinuityRequest(story, O)
+      .prompt.replace(`${OPTIONS_CONTINUITY_TEXT.drawsOnStats}\n`, "")
+      .replace(`${OPTIONS_CONTINUITY_TEXT.riskOnlyWeak}\n`, "")
+      .replace(`--- ${line}\n`, `--- ${today}\n`);
+    expect(undone).toBe(base);
+    // Arm C alone leaves the line as production sends it
+    expect(optionsContinuityRequest(story, C).prompt).toContain(`--- ${today}\n`);
+  });
+
+  (frozen.length ? it : it.skip)("every frozen rolled chapter step: arm O's request carries the chapter's lever line, on more steps than the played exploration-typed ones", () => {
+    const rolled = frozen
+      .filter((c) => c.role === "beat" && !c.tags.multiplayer)
+      .map((c) => ({ id: c.id, story: caseStory(c) }))
+      .filter(({ story }) => story.getCurrentBeatType() === "thread" && story.getCurrentBeat("player1") !== undefined)
+      .filter(({ story }) => {
+        const thread = story.getCurrentThreadAnalysis()?.threads.find((t) => t.playersSideA.includes("player1"));
+        return thread !== undefined && getThreadType(thread) !== "exploration";
+      });
+    expect(rolled.length).toBeGreaterThan(30);
+    const differing = rolled.filter(({ story }) => chapterLeverLine(story, "player1") !== sacrificeRewardLine(story, "player1"));
+    for (const { id, story } of rolled) {
+      const { prompt } = optionsContinuityRequest(story, O);
+      expect({ id, carries: prompt.includes(`--- ${chapterLeverLine(story, "player1")}\n`) }).toEqual({ id, carries: true });
+      expect({ id, lines: occurrences(prompt, "Sacrifice or reward: ") }).toEqual({ id, lines: 1 });
+    }
+    // Not only the gpt-4.1-mini cases whose chapter step typed its options as exploration (cont-7492b211-t2)
+    expect(differing.filter(({ id }) => !id.startsWith("cont-7492b211-t2")).length).toBeGreaterThan(0);
+  });
 });
 
 describe("chapterLevers: the sacrifices and rewards this chapter's options offered so far", () => {
@@ -210,29 +253,57 @@ describe("chapterLeverLine: today's rate line, counted per chapter", () => {
     expect(chapterLeverRule(story, "player1")).toEqual({ reward: false, sacrifice: "fits" });
   });
 
-  it("is never looser than today's line: where it gives none, none, whatever the chapter offered", () => {
-    for (const history of [
-      [switchBeat(), challengeBeat(["reward"])],
-      [switchBeat(), challengeBeat(["sacrifice"])],
-      [switchBeat(), challengeBeat(["sacrifice"], 1), challengeBeat()],
+  it("a first sacrifice and every reward as today's line allows: where it gives none and the chapter offered no sacrifice, none", () => {
+    const earlier = endedChapter(ENCLAVE, 2, 1, "The enclave listens");
+    for (const story of [
+      withHistory([switchBeat(), challengeBeat(["reward"])]),
+      withHistory([switchBeat(), challengeBeat(["reward"])], 1, [], 3),
+      // The chapter before offered the lever: this chapter offered none
+      withHistory([switchBeat(), challengeBeat(), challengeBeat(["sacrifice"]), switchBeat()], 4, [earlier]),
     ]) {
-      const story = withHistory(history);
       expect(sacrificeRewardLine(story, "player1")).toBe("Sacrifice or reward: none this turn.");
       expect(chapterLeverLine(story, "player1")).toBe("Sacrifice or reward: none this turn.");
       expect(chapterLeverRule(story, "player1")).toEqual({ reward: false, sacrifice: "none" });
     }
   });
 
-  it("from the second sacrifice on, where today's line fits: says one was offered and whether it was taken, and asks for a strong reason in the option's text", () => {
+  it("from the second sacrifice on, the chapter's count and not today's rate: in a three-step chapter, one only for a strong reason in the option's text, and no reward where today's line gives none", () => {
+    // The owner: "Several sacrifices can sometimes make sense, but should have a strong justification starting at the second one"
+    const taken = withHistory([switchBeat(), challengeBeat(["sacrifice"])], 1, [], 3);
+    expect(sacrificeRewardLine(taken, "player1")).toBe("Sacrifice or reward: none this turn.");
+    expect(chapterLeverRule(taken, "player1")).toEqual({ reward: false, sacrifice: "strongReason" });
+    expect(chapterLeverLine(taken, "player1")).toBe(
+      "Sacrifice or reward: this thread already offered a sacrifice, which the player took, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn."
+    );
+    // Declined at step 1, nothing at step 2: the last step
+    const declined = withHistory([switchBeat(), challengeBeat(["sacrifice"], 1), challengeBeat()], 1, [], 3);
+    expect(sacrificeRewardLine(declined, "player1")).toBe("Sacrifice or reward: none this turn.");
+    expect(chapterLeverLine(declined, "player1")).toBe(
+      "Sacrifice or reward: this thread already offered a sacrifice, which the player didn't take, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn."
+    );
+    // Two offered, neither taken
+    const twice = withHistory([switchBeat(), challengeBeat(["sacrifice"], 1), challengeBeat(["normal", "sacrifice"], 0)], 1, [], 3);
+    expect(chapterLeverLine(twice, "player1")).toBe(
+      "Sacrifice or reward: this thread already offered two sacrifices, and the player took none of them, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. No reward this turn."
+    );
+    // A reward and a sacrifice offered: no second reward either way
+    const both = withHistory([switchBeat(), challengeBeat(["reward"]), challengeBeat(["sacrifice"], 1)]);
+    expect(chapterLeverRule(both, "player1")).toEqual({ reward: false, sacrifice: "strongReason" });
+    expect(chapterLeverLine(both, "player1")).toMatch(/strong reason for it, and make that reason clear in the option's text\. No reward: this thread already offered one\.$/);
+    // The line never says "pay again", which a declined sacrifice would contradict
+    for (const story of [taken, declined, twice, both]) expect(chapterLeverLine(story, "player1")).not.toMatch(/again/);
+  });
+
+  it("from the second sacrifice on, where today's line fits too: says one was offered and whether it was taken, and a reward fits", () => {
     // A four-step chapter: a sacrifice at step 1, none at steps 2 and 3, so today's line fits again at step 4
     const taken = withHistory([switchBeat(), challengeBeat(["sacrifice"]), challengeBeat(), challengeBeat()]);
     expect(sacrificeRewardLine(taken, "player1")).toMatch(/one fits this turn/);
     expect(chapterLeverLine(taken, "player1")).toBe(
-      "Sacrifice or reward: this thread already offered a sacrifice, which the player took, so offer another only if the scene gives a strong reason to pay again, and make that reason clear in the option's text. A reward fits this turn if a stat allows it."
+      "Sacrifice or reward: this thread already offered a sacrifice, which the player took, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. A reward fits this turn if a stat allows it."
     );
     expect(chapterLeverRule(taken, "player1")).toEqual({ reward: true, sacrifice: "strongReason" });
     const declined = withHistory([switchBeat(), challengeBeat(["sacrifice"], 1), challengeBeat(), challengeBeat()]);
-    expect(chapterLeverLine(declined, "player1")).toContain("this thread already offered a sacrifice, which the player didn't take, so offer another only if");
+    expect(chapterLeverLine(declined, "player1")).toContain("this thread already offered a sacrifice, which the player didn't take, so offer another sacrifice only if");
   });
 
   it("counts every sacrifice the chapter offered, one on options the rate doesn't read included, in words", () => {
@@ -247,7 +318,7 @@ describe("chapterLeverLine: today's rate line, counted per chapter", () => {
     expect(sacrificeRewardLine(story, "player1")).toMatch(/one fits this turn/);
     expect(chapterLevers(story, "player1")).toEqual({ rewards: 0, sacrifices: 2, sacrificesTaken: 1 });
     expect(chapterLeverLine(story, "player1")).toBe(
-      "Sacrifice or reward: this thread already offered two sacrifices, and the player took one of them, so offer another only if the scene gives a strong reason to pay again, and make that reason clear in the option's text. A reward fits this turn if a stat allows it."
+      "Sacrifice or reward: this thread already offered two sacrifices, and the player took one of them, so offer another sacrifice only if the scene gives a strong reason for it, and make that reason clear in the option's text. A reward fits this turn if a stat allows it."
     );
   });
 });
