@@ -4,6 +4,7 @@ import path from "node:path";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
 import { GameModes } from "core/types/index.js";
+import { checkThreadPlan } from "../../../../src/game/services/planChecks.js";
 import { switchStep, threadStep } from "../../../../src/game/services/storyTextSteps.js";
 import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/game/services/storyTextRounds/turnRound1Planners.js";
 import { evalFiles } from "../../../../src/evals/textModelEval/evalFiles.js";
@@ -19,15 +20,18 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
 
 /*
  * Production's planners are planner v2 with two-sided contests as the eval
- * measured it (variant planV2b) for the switch, and planner v2c for the
- * chapter (planV2b with the nearer chapter question and the planner's own
- * kind of milestone, the owner's feedback of 2026-09-28, with a topic
- * switch's chosen direction narrowed to the chapter's own situation as a
- * flavor switch's question is, and the adopted "without a number" in the
- * chapter title's field): the same prompt and JSON
- * schema, byte for byte, on every story the tests build and on every frozen
- * planning case; and a reply is assembled into today's stored plan the way
- * the eval assembles it.
+ * measured it (variant planV2b) for the switch, and, since 2026-09-30,
+ * planner v2e for the chapter: planner v2c (planV2b with the nearer chapter
+ * question and the planner's own kind of milestone, the owner's feedback of
+ * 2026-09-28, with a topic switch's chosen direction narrowed to the
+ * chapter's own situation as a flavor switch's question is, and the adopted
+ * "without a number" in the chapter title's field) with the outcome's stages
+ * (planner v2d, the owner's feedback of 2026-09-29; the story's last chapter
+ * settles only its outcome's next stage, the owner's decision of 2026-09-30)
+ * and the last step listed once (the doubled-step fix). The same prompt and
+ * JSON schema, byte for byte, on every story the tests build and on every
+ * frozen planning case; and a reply is assembled into today's stored plan
+ * the way the eval assembles it.
  */
 
 jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -112,12 +116,15 @@ function expectSwitchLikeMeasured(story: Story) {
   expect(json(production.schema)).toBe(json(measured.schema));
 }
 
-/** planV2c: planV2b with the nearer chapter question, the planner's own kind of milestone, and the adopted title ("without a number"). */
-const planV2c = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true });
+/**
+ * planV2e: planV2b with the nearer chapter question, the planner's own kind of milestone and the adopted title
+ * ("without a number") (planV2c), the outcome's stages (planV2d) and the last step listed once.
+ */
+const planV2e = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, stepsOnce: true });
 
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
-  const measured = planV2c(story);
+  const measured = planV2e(story);
   expect(production.prompt).toBe(measured.prompt);
   expect(json(production.schema)).toBe(json(measured.schema));
 }
@@ -132,8 +139,67 @@ describe("the switch planner: planner v2 as measured", () => {
   });
 });
 
-describe("the chapter planner: planner v2c (two-sided contests, the nearer chapter question)", () => {
+describe("the chapter planner: planner v2e (two-sided contests, the nearer chapter question, the outcome's stages, each step once)", () => {
   it.each(THREAD_STORIES)("%s", (_, build) => expectThreadLikeMeasured(build()));
+
+  it("is no longer planner v2c: the stage item, PACING's stage and the steps line are what changed (2026-09-30)", () => {
+    const story = singlePlayerAfterChapters(25, 8);
+    const production = threadStep.request(story).prompt;
+    const v2c = plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true }).prompt;
+    expect(production).not.toBe(v2c);
+    expect(production).toContain("3. The outcome's stages, and the one this thread settles.");
+    expect(production).toContain("   - Each step comes once: a thread of n beats has n different steps, and the last one never repeats the step before it.");
+    expect(production).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 2 milestones; 2 still needed; this thread settles stage 1 of 2.`);
+    expect(json(threadStep.request(story).schema)).toContain('"outcomeStages"');
+  });
+
+  it("plans a saved story mid-story: the stage comes from the milestones so far, older chapters without stages read as they are", () => {
+    // Turn 9 of 25, the guild outcome at 1 of 3 from a chapter planned before stages existed (no outcomeStages on it)
+    const story = singlePlayerAfterChapters(25, 8);
+    const before = story.getState().storyPhases.flatMap((p) => ("threads" in p ? p.threads : []));
+    expect(before.every((t) => !("outcomeStages" in t))).toBe(true);
+    const picked = roundStory({
+      turns: 8,
+      maxTurns: 25,
+      playerOutcomes: {
+        player1: [outcome(GUILD, { intendedNumberOfMilestones: 3, milestones: ["The Guild listens"] }), outcome(ENCLAVE, { intendedNumberOfMilestones: 2 }), outcome(MIA, { intendedNumberOfMilestones: 1 })],
+      },
+      phases: [
+        topicSwitch([["Rally the enclave", GUILD], ["Visit Gruk", ENCLAVE], ["Walk with Mia", MIA]], 0),
+        endedChapter(GUILD, 3, 1, "Sir Bram suspends the bounty"),
+        topicSwitch([["Press the Guild", GUILD], ["Visit Gruk", ENCLAVE], ["Walk with Mia", MIA]], 7),
+      ],
+      lastChoice: 0,
+    });
+    const request = threadStep.request(picked);
+    expect(request.prompt).toContain(`The outcome this thread pushes: ${GUILD}: 1 of 3 milestones; 2 still needed; this thread settles stage 2 of 3.`);
+    const reply = {
+      thread: {
+        kind: "challenge",
+        typeOfThread: "Negotiation",
+        title: "The Guild Hall",
+        outcomeStages: ["win a hearing", "get Sir Bram's signature", "reform the Guild"],
+        question: "Will Sir Bram sign the petition before the Guild's vote?",
+        typeOfMilestone: "whether Sir Bram's signature carries the Guild",
+        possibleMilestones: { favorable: "Bram signs", mixed: "Bram stalls", unfavorable: "Bram refuses" },
+        steps: [
+          { title: "Knock", question: "Approach: How does Rikkit ask?", possibleResolutions: { favorable: "a", mixed: "b", unfavorable: "c" } },
+          { title: "Push", question: "Leverage: How does Rikkit press?", possibleResolutions: { favorable: "a", mixed: "b", unfavorable: "c" } },
+        ],
+        finalStep: { title: "The vote", question: "How does Rikkit settle it?" },
+        plan: "Rikkit stays in the hall.",
+      },
+    };
+    const plan = request.assemble(reply);
+    expect(plan).toEqual(planV2e(picked).assemble(reply));
+    expect(plan.threads[0]).toMatchObject({ outcomeId: GUILD, outcomeStages: reply.thread.outcomeStages });
+    const checked = checkThreadPlan(picked, plan, { lengths: true });
+    expect(checked.problem).toBeUndefined();
+    expect(checked.lengthProblem).toBeUndefined();
+    // The story takes the plan, and the next planner call reads the story as before
+    const next = threadStep.apply(picked, checkThreadPlan(picked, plan).plan);
+    expect(() => switchStep.request(next)).not.toThrow();
+  });
 
   (frozen.length ? it : it.skip)("every frozen chapter case", () => {
     const cases = frozen.filter((c) => c.role === "thread");
@@ -186,7 +252,7 @@ describe("a reply, assembled into today's stored plan as the eval assembled it",
       },
     };
     const assembled = threadStep.request(story).assemble(reply);
-    expect(assembled).toEqual(planV2c(story).assemble(reply));
+    expect(assembled).toEqual(planV2e(story).assemble(reply));
     const [stored] = (assembled as unknown as { threads: { outcomeId: string; typeOfMilestone: string; question: string }[] }).threads;
     expect(stored).toMatchObject({ outcomeId: ENCLAVE, typeOfMilestone: "whether Gruk lets the enclave's envoys in", question: "Will Gruk open the gate?" });
   });
@@ -212,6 +278,6 @@ describe("a reply, assembled into today's stored plan as the eval assembled it",
         },
       ],
     };
-    expect(threadStep.request(story).assemble(reply)).toEqual(planV2c(story).assemble(reply));
+    expect(threadStep.request(story).assemble(reply)).toEqual(planV2e(story).assemble(reply));
   });
 });

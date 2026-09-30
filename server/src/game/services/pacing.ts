@@ -21,7 +21,9 @@ import { outcomeIdsNamed } from "./outcomeIds.js";
  * - allowed lengths: 2 to 4, and either exactly the turns left (the story ends
  *   with this chapter) or leaving at least 3 (a switch and a two-turn chapter);
  * - the last chapter: 4 or fewer turns left after the switch, exactly that many;
- * - the phase: the first quarter of the turns, up to two thirds, then late.
+ * - the phase: the first quarter of the turns, up to two thirds, then late;
+ * - the stage a chapter settles (planner v2e, since 2026-09-30): the one after
+ *   the pushed outcome's milestones so far.
  * Model-facing text says "thread" and "beat" (turn doc Appendix A, vocabulary).
  */
 
@@ -274,6 +276,22 @@ function lengthsText(lengths: number[]): string {
   return `${lengths.slice(0, -1).join(", ")} or ${lengths[lengths.length - 1]} beats`;
 }
 
+/**
+ * The stage a chapter settles (planner v2e, adopted 2026-09-30; the owner's
+ * feedback of 2026-09-29 on a first chapter that reached into its outcome's
+ * next stage): an outcome with n intended milestones has n stages from start
+ * to finish, and the next chapter settles the one after the milestones it has
+ * (stage recorded + 1 of n), so a story saved mid-story reads its stage from
+ * the milestones it holds. The story's last chapter too settles only its
+ * next stage (the owner's decision of 2026-09-30); the ending tells each
+ * outcome as its milestones leave it. None once the outcome is complete: that
+ * chapter is an aftermath.
+ */
+export function stageOf(recorded: number, intended: number): { stage: number; of: number; last: boolean } | undefined {
+  if (intended < 1 || recorded >= intended) return undefined;
+  return { stage: recorded + 1, of: intended, last: recorded + 1 === intended };
+}
+
 function pushedLine(need: OutcomeNeed): string {
   const size =
     need.stillNeeded === 0
@@ -281,7 +299,9 @@ function pushedLine(need: OutcomeNeed): string {
       : need.stillNeeded === 1
         ? "this thread's milestone is its last one"
         : `${need.stillNeeded} still needed`;
-  return `${need.id}: ${need.recorded} of ${need.intended} milestones; ${size}.`;
+  const stage = stageOf(need.recorded, need.intended);
+  const settles = stage ? `; this thread settles stage ${stage.stage} of ${stage.of}${stage.last ? ", the last" : ""}` : "";
+  return `${need.id}: ${need.recorded} of ${need.intended} milestones; ${size}${settles}.`;
 }
 
 /** The outcomes the players' picks set, each once, with the slots that picked it. */

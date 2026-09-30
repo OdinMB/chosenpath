@@ -17,8 +17,9 @@ import { SCOREBOARD_ENDING_RULE, adoptedSetupPrompt, adoptedTurn } from "../../.
  * production's own code, the eval's "adopted" variant, builds byte for byte
  * the requests of the variants that passed on every frozen case the eval
  * holds: the final setup form (setupR3, a case's kids tag included), planner
- * v2 with two-sided contests (planV2b) for the switch and planner v2c (the
- * nearer chapter question, 2026-09-28) for the chapter, today's turn form with B6 alone
+ * v2 with two-sided contests (planV2b) for the switch and planner v2e (the
+ * nearer chapter question of 2026-09-28, the outcome's stages and each step
+ * once, 2026-09-30) for the chapter, today's turn form with B6 alone
  * (turnB6) for a single player and today's form (prod) for groups, and AI
  * Iteration on setup round 3's text. The only differences are the logged
  * ones in adoptedDeltas.ts. The frozen cases live in the eval's output
@@ -44,7 +45,8 @@ function measuredVariant(input: RequestInput): VariantId {
     case "switch":
       return "planV2b";
     case "thread":
-      return "planV2c";
+      // Planner v2e since 2026-09-30 (planner v2c with the outcome's stages and each step once); planner v2c until then
+      return "planV2e";
     case "beat":
       return input.story.isMultiplayer() ? "prod" : "turnB6";
   }

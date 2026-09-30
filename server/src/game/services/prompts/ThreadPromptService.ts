@@ -17,9 +17,12 @@ import { pickedOutcome, threadPacingBlock } from "../pacing.js";
  * accepted engine limit). The reply is lean (plannerReplies.ts). Since the
  * owner's feedback of 2026-09-28 the chapter asks a nearer question than its
  * outcome, one whose answer is one milestone, and names the concrete kind of
- * milestone it adds (planner v2c). Today's form before the adoption is kept
- * for the eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal
- * to the eval's planner v2c.
+ * milestone it adds (planner v2c). Since 2026-09-30 (planner v2e) it names
+ * its outcome's stages and stays within the one PACING says it settles (in
+ * the story's last chapter too, the next stage only: the owner's decision),
+ * and lists each step once. Today's form before the adoption is kept for the
+ * eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal to the
+ * eval's planner v2e.
  */
 
 /** A4's length rule. */
@@ -48,6 +51,7 @@ function progressionItem(number: number, multiplayer: boolean): string {
    - The thread stays with one situation: the same people, place, rival or problem from step to step. Each step raises the stakes of that situation instead of starting a new activity, and every step stays on the thread's outcome.
    - From the second step on, something pushes back: a rival moves, an ally hesitates, a cost comes due. In challenge${multiplayer ? " and contest" : ""} threads, each result gives an advantage or a disadvantage for the next step without closing it off. In exploration threads, each step's three results are three paths the ${who} can take, and the last step's results lead toward the outcome's three resolutions, in the same order.
    - The last step is the decisive moment: its question brings the thread's question to a head.
+   - Each step comes once: a thread of n beats has n different steps, and the last one never repeats the step before it.
    - Each step asks how the ${who} act${multiplayer ? "" : "s"} ("Stealth: How does Rikkit get past the Guild's night watch?").${multiplayer ? " In a contest, every step is the same moment for both sides, and its question names them all." : ""}
    - No step settles the thread early, and the ${who} can't leave or derail it.
    Weak: "Rally supporters" → "Print posters" → "Negotiate with the Guild" (three activities, and the last one belongs to a different question).
@@ -69,15 +73,38 @@ function questionItem(number: number, multiplayer: boolean): string {
    Outcome: "${outcome}" Weak thread question: "Will ${who} find enough evidence to stop the noble's conspiracy?" (the outcome's question again) Good: "Will ${who} get the noble's letters out of the manor before the guards change shifts?", with the kind of milestone "whether the letters prove the noble's hand in the conspiracy", not "progress toward stopping the conspiracy".`;
 }
 
+/**
+ * The outcome's stages, and the one this chapter settles (planner v2e,
+ * adopted 2026-09-30; the owner's feedback of 2026-09-29: a first chapter on
+ * an outcome of three milestones already asked how to expose what its first
+ * milestone should only gather): an outcome with n intended milestones has n
+ * stages from start to finish, PACING names the one this chapter settles, and
+ * its question, steps and three results stay within it. In the story's last
+ * chapter too it settles the next stage only (the owner's decision of
+ * 2026-09-30). The example is the prompt's own (Rikkit and the noble's
+ * letters), so no story's names reach the prompt.
+ */
+function stageItem(number: number, multiplayer: boolean): string {
+  const results = multiplayer ? "how well it went, which side came out ahead, or which path was taken" : "how well it went, or which path was taken";
+  const outcome = multiplayer ? "Will the players stop the noble's conspiracy?" : "Will Rikkit stop the noble's conspiracy?";
+  const step = multiplayer ? "How do [insert player names] expose the noble before the Guild?" : "How does Rikkit expose the noble before the Guild?";
+  const who = multiplayer ? "The group" : "Rikkit";
+  return `${number}. The outcome's stages, and the one this thread settles. An outcome with n intended milestones has n stages from start to finish: each thread that pushes it settles the next stage, and its milestone records how that stage went. Name the outcome's stages in order, consistent with the milestones it already has: stage 1 is what its first milestone settled, stage 2 what its second settled, and so on. PACING says which stage ${
+    multiplayer ? "each" : "this"
+  } thread settles: the one after the milestones the outcome already has. The thread's question, every step and its three possible milestones stay within that stage: the three milestones are three versions of that stage's result (${results}), and nothing in the thread already does what a later stage is for: no step starts, plans or carries out a later stage's task, and no result settles the outcome early. A result may still make a later stage easier or harder. Only the last stage settles the outcome itself; when the outcome is already complete, the thread is an aftermath of its last stage.
+   Outcome: "${outcome}" with 3 milestones has the stages 1. prove the noble's hand; 2. turn the Guild against him; 3. stop the conspiracy. At stage 1 the thread is about the proof. Weak: a last step "${step}", or the milestone "${who}'s proof brings the noble down" (stages 2 and 3). Good: the milestones "${who} gets the noble's letters out of the manor: proof of his hand", "${who} gets one letter, which hints at his hand but proves nothing", "${who} flees the manor with nothing".`;
+}
+
 function threadList(multiplayer: boolean): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
   if (!multiplayer) {
     return `Create the thread, with:
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
-${questionItem(3, false)}
-4. ${milestones}
-${progressionItem(5, false)}
+${stageItem(3, false)}
+${questionItem(4, false)}
+5. ${milestones}
+${progressionItem(6, false)}
 
 `;
   }
@@ -85,9 +112,10 @@ ${progressionItem(5, false)}
 1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
-${questionItem(4, true)}
-5. ${milestones}
-${progressionItem(6, true)}
+${stageItem(4, true)}
+${questionItem(5, true)}
+6. ${milestones}
+${progressionItem(7, true)}
 
 `;
 }

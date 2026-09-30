@@ -9,6 +9,7 @@ import {
   outcomeNeeds,
   phaseOf,
   pickedOutcome,
+  stageOf,
   switchPacingBlock,
   threadPacingBlock,
 } from "../../../../src/game/services/pacing.js";
@@ -295,7 +296,7 @@ describe("threadPacingBlock", () => {
         "======= PACING =======",
         "This thread starts at turn 14 of 25; 12 turns are left, this one included.",
         "Allowed lengths for this thread: 2, 3 or 4 beats.",
-        `The outcome this thread pushes: ${GUILD}: 2 of 3 milestones; this thread's milestone is its last one.`,
+        `The outcome this thread pushes: ${GUILD}: 2 of 3 milestones; this thread's milestone is its last one; this thread settles stage 3 of 3, the last.`,
         "Recent threads: 3 beats, 3 beats.",
         "Phase: the middle of the story.",
       ].join("\n")
@@ -314,7 +315,7 @@ describe("threadPacingBlock", () => {
     expect(block).toContain(`The outcome this thread pushes: ${GUILD}: 1 of 1 milestones; complete, so this thread's milestone is an aftermath.`);
   });
 
-  it("makes the last chapter take exactly the turns left and calls it the climax", () => {
+  it("makes the last chapter take exactly the turns left and calls it the climax, settling only the outcome's next stage", () => {
     const story = roundStory({
       turns: 17,
       maxTurns: 20,
@@ -324,7 +325,9 @@ describe("threadPacingBlock", () => {
     const block = threadPacingBlock(story);
     expect(block).toContain("This is the story's last thread: exactly 3 beats. It is the story's climax.");
     expect(block).not.toContain("Allowed lengths");
-    expect(block).toContain(`${GUILD}: 0 of 3 milestones; 3 still needed.`);
+    // The owner's decision of 2026-09-30: the last chapter settles the next stage, the ending tells the rest as it stands
+    expect(block).toContain(`${GUILD}: 0 of 3 milestones; 3 still needed; this thread settles stage 1 of 3.`);
+    expect(block).not.toContain("settles stages");
     expect(block).toContain("Phase: the story's final thread.");
   });
 
@@ -336,6 +339,47 @@ describe("threadPacingBlock", () => {
       playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: 1 }), outcome(ENCLAVE, { intendedNumberOfMilestones: 3 })] },
       phases: [topicSwitch([["Meet Sir Bram", GUILD], ["Visit the enclave", ENCLAVE]], 4)],
     });
-    expect(threadPacingBlock(story)).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 3 milestones; 3 still needed.`);
+    expect(threadPacingBlock(story)).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 3 milestones; 3 still needed; this thread settles stage 1 of 3.`);
+  });
+
+  it("names the stage each pushed outcome's thread settles from its milestones so far, so a saved story mid-story plans on (planner v2e, 2026-09-30)", () => {
+    const at = (recorded: number, intended = 3) =>
+      threadPacingBlock(
+        roundStory({
+          turns: 9,
+          maxTurns: 25,
+          playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: intended, milestones: Array.from({ length: recorded }, (_, i) => `m${i + 1}`) }), outcome(ENCLAVE)] },
+          phases: [topicSwitch([["Guild", GUILD], ["Enclave", ENCLAVE]], 8)],
+        })
+      );
+    expect(at(0)).toContain(`${GUILD}: 0 of 3 milestones; 3 still needed; this thread settles stage 1 of 3.`);
+    expect(at(1)).toContain(`${GUILD}: 1 of 3 milestones; 2 still needed; this thread settles stage 2 of 3.`);
+    expect(at(2)).toContain(`${GUILD}: 2 of 3 milestones; this thread's milestone is its last one; this thread settles stage 3 of 3, the last.`);
+    // Complete, or past its count (a story saved before the slate was sized), the thread is an aftermath and names no stage
+    expect(at(3)).toContain(`${GUILD}: 3 of 3 milestones; complete, so this thread's milestone is an aftermath.`);
+    expect(at(4)).toContain(`${GUILD}: 4 of 3 milestones; complete, so this thread's milestone is an aftermath.`);
+    expect(at(4)).not.toContain("settles stage");
+    // A group's outcomes each name their own stage
+    const group = roundStory({
+      players: 2,
+      turns: 5,
+      maxTurns: 20,
+      gameMode: GameModes.Cooperative,
+      sharedOutcomes: [outcome("shared_harbor", { intendedNumberOfMilestones: 2, milestones: ["m1"] })],
+      playerOutcomes: { player1: [outcome("player1_a")], player2: [outcome("player2_b")] },
+      phases: [flavorSwitch("shared_harbor", "q", 4, ["player1", "player2"])],
+    });
+    expect(threadPacingBlock(group)).toContain("- shared_harbor: 1 of 2 milestones; this thread's milestone is its last one; this thread settles stage 2 of 2, the last. (player1, player2)");
+  });
+});
+
+describe("stageOf: the stage a chapter settles (planner v2e, adopted 2026-09-30)", () => {
+  it("is the one after the milestones so far, the last at n, none once complete or without intended milestones", () => {
+    expect(stageOf(0, 3)).toEqual({ stage: 1, of: 3, last: false });
+    expect(stageOf(2, 3)).toEqual({ stage: 3, of: 3, last: true });
+    expect(stageOf(0, 1)).toEqual({ stage: 1, of: 1, last: true });
+    expect(stageOf(3, 3)).toBeUndefined();
+    expect(stageOf(5, 3)).toBeUndefined();
+    expect(stageOf(0, 0)).toBeUndefined();
   });
 });

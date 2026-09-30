@@ -76,7 +76,7 @@ describe("a single player's chapter whose pick names no outcome", () => {
     const prompt = threadStep.request(pickedAnInventedOption()).prompt;
 
     expect(prompt).toContain(`player1 chose direction 3 of 2: "player1 option 4.2"\nThis thread pushes: Question of ${ENCLAVE}? (${ENCLAVE}).`);
-    expect(prompt).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 3 milestones; 3 still needed.`);
+    expect(prompt).toContain(`The outcome this thread pushes: ${ENCLAVE}: 0 of 3 milestones; 3 still needed; this thread settles stage 1 of 3.`);
   });
 
   it("notes the fallback, so the log counts it", () => {

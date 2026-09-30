@@ -21,17 +21,18 @@ import { fallbackOutcomeId, outcomesFor, pickedOutcome } from "./pacing.js";
  *   story's outcome ids as a list (free text for a story without outcomes);
  *   stored as today's "text (outcome id)" string, with the pair beside it
  *   (`topicDirections`), which the chapter planner's pick reads.
- * - A chapter states its kind first, then its question (nearer than its
- *   outcome's since 2026-09-28, planner v2c) and its kind of milestone, its
- *   milestones, the steps before the last and a last step whose three
- *   results are the milestones, and its plan. A single player's chapter writes no outcome:
+ * - A chapter states its kind first, then its outcome's stages (since
+ *   2026-09-30, planner v2e), its question (nearer than its outcome's since
+ *   2026-09-28, planner v2c) and its kind of milestone, its milestones, the
+ *   steps before the last and a last step, written once, whose three results
+ *   are the milestones, and its plan. A single player's chapter writes no outcome:
  *   the player's pick sets it (pacing.ts, pickedOutcome), or, when the pick
  *   names none the story knows, the fallback the planner's prompt was told
  *   (fallbackOutcomeId). The code fills the
  *   last step's results, the length and the ids. The kind, question and plan
  *   ride along on the stored thread.
  * The eval's form is storyTextRounds/turnRound1Planners.ts (planV2b for the
- * switch, planV2c for the chapter); adoptedPlanners.test.ts holds these equal to it.
+ * switch, planV2e for the chapter); adoptedPlanners.test.ts holds these equal to it.
  */
 
 const NO_BLANK_ITEMS = "Every item in a list carries real content; a list never holds an empty or blank item.";
@@ -166,6 +167,8 @@ const [CHALLENGE_STEP_RESULTS, , EXPLORATION_STEP_RESULTS] = STEP_RESULTS.option
 /** The chapter's question, nearer than its outcome's (planner v2c, the owner's feedback of 2026-09-28). */
 const QUESTION =
   "The one question this thread decides, nearer than its outcome's: its three possible milestones are the answers, and each is one milestone of the outcome. Ask it about this thread's own situation (a place, a person, a deadline, an object), in the story's own names, so that its beats can answer it; never the outcome's question reworded. After a flavor switch: the switch's question, narrowed to this thread. After a topic switch: the chosen direction, narrowed to a question about this thread's own situation, even where the direction restates its outcome. Weak: 'Will Rikkit stop the noble's conspiracy?' (the outcome's question) Good: 'Will Rikkit get the noble's letters out of the manor before the guards change shifts?'";
+/** The outcome's stages (planner v2e, since 2026-09-30), named before the question so the question is asked within this chapter's stage. */
+const OUTCOME_STAGES = `The outcome's stages from start to finish, in order: one per intended milestone, each in a few words and the story's own names, the stages its milestones already settled first, as those milestones read. This thread settles the stage PACING names. ${NO_BLANK_ITEMS}`;
 /** The kind of milestone, written by the planner (stored as the thread's typeOfMilestone) instead of copied from the question. */
 const MILESTONE_KIND =
   "The kind of milestone this thread adds to its outcome: the concrete thing its answer settles, in a few words and the story's own names. Weak: 'progress toward stopping the conspiracy'. Good: 'whether the letters prove the noble's hand in the conspiracy'.";
@@ -230,21 +233,25 @@ function threadFields(multiplayer: boolean) {
         "The thread type: preferably the name part of one of the story's thread types (the words before any parenthesis), one whose kind fits when the story names one; otherwise a few words (Chase, Negotiation, Fight). Not one of the player's last three (PREVIOUS THREAD TYPES)."
       ),
     title: z.string().describe(THREAD_TITLE),
+    outcomeStages: z.array(z.string()).max(6).describe(OUTCOME_STAGES),
     question: z.string().describe(QUESTION),
     typeOfMilestone: z.string().describe(MILESTONE_KIND),
     possibleMilestones: (multiplayer ? z.union([CHALLENGE_MILESTONES, CONTEST_MILESTONES, EXPLORATION_MILESTONES]) : z.union([CHALLENGE_MILESTONES, EXPLORATION_MILESTONES])).describe(
       MILESTONES_DESCRIPTION
     ),
+    // Each step once (planner v2e): the stage scoping's plans wrote the last step in steps and again as finalStep
     steps: z
       .array(stepSchema(multiplayer))
       .max(3)
-      .describe(`The steps before the last one: one for a two-beat thread, two for three beats, three for a four-beat thread. ${NO_BLANK_ITEMS}`),
+      .describe(
+        `The steps before the last one: one for a two-beat thread, two for three beats, three for a four-beat thread. The last step is not among them: it is finalStep, and it comes only there. ${NO_BLANK_ITEMS}`
+      ),
     finalStep: z
       .object({
         title: TODAY_STEP.shape.title,
         question: z.string().describe(`The decisive moment: how the ${multiplayer ? "players act" : "player acts"} to settle the thread's question.`),
       })
-      .describe("The last step. Its three results are the milestones above."),
+      .describe("The last step, written only here and never one of the steps above again. Its three results are the milestones above."),
     plan: z.string().describe(PLAN(multiplayer)),
   };
 }
@@ -257,7 +264,7 @@ export function threadReplySchema(story: Story): z.AnyZodObject {
   const { kind, ...rest } = threadFields(true);
   return z.object({
     grouping: z.string().describe("Which players share which thread, and why, in one or two sentences."),
-    duration: z.number().describe("Two, three or four beats, the same for every thread in this batch."),
+    duration: z.number().describe("Two, three or four beats, the same for every thread in this batch: each thread's steps plus its final step make exactly this many."),
     threads: z
       .array(
         z.object({
@@ -274,8 +281,10 @@ export function threadReplySchema(story: Story): z.AnyZodObject {
 
 /**
  * A written thread in today's stored shape, the last step's results the
- * milestones; kind, question and plan ride along. The kind of milestone is
- * the planner's own, or the question where it wrote none.
+ * milestones; kind, question and plan ride along, and the outcome's stages
+ * where the reply wrote them (nothing reads them yet; a chapter planned
+ * before 2026-09-30 has none). The kind of milestone is the planner's own, or
+ * the question where it wrote none.
  */
 function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB: string[]): Loose {
   const milestones = asObject(written.possibleMilestones);
@@ -301,6 +310,7 @@ function storedThread(written: Loose, outcomeId: string, sideA: string[], sideB:
     kind: asString(written.kind),
     question,
     plan: asString(written.plan),
+    ...(Array.isArray(written.outcomeStages) ? { outcomeStages: written.outcomeStages.map(asString) } : {}),
   };
 }
 
