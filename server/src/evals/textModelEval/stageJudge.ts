@@ -33,8 +33,19 @@ import { rateMove, type RateMove } from "./stopRule.js";
 
 export const STAGE_CHECK = "staysWithinStage" as const;
 
-/** Part of each stage judge call's key: a wording change is judged afresh. */
-export const STAGE_JUDGE_PROMPT_VERSION = 1;
+/**
+ * Part of each stage judge call's key: a wording change is judged afresh. v2
+ * (2026-09-30) adds STAGE_DECISION_RULE, the calibration's one fix: on v1 the
+ * two samples agreed on 20 of 24 items, and each flip rode on how the judge
+ * had worded the later stages that time (a result that enlarges this stage's
+ * result, "significantly boosting their fame", read as a later stage's), or
+ * let a step asking how to expose the Ring pass on its results.
+ */
+export const STAGE_JUDGE_PROMPT_VERSION = 2;
+
+/** The v2 decision rule: what a step asks and what a result says happened, not the judge's own stage names. */
+export const STAGE_DECISION_RULE =
+  "Decide by what each step asks and what each result says has happened, not by how you worded the stages: a step whose question asks how a character carries out a later stage's task reaches past its stage, whatever its results; a result reaches past only when it records a later stage's own result, or the outcome's, as done. A result that makes this stage's result bigger, or a later stage easier, stays within, however big its words.";
 
 type Results = Record<string, string>;
 
@@ -86,9 +97,9 @@ const INTRO = `YOUR JOB: CHECK ONE CHAPTER PLAN OF A STORY GAME
 
 In this game a story's outcomes are settled over several chapters. An outcome with n intended milestones has n stages from start to finish. Each chapter that pushes the outcome settles its next stage and adds one milestone, which records how that stage went. So a chapter stays within its stage when its question, every step and every result are about what that stage settles. A result may make a later stage easier or harder (a lead found, an ally won or lost, a door left open). A chapter reaches past its stage when a step turns to a later stage's task (starts, plans or carries it out), or when a result already achieves what a later stage is for or settles the outcome itself.
 
-Read the chapter plan below as a careful editor and answer the question about it. Name the outcome's stages first, then quote the words that decide the answer before you give it.
+Read the chapter plan below as a careful editor and answer the question about it. Name the outcome's stages first, then quote the words that decide the answer before you give it. ${STAGE_DECISION_RULE}
 
-An example from another story: the outcome "Will Mara win the regional baking championship?" with 3 milestones has the stages 1. qualify at the town fair; 2. place at the county round; 3. win the regional final. A chapter at stage 1 whose last step is "How does Mara impress the regional judges?", or whose best result is "Mara's pie wins her the championship", reaches past its stage. One whose results are "Mara qualifies with the judges' praise", "Mara scrapes into the county round" and "Mara misses the cut" stays within it, even though qualifying opens the way to stage 2.`;
+An example from another story: the outcome "Will Mara win the regional baking championship?" with 3 milestones has the stages 1. qualify at the town fair; 2. place at the county round; 3. win the regional final. A chapter at stage 1 whose last step is "How does Mara impress the regional judges?", or whose best result is "Mara's pie wins her the championship", reaches past its stage. One whose results are "Mara qualifies with the judges' praise", "Mara scrapes into the county round" and "Mara misses the cut" stays within it, even though qualifying opens the way to stage 2. At stage 1, "Mara qualifies and the whole county talks about her pie" stays within; "Mara places at the county round" reaches past.`;
 
 const QUESTION = (stage: number, of: number) =>
   `${STAGE_CHECK}: Does this chapter stay within stage ${stage} of ${of}? First name the outcome's ${of} stages from start to finish, as its question, how it can end and its milestones so far suggest: the stages its milestones so far settled first, as those milestones read. Then read the chapter's question, every step and every result against stage ${stage}. Answer no if any step turns to the task of a later stage or any result already does what a later stage is for, including settling the outcome itself. Answer yes if everything stays within stage ${stage}, even where a result prepares or points toward a later stage.`;

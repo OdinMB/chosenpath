@@ -168,6 +168,68 @@ describe("planner v2d: the outcome's stages (planV2d)", () => {
     expect(v2d(story).assemble(reply())).toEqual(v2c(story).assemble(reply()));
   });
 
+  describe("the climax clause (planV2dClimax, the owner's open question): only the story's last thread differs", () => {
+    const climax = (story: AnyStory) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, climax: true });
+    /** A single player's last thread (3 turns left) on the guild outcome with `recorded` of its 3 milestones. */
+    const lastThread = (recorded = 1) =>
+      roundStory({
+        turns: 17,
+        maxTurns: 20,
+        playerOutcomes: {
+          player1: [outcome(GUILD, { intendedNumberOfMilestones: 3, milestones: Array.from({ length: recorded }, (_, i) => `The Guild moves ${i + 1}`) }), outcome("player1_enclave_trust")],
+        },
+        phases: [topicSwitch([["Rally the enclave", GUILD]], 0), endedChapter(GUILD, 3, 1, "The Guild hears"), topicSwitch([["Press the Guild", GUILD], ["Visit Gruk", "player1_enclave_trust"]], 16)],
+      });
+    const threeLast = () =>
+      roundStory({
+        players: 3,
+        turns: 17,
+        maxTurns: 20,
+        gameMode: GameModes.CooperativeCompetitive,
+        sharedOutcomes: [outcome("shared_lead", CONTEST), outcome("shared_launch")],
+        playerOutcomes: { player1: [outcome("player1_a")], player2: [outcome("player2_b")], player3: [outcome("player3_c")] },
+        phases: [
+          flavorSwitch("shared_launch", "q", 0, ["player1", "player2", "player3"]),
+          endedChapter("shared_launch", 4, 1, "m", ["player1", "player2", "player3"]),
+          topicSwitch([["Take the lead", "shared_lead"]], 16, ["player1", "player2", "player3"]),
+        ],
+      });
+
+    it("is planV2d's request byte for byte before the last thread, and in it where one milestone or none is left", () => {
+      for (const story of [onePlayer(0), onePlayer(1), twoPlayers(), threePlayers(), lastThread(2)]) {
+        expect(climax(story).prompt).toBe(v2d(story).prompt);
+        expect(schemaText(climax(story).schema)).toBe(schemaText(v2d(story).schema));
+      }
+    });
+
+    it("in the story's last thread, settles every stage left: the stage item says so once, PACING folds the stages", () => {
+      for (const [make, multiplayer] of [[() => lastThread(1), false], [threeLast, true]] as const) {
+        const ours = climax(make()).prompt;
+        const theirs = v2d(make()).prompt;
+        expect(ours).not.toBe(theirs);
+        expect(occurrences(ours, PLANNER_V2_TEXT.climaxClause(multiplayer))).toBe(1);
+        expect(theirs).not.toContain("In the story's last thread, PACING names every stage");
+        // Only the clause and PACING's lines differ; the schema is planV2d's
+        const back = ours
+          .replace(` ${PLANNER_V2_TEXT.climaxClause(multiplayer)}`, "")
+          .replace(/(\d+) still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages (\d+) (?:and|to) (\d+), the last\./g, "$1 still needed; this thread settles stage $2 of $3.");
+        expect(back).toBe(theirs);
+        expect(schemaText(climax(make()).schema)).toBe(schemaText(v2d(make()).schema));
+      }
+      expect(climax(lastThread(1)).prompt).toContain(
+        `${GUILD}: 1 of 3 milestones; 2 still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages 2 and 3, the last.`
+      );
+      expect(v2d(lastThread(1)).prompt).toContain(`${GUILD}: 1 of 3 milestones; 2 still needed; this thread settles stage 2 of 3.`);
+    });
+
+    it("is the eval's planV2dClimax variant, its switch planner planV2b's", () => {
+      const story = lastThread(1);
+      expect(requestText(requestFor("planV2dClimax", { role: "thread", story }))).toBe(climax(story).prompt);
+      expect(requestText(requestFor("planV2dClimax", { role: "switch", story }))).toBe(plannerV2SwitchRequest(story, false).prompt);
+      expect(() => requestFor("planV2dClimax", { role: "beat", story })).toThrow("does not cover role beat");
+    });
+  });
+
   it("is the eval's planV2d variant: the chapter planner above, the switch planner planV2b's", () => {
     for (const make of [() => onePlayer(), twoPlayers, threePlayers]) {
       const story = make();

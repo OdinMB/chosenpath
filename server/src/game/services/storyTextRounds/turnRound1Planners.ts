@@ -5,7 +5,7 @@ import { StoryStatePromptService } from "../prompts/StoryStatePromptService.js";
 import type { TextRequest } from "../storyTextSteps.js";
 // Production's requests as they stood at the round0 prompt state, so planner v2's requests stay as they ran
 import { round0SwitchStep as switchStep, round0ThreadStep as threadStep } from "../storyTextRound0/round0Steps.js";
-import { outcomesFor, pickedOutcome, switchPacingBlock, threadPacingBlock } from "./pacing.js";
+import { foldsStages, outcomesFor, pickedOutcome, switchPacingBlock, threadPacingBlock } from "./pacing.js";
 import { replaceOnce, replaceUntil, slugOf, splitAtState } from "./roundEdits.js";
 
 /*
@@ -352,18 +352,29 @@ const STAGE_ITEM_START = "The outcome's stages, and the one this thread settles.
 const STAGES_RULE =
   "An outcome with n intended milestones has n stages from start to finish: each thread that pushes it settles the next stage, and its milestone records how that stage went.";
 
-function stageItem(number: number, multiplayer: boolean): string {
+/**
+ * The climax clause (planV2dClimax, the owner's open question of 2026-09-29):
+ * printed only in the story's last thread where an outcome still needs several
+ * milestones (foldsStages), so the variant is planner v2d byte for byte
+ * wherever it changes nothing.
+ */
+const climaxClause = (multiplayer: boolean): string =>
+  multiplayer
+    ? "In the story's last thread, PACING names every stage each outcome has left: each thread settles them together as the story's climax, and its three milestones settle its outcome itself, each in its own direction."
+    : "In the story's last thread, PACING names every stage the outcome has left: this thread settles them together as the story's climax, and its three milestones settle the outcome itself, each in its own direction.";
+
+function stageItem(number: number, multiplayer: boolean, climax = false): string {
   const results = multiplayer ? "how well it went, which side came out ahead, or which path was taken" : "how well it went, or which path was taken";
   const outcome = multiplayer ? "Will the players stop the noble's conspiracy?" : "Will Rikkit stop the noble's conspiracy?";
   const step = multiplayer ? "How do [insert player names] expose the noble before the Guild?" : "How does Rikkit expose the noble before the Guild?";
   const who = multiplayer ? "The group" : "Rikkit";
   return `${number}. ${STAGE_ITEM_START} ${STAGES_RULE} Name the outcome's stages in order, consistent with the milestones it already has: stage 1 is what its first milestone settled, stage 2 what its second settled, and so on. PACING says which stage ${
     multiplayer ? "each" : "this"
-  } thread settles: the one after the milestones the outcome already has. The thread's question, every step and its three possible milestones stay within that stage: the three milestones are three versions of that stage's result (${results}), and nothing in the thread already does what a later stage is for: no step starts, plans or carries out a later stage's task, and no result settles the outcome early. A result may still make a later stage easier or harder. Only the last stage settles the outcome itself; when the outcome is already complete, the thread is an aftermath of its last stage.
+  } thread settles: the one after the milestones the outcome already has.${climax ? ` ${climaxClause(multiplayer)}` : ""} The thread's question, every step and its three possible milestones stay within that stage: the three milestones are three versions of that stage's result (${results}), and nothing in the thread already does what a later stage is for: no step starts, plans or carries out a later stage's task, and no result settles the outcome early. A result may still make a later stage easier or harder. Only the last stage settles the outcome itself; when the outcome is already complete, the thread is an aftermath of its last stage.
    Outcome: "${outcome}" with 3 milestones has the stages 1. prove the noble's hand; 2. turn the Guild against him; 3. stop the conspiracy. At stage 1 the thread is about the proof. Weak: a last step "${step}", or the milestone "${who}'s proof brings the noble down" (stages 2 and 3). Good: the milestones "${who} gets the noble's letters out of the manor: proof of his hand", "${who} gets one letter, which hints at his hand but proves nothing", "${who} flees the manor with nothing".`;
 }
 
-function threadList(multiplayer: boolean, nearer: boolean, staged = false): string {
+function threadList(multiplayer: boolean, nearer: boolean, staged = false, climax = false): string {
   const milestones = `Possible milestones, one of which is added to the outcome when the thread ends. ${MILESTONE_SIZE}`;
   // planV2c inserts its question item before the milestones, planV2d its stage item before that; the rest renumbers
   const q = nearer ? 1 : 0;
@@ -372,7 +383,7 @@ function threadList(multiplayer: boolean, nearer: boolean, staged = false): stri
     return `Create the thread, with:
 1. The thread's outcome is already set (PLAYER DECISIONS below). Every step and every milestone stays on that outcome.
 2. The type of thread.
-${staged ? `${stageItem(3, false)}\n` : ""}${nearer ? `${questionItem(3 + s, false)}\n` : ""}${3 + s + q}. ${milestones}
+${staged ? `${stageItem(3, false, climax)}\n` : ""}${nearer ? `${questionItem(3 + s, false)}\n` : ""}${3 + s + q}. ${milestones}
 ${progressionItem(4 + s + q, false)}
 
 `;
@@ -381,7 +392,7 @@ ${progressionItem(4 + s + q, false)}
 1. The outcome ID: for each group of players, the outcome they chose (topic switch) or their switch set (flavor switch), as PLAYER DECISIONS shows. Every step stays on it.
 2. Players involved (Side A and, if it's a Contest thread, Side B)
 3. The type of thread.
-${staged ? `${stageItem(4, true)}\n` : ""}${nearer ? `${questionItem(4 + s, true)}\n` : ""}${4 + s + q}. ${milestones}
+${staged ? `${stageItem(4, true, climax)}\n` : ""}${nearer ? `${questionItem(4 + s, true)}\n` : ""}${4 + s + q}. ${milestones}
 ${progressionItem(5 + s + q, true)}
 
 `;
@@ -404,7 +415,7 @@ const EXAMPLE_1P_EDITS: [string, string][] = [
   ["How do [insert player names] handle the situation?", "How does Rikkit handle the situation?"],
 ];
 
-function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false): string {
+function threadInstructions(production: string, story: Story, twoSided: boolean, nearer: boolean, staged = false, climax = false): string {
   const multiplayer = story.isMultiplayer();
   let text = production;
   for (const [find, replace] of CONTEXT_EDITS) text = replaceOnce(LABEL, text, find, replace);
@@ -441,7 +452,7 @@ function threadInstructions(production: string, story: Story, twoSided: boolean,
     `\n${kindRules(story, twoSided)}\n`
   );
   // The list, through the first-thread reminder that repeats the MANDATORY FIRST THREAD REQUIREMENT above
-  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged));
+  text = replaceUntil(LABEL, text, "Create a list of threads, each with:", "EXAMPLE 1: 3-BEAT CHALLENGE THREAD", threadList(multiplayer, nearer, staged, climax));
   text = replaceOnce(
     LABEL,
     text,
@@ -482,9 +493,9 @@ function productionDecisions(story: Story): string {
   return ["PLAYER DECISIONS:", ...lines].join("\n");
 }
 
-function threadState(state: string, story: Story, staged = false): string {
+function threadState(state: string, story: Story, staged = false, climax = false): string {
   const text = replaceOnce(LABEL, state, productionDecisions(story), playerDecisions(story));
-  return `${text}\n\n${threadPacingBlock(story, staged ? { stages: true } : {})}`;
+  return `${text}\n\n${threadPacingBlock(story, staged ? { stages: true, ...(climax ? { climax } : {}) } : {})}`;
 }
 
 // The reply
@@ -681,19 +692,24 @@ function assembleThread(story: Story, parsed: unknown): unknown {
  * title "without a number", so production builds it byte for byte; `stages`
  * with both is planV2d (the owner's feedback of 2026-09-29): the stage item
  * before the question item, PACING's stage sentence, and the outcome's stages
- * in the reply before the question.
+ * in the reply before the question; `climax` with those is planV2dClimax (the
+ * owner's open question of 2026-09-29): in the story's last thread, an outcome
+ * still needing several milestones is settled outright (the stage item's
+ * climax clause, PACING's folded stages), and elsewhere it is planV2d byte for
+ * byte.
  */
 export function plannerV2ThreadRequest(
   story: Story,
   full: boolean,
-  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean } = {}
+  options: { twoSided?: boolean; nearerQuestion?: boolean; stages?: boolean; climax?: boolean } = {}
 ): AssembledRequest {
   const production = threadStep.request(story);
   const { instructions, state } = splitAtState(LABEL, production.prompt);
   const nearer = options.nearerQuestion ?? false;
   const staged = options.stages ?? false;
+  const climax = staged && (options.climax ?? false) && foldsStages(story);
   return {
-    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged) + threadState(state, story, staged),
+    prompt: threadInstructions(instructions, story, options.twoSided ?? false, nearer, staged, climax) + threadState(state, story, staged, climax),
     schema: threadReplySchema(story, full, nearer, staged),
     assemble: (parsed) => assembleThread(story, parsed),
   };
@@ -718,4 +734,5 @@ export const PLANNER_V2_TEXT = {
   contestQuestion: CONTEST_QUESTION.trim(),
   stageItemStart: STAGE_ITEM_START,
   stagesRule: STAGES_RULE,
+  climaxClause,
 };

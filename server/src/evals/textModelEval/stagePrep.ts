@@ -10,7 +10,7 @@ import { jobEstimateUsd } from "./jobPlan.js";
 import { JUDGE_ARMS, outputIdOf } from "./judgedChecks.js";
 import { finishedPrepRecord, prepArmKey } from "./prepCalls.js";
 import { finishedJobKeys, jobKey, keyOf, runJobs, usable, type CallRecord } from "./runner.js";
-import { stageScopingCases } from "./stageCases.js";
+import { stageCasesToFreeze } from "./stageCases.js";
 import {
   STAGE_JUDGE_CALIBRATION,
   STAGE_JUDGE_PROMPT_VERSION,
@@ -34,8 +34,10 @@ import { referenceKeyOf } from "./variantComparison.js";
 /*
  * The stage scoping's CLI modes (the owner's feedback of 2026-09-29), kept
  * out of run.ts and turnPrep.ts:
- * - --build-stage-cases: the Arielle story's first chapter as a
- *   chapter-planning case (stageCases.ts), frozen beside the others; no calls;
+ * - --build-stage-cases: the Arielle story's first chapter and (2026-09-30)
+ *   the climax arm's three last chapters as chapter-planning cases
+ *   (stageCases.ts), frozen beside the others (those already frozen left as
+ *   they are, unless --rebuild-cases); no calls;
  * - --judge-stages: the judged stage check (stageJudge.ts) on its calibration
  *   set (two samples each), the stored chapters the cases read, and every
  *   final usable isolated chapter plan of the arms given (one sample each),
@@ -171,8 +173,10 @@ const referencesOf = (armKey: string) => [referenceKeyOf(armKey), ...secondRefer
 export function buildStageCasesMode(ctx: Pick<PrepContext, "files" | "log">, replace: boolean): void {
   const { files, log } = ctx;
   if (!files.casesExist()) throw new Error("No frozen cases. Run --build-cases first.");
-  const { cases, problems } = stageScopingCases(files.readCases());
+  const { cases, problems, skipped } = stageCasesToFreeze(files.readCases(), replace);
   if (problems.length) throw new Error(problems.join("; "));
+  if (skipped.length) log(`Already frozen, left as they are: ${skipped.join(", ")}.`);
+  if (cases.length === 0) return log("Nothing new to freeze; no calls.");
   files.addCases(cases, undefined, replace);
   log(`Froze ${cases.map((c) => c.id).join(", ")} beside the other cases; no calls.`);
 }

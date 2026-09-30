@@ -3,6 +3,7 @@ import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import { makeArm } from "../../../../src/evals/textModelEval/arms.js";
 import {
   STAGE_CHECK,
+  STAGE_DECISION_RULE,
   STAGE_JUDGE_CALIBRATION,
   judgedStage,
   judgedThread,
@@ -109,6 +110,18 @@ describe("stageJudgeRequest", () => {
     expect(JSON.stringify(toJsonSchema(request!.schema))).toContain(STAGE_CHECK);
   });
 
+  it("decides by what a step asks and what a result says happened, not by how the judge worded the stages (prompt v2)", () => {
+    // The calibration's first run (v1): 20 of 24 samples alike, each flip a result read against a later stage the judge
+    // had worded broadly ("boosting their fame", "strengthens its standing"), or a step asking how to expose read by its results
+    const prompt = request?.prompt ?? "";
+    expect(prompt.split(STAGE_DECISION_RULE).length - 1).toBe(1);
+    expect(STAGE_DECISION_RULE).toContain("a step whose question asks how a character carries out a later stage's task reaches past its stage, whatever its results");
+    expect(STAGE_DECISION_RULE).toContain("however big its words");
+    // Its example is Mara's, not a stored story's
+    expect(prompt).toContain("At stage 1, \"Mara qualifies and the whole county talks about her pie\" stays within; \"Mara places at the county round\" reaches past.");
+    expect(prompt.indexOf(STAGE_DECISION_RULE)).toBeLessThan(prompt.indexOf("An example from another story"));
+  });
+
   it("is not built where the check does not apply", () => {
     expect(stageJudgeRequest(story(2), judgedThread(stored))).toBeUndefined();
     expect(stageJudgeRequest(story(1, 1), judgedThread(stored))).toBeUndefined();
@@ -132,7 +145,9 @@ describe("the judge's reply and calls", () => {
       [stageJudgeCaseId("abc-t0"), 2, "stage-scoping", "prep", "judge>gpt-6-luna@low/prod"],
       [stageJudgeCaseId("def-t1"), 1, "stage-scoping", "prep", "judge>gpt-6-luna@low/prod"],
     ]);
-    expect(stageJudgeCaseId("abc-t0")).toBe("judge-stage-v1-abc-t0");
+    expect(stageJudgeCaseId("abc-t0")).toBe("judge-stage-v2-abc-t0");
+    // The first wording's calls keep their own keys
+    expect(stageJudgeCaseId("abc-t0", 1)).toBe("judge-stage-v1-abc-t0");
     function request() {
       return stageJudgeRequest(story(1), judgedThread(stored))!;
     }

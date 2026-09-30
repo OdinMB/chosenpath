@@ -19,8 +19,10 @@ import {
   SETUP_R3D_PREMISES,
   SETUP_RETEST_PREMISES,
   SETUP_SANITY_PREMISES,
+  STAGE_SCOPING_LAST_CHAPTER_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
+  stagePlansCase,
   stageRunsBaseline,
   standInKey,
 } from "../../../../src/evals/textModelEval/arms.js";
@@ -377,12 +379,25 @@ describe("budget caps", () => {
     const plans = armsFor("stage-scoping", "thread");
     expect(plans.map((p) => [p.arm.key, p.samples, p.scope, p.caseIds])).toEqual([
       ["gpt-6-luna@low/planV2d", 2, "all", undefined],
-      ["gpt-6-luna@low/planV2c", 2, "all", STAGE_SCOPING_NEW_CASES],
+      // Production's planner v2c on the built cases no planner v2c ran on: the first chapter and (2026-09-30) the last chapters
+      ["gpt-6-luna@low/planV2c", 2, "all", [...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES]],
       ["gpt-6-luna@low/prod", 2, "all", STAGE_SCOPING_NEW_CASES],
+      // The climax arm (2026-09-30) on the built last chapters only
+      ["gpt-6-luna@low/planV2dClimax", 2, "all", STAGE_SCOPING_LAST_CHAPTER_CASES],
     ]);
     for (const role of ["setup", "beat", "switch", "iteration"] as const) expect(armsFor("stage-scoping", role)).toEqual([]);
     expect(pipelinePlans("stage-scoping")).toEqual([]);
     expect(STAGE_SCOPING_NEW_CASES).toEqual(["round-thread-first-8988006e-t1"]);
+    expect(STAGE_SCOPING_LAST_CHAPTER_CASES).toEqual(["round-thread-last4-8988006e-t5", "round-thread-last2-8988006e-t5", "round-thread-last4-mp-965413e1-p3-t5"]);
+    // Frozen after the earlier stages closed, so only the stage scoping plans them
+    for (const id of STAGE_SCOPING_LAST_CHAPTER_CASES) {
+      expect(stagePlansCase("stage-scoping", id)).toBe(true);
+      expect(stagePlansCase("final-check", id)).toBe(false);
+    }
+    // The climax clause against planner v2d, whose last-chapter clause it replaces, and production's planner v2c second
+    expect(referenceKey("gpt-6-luna@low/planV2dClimax")).toBe("gpt-6-luna@low/planV2d");
+    expect(secondReferenceKeys("gpt-6-luna@low/planV2dClimax")).toEqual(["gpt-6-luna@low/planV2c"]);
+    expect(STAGE_CAP_REASONS["stage-scoping"]).toMatch(/planV2dClimax/);
     // Read against planner v2c, production's chapter planner, and today's form second
     expect(referenceKey("gpt-6-luna@low/planV2d")).toBe("gpt-6-luna@low/planV2c");
     expect(estimateBaseKey("gpt-6-luna@low/planV2d")).toBe("gpt-6-luna@low/planV2c");

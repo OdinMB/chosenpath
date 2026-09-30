@@ -165,6 +165,8 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   setupR3d: "setupR3",
   // The outcome's stages (owner's feedback, 2026-09-29) against the chapter planner it edits, production's
   planV2d: "planV2c",
+  // The climax clause (the owner's open question, 2026-09-30) against planner v2d, whose last-chapter clause it replaces
+  planV2dClimax: "planV2d",
 };
 
 /** The Stage 4 form each count-fix variant re-runs, whose measured outputs price it until it has its own. */
@@ -249,6 +251,8 @@ const SECOND_REFERENCES: Record<string, string[]> = {
   [armKey(LUNA_LOW, "turnB10b")]: [armKey(LUNA_LOW, "turnB10")],
   // Planner v2d against today's form too (the carry-forward guard)
   [armKey(LUNA_LOW, "planV2d")]: [armKey(LUNA_LOW, "prod")],
+  // The climax clause against production's planner v2c too, on the same last chapters
+  [armKey(LUNA_LOW, "planV2dClimax")]: [armKey(LUNA_LOW, "planV2c")],
   // The final check: production's Luna low arm (custom-story setup, both planners, group turns) against the measured
   // variants it builds byte for byte, each read in its own role: setup round 3 (and its retest, whose kids examples
   // production took), planner v2 (its switch planner is planner v2b's and production's byte for byte) and planner v2c
@@ -453,14 +457,25 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
 export const STAGE_SCOPING_NEW_CASES = ["round-thread-first-8988006e-t1"];
 
 /**
+ * The climax arm's cases (stageCases.ts, 2026-09-30): chapters in the story's
+ * last thread whose outcome still needs several milestones, where the owner's
+ * open question (next stage, or the climax settling the outcome) changes the
+ * request. No stored or built planning case is one: the stored stories' later
+ * chapters are all before their last thread.
+ */
+export const STAGE_SCOPING_LAST_CHAPTER_CASES = ["round-thread-last4-8988006e-t5", "round-thread-last2-8988006e-t5", "round-thread-last4-mp-965413e1-p3-t5"];
+
+/**
  * Cases frozen after earlier stages had closed, each with the first stage
  * that plans it: casesFor keeps each out of every stage before that one in
  * STAGES, so a closed stage's dry-run rows and records stay as they ran. The
- * stage scoping's built case was frozen on 2026-09-29, after the rounds, the
- * migration check and the feedback stages before it had closed; the round
- * cases before it were frozen before those stages ran.
+ * stage scoping's built cases were frozen on 2026-09-29 and 2026-09-30, after
+ * the rounds, the migration check and the feedback stages before it had
+ * closed; the round cases before them were frozen before those stages ran.
  */
-const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map(STAGE_SCOPING_NEW_CASES.map((id): [string, Stage] => [id, "stage-scoping"]));
+const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map(
+  [...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES].map((id): [string, Stage] => [id, "stage-scoping"])
+);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */
 export function stagePlansCase(stage: Stage, caseId: string): boolean {
@@ -475,14 +490,18 @@ export function stagePlansCase(stage: Stage, caseId: string): boolean {
  * planner v2c (its reference) and today's form (its second) at two samples
  * too, since neither ran there; every other case reads their stored records.
  * Its switch planner is planner v2b's, so no switch case runs. The judged
- * stage check books to this stage too (--judge-stages).
+ * stage check books to this stage too (--judge-stages). The climax arm
+ * (2026-09-30, the owner's open question) runs at two samples on the built
+ * last chapters only, where its request differs from planner v2d's, with
+ * planner v2c beside it there.
  */
 function stageScopingArms(role: EvalRole): ArmPlan[] {
   if (role !== "thread") return [];
   return [
     { arm: luna("low", "planV2d"), samples: 2, scope: "all" },
-    { arm: luna("low", "planV2c"), samples: 2, scope: "all", caseIds: STAGE_SCOPING_NEW_CASES },
+    { arm: luna("low", "planV2c"), samples: 2, scope: "all", caseIds: [...STAGE_SCOPING_NEW_CASES, ...STAGE_SCOPING_LAST_CHAPTER_CASES] },
     { arm: luna("low", "prod"), samples: 2, scope: "all", caseIds: STAGE_SCOPING_NEW_CASES },
+    { arm: luna("low", "planV2dClimax"), samples: 2, scope: "all", caseIds: STAGE_SCOPING_LAST_CHAPTER_CASES },
   ];
 }
 

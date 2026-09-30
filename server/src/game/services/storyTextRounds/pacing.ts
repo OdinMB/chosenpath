@@ -252,7 +252,21 @@ export function stageOf(recorded: number, intended: number): { stage: number; of
   return { stage: recorded + 1, of: intended, last: recorded + 1 === intended };
 }
 
-function pushedLine(need: OutcomeNeed, stages = false): string {
+/**
+ * The climax clause (planV2dClimax, the owner's open question of 2026-09-29,
+ * measured beside planner v2d): in the story's last thread, an outcome that
+ * still needs several milestones is settled by this thread outright, its
+ * stages k to n together, so its milestone is the outcome's last one (the
+ * milestone rule's "when this is its last one"). Planner v2d keeps stage k
+ * there, and the ending settles the rest.
+ */
+const foldsNeed = (need: OutcomeNeed): boolean => need.stillNeeded >= 2;
+
+function pushedLine(need: OutcomeNeed, stages = false, climax = false): string {
+  if (stages && climax && foldsNeed(need)) {
+    const [from, to] = [need.recorded + 1, need.intended];
+    return `${need.id}: ${need.recorded} of ${need.intended} milestones; ${need.stillNeeded} still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages ${from} ${to - from === 1 ? "and" : "to"} ${to}, the last.`;
+  }
   const size =
     need.stillNeeded === 0
       ? "complete, so this thread's milestone is an aftermath"
@@ -278,21 +292,29 @@ function pickedNeeds(story: Story): { need: OutcomeNeed; slots: string[] }[] {
   return [...byId.values()];
 }
 
+/** Whether the climax clause changes this chapter's request: the story's last thread, on an outcome still needing several milestones. */
+export function foldsStages(story: Story): boolean {
+  return isLastChapter(turnsLeft(story)) && pickedNeeds(story).some((p) => foldsNeed(p.need));
+}
+
 /**
  * The block for the chapter planner, at the end of its state; `stages`
  * (planner v2d) names the stage each pushed outcome's thread settles, and
- * without it the block is planner v2's to v2c's as they ran.
+ * without it the block is planner v2's to v2c's as they ran; `climax` with it
+ * (planV2dClimax) folds the stages left in the story's last thread, and is
+ * planner v2d's block wherever foldsStages is false.
  */
-export function threadPacingBlock(story: Story, options: { stages?: boolean } = {}): string {
+export function threadPacingBlock(story: Story, options: { stages?: boolean; climax?: boolean } = {}): string {
   const left = turnsLeft(story);
   const turn = story.getCurrentTurn() + 1;
   const last = isLastChapter(left);
   const stages = options.stages ?? false;
+  const climax = last && (options.climax ?? false);
   const lines = ["======= PACING =======", `This thread starts at turn ${turn} of ${story.getMaxTurns()}; ${plural(left, "turn")} ${left === 1 ? "is" : "are"} left, this one included.`];
   lines.push(last ? `This is the story's last thread: exactly ${left} beats. It is the story's climax.` : `Allowed lengths for this thread: ${lengthsText(allowedLengths(left))}.`);
   const picked = pickedNeeds(story);
-  if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need, stages)}`);
-  else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need, stages)} (${p.slots.join(", ")})`));
+  if (picked.length === 1 && !story.isMultiplayer()) lines.push(`The outcome this thread pushes: ${pushedLine(picked[0].need, stages, climax)}`);
+  else if (picked.length > 0) lines.push("The outcomes the players' choices set:", ...picked.map((p) => `- ${pushedLine(p.need, stages, climax)} (${p.slots.join(", ")})`));
   lines.push(recentLine(story, false));
   lines.push(`Phase: ${THREAD_PHASE[phaseOf(turn, story.getMaxTurns(), last)]}`);
   return lines.join("\n");

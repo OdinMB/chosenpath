@@ -157,6 +157,10 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * one the chapter settles, and its question, steps and results stay within
  * it; the reply names the stages before the question. Its switch planner is
  * planV2b's.
+ * "planV2dClimax" is planV2d with the climax clause (the owner's open question
+ * of 2026-09-29, measured on the built last chapters only): in the story's
+ * last thread an outcome still needing several milestones is settled outright,
+ * its stages left together; elsewhere planV2d byte for byte.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -201,7 +205,8 @@ export type VariantId =
   | "adoptedTemplate"
   | "setupR3c"
   | "setupR3d"
-  | "planV2d";
+  | "planV2d"
+  | "planV2dClimax";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -243,6 +248,7 @@ export const VARIANTS: VariantId[] = [
   "setupR3c",
   "setupR3d",
   "planV2d",
+  "planV2dClimax",
 ];
 
 /**
@@ -472,14 +478,19 @@ function setupRound2(variant: VariantId, order: Round2Order, parts: Round1Parts 
 /**
  * Turn round 1's planner v2, lean or with the restated instructions, or
  * (planV2b) with two-sided contests only, or (planV2c) planV2b with the
- * nearer chapter question, or (planV2d) planV2c with the outcome's stages:
- * switch and thread analysis. The switch planner is planner v2's in all of them.
+ * nearer chapter question, or (planV2d) planV2c with the outcome's stages,
+ * or (planV2dClimax) planV2d with the climax clause: switch and thread
+ * analysis. The switch planner is planner v2's in all of them.
  */
-function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQuestion = false, stages = false) {
+function plannerV2(variant: VariantId, full: boolean, twoSided = false, nearerQuestion = false, stages = false, climax = false) {
   return (input: RequestInput): Round2Request => {
     if (input.role === "switch") return plannerV2SwitchRequest(input.story, full);
     if (input.role === "thread") {
-      return plannerV2ThreadRequest(input.story, full, twoSided ? { twoSided, ...(nearerQuestion ? { nearerQuestion } : {}), ...(stages ? { stages } : {}) } : {});
+      return plannerV2ThreadRequest(
+        input.story,
+        full,
+        twoSided ? { twoSided, ...(nearerQuestion ? { nearerQuestion } : {}), ...(stages ? { stages } : {}), ...(climax ? { climax } : {}) } : {}
+      );
     }
     throw new Error(`Variant ${variant} does not cover role ${input.role}`);
   };
@@ -545,6 +556,7 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   planV2b: plannerV2("planV2b", false, true),
   planV2c: plannerV2("planV2c", false, true, true),
   planV2d: plannerV2("planV2d", false, true, true, true),
+  planV2dClimax: plannerV2("planV2dClimax", false, true, true, true, true),
   turnB6: (input) => {
     if (input.role !== "beat") throw new Error(`Variant turnB6 does not cover role ${input.role}`);
     return todaysFormWithB6Request(input.story);

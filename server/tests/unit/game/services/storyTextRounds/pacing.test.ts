@@ -3,6 +3,7 @@ import { GameModes } from "core/types/index.js";
 import {
   allowedLengths,
   chaptersThatFit,
+  foldsStages,
   isLastChapter,
   lastChapterAfterSwitch,
   mainOutcomeId,
@@ -302,5 +303,49 @@ describe("threadPacingBlock with the outcome's stages (planner v2d, the owner's 
     expect(stageOf(3, 3)).toBeUndefined();
     expect(stageOf(4, 3)).toBeUndefined();
     expect(stageOf(0, 0)).toBeUndefined();
+  });
+});
+
+describe("threadPacingBlock with the climax clause (planV2dClimax, the owner's open question of 2026-09-29)", () => {
+  const onGuild = (recorded: number, intended: number, turns = 5, maxTurns = 20) =>
+    roundStory({
+      turns,
+      maxTurns,
+      playerOutcomes: { player1: [outcome(GUILD, { intendedNumberOfMilestones: intended, milestones: Array.from({ length: recorded }, (_, i) => `m${i + 1}`) }), outcome(ENCLAVE)] },
+      phases: [flavorSwitch(GUILD, "q", turns - 1)],
+    });
+  const climax = { stages: true, climax: true } as const;
+
+  it("in the story's last thread, settles every stage the outcome has left: its milestone is the outcome's last", () => {
+    const block = threadPacingBlock(onGuild(1, 3, 17, 20), climax);
+    expect(block).toContain("This is the story's last thread: exactly 3 beats. It is the story's climax.");
+    expect(block).toContain(
+      `${GUILD}: 1 of 3 milestones; 2 still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages 2 and 3, the last.`
+    );
+    expect(threadPacingBlock(onGuild(0, 4, 17, 20), climax)).toContain(
+      `${GUILD}: 0 of 4 milestones; 4 still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages 1 to 4, the last.`
+    );
+    expect(foldsStages(onGuild(1, 3, 17, 20))).toBe(true);
+  });
+
+  it("is planner v2d's block wherever it changes nothing: before the last thread, or with one milestone or none left", () => {
+    for (const story of [onGuild(1, 3), onGuild(0, 3), onGuild(2, 3, 17, 20), onGuild(1, 1, 17, 20), onGuild(2, 3)]) {
+      expect(threadPacingBlock(story, climax)).toBe(threadPacingBlock(story, { stages: true }));
+      expect(foldsStages(story)).toBe(false);
+    }
+  });
+
+  it("names each group outcome's stages on its own line, folding only those that need several", () => {
+    const story = roundStory({
+      players: 2,
+      turns: 17,
+      maxTurns: 20,
+      sharedOutcomes: [outcome("shared_bounty", { intendedNumberOfMilestones: 3 })],
+      playerOutcomes: { player1: [outcome("player1_a")], player2: [outcome("player2_b")] },
+      phases: [flavorSwitch("shared_bounty", "q", 16, ["player1", "player2"])],
+    });
+    expect(threadPacingBlock(story, climax)).toContain(
+      "- shared_bounty: 0 of 3 milestones; 3 still needed, but this is the story's last thread, so this thread's milestone is its last one; this thread settles stages 1 to 3, the last. (player1, player2)"
+    );
   });
 });
