@@ -41,8 +41,9 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * code (playthroughs: no --run arms; its calls are the --playthroughs mode's
  * prep calls, playthroughMode.ts), then the playthroughs' choices that lead
  * somewhere else (choice-result: the exploration-order turn beside
- * production's, planner v2f beside planner v2e). Their caps and reasons are in
- * budget.ts.
+ * production's, planner v2f beside planner v2e), then that line for a single
+ * player with production's one checked retry in the loop (choice-line-sp).
+ * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -59,6 +60,7 @@ export const FEEDBACK_STAGES = [
   "runaway",
   "playthroughs",
   "choice-result",
+  "choice-line-sp",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -533,9 +535,42 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return runawayArms(role);
     case "choice-result":
       return choiceResultArms(role);
+    case "choice-line-sp":
+      return choiceLineSpArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the choice-line-sp stage (2026-09-30): production's own
+ * code since the choice-result stage's adoption (planner v2f, the exploration
+ * line on group turns), whose single-player turn requests are adopted5's byte
+ * for byte, under a tag of its own so production runs beside the variant in the
+ * same minutes, each with its one checked retry.
+ */
+export const CHOICE_LINE_SP_PROMPT_STATE = "adopted6";
+
+/**
+ * The choice-line-sp stage (the coordinator's brief of 2026-09-30, after the
+ * choice-result run): the exploration-order line for a single player, with
+ * production's one retry of a turn that comes back as one short paragraph in
+ * the loop as its safety net (stageChecksTurns). Production's turn (adopted)
+ * and the line (choiceResult, whose single-player request is production's turn
+ * with the line) on Luna medium, twice on the choice-result run's ten
+ * single-player exploration steps, interleaved, under adopted6.
+ */
+function choiceLineSpArms(role: EvalRole): ArmPlan[] {
+  if (role !== "beat") return [];
+  const single = [...CHOICE_RESULT_STORED_CASES, ...CHOICE_RESULT_BUILT_CASES.single];
+  return (["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single }));
+}
+
+/** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
+const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp"];
+
+export function stageChecksTurns(stage: Stage): boolean {
+  return CHECKED_TURN_STAGES.includes(stage);
 }
 
 /**
@@ -835,7 +870,7 @@ function optionsO2Arms(role: EvalRole): ArmPlan[] {
 }
 
 /** Stages whose arms run interleaved: sample by sample, every arm on a case before the next case (planJobs). */
-const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result"];
+const INTERLEAVED_STAGES: Stage[] = ["options-continuity", "options-o2", "ending-state", "runaway", "choice-result", "choice-line-sp"];
 
 export function stageInterleavesArms(stage: Stage): boolean {
   return INTERLEAVED_STAGES.includes(stage);

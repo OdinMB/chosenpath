@@ -116,6 +116,15 @@ describe("checksForRecords: checks read what the game keeps", () => {
       expect(clean?.checks.noRepairs).toBe(true);
       expect(clean?.counts["repair:statIdSeatForm"]).toBe(0);
     });
+
+    it("checks production's checked retry of a turn on the case's story, and leaves it out of the arm's prose (choice-line-sp, 2026-09-30)", () => {
+      const first = record({ role: "beat", group: "beat", caseId: "c", jobKey: "c|arm|adopted6|s1", jobFinal: false, checkedRetry: "short", outputFile: "outputs/first.json" });
+      const retry = record({ role: "beat", group: "beat", caseId: "c", jobKey: "c|arm|adopted6|s1", step: 2, checkedRetry: "short", outputFile: "outputs/retry.json" });
+      const { checks, prose } = checksForRecords([first, retry], [evalCase("c", "beat", { state })], () => beatSet(1), () => undefined);
+      expect([...checks.keys()].sort()).toEqual(["outputs/first.json", "outputs/retry.json"]);
+      // One beat of prose: the first reply's; the checked-turn report reads the reply the game keeps
+      expect(Object.values(prose).map((p) => p.beats)).toEqual([1]);
+    });
   });
 
   describe("plans", () => {

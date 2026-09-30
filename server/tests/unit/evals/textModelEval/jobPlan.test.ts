@@ -38,6 +38,7 @@ import {
 } from "../../../../src/evals/textModelEval/arms.js";
 import { SWITCH_REMINDER } from "../../../../src/game/services/storyTextRounds/switchReminder.js";
 import { CHOICE_RESULT_TEXT } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
+import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../../../src/game/services/beatChecks.js";
 import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
 import { setupStep } from "../../../../src/game/services/storyTextSteps.js";
 import { planJobs, rebuiltToday, requestInputFor, sameRequestAs, storyAfterAnalysis, todaysRequestHash, type PlanOptions } from "../../../../src/evals/textModelEval/jobPlan.js";
@@ -631,6 +632,59 @@ describe("planJobs: the round stages and the migration check", () => {
       ].sort()
     );
     expect(planJobs(cases, { stage: "choice-result", promptState: "adopted5", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+  });
+
+  it("plans the choice-line-sp stage (2026-09-30): production's turn and the exploration-order turn twice on the single-player steps, interleaved, each with production's one checked retry", () => {
+    const [stored] = CHOICE_RESULT_STORED_CASES;
+    const [single] = CHOICE_RESULT_BUILT_CASES.single;
+    const [group] = CHOICE_RESULT_BUILT_CASES.groups;
+    const exploring = (players: number, id: string) => {
+      const story = threadBeat(players, { id });
+      const state = structuredClone(story.getState());
+      const analysis = state.storyPhases[1] as ThreadAnalysis;
+      analysis.threads = analysis.threads.map((t) => ({ ...t, possibleMilestones: { resolution1: "one", resolution2: "two", resolution3: "three" }, progression: t.progression.map((s) => ({ ...s, possibleResolutions: { resolution1: "one", resolution2: "two", resolution3: "three" } })) }));
+      return state;
+    };
+    const cases = [
+      evalCase(stored, "beat", { state: exploring(1, "story-a") }),
+      evalCase(single, "beat", { state: exploring(1, "story-b"), tags: tags({ source: "round" }) }),
+      evalCase(group, "beat", { state: exploring(2, "story-c"), tags: tags({ source: "round", multiplayer: true, players: 2 }) }),
+    ];
+    const turns = planJobs(cases, { stage: "choice-line-sp", promptState: "adopted6", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(turns.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`).sort()).toEqual(
+      [...[1, 2].flatMap((s) => [stored, single].flatMap((c) => ["adopted", "choiceResult"].map((v) => `${c} s${s} gpt-6-luna@medium/${v}`)))].sort()
+    );
+    // Interleaved: both arms on a case before the next case; the requests differ by the exploration line alone
+    const onSingle = turns.filter((j) => j.caseId === single && j.sample === 1);
+    expect(Math.abs(turns.indexOf(onSingle[0]) - turns.indexOf(onSingle[1]))).toBe(1);
+    const [production, variant] = onSingle.map((j) => requestText(j.first.request()));
+    expect(variant.replace(CHOICE_RESULT_TEXT.explorationOrder, "")).toBe(production);
+    // Production's one checked retry on every job: its check is production's, and so is the retry's request
+    const reply = (paragraphs: number, options: number) => ({
+      player1: { text: Array.from({ length: paragraphs }, (_, i) => `Paragraph ${i + 1}. It goes on. And on.`).join("\n\n"), options: Array.from({ length: options }, (_, i) => ({ text: `Option ${i + 1}` })) },
+    });
+    for (const job of turns) {
+      expect(job.retry).toBeDefined();
+      const retry = job.retry as NonNullable<Job["retry"]>;
+      expect(retry.problemOf(reply(5, 3))).toBeUndefined();
+      expect(retry.problemOf(reply(1, 3))).toEqual({ text: shortTextProblem(reply(1, 3) as never), kind: "short" });
+      expect(retry.problemOf(reply(5, 0))).toEqual({ text: missingOptionsProblem(reply(5, 0) as never), kind: "noOptions" });
+      expect(retry.problemOf(reply(1, 0))).toEqual({ text: beatReplyProblem(reply(1, 0) as never), kind: "both" });
+      const problem = retry.problemOf(reply(1, 3)) as { text: string; kind: "short" };
+      const again = retry.build(problem);
+      const first = job.first.request() as { prompt: string; schema: unknown; limits?: unknown };
+      const asked = again.request() as { prompt: string; schema: unknown; limits?: unknown };
+      expect(asked.prompt).toBe(withBeatProblem(first.prompt, problem.text));
+      expect(asked.schema).toBe(first.schema);
+      expect(callLimitsOf(asked as never)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: 12_000 });
+      expect([again.role, again.arm.key, again.players]).toEqual(["beat", job.first.arm.key, 1]);
+      expect(retry.estimate).toEqual(job.first.estimate);
+    }
+    // No group turn, no planner, and no earlier stage's turn carries the retry
+    expect(planJobs(cases, { stage: "choice-line-sp", promptState: "adopted6", roles: ["switch", "thread"], mode: "pipeline", subset15: false, records: [] })).toEqual([]);
+    const earlier = planJobs(cases, { stage: "choice-result", promptState: "adopted5", roles: ["beat"], mode: "isolated", subset15: false, records: [] });
+    expect(earlier.length).toBeGreaterThan(0);
+    expect(earlier.every((j) => j.retry === undefined)).toBe(true);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

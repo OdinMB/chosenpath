@@ -2,7 +2,7 @@ import { armStatsOf, isResultRecord, type ArmStats } from "./armStats.js";
 import { chainKey, chainReferenceKey, chainSides, noiseReferenceKey, referenceKey, secondReferenceKeys, standInKey } from "./arms.js";
 import type { CaseTags } from "./cases.js";
 import { RATIOS } from "./checkBaselines.js";
-import { finishesJob, type CallRecord } from "./runner.js";
+import { finishesFirstReply, type CallRecord } from "./runner.js";
 import { meanMove, rateMove, type MeanMove, type RateMove, type Tally } from "./stopRule.js";
 import type { CheckResult } from "./textChecks.js";
 
@@ -83,8 +83,13 @@ export function referenceKeyOf(armKey: string): string | undefined {
 }
 
 const pairOf = (r: CallRecord) => `${r.caseId}|${r.sample}`;
-/** The runner's "finished": a pair whose only final record is a rejected request waits for its re-run, so it is not one. */
-const finishedPairs = (records: CallRecord[]) => new Set(records.filter(finishesJob).map(pairOf));
+/**
+ * The runner's "finished": a pair whose only final record is a rejected
+ * request waits for its re-run, so it is not one. A turn's first reply that
+ * production's checked retry follows is (the readings read a turn by its first
+ * reply; its job ends with the retry).
+ */
+const finishedPairs = (records: CallRecord[]) => new Set(records.filter(finishesFirstReply).map(pairOf));
 
 type Inputs = { checks: Map<string, CheckResult>; tags: Map<string, CaseTags> };
 

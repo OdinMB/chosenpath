@@ -100,6 +100,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   runaway: "The runaway turn (noSwitchReminder beside production's request on the case that ran away)",
   playthroughs: "Whole-story playthroughs (no --run jobs: --playthroughs plays them, listed below)",
   "choice-result": "Choices and results (choiceResult beside production's turn under adopted5, --role beat; planV2f beside planV2e under round0, --role thread)",
+  "choice-line-sp": "The exploration line for one player (choiceResult beside production's turn under adopted6, each with production's one checked retry)",
 };
 
 /** Jobs by arm key, in plan order. */
@@ -178,6 +179,12 @@ export async function printDryRun(input: DryRunInput): Promise<void> {
     const byRole = open.reduce<Record<string, number>>((acc, j) => ((acc[j.group] = (acc[j.group] ?? 0) + 1), acc), {});
     const minutes = Math.ceil(estimateMinutes(open, input.tpm, input.maxInFlight));
     log(`${label}: ${open.length} jobs ${JSON.stringify(byRole)}, est $${cost.toFixed(2)} (stage cap $${caps.stageCaps[stage]}), at least ${minutes} min`);
+    // Production's one checked retry goes out only where a first reply is short or has no options: its ceiling apart
+    const checked = open.filter((j) => j.retry);
+    if (checked.length) {
+      const ceiling = checked.reduce((sum, j) => sum + (j.retry?.estimate.costUsd ?? 0), 0);
+      log(`  plus production's one retry where a first reply is short or has no options: up to ${checked.length} more calls, at most $${ceiling.toFixed(2)} if every first reply were retried`);
+    }
     // A round's arms are its candidates: each one's open jobs and estimate, for the check by hand before a paid run
     if (ROUND_STAGES.includes(stage)) {
       for (const [armKey, armJobs] of byArm(open)) {

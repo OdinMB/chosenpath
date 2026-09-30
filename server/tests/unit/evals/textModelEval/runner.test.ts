@@ -3,6 +3,7 @@ import { resolveCaps } from "../../../../src/evals/textModelEval/budget.js";
 import { sha256, type CallSpec, type ExecutedCall } from "../../../../src/evals/textModelEval/executor.js";
 import {
   finishedJobKeys,
+  finishesFirstReply,
   finishesJob,
   finishingRecord,
   jobKey,
@@ -10,6 +11,7 @@ import {
   oneRecordPerAttempt,
   runJobs,
   type CallRecord,
+  type CheckedRetry,
   type Job,
   type RunnerDeps,
 } from "../../../../src/evals/textModelEval/runner.js";
@@ -337,6 +339,82 @@ describe("runJobs", () => {
       const result = await run;
       expect(result.stoppedReason).toMatch(/max-spend/);
       expect(new Set(started)).toEqual(new Set(["a1"]));
+    });
+  });
+
+  describe("production's one checked retry of a turn (the choice-line-sp stage, 2026-09-30)", () => {
+    /** A turn job with production's check: the first reply's problem, and the retry told it. */
+    const checked = (problemOf: CheckedRetry["problemOf"], built: string[] = []): Job => ({
+      ...job("t", "beat", LUNA, { stage: "choice-line-sp", promptState: "adopted6" }),
+      retry: {
+        problemOf,
+        estimate: { inputTokens: 100, outputTokens: 100, costUsd: 0.01 },
+        build: (problem) => {
+          built.push(problem.text);
+          return plannedCall("beat", LUNA, 0.01, `prompt\n\nYour previous reply could not be used: ${problem.text}. Write the beats again.`);
+        },
+      },
+    });
+    const short = () => ({ text: "the text for player1 is a single paragraph", kind: "short" as const });
+
+    it("sends the retry as the job's second step where the check finds a problem, told the problem; the first reply does not end the job", async () => {
+      const built: string[] = [];
+      const seen: unknown[] = [];
+      const { d, calls, records } = deps(() => executed("valid"));
+      await runJobs([checked((parsed) => (seen.push(parsed), seen.length === 1 ? short() : undefined), built)], d, { caps, previous: [], maxInFlight: 1 });
+      expect(built).toEqual(["the text for player1 is a single paragraph"]);
+      expect(calls.map((c) => ("prompt" in c.request ? c.request.prompt : ""))).toEqual(["prompt", expect.stringMatching(/could not be used: the text for player1 is a single paragraph\. Write the beats again\.$/)]);
+      // The check reads the first reply as parsed, and never the retry's: production uses a second short reply as it is
+      expect(seen).toEqual([{ ok: true }]);
+      expect(records.map((r) => [r.step, r.final, r.jobFinal, r.checkedRetry])).toEqual([
+        [1, true, false, "short"],
+        [2, true, true, "short"],
+      ]);
+      // Each step keeps its own callId, and a chain's fields stay empty
+      expect(new Set(calls.map((c) => c.callId)).size).toBe(2);
+      expect(records.map((r) => [r.chainId, r.turnLatencyMs])).toEqual([
+        [undefined, undefined],
+        [undefined, undefined],
+      ]);
+      expect(finishedJobKeys(records).size).toBe(1);
+      expect(finishesFirstReply(records[0])).toBe(true);
+    });
+
+    it("sends no retry where the first reply has no problem, and none after a reply production could not parse", async () => {
+      const fine = deps(() => executed("valid"));
+      await runJobs([checked(() => undefined)], fine.d, { caps, previous: [], maxInFlight: 1 });
+      expect(fine.records.map((r) => [r.step, r.jobFinal, r.checkedRetry])).toEqual([[1, true, undefined]]);
+      // After its re-sends the turn failed outright, as production's LangChain call does: nothing is checked
+      const failed = deps(() => executed("invalid-json"));
+      const asked: unknown[] = [];
+      await runJobs([checked((parsed) => (asked.push(parsed), short()))], failed.d, { caps, previous: [], maxInFlight: 1 });
+      expect(asked).toEqual([]);
+      expect(failed.records.map((r) => [r.step, r.final, r.jobFinal])).toEqual([
+        [1, false, false],
+        [1, false, false],
+        [1, true, true],
+      ]);
+    });
+
+    it("re-sends the retry's own unparseable replies, as production's LangChain call inside the retry does", async () => {
+      const queue = [executed("valid"), executed("invalid-json"), executed("valid")];
+      const { d, records } = deps(() => queue.shift() as ExecutedCall);
+      await runJobs([checked(short)], d, { caps, previous: [], maxInFlight: 1 });
+      expect(records.map((r) => [r.step, r.attempt, r.final, r.jobFinal, r.outcome])).toEqual([
+        [1, 1, true, false, "valid"],
+        [2, 1, false, false, "invalid-json"],
+        [2, 2, true, true, "valid"],
+      ]);
+    });
+
+    it("keeps a job open whose retry was due but never recorded (an interrupted run), and reads its first reply as finished for the readings", () => {
+      const first = record({ jobKey: "k", step: 1, jobFinal: false, checkedRetry: "short" });
+      expect(finishedJobKeys([first]).size).toBe(0);
+      expect(finishesFirstReply(first)).toBe(true);
+      expect(finishesFirstReply(record({ jobKey: "k", step: 1 }))).toBe(true);
+      // A chain's planner step is no first reply of a turn, nor is a non-final attempt
+      expect(finishesFirstReply(record({ jobKey: "k", step: 1, jobFinal: false, group: "pipeline" }))).toBe(false);
+      expect(finishesFirstReply(record({ jobKey: "k", step: 1, final: false, jobFinal: false, checkedRetry: "short" }))).toBe(false);
     });
   });
 

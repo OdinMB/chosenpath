@@ -1,6 +1,7 @@
 import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
+import { isCheckedRetry } from "./armStats.js";
 import { caseStory, type EvalCase } from "./cases.js";
 import { setupInputOf, storyAfterAnalysis } from "./jobPlan.js";
 import { usable, type CallRecord } from "./runner.js";
@@ -121,7 +122,8 @@ export function checksForRecords(
       const own = Object.entries(reply)
         .filter(([slot]) => /^player\d+$/.test(slot))
         .map(([, beat]) => (beat && typeof beat === "object" && "text" in beat ? String(beat.text) : ""));
-      texts.set(key, [...(texts.get(key) ?? []), ...own]);
+      // An arm's prose reads each turn once, by its first reply, as the other readings do (a checked retry is checked, not counted)
+      if (!isCheckedRetry(record)) texts.set(key, [...(texts.get(key) ?? []), ...own]);
     } else if (record.role === "switch") {
       const story = caseStory(evalCase, false);
       const checked = checkSwitchPlan(story, output as SwitchAnalysis);

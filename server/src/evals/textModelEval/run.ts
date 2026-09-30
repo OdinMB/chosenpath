@@ -46,6 +46,7 @@ import { DEFAULT_TOKENS_PER_MINUTE, finishedJobKeys, finishingRecord, keyOf, run
 import { buildStageCasesMode, judgeStagesMode } from "./stagePrep.js";
 import { buildEndingCasesMode, judgeEndingsMode } from "./endingPrep.js";
 import { buildChoiceCasesMode, judgeChoiceResultsMode } from "./choiceResultPrep.js";
+import { choiceLineMode } from "./choiceLinePrep.js";
 import { statReadouts } from "./turnDesignChecks.js";
 import { turnKindOf } from "./turnWaits.js";
 import {
@@ -76,7 +77,8 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *     runaway under adopted4: production's request and noSwitchReminder three times each on the switch turn that
  *     reasoned to its output cap, interleaved; choice-result in two parts: --role beat under adopted5, production's
  *     turn and choiceResult on the exploration steps, interleaved, then --role thread under round0, planner v2e and
- *     v2f on the chapter plans beside planner v2e's stored plans)
+ *     v2f on the chapter plans beside planner v2e's stored plans; choice-line-sp --role beat under adopted6: the
+ *     same on the single-player steps, each turn with production's one checked retry)
  *     (refuses the retired "prefix" and "postfix"; the rounds and the migration check run no baseline)
  *   --rating-page setup|turn --arms <k1,k2,…> [--items N] [--per-item K] [--pairwise] [--no-repeat] [--preview [--stored]]
  *     (--per-item K: the baseline plus K rotating candidates per item; --cases limits the regular items;
@@ -129,6 +131,12 @@ import { CURRENT_PROMPT_STATE, PRE_FIX_PROMPT_STATE, retiredPromptStateProblem }
  *   --judge-choice-results [--max-spend 0.15]  the two judged checks (choiceResultJudge.ts): their calibration on the
  *     playthroughs (two samples) and the stage's turns (adopted5) and plans (round0), one sample each, then
  *     judged-choice-results.md and .json; --cases <item or case ids> sends only those (a smoke)
+ *   The exploration line for one player (choiceLinePrep.ts, 2026-09-30), in the choice-line-sp stage: its turns run with
+ *   --run --stage choice-line-sp --role beat --prompt-state adopted6 (production's turn and choiceResult, interleaved, each
+ *   with production's one checked retry of a short or option-less first reply as its second step), then
+ *   --choice-line-sp [--max-spend 0.10] [--report-only]  the options judge on every reply (first and retry, one sample),
+ *     then choice-line-sp.md and .json: each turn read whole (checkedTurns.ts), the reply the game keeps, the wait
+ *     including the retry, cost; --cases <case ids> judges only those (a smoke)
  *   --balance-sim [--arms <beat keys>] [--prompt-state <tag>]  B6's balance simulation over the stored challenge
  *     options of today's form (balanceSim.ts), balance-sim.md; no API calls
  *   --setup-chain [--cases <chain ids>] [--samples N] [--max-spend 0.20] [--report-only] [--merge <chain file>]  setup
@@ -173,6 +181,7 @@ type Mode =
   | "judge-endings"
   | "build-choice-cases"
   | "judge-choice-results"
+  | "choice-line-sp"
   | "balance-sim"
   | "setup-chain"
   | "playthroughs";
@@ -296,6 +305,7 @@ function parseArgs(argv: string[]): Args {
       case "--judge-endings":
       case "--build-choice-cases":
       case "--judge-choice-results":
+      case "--choice-line-sp":
       case "--balance-sim":
       case "--setup-chain":
       case "--playthroughs":
@@ -978,6 +988,9 @@ async function main() {
     case "judge-choice-results":
       // The stage's judged checks book to its own stage unless another is given
       return judgeChoiceResultsMode(prepContext(args, files, args.stage ?? "choice-result"), { stage: args.stage ?? "choice-result", caseIds: args.caseIds });
+    case "choice-line-sp":
+      // The stage's options judge books to its own stage; --report-only renders the report afresh without a call
+      return choiceLineMode(args.reportOnly ? reportContext(files) : prepContext(args, files, "choice-line-sp"), { reportOnly: args.reportOnly, caseIds: args.caseIds });
     case "balance-sim":
       return balanceSimMode(args, files);
     case "setup-chain":

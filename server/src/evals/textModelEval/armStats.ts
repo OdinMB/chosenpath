@@ -262,11 +262,20 @@ export function armStatsOf(
 
 /**
  * Whether a record counts towards an arm's results: frozen cases only (case
- * building on other inputs counts as spend, not as results), and chains by
- * their beat step.
+ * building on other inputs counts as spend, not as results), chains by their
+ * beat step, and a turn by its first reply: production's one checked retry
+ * (a turn's step 2, the choice-line-sp stage) is read in the checked-turn
+ * report (checkedTurns.ts), with the reply the game keeps.
  */
 export function isResultRecord(record: CallRecord, tags: Map<string, CaseTags>): boolean {
-  return tags.has(record.caseId) && (record.group !== "pipeline" || record.step === 2);
+  if (!tags.has(record.caseId)) return false;
+  if (record.group === "pipeline") return record.step === 2;
+  return !isCheckedRetry(record);
+}
+
+/** A turn's second step: production's one checked retry of a short or option-less first reply (runner.ts, CheckedRetry). */
+export function isCheckedRetry(record: Pick<CallRecord, "group" | "step">): boolean {
+  return record.group === "beat" && record.step === 2;
 }
 
 /** One entry per prompt state, group and arm, over the frozen cases. Chains are summarised by their beat step. */

@@ -136,6 +136,20 @@ describe("variantComparisons", () => {
     expect(comparison.arm.turnLatencies).toEqual([30]);
   });
 
+  it("reads a checked turn by its first reply: a pair whose first reply production's check asked again is finished, and the retry is no call of its own (choice-line-sp, 2026-09-30)", () => {
+    const [LINE, ADOPTED] = ["gpt-6-luna@medium/choiceResult", "gpt-6-luna@medium/adopted"];
+    const records = [
+      // The line's first reply came back short: its job ends with the retry, step 2, which the checked-turn report reads
+      call(LINE, "a", 1, { jobFinal: false, checkedRetry: "short", outputTokens: 400 }),
+      call(LINE, "a", 1, { step: 2, checkedRetry: "short", outputTokens: 2_000, outputFile: "retry" }),
+      call(ADOPTED, "a", 1, { outputTokens: 1_000 }),
+    ];
+    const [comparison] = variantComparisons(records, new Map(), caseTags("a"), "postfix");
+    expect(comparison).toMatchObject({ armKey: LINE, referenceKey: ADOPTED, pairs: 1 });
+    expect(comparison.arm.calls).toBe(1);
+    expect(comparison.arm.medianTokens.output).toBe(400);
+  });
+
   describe("the stop rule's moved reading (owner, 2026-09-27)", () => {
     // 20 cases at two samples on each side: 40 matched pairs
     const cases = Array.from({ length: 20 }, (_, i) => `c${i}`);

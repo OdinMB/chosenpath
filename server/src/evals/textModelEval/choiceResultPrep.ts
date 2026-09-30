@@ -117,18 +117,25 @@ export function turnsToJudgeOptions({ records, cases, load }: Lookup): ToJudge[]
   return records.flatMap((r): ToJudge[] => {
     if (r.group !== "beat" || !r.final || !usable(r) || !r.outputFile || r.promptState !== CHOICE_RESULT_PROMPT_STATE || !CHOICE_TURN_ARMS.includes(r.armKey)) return [];
     const evalCase = byId.get(r.caseId);
-    if (!evalCase?.state || !TURN_CASES.has(r.caseId)) return [];
-    const parsed = load(r) as SetOfBeatGenerationSchema | undefined;
-    if (!parsed) return [];
-    const story = caseStory(evalCase);
-    const reply = repairBeatReply(story, parsed).reply;
-    const outputId = outputIdOf(r.outputFile);
-    const targets = story.getPlayerSlots().flatMap((slot) => {
-      const request = optionsJudgeRequest(story, reply, slot as PlayerSlot);
-      return request ? [{ check: OPTIONS_CHECK, key: `${outputId}-${slot}`, request, samples: 1, slot: slot as PlayerSlot }] : [];
-    });
-    return targets.length ? [{ armKey: r.armKey, caseId: r.caseId, sample: r.sample, outputId, targets }] : [];
+    if (!TURN_CASES.has(r.caseId)) return [];
+    const item = optionTargetsOf(r, evalCase, load);
+    return item ? [item] : [];
   });
+}
+
+/** One reply's options judge calls, one per exploring player, read after the beat repairs; undefined where no player explores or nothing is stored. */
+export function optionTargetsOf(r: CallRecord, evalCase: EvalCase | undefined, load: (record: CallRecord) => unknown): ToJudge | undefined {
+  if (!evalCase?.state || !r.outputFile) return undefined;
+  const parsed = load(r) as SetOfBeatGenerationSchema | undefined;
+  if (!parsed) return undefined;
+  const story = caseStory(evalCase);
+  const reply = repairBeatReply(story, parsed).reply;
+  const outputId = outputIdOf(r.outputFile);
+  const targets = story.getPlayerSlots().flatMap((slot) => {
+    const request = optionsJudgeRequest(story, reply, slot as PlayerSlot);
+    return request ? [{ check: OPTIONS_CHECK, key: `${outputId}-${slot}`, request, samples: 1, slot: slot as PlayerSlot }] : [];
+  });
+  return targets.length ? { armKey: r.armKey, caseId: r.caseId, sample: r.sample, outputId, targets } : undefined;
 }
 
 /** Every final usable plan of the planner arms under the planners' tag on the stage's plan cases, one call per plan, after the plan check. */

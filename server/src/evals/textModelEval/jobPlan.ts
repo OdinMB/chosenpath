@@ -1,8 +1,9 @@
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
 import type { Story } from "core/models/Story.js";
+import { beatReplyProblem, missingOptionsProblem, shortTextProblem, withBeatProblem } from "../../game/services/beatChecks.js";
 import { checkSwitchPlan, checkThreadPlan } from "../../game/services/planChecks.js";
 import { switchStep, threadStep, type TextRequest } from "../../game/services/storyTextSteps.js";
-import type { SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
+import type { SetOfBeatGenerationSchema, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import {
   armsFor,
   baselineArm,
@@ -10,6 +11,7 @@ import {
   chainSides,
   estimateBaseKey,
   pipelinePlans,
+  stageChecksTurns,
   stageInterleavesArms,
   stagePlansCase,
   stageRunsBaseline,
@@ -21,7 +23,7 @@ import {
 import { caseStory, hashOrder, type EvalCase } from "./cases.js";
 import { sha256 } from "./executor.js";
 import { estimateCall, MIN_MEASURED_RECORDS } from "./pricing.js";
-import { keyOf, usable, type CallRecord, type Job, type PlannedCall } from "./runner.js";
+import { keyOf, usable, type CallRecord, type CheckedRetry, type Job, type PlannedCall } from "./runner.js";
 import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, type RequestInput, type SetupInput, type VariantId } from "./variants.js";
 
 /*
@@ -34,7 +36,8 @@ import { isSplitRequest, requestFor, requestText, VARIANTS, type EvalRequest, ty
  * are enough, and a new variant borrows until then (estimateBaseKey: a
  * count-fix variant from its Stage 4 form, others along the reference chain).
  * Cases are queued in turn order, and a split request's job carries its
- * cache line, which the runner warms first.
+ * cache line, which the runner warms first. A turn in a stage that measures
+ * production's one checked retry carries it (checkedRetry).
  */
 
 export type PlanOptions = {
@@ -313,7 +316,39 @@ function callJob(options: PlanOptions, evalCase: EvalCase, arm: Arm, sample: num
     baseline: arm.baseline,
     group: evalCase.role,
     first,
+    ...(evalCase.role === "beat" && stageChecksTurns(options.stage) ? { retry: checkedRetry(evalCase, first) } : {}),
     cacheLine: cacheLineOf(arm.key, first.request()),
+  };
+}
+
+/**
+ * Production's one checked retry of a turn (checkedBeatReply, beatChecks.ts;
+ * the choice-line-sp stage, 2026-09-30): production's own check on the first
+ * reply as parsed (beatReplyProblem, with the ending's flag: an ending shows
+ * no options), and the retry as production sends it, the first request told
+ * the problem (withBeatProblem), on the same arm, schema and limits. Only a
+ * one-message request (production's shape) can be retried so.
+ */
+function checkedRetry(evalCase: EvalCase, first: PlannedCall): CheckedRetry {
+  const checks = { ending: caseStory(evalCase).getCurrentBeatType() === "ending" };
+  return {
+    problemOf: (parsed) => {
+      const reply = parsed as SetOfBeatGenerationSchema;
+      const text = beatReplyProblem(reply, checks);
+      if (text === undefined) return undefined;
+      const short = shortTextProblem(reply) !== undefined;
+      const missing = missingOptionsProblem(reply, checks) !== undefined;
+      return { text, kind: short && missing ? "both" : short ? "short" : "noOptions" };
+    },
+    estimate: first.estimate,
+    build: (problem) => ({
+      ...first,
+      request: () => {
+        const request = first.request();
+        if (!("prompt" in request)) throw new Error(`${evalCase.id}: production's checked retry needs a one-message request`);
+        return { ...request, prompt: withBeatProblem(request.prompt, problem.text) };
+      },
+    }),
   };
 }
 

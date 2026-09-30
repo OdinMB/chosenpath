@@ -15,7 +15,10 @@ import type { EvalRequest } from "./variants.js";
  * API rejected (a 400 naming a parameter) counts as not finished, so the next
  * invocation plans it again. Transport failures retry after a backoff; a
  * reply production could not parse is re-sent at once, up to production's
- * retries, as LangChain does in production.
+ * retries, as LangChain does in production. A turn job of a stage that
+ * measures production's one checked retry (a text of one paragraph, a beat
+ * without options: checkedBeatReply) sends that retry as its second step,
+ * right after the first reply, where the check finds a problem.
  *
  * Warm-first: the first call of each cache line (a split request's arm,
  * schema and fixed rules) runs alone, and the rest of that line waits until
@@ -32,6 +35,25 @@ export type PlannedCall = {
   request: () => EvalRequest;
 };
 
+/** Why production's check asked a turn again: a text of one paragraph, a beat without options, or both (beatChecks.ts). */
+export type RetryKind = "short" | "noOptions" | "both";
+
+/**
+ * Production's one checked retry of a turn (checkedBeatReply, beatChecks.ts;
+ * the choice-line-sp stage, 2026-09-30): where the first reply as parsed has
+ * a problem the check names, one more call, the first request told the
+ * problem, as the job's second step. The check reads the first reply only:
+ * production uses a second short reply as it is.
+ */
+export type CheckedRetry = {
+  /** The problem production's check finds in the first reply (its text, which names player slots, never story text), or undefined */
+  problemOf: (parsed: unknown) => { text: string; kind: RetryKind } | undefined;
+  /** The retry call, told the problem */
+  build: (problem: { text: string; kind: RetryKind }) => PlannedCall;
+  /** One retry's estimate, for the dry run's ceiling (the runner reserves the built call's own) */
+  estimate: Estimate;
+};
+
 export type Job = {
   stage: Stage;
   promptState: string;
@@ -45,6 +67,8 @@ export type Job = {
   first: PlannedCall;
   /** Pipeline chains: the beat call, built from the analysis output */
   then?: { estimate: Estimate; arm: Arm; players: number; build: (analysis: unknown) => PlannedCall };
+  /** Turns in a stage that measures production's one checked retry: that retry as the second step, where the check finds a problem */
+  retry?: CheckedRetry;
   /** Split requests: the cached prefix this call shares with others (arm, schema and fixed rules) */
   cacheLine?: string;
 };
@@ -98,6 +122,12 @@ export type CallRecord = {
   errorMessage?: string;
   /** The job's cache line, on every record of the job */
   cacheLine?: string;
+  /**
+   * A turn production's check asked again (CheckedRetry): on the first reply's
+   * final record, which then does not end the job, and on every record of the
+   * retry, step 2
+   */
+  checkedRetry?: RetryKind;
 };
 
 export type RunnerDeps = {
@@ -149,6 +179,16 @@ export function finishesJob(record: Pick<CallRecord, "jobFinal" | "rejectedParam
 
 export function finishedJobKeys(records: CallRecord[]): Set<string> {
   return new Set(records.filter(finishesJob).map((r) => r.jobKey));
+}
+
+/**
+ * Whether a record is a finished first reply for the readings: it finishes its
+ * job, or it is a turn's first reply that production's one checked retry
+ * follows (its job ends with the retry, step 2, which the checked-turn report
+ * reads, checkedTurns.ts). A chain's planner step is no reply of a turn.
+ */
+export function finishesFirstReply(record: Pick<CallRecord, "jobFinal" | "rejectedParam" | "final" | "step" | "group" | "checkedRetry"> & { code?: string | null }): boolean {
+  return finishesJob(record) || (record.final && record.step === 1 && record.group !== "pipeline" && record.checkedRetry !== undefined);
 }
 
 /** The record that finished the job (at most one: a finished job is never sent again), if any. */
@@ -222,6 +262,8 @@ function attemptRecord(input: {
   startedAt: number;
   chainLatencyMs: number;
   drift: boolean;
+  /** Production's checked retry: why the turn is asked again (on the first reply that triggers it, and on the retry's records) */
+  checkedRetry?: RetryKind;
 }): CallRecord {
   const { job, call, executed, step, final } = input;
   const { check, metrics } = executed;
@@ -269,6 +311,7 @@ function attemptRecord(input: {
     promptHashDrift: input.drift || undefined,
     errorMessage: check.errorMessage,
     cacheLine: job.cacheLine,
+    ...(input.checkedRetry ? { checkedRetry: input.checkedRetry } : {}),
   };
 }
 
@@ -355,8 +398,10 @@ export async function runJobs(
     call: PlannedCall,
     step: number,
     isLastStep: boolean,
-    chainLatencyMs: number
-  ): Promise<{ record: CallRecord; executed: ExecutedCall } | undefined> => {
+    chainLatencyMs: number,
+    /** The retry step's reason, on each of its records */
+    retryOf?: RetryKind
+  ): Promise<{ record: CallRecord; executed: ExecutedCall; problem?: { text: string; kind: RetryKind } } | undefined> => {
     const request = call.request();
     const key = keyOf(job);
     const recorded = allRecords.filter((r) => r.jobKey === key && r.step === step).map((r) => r.attempt);
@@ -381,6 +426,8 @@ export async function runJobs(
       const resend =
         PRODUCTION_RETRIED_OUTCOMES.includes(executed.check.outcome) && validityRetries < PRODUCTION_MAX_RETRIES;
       const final = !transportRetry && !resend;
+      // Production checks the first reply it could parse; a turn whose call failed outright is not checked
+      const problem = final && step === 1 && job.retry && usable(executed.check) ? job.retry.problemOf(executed.check.parsed) : undefined;
       const record = attemptRecord({
         job,
         call,
@@ -388,14 +435,15 @@ export async function runJobs(
         step,
         attempt,
         final,
-        isLastStep,
+        isLastStep: isLastStep && !problem,
         startedAt,
         chainLatencyMs,
         drift: step === 1 && driftChecked(job, executed.promptHash),
+        checkedRetry: problem?.kind ?? retryOf,
       });
       invocationSpent += record.costUsd;
       addRecord(record);
-      if (final) return { record, executed };
+      if (final) return { record, executed, problem };
       if (transportRetry) {
         await deps.sleep(executed.capture.retryAfterMs ?? backoffs[transportRetries]);
         transportRetries++;
@@ -407,6 +455,11 @@ export async function runJobs(
 
   const runJob = async (job: Job) => {
     const first = await runStep(job, job.first, 1, !job.then, 0);
+    if (first?.problem && job.retry) {
+      // Production's one checked retry, right after the first reply, told its problem
+      await runStep(job, job.retry.build(first.problem), 2, true, 0, first.problem.kind);
+      return;
+    }
     if (!first || !job.then || !usable(first.record)) return;
     await runStep(job, job.then.build(first.executed.check.parsed), 2, true, first.record.latencyMs);
   };

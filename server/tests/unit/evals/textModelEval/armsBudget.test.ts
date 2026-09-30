@@ -3,6 +3,7 @@ import {
   armsFor,
   armSettings,
   baselineArm,
+  CHOICE_LINE_SP_PROMPT_STATE,
   CHOICE_RESULT_BUILT_CASES,
   CHOICE_RESULT_PLANNER_PROMPT_STATE,
   CHOICE_RESULT_PROMPT_STATE,
@@ -37,6 +38,7 @@ import {
   STAGE_SCOPING_LAST_CHAPTER_CASES,
   STAGE_SCOPING_NEW_CASES,
   STAGES,
+  stageChecksTurns,
   stageInterleavesArms,
   stagePlansCase,
   stageRunsBaseline,
@@ -387,6 +389,7 @@ describe("budget caps", () => {
       runaway: 0.08,
       playthroughs: 0.7,
       "choice-result": 0.4,
+      "choice-line-sp": 0.25,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -403,6 +406,7 @@ describe("budget caps", () => {
       "runaway",
       "playthroughs",
       "choice-result",
+      "choice-line-sp",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -410,9 +414,9 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all fourteen caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all fifteen caps still fit
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(6.13);
+    expect(caps).toBeCloseTo(6.38);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -670,6 +674,31 @@ describe("budget caps", () => {
     // The coordinator's cap: $0.40, inside the $40 hard cap with the ledger at $36.73 and the stalled Stage 4 calls on top
     expect(DEFAULT_STAGE_CAPS["choice-result"]).toBe(0.4);
     expect(36.73 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["choice-result"]).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("runs the choice-line-sp stage (2026-09-30): production's turn and the exploration-order turn twice on the choice-result run's single-player steps, interleaved, with production's one checked retry in the loop", () => {
+    const single = [...CHOICE_RESULT_STORED_CASES, ...CHOICE_RESULT_BUILT_CASES.single];
+    expect(armsFor("choice-line-sp", "beat").map((p) => [p.arm.key, p.fromSample ?? 1, p.samples, p.scope, p.caseIds])).toEqual([
+      ["gpt-6-luna@medium/adopted", 1, 2, "single-player", single],
+      ["gpt-6-luna@medium/choiceResult", 1, 2, "single-player", single],
+    ]);
+    for (const role of ["setup", "switch", "thread", "iteration"] as const) expect(armsFor("choice-line-sp", role)).toEqual([]);
+    expect(pipelinePlans("choice-line-sp")).toEqual([]);
+    expect(stageInterleavesArms("choice-line-sp")).toBe(true);
+    // Its turns carry production's one retry of a short or option-less reply; no earlier stage's do
+    expect(stageChecksTurns("choice-line-sp")).toBe(true);
+    for (const stage of STAGES.filter((s) => s !== "choice-line-sp")) expect(stageChecksTurns(stage)).toBe(false);
+    // Production beside the variant under a tag of its own
+    expect(CHOICE_LINE_SP_PROMPT_STATE).toBe("adopted6");
+    expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE, RUNAWAY_PROMPT_STATE, CHOICE_RESULT_PROMPT_STATE]).not.toContain(CHOICE_LINE_SP_PROMPT_STATE);
+    for (const id of single) expect(stagePlansCase("choice-line-sp", id)).toBe(true);
+    expect(referenceKey("gpt-6-luna@medium/choiceResult")).toBe("gpt-6-luna@medium/adopted");
+    expect(STAGE_CAP_REASONS["choice-line-sp"]).toMatch(/2026-09-30/);
+    expect(STAGE_CAP_REASONS["choice-line-sp"]).toMatch(/retry/);
+    expect(stageRunsBaseline("choice-line-sp")).toBe(false);
+    // The coordinator's cap: $0.25, inside the $40 hard cap with the ledger at $37.11 and the stalled Stage 4 calls on top
+    expect(DEFAULT_STAGE_CAPS["choice-line-sp"]).toBe(0.25);
+    expect(37.11 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["choice-line-sp"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("gives the whole-story playthroughs (playthroughs, 2026-09-30) a stage of their own: no --run arms, their calls prep calls in its ledger", () => {

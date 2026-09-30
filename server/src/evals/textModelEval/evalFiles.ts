@@ -35,6 +35,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-stages.md|json  the stage scoping's judged check, "the chapter stays within its stage", and its calibration (--judge-stages)
  *   judged-endings.md|json the ending's judged check, "each outcome told as its milestones leave it", and its calibration (--judge-endings)
  *   judged-choice-results.md|json  the choice-result stage's judged checks, options against results and results against their kind (--judge-choice-results)
+ *   choice-line-sp.md|json  the exploration line for one player with production's retry in the loop, each turn read whole (--choice-line-sp)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
@@ -147,6 +148,11 @@ export function evalFiles(outDir: string) {
     writeJudgedChoiceResults: (markdown: string, json: unknown) => {
       writeJson(at("judged-choice-results.json"), json);
       fs.writeFileSync(at("judged-choice-results.md"), markdown);
+    },
+    /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
+    writeChoiceLine: (markdown: string, json: unknown) => {
+      writeJson(at("choice-line-sp.json"), json);
+      fs.writeFileSync(at("choice-line-sp.md"), markdown);
     },
     /** Setup round 3's setup-to-play chain (--setup-chain) */
     writeSetupChain: (markdown: string, json: unknown) => {

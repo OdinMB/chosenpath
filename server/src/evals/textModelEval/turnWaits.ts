@@ -1,5 +1,5 @@
 import { chainSides, productionArm } from "./arms.js";
-import { percentile } from "./armStats.js";
+import { isCheckedRetry, percentile } from "./armStats.js";
 import { caseStory, type EvalCase } from "./cases.js";
 import { PREGEN_TURN_CAP_S } from "./gateReadings.js";
 import { PRODUCTION_RETRIED_OUTCOMES, usable, type CallRecord } from "./runner.js";
@@ -135,10 +135,10 @@ export function turnWaitReadings(records: CallRecord[], kinds: Map<string, TurnK
   const kindOf = (r: CallRecord) => kinds.get(r.caseId);
   const resent = jobWaits(records);
   const jobSeconds = (r: CallRecord) => seconds(r.latencyMs + (resent.get(attemptKey(r)) ?? 0));
-  // Turns alone
+  // Turns alone, by their first reply (production's checked retry, a turn's step 2, waits in the checked-turn report)
   const turns = bucketed(records, (r) => {
     const kind = kindOf(r);
-    return r.group === "beat" && r.role === "beat" && kind ? [r.promptState, r.armKey, r.players, kind].join(SEP) : undefined;
+    return r.group === "beat" && r.role === "beat" && !isCheckedRetry(r) && kind ? [r.promptState, r.armKey, r.players, kind].join(SEP) : undefined;
   });
   // Planners alone, by role
   const planners = bucketed(records, (r) =>
@@ -230,7 +230,7 @@ export function turnWaitsBySample(records: CallRecord[], kinds: Map<string, Turn
   const groups = new Map<string, CallRecord[]>();
   for (const r of records) {
     const kind = kinds.get(r.caseId);
-    const isTurn = (r.group === "beat" && r.role === "beat") || (r.group === "pipeline" && r.step === 2);
+    const isTurn = (r.group === "beat" && r.role === "beat" && !isCheckedRetry(r)) || (r.group === "pipeline" && r.step === 2);
     if (!kind || !isTurn || !good(r)) continue;
     const key = [r.promptState, r.armKey, r.players, kind, r.sample].join(SEP);
     groups.set(key, [...(groups.get(key) ?? []), r]);

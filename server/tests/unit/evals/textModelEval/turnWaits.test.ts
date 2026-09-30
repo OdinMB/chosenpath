@@ -158,6 +158,20 @@ describe("a re-sent attempt is part of its turn's wait (turn round 3: B9's outpu
   });
 });
 
+describe("production's checked retry of a turn (choice-line-sp, 2026-09-30) is no turn of its own here", () => {
+  const LINE = "gpt-6-luna@medium/choiceResult";
+  const kinds = new Map<string, TurnKind>([["step-1", "chapter step"]]);
+  const step = (n: number, seconds: number, overrides: Partial<CallRecord> = {}) =>
+    record({ jobKey: `step-1|${LINE}|adopted6|s1`, promptState: "adopted6", caseId: "step-1", armKey: LINE, callArmKey: LINE, model: "gpt-6-luna", baseline: false, step: n, latencyMs: seconds * 1000, ...overrides });
+  // The first reply came back short and was asked again; the whole wait is the checked-turn report's (checkedTurns.ts)
+  const records = [step(1, 20, { jobFinal: false, checkedRetry: "short" }), step(2, 30, { checkedRetry: "short" })];
+
+  it("reads the first reply's wait alone, per kind and per sample", () => {
+    expect(turnWaitReadings(records, kinds)).toEqual([expect.objectContaining({ armKey: LINE, turns: 1, turnP95: 20 })]);
+    expect(turnWaitsBySample(records, kinds)).toEqual([expect.objectContaining({ armKey: LINE, turns: 1, p95: 20 })]);
+  });
+});
+
 describe("turnWaitsBySample: each sample of an arm as its own run, for the drift between runs (turn round 2)", () => {
   const kinds = new Map<string, TurnKind>([
     ["step-1", "chapter step"],

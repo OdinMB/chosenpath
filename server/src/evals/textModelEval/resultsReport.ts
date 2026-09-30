@@ -398,7 +398,8 @@ function renderChainWaits(comparisons: VariantComparison[]): string[] {
   ];
 }
 
-function renderVariantComparison(comparisons: VariantComparison[]): string[] {
+/** The variants against their reference, every table (also the checked-turn report's, choiceLinePrep.ts). */
+export function renderVariantComparison(comparisons: VariantComparison[]): string[] {
   if (comparisons.length === 0) return [];
   return [
     "",

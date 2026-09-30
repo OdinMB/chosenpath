@@ -14,7 +14,7 @@ export { FEEDBACK_STAGES };
  * (going on although the stalled Stage 4 calls may have been billed). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -49,6 +49,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   runaway: 0.08,
   playthroughs: 0.7,
   "choice-result": 0.4,
+  "choice-line-sp": 0.25,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27 and to $40 on 2026-09-28. */
 export const HARD_CEILING = 40;
@@ -109,6 +110,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (the owner's \"do whatever additional tests you think are useful\"; the coordinator chose whole-story playthroughs; the ledger at $36.20 of the $40 hard cap): four stories set up and played to their ending on production's own code and models (adopted, under adopted4: setup, character selection, both planners with pacing and their retry, turns with repairs, stat changes, chapter resolution, the ending), an automated player, no pregeneration: a 10-turn and a 25-turn single-player story, a 25-turn two-player contest and a 25-turn three-player cooperative-competitive story, about 150 calls, about $0.49 at the final check's measured costs ($0.0034 a single-player turn, $0.0043-0.0055 a group turn, $0.0011-0.0014 a plan, $0.006-0.009 a setup), the judged stage and ending checks on them (about 30 Luna low calls, about $0.01), a two-turn smoke, and the retries and runaways production's own re-sends pay",
   "choice-result":
     "coordinator, 2026-09-30 (after the playthroughs: exploration options that carry out another step result than the one at their position, and challenge results that say what the player does, so the next turn follows the result and not the choice; the ledger at $36.73 of the $40 hard cap): the exploration-order turn (choiceResult) and production's turn beside it (adopted, under adopted5), twice on the two stored exploration steps and eleven built from the playthroughs' stored runs (eight single-player, three group; 52 turns, about $0.21 at $0.0037 a single-player and $0.005-0.0065 a group turn); planner v2f (planV2f: challenge and contest results say how the attempt turns out, exploration results are the player's own choices) and planner v2e beside it twice on five built chapter plans, and planner v2f once on the 23 other chapter-planning cases beside planner v2e's stored plans (under round0; 43 plans, about $0.065); the two judged checks' calibration on hand-read playthrough turns and plans and their readings (about 230 Luna low calls, about $0.09-0.11), the judged stage check on planner v2f's plans, and a smoke; the one fix-and-retest (2026-09-30, after the run: 3 of the variant's 20 single-player replies one short paragraph): the same line asking for the full text (choiceResultB) twice on the ten single-player steps (about $0.06) and its judged turns, from what is left",
+  "choice-line-sp":
+    "coordinator, 2026-09-30 (after the choice-result run: the exploration-order line fixed a single player's options, 14 of 20 -> 19 of 20, but 3 of 20 replies came back as one short paragraph; measured again with production's one retry of a short reply in the loop as its safety net; the ledger at $37.11 of the $40 hard cap): production's turn (adopted, under adopted6) and the line (choiceResult) on Luna medium twice on the choice-result run's ten single-player exploration steps, interleaved, each turn with production's one checked retry where its first reply is short or has no options (40 turns, about $0.15 at $0.0037 a turn, plus the retries: about 3 of 20 on the line), the options judge on every first reply and retry (about 45 Luna low calls, about $0.015), and a smoke",
 };
 
 export type Caps = {
