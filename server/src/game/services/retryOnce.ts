@@ -15,6 +15,16 @@ export class UnusableResultError extends Error {
   }
 }
 
+/**
+ * How many more times a turn (moveStoryForward) whose writing fails is sent
+ * before the players are told it failed: once. Its own safeguards (the chat
+ * model's re-sends, the plan check's retry) have already run by then; before
+ * 2026-09-30 nothing ever sent it again, so the players were stuck at that
+ * turn for good (the playthroughs' group stories). Nothing else is resent.
+ * GameQueueProcessor sends it; the eval's playthroughs play by it.
+ */
+export const TURN_RESENDS = 1;
+
 /** An error's class for a log line ("APIConnectionTimeoutError"); its message can quote the model's reply. */
 export const errorClass = (error: unknown): string => (error instanceof Error ? error.name || "Error" : typeof error);
 

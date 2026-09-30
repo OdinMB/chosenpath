@@ -18,7 +18,7 @@ export { FEEDBACK_STAGES };
  * $40 left $2.76, about $1.46 with the stalled Stage 4 calls on top). The
  * stage caps are $8 / $13 / $3 / $4 for Stages 0 to 4, $3 / $2 / $1.20 for
  * the setup rounds, the turn rounds and the migration check, and $0.10 /
- * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 for the feedback
+ * $0.60 / $0.10 / $0.40 / $0.40 / $0.60 / $0.40 / $1.40 / $0.70 / $0.15 / $0.10 / $0.08 / $0.70 / $0.40 / $0.25 / $1.20 for the feedback
  * workflow's runs (STAGE_CAP_REASONS says why); a stage cap above its default needs a
  * recorded reason, and the global cap can only be lowered. The probe and case
  * building count as Stage 0. The content-filter check (--filter-check,
@@ -54,6 +54,7 @@ export const DEFAULT_STAGE_CAPS: Record<LedgerStage, number> = {
   playthroughs: 0.7,
   "choice-result": 0.4,
   "choice-line-sp": 0.25,
+  "playthroughs-2": 1.2,
 };
 /** The owner's hard cap: $30, raised to $33 on 2026-09-27, to $40 on 2026-09-28 and to $42 on 2026-09-30 (more playthroughs). */
 export const HARD_CEILING = 42;
@@ -116,6 +117,8 @@ export const STAGE_CAP_REASONS: Record<LedgerStage, string> = {
     "coordinator, 2026-09-30 (after the playthroughs: exploration options that carry out another step result than the one at their position, and challenge results that say what the player does, so the next turn follows the result and not the choice; the ledger at $36.73 of the $40 hard cap): the exploration-order turn (choiceResult) and production's turn beside it (adopted, under adopted5), twice on the two stored exploration steps and eleven built from the playthroughs' stored runs (eight single-player, three group; 52 turns, about $0.21 at $0.0037 a single-player and $0.005-0.0065 a group turn); planner v2f (planV2f: challenge and contest results say how the attempt turns out, exploration results are the player's own choices) and planner v2e beside it twice on five built chapter plans, and planner v2f once on the 23 other chapter-planning cases beside planner v2e's stored plans (under round0; 43 plans, about $0.065); the two judged checks' calibration on hand-read playthrough turns and plans and their readings (about 230 Luna low calls, about $0.09-0.11), the judged stage check on planner v2f's plans, and a smoke; the one fix-and-retest (2026-09-30, after the run: 3 of the variant's 20 single-player replies one short paragraph): the same line asking for the full text (choiceResultB) twice on the ten single-player steps (about $0.06) and its judged turns, from what is left",
   "choice-line-sp":
     "coordinator, 2026-09-30 (after the choice-result run: the exploration-order line fixed a single player's options, 14 of 20 -> 19 of 20, but 3 of 20 replies came back as one short paragraph; measured again with production's one retry of a short reply in the loop as its safety net; the ledger at $37.11 of the $40 hard cap): production's turn (adopted, under adopted6) and the line (choiceResult) on Luna medium twice on the choice-result run's ten single-player exploration steps, interleaved, each turn with production's one checked retry where its first reply is short or has no options (40 turns, about $0.15 at $0.0037 a turn, plus the retries: about 3 of 20 on the line), the options judge on every first reply and retry (about 45 Luna low calls, about $0.015), and a smoke",
+  "playthroughs-2":
+    "coordinator, 2026-09-30 (the owner OK'd \"a few more dollars to do useful playthroughs\"; the hard cap raised to $42 for it; the ledger at $37.24): a second round of whole-story playthroughs on production's current code (adopted, under adopted7: planner v2e and v2f, the ending's current-state rule, the group exploration owner rule, the one-sided contest repair, the pacing count, the five no-call fixes, the exploration line for every player count, the failed turn's resend and Try again), the first round's four premises and two more (a two-player contest over several chapters and a short story read with a child): 187 to 213 calls (typical 191), about $0.60 at the measured costs of production's own calls before retries (round 1 came in about 20% over its estimate, at $0.52), the judged stage, ending, options and results checks (about 120 Luna low calls, about $0.05), a two-turn smoke, and the resends and retries production pays",
 };
 
 export type Caps = {

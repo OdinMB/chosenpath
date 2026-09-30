@@ -84,7 +84,7 @@ describe("replayRun: the states a stored playthrough's turns saw", () => {
         return DEFAULT;
       },
     });
-    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, retryFailedTurns: 1, repickStuckSwitches: true });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, repickStuckSwitches: true });
     expect(run.turns.some((t) => t.repicks?.length)).toBe(true);
     const sent = sentBy(calls);
     for (const r of replayRun(run)) {

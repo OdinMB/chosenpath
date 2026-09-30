@@ -1,11 +1,14 @@
-import type { SetOfBeatGenerationSchema, StoryState, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
+import { Story } from "core/models/Story.js";
+import type { SetOfBeatGenerationSchema, Stat, StoryState, Switch, SwitchAnalysis, Thread, ThreadAnalysis } from "core/types/index.js";
 import { getThreadType, type ThreadType } from "core/types/thread.js";
+import { isContestedOutcome } from "core/utils/outcomeReadiness.js";
 import type { OutcomeState } from "../../game/services/endingStates.js";
 import { outcomeIdsNamed } from "../../game/services/outcomeIds.js";
 import { chaptersThatFit } from "../../game/services/pacing.js";
+import { scoreboardOf } from "../../game/services/scoreboards.js";
 import { percentile } from "./armStats.js";
 import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
-import { playRunId, playthroughArm, type JudgedItem, type PlayCallLog, type PlayRun } from "./playthroughs.js";
+import { playRunId, playthroughArm, turnCalls, type JudgedItem, type PlayCallLog, type PlayPlan, type PlayRun, type PlayTurn } from "./playthroughs.js";
 import { allowanceFor, type TurnKind } from "./turnWaits.js";
 
 /*
@@ -24,11 +27,14 @@ import { allowanceFor, type TurnKind } from "./turnWaits.js";
  * one": a second reward or sacrifice offered is flagged, and whether a second
  * sacrifice has its reason is read by hand); every lever the player took,
  * paid or not on the next turn, one shared change paying several players'
- * levers counted once; stat changes that don't fit their stat; what
- * production's repairs, retries and re-sends did; the turn design checks that
- * failed; the ending's outcomes as its milestones leave them, with the judged
- * checks; waits per turn kind against their allowances, and the turns left
- * out of them; cost.
+ * levers counted once; stat changes that don't fit their stat; whether each
+ * player's own stats moved; each contest scoreboard's move against the result
+ * it follows (both since round 2); what production's repairs, retries,
+ * re-sends and resends of a failed turn did, and which of its fixes of
+ * 2026-09-30 fired; the turn design checks that failed; the judged options
+ * and results checks; the ending's outcomes as its milestones leave them,
+ * with the judged checks; waits per turn kind against their allowances, and
+ * the turns left out of them; cost.
  */
 
 export type ThreadReading = {
@@ -162,6 +168,60 @@ export type SharedLeverReading = { turn: number; stat: string; slots: string[] }
 
 export type LeverCount = LeverStatus | "sharedOnce";
 
+/** A turn production sent again (since 2026-09-30): the sends that failed, the one that wrote it (none: the story stopped there), and whether the players had to press Try again. */
+export type ResentTurn = { turn: number; kind: TurnKind; failed: string[]; sentBy?: string; tryAgain: boolean; failures: string[] };
+
+/** A player's own stat over the story: its value at the start and the end, and the turns that changed it. */
+export type OwnStatReading = { slot: string; stat: string; name: string; start: unknown; end: unknown; changedAt: number[] };
+
+/**
+ * A scoreboard's move on a turn. The setup's rule moves a scoreboard after a
+ * thread about its contest, so a step's win that leaves it where it was is
+ * fine ("held after a step win"), while a chapter's win that does
+ * ("held after a chapter win", on the switch turn or ending after it) is not.
+ */
+export type ScoreboardReadingKind =
+  | "toward the winner"
+  | "the wrong way"
+  | "held"
+  | "held after a step win"
+  | "held after a chapter win"
+  | "moved without a winner"
+  | "moved with no contest result";
+
+/**
+ * A contest scoreboard on a turn that follows a contest result on it, or
+ * moves it: its value before and after the turn, the results, the side that
+ * won (every result the same side's, with player1 on side A, as production's
+ * scoreboardWinners reads it), and whether production's repair turned a move
+ * around (scoreboardDirection).
+ */
+export type ScoreboardMove = {
+  turn: number;
+  stat: string;
+  name: string;
+  before?: number;
+  after?: number;
+  results: (string | null)[];
+  winner?: "sideA" | "sideB";
+  reading: ScoreboardReadingKind;
+  repaired: boolean;
+};
+
+/** Production's fixes of 2026-09-30 that show in its repairs, by kind: the turns each fired at. */
+export const FIX_LABELS = {
+  lastStepRepeated: "last step written twice, the copy dropped",
+  lastStepRepeatedKept: "last step written twice, kept (dropping it would break the plan)",
+  contestOneSided: "a contest with one side's players made their challenge",
+  threadKeptOnPick: "a player written into two threads kept in the one they picked",
+  scoreboardDirection: "a scoreboard move turned toward the side that won",
+  sharedLeverRepeated: "a shared sacrifice or reward kept to one player",
+} as const;
+export type FixKind = keyof typeof FIX_LABELS;
+
+/** A judged check on an option set (a player at an exploration step) or a chapter plan's results. */
+export type ChoiceJudged = { turn: number; slot: string; verdict?: boolean; evidence?: string; lines: string[] };
+
 export type StoryReadings = {
   id: string;
   title: string;
@@ -182,6 +242,14 @@ export type StoryReadings = {
     sharedOnce: SharedLeverReading[];
   };
   unfit: { turn: number; group: string; name: string; kinds: string[] }[];
+  /** Each player's own stats, start to end */
+  ownStats: OwnStatReading[];
+  /** Each contest scoreboard's moves against the results they follow */
+  scoreboard: ScoreboardMove[];
+  /** Production's fixes of 2026-09-30 that fired, by kind */
+  fixes: Record<FixKind, number[]>;
+  /** The judged options check per player at an exploration step, and the results check per chapter plan (label: the plan's outcomes) */
+  choices: { options: ChoiceJudged[]; results: ChoiceJudged[] };
   repairs: {
     setupRetries: number;
     backgroundFixes?: string;
@@ -195,8 +263,10 @@ export type StoryReadings = {
     optionsRetries: number[];
     resends: { turn: number; caseId: string; outcomes: string[] }[];
     failedCalls: string[];
-    /** Turns production could not get past (a plan unusable twice fails the turn; nothing sends it again), where the harness asked the planner again */
+    /** Round 1: turns production could not get past (a plan unusable twice failed the turn and nothing sent it again), where the harness asked the planner again */
     stuckTurns: { turn: number; kind: string; failure: string; rounds: number; repicks?: { slot: string; from: number; to: number; outcomeId: string }[] }[];
+    /** Since round 2: turns production sent again (the queue's resend, the player's Try again) */
+    resentTurns: ResentTurn[];
   };
   /** Turn design checks that failed, with the turns */
   checkFailures: Record<string, number[]>;
@@ -204,7 +274,7 @@ export type StoryReadings = {
   planCheckFailures: Record<string, number[]>;
   ending?: { turn: number; states: OutcomeState[]; judged: JudgedItem[] };
   waits: WaitReading[];
-  /** Turns whose wait no count holds: production could not get past them (the harness's rounds) */
+  /** Turns whose wait no count holds: the players were told the turn failed (its resend failed too), or production could not get past it (round 1's harness rounds) */
   waitsLeftOut: number[];
   cost: { storyUsd: number; judgeUsd: number; calls: number };
 };
@@ -533,8 +603,9 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
   };
   read(0, setupCalls);
   for (const turn of run.turns) {
-    const plan = turn.plan;
-    if (plan) {
+    // Every send's plan: the failed sends' (their retries were production's too) and the one the turn kept
+    const plans = [...(turn.failedSends ?? []).map((s) => s.plan), turn.plan].filter((p): p is PlayPlan => p !== undefined);
+    for (const plan of plans) {
       for (const calls of [...(plan.failedRounds ?? []).map((r) => r.calls), plan.calls]) {
         calls.forEach((call, i) => {
           const previous = calls[i - 1];
@@ -543,6 +614,7 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
         read(turn.turn, calls);
       }
     }
+    for (const send of turn.failedSends ?? []) read(turn.turn, send.calls);
     read(turn.turn, turn.calls);
   }
   return {
@@ -561,14 +633,32 @@ function repairReadings(run: PlayRun): StoryReadings["repairs"] {
       const repicks = t.repicks?.map(({ slot, from, to, outcomeId }) => ({ slot, from, to, outcomeId }));
       return rounds.length && t.plan ? [{ turn: t.turn, kind: t.plan.kind, failure: rounds[0].failure, rounds: rounds.length, ...(repicks?.length ? { repicks } : {}) }] : [];
     }),
+    resentTurns: run.turns.flatMap((t): ResentTurn[] => {
+      const failed = t.failedSends ?? [];
+      if (failed.length === 0) return [];
+      const sends = failed.map((s) => s.send);
+      return [
+        {
+          turn: t.turn,
+          kind: t.kind,
+          failed: sends,
+          ...(t.reply && t.sentBy ? { sentBy: t.sentBy } : {}),
+          tryAgain: [...sends, t.sentBy ?? ""].some((s) => s.startsWith("try again")),
+          failures: failed.map((s) => s.failure),
+        },
+      ];
+    }),
   };
 }
+
+/** Whether the players were told the turn failed: its resend failed too (production then shows the notice), or round 1's harness asked the planner again. */
+const toldFailed = (turn: PlayTurn) => Boolean(turn.plan?.failedRounds?.length) || (turn.failedSends ?? []).some((s) => s.send.includes("resend"));
 
 function waitReadings(run: PlayRun): WaitReading[] {
   const beatArm = playthroughArm("beat", run.input.playerCount).key;
   return KINDS.flatMap((kind): WaitReading[] => {
-    // A turn production could not get past is no wait a player would have seen (the repairs list it)
-    const turns = run.turns.filter((t) => t.kind === kind && t.calls.length > 0 && !t.plan?.failedRounds?.length);
+    // A turn the players were told failed is no wait a player would have sat through (the repairs list it); one the queue's resend saved is, every send counted
+    const turns = run.turns.filter((t) => t.kind === kind && t.calls.length > 0 && t.reply !== undefined && !toldFailed(t));
     if (turns.length === 0) return [];
     const waits = turns.map((t) => t.waitMs);
     const allowanceS = allowanceFor(beatArm, kind);
@@ -584,6 +674,105 @@ function waitReadings(run: PlayRun): WaitReading[] {
       },
     ];
   });
+}
+
+/** Each player's own stats from the start to the end, and the turns that changed each. */
+function ownStatReadings(run: PlayRun): OwnStatReading[] {
+  const start = run.start;
+  if (!start) return [];
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  return Object.keys(start.players).flatMap((slot) =>
+    start.playerStats.map((stat): OwnStatReading => {
+      const valueIn = (values: { statId: string; value: unknown }[] | undefined) => values?.find((v) => v.statId === stat.id)?.value;
+      let before = valueIn(start.players[slot]?.statValues);
+      const first = before;
+      const changedAt: number[] = [];
+      for (const turn of run.turns) {
+        const after = valueIn(turn.statValues.players[slot]);
+        if (!same(before, after)) changedAt.push(turn.turn);
+        before = after;
+      }
+      return { slot, stat: stat.id, name: stat.name, start: first, end: before, changedAt };
+    })
+  );
+}
+
+/** The contest scoreboards the story's contested shared outcomes name (production's scoreboardOf). */
+function scoreboardsOf(state: StoryState | undefined): Stat[] {
+  if (!state) return [];
+  const story = Story.create(state);
+  const boards = (state.sharedOutcomes ?? []).filter(isContestedOutcome).map((o) => scoreboardOf(story, o.id)).filter((s): s is Stat => s !== undefined);
+  return [...new Map(boards.map((b) => [b.id, b])).values()];
+}
+
+/** Each scoreboard on each turn that follows a contest result on it or moves it, against the side that won. */
+function scoreboardReadings(run: PlayRun): ScoreboardMove[] {
+  const boards = scoreboardsOf(run.start);
+  const numberIn = (values: { statId: string; value: unknown }[] | undefined, id: string) => {
+    const value = values?.find((v) => v.statId === id)?.value;
+    return typeof value === "number" ? value : undefined;
+  };
+  const moves: ScoreboardMove[] = [];
+  let previous = run.start?.sharedStatValues ?? [];
+  for (const turn of run.turns) {
+    const now = turn.statValues.shared;
+    for (const board of boards) {
+      const before = numberIn(previous, board.id);
+      const after = numberIn(now, board.id);
+      const followed = (turn.contestResults ?? []).filter((c) => c.board === board.id);
+      const moved = before !== after;
+      if (!followed.length && !moved) continue;
+      const winners = followed.map((c) => (!c.oriented ? undefined : c.result === "sideAWins" ? "sideA" : c.result === "sideBWins" ? "sideB" : undefined));
+      const winner = winners.length && winners.every((w) => w !== undefined && w === winners[0]) ? winners[0] : undefined;
+      const up = (after ?? 0) > (before ?? 0);
+      const reading: ScoreboardReadingKind = !followed.length
+        ? "moved with no contest result"
+        : !winner
+          ? moved
+            ? "moved without a winner"
+            : "held"
+          : !moved
+            ? turn.kind === "chapter step"
+              ? "held after a step win"
+              : "held after a chapter win"
+            : up === (winner === "sideA")
+              ? "toward the winner"
+              : "the wrong way";
+      moves.push({
+        turn: turn.turn,
+        stat: board.id,
+        name: board.name,
+        ...(before !== undefined ? { before } : {}),
+        ...(after !== undefined ? { after } : {}),
+        results: followed.map((c) => c.result),
+        ...(winner ? { winner } : {}),
+        reading,
+        repaired: turn.repairs.some((r) => r.startsWith(`scoreboardDirection: ${board.id}:`)),
+      });
+    }
+    previous = now;
+  }
+  return moves;
+}
+
+/** The turns each of production's fixes of 2026-09-30 fired at: the plan check's (the plan the turn kept) and the beat repairs'. */
+function fixReadings(run: PlayRun): Record<FixKind, number[]> {
+  const fixes = Object.fromEntries(Object.keys(FIX_LABELS).map((kind) => [kind, [] as number[]])) as Record<FixKind, number[]>;
+  for (const turn of run.turns) {
+    const lines = [...(turn.plan?.calls.at(-1)?.repairs ?? []), ...turn.repairs];
+    for (const kind of new Set(lines.map(kindOf))) if (kind in fixes) fixes[kind as FixKind].push(turn.turn);
+  }
+  return fixes;
+}
+
+/** The judged options and results checks, in turn order. */
+function choiceReadings(run: PlayRun): StoryReadings["choices"] {
+  const of = (kind: "options" | "results") =>
+    (run.judged ?? [])
+      .filter((j) => j.kind === kind)
+      .sort((a, b) => a.turn - b.turn)
+      .map((j): ChoiceJudged => ({ turn: j.turn, slot: j.label, ...(j.verdict !== undefined ? { verdict: j.verdict } : {}), ...(j.evidence ? { evidence: j.evidence } : {}), lines: j.lines }));
+  return { options: of("options"), results: of("results") };
 }
 
 /** Every reading the code takes on one played story. */
@@ -625,16 +814,20 @@ export function readStory(run: PlayRun): StoryReadings {
     leverFlags,
     leversPaid: leverReadings(run),
     unfit: run.turns.flatMap((t) => t.unfit.map((u) => ({ turn: t.turn, ...u }))),
+    ownStats: ownStatReadings(run),
+    scoreboard: scoreboardReadings(run),
+    fixes: fixReadings(run),
+    choices: choiceReadings(run),
     repairs: repairReadings(run),
     checkFailures,
     planCheckFailures,
     ...(ending ? { ending: { turn: ending.turn, states: ending.endingStates ?? [], judged: (run.judged ?? []).filter((j) => j.kind === "ending") } } : {}),
     waits: waitReadings(run),
-    waitsLeftOut: run.turns.filter((t) => t.plan?.failedRounds?.length).map((t) => t.turn),
+    waitsLeftOut: run.turns.filter(toldFailed).map((t) => t.turn),
     cost: {
       storyUsd: sum(setupCalls.map((c) => c.costUsd)) + sum(run.turns.map((t) => t.costUsd)),
       judgeUsd: sum((run.judged ?? []).map((j) => j.costUsd)),
-      calls: setupCalls.length + sum(run.turns.map((t) => sum((t.plan?.failedRounds ?? []).map((r) => r.calls.length)) + (t.plan?.calls.length ?? 0) + t.calls.length)),
+      calls: setupCalls.length + sum(run.turns.map((t) => turnCalls(t).length)),
     },
   };
 }
@@ -651,6 +844,75 @@ const counted = (counts: Record<string, number>) =>
         .map(([kind, n]) => `${kind} ${n}`)
         .join(", ")
     : "none";
+
+/** Which players' own stats moved, one line. */
+export function ownStatsLine(r: StoryReadings): string {
+  const moved = r.ownStats.filter((s) => s.changedAt.length > 0);
+  const stats = new Set(r.ownStats.map((s) => s.stat)).size;
+  const seats = new Set(r.ownStats.map((s) => s.slot)).size;
+  const of = `of ${stats} stat${stats === 1 ? "" : "s"} per player, ${seats} player${seats === 1 ? "" : "s"}`;
+  if (moved.length === 0) return `Players' own stats that moved: none (${of}).`;
+  const shown = (value: unknown) => (Array.isArray(value) ? `[${value.join(", ")}]` : String(value));
+  return `Players' own stats that moved: ${moved.map((s) => `${s.name} (${s.slot}: ${shown(s.start)} → ${shown(s.end)}, ${s.changedAt.length} turn${s.changedAt.length === 1 ? "" : "s"})`).join("; ")} (${of}).`;
+}
+
+const SCOREBOARD_ORDER: { reading: ScoreboardReadingKind; label: string; problem: boolean }[] = [
+  { reading: "toward the winner", label: "toward the winner", problem: false },
+  { reading: "the wrong way", label: "the wrong way", problem: true },
+  { reading: "held", label: "held after a mixed result", problem: false },
+  { reading: "held after a step win", label: "held after a step win", problem: false },
+  { reading: "held after a chapter win", label: "held after a chapter win", problem: true },
+  { reading: "moved without a winner", label: "moved without a winner", problem: true },
+  { reading: "moved with no contest result", label: "moved with no contest result", problem: true },
+];
+
+/** Each scoreboard's moves against the results they follow, one line. */
+export function scoreboardLine(r: StoryReadings): string {
+  if (r.scoreboard.length === 0) return "Scoreboard moves: none (no contest scoreboard moved or followed a contest result).";
+  const boards = [...new Set(r.scoreboard.map((m) => m.name))];
+  const parts = boards.map((name) => {
+    const moves = r.scoreboard.filter((m) => m.name === name);
+    const readings = SCOREBOARD_ORDER.flatMap(({ reading, label, problem }) => {
+      const turns = moves.filter((m) => m.reading === reading).map((m) => m.turn);
+      if (turns.length === 0) return [];
+      return [problem ? `${label} at turn ${turns.join(", ")}` : `${label} ${turns.length}`];
+    });
+    const repaired = moves.filter((m) => m.repaired).map((m) => m.turn);
+    const turned = repaired.length ? `production turned ${repaired.length} move${repaired.length === 1 ? "" : "s"} around (turn ${repaired.join(", ")})` : "production turned no move around";
+    return `${name}: ${moves.length} turn${moves.length === 1 ? "" : "s"} after a contest result or with a move: ${readings.join(", ")}; ${turned}`;
+  });
+  return `Scoreboard moves: ${parts.join(". ")}.`;
+}
+
+/** A turn production sent again, in words. */
+export function resentLine(t: ResentTurn): string {
+  const failed = t.failed.map((send, i) => (i === 0 ? "the first send" : send.startsWith("try again") && !send.includes("resend") ? "the Try again" : "its resend"));
+  const failedWords = failed.length > 1 ? `${failed.slice(0, -1).join(", ")} and ${failed.at(-1)}` : failed[0];
+  const wrote =
+    t.sentBy === undefined
+      ? "no send wrote it: the story stopped here"
+      : t.sentBy === "after repick"
+        ? "the harness's re-pick and one more send wrote it"
+        : t.sentBy.startsWith("try again")
+          ? `${t.sentBy.includes("resend") ? "the Try again's resend" : "the Try again"} wrote it`
+          : "the queue's resend wrote it";
+  return `turn ${t.turn} (${failedWords} failed${t.tryAgain ? "; the players saw the failure notice and pressed Try again" : ""}; ${wrote})`;
+}
+
+/** The fixes that fired, one line. */
+export function fixesLine(r: StoryReadings): string {
+  const fired = (Object.keys(FIX_LABELS) as FixKind[]).filter((kind) => r.fixes[kind].length > 0);
+  return fired.length ? fired.map((kind) => `${FIX_LABELS[kind]}: turn ${r.fixes[kind].join(", ")}`).join("; ") : "none";
+}
+
+/** A judged check's tally, one line: the passes of those answered, and where it failed with the judge's evidence. */
+export function choiceLine(label: string, items: ChoiceJudged[], where: (c: ChoiceJudged) => string): string {
+  const answered = items.filter((c) => c.verdict !== undefined);
+  const failed = answered.filter((c) => c.verdict === false);
+  const unanswered = items.length - answered.length;
+  const not = failed.length ? ` (not at ${failed.map((c) => `${where(c)}${c.evidence ? `: ${cell(c.evidence)}` : ""}`).join("; ")})` : "";
+  return `${label}: ${answered.length - failed.length} of ${answered.length}${not}${unanswered ? `; ${unanswered} unanswered` : ""}`;
+}
 
 function storySection(run: PlayRun, r: StoryReadings): string[] {
   const lines: string[] = [
@@ -732,6 +994,11 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `Stat changes that don't fit their stat: ${r.unfit.length ? "" : "none"}`,
     ...r.unfit.map((u) => `- turn ${u.turn}, ${u.group}: ${u.name}: ${u.kinds.join("; ")}`),
     "",
+    ownStatsLine(r),
+    "",
+    scoreboardLine(r),
+    ...r.scoreboard.map((m) => `- turn ${m.turn}, ${m.name}: ${m.before ?? "–"} → ${m.after ?? "–"} after ${m.results.length ? m.results.map((x) => x ?? "no result").join(", ") : "no contest result"}: ${m.reading}${m.repaired ? " (production turned the model's move around)" : ""}`),
+    "",
     "### Repairs and retries",
     "",
     `- setup asked again (the story couldn't start): ${r.repairs.setupRetries}${r.repairs.backgroundFixes ? `; background values fixed: ${r.repairs.backgroundFixes}` : ""}`,
@@ -742,6 +1009,9 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `- turns without options retried: ${list(r.repairs.optionsRetries)}`,
     `- calls re-sent by the runner: ${r.repairs.resends.length ? r.repairs.resends.map((s) => `turn ${s.turn} ${s.caseId} (${s.outcomes.join(", ")})`).join("; ") : "none"}`,
     `- calls with no usable reply: ${list(r.repairs.failedCalls)}`,
+    `- turns production sent again: ${r.repairs.resentTurns.length ? r.repairs.resentTurns.map(resentLine).join("; ") : "none"}`,
+    ...r.repairs.resentTurns.flatMap((t) => t.failures.map((f, i) => `  - turn ${t.turn}, ${t.failed[i] === "first" ? "the first send" : `the ${t.failed[i]}`}: ${cell(f)}`)),
+    `- production's fixes of 2026-09-30 that fired: ${fixesLine(r)}`,
     `- production would have stopped at: ${r.repairs.stuckTurns.length ? r.repairs.stuckTurns
             .map(
               (s) =>
@@ -757,13 +1027,20 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     "",
     ...(Object.keys(r.planCheckFailures).length ? Object.entries(r.planCheckFailures).map(([name, turns]) => `- ${name}: turns ${turns.join(", ")}`) : ["none"]),
     "",
+    "### Options and results (judged)",
+    "",
+    "The choice-result stage's calibrated checks, on Luna low: at each exploration step, does each of a player's options carry out the step's result at its own position (optionsFollowResults)? In each chapter plan, does every result fit its chapter's kind: a challenge or contest result says how the attempt turns out, an exploration result is the player's own choice (resultsFitKind)?",
+    "",
+    choiceLine("Option sets that carry out the result at each position", r.choices.options, (c) => `turn ${c.turn} ${c.slot}`),
+    choiceLine("Chapter plans whose results fit their kind", r.choices.results, (c) => `turn ${c.turn}`),
+    "",
     "### Waits",
     "",
     "| Turn kind | Turns | p50 | p95 | Longest | Allowance | Over it (turns) |",
     "|---|---|---|---|---|---|---|",
     ...r.waits.map((w) => `| ${w.kind} | ${w.turns} | ${w.p50S ?? "–"} s | ${w.p95S ?? "–"} s | ${w.maxS ?? "–"} s | ${w.allowanceS} s | ${list(w.over)} |`),
     "",
-    `Turns left out of the waits (production would have stopped there): ${r.waitsLeftOut.length ? r.waitsLeftOut.map((t) => `turn ${t}`).join(", ") : "none"}.`,
+    `Turns left out of the waits (the players were told the turn failed, or production could not get past it): ${r.waitsLeftOut.length ? r.waitsLeftOut.map((t) => `turn ${t}`).join(", ") : "none"}.`,
     "",
     "### The ending",
     "",
@@ -778,11 +1055,11 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
   return lines;
 }
 
-/** playthroughs.md: a table over the stories, then each story's readings. */
-export function renderPlaythroughReadings(runs: PlayRun[], generatedAt: Date): string {
+/** playthroughs.md (a later round's own file): a table over the stories, then each story's readings. */
+export function renderPlaythroughReadings(runs: PlayRun[], generatedAt: Date, round = 1): string {
   const readings = runs.map(readStory);
   const lines = [
-    "# Whole-story playthroughs on production's own code",
+    `# Whole-story playthroughs on production's own code${round > 1 ? `, round ${round}` : ""}`,
     "",
     `Generated ${generatedAt.toISOString()}. Each story: a new setup, character selection and every turn to the ending on production's own code and models (playthroughs.ts); choices by the fixed policy, the game's own dice on a seeded source. Readings are the code's; the report reads the stories by hand too.`,
     "",

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { indexPage, storyFileName, storyPage } from "../../../../src/evals/textModelEval/playthroughPages.js";
-import { PLAYTHROUGHS, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { beatSet, SIX_PARAGRAPHS, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input } from "./playFixtures.js";
 
@@ -115,6 +115,37 @@ describe("storyPage: what a group's choices did", () => {
   });
 });
 
+describe("storyPage: round 2 (production's resend, the judged options and results)", () => {
+  it("says where production sent a failed turn again, and where the players saw the notice and pressed Try again", async () => {
+    const unusable = () => {
+      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+      return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
+    };
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "thread" && (nth <= 1 || (nth >= 3 && nth <= 6)) ? unusable() : DEFAULT) });
+    const { run } = await playStory(PLAYTHROUGHS_2[0], input(1), call, { sample: 1, tryAgain: 1 });
+    const html = storyPage({ ...run, round: 2 });
+    // The line goes through the page's escaping (the failure's own words may hold quotes)
+    expect(html).toContain("Production&#39;s turn failed (the first send: Failed to generate a usable thread plan");
+    expect(html).toContain("the queue sent it once more, and that worked");
+    expect(html).toContain("The players saw “Unable to continue the story. Please try again.” and pressed Try again");
+    // Round 2 points at its own report
+    expect(html).toContain("2026-09-30_playthroughs-2-report.md");
+    expect(storyPage(run)).toContain("2026-09-30_playthroughs-report.md");
+  });
+
+  it("shows the judged options check under a turn and the judged results check on a chapter", async () => {
+    const run = structuredClone(await played());
+    run.judged = [
+      { key: "play-lemonade-s1-t4-player1", kind: "options", turn: 4, label: "player1", verdict: false, evidence: "Option 2 asks instead.", lines: ["option 2 → none (asks)"], costUsd: 0 },
+      { key: "play-lemonade-s1-t2", kind: "results", turn: 2, label: "player1_main", verdict: true, evidence: "Each result is an outcome.", lines: [], costUsd: 0 },
+    ];
+    const html = storyPage(run);
+    const turn4 = html.slice(html.indexOf('id="turn-4"'), html.indexOf("</article>", html.indexOf('id="turn-4"')));
+    expect(turn4).toContain("Judged: the options don't each carry out the result at their position (Option 2 asks instead.)");
+    expect(html).toContain("Judged, the results fit the chapter's kind: yes (Each result is an outcome.)");
+  });
+});
+
 describe("indexPage and file names", () => {
   it("links each story's page with its main facts", async () => {
     const run = await played();
@@ -124,5 +155,14 @@ describe("indexPage and file names", () => {
     expect(html).toContain('href="play-lemonade.html"');
     expect(html).toContain("The Harbour");
     expect(html).toMatch(/10 turns/);
+  });
+
+  it("titles round 2's index by its round and story count, and links round 1's pages and round 2's report", async () => {
+    const run = { ...(await played()), round: 2 };
+    const html = indexPage([run, { ...run, sample: 2 }], new Date("2026-09-30T20:00:00Z"), 2);
+    expect(html).toContain("<h1>Round 2: two stories on production's current code</h1>");
+    expect(html).toContain('href="../index.html"');
+    expect(html).toContain("2026-09-30_playthroughs-2-report.md");
+    expect(indexPage([run], new Date(0))).toContain("<h1>One story on production's own code</h1>");
   });
 });

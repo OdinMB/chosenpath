@@ -42,8 +42,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * prep calls, playthroughMode.ts), then the playthroughs' choices that lead
  * somewhere else (choice-result: the exploration-order turn beside
  * production's, planner v2f beside planner v2e), then that line for a single
- * player with production's one checked retry in the loop (choice-line-sp).
- * Their caps and reasons are in budget.ts.
+ * player with production's one checked retry in the loop (choice-line-sp),
+ * then a second round of whole-story playthroughs on production's current
+ * code (playthroughs-2: no --run arms either, the --playthroughs --round 2
+ * mode's prep calls). Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
   "plan-refresh",
@@ -61,6 +63,7 @@ export const FEEDBACK_STAGES = [
   "playthroughs",
   "choice-result",
   "choice-line-sp",
+  "playthroughs-2",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -565,6 +568,15 @@ function choiceLineSpArms(role: EvalRole): ArmPlan[] {
   const single = [...CHOICE_RESULT_STORED_CASES, ...CHOICE_RESULT_BUILT_CASES.single];
   return (["adopted", "choiceResult"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single }));
 }
+
+/**
+ * The prompt state of the second round of playthroughs (playthroughs-2,
+ * 2026-09-30): production's own code since the single-player exploration
+ * line's adoption (2db5134) and the failed turn's resend and notice (ed48f48,
+ * fe31dc0, ead6e86), under a tag no earlier stage used, so no call of round 1
+ * (adopted4) is reused for a request today's code builds differently.
+ */
+export const PLAYTHROUGHS_2_PROMPT_STATE = "adopted7";
 
 /** Stages whose turns carry production's one checked retry (a text of one paragraph, a beat without options) as a second step. */
 const CHECKED_TURN_STAGES: Stage[] = ["choice-line-sp"];

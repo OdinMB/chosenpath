@@ -113,6 +113,22 @@ describe("evalFiles", () => {
     expect(JSON.parse(fs.readFileSync(path.join(outDir, "choice-line-sp.json"), "utf-8"))).toEqual({ set: "line" });
   });
 
+  it("writes a second round of playthroughs to its own files and pages folder, beside the first round's", () => {
+    const files = evalFiles(outDir);
+    files.writePlaythroughs("# round 1\n", { runs: [1] });
+    files.writePlaythroughs("# round 2\n", { runs: [2] }, "playthroughs-2");
+    expect(fs.readFileSync(path.join(outDir, "playthroughs.md"), "utf-8")).toBe("# round 1\n");
+    expect(fs.readFileSync(path.join(outDir, "playthroughs-2.md"), "utf-8")).toBe("# round 2\n");
+    expect(files.readPlaythroughs()).toEqual({ runs: [1] });
+    expect(files.readPlaythroughs("playthroughs-2")).toEqual({ runs: [2] });
+    expect(files.readPlaythroughs("playthroughs-3")).toBeUndefined();
+    files.writeStoryPage("index.html", "<p>1</p>");
+    const written = files.writeStoryPage("index.html", "<p>2</p>", "stories/round2");
+    expect(written).toBe(path.join(outDir, "stories", "round2", "index.html"));
+    expect(fs.readFileSync(path.join(outDir, "stories", "index.html"), "utf-8")).toBe("<p>1</p>");
+    expect(fs.readFileSync(written, "utf-8")).toBe("<p>2</p>");
+  });
+
   it("writes the nearer frames' judged turns beside the rounds' file, not over it", () => {
     const files = evalFiles(outDir);
     files.writeJudgedTurns("# rounds\n", { set: "rounds" });

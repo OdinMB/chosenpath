@@ -21,6 +21,7 @@ import {
   OPTIONS_O2_CASES,
   OPTIONS_O2_PROMPT_STATE,
   pipelinePlans,
+  PLAYTHROUGHS_2_PROMPT_STATE,
   productionArm,
   referenceKey,
   ROUND1_SETUP_PAGE_PREMISES,
@@ -413,6 +414,7 @@ describe("budget caps", () => {
       playthroughs: 0.7,
       "choice-result": 0.4,
       "choice-line-sp": 0.25,
+      "playthroughs-2": 1.2,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -430,6 +432,7 @@ describe("budget caps", () => {
       "playthroughs",
       "choice-result",
       "choice-line-sp",
+      "playthroughs-2",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -437,9 +440,10 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all fifteen caps still fit
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all sixteen caps still
+    // fit (the hard cap $42 since the second round of playthroughs)
     const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(6.38);
+    expect(caps).toBeCloseTo(7.58);
     expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
@@ -732,6 +736,23 @@ describe("budget caps", () => {
     expect(STAGE_CAP_REASONS.playthroughs).toMatch(/production's own code/);
     // The ledger read $36.20 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top
     expect(36.2 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS.playthroughs).toBeLessThanOrEqual(HARD_CEILING);
+  });
+
+  it("gives the second round of playthroughs (playthroughs-2, 2026-09-30) a stage of its own on production's current code, under a tag of its own", () => {
+    for (const role of ["setup", "beat", "switch", "thread", "iteration"] as const) expect(armsFor("playthroughs-2", role)).toEqual([]);
+    expect(pipelinePlans("playthroughs-2")).toEqual([]);
+    expect(stageRunsBaseline("playthroughs-2")).toBe(false);
+    expect(stageChecksTurns("playthroughs-2")).toBe(false);
+    expect(STAGE_CAP_REASONS["playthroughs-2"]).toMatch(/2026-09-30/);
+    expect(STAGE_CAP_REASONS["playthroughs-2"]).toMatch(/a few more dollars/);
+    expect(STAGE_CAP_REASONS["playthroughs-2"]).toMatch(/production's current code/);
+    // Production's code since the single-player line's adoption and the failed turn's resend: a tag none of the earlier
+    // stages used, so no call of round 1 (adopted4) is reused for a request today's code builds differently
+    expect(PLAYTHROUGHS_2_PROMPT_STATE).toBe("adopted7");
+    expect([OPTIONS_CONTINUITY_PROMPT_STATE, OPTIONS_O2_PROMPT_STATE, ENDING_STATE_PROMPT_STATE, RUNAWAY_PROMPT_STATE, CHOICE_RESULT_PROMPT_STATE, CHOICE_LINE_SP_PROMPT_STATE]).not.toContain(PLAYTHROUGHS_2_PROMPT_STATE);
+    // The coordinator's cap: $1.20, inside the $42 hard cap with the ledger at $37.24 and the stalled Stage 4 calls on top
+    expect(DEFAULT_STAGE_CAPS["playthroughs-2"]).toBe(1.2);
+    expect(37.24 + UNRECORDED_STAGE4_USD + DEFAULT_STAGE_CAPS["playthroughs-2"]).toBeLessThanOrEqual(HARD_CEILING);
   });
 
   it("books and checks spend of the new stages on their own caps", () => {

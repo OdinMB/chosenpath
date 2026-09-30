@@ -12,7 +12,7 @@ import { GameModes, type GameMode, type PlayerCount } from "core/types/index.js"
  * buildMergedPrompt). Delete this copy if buildMergedPrompt moves to core.
  */
 
-type Category =
+export type Category =
   | "flexible"
   | "enjoy-fiction"
   | "vent-about-reality"

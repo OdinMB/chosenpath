@@ -20,6 +20,7 @@ import { Logger } from "shared/logger.js";
 import { storyDbService } from "server/stories/StoryDbService.js";
 import { CharacterIdentity } from "core/types/index.js";
 import { noteBroadcast, notePregenerationFinished } from "./turnTimings.js";
+import { TURN_RESENDS } from "./retryOnce.js";
 import {
   applyImageOutcome,
   collectLatestBeatImageRequests,
@@ -49,14 +50,8 @@ export interface GameOperationExtended {
   input: unknown;
 }
 
-/**
- * How many more times a turn (moveStoryForward) whose writing fails is sent
- * before the players are told it failed: once. Its own safeguards (the chat
- * model's re-sends, the plan check's retry) have already run by then; before
- * 2026-09-30 nothing ever sent it again, so the players were stuck at that
- * turn for good (the playthroughs' group stories). Nothing else is resent.
- */
-export const TURN_RESENDS = 1;
+/** How many more times a failed turn is sent (retryOnce.ts, where the eval's playthroughs read it too). */
+export { TURN_RESENDS };
 
 /** The operations that write a turn or queue one (isTurnOnItsWay). */
 const TURN_OPERATIONS: ReadonlySet<GameOperation["type"]> = new Set([

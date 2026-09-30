@@ -36,9 +36,10 @@ export function scoreboardOf(story: Story, outcomeId: string): Stat | undefined 
 /**
  * The results this turn follows, thread by thread: at a switch or the ending,
  * the chapter that just ended (its result); in a chapter, its step just
- * played (none on the chapter's first step).
+ * played (none on the chapter's first step). The eval's playthroughs read it
+ * too, beside the scoreboard's move.
  */
-function resultsFollowed(story: Story): { thread: Thread; result: Resolution | null }[] {
+export function resultsFollowed(story: Story): { thread: Thread; result: Resolution | null }[] {
   const beatType = story.getCurrentBeatType();
   if (beatType === "switch" || beatType === "ending") {
     return (story.getResolvedThreadAnalysis()?.threads ?? []).map((thread) => ({ thread, result: thread.resolution }));

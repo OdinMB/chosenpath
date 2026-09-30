@@ -1,11 +1,12 @@
-import { RUNAWAY_PROMPT_STATE, type Stage } from "./arms.js";
+import { PLAYTHROUGHS_2_PROMPT_STATE, RUNAWAY_PROMPT_STATE, type Stage } from "./arms.js";
 import { DEFAULT_STAGE_CAPS, spentByStage } from "./budget.js";
+import { CHOICE_JUDGE_PROMPT_VERSION, OPTIONS_CHECK, RESULTS_CHECK, evidenceFrom as choiceEvidenceFrom, verdictFrom as choiceVerdictFrom } from "./choiceResultJudge.js";
 import { ENDING_JUDGE_PROMPT_VERSION, endingEvidenceFrom, endingVerdictFrom } from "./endingJudge.js";
 import type { EvalFiles } from "./evalFiles.js";
 import { JUDGE_ARMS } from "./judgedChecks.js";
 import { readStory, renderPlaythroughReadings } from "./playthroughChecks.js";
-import { indexPage, storyFileName, storyPage } from "./playthroughPages.js";
-import { PLAYTHROUGHS, playStory, playthroughArm, playthroughSetupInput, type JudgeTarget, type JudgedItem, type PlayRun, type PlaythroughSpec } from "./playthroughs.js";
+import { PLAYTHROUGH_REPORTS, indexPage, storyFileName, storyPage } from "./playthroughPages.js";
+import { PLAYTHROUGHS, PLAYTHROUGHS_2, playStory, playthroughArm, playthroughSetupInput, type JudgeTarget, type JudgedItem, type PlayRun, type PlaythroughSpec } from "./playthroughs.js";
 import { usable, type CallRecord } from "./runner.js";
 import { budgetedPrepCall, type PrepCallResult, type PrepCallSpec } from "./setupChainMode.js";
 import { STAGE_JUDGE_PROMPT_VERSION, stageEvidenceFrom, stageVerdictFrom } from "./stageJudge.js";
@@ -13,35 +14,64 @@ import { spendBeside, type PrepContext } from "./turnPrep.js";
 import type { SetupInput } from "./variants.js";
 
 /*
- * The --playthroughs mode (the coordinator's brief of 2026-09-30): the four
+ * The --playthroughs mode (the coordinator's brief of 2026-09-30): the
  * whole-story playthroughs of playthroughs.ts with real calls, each a prep
- * job ("play>…", "judge>…") in prep-calls.jsonl, in the playthroughs stage
- * under adopted4 (production's code since the ending's adoption, which the
- * runaway replay tagged; unchanged since). The stories play side by side,
- * each call after the one before it; the invocation never spends past the
- * least of --max-spend, what the stage's cap leaves and what the hard cap
- * leaves, with the calls in flight counted. After each story, the judged
- * stage check on its chapters and the ending check per player (Luna low).
- * A finished call on the same request is reused (the dice are seeded), so an
- * interrupted run resumes and a smoke's turns are the full run's first. It
- * writes playthroughs.json and .md and the pages in stories/, keeping the
- * stories the file already holds (a story and sample played again replaces
- * its run). --report-only renders them afresh without a call.
+ * job ("play>…", "judge>…") in prep-calls.jsonl, in a round's own stage
+ * under its own tag (PLAYTHROUGH_ROUNDS). Round 1: the four stories in the
+ * playthroughs stage under adopted4 (production's code since the ending's
+ * adoption, which the runaway replay tagged). Round 2 (--round 2, after the
+ * owner OK'd "a few more dollars to do useful playthroughs"): the same four
+ * and two more in the playthroughs-2 stage under adopted7, production's
+ * current code, the automated player pressing Try again once where a turn
+ * fails twice. The stories play side by side, each call after the one before
+ * it; the invocation never spends past the least of --max-spend, what the
+ * stage's cap leaves and what the hard cap leaves, with the calls in flight
+ * counted. After each story, the judged checks (Luna low): each chapter's
+ * stage, each chapter plan's results against their kind and each exploration
+ * step's options against its results (the choice-result stage's calibrated
+ * checks), each player's ending. A finished call on the same request is
+ * reused (the dice are seeded), so an interrupted run resumes and a smoke's
+ * turns are the full run's first. It writes the round's json and md and its
+ * pages (round 1: playthroughs.json and stories/; round 2: playthroughs-2.json
+ * and stories/round2/), keeping the stories the round's file already holds (a
+ * story and sample played again replaces its run). --report-only renders them
+ * afresh without a call.
  */
 
-export const PLAYTHROUGH_STAGE: Stage = "playthroughs";
-export const PLAYTHROUGH_PROMPT_STATE = RUNAWAY_PROMPT_STATE;
+/** One round of playthroughs: its stage and tag, its stories, its files and pages, and how often the player presses Try again. */
+export type PlaythroughRound = {
+  round: 1 | 2;
+  stage: Stage;
+  promptState: string;
+  specs: PlaythroughSpec[];
+  /** The json and md file name, without its extension */
+  fileBase: string;
+  /** The pages' folder in the output folder */
+  pagesDir: string;
+  /** The hand-read report the pages point to (in the output folder) */
+  report: string;
+  /** Presses of Try again on a turn that failed twice (turnSends): round 1 played before the notice existed */
+  tryAgain: number;
+};
+
+export const PLAYTHROUGH_ROUNDS: Record<1 | 2, PlaythroughRound> = {
+  1: { round: 1, stage: "playthroughs", promptState: RUNAWAY_PROMPT_STATE, specs: PLAYTHROUGHS, fileBase: "playthroughs", pagesDir: "stories", report: PLAYTHROUGH_REPORTS[1], tryAgain: 0 },
+  2: { round: 2, stage: "playthroughs-2", promptState: PLAYTHROUGHS_2_PROMPT_STATE, specs: PLAYTHROUGHS_2, fileBase: "playthroughs-2", pagesDir: "stories/round2", report: PLAYTHROUGH_REPORTS[2], tryAgain: 1 },
+};
+
+export const PLAYTHROUGH_STAGE: Stage = PLAYTHROUGH_ROUNDS[1].stage;
+export const PLAYTHROUGH_PROMPT_STATE = PLAYTHROUGH_ROUNDS[1].promptState;
 export const DEFAULT_PLAYTHROUGH_MAX_SPEND = DEFAULT_STAGE_CAPS.playthroughs;
 
 export type ModeCall = (spec: PrepCallSpec) => Promise<PrepCallResult>;
 
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
-/** The stories' calls: prep jobs in the playthroughs stage under adopted4, never past `limitUsd` for this invocation. */
-export function playthroughCall(ctx: PrepContext, sample: number, limitUsd: number): ModeCall {
+/** The stories' calls: prep jobs in the round's stage under its tag, never past `limitUsd` for this invocation. */
+export function playthroughCall(ctx: PrepContext, sample: number, limitUsd: number, round: PlaythroughRound = PLAYTHROUGH_ROUNDS[1]): ModeCall {
   return budgetedPrepCall(ctx, {
-    stage: PLAYTHROUGH_STAGE,
-    promptState: PLAYTHROUGH_PROMPT_STATE,
+    stage: round.stage,
+    promptState: round.promptState,
     sample,
     limitUsd,
     rerunHint: "the dice are seeded, so the code or a reply changed; play a new sample with --samples <n>",
@@ -49,11 +79,32 @@ export function playthroughCall(ctx: PrepContext, sample: number, limitUsd: numb
 }
 
 /** A judged check's case id: its check, its prompt version and the story's key. */
-export const playJudgeCaseId = (target: Pick<JudgeTarget, "kind" | "key">) =>
-  target.kind === "stage" ? `judge-play-stage-v${STAGE_JUDGE_PROMPT_VERSION}-${target.key}` : `judge-play-ending-v${ENDING_JUDGE_PROMPT_VERSION}-${target.key}`;
+export const playJudgeCaseId = (target: Pick<JudgeTarget, "kind" | "key">) => {
+  switch (target.kind) {
+    case "stage":
+      return `judge-play-stage-v${STAGE_JUDGE_PROMPT_VERSION}-${target.key}`;
+    case "ending":
+      return `judge-play-ending-v${ENDING_JUDGE_PROMPT_VERSION}-${target.key}`;
+    default:
+      return `judge-play-${target.kind}-v${CHOICE_JUDGE_PROMPT_VERSION}-${target.key}`;
+  }
+};
 
-/** Luna low reads one chapter plan or one ending: a stage list or a line per outcome, and a short answer */
-const JUDGE_OUTPUT_TOKENS = { stage: 1_000, ending: 500 } as const;
+/** Luna low reads one chapter plan, one ending or one option set: a stage list, a line per outcome, option or result, and a short answer */
+const JUDGE_OUTPUT_TOKENS = { stage: 1_000, ending: 500, options: 500, results: 900 } as const;
+
+/** A judged check's verdict and its reading (the judge's evidence and lines). */
+function judgedReading(target: JudgeTarget, parsed: unknown): { verdict?: boolean; evidence?: string; lines: string[] } {
+  if (target.kind === "options" || target.kind === "results") {
+    const check = target.kind === "options" ? OPTIONS_CHECK : RESULTS_CHECK;
+    const read = choiceEvidenceFrom(parsed, check);
+    const verdict = choiceVerdictFrom(parsed, check);
+    return { ...(verdict !== undefined ? { verdict } : {}), ...(read.evidence ? { evidence: read.evidence } : {}), lines: read.lines };
+  }
+  const verdict = target.kind === "stage" ? stageVerdictFrom(parsed) : endingVerdictFrom(parsed);
+  const read = target.kind === "stage" ? stageEvidenceFrom(parsed) : endingEvidenceFrom(parsed);
+  return { ...(verdict !== undefined ? { verdict } : {}), ...(read?.evidence ? { evidence: read.evidence } : {}), lines: read ? ("stages" in read ? read.stages : read.outcomes) : [] };
+}
 
 /** The judged checks on a story, one call each, one after another: the verdict, the evidence and the judge's lines. */
 export async function judgeTargets(targets: JudgeTarget[], call: ModeCall): Promise<JudgedItem[]> {
@@ -62,23 +113,21 @@ export async function judgeTargets(targets: JudgeTarget[], call: ModeCall): Prom
     const result = await call({
       kind: "judge",
       caseId: playJudgeCaseId(target),
-      role: target.kind === "stage" ? "thread" : "beat",
+      role: target.kind === "stage" || target.kind === "results" ? "thread" : "beat",
       arm: JUDGE_ARMS[0],
       players: 1,
       request: target.request,
       outputTokens: JUDGE_OUTPUT_TOKENS[target.kind],
     });
     const parsed = result.parsed;
-    const verdict = parsed === undefined ? undefined : target.kind === "stage" ? stageVerdictFrom(parsed) : endingVerdictFrom(parsed);
-    const read = parsed === undefined ? undefined : target.kind === "stage" ? stageEvidenceFrom(parsed) : endingEvidenceFrom(parsed);
-    const lines = read ? ("stages" in read ? read.stages : read.outcomes) : [];
+    const { verdict, evidence, lines } = parsed === undefined ? { verdict: undefined, evidence: undefined, lines: [] } : judgedReading(target, parsed);
     items.push({
       key: target.key,
       kind: target.kind,
       turn: target.turn,
       label: target.label,
       ...(verdict !== undefined ? { verdict } : {}),
-      ...(read?.evidence ? { evidence: read.evidence } : {}),
+      ...(evidence ? { evidence } : {}),
       lines,
       costUsd: result.costUsd,
     });
@@ -87,38 +136,43 @@ export async function judgeTargets(targets: JudgeTarget[], call: ModeCall): Prom
 }
 
 /**
- * How often the harness asks production's checked planner again where a plan
- * unusable twice fails the turn (2026-09-30: both group stories stopped there
- * on the first run; production leaves such a story waiting), so the rest of
- * the story can be read; where every round fails on the players' switch
- * picks, a group's stuck players re-pick the shared direction another player
- * took (coordinatedRepick) and the planner runs once more. The pages and
- * readings mark each such turn.
+ * One story played on production's code, then its judged checks. A turn that
+ * fails is sent as production sends it: the queue's resend, then the round's
+ * presses of Try again (turnSends). Where a group chapter still can't be
+ * planned from the players' switch picks, the stuck players re-pick the
+ * shared direction another player took and the turn is sent once more (the
+ * harness's step, marked on the pages and readings).
  */
-export const HARNESS_TURN_RETRIES = 2;
-
-/** One story played on production's code, then its judged checks. */
-export async function playAndJudge(spec: PlaythroughSpec, call: ModeCall, options: { sample: number; turnLimit?: number }, input: SetupInput = playthroughSetupInput(spec)): Promise<PlayRun> {
-  const { run, judgeTargets: targets } = await playStory(spec, input, (s) => call({ kind: "play", ...s }), { ...options, retryFailedTurns: HARNESS_TURN_RETRIES, repickStuckSwitches: true });
+export async function playAndJudge(
+  spec: PlaythroughSpec,
+  call: ModeCall,
+  options: { sample: number; turnLimit?: number },
+  input: SetupInput = playthroughSetupInput(spec),
+  round: PlaythroughRound = PLAYTHROUGH_ROUNDS[1]
+): Promise<PlayRun> {
+  const { run, judgeTargets: targets } = await playStory(spec, input, (s) => call({ kind: "play", ...s }), { ...options, tryAgain: round.tryAgain, repickStuckSwitches: true });
+  run.round = round.round;
   run.judged = await judgeTargets(targets, call);
   return run;
 }
 
-/** The file's runs with new ones: a story and sample played again replaces its run, in the stories' order, then by sample. */
-export function mergePlayRuns(existing: PlayRun[], added: PlayRun[]): PlayRun[] {
+/** The file's runs with new ones: a story and sample played again replaces its run, in the round's stories' order, then by sample. */
+export function mergePlayRuns(existing: PlayRun[], added: PlayRun[], specs: PlaythroughSpec[] = PLAYTHROUGHS): PlayRun[] {
   const key = (run: PlayRun) => `${run.spec.id}|${run.sample}`;
   const replaced = new Set(added.map(key));
   const order = (run: PlayRun) => {
-    const at = PLAYTHROUGHS.findIndex((p) => p.id === run.spec.id);
-    return at < 0 ? PLAYTHROUGHS.length : at;
+    const at = specs.findIndex((p) => p.id === run.spec.id);
+    return at < 0 ? specs.length : at;
   };
   return [...existing.filter((run) => !replaced.has(key(run))), ...added].sort((a, b) => order(a) - order(b) || a.sample - b.sample);
 }
 
-export function playthroughFile(runs: PlayRun[], generatedAt: Date) {
+export function playthroughFile(runs: PlayRun[], generatedAt: Date, round: PlaythroughRound = PLAYTHROUGH_ROUNDS[1]) {
   return {
     generatedAt: generatedAt.toISOString(),
-    promptState: PLAYTHROUGH_PROMPT_STATE,
+    round: round.round,
+    stage: round.stage,
+    promptState: round.promptState,
     arms: {
       setup: playthroughArm("setup", 1).key,
       planners: playthroughArm("switch", 1).key,
@@ -181,59 +235,85 @@ export function playthroughEstimate(spec: PlaythroughSpec, costsFor: (players: n
   };
 }
 
-/** The dry run's lines: each story's calls and cost, what the file already holds, and the stage's spend. */
-export function printPlaythroughPlan(files: EvalFiles, log: (line: string) => void): void {
+/** A judged call's cost as the first round measured it (19 calls, $0.007), rounded up. */
+const JUDGE_CALL_USD = 0.0004;
+
+/**
+ * A story's judged checks before it runs: a stage and a results check per
+ * chapter (about T/4), an options check per player on about a third of the
+ * chapter steps (the exploration ones), and an ending check per player.
+ */
+export function judgedEstimate(spec: PlaythroughSpec): { calls: number; usd: number } {
+  const turns = spec.maxTurns;
+  const players = playthroughSetupInput(spec).playerCount;
+  const chapters = Math.round(turns / 4);
+  const calls = 2 * chapters + Math.round((turns - chapters) / 3) * players + players;
+  return { calls, usd: calls * JUDGE_CALL_USD };
+}
+
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+
+/** The dry run's lines for a round: each story's calls and cost, what the round's file already holds, the judged checks and the stage's spend. */
+export function printPlaythroughPlan(files: EvalFiles, log: (line: string) => void, round: PlaythroughRound = PLAYTHROUGH_ROUNDS[1]): void {
   const costsFor = measuredCallCosts(files.readRecords());
-  const held = playthroughRunsFrom(files.readPlaythroughs());
-  const prep = files.readPrepRecords().filter((r) => r.stage === PLAYTHROUGH_STAGE);
-  log(`\nWhole-story playthroughs (--playthroughs, stage ${PLAYTHROUGH_STAGE}, cap $${DEFAULT_STAGE_CAPS.playthroughs}, under ${PLAYTHROUGH_PROMPT_STATE}):`);
+  const held = playthroughRunsFrom(files.readPlaythroughs(round.fileBase));
+  const prep = files.readPrepRecords().filter((r) => r.stage === round.stage);
+  log(`\nWhole-story playthroughs, round ${round.round} (--playthroughs${round.round > 1 ? ` --round ${round.round}` : ""}, stage ${round.stage}, cap $${DEFAULT_STAGE_CAPS[round.stage]}, under ${round.promptState}):`);
   let total = 0;
-  for (const spec of PLAYTHROUGHS) {
+  let judged = { calls: 0, usd: 0 };
+  for (const spec of round.specs) {
     const estimate = playthroughEstimate(spec, costsFor);
+    const judge = judgedEstimate(spec);
     total += estimate.usd;
+    judged = { calls: judged.calls + judge.calls, usd: judged.usd + judge.usd };
     const runs = held.filter((r) => r.spec.id === spec.id).map((r) => `s${r.sample}: ${r.turns.length} turns${r.complete ? ", ended" : `, ${r.stopped}`}`);
     log(
-      `  ${spec.id}: ${estimate.players} player(s), ${spec.maxTurns} turns, ${estimate.calls.min}-${estimate.calls.max} calls (typical ${estimate.calls.typical}), est $${estimate.usd.toFixed(3)} (up to $${estimate.usdMax.toFixed(3)} at the most chapters)${runs.length ? `; held: ${runs.join("; ")}` : ""}`
+      `  ${spec.id}: ${estimate.players} player(s), ${spec.maxTurns} turns, ${estimate.calls.min}-${estimate.calls.max} calls (typical ${estimate.calls.typical}), est $${estimate.usd.toFixed(3)} (up to $${estimate.usdMax.toFixed(3)} at the most chapters); judged checks about ${judge.calls}${runs.length ? `; held: ${runs.join("; ")}` : ""}`
     );
   }
-  log(`  All four: est $${total.toFixed(3)} before retries, plus the judged checks (about 30 calls, about $0.01); spent in the stage so far $${sum(prep.map((r) => r.costUsd)).toFixed(4)} over ${prep.length} attempts`);
+  const all = COUNT_WORDS[round.specs.length] ?? String(round.specs.length);
+  log(
+    `  All ${all}: est $${total.toFixed(3)} before retries, plus the judged checks (about ${judged.calls} calls, about $${judged.usd.toFixed(2)}); spent in the stage so far $${sum(prep.map((r) => r.costUsd)).toFixed(4)} over ${prep.length} attempts`
+  );
 }
 
 // ---------------------------------------------------------------- the mode
 
 /**
- * Plays the stories (all four, or those --cases names; --turns stops each
- * after that many turns, the smoke), then writes the files with every story
- * the file already holds. `reportOnly` plays nothing and renders afresh.
+ * Plays a round's stories (all of them, or those --cases names; --turns stops
+ * each after that many turns, the smoke), then writes the round's files with
+ * every story its file already holds. `reportOnly` plays nothing and renders
+ * afresh.
  */
-export async function playthroughsMode(ctx: PrepContext, options: { sample: number; caseIds?: string[]; turns?: number; reportOnly?: boolean }): Promise<void> {
+export async function playthroughsMode(ctx: PrepContext, options: { sample: number; caseIds?: string[]; turns?: number; reportOnly?: boolean; round?: PlaythroughRound }): Promise<void> {
   const { files, log } = ctx;
-  const specs = PLAYTHROUGHS.filter((p) => !options.caseIds?.length || options.caseIds.includes(p.id));
-  if (specs.length === 0) throw new Error(`No playthrough among --cases; one of ${PLAYTHROUGHS.map((p) => p.id).join(", ")}`);
+  const round = options.round ?? PLAYTHROUGH_ROUNDS[1];
+  const specs = round.specs.filter((p) => !options.caseIds?.length || options.caseIds.includes(p.id));
+  if (specs.length === 0) throw new Error(`No playthrough among --cases; one of ${round.specs.map((p) => p.id).join(", ")}`);
   const played: PlayRun[] = [];
   if (!options.reportOnly) {
     const spend = spentByStage([...files.readRecords(), ...spendBeside(files, "calls")]);
-    const stageLeft = ctx.caps.stageCaps[PLAYTHROUGH_STAGE] - spend.byStage[PLAYTHROUGH_STAGE];
+    const stageLeft = ctx.caps.stageCaps[round.stage] - spend.byStage[round.stage];
     const limit = Math.min(ctx.caps.maxSpend ?? Number.POSITIVE_INFINITY, stageLeft, ctx.caps.globalCap - spend.total);
     log(
-      `Playing ${specs.map((s) => s.id).join(", ")} (sample ${options.sample}${options.turns ? `, the first ${options.turns} turns each` : ""}); this invocation spends at most $${limit.toFixed(4)} (stage ${PLAYTHROUGH_STAGE} spent $${spend.byStage[PLAYTHROUGH_STAGE].toFixed(4)} of $${ctx.caps.stageCaps[PLAYTHROUGH_STAGE]}; the ledger $${spend.total.toFixed(2)} of $${ctx.caps.globalCap})`
+      `Playing round ${round.round}: ${specs.map((s) => s.id).join(", ")} (sample ${options.sample}${options.turns ? `, the first ${options.turns} turns each` : ""}); this invocation spends at most $${limit.toFixed(4)} (stage ${round.stage} spent $${spend.byStage[round.stage].toFixed(4)} of $${ctx.caps.stageCaps[round.stage]}; the ledger $${spend.total.toFixed(2)} of $${ctx.caps.globalCap})`
     );
-    const call = playthroughCall(ctx, options.sample, limit);
-    const settled = await Promise.allSettled(specs.map((spec) => playAndJudge(spec, call, { sample: options.sample, ...(options.turns ? { turnLimit: options.turns } : {}) })));
+    const call = playthroughCall(ctx, options.sample, limit, round);
+    const settled = await Promise.allSettled(specs.map((spec) => playAndJudge(spec, call, { sample: options.sample, ...(options.turns ? { turnLimit: options.turns } : {}) }, playthroughSetupInput(spec), round)));
     settled.forEach((outcome, i) => {
       if (outcome.status === "fulfilled") played.push(outcome.value);
       else log(`${specs[i].id}: ${outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)}`);
     });
   }
-  const all = mergePlayRuns(playthroughRunsFrom(files.readPlaythroughs()), played);
+  const all = mergePlayRuns(playthroughRunsFrom(files.readPlaythroughs(round.fileBase)), played, round.specs);
   const now = new Date();
-  files.writePlaythroughs(renderPlaythroughReadings(all, now), playthroughFile(all, now));
-  for (const run of all) files.writeStoryPage(storyFileName(run), storyPage(run));
-  const index = files.writeStoryPage("index.html", indexPage(all, now));
+  files.writePlaythroughs(renderPlaythroughReadings(all, now, round.round), playthroughFile(all, now, round), round.fileBase);
+  for (const run of all) files.writeStoryPage(storyFileName(run), storyPage(run), round.pagesDir);
+  const index = files.writeStoryPage("index.html", indexPage(all, now, round.round), round.pagesDir);
   const cost = sum(played.map((run) => {
     const readings = readStory(run);
     return readings.cost.storyUsd + readings.cost.judgeUsd;
   }));
   for (const run of played) log(`${run.spec.id} s${run.sample}: ${run.turns.length} turns, stopped: ${run.stopped}`);
-  log(`Played ${played.length} of ${options.reportOnly ? 0 : specs.length} stories, $${cost.toFixed(4)} with their judged checks. Wrote playthroughs.md and .json and ${all.length} story pages; the index is ${index}`);
+  log(`Played ${played.length} of ${options.reportOnly ? 0 : specs.length} stories, $${cost.toFixed(4)} with their judged checks. Wrote ${round.fileBase}.md and .json and ${all.length} story pages; the index is ${index}`);
 }

@@ -39,6 +39,7 @@ import type { CallRecord } from "./runner.js";
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
+ *   playthroughs-2.md|json, stories/round2/  the second round, on production's current code (--playthroughs --round 2)
  */
 
 /** Each frame set's file: the first backfill's, and the nearer backfill's (the owner's feedback of 2026-09-28). */
@@ -164,17 +165,18 @@ export function evalFiles(outDir: string) {
       const chain = file ?? at("setup-chain.json");
       return fs.existsSync(chain) ? JSON.parse(fs.readFileSync(chain, "utf-8")) : undefined;
     },
-    /** The whole-story playthroughs (--playthroughs): the runs as JSON, the code's readings as markdown */
-    writePlaythroughs: (markdown: string, json: unknown) => {
-      writeJson(at("playthroughs.json"), json);
-      fs.writeFileSync(at("playthroughs.md"), markdown);
+    /** The whole-story playthroughs (--playthroughs): the runs as JSON, the code's readings as markdown; a later round under its own name (playthroughs-2) */
+    writePlaythroughs: (markdown: string, json: unknown, base = "playthroughs") => {
+      writeJson(at(`${base}.json`), json);
+      fs.writeFileSync(at(`${base}.md`), markdown);
     },
-    readPlaythroughs: (): unknown => (fs.existsSync(at("playthroughs.json")) ? JSON.parse(fs.readFileSync(at("playthroughs.json"), "utf-8")) : undefined),
-    /** A played story's page (or the index) in stories/; its path */
-    writeStoryPage: (fileName: string, html: string) => {
-      fs.mkdirSync(at("stories"), { recursive: true });
-      fs.writeFileSync(at("stories", fileName), html);
-      return at("stories", fileName);
+    readPlaythroughs: (base = "playthroughs"): unknown => (fs.existsSync(at(`${base}.json`)) ? JSON.parse(fs.readFileSync(at(`${base}.json`), "utf-8")) : undefined),
+    /** A played story's page (or the index) in stories/, or a later round's folder (stories/round2); its path */
+    writeStoryPage: (fileName: string, html: string, dir = "stories") => {
+      const folder = at(...dir.split("/"));
+      fs.mkdirSync(folder, { recursive: true });
+      fs.writeFileSync(path.join(folder, fileName), html);
+      return path.join(folder, fileName);
     },
     /** The parsed reply an output file holds (outputs/<callId>.json, as a record names it) */
     loadOutputFile: (outputFile: string): unknown => (JSON.parse(fs.readFileSync(at(outputFile), "utf-8")) as { parsed?: unknown }).parsed,

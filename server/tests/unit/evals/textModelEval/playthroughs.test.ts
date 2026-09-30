@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { GameModes, type BeatOption } from "core/types/index.js";
 import { withBeatProblem } from "../../../../src/game/services/beatChecks.js";
 import { withPlanProblem } from "../../../../src/game/services/planChecks.js";
-import { SETUP_PREMISES } from "../../../../src/evals/textModelEval/setupPremises.js";
+import { TURN_RESENDS } from "../../../../src/game/services/retryOnce.js";
+import { SETUP_PREMISES, buildMergedPrompt } from "../../../../src/evals/textModelEval/setupPremises.js";
 import {
   PLAYTHROUGHS,
+  PLAYTHROUGHS_2,
   START_POLICY,
   countedBonus,
   nextPolicy,
@@ -13,10 +15,12 @@ import {
   playthroughArm,
   playthroughSetupInput,
   seededRandom,
+  turnSends,
   withSeededDice,
+  type PlayCall,
 } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { callLimitsOf, requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
-import { beatSet, explorationOptions, PARAGRAPH, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
+import { beatSet, explorationOptions, outcome, PARAGRAPH, stat, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input, leverSet, setupReply } from "./playFixtures.js";
 
 /*
@@ -62,6 +66,31 @@ describe("the four playthroughs", () => {
     for (const id of ["setup-vent-subscription", "setup-kids-animal-rescue", "setup-fiction-bounty-hunters", "setup-pretend-cofounders"]) {
       expect(PLAYTHROUGHS.some((p) => p.premiseId === id)).toBe(false);
     }
+  });
+
+  it("plays round 2 on the same four premises and two more: a two-player contest that can run through several chapters, and a short story read with a child", () => {
+    expect(PLAYTHROUGHS_2.map((p) => [p.id, p.maxTurns])).toEqual([
+      ["play-lemonade", 10],
+      ["play-avalon", 25],
+      ["play-food-trucks", 25],
+      ["play-space-pirates", 25],
+      ["play-estate-agents", 25],
+      ["play-kids-mouse", 10],
+    ]);
+    // The first four are round 1's setups, input for input
+    expect(PLAYTHROUGHS_2.slice(0, 4).map((p) => playthroughSetupInput(p))).toEqual(PLAYTHROUGHS.map((p) => playthroughSetupInput(p)));
+    const [agents, mouse] = PLAYTHROUGHS_2.slice(4).map((p) => playthroughSetupInput(p));
+    // Two rivals and one prize, no shared bond named: the setup's competitive slate gives the contest the most milestones
+    expect([agents.playerCount, agents.gameMode, agents.kids]).toEqual([2, GameModes.Competitive, undefined]);
+    expect(agents.premise).toBe("We're rival estate agents trying to sell the same haunted mansion to unsuspecting buyers...");
+    // Read with a child as the client merges that category (its instruction, the child's age, the suggestion as context), with production's kids setup
+    expect([mouse.playerCount, mouse.gameMode, mouse.kids]).toEqual([1, GameModes.SinglePlayer, true]);
+    expect(mouse.premise).toBe(
+      buildMergedPrompt("read-with-kids", { kidAge: "5" }, "I'm a field mouse trying to save my burrow village from the giant tabby cat by using my knowledge of the Big House's secret passages...")
+    );
+    expect(mouse.premise).toMatch(/^Create an age-appropriate story[\s\S]*How old is the child\?: 5[\s\S]*Additional context: I'm a field mouse/);
+    // Neither new premise was played or set up in the eval before
+    for (const p of SETUP_PREMISES) expect([agents.premise, mouse.premise]).not.toContain(p.premise);
   });
 
   it("plays every call on production's own code (adopted) and production's settings for the role and player count", () => {
@@ -219,9 +248,12 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.turns[5].milestones.player1_main).toBe(1);
     expect(run.turns[10].milestones.player1_main).toBe(2);
     expect(run.end?.players.player1.outcomes.find((o) => o.id === "player1_main")?.milestones).toHaveLength(2);
-    // The first chapter's stage (1 of 2) is judged; the second is the outcome's last stage; the ending is judged per player
+    // The first chapter's stage (1 of 2) is judged; the second is the outcome's last stage; every chapter plan's results
+    // are judged against their kind; the ending is judged per player. The fake's chapters are challenges: no option set to judge
     expect(judgeTargets.map((t) => [t.kind, t.turn, t.label])).toEqual([
       ["stage", 2, "player1_main"],
+      ["results", 2, "player1_main"],
+      ["results", 7, "player1_main"],
       ["ending", 11, "player1"],
     ]);
     // What each call cost and waited
@@ -282,39 +314,81 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.complete).toBe(true);
   });
 
-  it("stops where a plan can't be used twice, as production fails the turn", async () => {
-    const { call } = fakeCall(1, {
-      reply: (role) => {
-        if (role !== "thread") return DEFAULT;
-        const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
-        return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
-      },
-    });
+  const unusablePlan = () => {
+    const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+    return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
+  };
+  const shortName = (caseId: string) => caseId.replace(/^play-lemonade-s1-\d+-/, "");
+
+  it("sends a turn whose writing failed once more, as production's queue does (since 2026-09-30), the whole turn from the same story", async () => {
+    // The chapter opening's first reply brings nothing usable back (production's model throws after its re-sends)
+    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "beat" && nth === 1 ? undefined : DEFAULT) });
     const { run } = await playStory(spec, input(1), call, { sample: 1 });
-    expect(run.complete).toBe(false);
-    expect(run.stopped).toMatch(/turn 2.*chapter plan.*could not be used/);
-    expect(run.turns.at(-1)?.plan?.failure).toBeTruthy();
+    expect(TURN_RESENDS).toBe(1);
+    expect(run.complete).toBe(true);
+    const opening = run.turns[1];
+    // The failed send keeps its plan and calls; the send that worked is the turn's
+    expect(opening.failedSends).toEqual([expect.objectContaining({ send: "first", failure: expect.stringMatching(/no usable reply/), calls: [expect.objectContaining({ failed: true })] })]);
+    expect(opening.failedSends?.[0].plan?.plan).toBeDefined();
+    expect(opening.sentBy).toBe("resend");
+    // A resend runs the whole turn again: production's chapter planner, then the turn
+    expect(calls.filter((c) => /resend/.test(c.caseId)).map((c) => shortName(c.caseId))).toEqual(["chapter-plan-resend", "chapter-opening-resend"]);
+    expect(opening.plan?.calls[0].caseId).toMatch(/chapter-plan-resend$/);
+    // The player waits for every send: the failed send's plan, then the resend's plan and turn
+    expect(opening.waitMs).toBe(3_000);
+    // A turn that worked first time has no failed send
+    expect(run.turns[2].failedSends).toBeUndefined();
+    expect(run.turns[2].sentBy).toBeUndefined();
   });
 
-  it("where production would fail the turn on a plan unusable twice, asks production's checked planner again when told to, and marks the turn", async () => {
-    const unusable = () => {
-      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
-      return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
-    };
-    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth < 2 ? unusable() : DEFAULT) });
-    const { run } = await playStory(spec, input(1), call, { sample: 1, retryFailedTurns: 2 });
+  it("sends a turn whose chapter plan can't be used twice once more, and a turn whose retry has no options either", async () => {
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth < 2 ? unusablePlan() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1 });
     expect(run.complete).toBe(true);
-    const planned = run.turns[1].plan;
-    // The failed round keeps both of production's calls; the next round is production's checked planner again
-    expect(planned?.failedRounds).toEqual([{ calls: [expect.objectContaining({ retry: false }), expect.objectContaining({ retry: true })], failure: expect.stringMatching(/usable thread plan/) }]);
-    expect(planned?.calls).toHaveLength(1);
-    expect(planned?.calls[0].caseId).toMatch(/chapter-plan-again-1$/);
-    expect(calls.filter((c) => c.role === "thread").map((c) => c.caseId.replace(/^play-lemonade-s1-\d+-/, ""))).toEqual(["chapter-plan", "chapter-plan-retry", "chapter-plan-again-1", "chapter-plan"]);
-    // Where the harness gives up, it says so
-    const { call: never } = fakeCall(1, { reply: (role) => (role === "thread" ? unusable() : DEFAULT) });
-    const stuck = await playStory(spec, input(1), never, { sample: 1, retryFailedTurns: 1 });
-    expect(stuck.run.stopped).toMatch(/turn 2.*chapter plan.*could not be used/);
-    expect(stuck.run.turns[1].plan?.failedRounds).toHaveLength(1);
+    expect(run.turns[1].failedSends).toEqual([
+      expect.objectContaining({ send: "first", failure: expect.stringMatching(/usable thread plan/), plan: expect.objectContaining({ calls: [expect.objectContaining({ retry: false }), expect.objectContaining({ retry: true })] }) }),
+    ]);
+    const withoutOptions = () => beatSet(1, { player1: { ...beatSet(1).player1, options: [] } } as never);
+    const { call: bare } = fakeCall(1, { reply: (role, nth) => (role === "beat" && (nth === 1 || nth === 2) ? withoutOptions() : DEFAULT) });
+    const played = await playStory(spec, input(1), bare, { sample: 1 });
+    expect(played.run.complete).toBe(true);
+    expect(played.run.turns[1].failedSends?.[0].calls.map((c) => c.problem)).toEqual([expect.stringMatching(/no options/), expect.stringMatching(/no options/)]);
+  });
+
+  it("after the resend fails too, the player presses Try again on the notice as asked, which production sends with its own resend; with no press the story waits there", async () => {
+    expect(turnSends(0)).toEqual(["first", "resend"]);
+    expect(turnSends(1)).toEqual(["first", "resend", "try again", "try again resend"]);
+    // The chapter plan is unusable in the first three sends (a call and its retry each)
+    const { call, calls } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth < 6 ? unusablePlan() : DEFAULT) });
+    const { run } = await playStory(spec, input(1), call, { sample: 1, tryAgain: 1 });
+    expect(run.complete).toBe(true);
+    expect(run.turns[1].failedSends?.map((s) => s.send)).toEqual(["first", "resend", "try again"]);
+    expect(run.turns[1].sentBy).toBe("try again resend");
+    expect(calls.filter((c) => c.role === "thread").map((c) => shortName(c.caseId)).slice(0, 7)).toEqual([
+      "chapter-plan",
+      "chapter-plan-retry",
+      "chapter-plan-resend",
+      "chapter-plan-resend-retry",
+      "chapter-plan-try-again",
+      "chapter-plan-try-again-retry",
+      "chapter-plan-try-again-resend",
+    ]);
+    // No press: after the first send and its resend production shows the notice, and the story stops there
+    const { call: never } = fakeCall(1, { reply: (role) => (role === "thread" ? unusablePlan() : DEFAULT) });
+    const stuck = await playStory(spec, input(1), never, { sample: 1 });
+    expect(stuck.run.complete).toBe(false);
+    expect(stuck.run.stopped).toMatch(/^turn 2: production could not write the turn in 2 sends \(the first and its resend\)/);
+    expect(stuck.run.turns[1].failedSends).toHaveLength(2);
+    expect(stuck.run.turns[1].plan).toBeUndefined();
+  });
+
+  it("never sends again a call a spend limit kept from being sent: the story stops there", async () => {
+    const { call: base, calls } = fakeCall(1);
+    let beats = 0;
+    const call: PlayCall = async (s) => (s.role === "beat" && beats++ === 1 ? { latencyMs: 0, costUsd: 0, sends: [], notSent: "the spend limit $0.0100" } : base(s));
+    const { run } = await playStory(spec, input(1), call, { sample: 1, tryAgain: 1 });
+    expect(run.stopped).toMatch(/turn 2: the chapter opening was not sent \(the spend limit/);
+    expect(calls.some((c) => /resend|try-again/.test(c.caseId))).toBe(false);
   });
 
   it("where a group chapter can't be planned from the players' switch picks, has the stuck players pick the shared direction another player took, then plans once more, and marks it", async () => {
@@ -345,12 +419,14 @@ describe("playStory: a whole story as the game plays it", () => {
         return DEFAULT;
       },
     });
-    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, retryFailedTurns: 1, repickStuckSwitches: true });
+    const { run } = await playStory(PLAYTHROUGHS[2], input(2), call, { sample: 1, repickStuckSwitches: true });
     const stuck = run.turns.find((t) => t.repicks?.length);
     expect(stuck?.turn).toBe(7);
     // player1 had taken their own outcome (Option 2); they now take the shared direction player2 took (Option 1)
     expect(stuck?.repicks).toEqual([{ slot: "player1", from: 1, to: 0, text: "Option 1", outcomeId: "shared_harbour" }]);
-    expect(stuck?.plan?.failedRounds).toHaveLength(2);
+    // Only after production's own sends failed: the first and its resend
+    expect(stuck?.failedSends?.map((s) => s.send)).toEqual(["first", "resend"]);
+    expect(stuck?.sentBy).toBe("after repick");
     expect(stuck?.plan?.plan).toBeDefined();
     const last = calls.filter((c) => c.role === "thread").at(-1);
     expect(last?.caseId).toMatch(/chapter-plan-after-repick$/);
@@ -396,10 +472,52 @@ describe("playStory: a whole story as the game plays it", () => {
     expect(run.complete).toBe(true);
   });
 
-  it("stops where production fails the turn: the retry has no options either", async () => {
-    const { call } = fakeCall(1, { reply: (role, nth) => (role === "beat" && (nth === 1 || nth === 2) ? withoutOptions() : DEFAULT) });
+  it("stops where production fails the turn in every send: the retry has no options either, each time", async () => {
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "beat" && nth >= 1 ? withoutOptions() : DEFAULT) });
     const { run } = await playStory(spec, input(1), call, { sample: 1 });
-    expect(run.stopped).toMatch(/turn 2.*no usable reply/);
+    expect(run.stopped).toMatch(/turn 2: production could not write the turn in 2 sends.*no usable reply/);
+  });
+
+  it("hands the judged checks each chapter plan's results and, at each step of an exploration chapter, each player's options", async () => {
+    const exploring = () => {
+      const plan = threadAnalysis("exploration", 4, 0, ["player1"]);
+      return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "player1_main" }] };
+    };
+    const { call } = fakeCall(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? exploring() : DEFAULT), chapterOptions: () => explorationOptions() });
+    const { judgeTargets } = await playStory(spec, input(1), call, { sample: 1 });
+    // The first chapter explores (turns 2-5); the second is a challenge, whose options are not judged
+    expect(judgeTargets.filter((t) => t.kind === "options").map((t) => [t.turn, t.label, t.key])).toEqual([
+      [2, "player1", "play-lemonade-s1-t2-player1"],
+      [3, "player1", "play-lemonade-s1-t3-player1"],
+      [4, "player1", "play-lemonade-s1-t4-player1"],
+      [5, "player1", "play-lemonade-s1-t5-player1"],
+    ]);
+    const [first] = judgeTargets.filter((t) => t.kind === "options");
+    expect(first.request.prompt).toContain("This step (1 of 4)");
+    expect(first.request.prompt).toContain("Option 1: Option 1");
+    expect(judgeTargets.filter((t) => t.kind === "results").map((t) => [t.turn, t.key])).toEqual([
+      [2, "play-lemonade-s1-t2"],
+      [7, "play-lemonade-s1-t7"],
+    ]);
+  });
+
+  it("records, on each turn after a contest step or chapter, its result on the contest's scoreboard", async () => {
+    // Two rivals: a contested shared outcome scored on a shared opposites stat, and a chapter that is that contest
+    const contested = outcome("shared_harbour", { intendedNumberOfMilestones: 3, possibleResolutions: { sideAWins: "A takes it.", mixed: "Split.", sideBWins: "B takes it." }, resonance: "The harbour. Scored by Harbour Race." } as never);
+    const board = stat("shared_race", { name: "Harbour Race", type: "opposites", initialValue: 50 } as never);
+    const setup = { ...setupReply(2), sharedOutcomes: [contested], sharedStats: [...setupReply(2).sharedStats, board] };
+    const contest = () => {
+      const plan = threadAnalysis("contest", 4, 0, ["player1"], ["player2"]);
+      return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "shared_harbour" }] };
+    };
+    const { call } = fakeCall(2, { reply: (role) => (role === "setup" ? setup : role === "thread" ? contest() : DEFAULT) });
+    const { run } = await playStory(PLAYTHROUGHS_2[4], { ...input(2), gameMode: GameModes.Competitive }, call, { sample: 1, turnLimit: 6 });
+    // The chapter opening follows no step; each later step, and the switch after the chapter, follow a contest result
+    expect(run.turns[1].contestResults).toBeUndefined();
+    const step = run.turns[2].contestResults ?? [];
+    expect(step).toEqual([expect.objectContaining({ outcomeId: "shared_harbour", board: "shared_race", oriented: true })]);
+    expect(["sideAWins", "mixed", "sideBWins"]).toContain(step[0].result);
+    expect(run.turns[5].contestResults?.[0]).toMatchObject({ outcomeId: "shared_harbour", board: "shared_race" });
   });
 
   it("asks no ending for options: the game shows none there", async () => {

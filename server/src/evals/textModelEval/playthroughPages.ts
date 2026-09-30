@@ -1,8 +1,13 @@
 import type { Outcome, Stat, StatValueEntry, StoryState, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { playerParagraphs } from "./playerText.js";
-import { readStory, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
+import { choiceLine, fixesLine, ownStatsLine, readStory, resentLine, scoreboardLine, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
 import type { PlayPick, PlayRun, PlayTurn } from "./playthroughs.js";
 import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
+
+/** Each round's hand-read report, in the output folder (the pages point to it). */
+export const PLAYTHROUGH_REPORTS: Record<number, string> = { 1: "2026-09-30_playthroughs-report.md", 2: "2026-09-30_playthroughs-2-report.md" };
+
+const reportOf = (round: number | undefined) => `DOCS/2026-09-26_gpt6-text-eval/${PLAYTHROUGH_REPORTS[round ?? 1] ?? PLAYTHROUGH_REPORTS[1]}`;
 
 /*
  * Each played story (playthroughs.ts) as a page for the owner: offline HTML,
@@ -15,9 +20,11 @@ import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
  * lines as the rating pages', ratingMechanics.ts), the option the player
  * chose and why, its roll, and what the turn changes; each chapter's result
  * and milestone; the ending with each outcome as its milestones leave it; the
- * stats over the story; and the code's readings (playthroughChecks.ts). Every
- * story string goes through escapeHtml. No rating page: one version, no
- * blinding.
+ * stats over the story; and the code's readings (playthroughChecks.ts). Since
+ * round 2 a page also says where production sent a failed turn again (the
+ * queue's resend, the player's Try again) and shows the judged options and
+ * results checks. Every story string goes through escapeHtml. No rating page:
+ * one version, no blinding.
  */
 
 const e = escapeHtml;
@@ -297,7 +304,11 @@ function chapterBlock(run: PlayRun, turn: PlayTurn, chapter: ChapterReading | un
     ...lostPicks,
     ...(plan.failure ? [`The chapter plan failed: ${plan.failure}`] : []),
   ];
-  return `<section class="chapter">${head}${body}${flags.map((f) => `<p class="flag">${e(f)}</p>`).join("")}</section>`;
+  const results = readings.choices.results.find((c) => c.turn === turn.turn);
+  const judged = results
+    ? `<p class="${results.verdict === false ? "flag" : "muted"}">Judged, the results fit the chapter's kind: ${results.verdict === undefined ? "no answer" : results.verdict ? "yes" : "no"}${results.evidence ? ` (${e(results.evidence)})` : ""}</p>`
+    : "";
+  return `<section class="chapter">${head}${body}${judged}${flags.map((f) => `<p class="flag">${e(f)}</p>`).join("")}</section>`;
 }
 
 function chapterResult(run: PlayRun, chapter: ChapterReading): string {
@@ -342,16 +353,42 @@ function beatBlock(run: PlayRun, turn: PlayTurn, slot: string, readings: StoryRe
     .join("");
   const interludes = ending ? [] : asArray<Loose>(beat.interludes);
   const multi = Object.keys(asObject(run.start?.players)).length > 1;
+  const judged = readings.choices.options.find((c) => c.turn === turn.turn && c.slot === slot);
+  const verdict = !judged
+    ? ""
+    : judged.verdict === false
+      ? `<p class="flag">Judged: the options don't each carry out the result at their position${judged.evidence ? ` (${e(judged.evidence)})` : ""}</p>`
+      : `<p class="muted">Judged: ${judged.verdict ? "each option carries out the result at its position" : "no answer"}${judged.evidence ? ` (${e(judged.evidence)})` : ""}</p>`;
   return `<div class="beat">
 <h4>${multi ? `${e(nameOf(run.start, slot))}: ` : ""}${e(asString(beat.title))}</h4>
 ${prose(asString(beat.text))}
 ${options.length ? `<ol class="options">${optionItems}</ol>` : ending ? "" : `<p class="flag">No options: the player could not go on.</p>`}
+${verdict}
 ${interludes.length ? `<details><summary>Shown while the next turn was written</summary><ul>${interludes.map((i) => `<li>${e(asString(i.text))}</li>`).join("")}</ul></details>` : ""}
 </div>`;
 }
 
+/** Where production sent a failed turn again: each failed send's reason, then how the turn got written (or didn't). */
+function sendLines(turn: PlayTurn): string[] {
+  const failed = turn.failedSends ?? [];
+  if (failed.length === 0) return [];
+  const which = (send: string) => (send === "first" ? "the first send" : send === "resend" ? "its resend" : `the ${send}`);
+  const reasons = `Production's turn failed (${failed.map((s) => `${which(s.send)}: ${s.failure}`).join("; ")})`;
+  const told = failed.some((s) => s.send.includes("resend"));
+  if (!told) return [`${reasons}; the queue sent it once more, and that worked.`];
+  const wrote =
+    !turn.reply
+      ? "no send wrote it, and the story stops here"
+      : turn.sentBy === "after repick"
+        ? "the harness then changed the stuck players' switch picks and sent the turn once more (not production's step)"
+        : `${turn.sentBy?.includes("resend") ? "that Try again's resend" : "that Try again"} wrote it`;
+  const pressed = failed.some((s) => s.send.startsWith("try again")) || turn.sentBy?.startsWith("try again") ? " and pressed Try again" : "";
+  return [`${reasons}. The players saw “Unable to continue the story. Please try again.”${pressed}; ${wrote}.`];
+}
+
 function turnNotes(turn: PlayTurn): string {
   const notes = [
+    ...sendLines(turn),
     ...(turn.calls.length > 1 ? [`Asked for again: ${turn.calls[0].problem ?? "the first reply could not be used"}`] : []),
     ...turn.calls.filter((c) => c.sends.length > 1).map((c) => `Re-sent ${c.sends.length - 1} time(s): ${c.sends.map((s) => s.outcome).join(", ")}`),
     ...(turn.repairs.length ? [`The game repaired: ${turn.repairs.join("; ")}`] : []),
@@ -420,7 +457,7 @@ function statsSection(run: PlayRun): string {
   return `<section id="stats"><h2>Stats at the start and the end</h2><div class="scroll"><table><tr><th>Stat</th><th>Start</th><th>End</th></tr>${rows}</table></div></section>`;
 }
 
-function readingsSection(readings: StoryReadings): string {
+function readingsSection(run: PlayRun, readings: StoryReadings): string {
   const r = readings;
   const items = [
     `Ends on its turn count: ${r.endsOnTurnCount.ok ? "yes" : "no"} (${r.endsOnTurnCount.turnsBeforeEnding} turns${r.endsOnTurnCount.endingTurn ? `, the ending at turn ${r.endsOnTurnCount.endingTurn}` : ", no ending"}).`,
@@ -437,12 +474,22 @@ function readingsSection(readings: StoryReadings): string {
           `Switch picks the next chapter did not follow: ${r.switchPicks.filter((p) => !p.kept).map((p) => `turn ${p.turn} (${p.slot})`).join(", ") || "none"} (of ${r.switchPicks.length}).`,
         ]
       : []),
-    `Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ") || "none"}.`,
+    ...(r.repairs.stuckTurns.length ? [`Turns production could not get past (the harness asked the planner again): ${r.repairs.stuckTurns.map((s) => `turn ${s.turn} (${s.kind})`).join(", ")}.`] : []),
+    `Turns production sent again: ${r.repairs.resentTurns.length ? r.repairs.resentTurns.map(resentLine).join("; ") : "none"}.`,
+    `Production's fixes of 2026-09-30 that fired: ${fixesLine(r)}.`,
     `Repairs: plans retried ${r.repairs.planRetries.length}, one-paragraph turns retried ${r.repairs.shortTextRetries.length} (the retry one paragraph too and used: ${r.repairs.shortTextUsedAsIs.length}), turns without options retried ${r.repairs.optionsRetries.length}, calls re-sent ${r.repairs.resends.length}, beat repairs ${Object.values(r.repairs.beatRepairs).reduce((a, b) => a + b, 0)}.`,
-    `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}${r.waitsLeftOut.length ? `; left out of the waits, where production would have stopped: ${r.waitsLeftOut.map((t) => `turn ${t}`).join(", ")}` : ""}.`,
+    ownStatsLine(r),
+    scoreboardLine(r),
+    ...(r.choices.options.length || r.choices.results.length
+      ? [
+          `Judged: ${choiceLine("option sets that carry out the result at each position", r.choices.options, (c) => `turn ${c.turn} ${c.slot}`)}.`,
+          `Judged: ${choiceLine("chapter plans whose results fit their kind", r.choices.results, (c) => `turn ${c.turn}`)}.`,
+        ]
+      : []),
+    `Waits over their allowance: ${r.waits.flatMap((w) => w.over.map((t) => `turn ${t} (${w.kind})`)).join(", ") || "none"}${r.waitsLeftOut.length ? `; left out of the waits, where the players were told the turn failed or production could not get past it: ${r.waitsLeftOut.map((t) => `turn ${t}`).join(", ")}` : ""}.`,
     `Cost: ${usd(r.cost.storyUsd)} over ${r.cost.calls} calls (judged checks ${usd(r.cost.judgeUsd)}).`,
   ];
-  return `<section id="readings"><h2>What the code read</h2><ul>${items.map((i) => `<li>${e(i)}</li>`).join("")}</ul><p class="muted">The report reads the story by hand as well: DOCS/2026-09-26_gpt6-text-eval/2026-09-30_playthroughs-report.md.</p></section>`;
+  return `<section id="readings"><h2>What the code read</h2><ul>${items.map((i) => `<li>${e(i)}</li>`).join("")}</ul><p class="muted">The report reads the story by hand as well: ${e(reportOf(run.round))}.</p></section>`;
 }
 
 /** One played story as a page. */
@@ -458,35 +505,41 @@ export function storyPage(run: PlayRun): string {
     ["Cost", `${usd(readings.cost.storyUsd)} over ${readings.cost.calls} calls`],
   ];
   const body = `<header>
-<p class="kicker">A whole story on production's own code · ${e(run.spec.tests)}</p>
+<p class="kicker">A whole story on production's ${(run.round ?? 1) > 1 ? `current code (round ${run.round})` : "own code"} · ${e(run.spec.tests)}</p>
 <h1>${e(title)}</h1>
 <p class="lede">${e(run.input.premise)}</p>
 <dl class="facts">${facts.map(([k, v]) => `<dt>${e(k)}</dt><dd>${e(v)}</dd>`).join("")}</dl>
 <nav><a href="index.html">All stories</a><a href="#setup">Setup</a><a href="#story">The story</a>${readings.ending ? '<a href="#ending">The ending</a>' : ""}<a href="#stats">Stats</a><a href="#readings">What the code read</a></nav>
-<p class="muted">The player is automated: a sacrifice or reward whenever one is offered (never twice in a row), otherwise the stat-backed, the riskiest and the most sensible option in turn; exploration choices rotate. The game's own dice, on a seeded source. No images, no pregeneration.</p>
+<p class="muted">The player is automated: a sacrifice or reward whenever one is offered (never twice in a row), otherwise the stat-backed, the riskiest and the most sensible option in turn; exploration choices rotate${(run.round ?? 1) > 1 ? "; where a turn fails twice, it presses Try again once" : ""}. The game's own dice, on a seeded source. No images, no pregeneration.</p>
 </header>
 ${setupSection(run)}
 ${storySection(run, readings)}
 ${endingSection(run, readings)}
 ${statsSection(run)}
-${readingsSection(readings)}`;
+${readingsSection(run, readings)}`;
   return page(title, body);
 }
 
-/** The stories' index: each story's page and its main facts. */
-export function indexPage(runs: PlayRun[], generatedAt: Date): string {
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+/** The stories' index: each story's page and its main facts; a later round's links the first round's pages and names its own report. */
+export function indexPage(runs: PlayRun[], generatedAt: Date, round = 1): string {
   const rows = runs
     .map((run) => {
       const r = readStory(run);
       return `<tr><td><a href="${e(storyFileName(run))}">${e(run.start?.title || run.spec.id)}</a><br><span class="muted">${e(run.spec.tests)}</span></td><td>${run.input.playerCount}</td><td>${e(run.input.gameMode)}</td><td>${run.input.maxTurns} turns</td><td>${run.complete ? "yes" : `no: ${e(run.stopped)}`}</td><td>${r.endsOnTurnCount.ok ? "yes" : "no"}</td><td>${r.chapters.length}</td><td>${usd(r.cost.storyUsd)}</td></tr>`;
     })
     .join("");
+  const count = `${COUNT_WORDS[runs.length] ?? String(runs.length)} ${runs.length === 1 ? "story" : "stories"}`;
+  const heading = round > 1 ? `Round ${round}: ${count} on production's current code` : `${count[0].toUpperCase()}${count.slice(1)} on production's own code`;
+  const earlier = round > 1 ? `<p class="muted">The first round's pages, played before the fixes since (production's code of the morning of 30 September): <a href="../index.html">round 1</a>.</p>` : "";
   const body = `<header>
-<p class="kicker">Whole-story playthroughs</p>
-<h1>Four stories on production's own code</h1>
+<p class="kicker">Whole-story playthroughs${round > 1 ? `, round ${round}` : ""}</p>
+<h1>${heading}</h1>
 <p class="lede">Each story was set up and played to its end the way the game plays it on this branch: production's own requests, models, checks and repairs, with an automated player. Written ${e(generatedAt.toISOString().slice(0, 16).replace("T", " "))} UTC.</p>
+${earlier}
 </header>
 <div class="scroll"><table><tr><th>Story</th><th>Players</th><th>Mode</th><th>Length</th><th>Reached the ending</th><th>On its turn count</th><th>Chapters</th><th>Cost</th></tr>${rows}</table></div>
-<p class="muted">These pages show production's own turns, one version each; they are not rating pages. The report is DOCS/2026-09-26_gpt6-text-eval/2026-09-30_playthroughs-report.md.</p>`;
-  return page("Playthroughs", body);
+<p class="muted">These pages show production's own turns, one version each; they are not rating pages. The report is ${e(reportOf(round))}.</p>`;
+  return page(round > 1 ? `Playthroughs, round ${round}` : "Playthroughs", body);
 }

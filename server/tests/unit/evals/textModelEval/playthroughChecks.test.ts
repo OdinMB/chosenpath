@@ -91,22 +91,131 @@ describe("readStory", () => {
     expect(misfit.unfit[0]).toMatchObject({ name: "Supplies", kinds: [expect.stringMatching(/cantApply/)] });
   });
 
-  it("lists the turns production could not get past, where the harness asked the planner again", async () => {
+  it("lists the turns production could not get past in a run stored before its resend, where the harness asked the planner again (round 1)", async () => {
+    const run = structuredClone(await played());
+    const plan = run.turns[1].plan;
+    if (!plan) throw new Error("no chapter plan at turn 2");
+    plan.failedRounds = [{ calls: plan.calls, failure: "No usable thread plan: unknown outcome" }];
+    const readings = readStory(run);
+    expect(readings.repairs.stuckTurns).toEqual([{ turn: 2, kind: "chapter plan", failure: expect.stringMatching(/usable thread plan/), rounds: 1 }]);
+    expect(readings.waitsLeftOut).toEqual([2]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toMatch(/production would have stopped at: turn 2/);
+  });
+
+  const unusable = () => {
+    const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+    return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
+  };
+
+  it("lists the turns production sent again, and those where the players saw the failure notice and pressed Try again", async () => {
+    // Turn 2's chapter plan fails in its first send; turn 7's in the first send and its resend
     const { run } = await playStory(
       PLAYTHROUGHS[0],
       input(1),
-      fakeCall(1, {
-        reply: (role, nth) => {
-          if (role !== "thread" || nth > 1) return DEFAULT;
-          const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
-          return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
-        },
-      }).call,
-      { sample: 1, retryFailedTurns: 2 }
+      fakeCall(1, { reply: (role, nth) => (role === "thread" && (nth <= 1 || (nth >= 3 && nth <= 6)) ? unusable() : DEFAULT) }).call,
+      { sample: 1, tryAgain: 1 }
     );
+    expect(run.complete).toBe(true);
     const readings = readStory(run);
-    expect(readings.repairs.stuckTurns).toEqual([{ turn: 2, kind: "chapter plan", failure: expect.stringMatching(/usable thread plan/), rounds: 1 }]);
-    expect(renderPlaythroughReadings([run], new Date(0))).toMatch(/production would have stopped at: turn 2/);
+    expect(readings.repairs.resentTurns).toEqual([
+      { turn: 2, kind: "chapter opening", failed: ["first"], sentBy: "resend", tryAgain: false, failures: [expect.stringMatching(/usable thread plan/)] },
+      { turn: 7, kind: "chapter opening", failed: ["first", "resend"], sentBy: "try again", tryAgain: true, failures: [expect.stringMatching(/usable thread plan/), expect.stringMatching(/usable thread plan/)] },
+    ]);
+    // A turn the queue's resend saved counts in the waits, every send included; one the players had to send again does not
+    expect(readings.waitsLeftOut).toEqual([7]);
+    expect(readings.waits.find((w) => w.kind === "chapter opening")).toMatchObject({ turns: 1, maxS: 4 });
+    const text = renderPlaythroughReadings([run], new Date(0));
+    expect(text).toContain("- turns production sent again: turn 2 (the first send failed");
+    expect(text).toMatch(/turn 7 \(the first send and its resend failed[^)]*; the players saw the failure notice and pressed Try again/);
+    expect(text).toContain("Turns left out of the waits (the players were told the turn failed, or production could not get past it): turn 7.");
+  });
+
+  it("reads whether each player's own stats moved over the story", async () => {
+    const still = readStory(await played());
+    expect(still.ownStats).toEqual([{ slot: "player1", stat: "player_courage", name: "Courage", start: expect.any(Number), end: expect.any(Number), changedAt: [] }]);
+    const moving = readStory(await played(1, { statChanges: [{ type: "statChange", group: "player1", stat: "player_courage", change: "subtractNumber", value: 2 }] }));
+    expect(moving.ownStats[0].changedAt.length).toBeGreaterThan(5);
+    expect(moving.ownStats[0].end).toBe((moving.ownStats[0].start as number) - 2 * moving.ownStats[0].changedAt.length);
+    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Players' own stats that moved: none (of 1 stat per player, 1 player).");
+  });
+
+  it("reads each scoreboard move against the contest result it follows", async () => {
+    const run = structuredClone(await played(2));
+    const start = run.start;
+    if (!start) throw new Error("no start");
+    start.sharedOutcomes = [{ ...start.sharedOutcomes[0], possibleResolutions: { sideAWins: "A.", mixed: "Split.", sideBWins: "B." }, resonance: "The harbour. Scored by Harbour Race." } as never];
+    start.sharedStats = [...start.sharedStats, { ...start.sharedStats[0], id: "shared_race", name: "Harbour Race", type: "opposites" } as never];
+    const others = [...(start.sharedStatValues ?? [])];
+    const race = (value: number) => [...others, { statId: "shared_race", value }];
+    const results = (result: string) => [{ outcomeId: start.sharedOutcomes[0].id, board: "shared_race", result, oriented: true }];
+    start.sharedStatValues = race(50);
+    const set = (turn: number, value: number, result?: string, repaired = false) => {
+      const t = run.turns[turn - 1];
+      t.statValues = { ...t.statValues, shared: race(value) };
+      if (result) t.contestResults = results(result);
+      if (repaired) t.repairs = [...t.repairs, "scoreboardDirection: shared_race: 60 -> 45 after side A won; 60 -> 75"];
+    };
+    [1, 2].forEach((t) => set(t, 50));
+    set(3, 60, "sideAWins");
+    set(4, 70, "sideBWins");
+    set(5, 70, "mixed");
+    set(6, 85, "sideAWins", true);
+    set(7, 95);
+    // A step's win holds the scoreboard, as the setup's rule moves it only after a chapter; a switch turn after a won chapter should move it
+    set(8, 95, "sideBWins");
+    for (const t of [9, 10]) set(t, 95);
+    set(11, 95, "sideAWins");
+    const moves = readStory(run).scoreboard;
+    expect(moves.map((m) => [m.turn, m.before, m.after, m.winner ?? null, m.reading, m.repaired])).toEqual([
+      [3, 50, 60, "sideA", "toward the winner", false],
+      [4, 60, 70, "sideB", "the wrong way", false],
+      [5, 70, 70, null, "held", false],
+      [6, 70, 85, "sideA", "toward the winner", true],
+      [7, 85, 95, null, "moved with no contest result", false],
+      [8, 95, 95, "sideB", "held after a step win", false],
+      [11, 95, 95, "sideA", "held after a chapter win", false],
+    ]);
+    expect(renderPlaythroughReadings([run], new Date(0))).toMatch(
+      /Scoreboard moves: Harbour Race: 7 turns[^\n]*the wrong way at turn 4[^\n]*held after a step win 1[^\n]*held after a chapter win at turn 11[^\n]*moved with no contest result at turn 7[^\n]*production turned 1 move around \(turn 6\)/
+    );
+  });
+
+  it("lists which of production's fixes of 2026-09-30 fired, by turn", async () => {
+    // The last step written twice, word for word: production's plan check drops the copy (PL-14)
+    const doubled = () => {
+      const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
+      const [first] = plan.threads;
+      return { ...plan, threads: [{ ...first, outcomeId: "player1_main", progression: [first.progression[0], first.progression[1], first.progression[2], { ...first.progression[2] }] }] };
+    };
+    const readings = readStory(await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) }));
+    expect(readings.fixes.lastStepRepeated).toEqual([2]);
+    expect(readings.fixes.sharedLeverRepeated).toEqual([]);
+    const shared: BeatOption = { optionType: "challenge", resourceType: "sacrifice", riskType: "normal", text: "Spend 10 Supplies to charge", basePoints: 30, modifiersToSuccessRate: [] };
+    const group = readStory(await played(2, { chapterOptions: () => [leverSet()[0], leverSet()[1], shared] }));
+    expect(group.fixes.sharedLeverRepeated.length).toBeGreaterThan(0);
+    expect(renderPlaythroughReadings([await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) })], new Date(0))).toContain(
+      "- production's fixes of 2026-09-30 that fired: last step written twice, the copy dropped: turn 2"
+    );
+  });
+
+  it("reads the judged checks on each option set at an exploration step and on each chapter plan's results", async () => {
+    const run = structuredClone(await played());
+    run.judged = [
+      { key: "play-lemonade-s1-t3-player1", kind: "options", turn: 3, label: "player1", verdict: true, evidence: "fine", lines: ["option 1 → 1 (same)"], costUsd: 0.0004 },
+      { key: "play-lemonade-s1-t4-player1", kind: "options", turn: 4, label: "player1", verdict: false, evidence: "Option 2 asks instead.", lines: ["option 2 → none (asks)"], costUsd: 0.0004 },
+      { key: "play-lemonade-s1-t2", kind: "results", turn: 2, label: "player1_main", verdict: false, evidence: "Step 2 names the approach.", lines: [], costUsd: 0.0008 },
+    ];
+    const readings = readStory(run);
+    expect(readings.choices.options.map((o) => [o.turn, o.slot, o.verdict])).toEqual([
+      [3, "player1", true],
+      [4, "player1", false],
+    ]);
+    expect(readings.choices.results.map((r) => [r.turn, r.verdict])).toEqual([[2, false]]);
+    expect(readings.cost.judgeUsd).toBeCloseTo(0.0016);
+    const text = renderPlaythroughReadings([run], new Date(0));
+    expect(text).toContain("### Options and results (judged)");
+    expect(text).toContain("Option sets that carry out the result at each position: 1 of 2 (not at turn 4 player1: Option 2 asks instead.)");
+    expect(text).toContain("Chapter plans whose results fit their kind: 0 of 1 (not at turn 2: Step 2 names the approach.)");
   });
 
   it("lists the plan design checks that failed, with the turn of each plan", async () => {
@@ -257,28 +366,15 @@ describe("readStory", () => {
     expect(readings.leversPaid.counts.applied).toBe(readings.leversPaid.sharedOnce.length);
   });
 
-  it("lists the turns whose wait is left out, and the one-paragraph retries whose second reply was one paragraph too", async () => {
-    const { run } = await playStory(
-      PLAYTHROUGHS[0],
-      input(1),
-      fakeCall(1, {
-        reply: (role, nth) => {
-          if (role === "thread" && nth <= 1) {
-            const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
-            return { ...plan, threads: [{ ...plan.threads[0], outcomeId: "no_such_outcome" }] };
-          }
-          if (role === "beat" && (nth === 3 || nth === 4)) return beatSet(1, { player1: { ...beatSet(1).player1, text: "One short paragraph.", options: leverSet() } } as never);
-          return DEFAULT;
-        },
-      }).call,
-      { sample: 1, retryFailedTurns: 2 }
-    );
+  it("lists the one-paragraph retries whose second reply was one paragraph too", async () => {
+    const run = await played(1, {
+      reply: (role, nth) => (role === "beat" && (nth === 3 || nth === 4) ? beatSet(1, { player1: { ...beatSet(1).player1, text: "One short paragraph.", options: leverSet() } } as never) : DEFAULT),
+    });
     const readings = readStory(run);
-    expect(readings.waitsLeftOut).toEqual([2]);
+    expect(readings.waitsLeftOut).toEqual([]);
     expect(readings.repairs.shortTextRetries).toEqual([4]);
     expect(readings.repairs.shortTextUsedAsIs).toEqual([4]);
     const text = renderPlaythroughReadings([run], new Date(0));
-    expect(text).toContain("left out of the waits (production would have stopped there): turn 2");
     expect(text).toContain("one-paragraph turns retried: 4 (the retry was one paragraph too, and was used: 4)");
   });
 
