@@ -110,10 +110,11 @@ describe("readStory", () => {
   });
 
   it("lists the plan design checks that failed, with the turn of each plan", async () => {
+    // The last step twice, relabelled: production's plan check drops only an exact copy (PL-14), so this one stays
     const doubled = () => {
       const plan = threadAnalysis("challenge", 4, 0, ["player1"]);
       const [first] = plan.threads;
-      const steps = [first.progression[0], first.progression[1], { ...first.progression[2], title: "The Last Push" }, { ...first.progression[3], title: "The Last Push" }];
+      const steps = [first.progression[0], first.progression[1], { ...first.progression[2], title: "The Last Push", question: "Push: Q" }, { ...first.progression[3], title: "The Last Push" }];
       return { ...plan, threads: [{ ...first, outcomeId: "player1_main", progression: steps }] };
     };
     const readings = readStory(await played(1, { reply: (role, nth) => (role === "thread" && nth === 0 ? doubled() : DEFAULT) }));

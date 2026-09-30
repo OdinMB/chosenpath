@@ -20,7 +20,8 @@ import { logRepairs, type Repair } from "./textRepairs.js";
  * Checks on a switch or thread plan before it becomes the story's next
  * phase. What can be put right without guessing is repaired (a player in two
  * switches or threads, junk directions, a length the steps disagree with,
- * contest sides in the wrong order, a contest with one side's players only);
+ * contest sides in the wrong order, a contest with one side's players only,
+ * an exact copy of a thread's last step);
  * what can't is a problem, and the planner is called once
  * more with the problem stated (checkedSwitchPlan, checkedThreadPlan). A
  * second problem fails the turn, as a failed call does. A story that holds no
@@ -255,6 +256,61 @@ function withUniqueIds(threads: Thread[], repairs: Repair[]): Thread[] {
     repairs.push({ kind: "threadIdDuplicate", detail: `${thread.id} -> ${id}` });
     return { ...thread, id };
   });
+}
+
+/** A step's words, compared exactly but for whitespace. */
+const stepWords = (text: unknown) => (typeof text === "string" ? text.replace(/\s+/g, " ").trim() : "");
+const sameStep = (a: Thread["progression"][number], b: Thread["progression"][number]) =>
+  stepWords(a.title) === stepWords(b.title) && stepWords(a.question) === stepWords(b.question);
+
+/** The number of steps every thread has, when they all have the same, 2 to 4 (what durationFromSteps takes); undefined otherwise. */
+function stepCount(threads: Thread[]): number | undefined {
+  const counts = [...new Set(threads.map((thread) => thread.progression?.length ?? 0))];
+  return counts.length === 1 && counts[0] >= MIN_STEPS && counts[0] <= MAX_STEPS ? counts[0] : undefined;
+}
+
+/**
+ * Whether dropping the copies gives the plan a problem the written one didn't
+ * have: threads of different lengths or a thread outside 2 to 4 steps (a
+ * problem, which can fail the turn), or a length PACING doesn't allow where
+ * the written one it did (a length problem, one more call).
+ */
+function dropMakesProblem(written: Thread[], dropped: Thread[], allowed: number[]): boolean {
+  const before = stepCount(written);
+  const after = stepCount(dropped);
+  if (before === undefined) return false;
+  if (after === undefined) return true;
+  return allowed.length > 0 && allowed.includes(before) && !allowed.includes(after);
+}
+
+/**
+ * A step before the last that is an exact copy of the last one (the same
+ * title and question) is dropped, and the last step, whose results are the
+ * milestones, stays (PL-14, since 2026-09-30). Planners wrote the last step
+ * twice, in `steps` and again as `finalStep`, which made a chapter a beat
+ * longer and played its moment twice (planner v2e: 2 of 46 plans, 4.3% of
+ * production's form). Only where that gives the plan no problem the written
+ * one didn't have (dropMakesProblem); otherwise every copy stays, noted. A
+ * relabelled or reworded copy is not exact and stays.
+ */
+function withoutRepeatedLastSteps(story: Story, threads: Thread[], repairs: Repair[]): Thread[] {
+  const dropped: Repair[] = [];
+  const deduplicated = threads.map((thread) => {
+    const steps = thread.progression ?? [];
+    const last = steps[steps.length - 1];
+    if (!last) return thread;
+    const kept = steps.slice(0, -1).filter((step) => !sameStep(step, last));
+    if (kept.length === steps.length - 1) return thread;
+    dropped.push({ kind: "lastStepRepeated", detail: `${thread.id}: ${stepWords(last.title)}` });
+    return { ...thread, progression: [...kept, last] };
+  });
+  if (dropped.length === 0) return threads;
+  if (!dropMakesProblem(threads, deduplicated, allowedLengths(turnsLeft(story)))) {
+    repairs.push(...dropped);
+    return deduplicated;
+  }
+  repairs.push(...dropped.map((repair) => ({ ...repair, kind: "lastStepRepeatedKept", note: true })));
+  return threads;
 }
 
 /** The length the steps give, when every thread has the same number of steps, 2 to 4 (PL-7). */
@@ -501,7 +557,7 @@ export function checkThreadPlan(story: Story, reply: ThreadAnalysis, options: Th
     if (!placed.has(slot)) problems.push(`${slot} is in no thread`);
   }
 
-  const uniqueThreads = withUniqueIds(placedThreads, repairs);
+  const uniqueThreads = withoutRepeatedLastSteps(story, withUniqueIds(placedThreads, repairs), repairs);
   const duration = durationFromSteps(reply.duration, uniqueThreads, repairs, problems);
   const threads = uniqueThreads.map((thread) => checkThread(story, thread, outcomes, repairs, problems));
   noteOutcomeFallback(story, threads, outcomes, repairs);

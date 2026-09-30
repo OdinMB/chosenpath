@@ -796,6 +796,82 @@ describe("checkThreadPlan", () => {
     });
   });
 
+  describe("an exact copy of the chapter's last step (PL-14)", () => {
+    const LAST = { title: "The Last Push", question: "Escape: How does the crew get the ferry out before the tide turns?" };
+
+    /** The thread with its last step written twice, as planners wrote it (in steps and again as finalStep): the copy with its own step results, the last with the milestones. */
+    function lastStepTwice(written: Thread, copy: Partial<typeof LAST> = {}): Thread {
+      const steps = written.progression;
+      const last = { ...steps[steps.length - 1], ...LAST };
+      const twice = { ...last, ...copy, possibleResolutions: { favorable: "ahead", mixed: "level", unfavorable: "behind" } };
+      return { ...written, progression: [...steps.slice(0, -2), twice, last] };
+    }
+
+    it("drops a step that is an exact copy of the last one, keeps the last with the milestones, and takes the length from the steps", () => {
+      const written = lastStepTwice(aThread("challenge", 4, ["player1"]));
+      const result = checkThreadPlan(threadStory(1), threadPlan([written]), { lengths: true });
+
+      const [kept] = result.plan.threads;
+      expect(kept.progression).toEqual([written.progression[0], written.progression[1], written.progression[3]]);
+      expect(result.plan.duration).toBe(3);
+      expect(kinds(result.repairs)).toEqual(["lastStepRepeated", "durationFromSteps"]);
+      expect(result.repairs[0].detail).toBe("a_thread: The Last Push");
+      // Four beats were more than PACING allows with 6 turns left; three are not
+      expect(result.problem).toBeUndefined();
+      expect(result.lengthProblem).toBeUndefined();
+    });
+
+    it("keeps a copy that is relabelled or reworded: only an exact copy is dropped, whitespace aside", () => {
+      const relabelled = lastStepTwice(aThread("challenge", 3, ["player1"]), { question: `Final ${LAST.question}` });
+      expect(checkThreadPlan(threadStory(1), threadPlan([relabelled])).plan.threads[0].progression).toHaveLength(3);
+      const spaced = lastStepTwice(aThread("challenge", 3, ["player1"]), { question: ` ${LAST.question.replace(" How", "  How")} ` });
+      expect(checkThreadPlan(threadStory(1), threadPlan([spaced])).plan.threads[0].progression).toHaveLength(2);
+    });
+
+    it("keeps the copy, noted, where dropping it would leave a length PACING doesn't allow and the written one it does", () => {
+      // Three turns left: the last chapter takes exactly three beats
+      const story = withOutcomes(threadAnalysisAfterSwitch(1, { maxTurns: 7 }), [ESCAPE], PLAYER_OUTCOMES);
+      const written = lastStepTwice(aThread("challenge", 3, ["player1"]));
+      const result = checkThreadPlan(story, threadPlan([written]), { lengths: true });
+
+      expect(result.plan.threads[0].progression).toEqual(written.progression);
+      expect(notes(result.repairs)).toContain("lastStepRepeatedKept");
+      expect(kinds(result.repairs)).not.toContain("lastStepRepeated");
+      expect(result.lengthProblem).toBeUndefined();
+    });
+
+    it("keeps a two-step thread whose steps are one step twice: a thread needs two steps", () => {
+      const written = lastStepTwice(aThread("challenge", 2, ["player1"]));
+      const result = checkThreadPlan(threadStory(1), threadPlan([written]));
+
+      expect(result.plan.threads[0].progression).toHaveLength(2);
+      expect(notes(result.repairs)).toContain("lastStepRepeatedKept");
+      expect(result.problem).toBeUndefined();
+    });
+
+    it("in a group plan, drops the copies only where every thread is left with the same number of steps", () => {
+      const own = (slot: string, outcomeId: string) => aThread("challenge", 3, [slot], [], { id: `${slot}_thread`, outcomeId });
+      const oneDoubled = threadPlan([lastStepTwice(own("player1", "player1_trust")), own("player2", "player2_debt")]);
+      const uneven = checkThreadPlan(threadStory(2), oneDoubled);
+      expect(uneven.plan.threads.map((t) => t.progression.length)).toEqual([3, 3]);
+      expect(notes(uneven.repairs)).toContain("lastStepRepeatedKept");
+      expect(uneven.problem).toBeUndefined();
+
+      // Four beats are more than PACING allows with 6 turns left, which never fails a turn; threads of different lengths would
+      const long = (slot: string, outcomeId: string) => aThread("challenge", 4, [slot], [], { id: `${slot}_thread`, outcomeId });
+      const tooLong = checkThreadPlan(threadStory(2), threadPlan([lastStepTwice(long("player1", "player1_trust")), long("player2", "player2_debt")]), { lengths: true });
+      expect(tooLong.plan.threads.map((t) => t.progression.length)).toEqual([4, 4]);
+      expect(tooLong.problem).toBeUndefined();
+      expect(tooLong.lengthProblem).toBeDefined();
+
+      const bothDoubled = threadPlan([lastStepTwice(own("player1", "player1_trust")), lastStepTwice(own("player2", "player2_debt"))]);
+      const even = checkThreadPlan(threadStory(2), bothDoubled);
+      expect(even.plan.threads.map((t) => t.progression.length)).toEqual([2, 2]);
+      expect(even.plan.duration).toBe(2);
+      expect(kinds(even.repairs).filter((k) => k === "lastStepRepeated")).toHaveLength(2);
+    });
+  });
+
   it("skips the outcome rules in a story that holds no outcomes, with a note", () => {
     const story = threadAnalysisAfterSwitch(1);
     const result = checkThreadPlan(story, threadPlan([aThread("challenge", 3, ["player1"], [], { outcomeId: "made_up_outcome" })]));
