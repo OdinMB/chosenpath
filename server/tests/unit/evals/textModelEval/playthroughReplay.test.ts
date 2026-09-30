@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import fs from "node:fs";
 import path from "node:path";
+import type { SetOfBeatGenerationSchema } from "core/types/index.js";
+import { repairBeatReply } from "../../../../src/game/services/beatRepairs.js";
 import { PLAYTHROUGHS, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { replayRun, replayedTurn } from "../../../../src/evals/textModelEval/playthroughReplay.js";
@@ -157,5 +159,43 @@ describe("replayRun on the stored playthroughs (skipped where the output folder 
         expect([run.spec.id, r.turn, sha256(playthroughsSent({ role: "beat", story: r.before }))]).toEqual([run.spec.id, r.turn, sentHash]);
       }
     }
+  });
+});
+
+const stored2: PlayRun[] = fs.existsSync(path.join(DIR, "playthroughs-2.json")) ? playthroughRunsFrom(JSON.parse(fs.readFileSync(path.join(DIR, "playthroughs-2.json"), "utf-8"))) : [];
+
+/** The turns where production's beat repairs now drop a lever charged again (leverChargedAgain), replaying each stored reply on the state its turn saw. */
+function chargedAgain(runs: PlayRun[], before: (run: PlayRun) => number = () => Number.POSITIVE_INFINITY) {
+  return runs.flatMap((run) =>
+    replayRun(run)
+      .filter((r) => r.turn < before(run) && r.played.reply)
+      .flatMap((r) => repairBeatReply(r.before, r.played.reply as SetOfBeatGenerationSchema).repairs.filter((k) => k.kind === "leverChargedAgain").map((k) => [run.spec.id, r.turn, k.detail]))
+  );
+}
+
+describe("replayRun on the stored round 2 (skipped where the output folder is absent)", () => {
+  (stored2.length ? it : it.skip)("rebuilds every turn's request byte for byte, as production sent it on 30 September", () => {
+    let turns = 0;
+    for (const run of stored2) {
+      for (const r of replayRun(run)) {
+        const sentHash = promptHashes.get(outputIdOf(r.played.calls[0]?.outputFile ?? ""));
+        expect([run.spec.id, r.turn, sha256(requestText(requestFor("adopted", { role: "beat", story: r.before })))]).toEqual([run.spec.id, r.turn, sentHash]);
+        turns++;
+      }
+    }
+    // Six stories: 11 + 26 + 26 + 26 + 26 + 11 turns
+    expect(turns).toBe(126);
+  });
+
+  (stored2.length ? it : it.skip)("production now drops the two levers round 2 charged twice, and nothing else in either round", () => {
+    expect(chargedAgain(stored2)).toEqual([
+      // New Avalon: the bracing (-15%) turn 2 took, turn 3 paid (60 → 45); turn 4 charged it again (45 → 30)
+      ["play-avalon", 4, "player1/player_personal_reserve: -15, the sacrifice the previous turn paid"],
+      // The mouse story: the Pantry Crumb turn 9 spent as a wedge, turn 10 paid (3 → 2); the ending spent it again (2 → 1)
+      ["play-kids-mouse", 11, "shared/shared_pantry_crumbs: -1, the sacrifice the previous turn paid"],
+    ]);
+    // Round 1: the group stories up to the step the owner rule now decides differently
+    const firstChanged: Record<string, number> = { "play-food-trucks": 24, "play-space-pirates": 19 };
+    expect(chargedAgain(stored, (run) => firstChanged[run.spec.id] ?? Number.POSITIVE_INFINITY)).toEqual([]);
   });
 });

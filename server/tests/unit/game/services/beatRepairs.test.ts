@@ -6,6 +6,7 @@ import type {
   ChallengeOption,
   Change,
   Outcome,
+  PaidLever,
   SetOfBeatGenerationSchema,
   Stat,
   StoryState,
@@ -921,6 +922,122 @@ describe("repairBeatReply: a shared sacrifice or reward goes to one player per t
       { kind: "sharedLeverRepeatedKept", note: true, detail: "player2: shared_dockside_favors (sacrifice) is player1's this turn" },
       { kind: "sharedLeverRepeatedKept", note: true, detail: "player3: shared_dockside_favors (sacrifice) is player1's this turn" },
     ]);
+  });
+});
+
+describe("repairBeatReply: a sacrifice or reward charged again on the turn after its payment (TR-10)", () => {
+  const RESERVE = stat("player_personal_reserve", {
+    name: "Personal Reserve",
+    optionsToSacrifice: "Spend 15% Personal Reserve to sustain one difficult effort without stopping.",
+    optionsToGainAsReward: "Regain 10% Personal Reserve by taking time to rest instead of pursuing a lead.",
+  });
+  const CRUMBS = stat("shared_pantry_crumbs", { type: "number", name: "Pantry Crumbs", optionsToSacrifice: "Spend 1 Pantry Crumb to wedge, bait or bribe.", initialValue: 3 });
+  const BRACE = "Brace the shuddering control ring and keep it aligned while Mara works the credential and tokens (-15% Personal Reserve).";
+  const WEDGE = "Use one Pantry Crumb as a soft wedge beneath the board, spending 1 Pantry Crumb to keep the wood from shifting while Pip listens.";
+
+  const lever = (text: string, resourceType: "sacrifice" | "reward" = "sacrifice"): BeatOption => ({
+    optionType: "challenge",
+    resourceType,
+    riskType: "normal",
+    text,
+    basePoints: resourceType === "sacrifice" ? POINTS_FOR_SACRIFICE : POINTS_FOR_REWARD,
+    modifiersToSuccessRate: [],
+  });
+  const withLever = (option: BeatOption): BeatOption[] => [...challengeOptions().slice(0, 2), option];
+  const reservePaid = (overrides: Partial<PaidLever> = {}): PaidLever => ({ kind: "sacrifice", group: "player1", stat: RESERVE.id, step: -15, ...overrides });
+
+  type History = { tookLever?: BeatOption; paidLever?: PaidLever; lastChoice?: BeatOption };
+
+  /**
+   * Each player's history as New Avalon's turns 2-3: the beat before last took a
+   * lever, the last beat's turn paid it (its record) and the player chose again
+   * (a normal option unless `lastChoice`). Personal Reserve at 45, two Pantry Crumbs.
+   */
+  function afterPayment(base: Story, bySlot: Record<string, History>): Story {
+    const players = Object.fromEntries(
+      Object.entries(base.getPlayers()).map(([slot, player]) => {
+        const history = bySlot[slot] ?? {};
+        const beats = [...player.beatHistory];
+        const [previous, last] = [beats.length - 2, beats.length - 1];
+        if (history.tookLever) beats[previous] = { ...beats[previous], options: withLever(history.tookLever), choice: 2 };
+        beats[last] = {
+          ...beats[last],
+          ...(history.lastChoice ? { options: withLever(history.lastChoice), choice: 2 } : { options: challengeOptions(), choice: 0 }),
+          ...(history.paidLever ? { paidLever: history.paidLever } : {}),
+        };
+        return [slot, { ...player, beatHistory: beats, statValues: [{ statId: RESERVE.id, value: 45 }] }];
+      })
+    );
+    return base.clone({
+      sharedStats: [CRUMBS],
+      sharedStatValues: [{ statId: CRUMBS.id, value: 2 }],
+      playerStats: [RESERVE],
+      players,
+    });
+  }
+  const avalon = (history: History = { tookLever: lever(BRACE), paidLever: reservePaid() }) => afterPayment(threadBeat(1), { player1: history });
+
+  function repaired(story: Story, statChanges: Change[]) {
+    const { reply, repairs } = repairBeatReply(story, beatSet(story.getPlayerSlots().length, { statChanges }));
+    return { statChanges: reply.statChanges, repairs: repairs.filter((r) => r.kind === "leverChargedAgain") };
+  }
+
+  it("drops the same charge again on the turn after the one that paid it (New Avalon turn 4: 45 → 30 for the bracing turn 2 took and turn 3 paid)", () => {
+    const other = statChange("shared", CRUMBS.id, "addNumber", 1);
+    const result = repaired(avalon(), [statChange("player1", RESERVE.id, "subtractNumber", 15), other]);
+    expect(result.statChanges).toEqual([other]);
+    expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_personal_reserve: -15, the sacrifice the previous turn paid" }]);
+  });
+
+  it("drops it on a shared stat at the ending too (the mouse story: a Pantry Crumb spent at turn 9, paid at 10, spent again at 11)", () => {
+    const story = afterPayment(endingBeat(1), { player1: { tookLever: lever(WEDGE), paidLever: { kind: "sacrifice", group: "shared", stat: CRUMBS.id, step: -1 } } });
+    expect(story.getCurrentBeatType()).toBe("ending");
+    const result = repaired(story, [statChange("shared", CRUMBS.id, "subtractNumber", 1)]);
+    expect(result.statChanges).toEqual([]);
+    expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "shared/shared_pantry_crumbs: -1, the sacrifice the previous turn paid" }]);
+  });
+
+  it("reads a value set as the change it makes, and drops a reward gained again the same way", () => {
+    expect(repaired(avalon(), [statChange("player1", RESERVE.id, "setNumber", 30)]).statChanges).toEqual([]);
+    const rested = avalon({ tookLever: lever("Rest by the fountain and regain 10% Personal Reserve.", "reward"), paidLever: reservePaid({ kind: "reward", step: 10 }) });
+    const result = repaired(rested, [statChange("player1", RESERVE.id, "addNumber", 10)]);
+    expect(result.statChanges).toEqual([]);
+    expect(result.repairs).toEqual([{ kind: "leverChargedAgain", detail: "player1/player_personal_reserve: +10, the reward the previous turn paid" }]);
+  });
+
+  it("keeps a change of another size, one the other way, and one on another stat", () => {
+    const changes = [statChange("player1", RESERVE.id, "subtractNumber", 10), statChange("player1", RESERVE.id, "addNumber", 15), statChange("shared", CRUMBS.id, "subtractNumber", 15)];
+    const result = repaired(avalon(), changes);
+    expect(result.statChanges).toEqual(changes);
+    expect(result.repairs).toEqual([]);
+  });
+
+  it("keeps the charge when the last choice was itself a sacrifice of that stat: a new payment is due", () => {
+    const again = avalon({ tookLever: lever(BRACE), paidLever: reservePaid(), lastChoice: lever("Run the full sweep, spending 15% of your Personal Reserve.") });
+    const changes = [statChange("player1", RESERVE.id, "subtractNumber", 15)];
+    expect(repaired(again, changes)).toEqual({ statChanges: changes, repairs: [] });
+  });
+
+  it("keeps a late payment: a turn that paid nothing leaves the next turn's charge alone", () => {
+    const unpaid = avalon({ tookLever: lever(BRACE) });
+    const changes = [statChange("player1", RESERVE.id, "subtractNumber", 15)];
+    expect(repaired(unpaid, changes)).toEqual({ statChanges: changes, repairs: [] });
+  });
+
+  it("drops one charge per payment", () => {
+    const charge = statChange("player1", RESERVE.id, "subtractNumber", 15);
+    const result = repaired(avalon(), [charge, charge]);
+    expect(result.statChanges).toEqual([charge]);
+    expect(result.repairs).toHaveLength(1);
+  });
+
+  it("in a group, drops a shared stat's second charge unless another player's last choice spends it again", () => {
+    const crumbPaid: PaidLever = { kind: "sacrifice", group: "shared", stat: CRUMBS.id, step: -1 };
+    const charge = statChange("shared", CRUMBS.id, "subtractNumber", 1);
+    const paidOnce = afterPayment(threadBeat(2), { player1: { tookLever: lever(WEDGE), paidLever: crumbPaid } });
+    expect(repaired(paidOnce, [charge]).statChanges).toEqual([]);
+    const spentAgain = afterPayment(threadBeat(2), { player1: { tookLever: lever(WEDGE), paidLever: crumbPaid }, player2: { lastChoice: lever(WEDGE) } });
+    expect(repaired(spentAgain, [charge])).toEqual({ statChanges: [charge], repairs: [] });
   });
 });
 

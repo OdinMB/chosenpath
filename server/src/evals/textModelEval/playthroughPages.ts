@@ -1,6 +1,6 @@
 import type { Outcome, Stat, StatValueEntry, StoryState, Switch, SwitchAnalysis, ThreadAnalysis } from "core/types/index.js";
 import { playerParagraphs } from "./playerText.js";
-import { choiceLine, fixesLine, ownStatsLine, readStory, resentLine, scoreboardLine, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
+import { chargedAgainLine, choiceLine, fixesLine, ownStatsLine, readStory, resentLine, scoreboardLine, type ChapterReading, type GroupStepReading, type StoryReadings } from "./playthroughChecks.js";
 import type { PlayPick, PlayRun, PlayTurn } from "./playthroughs.js";
 import { contextLinesHtml, escapeHtml } from "./ratingHtml.js";
 
@@ -467,6 +467,7 @@ function readingsSection(run: PlayRun, readings: StoryReadings): string {
     `Levers the player took, paid on the next turn: ${r.leversPaid.counts.applied} of ${Object.values(r.leversPaid.counts).reduce((a, b) => a + b, 0)}${
       r.leversPaid.counts.sharedOnce ? `; ${r.leversPaid.counts.sharedOnce} more rode on one change of a shared stat that paid another player's (${r.leversPaid.sharedOnce.map((s) => `turn ${s.turn}, ${s.stat}`).join("; ")})` : ""
     }.`,
+    chargedAgainLine(r),
     `Stat changes that don't fit their stat: ${r.unfit.length}.`,
     ...(r.players > 1
       ? [

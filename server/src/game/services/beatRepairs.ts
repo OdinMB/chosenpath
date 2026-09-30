@@ -13,6 +13,7 @@ import { POINTS_FOR_REWARD, POINTS_FOR_SACRIFICE } from "core/config.js";
 import { checkStatValue, statValueFit } from "core/utils/statValueCheck.js";
 import { canAddMilestones, isPlayerBeat } from "./storyTextSteps.js";
 import { scoreboardWinners } from "./scoreboards.js";
+import { dropLeversChargedAgain, leverStatOf } from "./leverPayments.js";
 import type { Repair } from "./textRepairs.js";
 
 /*
@@ -20,8 +21,9 @@ import type { Repair } from "./textRepairs.js";
  * wrote in a form the game would drop or not resolve (a stat in seat form, a
  * stat bonus in doubled seat form, a fact filed under a stat, a milestone in
  * the wrong group, an option of the wrong type) is put where the game reads
- * it, and what cannot be placed is dropped. Every change is recorded as a
- * Repair; ChangeService keeps applying exact ids.
+ * it, and what cannot be placed is dropped; so is a lever charged again on
+ * the turn after its payment (leverPayments.ts). Every change is recorded as
+ * a Repair; ChangeService keeps applying exact ids.
  */
 
 type StatChange = Extract<Change, { type: "statChange" }>;
@@ -64,7 +66,8 @@ export function repairBeatReply(
 
   const repaired: SetOfBeatGenerationSchema = { ...reply };
   if (Array.isArray(reply.statChanges)) {
-    repaired.statChanges = repairScoreboardMoves(story, repairStatChanges(reply.statChanges, known, repairs), repairs);
+    const placed = repairScoreboardMoves(story, repairStatChanges(reply.statChanges, known, repairs), repairs);
+    repaired.statChanges = dropLeversChargedAgain(story, placed, repairs);
   }
   if (Array.isArray(reply.newMilestones)) {
     repaired.newMilestones = repairMilestones(story, reply.newMilestones, repairs);
@@ -485,58 +488,6 @@ function repairOptions(story: Story, slot: string, options: BeatOption[], repair
 }
 
 // --- A shared sacrifice or reward, one player per turn ---
-
-type Lever = "sacrifice" | "reward";
-
-/** Whether a stat's lever rule allows this lever: its text, unless it says the stat has none. */
-function allowsLever(stat: Stat, kind: Lever): boolean {
-  const rule = kind === "sacrifice" ? stat.optionsToSacrifice : stat.optionsToGainAsReward;
-  return typeof rule === "string" && rule.trim() !== "" && !/^none\b/i.test(rule.trim());
-}
-
-/** Words shorter than this are too common to read as a stat's name or value in an option's text. */
-const MIN_NAMED_LETTERS = 4;
-
-/** The words that name a stat in an option's text: its name (an opposites stat's sides too), and a plural name without its "s". */
-function statNameWords(stat: Stat): string[] {
-  const names = [stat.name, ...(stat.type === "opposites" ? stat.name.split("|") : [])]
-    .map((name) => name.trim().toLowerCase())
-    .filter((name) => name.length >= MIN_NAMED_LETTERS);
-  return [...new Set(names.flatMap((name) => (name.length > MIN_NAMED_LETTERS && name.endsWith("s") ? [name, name.slice(0, -1)] : [name])))];
-}
-
-/** What a stat holds for this player (a shared stat's own value), as words an option's text can name: an item, a contact. */
-function heldWords(story: Story, stat: Stat, slot: string, shared: boolean): string[] {
-  const entries = shared ? story.getState().sharedStatValues : story.getPlayer(slot)?.statValues ?? [];
-  const value = entries.find((entry) => entry.statId === stat.id)?.value;
-  const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-  return values.map((held) => held.trim().toLowerCase()).filter((held) => held.length >= MIN_NAMED_LETTERS);
-}
-
-type LeverStat = { stat: Stat; shared: boolean };
-
-/**
- * The stat a sacrifice or reward option draws on. The option names none in
- * a field, only in its text (the schema asks it to), so this reads the text
- * as the eval's lever readings do: the stats it names; else those whose held
- * value it names ("Ivo Senn", an item of the crew's Dockside Favors); else
- * the one stat that allows this lever at all. Of those, the ones that allow
- * it, when any does; undefined unless exactly one is left.
- */
-function leverStatOf(story: Story, slot: string, kind: Lever, text: string, known: Known): LeverStat | undefined {
-  const lower = text.toLowerCase();
-  const stats: LeverStat[] = [
-    ...[...known.sharedStats.values()].map((stat) => ({ stat, shared: true })),
-    ...[...known.playerStats.values()].map((stat) => ({ stat, shared: false })),
-  ];
-  const byName = stats.filter(({ stat }) => statNameWords(stat).some((word) => lower.includes(word)));
-  const byValue = byName.length > 0 ? byName : stats.filter(({ stat, shared }) => heldWords(story, stat, slot, shared).some((word) => lower.includes(word)));
-  const allowing = stats.filter(({ stat }) => allowsLever(stat, kind));
-  const candidates = byValue.length > 0 ? byValue : allowing.length === 1 ? allowing : [];
-  const allowed = candidates.filter(({ stat }) => allowsLever(stat, kind));
-  const pool = allowed.length > 0 ? allowed : candidates;
-  return pool.length === 1 ? pool[0] : undefined;
-}
 
 const seatNumber = (key: string) => Number(key.toLowerCase().replace("player", ""));
 

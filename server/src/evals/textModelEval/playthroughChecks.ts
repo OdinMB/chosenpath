@@ -6,9 +6,11 @@ import type { OutcomeState } from "../../game/services/endingStates.js";
 import { outcomeIdsNamed } from "../../game/services/outcomeIds.js";
 import { chaptersThatFit } from "../../game/services/pacing.js";
 import { scoreboardOf } from "../../game/services/scoreboards.js";
+import { repairBeatReply } from "../../game/services/beatRepairs.js";
 import { percentile } from "./armStats.js";
 import type { LeverReading, LeverStatus } from "./ratingMechanics.js";
 import { playRunId, playthroughArm, turnCalls, type JudgedItem, type PlayCallLog, type PlayPlan, type PlayRun, type PlayTurn } from "./playthroughs.js";
+import { replayRun } from "./playthroughReplay.js";
 import { allowanceFor, type TurnKind } from "./turnWaits.js";
 
 /*
@@ -166,6 +168,9 @@ export type SwitchPickReading = {
 /** Levers one shared stat's single change paid for several players: the first counts as paid, the rest as riding on it. */
 export type SharedLeverReading = { turn: number; stat: string; slots: string[] };
 
+/** A lever charged again on the turn after the one that paid it: the turn, and production's repair line ("player1/player_personal_reserve: -15, the sacrifice the previous turn paid"). */
+export type ChargedAgain = { turn: number; detail: string };
+
 export type LeverCount = LeverStatus | "sharedOnce";
 
 /** A turn production sent again (since 2026-09-30): the sends that failed, the one that wrote it (none: the story stopped there), and whether the players had to press Try again. */
@@ -216,6 +221,7 @@ export const FIX_LABELS = {
   threadKeptOnPick: "a player written into two threads kept in the one they picked",
   scoreboardDirection: "a scoreboard move turned toward the side that won",
   sharedLeverRepeated: "a shared sacrifice or reward kept to one player",
+  leverChargedAgain: "a sacrifice or reward charged again on the turn after its payment, dropped",
 } as const;
 export type FixKind = keyof typeof FIX_LABELS;
 
@@ -240,6 +246,8 @@ export type StoryReadings = {
     counts: Record<LeverCount, number>;
     missed: { turn: number; slot: string; kind: string; stat?: string; status: LeverStatus }[];
     sharedOnce: SharedLeverReading[];
+    /** Levers charged again on the turn after the one that paid them, where production's current repairs drop a change from the reply the run kept (none read: the replay failed) */
+    chargedAgain?: ChargedAgain[];
   };
   unfit: { turn: number; group: string; name: string; kinds: string[] }[];
   /** Each player's own stats, start to end */
@@ -575,7 +583,32 @@ function leverReadings(run: PlayRun): StoryReadings["leversPaid"] {
       if (levers.length > paid) sharedOnce.push({ turn: turn.turn, stat: levers[0].stat?.name ?? "", slots: levers.map((l) => l.slot) });
     }
   }
-  return { counts, missed, sharedOnce };
+  const chargedAgain = chargedAgainReadings(run);
+  return { counts, missed, sharedOnce, ...(chargedAgain ? { chargedAgain } : {}) };
+}
+
+/**
+ * Levers charged again on the turn after the one that paid it (production's
+ * `leverChargedAgain`, since the review of round 2): each turn's kept reply
+ * replayed through production's current beat repairs on the state the turn
+ * saw (playthroughReplay.ts), where they now drop a change. A run played
+ * with the repair shows none here (its kept replies lack the change) and
+ * lists the turns it fired in the fixes. Undefined where the run can't be
+ * replayed. A round 1 group story replays differently from the step the
+ * owner rule now decides, so its later turns read that state, not the played one.
+ */
+function chargedAgainReadings(run: PlayRun): ChargedAgain[] | undefined {
+  try {
+    return replayRun(run).flatMap((r) =>
+      r.played.reply
+        ? repairBeatReply(r.before, r.played.reply)
+            .repairs.filter((repair) => repair.kind === "leverChargedAgain")
+            .map((repair) => ({ turn: r.turn, detail: repair.detail ?? "" }))
+        : []
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 const kindOf = (line: string) => line.replace(/^note /, "").split(":")[0];
@@ -845,15 +878,28 @@ const counted = (counts: Record<string, number>) =>
         .join(", ")
     : "none";
 
-/** Which players' own stats moved, one line. */
+/** Which players' own stats moved from the start to the end, one line; those that moved and came back apart. */
 export function ownStatsLine(r: StoryReadings): string {
-  const moved = r.ownStats.filter((s) => s.changedAt.length > 0);
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const changed = r.ownStats.filter((s) => s.changedAt.length > 0);
+  const moved = changed.filter((s) => !same(s.start, s.end));
+  const back = changed.filter((s) => same(s.start, s.end));
   const stats = new Set(r.ownStats.map((s) => s.stat)).size;
   const seats = new Set(r.ownStats.map((s) => s.slot)).size;
   const of = `of ${stats} stat${stats === 1 ? "" : "s"} per player, ${seats} player${seats === 1 ? "" : "s"}`;
-  if (moved.length === 0) return `Players' own stats that moved: none (${of}).`;
   const shown = (value: unknown) => (Array.isArray(value) ? `[${value.join(", ")}]` : String(value));
-  return `Players' own stats that moved: ${moved.map((s) => `${s.name} (${s.slot}: ${shown(s.start)} → ${shown(s.end)}, ${s.changedAt.length} turn${s.changedAt.length === 1 ? "" : "s"})`).join("; ")} (${of}).`;
+  const listed = (readings: OwnStatReading[]) =>
+    readings.map((s) => `${s.name} (${s.slot}: ${shown(s.start)} → ${shown(s.end)}, ${s.changedAt.length} turn${s.changedAt.length === 1 ? "" : "s"})`).join("; ");
+  const cameBack = back.length ? `; moved and back where they started: ${listed(back)}` : "";
+  return `Players' own stats that moved: ${moved.length ? listed(moved) : "none"} (${of})${cameBack}.`;
+}
+
+/** The levers charged again on the turn after the one that paid them, one line. */
+export function chargedAgainLine(r: StoryReadings): string {
+  const found = r.leversPaid.chargedAgain;
+  const label = "Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain)";
+  if (found === undefined) return `${label}: not read (the run could not be replayed).`;
+  return `${label}: ${found.length ? found.map((c) => `turn ${c.turn} (${c.detail})`).join("; ") : "none"}.`;
 }
 
 const SCOREBOARD_ORDER: { reading: ScoreboardReadingKind; label: string; problem: boolean }[] = [
@@ -990,6 +1036,8 @@ function storySection(run: PlayRun, r: StoryReadings): string[] {
     `Levers taken and paid on the next turn: applied ${paid.applied}, not applied ${paid.notApplied}, the other way ${paid.otherWay}, written without effect ${paid.noChange}, stat unnamed ${paid.unnamed}, riding on another player's paid change of a shared stat ${paid.sharedOnce}.`,
     ...r.leversPaid.missed.map((m) => `- turn ${m.turn}, ${m.slot}: the previous ${m.kind}${m.stat ? ` of ${m.stat}` : ""}: ${m.status}`),
     ...r.leversPaid.sharedOnce.map((s) => `- turn ${s.turn}: one change of the shared ${s.stat} paid the levers of ${s.slots.join(", ")}`),
+    "",
+    chargedAgainLine(r),
     "",
     `Stat changes that don't fit their stat: ${r.unfit.length ? "" : "none"}`,
     ...r.unfit.map((u) => `- turn ${u.turn}, ${u.group}: ${u.name}: ${u.kinds.join("; ")}`),

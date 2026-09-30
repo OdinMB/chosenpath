@@ -384,10 +384,24 @@ export interface ResolutionDetails {
   }>;
 }
 
+/**
+ * The sacrifice or reward the player chose on the beat before, as this beat's
+ * turn paid it: its kind, the stat's group ("shared" or the player's slot) and
+ * id, and the change that paid it (-15 for 60 → 45). The next turn's beat
+ * repairs read it, so a lever is not charged twice.
+ */
+export type PaidLever = {
+  kind: "sacrifice" | "reward";
+  group: string;
+  stat: string;
+  step: number;
+};
+
 export type Beat = z.infer<typeof beatGenerationSchema> & {
   choice: number;
   resolution: Resolution | null;
   resolutionDetails?: ResolutionDetails;
+  paidLever?: PaidLever;
 };
 
 export type BeatHistory = Array<Beat>;

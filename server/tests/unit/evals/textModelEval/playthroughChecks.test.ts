@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BeatOption } from "core/types/index.js";
-import { readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
+import { ownStatsLine, readStory, renderPlaythroughReadings } from "../../../../src/evals/textModelEval/playthroughChecks.js";
 import { PLAYTHROUGHS, playStory, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { beatSet, switchAnalysis, threadAnalysis } from "../../../helpers/textFixtures.js";
 import { DEFAULT, fakeCall, input, leverSet, type Overrides } from "./playFixtures.js";
@@ -137,6 +137,38 @@ describe("readStory", () => {
     expect(moving.ownStats[0].changedAt.length).toBeGreaterThan(5);
     expect(moving.ownStats[0].end).toBe((moving.ownStats[0].start as number) - 2 * moving.ownStats[0].changedAt.length);
     expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Players' own stats that moved: none (of 1 stat per player, 1 player).");
+  });
+
+  it("tells an own stat that moved and came back from one that ended elsewhere (round 2's estate agents: Nia's credibility 40 → 30 → 40)", async () => {
+    const run = structuredClone(await played());
+    const start = run.start?.players.player1?.statValues.find((v) => v.statId === "player_courage")?.value as number;
+    run.turns.forEach((t) => {
+      const value = t.turn >= 3 && t.turn < 6 ? start - 10 : start;
+      t.statValues = { ...t.statValues, players: { ...t.statValues.players, player1: [{ statId: "player_courage", value }] } };
+    });
+    const readings = readStory(run);
+    expect(readings.ownStats[0]).toMatchObject({ start, end: start, changedAt: [3, 6] });
+    expect(ownStatsLine(readings)).toBe(`Players' own stats that moved: none (of 1 stat per player, 1 player); moved and back where they started: Courage (player1: ${start} → ${start}, 2 turns).`);
+  });
+
+  it("reads a lever charged again on the turn after its payment: production drops it since 2026-09-30, and a run stored before shows where", async () => {
+    // Every turn lowers Courage by 2: the turn after a lever pays it by 2, and the turn after that would charge it again
+    const courage = { type: "statChange", group: "player1", stat: "player_courage", change: "subtractNumber", value: 2 };
+    const live = readStory(await played(1, { statChanges: [courage] }));
+    expect(live.fixes.leverChargedAgain.length).toBeGreaterThan(0);
+    expect(live.leversPaid.chargedAgain).toEqual([]);
+    // The same story as a run stored before the repair: one of those turns' kept reply still carries the second charge
+    const stored = structuredClone(await played(1, { statChanges: [courage] }));
+    const fired = stored.turns.find((t) => t.repairs.some((r) => r.startsWith("leverChargedAgain")));
+    if (!fired?.reply) throw new Error("no turn where the repair fired");
+    fired.reply = { ...fired.reply, statChanges: [...fired.reply.statChanges, courage as never] };
+    fired.repairs = fired.repairs.filter((r) => !r.startsWith("leverChargedAgain"));
+    const readings = readStory(stored);
+    expect(readings.leversPaid.chargedAgain).toEqual([{ turn: fired.turn, detail: "player1/player_courage: -2, the sacrifice the previous turn paid" }]);
+    expect(renderPlaythroughReadings([stored], new Date(0))).toContain(
+      `Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain): turn ${fired.turn} (player1/player_courage: -2, the sacrifice the previous turn paid).`
+    );
+    expect(renderPlaythroughReadings([await played()], new Date(0))).toContain("Levers charged again on the turn after the one that paid them (each kept reply through production's current repairs, leverChargedAgain): none.");
   });
 
   it("reads each scoreboard move against the contest result it follows", async () => {

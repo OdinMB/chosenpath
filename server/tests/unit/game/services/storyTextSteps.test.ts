@@ -1,6 +1,8 @@
 import { jest } from "@jest/globals";
 import { z } from "zod";
-import { GameModes, type Beat, type Change } from "core/types/index.js";
+import type { Story } from "core/models/Story.js";
+import { GameModes, type Beat, type ChallengeOption, type Change } from "core/types/index.js";
+import { POINTS_FOR_SACRIFICE } from "core/config.js";
 import {
   analysisBefore,
   beatStep,
@@ -9,9 +11,12 @@ import {
   threadStep,
 } from "../../../../src/game/services/storyTextSteps.js";
 import { createMockMultiplayerStory, createMockStory } from "../../../helpers/testHelpers.js";
+import { threadBeat } from "../../../helpers/promptStories.js";
 import {
   beatGeneration,
   beatSet,
+  challengeOptions,
+  stat,
   switchAnalysis,
   threadAnalysis,
 } from "../../../helpers/textFixtures.js";
@@ -125,6 +130,63 @@ describe("beatStep.apply", () => {
     expect(updated.getCurrentBeat("player1")?.choice).toBe(-1);
     expect(imageRequests).toHaveLength(1);
     expect(beatStep.apply(story, response, true)[2]).toHaveLength(0);
+  });
+});
+
+describe("beatStep.apply records the lever a turn paid on its new beat (for the next turn's repair, TR-10)", () => {
+  const RESERVE = stat("player_personal_reserve", { name: "Personal Reserve", optionsToSacrifice: "Spend 15% Personal Reserve to sustain one difficult effort." });
+  const CONTACTS = stat("player_city_contacts", { type: "string[]", name: "City Contacts", optionsToSacrifice: "Call in one contact, removing them from the list." });
+  const CRUMBS = stat("shared_pantry_crumbs", { type: "number", name: "Pantry Crumbs", optionsToSacrifice: "Spend 1 Pantry Crumb to wedge, bait or bribe." });
+  const BRACE = "Brace the shuddering control ring and keep it aligned (-15% Personal Reserve).";
+  const option = (text: string, resourceType: "normal" | "sacrifice" = "sacrifice"): ChallengeOption => ({
+    optionType: "challenge",
+    resourceType,
+    riskType: "normal",
+    text,
+    basePoints: resourceType === "sacrifice" ? POINTS_FOR_SACRIFICE : 0,
+    modifiersToSuccessRate: [],
+  });
+
+  /** Each player's last beat chose this option (none: a normal one); Personal Reserve at 60, two contacts, three Pantry Crumbs. */
+  function chose(base: Story, bySlot: Record<string, string | undefined>): Story {
+    const players = Object.fromEntries(
+      Object.entries(base.getPlayers()).map(([slot, player]) => {
+        const beats = [...player.beatHistory];
+        const text = bySlot[slot];
+        beats[beats.length - 1] = { ...beats[beats.length - 1], options: [...challengeOptions().slice(0, 2), option(text ?? "Look around", text ? "sacrifice" : "normal")], choice: 2 };
+        const statValues = [
+          { statId: RESERVE.id, value: 60 },
+          { statId: CONTACTS.id, value: ["Mara Vell", "Tavi Renn"] },
+        ];
+        return [slot, { ...player, beatHistory: beats, statValues }];
+      })
+    );
+    return base.clone({ sharedStats: [CRUMBS], sharedStatValues: [{ statId: CRUMBS.id, value: 3 }], playerStats: [RESERVE, CONTACTS], players });
+  }
+  const change = (group: string, id: string, kind: "addNumber" | "subtractNumber" | "setNumber" | "removeElement", value: number | string): Change => ({ type: "statChange", group, stat: id, change: kind, value });
+  const paidOn = (story: Story, statChanges: Change[], slot = "player1") =>
+    beatStep.apply(story, beatSet(story.getPlayerSlots().length, { statChanges }))[0].getCurrentBeat(slot as "player1")?.paidLever;
+
+  it("records the sacrifice the turn paid, by the change that paid it (New Avalon turn 3: 60 → 45)", () => {
+    const story = chose(threadBeat(1), { player1: BRACE });
+    expect(paidOn(story, [change("player1", RESERVE.id, "subtractNumber", 15)])).toEqual({ kind: "sacrifice", group: "player1", stat: RESERVE.id, step: -15 });
+    expect(paidOn(story, [change("player1", RESERVE.id, "setNumber", 45)])).toEqual({ kind: "sacrifice", group: "player1", stat: RESERVE.id, step: -15 });
+  });
+
+  it("records nothing for a lever the turn left unpaid or paid the other way, for a normal choice, or for a list stat", () => {
+    const story = chose(threadBeat(1), { player1: BRACE });
+    expect(paidOn(story, [])).toBeUndefined();
+    expect(paidOn(story, [change("player1", RESERVE.id, "addNumber", 15)])).toBeUndefined();
+    expect(paidOn(chose(threadBeat(1), {}), [change("player1", RESERVE.id, "subtractNumber", 15)])).toBeUndefined();
+    const contact = chose(threadBeat(1), { player1: "Call in Tavi Renn from your City Contacts." });
+    expect(paidOn(contact, [change("player1", CONTACTS.id, "removeElement", "Tavi Renn")])).toBeUndefined();
+  });
+
+  it("records a shared stat's payment on the beat of the player who chose it", () => {
+    const story = chose(threadBeat(2), { player2: "Spend 1 Pantry Crumb as a wedge under the board." });
+    const paid = [change("shared", CRUMBS.id, "subtractNumber", 1)];
+    expect(paidOn(story, paid, "player2")).toEqual({ kind: "sacrifice", group: "shared", stat: CRUMBS.id, step: -1 });
+    expect(paidOn(story, paid, "player1")).toBeUndefined();
   });
 });
 

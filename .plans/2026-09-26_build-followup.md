@@ -1815,3 +1815,59 @@ No calls, no spend (ledger $33.74 of $40; the dry run's per-stage figures). The 
   - **Endings:** I agree with the judge's four fails (complete outcomes told as open). I read New Avalon's Orin line as partly softened.
 - **Readings fixed after the first render:** a step's win that holds a scoreboard was first flagged as a problem (`held after a win`). The setup's rule moves a scoreboard only after a chapter, so it now reads `held after a step win` (fine) or `held after a chapter win` (flagged), test-first. The files were re-rendered with `--report-only`.
 - **Report:** `DOCS/2026-09-26_gpt6-text-eval/2026-09-30_playthroughs-2-report.md`, with pages in `stories/round2/`. `.context/text-model-eval.md` gains the round-2 mode and results, and `.context/story.md` the constant's new home. `.context/ai-transparency.md` was checked: nothing to change, since this is eval-only with no new AI use. No browser check (Playwright didn't connect). `npm run check:all` clean (server 3,489, client 256).
+
+## 2026-09-30 (late evening): the review of the second playthroughs (no calls, $0)
+
+The review verified nine findings on the round-2 report. All nine hold; three are overstated in part (noted below). The report is corrected in place, with a new section 12 listing the corrections.
+
+- **Production fix, no calls (test-first): a lever charged twice.**
+  - **What happened:** in 2 of the 7 levers taken, the turn after the payment took the same cost again.
+    - New Avalon: turn 2's bracing (-15% Personal Reserve) was paid at turn 3 (60 → 45). Turn 4 took it again (45 → 30), its reply reading "Jun spent 15% of his reserve bracing the control ring". Without it Jun would have been at 30%, not 15%, at turn 18, and the stat's "below 30%" -10 on one option at turns 18-19 wouldn't have applied.
+    - The mouse story: turn 9's crumb wedge was paid at turn 10 (3 → 2). The ending took it again (2 → 1): "Bran used a Pantry Crumb as a wedge in the previous beat".
+    - The cause is the request. The history shows only the last beat's chosen option (a normal one), beside a summary that narrates the cost, and nothing says the cost is paid. The harness read only the turn after the choice, so it counted both as paid.
+  - **The fix:** `leverPayments.ts` (new; `leverStatOf` moved there from `beatRepairs.ts`). `beatStep.apply` records on each chooser's new beat the lever its turn paid (`Beat.paidLever` in `core/types/beat.ts`: kind, group, stat and the step; percentage and number stats). `repairBeatReply` then drops, on the turn after, the first change that moves that stat by the same step (`leverChargedAgain`), one per payment.
+    - Kept: a charge a lever on the last beat now owes (any player's), another size or the other way, a late payment (no record), and later turns.
+    - The risk, written down: a same-size change a stat rule asks for on that very turn is dropped too.
+    - On the stored runs (replayed, no calls), the repair drops exactly round 2's two double charges and nothing in round 1 as far as it replays. The request is unchanged; the prompt line that would tell the next turn is a paid measurement.
+  - **Tests:** 10 tests failed first: 7 repair and record tests, 1 stored-run test, 2 harness readings. Then they passed. Round 2's 126 turn requests replay byte for byte (a new test), so the replay the reading rests on is the played story.
+- **Harness readings, no calls (test-first):**
+  - `leversPaid.chargedAgain`: each kept reply replayed through production's current repairs. `leverChargedAgain` joins the fixes.
+  - `ownStatsLine` lists "moved and back where they started" apart.
+  - Round 2 was re-rendered with `--report-only`: the pages list New Avalon turn 4 and the mouse story's turn 11, and Nia's credibility (40 → 40, 2 turns) as back where it started.
+- **Report corrections:**
+  - **Milestones:** 44 of 44, not 43. The same slip is corrected in `.context/text-model-eval.md`; the commit message of `5ec550a` keeps 43.
+  - **Group own stats:** 3 of 7 from start to end, and 2 of 5 on round 1's premises, not 4 of 7. Nia's one change was a contest loss the ending reversed.
+  - **Levers:** 7 of 7 were paid, but 2 were charged twice and 1 was backwards. The mouse setup's Cat's Nearness is higher-is-worse, so its "sacrifice" moved the cat away, a second benefit beside the +30. New Avalon's Heartwell Feedback is backwards too but was never used. The setup prompt's examples and the schema's lever wording pull that way, and nothing checks direction. The fix is paid.
+  - **A new kind of slip (food trucks 22 → 23):** Suri chose result 2 (use the cabinet within disclosed safeguards). Turn 23's plan and text told result 1 (not until verified), the milestone blended them, and the ending told result 1. The judge passed it. So the hand count is 4 of 10 endings pass, 1 partly and 5 fail, not 5 of 10.
+    - Overstated in part: the options matched their positions. The ending matches the blended milestone, so the error entered at turn 23.
+  - **Split scenes:** beyond pirates turns 10-14.
+    - The Needlepoint dockhands turn up aboard at Blackglass Anchorage from turn 22 with no word of how, and the captain's outcome is completed through them.
+    - The shared ship's last stage was the pilot's thread alone.
+    - At estate agents turn 14, Mara is at the archive in Rory's text and at the open house in Nia's, with Rory beside her.
+    - Overstated in part: the report's planner-line suggestion wasn't limited to contests. Only the plan check was.
+  - **The treasure claim:** the completing milestone named the captain's win, and the scoreboard ended 65|35.
+    - The completing turn told the claim as provisional and stored facts saying so, on top of stale facts from turns 9 and 13. The endings followed the facts. The fix is a completing-turn line and a facts-give-way line (paid), not a stronger milestone.
+    - Overstated in part: the milestone's own wording did soften "secures" to "secures recognition of".
+  - **New Avalon's renewed trust:** turn 16 set Orin's relationship to "Deeply Trusted" beside the parting milestone it wrote. The ending read the stat. The top level's sealed-record line never fired.
+  - **The lemonade ledger:** besides the missing sales, the opening costs are never taken out (12 coins spent from 10, still 5), and the margin rises 25% → 30% with no sum.
+  - **Estate agents chapter 6:** a group challenge on Nia's own outcome, after both of Rory's were complete. His favourable roll turned her unfavourable one into the mixed result her milestone records. The rolls are pooled by design, and the owner rule covers exploration steps only. It is a design call for the owner, not a bug.
+- **Not built, and why:**
+  - **Dropping milestones on outcomes no ended chapter pushed** (report 6.3) is no-call, but it reverses the TR-4 rule and its test that keep them. It waits for the owner's OK.
+  - **The owner's roll for group challenges on an own outcome:** the owner's call.
+  - **The contested-outcome plan check (6.4) and ranking setup rules below pacing (6.2):** production would answer both with a planner retry, so they move to the measured list.
+  - **The paid list with estimates is in the report's section 10**, about $1.8-2.1 in all:
+    - the lever-direction setup line, about $0.20-0.40;
+    - the recorded-result turn line, about $0.20;
+    - the completing-turn, stat-against-milestone and ending-facts lines, about $0.30;
+    - parallel threads and converted-contest wording, about $0.15;
+    - the learning-story ledger, about $0.15;
+    - challenge results, about $0.15;
+    - the kids' length and vocabulary, about $0.15;
+    - pacing with setup-rule ranking and planted details, about $0.50-0.60, since only whole stories show it;
+    - group levers and rewards, as before.
+- **Spend:** $0. The ledger stays at $37.99 of $42.
+- **Docs and checks:**
+  - `.context/story.md` gains the repair.
+  - `.context/text-model-eval.md` gains the readings and corrected results.
+  - `.context/ai-transparency.md` and `Privacy.tsx` were checked: nothing to change.
+  - `npm run check:all` clean (server 3,504, client 256).

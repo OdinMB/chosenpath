@@ -19,6 +19,7 @@ import { StorySetupPromptService, type SetupPromptOptions } from "./prompts/Stor
 import { assembleSetupReply, iterationSchema, setupGenerationSchema } from "./setupSchema.js";
 import { assembleSwitchPlan, assembleThreadPlan, switchReplySchema, threadReplySchema } from "./plannerReplies.js";
 import { beatSchemaWithOptionRules, takesOptionRules } from "./optionRules.js";
+import { paidLevers } from "./leverPayments.js";
 import { SwitchPromptService } from "./prompts/SwitchPromptService.js";
 import { ThreadPromptService } from "./prompts/ThreadPromptService.js";
 import { BeatPromptService } from "./prompts/BeatPromptService.js";
@@ -53,6 +54,8 @@ function applyBeats(
 ): [Story, ImageRequest[]] {
   let updatedStory = story.clone();
   const imageRequests: ImageRequest[] = [];
+  // The levers this turn's changes pay for the choices on the story's current beat, kept on each chooser's new beat
+  const paid = paidLevers(story, Array.isArray(response.statChanges) ? response.statChanges : []);
 
   Object.entries(response).forEach(([key, value]) => {
     if (isPlayerBeat(key)) {
@@ -64,6 +67,7 @@ function applyBeats(
           ...beatData,
           choice: -1,
           resolution: null,
+          ...(paid[playerSlot] ? { paidLever: paid[playerSlot] } : {}),
         };
 
         updatedStory = updatedStory.addBeatToPlayer(playerSlot, beat);
