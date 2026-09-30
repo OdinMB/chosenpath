@@ -93,6 +93,12 @@ function baseBlock(story: Story): string {
   return `${ENDING_STATE_TEXT.sharedOutcomesLine}${scoreboardEnding(story) ? ENDING_STATE_TEXT.measuredScoreboardRule : ""}`;
 }
 
+/** The variant's block: the rule, the outcomes' standing, what each kind gets, (with the smoke's fix) the own words, the contest rule. */
+function variantBlock(story: Story, ownWords = true): string {
+  const { sharedOutcomesLine, tellAsLeft, complete, unfinished, contestRule } = ENDING_STATE_TEXT;
+  return `${sharedOutcomesLine}${tellAsLeft}${outcomeStateLines(story)}${complete}${unfinished}${ownWords ? ENDING_STATE_TEXT.ownWords : ""}${scoreboardEnding(story) ? contestRule : ""}`;
+}
+
 describe("the base: production's ending as measured", () => {
   it.each([
     ["one player", () => onePlayerEnding()],
@@ -190,10 +196,22 @@ describe("the variant: each outcome told as its milestones leave it", () => {
     const story = build();
     const base = productionEndingForm(story);
     const variant = endingStateRequest(story);
-    const block = `${ENDING_STATE_TEXT.sharedOutcomesLine}${ENDING_STATE_TEXT.tellAsLeft}${outcomeStateLines(story)}${ENDING_STATE_TEXT.complete}${ENDING_STATE_TEXT.unfinished}${scoreboardEnding(story) ? ENDING_STATE_TEXT.contestRule : ""}`;
-    expect(variant.prompt).toBe(base.prompt.replace(baseBlock(story), block));
+    expect(variant.prompt).toBe(base.prompt.replace(baseBlock(story), variantBlock(story)));
     expect(occurrences(variant.prompt, ENDING_STATE_TEXT.tellAsLeft)).toBe(1);
     expect(json(variant.schema)).toBe(json(base.schema));
+  });
+
+  it.each(CASES)("%s: the smoke's draft is the same without the own-words line (its two records rebuild)", (_, build) => {
+    const story = build();
+    const draft = endingStateRequest(story, { ownWords: false });
+    expect(draft.prompt).toBe(productionEndingForm(story).prompt.replace(baseBlock(story), variantBlock(story, false)));
+    expect(endingStateRequest(story).prompt).toBe(draft.prompt.replace(ENDING_STATE_TEXT.unfinished, `${ENDING_STATE_TEXT.unfinished}${ENDING_STATE_TEXT.ownWords}`));
+  });
+
+  it("keeps the rule's own words out of the prose (the smoke's one fix): no milestones, outcomes or resolutions in the text", () => {
+    expect(ENDING_STATE_TEXT.ownWords).toBe("--- Either way, tell it in the story's own words: the text never mentions milestones, outcomes or resolutions.\n");
+    expect(endingStateRequest(onePlayerEnding()).prompt).toContain(ENDING_STATE_TEXT.ownWords);
+    expect(endingStateRequest(onePlayerEnding(), { ownWords: false }).prompt).not.toContain(ENDING_STATE_TEXT.ownWords);
   });
 
   it("keeps the rule's place: after the shared outcomes' line and before the stats' line", () => {
@@ -236,18 +254,22 @@ describe("the variant: each outcome told as its milestones leave it", () => {
   });
 });
 
-describe("the eval variant (endingState)", () => {
+describe("the eval variants: endingStateB, and the smoke's draft endingState", () => {
   it("sends the request with production's turn limits for the player count, on beats only", () => {
     for (const [story, cap] of [
       [onePlayerEnding(), 12_000],
       [contestEnding(2), 14_000],
       [contestEnding(3, { mode: GameModes.CooperativeCompetitive }), 16_000],
     ] as const) {
-      const request = requestFor("endingState", { role: "beat", story });
-      expect(requestText(request)).toBe(endingStateRequest(story).prompt);
-      expect(callLimitsOf(request)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: cap });
+      const fixed = requestFor("endingStateB", { role: "beat", story });
+      const draft = requestFor("endingState", { role: "beat", story });
+      expect(requestText(fixed)).toBe(endingStateRequest(story).prompt);
+      expect(requestText(draft)).toBe(endingStateRequest(story, { ownWords: false }).prompt);
+      for (const request of [fixed, draft]) expect(callLimitsOf(request)).toEqual({ timeoutMs: 90_000, maxCompletionTokens: cap });
     }
-    expect(() => requestFor("endingState", { role: "thread", story: onePlayerEnding() })).toThrow(/does not cover role thread/);
+    for (const variant of ["endingState", "endingStateB"] as const) {
+      expect(() => requestFor(variant, { role: "thread", story: onePlayerEnding() })).toThrow(/does not cover role thread/);
+    }
   });
 });
 
@@ -262,8 +284,11 @@ const frozen = fs.existsSync(path.join(CASES_DIR, "cases", "cases.json")) ? eval
       const story = caseStory(c);
       const base = productionEndingForm(story);
       const variant = endingStateRequest(story);
-      const block = `${ENDING_STATE_TEXT.sharedOutcomesLine}${ENDING_STATE_TEXT.tellAsLeft}${outcomeStateLines(story)}${ENDING_STATE_TEXT.complete}${ENDING_STATE_TEXT.unfinished}${scoreboardEnding(story) ? ENDING_STATE_TEXT.contestRule : ""}`;
-      expect({ id: c.id, same: variant.prompt === base.prompt.replace(baseBlock(story), block), schema: json(variant.schema) === json(base.schema) }).toEqual({ id: c.id, same: true, schema: true });
+      expect({ id: c.id, same: variant.prompt === base.prompt.replace(baseBlock(story), variantBlock(story)), schema: json(variant.schema) === json(base.schema) }).toEqual({
+        id: c.id,
+        same: true,
+        schema: true,
+      });
     }
   });
 });

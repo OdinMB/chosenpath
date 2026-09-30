@@ -46,7 +46,7 @@ import { turnRound3FormRequest, type TurnRound3Request } from "../../game/servic
 import { groupTurnB10Request } from "../../game/services/storyTextRounds/turnRound3Groups.js";
 import { productionFormRequest } from "../../game/services/storyTextRounds/requestFormB9.js";
 import { optionsContinuityRequest, type OptionsContinuityArm } from "../../game/services/storyTextRounds/turnOptionsContinuity.js";
-import { endingStateRequest } from "../../game/services/storyTextRounds/endingState.js";
+import { endingStateRequest, type EndingStateForm } from "../../game/services/storyTextRounds/endingState.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -192,7 +192,9 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * its milestones leave it, the game stating which are complete and which
  * unfinished after this beat, a contest's rule with its unfinished half),
  * with production's turn limits for the player count; endings only, every
- * player count.
+ * player count. That is the smoke's draft (two records); "endingStateB" is the
+ * run's form, the draft with the smoke's one fix: the rule's words kept out of
+ * the prose (both smoke endings wrote "milestone" or "favorable outcome").
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -246,7 +248,8 @@ export type VariantId =
   | "turnOb"
   | "turnO2"
   | "turnO2b"
-  | "endingState";
+  | "endingState"
+  | "endingStateB";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -297,6 +300,7 @@ export const VARIANTS: VariantId[] = [
   "turnO2",
   "turnO2b",
   "endingState",
+  "endingStateB",
 ];
 
 /**
@@ -571,6 +575,14 @@ function optionsContinuity(variant: VariantId, arm: OptionsContinuityArm) {
   };
 }
 
+/** The ending told as its milestones leave it (2026-09-30), with production's turn limits for the player count: endings only. */
+function endingStateVariant(variant: VariantId, form: EndingStateForm) {
+  return (input: RequestInput): EvalRequest => {
+    if (input.role !== "beat") throw new Error(`Variant ${variant} does not cover role ${input.role}`);
+    return { ...endingStateRequest(input.story, form), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
+  };
+}
+
 /** Turn round 2's form, or its paragraph arm: every single-player turn. */
 function roundTwoTurn(variant: VariantId, form: TurnRound2Form) {
   return (input: RequestInput): Round2Request => {
@@ -649,10 +661,9 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   turnOb: optionsContinuity("turnOb", { options: true, continuity: false, statsUnnamed: true }),
   turnO2: optionsContinuity("turnO2", { options: true, continuity: false, o2: true }),
   turnO2b: optionsContinuity("turnO2b", { options: true, continuity: false, o2: true, o2RateSacrifices: true }),
-  endingState: (input) => {
-    if (input.role !== "beat") throw new Error(`Variant endingState does not cover role ${input.role}`);
-    return { ...endingStateRequest(input.story), limits: productionCallLimits("beat", input.story.getNumberOfPlayers()) };
-  },
+  // The smoke's draft (its two records rebuild), then the run's form with the smoke's one fix, the story's own words
+  endingState: endingStateVariant("endingState", { ownWords: false }),
+  endingStateB: endingStateVariant("endingStateB", { ownWords: true }),
 };
 
 export function requestFor(variant: VariantId, input: RequestInput): EvalRequest {

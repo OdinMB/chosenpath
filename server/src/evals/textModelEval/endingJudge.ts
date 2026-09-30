@@ -178,8 +178,8 @@ export function replyVerdict(players: (boolean | undefined)[]): boolean | undefi
 
 export const endingJudgeCaseId = (key: string, version = ENDING_JUDGE_PROMPT_VERSION) => `judge-ending-v${version}-${key}`;
 
-/** Luna low reads one ending and writes a line per outcome and a short answer */
-const ENDING_JUDGE_OUTPUT_TOKENS = 900;
+/** Luna low reads one ending and writes a line per outcome and a short answer: the smoke's two calls wrote 336 and 421 tokens, reasoning included */
+const ENDING_JUDGE_OUTPUT_TOKENS = 500;
 
 /** The judge calls: each target at its number of samples (the calibration's two, the rest one). */
 export function endingJudgeJobs(targets: { key: string; request: TextRequest; samples: number }[], arm: Arm, promptState: string, stage: Stage): Job[] {
@@ -219,9 +219,143 @@ export type EndingCalibrationItem = {
  * when every outcome the ending tells is told as its milestones leave it, no
  * when it resolves an unfinished outcome or leaves a complete one open or
  * resolves it against its milestones, partial where a line could be read
- * either way (left out of agreement).
+ * either way (left out of agreement). Read on 2026-09-30 before the first judge
+ * call: the stored endings (Novi Reg after its first chapter, every outcome
+ * unfinished: the Waste Ring 1 of 3 with the ending's, identity 0 of 2, City AI
+ * 0 of 1) and the ending run's own (the built single-player ending: the Waste
+ * Ring complete at 2 of 2, identity and City AI unfinished; the bounty contest
+ * complete at 1 of 1 or unfinished at 1 of 3, side B ahead; the co-founders'
+ * governance contest unfinished at 0 of 2 with side A ahead). Production's
+ * ending and the variant on both sides, groups among them.
  */
-export const ENDING_JUDGE_CALIBRATION: EndingCalibrationItem[] = [];
+const PRODUCTION = "production's ending (adopted)";
+const VARIANT = "the variant (endingStateB)";
+
+export const ENDING_JUDGE_CALIBRATION: EndingCalibrationItem[] = [
+  // --- Hand yes ---
+  {
+    id: "stored-o0-variant",
+    output: "cba656b14056c98abfee",
+    slot: "player1",
+    hand: true,
+    writer: VARIANT,
+    note: "All unfinished: the Ring 'stays out of reach', the Council question 'remains open', belonging 'still yours to define'",
+  },
+  {
+    id: "stored-o2-variant",
+    output: "b332495a751f1480f2e6",
+    slot: "player1",
+    hand: true,
+    writer: VARIANT,
+    note: "All unfinished: evidence strong enough to make denial harder but 'no one announces that the Ring is dismantled'; the Council unchanged; her place 'remains unwritten'",
+  },
+  {
+    id: "stored-o0-arm-c",
+    output: "fe408890aba838337993",
+    slot: "player1",
+    hand: true,
+    writer: "arm C of the options and continuity run (adopted2, stored)",
+    note: "All unfinished: the Ring not exposed, 'You are still deciding what place you can claim here, and whether the Council can ever be made to answer plainly'",
+  },
+  {
+    id: "single-complete-variant",
+    output: "65843c5b5d9be21cb929",
+    slot: "player1",
+    hand: true,
+    writer: VARIANT,
+    note: "The complete Ring resolved as its favorable milestones point (the operations face scrutiny, reforms reported in public); the Council's agreement narrated as the chapter's event while fairness is not promised; her place 'remains yours to discover'",
+  },
+  {
+    id: "bounty-complete-variant-s1-p2",
+    output: "503a8c49dd09045b3be9",
+    slot: "player2",
+    hand: true,
+    writer: VARIANT,
+    note: "The complete contest resolved for side B as the scoreboard and milestone point: 'The bounty is yours'; Mara's trust and the spring's protection left open",
+  },
+  {
+    id: "bounty-unfinished-variant-p1",
+    output: "4119832834268a749ba0",
+    slot: "player1",
+    hand: true,
+    writer: VARIANT,
+    note: "The unfinished contest told as it stands: the board leans toward Maeve, 'No one has won the reward'; the ledger choice and Ada's trust left open",
+  },
+  {
+    id: "bounty-unfinished-production-p2",
+    output: "226ec8bdc6b2eca55d4b",
+    slot: "player2",
+    hand: true,
+    writer: PRODUCTION,
+    note: "The unfinished contest told as it stands: 'The race has turned your way, but the reward is still locked and the pursuit is not done'; Maeve's own outcomes not told",
+  },
+  // --- Hand no ---
+  {
+    id: "single-complete-production",
+    output: "8d5f1cf525a7532f8eb8",
+    slot: "player1",
+    hand: false,
+    writer: PRODUCTION,
+    note: "The unfinished City AI outcome resolved (the Council opens its decisions to public review and answers in public) and the untouched identity outcome too ('a community you can call your own')",
+  },
+  {
+    id: "stored-o1-production",
+    output: "b7142ca73b221f80d6eb",
+    slot: "player1",
+    hand: false,
+    writer: PRODUCTION,
+    note: "The unfinished City AI outcome at 0 of 1 given its mixed resolution ('The Council opens its waste contracts to citizen scrutiny and publishes an audit trail'), and identity resolved ('you have found a purpose')",
+  },
+  {
+    id: "stored-o0-round2",
+    output: "bd9653c55b3557a938ce",
+    slot: "player1",
+    hand: false,
+    writer: "turn round 2's held form (turnR2b, round0, stored)",
+    note: "B8's rule ends every outcome: the City AI outcome at 0 of 1 gets its mixed resolution (a review panel and audit summaries), identity lands on 'an outsider who has found a reason to stay attentive'",
+  },
+  {
+    id: "camps-production-p2",
+    output: "d5d3363d09d5362f8447",
+    slot: "player2",
+    hand: false,
+    writer: PRODUCTION,
+    note: "The camps' governance contest is unfinished at 0 of 2, but 'The governance amendment gives Stewardship the decisive voice': a winner named",
+  },
+  {
+    id: "bounty-complete-production-p1",
+    output: "ffec98a5956dc7ff47bd",
+    slot: "player1",
+    hand: false,
+    writer: PRODUCTION,
+    note: "The complete contest left open ('Ada does not announce a capture or pay out the reward'), and Ruth's unfinished claims-trust outcome given its mixed resolution word for word ('every future claim you bring me will need independent checking')",
+  },
+  {
+    id: "bounty-complete-variant-s2-p2",
+    output: "f94c68d65d1a8a5f8646",
+    slot: "player2",
+    hand: false,
+    writer: VARIANT,
+    note: "The complete contest left open: 'Your name is the likely one on the bounty claim; the actual reward ... still unwritten'",
+  },
+  {
+    id: "bounty-unfinished-production-p1",
+    output: "64d59245f6645b7c663f",
+    slot: "player1",
+    hand: false,
+    writer: PRODUCTION,
+    note: "The unfinished contest given a winner: 'The contest goes Maeve's way', 'The ruling costs you the prize'",
+  },
+  // --- Partial, left out of agreement ---
+  {
+    id: "stored-o0-production",
+    output: "1a2b9d6f206784b5eefa",
+    slot: "player1",
+    hand: "partial",
+    writer: PRODUCTION,
+    note: "Ring and Council told as they stand, but 'you begin building a smaller, independent purpose' may land the untouched identity outcome on its second resolution",
+  },
+];
 
 export type EndingAgreement = {
   check: typeof ENDING_CHECK;

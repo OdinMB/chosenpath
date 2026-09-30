@@ -146,9 +146,19 @@ describe("the judge calls", () => {
 });
 
 describe("the calibration", () => {
-  it("holds hand-read endings, each once and well formed", () => {
+  it("holds hand-read endings, each once and well formed, with enough on each side for the reliability bar, from both forms", () => {
     const ids = ENDING_JUDGE_CALIBRATION.map((i) => i.id);
     expect(new Set(ids).size).toBe(ids.length);
+    const yes = ENDING_JUDGE_CALIBRATION.filter((i) => i.hand === true);
+    const no = ENDING_JUDGE_CALIBRATION.filter((i) => i.hand === false);
+    expect(yes.length).toBeGreaterThanOrEqual(3);
+    expect(no.length).toBeGreaterThanOrEqual(3);
+    // Neither side is one form's alone: production writes a yes, the variant a no
+    expect(yes.some((i) => /production/.test(i.writer))).toBe(true);
+    expect(no.some((i) => /variant/.test(i.writer))).toBe(true);
+    // Complete outcomes on both sides too, and group endings among them
+    expect(ENDING_JUDGE_CALIBRATION.some((i) => i.slot !== "player1")).toBe(true);
+    expect(no.some((i) => /complete/.test(i.note))).toBe(true);
     for (const item of ENDING_JUDGE_CALIBRATION) {
       expect(item.output).toMatch(/^[0-9a-f]{20}$/);
       expect(item.slot).toMatch(/^player[123]$/);

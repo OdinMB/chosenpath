@@ -197,8 +197,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // O2's one fix-and-retest (after its run of 2026-09-30) against production's form too, O2 second
   turnO2b: "adopted",
   // The ending told as its milestones leave it (the owner's decision of 2026-09-30) against production's ending, which it
-  // edits and which runs beside it on the same turn model
+  // edits and which runs beside it on the same turn model: the smoke's draft, and the run's form with the smoke's one fix
   endingState: "adopted",
+  endingStateB: "adopted",
 };
 
 /**
@@ -216,6 +217,7 @@ const EARLIER_FORM: Partial<Record<VariantId, VariantId>> = {
   turnO2: "turnOb",
   turnO2b: "turnO2",
   planV2e: "planV2d",
+  endingStateB: "endingState",
 };
 
 const isVariant = (variant: string): variant is VariantId => Object.prototype.hasOwnProperty.call(VARIANT_REFERENCE, variant);
@@ -538,16 +540,18 @@ export const ENDING_STATE_BUILT_CASES = {
 /**
  * The ending's run (the coordinator's brief of 2026-09-30, the owner's decision
  * that each outcome is told as its milestones leave it): production's ending
- * (adopted) and the variant (endingState) on each player count's own turn
- * group, twice on the stored and built endings, interleaved.
+ * (adopted) and the variant on each player count's own turn group, twice on
+ * the stored and built endings, interleaved. The variant runs as endingStateB,
+ * the smoke's draft (endingState, two records) with its one fix; the draft is
+ * not planned again.
  */
 function endingStateArms(role: EvalRole): ArmPlan[] {
   if (role !== "beat") return [];
   const single = [...ENDING_STATE_STORED_CASES, ...ENDING_STATE_BUILT_CASES.single];
   const groups = [...ENDING_STATE_BUILT_CASES.groups];
   return [
-    ...(["adopted", "endingState"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single })),
-    ...(["adopted", "endingState"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: groups })),
+    ...(["adopted", "endingStateB"] as const).map((variant) => ({ arm: adoptedDefault("beat", variant), samples: 2, scope: "single-player" as const, caseIds: single })),
+    ...(["adopted", "endingStateB"] as const).map((variant) => ({ arm: adoptedDefault("multiplayerBeat", variant), samples: 2, scope: "multiplayer" as const, caseIds: groups })),
   ];
 }
 

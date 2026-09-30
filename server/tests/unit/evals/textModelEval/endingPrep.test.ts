@@ -14,8 +14,8 @@ afterEach(() => {
 });
 
 const RING = "player1_ring";
-const VARIANT = "gpt-6-luna@medium/endingState";
-const GROUP_VARIANT = "gpt-6-luna@low/endingState";
+const VARIANT = "gpt-6-luna@medium/endingStateB";
+const GROUP_VARIANT = "gpt-6-luna@low/endingStateB";
 
 const ending = (players: number, maxTurns = 4) => {
   const slots = Array.from({ length: players }, (_, i) => `player${i + 1}`);

@@ -528,8 +528,8 @@ describe("budget caps", () => {
 
   it("runs the ending told as its milestones leave it (ending-state, 2026-09-30) beside production's ending: each player count on its own turn model, twice on the stored and built endings, interleaved", () => {
     const plans = armsFor("ending-state", "beat");
-    const one = ["adopted", "endingState"].map((variant) => armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted"));
-    const group = ["adopted", "endingState"].map((variant) =>
+    const one = ["adopted", "endingStateB"].map((variant) => armKey({ model: TEXT_MODEL_GROUPS.beat.model, reasoningEffort: TEXT_MODEL_GROUPS.beat.reasoningEffort }, variant as "adopted"));
+    const group = ["adopted", "endingStateB"].map((variant) =>
       armKey({ model: TEXT_MODEL_GROUPS.multiplayerBeat.model, reasoningEffort: TEXT_MODEL_GROUPS.multiplayerBeat.reasoningEffort }, variant as "adopted")
     );
     const single = [...ENDING_STATE_STORED_CASES, ...ENDING_STATE_BUILT_CASES.single];
@@ -539,8 +539,10 @@ describe("budget caps", () => {
       [group[0], 1, 2, "multiplayer", undefined, ENDING_STATE_BUILT_CASES.groups],
       [group[1], 1, 2, "multiplayer", undefined, ENDING_STATE_BUILT_CASES.groups],
     ]);
-    expect(one).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/endingState"]);
-    expect(group).toEqual(["gpt-6-luna@low/adopted", "gpt-6-luna@low/endingState"]);
+    // The run's variant is endingStateB (the smoke's one fix); the smoke's draft, endingState, is not planned again
+    expect(one).toEqual(["gpt-6-luna@medium/adopted", "gpt-6-luna@medium/endingStateB"]);
+    expect(group).toEqual(["gpt-6-luna@low/adopted", "gpt-6-luna@low/endingStateB"]);
+    expect(plans.some((p) => p.arm.variant === "endingState")).toBe(false);
     expect(ENDING_STATE_STORED_CASES).toEqual(["end-8988006e-t4-o0", "end-8988006e-t4-o1", "end-8988006e-t4-o2"]);
     expect(ENDING_STATE_BUILT_CASES.single).toHaveLength(1);
     expect(ENDING_STATE_BUILT_CASES.groups).toHaveLength(3);
@@ -555,12 +557,14 @@ describe("budget caps", () => {
       expect(stagePlansCase("planner-v2e", id)).toBe(false);
       expect(stagePlansCase("options-continuity", id)).toBe(false);
     }
-    // Against production's ending on the same turn model; priced from it
+    // Against production's ending on the same turn model; priced from the draft, then production's ending
     expect(referenceKey(one[1])).toBe(one[0]);
     expect(referenceKey(group[1])).toBe(group[0]);
-    expect(estimateBaseKey(one[1])).toBe(one[0]);
+    expect(referenceKey("gpt-6-luna@medium/endingState")).toBe(one[0]);
+    expect(estimateBaseKey(one[1])).toBe("gpt-6-luna@medium/endingState");
+    expect(estimateBaseKey("gpt-6-luna@medium/endingState")).toBe(one[0]);
     expect(secondReferenceKeys(one[1])).toEqual([]);
-    expect(STAGE_CAP_REASONS["ending-state"]).toMatch(/endingState/);
+    expect(STAGE_CAP_REASONS["ending-state"]).toMatch(/endingStateB/);
     expect(STAGE_CAP_REASONS["ending-state"]).toMatch(/2026-09-30/);
     expect(stageRunsBaseline("ending-state")).toBe(false);
     // The ledger read $36.08 when it opened: its cap fits under the $40 with the stalled Stage 4 calls on top

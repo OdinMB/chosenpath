@@ -46,6 +46,14 @@ const TELL_AS_LEFT = "- Tell each outcome as its milestones leave it, counting t
 const COMPLETE = "--- A complete outcome is resolved: narrate the possible resolution its milestones point to.\n";
 const UNFINISHED =
   "--- An unfinished outcome is told in its current state, even if that state is inconclusive: what its milestones so far have settled, and what is still open. Never resolve it beyond its milestones: none of its possible resolutions has been reached yet.\n";
+/**
+ * The smoke's one fix (2026-09-30): both smoke endings of the draft (endingState)
+ * wrote the rule's own words into the prose ("The second milestone completes
+ * the story of your exposé", "has led to a favorable outcome", "there is no
+ * milestone saying that protections are complete"), which the fourth-wall rule
+ * forbids; endingStateB says so where the rule is given.
+ */
+const OWN_WORDS = "--- Either way, tell it in the story's own words: the text never mentions milestones, outcomes or resolutions.\n";
 const CONTEST_RULE =
   "- For a contested outcome, once it is complete, the side ahead on its scoreboard wins unless its milestones clearly say otherwise; a score between 45 and 55 is a draw (the mixed resolution). While it is unfinished, no side has won yet: tell which side is ahead (neither, between 45 and 55) and that the contest isn't settled. The scoreboard is the shared opposites stat its resonance names (\"Scored by …\"), and its first side is side A (with three players, player1's camp).\n";
 
@@ -56,8 +64,12 @@ export const ENDING_STATE_TEXT = {
   tellAsLeft: TELL_AS_LEFT,
   complete: COMPLETE,
   unfinished: UNFINISHED,
+  ownWords: OWN_WORDS,
   contestRule: CONTEST_RULE,
 };
+
+/** The form: the smoke's draft (endingState, as its two records ran), or with the smoke's one fix, the story's own words (endingStateB). */
+export type EndingStateForm = { ownWords: boolean };
 
 /**
  * Whether an ending takes the scoreboard rule, as production decides it: a
@@ -134,11 +146,11 @@ export function outcomeStateLines(story: Story): string {
   return line("Complete", states.filter((s) => s.complete)) + line("Unfinished", states.filter((s) => !s.complete));
 }
 
-/** Production's ending with its outcome lines replaced: each outcome told as its milestones leave it. */
-export function endingStateRequest(story: Story): TextRequest {
+/** Production's ending with its outcome lines replaced: each outcome told as its milestones leave it (in the story's own words, the smoke's fix, unless the draft is asked for). */
+export function endingStateRequest(story: Story, form: EndingStateForm = { ownWords: true }): TextRequest {
   const base = productionEndingForm(story);
   const { instructions, state } = splitAtState(LABEL, base.prompt);
   const measured = `${SHARED_OUTCOMES_LINE}${scoreboardEnding(story) ? MEASURED_SCOREBOARD_RULE : ""}`;
-  const block = `${SHARED_OUTCOMES_LINE}${TELL_AS_LEFT}${outcomeStateLines(story)}${COMPLETE}${UNFINISHED}${scoreboardEnding(story) ? CONTEST_RULE : ""}`;
+  const block = `${SHARED_OUTCOMES_LINE}${TELL_AS_LEFT}${outcomeStateLines(story)}${COMPLETE}${UNFINISHED}${form.ownWords ? OWN_WORDS : ""}${scoreboardEnding(story) ? CONTEST_RULE : ""}`;
   return { ...base, prompt: replaceOnce(LABEL, instructions, measured, block) + state };
 }

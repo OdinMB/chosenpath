@@ -96,7 +96,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "options-continuity": "Options and continuity (turnO, turnC, turnOC; retest turnOb)",
   "options-o2": "Options O2 (turnO2 beside production's form; retest turnO2b)",
   "planner-v2e": "Planner v2e (planner v2d, its last step listed once)",
-  "ending-state": "The ending as its milestones leave it (endingState beside production's ending)",
+  "ending-state": "The ending as its milestones leave it (endingStateB beside production's ending; the smoke's draft endingState)",
 };
 
 /** Jobs by arm key, in plan order. */
