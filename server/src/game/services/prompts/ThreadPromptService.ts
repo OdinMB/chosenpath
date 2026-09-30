@@ -23,9 +23,14 @@ import { pickedOutcome, threadPacingBlock } from "../pacing.js";
  * and lists each step once. Since the choice-result stage of 2026-09-30
  * (planner v2f) each step result follows the rule for its kind: a challenge
  * or contest result says how the attempt turns out, an exploration result is
- * something the player chooses to do. Today's form before the adoption is
- * kept for the eval in storyTextRound0/; adoptedPlanners.test.ts holds this
- * equal to the eval's planner v2f.
+ * something the player chooses to do. Since the challenge-results stage of
+ * 2026-10-01 the approach the players chose at the switch, and the one a
+ * step's question names, are where a thread starts and no result restates
+ * them (STEP_RESULTS_APPROACH, FLAVOR_APPROACH_LINE, and the milestone fields
+ * in plannerReplies.ts). Today's form before the adoption is kept for the
+ * eval in storyTextRound0/; adoptedPlanners.test.ts holds this equal to the
+ * eval's planner v2f with that stage's measured edits (its variant
+ * resultsAsOutcomes, byte for byte).
  */
 
 /** A4's length rule. */
@@ -49,6 +54,27 @@ function kindRule(story: Story): string {
 }
 
 /**
+ * The results rule's sentence on the approach (the challenge-results stage of
+ * 2026-10-01, fix 5 of the second playthroughs' review; its variant
+ * resultsAsOutcomes as measured: resultsFitKind 8 of 30 -> 22 of 30 plans,
+ * moved): 14 of the second round's 16 chapters planned after a flavor switch
+ * wrote the approach the players chose at the switch into their results
+ * ("Bex coordinates the work while Jori confirms the right fittings", "Rory's
+ * careful separation of documented defects"), and the rule's weak example was
+ * only a different decision. It follows the challenge sentence, by player
+ * count, and starts with its space.
+ */
+export const STEP_RESULTS_APPROACH = {
+  single:
+    ' The same goes for the approach the player chose at the switch (PLAYER DECISIONS) and the one a step\'s question names: the thread can start from it, but no result restates it, not even as the way the player succeeds; each result says what comes of it (weak: "Rikkit keeps his forged papers steady, and the guard waves him through"; good: "The guard waves Rikkit through without a second look").',
+  group:
+    ' The same goes for the approaches the players chose at the switch (PLAYER DECISIONS) and the ones a step\'s question names: the thread can start from them, but no result restates them, not even as the way a player succeeds or why a side comes out ahead; each result says what comes of them (weak: "The group keeps its forged papers steady, and the guard waves them through", "Side A\'s careful account sways the council"; good: "The guard waves the group through without a second look", "The council leans toward Side A").',
+} as const;
+
+/** A flavor pick's line in PLAYER DECISIONS (the same stage): the approach is where the thread starts, never what a result restates. */
+export const FLAVOR_APPROACH_LINE = "The choice sets the approach the thread starts from, not the outcome; no step result or milestone restates it.";
+
+/**
  * The two rules on a step's results (planner v2f, adopted at the
  * choice-result stage of 2026-09-30: the playthroughs' next turns told the
  * result instead of the choice). A challenge or contest result is rolled
@@ -56,12 +82,13 @@ function kindRule(story: Story): string {
  * never which approach the player takes or what they say or decide; an
  * exploration result is the option at its position, so it is something the
  * player chooses to do, never how others respond. Each follows the sentence
- * planner v2e printed for its kind.
+ * planner v2e printed for its kind; the challenge sentence is followed by the
+ * approach sentence (STEP_RESULTS_APPROACH, 2026-10-01).
  */
 const stepResultRules = (multiplayer: boolean) =>
   multiplayer
-    ? `In challenge and contest threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge or contest result, the milestones included, says how the players' attempts turn out, whatever they chose to do: what each side achieves or fails to achieve, and how others respond; never which approach a player takes or what they say or decide, since the options they choose decide that (weak: "The group bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the players can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something a player chooses to do, and the step's three options offer them one each, in order: never how others respond.`
-    : `In challenge threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge result, the milestones included, says how the player's attempt turns out, whatever they chose to do: what they achieve or fail to achieve, and how others respond; never which approach the player takes or what they say or decide, since the option they choose decides that (weak: "Rikkit bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway"). In exploration threads, each step's three results are three paths the player can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something the player chooses to do, and the step's three options offer them one each, in order: never how others respond.`;
+    ? `In challenge and contest threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge or contest result, the milestones included, says how the players' attempts turn out, whatever they chose to do: what each side achieves or fails to achieve, and how others respond; never which approach a player takes or what they say or decide, since the options they choose decide that (weak: "The group bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway").${STEP_RESULTS_APPROACH.group} In exploration threads, each step's three results are three paths the players can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something a player chooses to do, and the step's three options offer them one each, in order: never how others respond.`
+    : `In challenge threads, each result gives an advantage or a disadvantage for the next step without closing it off. Each challenge result, the milestones included, says how the player's attempt turns out, whatever they chose to do: what they achieve or fail to achieve, and how others respond; never which approach the player takes or what they say or decide, since the option they choose decides that (weak: "Rikkit bribes the guard instead"; good: "The guard pockets the coin and calls his sergeant anyway").${STEP_RESULTS_APPROACH.single} In exploration threads, each step's three results are three paths the player can take, and the last step's results lead toward the outcome's three resolutions, in the same order. Each exploration result is something the player chooses to do, and the step's three options offer them one each, in order: never how others respond.`;
 
 function progressionItem(number: number, multiplayer: boolean): string {
   const who = multiplayer ? "players" : "player";
@@ -150,7 +177,7 @@ function playerDecisions(story: Story): string {
     const lead = story.isMultiplayer() ? "That choice pushes" : "This thread pushes";
     if (!pick) return `${slot}: ${option}`;
     if (pick.kind === "flavor") {
-      const set = outcome ? `\n${lead} the outcome the switch set: ${outcome.question} (${outcome.id}). The choice sets the approach, not the outcome.` : "";
+      const set = outcome ? `\n${lead} the outcome the switch set: ${outcome.question} (${outcome.id}). ${FLAVOR_APPROACH_LINE}` : "";
       return `${slot} chose: "${option}"${set}`;
     }
     const pushes = outcome ? `\n${lead}: ${outcome.question} (${outcome.id}). Why it matters: ${withoutScoreLine(outcome.resonance)}` : "";

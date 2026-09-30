@@ -11,7 +11,7 @@ import { SCOREBOARD_ENDING_RULE as PRODUCTION_ENDING_RULE } from "../../../../sr
 import { ROUND3_PARTS } from "../../../../src/game/services/storyTextRounds/setupRound1.js";
 import { setupRound2Request } from "../../../../src/game/services/storyTextRounds/setupRound2.js";
 import { ENDING_STATE_TEXT } from "../../../../src/game/services/storyTextRounds/endingState.js";
-import { adoptedSetupPrompt, adoptedTurn, withContestLastStage, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { adoptedSetupPrompt, adoptedTurn, withContestLastStage, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 import { takesExplorationOrder } from "../../../../src/game/services/storyTextRounds/choiceResult.js";
 
 /*
@@ -21,7 +21,8 @@ import { takesExplorationOrder } from "../../../../src/game/services/storyTextRo
  * holds: the final setup form (setupR3, a case's kids tag included), planner
  * v2 with two-sided contests (planV2b) for the switch and planner v2f (the
  * nearer chapter question of 2026-09-28, the outcome's stages and each step
- * once, and the step results' two rules, 2026-09-30) for the chapter, today's
+ * once, and the step results' two rules, 2026-09-30) with the challenge-results
+ * stage's measured edits (2026-10-01) for the chapter, today's
  * turn form with B6 alone (turnB6) for a single player and today's form
  * (prod) for groups, an exploration step with the exploration-order line
  * (choiceResult; a group's and, since the choice-line-sp stage, a single
@@ -74,7 +75,8 @@ function expected(input: RequestInput): { prompt: string; schema: string } {
     case "iteration":
       return { prompt: adoptedSetupPrompt(prompt, input.iteration.playerCount, input.iteration.gameMode), schema: json(measured) };
     case "thread":
-      return { prompt, schema: json(measured) };
+      // Since the challenge-results stage (2026-10-01): results and milestones that never restate the approach, as measured
+      return { prompt: withResultsAsOutcomes(prompt, input.story), schema: withResultsAsOutcomesSchema(json(measured), input.story) };
     case "switch":
       // Since the parallel-threads stage (2026-10-01): a contest's last stage offered only as a grouped thread, as measured
       return { prompt: withContestLastStage(withThreadsThatFit(prompt, input.story), input.story), schema: json(measured) };

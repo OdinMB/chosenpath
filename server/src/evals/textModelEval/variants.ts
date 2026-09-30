@@ -53,6 +53,7 @@ import { outcomeSettledRequest } from "../../game/services/storyTextRounds/outco
 import { recordedResultRequest } from "../../game/services/storyTextRounds/recordedResult.js";
 import { leverDirectionRequest } from "../../game/services/storyTextRounds/leverDirection.js";
 import { parallelThreadsRequest } from "../../game/services/storyTextRounds/parallelThreads.js";
+import { resultsAsOutcomesRequest } from "../../game/services/storyTextRounds/resultsAsOutcomes.js";
 import { productionCallLimits } from "shared/llm/chatModel.js";
 import { productionRole } from "./arms.js";
 import type { CallLimits } from "shared/llm/chatModel.js";
@@ -263,6 +264,16 @@ import type { CallLimits } from "shared/llm/chatModel.js";
  * on a chapter step with several threads (everyone in one place across the
  * beats); production's request byte for byte elsewhere, with production's
  * limits for the role and player count.
+ * "resultsAsOutcomes" is the challenge-results stage's chapter planner
+ * (2026-10-01, fix 5 of the second playthroughs' review,
+ * storyTextRounds/resultsAsOutcomes.ts): production's chapter planner with
+ * one sentence after the results rule (the approach chosen at the switch and
+ * the one a step's question names are where a thread starts, and no result
+ * restates it, not even as the way the player succeeds), the flavor pick's
+ * line in PLAYER DECISIONS worded the same way, and the challenge and contest
+ * milestone fields' "naming who did what" narrowed to what was won or lost,
+ * never how the players went about it; production's request byte for byte
+ * elsewhere, with production's planner limits; the chapter planner only.
  * Each round variant edits the round0 form, so none of them follows a later
  * production change.
  */
@@ -326,7 +337,8 @@ export type VariantId =
   | "outcomeSettledB"
   | "recordedResult"
   | "leverDirection"
-  | "parallelThreads";
+  | "parallelThreads"
+  | "resultsAsOutcomes";
 export const VARIANTS: VariantId[] = [
   "prod",
   "adopted",
@@ -387,6 +399,7 @@ export const VARIANTS: VariantId[] = [
   "recordedResult",
   "leverDirection",
   "parallelThreads",
+  "resultsAsOutcomes",
 ];
 
 /**
@@ -802,6 +815,12 @@ const BUILDERS: Record<VariantId, (input: RequestInput) => EvalRequest> = {
   parallelThreads: (input) => {
     if (input.role !== "beat" && input.role !== "switch" && input.role !== "thread") throw new Error(`Variant parallelThreads does not cover role ${input.role}`);
     return { ...parallelThreadsRequest(input.story, input.role), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
+  },
+  // The challenge-results stage's chapter planner: results and milestones say what comes of an approach, never the
+  // approach itself, the switch's included; production's planner limits
+  resultsAsOutcomes: (input) => {
+    if (input.role !== "thread") throw new Error(`Variant resultsAsOutcomes does not cover role ${input.role}`);
+    return { ...resultsAsOutcomesRequest(input.story), limits: productionCallLimits(productionRole(input.role), input.story.getNumberOfPlayers()) };
   },
 };
 

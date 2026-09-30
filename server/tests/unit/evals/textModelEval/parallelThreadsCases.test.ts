@@ -6,6 +6,7 @@ import { caseStory } from "../../../../src/evals/textModelEval/cases.js";
 import { sha256 } from "../../../../src/evals/textModelEval/executor.js";
 import { outputIdOf } from "../../../../src/evals/textModelEval/judgedChecks.js";
 import { PARALLEL_THREADS_CASE_SPECS, parallelThreadsCases, parallelThreadsCasesToFreeze } from "../../../../src/evals/textModelEval/parallelThreadsCases.js";
+import { productionSends } from "../../../../src/evals/textModelEval/choiceResultCases.js";
 import { playthroughRunsFrom } from "../../../../src/evals/textModelEval/playthroughMode.js";
 import { PLAYTHROUGHS_2, playStory, type PlayCallSpec, type PlayRun } from "../../../../src/evals/textModelEval/playthroughs.js";
 import { requestText } from "../../../../src/evals/textModelEval/variants.js";
@@ -43,7 +44,8 @@ describe("parallelThreadsCases on a played fake story", () => {
       { id: "round-parallel-switch-fake", story: run.spec.id, turn: switchTurn?.turn ?? 0, role: "switch" as const, purpose: "A switch plan." },
       { id: "round-parallel-fake", story: run.spec.id, turn: chapterTurn?.turn ?? 0, role: "thread" as const, purpose: "A chapter plan." },
     ];
-    const { cases, problems } = parallelThreadsCases([run], hashOf, specs);
+    // A run played through today's code sent today's requests
+    const { cases, problems } = parallelThreadsCases([run], hashOf, specs, productionSends);
     expect(problems).toEqual([]);
     expect(cases.map((c) => [c.id, c.role, c.fixedAnalysis, c.tags.source, c.tags.category, c.tags.players])).toEqual([
       ["round-parallel-switch-fake", "switch", undefined, "round", "parallel-threads", 2],
@@ -51,7 +53,9 @@ describe("parallelThreadsCases on a played fake story", () => {
     ]);
     // The switch case is the story before the switch plan: its switch planner's request is the one the run sent
     expect(caseStory(cases[0], false).getCurrentTurn()).toBe(switchTurn?.turn ? switchTurn.turn - 1 : -1);
-    expect(parallelThreadsCasesToFreeze(cases, [run], hashOf, false, specs).skipped).toEqual(["round-parallel-switch-fake", "round-parallel-fake"]);
+    expect(parallelThreadsCasesToFreeze(cases, [run], hashOf, false, specs, productionSends).skipped).toEqual(["round-parallel-switch-fake", "round-parallel-fake"]);
+    // Read as the second round sent it, today's chapter planner is not what that round's chapter plans sent (2026-10-01)
+    expect(parallelThreadsCases([run], hashOf, specs).problems).toEqual([expect.stringMatching(/^round-parallel-fake: its request is not the one the run sent/)]);
   });
 
   it("builds no switch case at a turn that planned no switch", async () => {

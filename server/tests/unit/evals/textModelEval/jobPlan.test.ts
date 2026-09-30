@@ -20,6 +20,7 @@ import { plannerV2SwitchRequest, plannerV2ThreadRequest } from "../../../../src/
 import { todaysFormWithB6Request } from "../../../../src/game/services/storyTextRounds/turnRound2.js";
 import { MIN_MEASURED_RECORDS } from "../../../../src/evals/textModelEval/pricing.js";
 import {
+  CHALLENGE_RESULTS_CASES,
   CHOICE_RESULT_BUILT_CASES,
   CHOICE_RESULT_STORED_CASES,
   CHOICE_RESULT_STORED_PLAN_CASES,
@@ -725,6 +726,27 @@ describe("planJobs: the round stages and the migration check", () => {
     // Nothing isolated on the chapter openings, no turn case, and no earlier stage plans the cases
     expect(planJobs(cases, { ...options, roles: ["beat", "thread"], mode: "isolated" })).toEqual([]);
     expect(planJobs(cases, { ...options, stage: "lever-direction", roles: ["switch", "thread"], mode: "pipeline" })).toEqual([]);
+  });
+
+  it("plans the challenge-results stage (2026-10-01): production's and the variant's chapter planners twice on its chapter plans, interleaved, each with production's planner limits for the player count", () => {
+    const [single] = CHALLENGE_RESULTS_CASES.single;
+    const [group] = CHALLENGE_RESULTS_CASES.groups;
+    const cases = [
+      evalCase(single, "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-a" }).getState(), tags: tags({ source: "round" }) }),
+      evalCase(group, "thread", { state: threadAnalysisAfterSwitch(3, { id: "story-b" }).getState(), tags: tags({ source: "round", multiplayer: true, players: 3 }) }),
+      evalCase("sp-other-plan", "thread", { state: threadAnalysisAfterSwitch(1, { id: "story-c" }).getState() }),
+    ];
+    const options = { stage: "challenge-results" as const, promptState: "adopted12", subset15: false, records: [] };
+    const plans = planJobs(cases, { ...options, roles: ["thread"], mode: "isolated" });
+    // Sample by sample, both arms on a case before the next case
+    expect(plans.map((j) => `${j.caseId} s${j.sample} ${j.armKey}`)).toEqual(
+      [1, 2].flatMap((s) => [single, group].flatMap((id) => ["adopted", "resultsAsOutcomes"].map((v) => `${id} s${s} gpt-6-luna@low/${v}`)))
+    );
+    for (const job of plans) expect(callLimitsOf(job.first.request())).toEqual(productionCallLimits("threadAnalysis", job.caseId === group ? 3 : 1));
+    // No chains, no other role, and no earlier stage plans the cases
+    expect(planJobs(cases, { ...options, roles: ["thread"], mode: "pipeline" })).toEqual([]);
+    expect(planJobs(cases, { ...options, roles: ["beat", "switch", "setup"], mode: "isolated" })).toEqual([]);
+    expect(planJobs(cases, { ...options, stage: "parallel-threads", roles: ["thread"], mode: "isolated" })).toEqual([]);
   });
 
   it("plans the group round (B10): the sharpened note twice on the stored group turns, today's group form's sample 2 beside it", () => {

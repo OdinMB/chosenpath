@@ -16,8 +16,10 @@ import {
   switchAnalysisAfterThread,
   threadAnalysisAfterSwitch,
 } from "../../../helpers/promptStories.js";
-import { withContestLastStage, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
+import { withContestLastStage, withResultsAsOutcomes, withResultsAsOutcomesSchema, withThreadsThatFit } from "../../../helpers/adoptedDeltas.js";
 import { CONTEST_LAST_STAGE_LINE } from "../../../../src/game/services/prompts/SwitchPromptService.js";
+import { FLAVOR_APPROACH_LINE, STEP_RESULTS_APPROACH } from "../../../../src/game/services/prompts/ThreadPromptService.js";
+import { RESULTS_AS_OUTCOMES_TEXT } from "../../../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
 import { PARALLEL_THREADS_TEXT } from "../../../../src/game/services/storyTextRounds/parallelThreads.js";
 import { requestFor, requestText } from "../../../../src/evals/textModelEval/variants.js";
 import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "../../../helpers/roundStories.js";
@@ -39,7 +41,12 @@ import { endedChapter, flavorSwitch, outcome, roundStory, topicSwitch } from "..
  * choice-result stage of 2026-09-30, planner v2f: the step results' two
  * rules (a challenge or contest result says how the attempt turns out, never
  * the player's approach or decision; an exploration result is the player's
- * own choice). The same prompt and JSON schema, byte for byte, on every story
+ * own choice); and, since the challenge-results stage of 2026-10-01, the
+ * measured edits of its variant resultsAsOutcomes (the approach chosen at the
+ * switch and the one a step's question names are where a thread starts, and
+ * no result restates it; the flavor pick's line; the milestone fields'
+ * "naming who did what" narrowed to what was won or lost: withResultsAsOutcomes
+ * and withResultsAsOutcomesSchema). The same prompt and JSON schema, byte for byte, on every story
  * the tests build and on every frozen planning case; and a reply is assembled
  * into today's stored plan the way the eval assembles it.
  */
@@ -161,11 +168,12 @@ const planV2e = (story: Story) => plannerV2ThreadRequest(story, false, { twoSide
 /** planV2f: planV2e with the step results' two rules (the choice-result stage), production's chapter planner since. */
 const planV2f = (story: Story) => plannerV2ThreadRequest(story, false, { twoSided: true, nearerQuestion: true, stages: true, stepsOnce: true, outcomeResults: true });
 
+/** Planner v2f with the challenge-results stage's measured edits (2026-10-01): production's chapter planner since. */
 function expectThreadLikeMeasured(story: Story) {
   const production = threadStep.request(story);
   const measured = planV2f(story);
-  expect(production.prompt).toBe(measured.prompt);
-  expect(json(production.schema)).toBe(json(measured.schema));
+  expect(production.prompt).toBe(withResultsAsOutcomes(measured.prompt, story));
+  expect(json(production.schema)).toBe(withResultsAsOutcomesSchema(json(measured.schema), story));
 }
 
 describe("the switch planner: planner v2 as measured", () => {
@@ -217,11 +225,30 @@ describe("the chapter planner: planner v2f (two-sided contests, the nearer chapt
       const story = build();
       const multiplayer = story.isMultiplayer();
       const { before, after } = PLANNER_V2_TEXT.stepResults(multiplayer);
-      const production = threadStep.request(story).prompt;
-      expect(production).toContain(after);
-      expect(production).not.toContain(before);
-      expect(production.replace(after, before)).toBe(planV2e(story).prompt);
+      const measured = planV2f(story).prompt;
+      expect(measured).toContain(after);
+      expect(measured).not.toContain(before);
+      expect(measured.replace(after, before)).toBe(planV2e(story).prompt);
     }
+  });
+
+  it("carries the challenge-results stage's measured edits, byte for byte the variant resultsAsOutcomes (2026-10-01)", () => {
+    const { rule, approachLine, flavorAnchor, flavorLine } = RESULTS_AS_OUTCOMES_TEXT;
+    for (const [, build] of THREAD_STORIES) {
+      const story = build();
+      const which = story.isMultiplayer() ? "group" : "single";
+      const production = threadStep.request(story);
+      const variant = requestFor("resultsAsOutcomes", { role: "thread", story });
+      expect(production.prompt).toBe(requestText(variant));
+      expect(json(production.schema)).toBe(json((variant as { schema: Parameters<typeof toJsonSchema>[0] }).schema));
+      expect(production.prompt.split(`${rule[which]}${approachLine[which]}`).length - 1).toBe(1);
+      expect(production.prompt).not.toContain(flavorAnchor);
+      // The flavor pick's line where a flavor switch set the chapter's outcome, and nowhere else
+      if (planV2f(story).prompt.includes(flavorAnchor)) expect(production.prompt).toContain(flavorLine);
+    }
+    // Production's own constants are the measured text
+    expect(STEP_RESULTS_APPROACH).toEqual(approachLine);
+    expect(FLAVOR_APPROACH_LINE).toBe(flavorLine);
   });
 
   it("is no longer planner v2c: the stage item, PACING's stage and the steps line are what changed (2026-09-30)", () => {

@@ -8,11 +8,14 @@
  * everything else production sends is the variant's request byte for byte
  * (.plans/2026-09-26_build-followup.md, "Adoption into production" and "The
  * owner's feedback of 2026-09-28"). The chapter planner has none: planV2c
- * carries the adopted "without a number" in the chapter title's field. The
- * switch planner has one since 2026-09-30: the threads that fit near the end;
- * since 2026-10-01 it also carries a measured line planner v2b never had (a
- * contest's last stage offered only as a grouped thread: withContestLastStage,
- * the parallel-threads stage's variant, not a delta).
+ * carries the adopted "without a number" in the chapter title's field; since
+ * 2026-10-01 it carries measured wording planner v2f never had (challenge and
+ * contest results that never restate the approach: withResultsAsOutcomes and
+ * withResultsAsOutcomesSchema, the challenge-results stage's variant, not a
+ * delta). The switch planner has one since 2026-09-30: the threads that fit
+ * near the end; since 2026-10-01 it also carries a measured line planner v2b
+ * never had (a contest's last stage offered only as a grouped thread:
+ * withContestLastStage, the parallel-threads stage's variant, not a delta).
  */
 
 import type { Story } from "core/models/Story.js";
@@ -23,6 +26,7 @@ import { StoryStatePromptService } from "../../src/game/services/prompts/StorySt
 import { chaptersThatFit as measuredChaptersThatFit } from "../../src/game/services/storyTextRounds/pacing.js";
 import { KIDS_STATS, KIDS_STATS_VARIED } from "../../src/game/services/storyTextRounds/setupRound3Text.js";
 import { PARALLEL_THREADS_TEXT, takesLastStageLine } from "../../src/game/services/storyTextRounds/parallelThreads.js";
+import { RESULTS_AS_OUTCOMES_TEXT } from "../../src/game/services/storyTextRounds/resultsAsOutcomes.js";
 
 /** Contests keep score (competitive and cooperative-competitive multiplayer). */
 export const isContestSetup = (players: number, mode: GameMode): boolean =>
@@ -109,6 +113,36 @@ export function withContestLastStage(measured: string, story: Story): string {
   const { lastStageAnchor, lastStageLine } = PARALLEL_THREADS_TEXT;
   if (measured.split(lastStageAnchor).length !== 2) throw new Error("The measured switch planner no longer carries the coordination examples' last line once");
   return measured.replace(lastStageAnchor, `${lastStageAnchor}${lastStageLine}`);
+}
+
+/*
+ * The chapter planner (2026-10-01, the challenge-results stage, fix 5 of the
+ * second playthroughs' review): after the results rule's challenge sentence,
+ * the sentence that the approach chosen at the switch and the one a step's
+ * question names are where a thread starts and no result restates them; the
+ * flavor pick's line in PLAYER DECISIONS worded the same way; and the
+ * challenge and contest milestone fields' "naming who did what" narrowed to
+ * what was won or lost. Not a delta: measured (the variant resultsAsOutcomes,
+ * resultsFitKind 8 of 30 -> 22 of 30, moved) and adopted as measured; planner
+ * v2f, the measured base the other chapter tests read, never carried it.
+ */
+const countOf = (story: Story) => (story.isMultiplayer() ? "group" : "single");
+
+/** The measured chapter planner's prompt with the results-as-outcomes edits. */
+export function withResultsAsOutcomes(measured: string, story: Story): string {
+  const { rule, approachLine, flavorAnchor, flavorLine } = RESULTS_AS_OUTCOMES_TEXT;
+  const which = countOf(story);
+  if (measured.split(rule[which]).length !== 2) throw new Error("The measured chapter planner no longer carries the results rule's challenge sentence once");
+  return measured.replace(rule[which], `${rule[which]}${approachLine[which]}`).split(flavorAnchor).join(flavorLine);
+}
+
+/** The measured chapter planner's JSON schema text with the milestone fields reworded. */
+export function withResultsAsOutcomesSchema(measuredJson: string, story: Story): string {
+  const inJson = (text: string) => JSON.stringify(text).slice(1, -1);
+  return RESULTS_AS_OUTCOMES_TEXT.milestones[countOf(story)].reduce((text, edit) => {
+    if (!text.includes(inJson(edit.from))) throw new Error(`The measured chapter planner's schema no longer says "${edit.from}"`);
+    return text.split(inJson(edit.from)).join(inJson(edit.to));
+  }, measuredJson);
 }
 
 /** The chapter rules as the measured switch turn printed them: the story's thread types and switch/thread instructions. */

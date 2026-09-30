@@ -107,6 +107,7 @@ const FEEDBACK_LABELS: Record<FeedbackStage, string> = {
   "lever-direction": "The setup whose sacrifices cost and rewards help whichever way a stat runs (leverDirection beside production's setup under adopted10, --role setup)",
   "parallel-threads":
     "Parallel threads in one world, contests with both sides (parallelThreads beside production under adopted11: --role switch, and --role thread --mode pipeline for the chapter openings' chains)",
+  "challenge-results": "Challenge and contest results that tell how the attempt turns out, not the approach (resultsAsOutcomes beside production's chapter planner under adopted12, --role thread)",
 };
 
 /** Jobs by arm key, in plan order. */

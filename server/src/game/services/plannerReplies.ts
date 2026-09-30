@@ -177,24 +177,40 @@ const PLAN = (multiplayer: boolean) =>
     multiplayer ? " In multiplayer, also what each player does." : ""
   } No ids.`;
 
-const event = (result: string) => `The milestone if ${result}: an event that happened, naming who did what, sized as the milestone rule says.`;
+/*
+ * A milestone names who did what, and (the challenge-results stage of
+ * 2026-10-01, its variant resultsAsOutcomes as measured) the players' part of
+ * it is what they won or lost or what others did in answer, never how they
+ * went about it: the option they pick sets that, so a milestone that tells the
+ * approach contradicts a player who chose another.
+ */
+const event = (result: string, who: string) =>
+  `The milestone if ${result}: an event that happened, naming who did what, sized as the milestone rule says: what the ${who} won or lost, or what others did in answer, never how the ${who} went about it.`;
 
-const CHALLENGE_MILESTONES = z
-  .object({
-    favorable: z
-      .string()
-      .describe(
-        `${event("the thread ends favorably")} Weak: 'The group makes progress with the Guild.' Good: 'Threatened by the enclave's strike, Sir Bram suspends the Guild's bounty on goblins for one season.'`
-      ),
-    mixed: z.string().describe(event("the thread ends mixed")),
-    unfavorable: z.string().describe(event("the thread ends unfavorably")),
-  })
-  .describe("Milestones for a challenge thread.");
+/** The challenge milestones, worded for one player or for the players of a group. */
+function challengeMilestones(multiplayer: boolean) {
+  const who = multiplayer ? "players" : "player";
+  return z
+    .object({
+      favorable: z
+        .string()
+        .describe(
+          `${event("the thread ends favorably", who)} Weak: 'The group makes progress with the Guild.' Good: 'Threatened by the enclave's strike, Sir Bram suspends the Guild's bounty on goblins for one season.'`
+        ),
+      mixed: z.string().describe(event("the thread ends mixed", who)),
+      unfavorable: z.string().describe(event("the thread ends unfavorably", who)),
+    })
+    .describe("Milestones for a challenge thread.");
+}
 const CONTEST_MILESTONES = z
   .object({
-    sideAWins: z.string().describe("The milestone if side A wins the thread: an event that happened, naming who did what."),
-    mixed: z.string().describe("The milestone on a draw: an event that happened, naming who did what."),
-    sideBWins: z.string().describe("The milestone if side B wins the thread: an event that happened, naming who did what."),
+    sideAWins: z
+      .string()
+      .describe("The milestone if side A wins the thread: an event that happened, naming who did what: what side A won, or what others decided in its favor, never how its players went about it."),
+    mixed: z.string().describe("The milestone on a draw: an event that happened, naming who did what: what each side won or lost, never how their players went about it."),
+    sideBWins: z
+      .string()
+      .describe("The milestone if side B wins the thread: an event that happened, naming who did what: what side B won, or what others decided in its favor, never how its players went about it."),
   })
   .describe("Milestones for a contest thread.");
 const path = (n: string) => `The milestone if the player's final choice takes the ${n} path. The three are paths toward the outcome's three resolutions, in the same order.`;
@@ -236,9 +252,10 @@ function threadFields(multiplayer: boolean) {
     outcomeStages: z.array(z.string()).max(6).describe(OUTCOME_STAGES),
     question: z.string().describe(QUESTION),
     typeOfMilestone: z.string().describe(MILESTONE_KIND),
-    possibleMilestones: (multiplayer ? z.union([CHALLENGE_MILESTONES, CONTEST_MILESTONES, EXPLORATION_MILESTONES]) : z.union([CHALLENGE_MILESTONES, EXPLORATION_MILESTONES])).describe(
-      MILESTONES_DESCRIPTION
-    ),
+    possibleMilestones: (multiplayer
+      ? z.union([challengeMilestones(true), CONTEST_MILESTONES, EXPLORATION_MILESTONES])
+      : z.union([challengeMilestones(false), EXPLORATION_MILESTONES])
+    ).describe(MILESTONES_DESCRIPTION),
     // Each step once (planner v2e): the stage scoping's plans wrote the last step in steps and again as finalStep
     steps: z
       .array(stepSchema(multiplayer))

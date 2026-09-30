@@ -60,6 +60,7 @@ import {
   HARD_CEILING,
   LEDGER_STAGES,
   LEDGER_WHEN_FEEDBACK_OPENED,
+  LEDGER_WHEN_REVIEW_OPENED,
   LEDGER_WHEN_ROUNDS_OPENED,
   resolveCaps,
   spentByStage,
@@ -423,6 +424,8 @@ describe("budget caps", () => {
       "lever-direction": 0.26,
       // Fix 4, its estimate plus 30%
       "parallel-threads": 0.195,
+      // Fix 5, its estimate plus 30%
+      "challenge-results": 0.195,
     });
     expect(FEEDBACK_STAGES).toEqual([
       "plan-refresh",
@@ -445,6 +448,7 @@ describe("budget caps", () => {
       "recorded-result",
       "lever-direction",
       "parallel-threads",
+      "challenge-results",
     ]);
     for (const stage of FEEDBACK_STAGES) {
       expect(STAGES).toContain(stage);
@@ -452,11 +456,18 @@ describe("budget caps", () => {
       expect(stageRunsBaseline(stage)).toBe(false);
       expect(STAGE_CAP_REASONS[stage]).toMatch(/2026-09-(2[89]|30)/);
     }
-    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, all twenty caps still
-    // fit (the hard cap $42 since the second round of playthroughs)
-    const caps = FEEDBACK_STAGES.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
-    expect(caps).toBeCloseTo(8.685);
-    expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + caps).toBeLessThanOrEqual(HARD_CEILING);
+    // The ledger read $31.99 when they opened; with the stalled Stage 4 calls' possible $1.3 on top, the sixteen caps up to
+    // the second playthroughs still fit (the hard cap $42 since the second round of playthroughs)
+    const review = FEEDBACK_STAGES.slice(FEEDBACK_STAGES.indexOf("outcome-settled"));
+    const before = FEEDBACK_STAGES.filter((stage) => !review.includes(stage));
+    const capsOf = (stages: readonly (typeof FEEDBACK_STAGES)[number][]) => stages.reduce((sum, stage) => sum + DEFAULT_STAGE_CAPS[stage], 0);
+    expect(capsOf(before)).toBeCloseTo(7.58);
+    expect(LEDGER_WHEN_FEEDBACK_OPENED + UNRECORDED_STAGE4_USD + capsOf(before)).toBeLessThanOrEqual(HARD_CEILING);
+    // The review of the second playthroughs opened its fix stages with the ledger at $37.99 (its stages before it had
+    // spent what they spent, not their caps): each fix capped at its estimate plus 30%, all of them fit with the $1.3 on top
+    expect(review).toEqual(["outcome-settled", "recorded-result", "lever-direction", "parallel-threads", "challenge-results"]);
+    expect(capsOf(review)).toBeCloseTo(1.3);
+    expect(LEDGER_WHEN_REVIEW_OPENED + UNRECORDED_STAGE4_USD + capsOf(review)).toBeLessThanOrEqual(HARD_CEILING);
     // A run's stage only spends its own cap
     const spend = spentByStage([{ stage: "plan-refresh", costUsd: 0.09 }]);
     const { caps: defaults } = resolveCaps({});

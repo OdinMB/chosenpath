@@ -55,7 +55,10 @@ export const EVAL_ROLES: EvalRole[] = ["setup", "beat", "switch", "thread", "ite
  * then parallel threads in one world and contests with both sides
  * (parallel-threads: the variant's switch planner beside production's on the
  * switches before a contest's last stage, and its chapter planner into its
- * group turn beside production's chains on the chapter openings).
+ * group turn beside production's chains on the chapter openings), then
+ * challenge and contest results that tell how the attempt turns out, not the
+ * player's approach (challenge-results: the variant's chapter planner beside
+ * production's on chapter plans of the second round's stored runs).
  * Their caps and reasons are in budget.ts.
  */
 export const FEEDBACK_STAGES = [
@@ -79,6 +82,7 @@ export const FEEDBACK_STAGES = [
   "recorded-result",
   "lever-direction",
   "parallel-threads",
+  "challenge-results",
 ] as const;
 export type FeedbackStage = (typeof FEEDBACK_STAGES)[number];
 export type Stage = "0" | "1-2" | "3" | "4" | "setup-rounds" | "turn-rounds" | "migration" | FeedbackStage;
@@ -253,6 +257,9 @@ const VARIANT_REFERENCE: Record<VariantId, VariantId | undefined> = {
   // The parallel-threads stage (2026-10-01, fix 4 of the review): the switch planner, chapter planner and group turn with
   // their lines, against production's, which run beside them (its chains against production's chains)
   parallelThreads: "adopted",
+  // The challenge-results stage (2026-10-01, fix 5 of the review): the chapter planner whose results and milestones say
+  // what comes of an approach, never the approach, against production's chapter planner, which runs beside it
+  resultsAsOutcomes: "adopted",
 };
 
 /**
@@ -582,9 +589,57 @@ export function armsFor(stage: Stage, role: EvalRole): ArmPlan[] {
       return leverDirectionArms(role);
     case "parallel-threads":
       return parallelThreadsArms(role);
+    case "challenge-results":
+      return challengeResultsArms(role);
     default:
       return [];
   }
+}
+
+/**
+ * The prompt state of the challenge-results stage (2026-10-01, fix 5 of the
+ * second playthroughs' review): production's own code since the
+ * parallel-threads stage's adoption (the switch planner's last-stage line;
+ * the chapter planner's requests are adopted11's byte for byte), under a tag
+ * of its own so production's chapter planner runs beside the variant in the
+ * same minutes.
+ */
+export const CHALLENGE_RESULTS_PROMPT_STATE = "adopted12";
+
+/**
+ * The stage's cases, built from the second round's stored runs
+ * (challengeResultsCases.ts, no calls), by player count: chapter plans whose
+ * challenge or contest results told how the player acts (most after a flavor
+ * switch, whose chosen approach they restate), and beside them ordinary ones
+ * whose results passed.
+ */
+export const CHALLENGE_RESULTS_CASES = {
+  single: ["round-results-lemonade-t2", "round-results-avalon-t2", "round-results-kids-mouse-t9", "round-results-avalon-t21", "round-results-kids-mouse-t2"],
+  groups: [
+    "round-results-food-trucks-t2",
+    "round-results-food-trucks-t6",
+    "round-results-food-trucks-t9",
+    "round-results-food-trucks-t21",
+    "round-results-space-pirates-t2",
+    "round-results-space-pirates-t19",
+    "round-results-space-pirates-t6",
+    "round-results-estate-agents-t2",
+    "round-results-estate-agents-t16",
+    "round-results-estate-agents-t23",
+  ],
+} as const;
+
+/**
+ * The challenge-results stage (the coordinator's fix 5 after the second
+ * playthroughs' review): production's chapter planner (adopted) and the
+ * variant (resultsAsOutcomes) on the planner model (Luna low, which the
+ * single-player and group planners share), twice on the stage's cases,
+ * interleaved, under adopted12.
+ */
+function challengeResultsArms(role: EvalRole): ArmPlan[] {
+  if (role !== "thread") return [];
+  const caseIds = [...CHALLENGE_RESULTS_CASES.single, ...CHALLENGE_RESULTS_CASES.groups];
+  return (["adopted", "resultsAsOutcomes"] as const).map((variant) => ({ arm: adoptedDefault("analysis", variant), samples: 2, scope: "all" as const, caseIds }));
 }
 
 /**
@@ -1118,6 +1173,7 @@ const INTERLEAVED_STAGES: Stage[] = [
   "recorded-result",
   "lever-direction",
   "parallel-threads",
+  "challenge-results",
 ];
 
 export function stageInterleavesArms(stage: Stage): boolean {
@@ -1165,6 +1221,9 @@ const CASE_FIRST_STAGE: ReadonlyMap<string, Stage> = new Map([
   // The parallel-threads stage's switch plans and chapter openings from the second playthroughs (2026-10-01), frozen after
   // every earlier stage had closed
   ...[...PARALLEL_THREADS_CASES.switches, ...PARALLEL_THREADS_CASES.chapters].map((id): [string, Stage] => [id, "parallel-threads"]),
+  // The challenge-results stage's chapter plans from the second playthroughs (2026-10-01), frozen after every earlier stage
+  // had closed
+  ...[...CHALLENGE_RESULTS_CASES.single, ...CHALLENGE_RESULTS_CASES.groups].map((id): [string, Stage] => [id, "challenge-results"]),
 ]);
 
 /** Whether a stage may plan a case: any case but one frozen for a later stage (CASE_FIRST_STAGE). */

@@ -2,6 +2,7 @@ import { CONTEST_LAST_STAGE_LINE } from "../../game/services/prompts/SwitchPromp
 import type { EvalCase } from "./cases.js";
 import { choiceResultCases, productionSends, type ChoiceCaseSpec, type PromptHashOf, type SentRequestText } from "./choiceResultCases.js";
 import type { PlayRun } from "./playthroughs.js";
+import { requestFor, requestText } from "./variants.js";
 
 /*
  * The parallel-threads stage's cases (2026-10-01, fix 4 of the second
@@ -67,16 +68,28 @@ const CATEGORY = "parallel-threads";
 /**
  * What production sent in the second round of playthroughs: today's request,
  * but for the switch planner's last-stage line, which the stage's run led
- * production to adopt (2026-10-01) and which no switch of that round carried.
+ * production to adopt (2026-10-01) and which no switch of that round carried;
+ * and for the chapter planner, planner v2f as measured (production byte for
+ * byte until the challenge-results stage's adoption of 2026-10-01, whose edits
+ * no chapter plan of that round carried).
  */
 export const playthroughs2Sent: SentRequestText = (input) => {
+  if (input.role === "thread") return requestText(requestFor("planV2f", input));
   const sent = productionSends(input);
   return input.role === "switch" ? sent.split(CONTEST_LAST_STAGE_LINE).join("") : sent;
 };
 
-/** The stage's cases from the second round's stored runs, each only where its request is the one the run sent; and what could not be built. */
-export function parallelThreadsCases(runs: PlayRun[], promptHashOf: PromptHashOf, specs: ChoiceCaseSpec[] = PARALLEL_THREADS_CASE_SPECS): { cases: EvalCase[]; problems: string[] } {
-  return choiceResultCases(runs, promptHashOf, specs, playthroughs2Sent, CATEGORY);
+/**
+ * The stage's cases from the second round's stored runs, each only where its request is the one the run sent; and what
+ * could not be built. A run played through today's code (the tests' fake runs) sent productionSends.
+ */
+export function parallelThreadsCases(
+  runs: PlayRun[],
+  promptHashOf: PromptHashOf,
+  specs: ChoiceCaseSpec[] = PARALLEL_THREADS_CASE_SPECS,
+  sent: SentRequestText = playthroughs2Sent
+): { cases: EvalCase[]; problems: string[] } {
+  return choiceResultCases(runs, promptHashOf, specs, sent, CATEGORY);
 }
 
 /** What --build-parallel-cases freezes: every built case not frozen yet (all of them when rebuilding), and what was left as frozen. */
@@ -85,9 +98,10 @@ export function parallelThreadsCasesToFreeze(
   runs: PlayRun[],
   promptHashOf: PromptHashOf,
   replace: boolean,
-  specs: ChoiceCaseSpec[] = PARALLEL_THREADS_CASE_SPECS
+  specs: ChoiceCaseSpec[] = PARALLEL_THREADS_CASE_SPECS,
+  sent: SentRequestText = playthroughs2Sent
 ): { cases: EvalCase[]; problems: string[]; skipped: string[] } {
-  const { cases, problems } = parallelThreadsCases(runs, promptHashOf, specs);
+  const { cases, problems } = parallelThreadsCases(runs, promptHashOf, specs, sent);
   const known = new Set(frozen.map((c) => c.id));
   const skipped = replace ? [] : cases.filter((c) => known.has(c.id)).map((c) => c.id);
   return { cases: cases.filter((c) => !skipped.includes(c.id)), problems, skipped };

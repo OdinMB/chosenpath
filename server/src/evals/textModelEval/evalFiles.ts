@@ -40,6 +40,7 @@ import type { CallRecord } from "./runner.js";
  *   judged-recorded.md|json  the recorded-result stage's judged check, the turn after an exploration step told as recorded (--judge-recorded)
  *   judged-levers.md|json  the lever-direction stage's judged check, every sacrifice costing and every reward helping (--judge-levers)
  *   judged-parallel.md|json  the parallel-threads stage's judged check and plan readings, people and places across the players' texts (--judge-parallel)
+ *   judged-challenge-results.md|json  the challenge-results stage's judged check, results against their kind, and the second round's stored readings against the hand (--judge-challenge-results)
  *   setup-chain.md|json    setup round 3's setup-to-play chain (--setup-chain)
  *   playthroughs.md|json   the whole-story playthroughs on production's own code (--playthroughs)
  *   stories/<id>.html, stories/index.html  each played story as a page for the owner (--playthroughs)
@@ -173,6 +174,11 @@ export function evalFiles(outDir: string) {
     writeJudgedParallel: (markdown: string, json: unknown) => {
       writeJson(at("judged-parallel.json"), json);
       fs.writeFileSync(at("judged-parallel.md"), markdown);
+    },
+    /** The challenge-results stage's judged check, results against their kind on the stage's plans (--judge-challenge-results, challengeResultsPrep.ts) */
+    writeJudgedChallengeResults: (markdown: string, json: unknown) => {
+      writeJson(at("judged-challenge-results.json"), json);
+      fs.writeFileSync(at("judged-challenge-results.md"), markdown);
     },
     /** The choice-line-sp stage's report: each turn read whole, production's retry in the loop (--choice-line-sp, choiceLinePrep.ts) */
     writeChoiceLine: (markdown: string, json: unknown) => {
